@@ -38,7 +38,9 @@
                     "dynamic_parent_node_children_dynamic",
                     "mixed_tree_only_dynamic_reuploaded",
                     "reparent_between_storages_requeues_subtree",
-                    "delete_parent_node_frees_slots"
+                    "delete_parent_node_frees_slots",
+                    "instance_color_is_the_composed_tint",
+                    "tinted_opaque_entity_stays_static"
                 ],
                 "setup": true,
                 "teardown": true
@@ -149,7 +151,7 @@
                 "id": "Material",
                 "testcases": [
                     "tint_resolves_to_children",
-                    "child_with_own_tint_keeps_it",
+                    "child_tint_composes_with_the_parent",
                     "tint_removed_falls_back_to_parent",
                     "new_child_inherits_tint",
                     "instance_color_uses_tint_and_opacity",
@@ -157,11 +159,25 @@
                     "pbr_defaults",
                     "tint_resolves_through_parent_component",
                     "tint_change_propagates_through_parent",
-                    "parent_child_with_own_tint_keeps_it",
+                    "parent_child_tint_composes_with_the_parent",
                     "new_parent_child_inherits_tint",
                     "tint_resolves_through_mixed_tree",
                     "tint_removed_falls_back_through_parent",
-                    "tint_follows_reparent_between_storages"
+                    "tint_follows_reparent_between_storages",
+                    "tint_mix_at_zero_keeps_the_color",
+                    "tint_mix_at_half_blends_the_color",
+                    "tint_mix_at_full_replaces_the_color",
+                    "tint_composes_two_levels",
+                    "tint_composes_three_levels",
+                    "child_tint_over_an_untinted_parent",
+                    "root_tint_change_recomposes_the_subtree",
+                    "middle_tint_change_recomposes_below_it",
+                    "tint_removed_restores_the_ancestor_result",
+                    "tint_composes_through_a_childof_chain",
+                    "tint_composes_through_a_parent_chain",
+                    "tint_composes_with_childof_under_parent",
+                    "tint_composes_with_parent_under_childof",
+                    "tint_composition_survives_a_reparent"
                 ],
                 "setup": true,
                 "teardown": true
@@ -276,7 +292,7 @@
                     "blend_mode_moves_to_the_sorted_list",
                     "opacity_moves_to_the_sorted_list",
                     "full_opacity_stays_in_its_batch",
-                    "tint_alpha_moves_to_the_sorted_list",
+                    "tint_alpha_stays_in_its_batch",
                     "translucent_opaque_mode_blends_as_alpha",
                     "back_face_mode_moves_to_the_sorted_list",
                     "back_face_modes_reach_the_packet",

@@ -92,7 +92,7 @@ void Blending_full_opacity_stays_in_its_batch(void)
     test_int(packet.static_updates.count, 1);
 }
 
-void Blending_tint_alpha_moves_to_the_sorted_list(void)
+void Blending_tint_alpha_stays_in_its_batch(void)
 {
     // materials/blending
     ecs_entity_t e = ecs_new(w);
@@ -100,10 +100,10 @@ void Blending_tint_alpha_moves_to_the_sorted_list(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_set(w, e, Tint, {255, 255, 255, 128});
     box_render_extract(w, &packet);
-    test_int(packet.static_updates.count, 0);
-    test_int(packet.transparent.count, 1);
-    box_transparent_t *entry = box_vec_at(&packet.transparent, 0);
-    test_assert(fabsf(entry->data.color[3] - 128.0f / 255.0f) < 1e-5f);
+    test_int(packet.transparent.count, 0);
+    test_int(packet.static_updates.count, 1);
+    box_static_update_t *entry = box_vec_at(&packet.static_updates, 0);
+    test_flt(entry->data.color[3], 1.0f);
 }
 
 void Blending_translucent_opaque_mode_blends_as_alpha(void)
@@ -477,3 +477,4 @@ void Blending_translucent_count_covers_the_alpha_blended_instances(void)
     test_int(packet.view.transparent_count, 3);
     test_int(packet.view.translucent_count, 2);
 }
+

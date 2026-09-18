@@ -583,3 +583,45 @@ void Extract_delete_parent_node_frees_slots(void)
     test_int(((box_static_count_t*)box_vec_at(&packet.static_counts, 0))->count, 1);
     test_int(ecs_get(w, root, RenderInstance)->slot, 0);
 }
+
+void Extract_instance_color_is_the_composed_tint(void)
+{
+    // materials/tint_compose
+    ecs_entity_t parent = ecs_new(w);
+    ecs_set(w, parent, Tint, {0, 0, 255, 128});
+    ecs_entity_t e = ecs_new_w_pair(w, EcsChildOf, parent);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    ecs_set(w, e, Rgb, {255, 255, 255});
+    ecs_set(w, e, Tint, {0, 0, 0, 128});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    float strength = 192.0f / 255.0f;
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_assert(fabsf(u->data.color[0] - (1.0f - strength)) < 1e-5f);
+    test_assert(fabsf(u->data.color[1] - (1.0f - strength)) < 1e-5f);
+    test_assert(fabsf(u->data.color[2] -
+        (1.0f + (85.0f / 255.0f - 1.0f) * strength)) < 1e-5f);
+    test_flt(u->data.color[3], 1.0f);
+}
+
+void Extract_tinted_opaque_entity_stays_static(void)
+{
+    // materials/tint_compose
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    ecs_set(w, e, Rgb, {255, 255, 255});
+    ecs_set(w, e, Tint, {0, 0, 255, 128});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.transparent.count, 0);
+    test_int(packet.static_updates.count, 1);
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.color[3], 1.0f);
+    test_bool(ecs_get(w, e, RenderInstance)->transparent, false);
+}
