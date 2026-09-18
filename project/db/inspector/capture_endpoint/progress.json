@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:36:31.135+00:00",
   "start_time": "2026-09-18T08:37:25.671+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T08:47:04.767+00:00",
   "dependencies": [
     "inspector/wasm_request",
     "command/capture"

@@ -1,0 +1,19 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T08:46:56Z",
+  "pass": 9,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.057829,
+  "tests": [
+    {"suite": "CaptureEndpoint", "case": "unknown_session_gives_404", "status": "pass", "elapsed": 0.015864},
+    {"suite": "CaptureEndpoint", "case": "unknown_camera_gives_400", "status": "pass", "elapsed": 0.015607},
+    {"suite": "CaptureEndpoint", "case": "without_camera_gives_400", "status": "pass", "elapsed": 0.013806},
+    {"suite": "CaptureEndpoint", "case": "first_request_sets_capture", "status": "pass", "elapsed": 0.015059},
+    {"suite": "CaptureEndpoint", "case": "second_request_keeps_the_capture", "status": "pass", "elapsed": 0.015322},
+    {"suite": "CaptureEndpoint", "case": "named_camera", "status": "pass", "elapsed": 0.015536},
+    {"suite": "CaptureEndpoint", "case": "reply_allows_any_origin", "status": "pass", "elapsed": 0.014932},
+    {"suite": "CaptureEndpoint", "case": "preflight_lists_methods", "status": "pass", "elapsed": 0.015253},
+    {"suite": "CaptureEndpoint", "case": "headless_run_returns_the_png", "status": "pass", "elapsed": 0.043868}
+  ]
+}
