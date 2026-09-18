@@ -1,0 +1,226 @@
+{
+  "project": "box_inspector",
+  "timestamp": "2026-09-18T09:53:33Z",
+  "pass": 36,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.006737,
+  "tests": [
+    {
+      "suite": "Reply",
+      "case": "parses_status_type_and_body",
+      "status": "pass",
+      "elapsed": 0.000051
+    },
+    {
+      "suite": "Reply",
+      "case": "keeps_newlines_in_the_body",
+      "status": "pass",
+      "elapsed": 0.000011
+    },
+    {
+      "suite": "Reply",
+      "case": "error_status_survives",
+      "status": "pass",
+      "elapsed": 0.000007
+    },
+    {
+      "suite": "Reply",
+      "case": "malformed_reply_is_text",
+      "status": "pass",
+      "elapsed": 0.000007
+    },
+    {
+      "suite": "Reply",
+      "case": "base64_image_becomes_a_data_url",
+      "status": "pass",
+      "elapsed": 0.000035
+    },
+    {
+      "suite": "Http",
+      "case": "text_reply_carries_status_and_body",
+      "status": "pass",
+      "elapsed": 0.000144
+    },
+    {
+      "suite": "Http",
+      "case": "trailing_slash_is_trimmed",
+      "status": "pass",
+      "elapsed": 0.000031
+    },
+    {
+      "suite": "Http",
+      "case": "png_reply_becomes_an_object_url",
+      "status": "pass",
+      "elapsed": 0.000047
+    },
+    {
+      "suite": "Http",
+      "case": "error_status_is_reported",
+      "status": "pass",
+      "elapsed": 0.000018
+    },
+    {
+      "suite": "Http",
+      "case": "body_is_posted_as_text_plain",
+      "status": "pass",
+      "elapsed": 0.000022
+    },
+    {
+      "suite": "Wasm",
+      "case": "routes_method_path_and_body",
+      "status": "pass",
+      "elapsed": 0.000054
+    },
+    {
+      "suite": "Wasm",
+      "case": "text_reply_is_parsed",
+      "status": "pass",
+      "elapsed": 0.000015
+    },
+    {
+      "suite": "Wasm",
+      "case": "png_reply_becomes_a_data_url",
+      "status": "pass",
+      "elapsed": 0.000016
+    },
+    {
+      "suite": "Wasm",
+      "case": "unknown_endpoint_gives_404",
+      "status": "pass",
+      "elapsed": 0.000012
+    },
+    {
+      "suite": "Wasm",
+      "case": "module_name_comes_from_the_url",
+      "status": "pass",
+      "elapsed": 0.000049
+    },
+    {
+      "suite": "Paths",
+      "case": "exec_uses_get_with_an_encoded_command",
+      "status": "pass",
+      "elapsed": 0.00002
+    },
+    {
+      "suite": "Paths",
+      "case": "long_command_falls_back_to_post",
+      "status": "pass",
+      "elapsed": 0.000013
+    },
+    {
+      "suite": "Paths",
+      "case": "bare_clear_is_handled_by_the_page",
+      "status": "pass",
+      "elapsed": 0.000012
+    },
+    {
+      "suite": "Paths",
+      "case": "capture_takes_an_optional_camera",
+      "status": "pass",
+      "elapsed": 0.000011
+    },
+    {
+      "suite": "Paths",
+      "case": "resource_lines_are_detected",
+      "status": "pass",
+      "elapsed": 0.000608
+    },
+    {
+      "suite": "Paths",
+      "case": "resource_path_carries_the_session",
+      "status": "pass",
+      "elapsed": 0.000027
+    },
+    {
+      "suite": "Paths",
+      "case": "resource_is_retried_until_it_is_ready",
+      "status": "pass",
+      "elapsed": 0.000112
+    },
+    {
+      "suite": "Paths",
+      "case": "resource_gives_up_after_the_last_attempt",
+      "status": "pass",
+      "elapsed": 0.000038
+    },
+    {
+      "suite": "Paths",
+      "case": "frame_is_read_from_get_app",
+      "status": "pass",
+      "elapsed": 0.00005
+    },
+    {
+      "suite": "Session",
+      "case": "connect_creates_a_session",
+      "status": "pass",
+      "elapsed": 0.000054
+    },
+    {
+      "suite": "Session",
+      "case": "failed_new_is_an_error",
+      "status": "pass",
+      "elapsed": 0.00004
+    },
+    {
+      "suite": "Session",
+      "case": "exec_runs_on_the_session",
+      "status": "pass",
+      "elapsed": 0.000044
+    },
+    {
+      "suite": "Session",
+      "case": "disconnect_closes_the_session",
+      "status": "pass",
+      "elapsed": 0.000035
+    },
+    {
+      "suite": "Console",
+      "case": "up_walks_back_and_down_walks_forward",
+      "status": "pass",
+      "elapsed": 0.000039
+    },
+    {
+      "suite": "Console",
+      "case": "push_resets_the_cursor_and_skips_repeats",
+      "status": "pass",
+      "elapsed": 0.000024
+    },
+    {
+      "suite": "Console",
+      "case": "history_is_capped",
+      "status": "pass",
+      "elapsed": 0.000013
+    },
+    {
+      "suite": "Console",
+      "case": "history_survives_a_broken_store",
+      "status": "pass",
+      "elapsed": 0.000048
+    },
+    {
+      "suite": "Console",
+      "case": "store_round_trips",
+      "status": "pass",
+      "elapsed": 0.000031
+    },
+    {
+      "suite": "Query",
+      "case": "http_parameter_preconnects",
+      "status": "pass",
+      "elapsed": 0.000049
+    },
+    {
+      "suite": "Query",
+      "case": "wasm_parameter_carries_a_scene",
+      "status": "pass",
+      "elapsed": 0.000022
+    },
+    {
+      "suite": "Query",
+      "case": "no_parameters_means_no_preconnect",
+      "status": "pass",
+      "elapsed": 0.000011
+    }
+  ]
+}
