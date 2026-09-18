@@ -167,7 +167,8 @@
                     "reload_reextracts_dependents",
                     "deleting_a_texture_unbinds_and_warns",
                     "missing_file_leaves_no_handle",
-                    "kept_source_pixels_survive_the_upload"
+                    "kept_source_pixels_survive_the_upload",
+                    "row_zero_is_the_bottom_of_the_file"
                 ],
                 "setup": true,
                 "teardown": true
@@ -181,7 +182,8 @@
                     "resize_rerasterizes",
                     "removing_the_component_destroys_the_handle",
                     "handle_reaches_a_pbr_slot",
-                    "texture_and_svg_is_an_error"
+                    "texture_and_svg_is_an_error",
+                    "row_zero_is_the_bottom_of_the_image"
                 ],
                 "setup": true,
                 "teardown": true

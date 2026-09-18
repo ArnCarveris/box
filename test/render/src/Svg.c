@@ -10,6 +10,11 @@
 #include <string.h>
 #include "../../../src/texture/texture_internal.h"
 
+static const char *svg_halves =
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"
+    "<rect x=\"0\" y=\"0\" width=\"64\" height=\"32\" fill=\"#ff0000\"/>"
+    "<rect x=\"0\" y=\"32\" width=\"64\" height=\"32\" fill=\"#0000ff\"/></svg>";
+
 static const char *svg_circle =
     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\">"
     "<circle cx=\"32\" cy=\"32\" r=\"30\" fill=\"#ff0000\"/></svg>";
@@ -226,4 +231,23 @@ void Svg_texture_and_svg_is_an_error(void)
     ecs_set(w, t, Texture, { .path = ecs_os_strdup("/tmp/box_test_svg_conflict.png") });
     test_int(svg_errors, 1);
     test_int(ecs_get(w, t, RenderTexture)->handle, handle);
+}
+
+void Svg_row_zero_is_the_bottom_of_the_image(void)
+{
+    // textures/uv_orientation
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_halves), .width = 2, .height = 2 });
+    box_render_extract(w, &packet);
+    test_int(packet.texture_create.count, 1);
+    box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
+    test_int(cmd->width, 256);
+    test_int(cmd->pixels[0], 0);
+    test_int(cmd->pixels[1], 0);
+    test_int(cmd->pixels[2], 255);
+    const uint8_t *top = cmd->pixels + ((size_t)255 * 256) * 4;
+    test_int(top[0], 255);
+    test_int(top[1], 0);
+    test_int(top[2], 0);
+    test_int(svg_errors, 0);
 }

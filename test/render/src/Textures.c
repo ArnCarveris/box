@@ -363,3 +363,37 @@ void Textures_kept_source_pixels_survive_the_upload(void)
     test_int(impl->source_width, 64);
     test_int(impl->source_height, 64);
 }
+
+void Textures_row_zero_is_the_bottom_of_the_file(void)
+{
+    // textures/uv_orientation
+    const char *path = "/tmp/box_test_tex_orientation.png";
+    static uint8_t pixels[2 * 2 * 4];
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        pixels[i * 4 + 0] = 255;
+        pixels[i * 4 + 1] = 0;
+        pixels[i * 4 + 2] = 0;
+        pixels[i * 4 + 3] = 255;
+        pixels[(2 + i) * 4 + 0] = 0;
+        pixels[(2 + i) * 4 + 1] = 0;
+        pixels[(2 + i) * 4 + 2] = 255;
+        pixels[(2 + i) * 4 + 3] = 255;
+    }
+
+    test_int(box_image_write_png(path, 2, 2, 2 * 4, pixels), 0);
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Texture, { .path = ecs_os_strdup(path) });
+    box_render_extract(w, &packet);
+    test_int(packet.texture_create.count, 1);
+    box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
+    test_int(cmd->width, 256);
+    test_int(cmd->pixels[0], 0);
+    test_int(cmd->pixels[1], 0);
+    test_int(cmd->pixels[2], 255);
+    const uint8_t *top = cmd->pixels + ((size_t)255 * 256) * 4;
+    test_int(top[0], 255);
+    test_int(top[1], 0);
+    test_int(top[2], 0);
+    test_int(texture_errors, 0);
+}
