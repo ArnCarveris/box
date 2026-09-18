@@ -723,7 +723,12 @@ function loadWasm(url, scene) {
         printErr: function (text) { console.error(text); }
       }).then(function (Module) {
         window.Module = Module;
+        var exported = typeof Module._box_request === "function";
         window.boxRequest = function (method, path, body) {
+          if (!exported) {
+            return "501\ntext/plain\nthis image predates the box_request export: " +
+              "it renders live but has no console";
+          }
           return Module.ccall("box_request", "string",
             ["string", "string", "string"], [method, path, body || ""]);
         };
