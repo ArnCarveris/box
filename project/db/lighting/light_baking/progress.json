@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:13.517+00:00",
   "start_time": "2026-09-18T10:45:52.852+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T11:21:54.404+00:00",
   "dependencies": [
     "lighting/clustered_forward"
   ]
