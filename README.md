@@ -147,6 +147,12 @@ A terminal drives both layers with the `key.*`, `mouse.*`, `input.*` and `action
 which queue injected events over frames; `test/integration/command/input.flecs` types, clicks
 and drags through them.
 
+`CameraController` from `box.controller` flies a camera with the `Forward`, `Back`, `Left`,
+`Right`, `Up`, `Down`, `Fast` and `Look` actions the module binds to WASD, QE, shift and the
+right mouse button under `box.input.map`; it writes `Position`, `Orientation` and `LookAt`,
+turns with the cursor while the surface captures it, and keeps `clearance` above the bounds of
+its `terrain` entity.
+
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
 rasterization and light baking stay off the frame; `JobStats` reports the queue.
@@ -169,7 +175,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, job, input, script
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, job, input, controller, script
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered

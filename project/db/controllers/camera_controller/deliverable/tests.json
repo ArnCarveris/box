@@ -1,0 +1,25 @@
+{
+  "project": "controller",
+  "timestamp": "2026-09-18T21:55:59Z",
+  "pass": 15,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.033379,
+  "tests": [
+    {"suite": "Camera", "case": "the_module_binds_the_movement_actions", "status": "pass", "elapsed": 0.016553},
+    {"suite": "Camera", "case": "forward_moves_along_the_view", "status": "pass", "elapsed": 0.016772},
+    {"suite": "Camera", "case": "back_moves_against_the_view", "status": "pass", "elapsed": 0.016764},
+    {"suite": "Camera", "case": "strafing_moves_sideways", "status": "pass", "elapsed": 0.017113},
+    {"suite": "Camera", "case": "up_and_down_move_the_height", "status": "pass", "elapsed": 0.016878},
+    {"suite": "Camera", "case": "the_fast_modifier_multiplies_the_speed", "status": "pass", "elapsed": 0.016893},
+    {"suite": "Camera", "case": "the_mouse_turns_the_camera_while_captured", "status": "pass", "elapsed": 0.016814},
+    {"suite": "Camera", "case": "the_mouse_is_ignored_without_capture", "status": "pass", "elapsed": 0.016491},
+    {"suite": "Camera", "case": "the_look_action_turns_without_capture", "status": "pass", "elapsed": 0.016402},
+    {"suite": "Camera", "case": "sensitivity_scales_the_turn", "status": "pass", "elapsed": 0.016408},
+    {"suite": "Camera", "case": "pitch_stops_short_of_straight_down", "status": "pass", "elapsed": 0.016064},
+    {"suite": "Camera", "case": "yaw_turns_the_movement_with_the_view", "status": "pass", "elapsed": 0.016122},
+    {"suite": "Camera", "case": "clearance_keeps_the_camera_above_the_terrain", "status": "pass", "elapsed": 0.016368},
+    {"suite": "Camera", "case": "a_scene_rebinds_an_action", "status": "pass", "elapsed": 0.015985},
+    {"suite": "Camera", "case": "the_controller_writes_orientation_and_lookat", "status": "pass", "elapsed": 0.015990}
+  ]
+}
