@@ -82,10 +82,25 @@ void box_render_instance_init(
  * @param inst Its instance record
  * @return True when the record names a live slot of the entity
  */
-bool box_render_has_slot(
+static inline bool box_render_has_slot(
     const RenderState *state,
     ecs_entity_t e,
-    const RenderInstance *inst);
+    const RenderInstance *inst)
+{
+    bool result = false;
+    if (inst->dynamic || inst->mesh >= (uint32_t)ecs_vec_count(&state->batches)) {
+        goto done;
+    }
+
+    const box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst->mesh);
+    if (inst->slot >= (uint32_t)ecs_vec_count(&batch->entities)) {
+        goto done;
+    }
+
+    result = ecs_vec_get_t(&batch->entities, ecs_entity_t, (int32_t)inst->slot)[0] == e;
+done:
+    return result;
+}
 
 /** Take an entity out of its static batch.
  *
