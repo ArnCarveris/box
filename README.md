@@ -134,6 +134,12 @@ exported as script constants under `keys` (`keys.W`, `keys.MouseLeft`).
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
 rasterization and light baking stay off the frame; `JobStats` reports the queue.
 
+`apps/box_app/etc/scenes/templates.flecs` is the incremental loading demo: a ground
+that appears at once and 4096 instances of a `Pillar` template that `box.script`
+expands over frames, nearest to the camera first, inside the `ScriptSettings`
+budget (`templates_per_frame`, `budget_ms`, `nearest_first`, `enabled`) while
+`ScriptStats` reports the queue and the worst frame.
+
 `CpuMonitor`, `EcsStats` and `SystemMonitor` from `box.monitor` publish process
 and machine CPU usage, the flecs statistics addon and the per system frame
 breakdown as components; a source is only sampled while its singleton exists,
@@ -146,7 +152,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, command, job, input
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, command, job, input, script
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
