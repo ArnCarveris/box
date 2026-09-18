@@ -1,0 +1,130 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T06:48:30Z",
+  "pass": 20,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.267992,
+  "tests": [
+    {
+      "suite": "render.Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.016326
+    },
+    {
+      "suite": "render.Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.016193
+    },
+    {
+      "suite": "render.Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.016382
+    },
+    {
+      "suite": "render.Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.016212
+    },
+    {
+      "suite": "render.Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.016345
+    },
+    {
+      "suite": "render.Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.016226
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.01635
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.016397
+    },
+    {
+      "suite": "render.Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.012298
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.012809
+    },
+    {
+      "suite": "render.Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.012602
+    },
+    {
+      "suite": "render.Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.012176
+    },
+    {
+      "suite": "render.Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.01231
+    },
+    {
+      "suite": "render.Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.012477
+    },
+    {
+      "suite": "render.Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.012487
+    },
+    {
+      "suite": "render.Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.012095
+    },
+    {
+      "suite": "render.Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.012566
+    },
+    {
+      "suite": "render.Movement",
+      "case": "velocity_integrates_position",
+      "status": "pass",
+      "elapsed": 0.009065
+    },
+    {
+      "suite": "render.Movement",
+      "case": "angular_velocity_integrates_rotation",
+      "status": "pass",
+      "elapsed": 0.008667
+    },
+    {
+      "suite": "render.Movement",
+      "case": "velocity_marks_dynamic",
+      "status": "pass",
+      "elapsed": 0.008009
+    }
+  ]
+}

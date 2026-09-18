@@ -1,0 +1,13 @@
+{
+  "scene": "../../test/integration/bench/material_100k.flecs",
+  "entities": 110000,
+  "static": 110000,
+  "dynamic": 0,
+  "churn": [1, 1000],
+  "frames": 300,
+  "mean_ms": 1.232,
+  "p50_ms": 1.225,
+  "p99_ms": 2.580,
+  "max_ms": 2.732,
+  "fps": 811.8
+}
