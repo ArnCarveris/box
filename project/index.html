@@ -388,6 +388,7 @@ const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench", pla
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
 let saveTimer = 0, panelTimer = 0, searchTimer = 0, restoring = false;
+let panelKey = "";
 const ICONS = {
   complete: '<svg viewBox="0 0 10 10"><path d="M1.5 5.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   "in progress": '<svg viewBox="0 0 10 10"><path d="M2 1.5v7l6-3.5z" fill="currentColor"/></svg>',
@@ -590,6 +591,7 @@ function renderBoard() {
 }
 
 function closePanel() {
+  panelKey = "";
   const panel = document.getElementById("panel");
   panel.classList.remove("open");
   clearTimeout(panelTimer);
@@ -613,7 +615,7 @@ function openPanel(path) {
       ${t ? `<span class="tests"><b class="ok">${t.pass}</b>${t.fail ? `<b class="bad">${t.fail}</b>` : ""}${t.empty ? `<b class="empty">${t.empty}</b>` : ""}</span>` : `<span style="color:var(--ink-3);font-size:11px">${(d.size / 1024).toFixed(1)} KB</span>`}
       </li>${img ? `<li style="display:block;border:0;padding:0"><img src="${esc(d.url)}" alt="${esc(d.name)}"></li>` : ""}`;
   }).join("");
-  panel.innerHTML = `
+  const html = `
     <button class="close icon-btn" id="close">✕</button>
     <div class="path">${esc(item.level)} · ${esc(item.path)}</div>
     <h1>${esc(item.readme.title || item.name)}</h1>
@@ -629,6 +631,10 @@ function openPanel(path) {
     ${item.children.length ? `<h2>${item.children[0].level}s</h2><ul class="subtasks">${item.children.map(s => `
       <li class="${cls(s.status)}" data-item="${esc(s.path)}"><span class="dot ${cls(s.status)}"></span><span class="t">${esc(s.readme.title || s.name)}</span><time>${s.start_time ? dur(s.start_time, s.end_time) : ""}</time></li>`).join("")}</ul>` : ""}`;
   clearTimeout(panelTimer);
+  const key = path + "\n" + html;
+  if (key === panelKey && !panel.hidden) { panel.classList.add("open"); return; }
+  panelKey = key;
+  panel.innerHTML = html;
   if (panel.hidden) { panel.hidden = false; void panel.offsetWidth; }
   panel.classList.add("open");
   restoreScroll(panel, state.scroll.panel);
@@ -643,6 +649,7 @@ function openPanel(path) {
     div.className = "readme-deliverable md";
     div.innerHTML = `<h2>Completion report</h2>` + markdown(t);
     panel.querySelector(".deliverables")?.after(div);
+    restoreScroll(panel, state.scroll.panel);
   });
 }
 
