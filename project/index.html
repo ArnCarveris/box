@@ -203,11 +203,22 @@ td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color:
 .chart { display: flex; flex-direction: column; gap: 6px; }
 .chart svg { display: block; max-width: 100%; overflow: visible; }
 .chart .ax { fill: var(--ink-3); font-size: 10px; }
-.chart .ax-title { fill: var(--ink-3); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.chart .ax-title { fill: var(--ink-3); font-size: 10px; letter-spacing: .04em; }
 .chart .grid { stroke: var(--border); stroke-width: 1; }
 .chart .hit { fill: transparent; cursor: default; }
+.spark { display: block; }
+.spark-cell { width: 92px; }
+.tw { display: inline-block; width: 14px; color: var(--ink-2); font-size: 11px; }
+td .dot { display: inline-block; vertical-align: middle; margin-right: 4px; }
+tr.exp > td { background: var(--surface-2); padding: 8px 12px 12px; box-shadow: inset 2px 0 0 var(--accent); }
+table.data.sub { margin: 2px 0 8px; }
+table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
+.sub-note { color: var(--ink-3); font-size: 11px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend span, .legend button { display: inline-flex; align-items: center; gap: 6px; }
+.legend button { padding: 1px 5px; border-radius: 5px; color: var(--ink-2); }
+.legend button:hover { background: var(--surface-2); color: var(--ink); }
+.legend button.off { opacity: .45; text-decoration: line-through; }
 .tooltip {
   position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 6px;
   font-size: 12px; z-index: 20; display: none; white-space: nowrap; box-shadow: var(--shadow);
@@ -253,7 +264,8 @@ td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color:
 
 <script>
 const state = {
-  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, suite: null, scene: null,
+  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
+  suites: [], benchSuites: [], hidden: {},
   scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0 },
 };
 const VIEWS = ["board", "timeline", "tests", "benchmarks"];
@@ -283,7 +295,7 @@ function saveUi() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
-      suite: state.suite, scene: state.scene,
+      suites: state.suites, benchSuites: state.benchSuites, hidden: state.hidden, scene: state.scene,
     }));
   } catch (e) {}
 }
@@ -300,7 +312,10 @@ function loadUi() {
   if (VIEWS.includes(saved.view)) state.view = saved.view;
   if (saved.epic) state.epic = saved.epic;
   if (saved.item) state.item = saved.item;
-  if (saved.suite) state.suite = saved.suite;
+  if (Array.isArray(saved.suites)) state.suites = saved.suites;
+  else if (saved.suite) state.suites = [saved.suite];
+  if (Array.isArray(saved.benchSuites)) state.benchSuites = saved.benchSuites;
+  if (saved.hidden && typeof saved.hidden === "object") state.hidden = saved.hidden;
   if (saved.scene) state.scene = saved.scene;
   if (saved.zoom > 0) state.zoom = saved.zoom;
   if (saved.scroll) Object.assign(state.scroll, saved.scroll);
@@ -580,16 +595,36 @@ function chartWidth(el) {
   return Math.max(320, (el.clientWidth || 900) - 74);
 }
 
+function seriesDash(i) {
+  return i >= SERIES.length * 2 ? "2 3" : i >= SERIES.length ? "6 4" : null;
+}
+
+function nsUnit(max) {
+  if (max >= 1e9) return { div: 1e9, unit: "s" };
+  if (max >= 1e6) return { div: 1e6, unit: "ms" };
+  if (max >= 1e3) return { div: 1e3, unit: "µs" };
+  return { div: 1, unit: "ns" };
+}
+
+function nsText(v) {
+  if (v == null) return "—";
+  const u = nsUnit(Math.abs(v));
+  return +(v / u.div).toPrecision(4) + " " + u.unit;
+}
+
 function lineChart(spec) {
-  const series = (spec.series || []).filter(s => s.points.length);
-  if (!series.length) return `<div class="chart"><div class="empty-state">No data points</div></div>`;
+  const all = (spec.series || []).filter(s => s.points.length);
+  if (!all.length) return `<div class="chart"><div class="empty-state">No data points</div></div>`;
+  const shown = all.filter(s => !s.hidden);
+  const scale = shown.length ? shown : all;
   const w = spec.width, h = spec.height || 210;
   const pad = { l: 56, r: 18, t: 22, b: 40 };
   const iw = Math.max(120, w - pad.l - pad.r), ih = Math.max(70, h - pad.t - pad.b);
-  const ts = series.flatMap(s => s.points.map(p => p.t));
+  const ts = scale.flatMap(s => s.points.map(p => p.t));
   let t0 = Math.min(...ts), t1 = Math.max(...ts);
   if (t1 - t0 < 6e5) { t0 -= 9e5; t1 += 9e5; }
-  const ticks = niceTicks(Math.max(...series.flatMap(s => s.points.map(p => p.v)), 0), 4);
+  const values = scale.flatMap(s => s.points.map(p => p.v).concat((s.band || []).map(b => b.hi)));
+  const ticks = niceTicks(Math.max(...values, 0), 4);
   const top = ticks[ticks.length - 1] || 1;
   const X = t => +(pad.l + (t - t0) / (t1 - t0) * iw).toFixed(1);
   const Y = v => +(pad.t + ih - Math.max(0, Math.min(v, top)) / top * ih).toFixed(1);
@@ -605,24 +640,53 @@ function lineChart(spec) {
     lastDay = day;
     return `<text class="ax" x="${X(t)}" y="${pad.t + ih + 15}" text-anchor="${anchor}">${esc(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}${show ? `<tspan x="${X(t)}" dy="12">${esc(day)}</tspan>` : ""}</text>`;
   }).join("");
-  const marks = series.map(s => {
+  const bands = shown.map(s => {
+    const band = s.band || [];
+    if (!band.length) return "";
+    if (band.length === 1) {
+      return `<line x1="${X(band[0].t)}" y1="${Y(band[0].hi)}" x2="${X(band[0].t)}" y2="${Y(band[0].lo)}"
+        stroke="${s.color}" stroke-width="8" stroke-linecap="round" opacity=".22"/>`;
+    }
+    const up = band.map(b => `${X(b.t)},${Y(b.hi)}`).join(" ");
+    const down = band.slice().reverse().map(b => `${X(b.t)},${Y(b.lo)}`).join(" ");
+    return `<polygon points="${up} ${down}" fill="${s.color}" opacity=".16"/>`;
+  }).join("");
+  const marks = shown.map(s => {
     const pts = s.points.map(p => `${X(p.t)},${Y(p.v)}`).join(" ");
     const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : "";
     const line = s.points.length > 1
       ? `<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${dash} points="${pts}"/>` : "";
     return line + s.points.map(p => `<circle cx="${X(p.t)}" cy="${Y(p.v)}" r="3.5" fill="var(--surface)" stroke="${s.color}" stroke-width="2"/>`).join("");
   }).join("");
-  const hits = series.flatMap(s => s.points.map(p =>
+  const hits = shown.flatMap(s => s.points.map(p =>
     `<circle class="hit" cx="${X(p.t)}" cy="${Y(p.v)}" r="9" data-tip="${esc(p.tip)}" data-sub="${esc(p.sub || "")}"/>`)).join("");
-  const items = spec.legend || (series.length > 1 ? series : []);
-  const legend = items.length ? `<div class="legend">${items.map(s =>
-    `<span><svg width="18" height="8" aria-hidden="true"><line x1="1" y1="4" x2="17" y2="4" stroke="${s.color}" stroke-width="2"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/></svg>${esc(s.name)}</span>`).join("")}</div>` : "";
+  const items = spec.legend || (all.length > 1 ? all : []);
+  const legend = items.length ? `<div class="legend">${items.map(s => {
+    const swatch = `<svg width="18" height="8" aria-hidden="true"><line x1="1" y1="4" x2="17" y2="4" stroke="${s.color}" stroke-width="2"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/></svg>${esc(s.name)}`;
+    return s.key
+      ? `<button class="${s.hidden ? "off" : ""}" data-series="${esc(s.key)}" title="Show or hide this line">${swatch}</button>`
+      : `<span>${swatch}</span>`;
+  }).join("")}</div>` : "";
   return `<div class="chart">${legend}
     <svg width="${w}" height="${h}" role="img" aria-label="${esc(spec.label || "time series")}">
       ${grid}<line class="grid" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t + ih}"/>
       <text class="ax-title" x="${pad.l}" y="${pad.t - 10}">${esc(spec.yLabel || "")}</text>
-      ${xAxis}${marks}${hits}
+      ${xAxis}${bands}${marks}${hits}
     </svg></div>`;
+}
+
+function sparkline(points, color, tip, sub) {
+  if (!points.length) return `<span class="muted">—</span>`;
+  const w = 84, h = 22, pad = 3;
+  const ts = points.map(p => p.t), vs = points.map(p => p.v);
+  const t0 = Math.min(...ts), t1 = Math.max(...ts), top = Math.max(...vs, 0) || 1;
+  const X = t => +(t1 === t0 ? w / 2 : pad + (t - t0) / (t1 - t0) * (w - 2 * pad)).toFixed(1);
+  const Y = v => +(h - pad - Math.max(0, v) / top * (h - 2 * pad)).toFixed(1);
+  const last = points[points.length - 1];
+  const line = points.length > 1
+    ? `<polyline fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" points="${points.map(p => `${X(p.t)},${Y(p.v)}`).join(" ")}"/>` : "";
+  return `<svg class="spark" width="${w}" height="${h}" data-tip="${esc(tip)}" data-sub="${esc(sub || "")}"
+    role="img" aria-label="${esc(tip)}">${line}<circle cx="${X(last.t)}" cy="${Y(last.v)}" r="2.5" fill="${color}"/></svg>`;
 }
 
 function bindTips(host) {
@@ -640,6 +704,75 @@ function bindTips(host) {
   });
 }
 
+function bindRows(host, attr, expanded, rerender) {
+  host.querySelectorAll("[" + attr + "]").forEach(row => row.onclick = () => {
+    const key = row.getAttribute(attr);
+    const i = expanded.indexOf(key);
+    if (i < 0) expanded.push(key); else expanded.splice(i, 1);
+    rerender();
+    saveUi();
+  });
+  host.querySelectorAll("[data-series]").forEach(btn => btn.onclick = ev => {
+    ev.stopPropagation();
+    const key = btn.dataset.series;
+    if (state.hidden[key]) delete state.hidden[key]; else state.hidden[key] = true;
+    rerender();
+    saveUi();
+  });
+}
+
+function testSuiteRows(suites, hist, caseHist) {
+  return suites.map((s, i) => {
+    const color = SERIES[i % SERIES.length];
+    const open = state.suites.includes(s.key);
+    const history = hist[s.key] || [];
+    const points = history.map(h => ({ t: +new Date(h.time), v: h.elapsed }));
+    const row = `<tr class="pick${open ? " sel" : ""}" data-suite="${esc(s.key)}">
+      <td><span class="tw">${open ? "▾" : "▸"}</span><span class="dot" style="background:${color}"></span> <b>${esc(s.suite)}</b></td>
+      <td class="num">${s.cases}</td><td class="num ok">${s.pass}</td>
+      <td class="num${s.fail ? " bad" : ""}">${s.fail}</td><td class="num${s.empty ? " empty" : ""}">${s.empty}</td>
+      <td class="num">${(+s.time).toFixed(3)}</td>
+      <td class="spark-cell">${sparkline(points, color, s.suite + " · " + history.length + " report(s)",
+        points.map(p => (+p.v).toFixed(3) + "s").slice(-6).join(" → "))}</td>
+      <td class="muted">${esc(s.item || "db")} · ${esc(fmtDate(s.report_time))}</td></tr>`;
+    if (!open) return row;
+    const cases = (s.cases_detail || []).map(c => {
+      const ch = caseHist[s.key + "|" + c.case] || [];
+      const color2 = c.status === "fail" ? "var(--bad)" : c.status === "empty" ? "var(--warn)" : "var(--good)";
+      return `<tr><td class="mono">${esc(c.case)}</td><td>${caseChip(c.status)}</td>
+        <td class="num">${(+c.time).toFixed(4)}</td>
+        <td class="spark-cell">${sparkline(ch.map(h => ({ t: +new Date(h.time), v: h.elapsed })), color2,
+          c.case + " · " + ch.length + " report(s)", ch.map(h => (+h.elapsed).toFixed(4) + "s").slice(-6).join(" → "))}</td></tr>`;
+    }).join("");
+    return row + `<tr class="exp"><td colspan="8">
+      <table class="data sub"><thead><tr><th>Case</th><th>Status</th><th class="num">Time (s)</th><th>History</th></tr></thead>
+        <tbody>${cases}</tbody></table>
+      <div class="sub-note">latest report <a href="${esc(s.url)}" target="_blank">${esc(s.file)}</a></div></td></tr>`;
+  }).join("");
+}
+
+function testProjectCard(project, suites, hist, caseHist, width) {
+  const series = suites.map((s, i) => ({
+    key: "tests:" + s.key, name: s.suite, color: SERIES[i % SERIES.length], dash: seriesDash(i),
+    hidden: !!state.hidden["tests:" + s.key],
+    points: (hist[s.key] || []).map(h => ({
+      t: +new Date(h.time), v: h.elapsed,
+      tip: `${s.suite} · ${(+h.elapsed).toFixed(3)}s`,
+      sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.cases} cases · ${h.pass} pass${h.fail ? ` · ${h.fail} fail` : ""}`,
+    })),
+  }));
+  return `<div class="card">
+    <div class="card-title"><h3>${esc(project.project)}</h3>
+      <span>${project.suites} suites · ${project.cases} cases · <b class="ok">${project.pass} pass</b>${project.fail ? ` · <b class="bad">${project.fail} fail</b>` : ""}${project.empty ? ` · <b class="empty">${project.empty} empty</b>` : ""} · ${(+project.time).toFixed(3)}s · click a suite for its cases</span></div>
+    <table class="data"><thead><tr><th>Suite</th><th class="num">Cases</th><th class="num">Pass</th><th class="num">Fail</th>
+      <th class="num">Empty</th><th class="num">Time (s)</th><th>History</th><th>Report</th></tr></thead>
+      <tbody>${testSuiteRows(suites, hist, caseHist)}</tbody></table>
+    <div class="card-title"><h3>Time per suite</h3><span>seconds per report · click a legend entry to hide a line</span></div>
+    ${lineChart({ width, label: project.project + " suite time over time", yLabel: "seconds",
+      yFormat: v => v.toFixed(2), series })}
+  </div>`;
+}
+
 function renderTests() {
   const el = document.getElementById("tests");
   const d = state.tests;
@@ -647,7 +780,13 @@ function renderTests() {
   if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
   if (!d.reports.length) { el.innerHTML = `<div class="empty-state">No test reports under project/db</div>`; return; }
   const w = chartWidth(el);
+  const hist = d.suite_history || {}, caseHist = d.case_history || {};
   const reports = d.reports.filter(r => r.time);
+  const byProject = {};
+  for (const s of d.suites) (byProject[s.project] = byProject[s.project] || []).push(s);
+  const totals = d.projects.reduce((a, p) => ({
+    cases: a.cases + p.cases, pass: a.pass + p.pass, fail: a.fail + p.fail, empty: a.empty + p.empty, time: a.time + p.time,
+  }), { cases: 0, pass: 0, fail: 0, empty: 0, time: 0 });
   const point = (r, v) => ({
     t: +new Date(r.time), v,
     tip: `${r.project} · ${r.item || "db"}`,
@@ -666,11 +805,6 @@ function renderTests() {
     width: w, label: "total run time per report over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
     series: [{ name: "run time", color: "var(--accent)", points: reports.map(r => point(r, r.elapsed)) }],
   });
-  const totals = d.projects.reduce((a, p) => ({
-    cases: a.cases + p.cases, pass: a.pass + p.pass, fail: a.fail + p.fail, empty: a.empty + p.empty, time: a.time + p.time,
-  }), { cases: 0, pass: 0, fail: 0, empty: 0, time: 0 });
-  const num = (v, n) => `<td class="num">${(+v).toFixed(n)}</td>`;
-  const selected = d.suites.find(s => s.project + "|" + s.suite === state.suite);
   el.innerHTML = `
     <div class="card">
       <div class="card-title"><h3>Latest test run</h3>
@@ -679,42 +813,111 @@ function renderTests() {
         ${totals.time.toFixed(2)}s</span></div>
       <table class="data"><thead><tr><th>Project</th><th class="num">Suites</th><th class="num">Cases</th>
         <th class="num">Passed</th><th class="num">Failed</th><th class="num">Empty</th><th class="num">Time (s)</th></tr></thead>
-        <tbody>${d.projects.map(p => `<tr><td>${esc(p.project)}</td><td class="num">${p.suites}</td><td class="num">${p.cases}</td>
+        <tbody>${d.projects.map(p => `<tr><td><b>${esc(p.project)}</b></td><td class="num">${p.suites}</td><td class="num">${p.cases}</td>
           <td class="num ok">${p.pass}</td><td class="num${p.fail ? " bad" : ""}">${p.fail}</td>
-          <td class="num${p.empty ? " empty" : ""}">${p.empty}</td>${num(p.time, 3)}</tr>`).join("")}</tbody></table>
+          <td class="num${p.empty ? " empty" : ""}">${p.empty}</td><td class="num">${(+p.time).toFixed(3)}</td></tr>`).join("")}</tbody></table>
     </div>
+    ${d.projects.map(p => testProjectCard(p, byProject[p.project] || [], hist, caseHist, w)).join("")}
     <div class="card">
-      <div class="card-title"><h3>Cases over time</h3><span>one point per report, ${esc(fmtDate(reports.length ? reports[reports.length - 1].time : null))} latest</span></div>
+      <div class="card-title"><h3>Pass and fail over time</h3>
+        <span>one point per report · ${esc(fmtDate(reports.length ? reports[reports.length - 1].time : null))} latest</span></div>
       ${counts}
       <div class="card-title"><h3>Run time over time</h3><span>report total, seconds</span></div>
       ${timing}
-    </div>
-    <div class="card">
-      <div class="card-title"><h3>Suites</h3><span>latest report per suite · click a row for its cases</span></div>
-      <table class="data"><thead><tr><th>Project</th><th>Suite</th><th class="num">Cases</th><th class="num">Passed</th>
-        <th class="num">Failed</th><th class="num">Time (s)</th><th>Report</th></tr></thead>
-        <tbody>${d.suites.map(s => {
-          const key = s.project + "|" + s.suite;
-          return `<tr class="pick ${key === state.suite ? "sel" : ""}" data-suite="${esc(key)}">
-            <td>${esc(s.project)}</td><td class="mono">${esc(s.suite)}</td><td class="num">${s.cases}</td>
-            <td class="num ok">${s.pass}</td><td class="num${s.fail ? " bad" : ""}">${s.fail}</td>${num(s.time, 3)}
-            <td class="muted">${esc(s.item || "db")} · ${esc(fmtDate(s.report_time))}</td></tr>`;
-        }).join("")}</tbody></table>
-    </div>
-    ${selected ? `<div class="card">
-      <div class="card-title"><h3>${esc(selected.suite)}</h3>
-        <span>${esc(selected.project)} · <a href="${esc(selected.url)}" target="_blank">${esc(selected.file)}</a></span></div>
-      <table class="data"><thead><tr><th>Case</th><th>Status</th><th class="num">Time (s)</th></tr></thead>
-        <tbody>${selected.cases_detail.map(c => `<tr><td class="mono">${esc(c.case)}</td>
-          <td>${caseChip(c.status)}</td>
-          ${num(c.time, 4)}</tr>`).join("")}</tbody></table></div>` : ""}`;
-  el.querySelectorAll("[data-suite]").forEach(row => row.onclick = () => {
-    state.suite = state.suite === row.dataset.suite ? null : row.dataset.suite;
-    renderTests();
-    saveUi();
-  });
+    </div>`;
+  bindRows(el, "data-suite", state.suites, renderTests);
   bindTips(el);
   restoreScroll(document.getElementById("content"), state.scroll.tests);
+}
+
+function microCaseSeries(suite, caseHist, offset) {
+  return (suite.cases_detail || []).map((c, j) => {
+    const key = "bench:" + suite.key + "|" + c.case;
+    const history = caseHist[suite.key + "|" + c.case] || [];
+    return {
+      key, name: suite.suite + "." + c.case, color: SERIES[(offset + j) % SERIES.length], dash: seriesDash(j),
+      hidden: !!state.hidden[key],
+      points: history.map(h => ({
+        t: +new Date(h.time), v: h.median_ns,
+        tip: `${c.case} · ${nsText(h.median_ns)}`,
+        sub: `${fmtDate(h.time)} · ${h.item || ""}${h.ci_low_ns == null ? "" : ` · ci95 ${nsText(h.ci_low_ns)} – ${nsText(h.ci_high_ns)}`}`,
+      })),
+      band: history.filter(h => h.ci_low_ns != null && h.ci_high_ns != null)
+        .map(h => ({ t: +new Date(h.time), lo: h.ci_low_ns, hi: h.ci_high_ns })),
+    };
+  });
+}
+
+function microSuiteRows(suites, hist, caseHist, width) {
+  return suites.map((s, i) => {
+    const color = SERIES[i % SERIES.length];
+    const open = state.benchSuites.includes(s.key);
+    const history = hist[s.key] || [];
+    const points = history.map(h => ({ t: +new Date(h.time), v: h.median_ns }));
+    const row = `<tr class="pick${open ? " sel" : ""}" data-bench-suite="${esc(s.key)}">
+      <td><span class="tw">${open ? "▾" : "▸"}</span><span class="dot" style="background:${color}"></span> <b>${esc(s.suite)}</b></td>
+      <td class="num">${s.cases}</td><td class="num">${esc(nsText(s.median_ns))}</td><td class="num">${esc(nsText(s.mean_ns))}</td>
+      <td class="spark-cell">${sparkline(points, color, s.suite + " · " + history.length + " report(s)",
+        points.map(p => nsText(p.v)).slice(-6).join(" → "))}</td>
+      <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>`;
+    if (!open) return row;
+    const rows = (s.cases_detail || []).map((c, j) => {
+      const ch = caseHist[s.key + "|" + c.case] || [];
+      return `<tr><td class="mono">${esc(c.case)}</td>
+        <td class="num">${esc(nsText(c.median_ns))}</td>
+        <td class="num muted">${c.ci_low_ns == null ? "—" : esc(nsText(c.ci_low_ns) + " – " + nsText(c.ci_high_ns))}</td>
+        <td class="num">${esc(nsText(c.mean_ns))}</td><td class="num">${esc(nsText(c.stddev_ns))}</td>
+        <td class="num">${esc(nsText(c.p99_ns))}</td>
+        <td class="num">${c.iterations == null ? "—" : (+c.iterations).toLocaleString()}</td>
+        <td class="num">${c.samples == null ? "—" : c.samples}</td>
+        <td class="num${c.outliers ? " empty" : ""}">${c.outliers == null ? "—" : c.outliers}</td>
+        <td class="spark-cell">${sparkline(ch.map(h => ({ t: +new Date(h.time), v: h.median_ns })), SERIES[j % SERIES.length],
+          c.case + " · " + ch.length + " report(s)", ch.map(h => nsText(h.median_ns)).slice(-6).join(" → "))}</td></tr>`;
+    }).join("");
+    const series = microCaseSeries(s, caseHist, i);
+    const unit = nsUnit(Math.max(...series.flatMap(x => x.points.map(p => p.v)), 0));
+    return row + `<tr class="exp"><td colspan="6">
+      <table class="data sub"><thead><tr><th>Case</th><th class="num">Median</th><th class="num">ci95</th>
+        <th class="num">Mean</th><th class="num">Stddev</th><th class="num">p99</th><th class="num">Iterations</th>
+        <th class="num">Samples</th><th class="num">Outliers</th><th>History</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      ${lineChart({ width: Math.max(320, width - 60), height: 190, label: s.suite + " median over time",
+        yLabel: "median (" + unit.unit + ")", yFormat: v => String(+(v / unit.div).toPrecision(3)), series })}
+      <div class="sub-note">median with its 95% confidence interval as a band · latest report
+        <a href="${esc(s.url)}" target="_blank">${esc(s.file)}</a></div></td></tr>`;
+  }).join("");
+}
+
+function microProjectCard(project, suites, hist, caseHist, width) {
+  const series = [];
+  suites.forEach((s, i) => {
+    if (state.benchSuites.includes(s.key)) {
+      series.push(...microCaseSeries(s, caseHist, i).map(x => ({ ...x, key: "bench:sum:" + x.key, hidden: !!state.hidden["bench:sum:" + x.key], band: null })));
+      return;
+    }
+    const key = "bench:sum:" + s.key;
+    series.push({
+      key, name: s.suite, color: SERIES[i % SERIES.length], dash: seriesDash(i), hidden: !!state.hidden[key],
+      points: (hist[s.key] || []).map(h => ({
+        t: +new Date(h.time), v: h.median_ns,
+        tip: `${s.suite} · ${nsText(h.median_ns)}`,
+        sub: `${fmtDate(h.time)} · ${h.item || ""} · ${h.cases} case(s)`,
+      })),
+    });
+  });
+  const unit = nsUnit(Math.max(...series.flatMap(x => x.points.map(p => p.v)), 0));
+  return `<div class="card">
+    <div class="card-title"><h3>${esc(project.project)}</h3>
+      <span>${project.suites} suites · ${project.cases} cases · ${esc(nsText(project.median_ns))} total ·
+      ${esc(fmtDate(project.time))} · click a suite for its cases</span></div>
+    <table class="data"><thead><tr><th>Suite</th><th class="num">Cases</th><th class="num">Median total</th>
+      <th class="num">Mean total</th><th>History</th><th>Report</th></tr></thead>
+      <tbody>${microSuiteRows(suites, hist, caseHist, width)}</tbody></table>
+    <div class="card-title"><h3>Time per suite</h3>
+      <span>sum of case medians, per case for an expanded suite · click a legend entry to hide a line</span></div>
+    ${lineChart({ width, label: project.project + " suite time over time", yLabel: "median (" + unit.unit + ")",
+      yFormat: v => String(+(v / unit.div).toPrecision(3)), series })}
+  </div>`;
 }
 
 function renderBenchmarks() {
@@ -722,9 +925,12 @@ function renderBenchmarks() {
   const d = state.bench;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
   if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
-  const micro = d.micro || [], microRuns = d.micro_runs || [];
-  if (!d.scenes.length && !micro.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
+  const microProjects = d.micro_projects || [], microSuites = d.micro_suites || [];
+  if (!d.scenes.length && !microSuites.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
   const w = chartWidth(el);
+  const mHist = d.micro_suite_history || {}, mCases = d.micro_case_history || {};
+  const byProject = {};
+  for (const s of microSuites) (byProject[s.project] = byProject[s.project] || []).push(s);
   const color = {};
   d.scenes.forEach((s, i) => { color[s.scene] = SERIES[i % SERIES.length]; });
   const metric = (run, key) => (run[key] == null ? null : {
@@ -748,46 +954,45 @@ function renderBenchmarks() {
   const selected = d.scenes.find(s => s.scene === state.scene);
   const history = selected ? d.runs.filter(r => r.scene === selected.scene) : [];
   el.innerHTML = `
+    ${!microSuites.length ? "" : `<div class="card">
+      <div class="card-title"><h3>Microbenchmarks</h3>
+        <span>${microProjects.length} bench projects · ${microSuites.length} suites ·
+        ${microSuites.reduce((a, s) => a + s.cases, 0)} cases · ${(d.micro_runs || []).length} case runs · bake3 reports</span></div>
+      <table class="data"><thead><tr><th>Project</th><th class="num">Suites</th><th class="num">Cases</th>
+        <th class="num">Median total</th><th>Report</th></tr></thead>
+        <tbody>${microProjects.map(p => `<tr><td><b>${esc(p.project)}</b></td><td class="num">${p.suites}</td>
+          <td class="num">${p.cases}</td><td class="num">${esc(nsText(p.median_ns))}</td>
+          <td class="muted">${esc(p.item || "")} · ${esc(fmtDate(p.time))}</td></tr>`).join("")}</tbody></table>
+    </div>`}
+    ${microProjects.map(p => microProjectCard(p, byProject[p.project] || [], mHist, mCases, w)).join("")}
     ${!d.scenes.length ? "" : `<div class="card">
-      <div class="card-title"><h3>Latest benchmark per scene</h3>
-        <span>${d.scenes.length} scenes · ${d.runs.length} runs · click a row for its history</span></div>
+      <div class="card-title"><h3>Scene benchmarks</h3>
+        <span>${d.scenes.length} scenes · ${d.runs.length} runs · latest per scene · click a row for its history</span></div>
       <table class="data"><thead><tr><th>Scene</th><th class="num">Entities</th><th class="num">Frames</th>
         <th class="num">Mean (ms)</th><th class="num">p50 (ms)</th><th class="num">p99 (ms)</th><th class="num">Max (ms)</th>
         <th class="num">FPS</th><th>Report</th></tr></thead>
         <tbody>${d.scenes.map(s => `<tr class="pick ${s.scene === state.scene ? "sel" : ""}" data-scene="${esc(s.scene)}">
-          <td><span class="dot" style="background:${color[s.scene]}"></span> ${esc(s.scene)}</td>
+          <td><span class="tw">${s.scene === state.scene ? "▾" : "▸"}</span><span class="dot" style="background:${color[s.scene]}"></span> <b>${esc(s.scene)}</b></td>
           <td class="num">${s.entities == null ? "—" : (+s.entities).toLocaleString()}</td>
           <td class="num">${s.frames == null ? "—" : s.frames}</td>
           ${cell(s.mean_ms, 3)}${cell(s.p50_ms, 3)}${cell(s.p99_ms, 3)}${cell(s.max_ms, 3)}${cell(s.fps, 0)}
-          <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>`).join("")}</tbody></table>
-    </div>
-    <div class="card">
+          <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>
+          ${s.scene !== state.scene ? "" : `<tr class="exp"><td colspan="9">
+            <table class="data sub"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>
+              <th class="num">Max (ms)</th><th class="num">FPS</th><th>File</th></tr></thead>
+              <tbody>${history.slice().reverse().map(r => `<tr><td>${esc(fmtDate(r.time))}${r.time_source === "mtime" ? ' <span class="muted">(file time)</span>' : ""}</td>
+                ${cell(r.mean_ms, 3)}${cell(r.p99_ms, 3)}${cell(r.max_ms, 3)}${cell(r.fps, 0)}
+                <td class="mono">${r.url ? `<a href="${esc(r.url)}" target="_blank">${esc(r.file)}</a>` : esc(r.file)}</td></tr>`).join("")}</tbody></table>
+            <div class="sub-note">${history.length} run(s)${selected && selected.source ? " · " + esc(selected.source) : ""}</div></td></tr>`}`).join("")}</tbody></table>
       <div class="card-title"><h3>Frame time over time</h3><span>one line per scene, solid mean and dashed p99</span></div>
       ${chart}
-    </div>`}
-    ${!micro.length ? "" : `<div class="card">
-      <div class="card-title"><h3>Microbenchmarks</h3>
-        <span>${micro.length} case(s) · ${microRuns.length} run(s) · bake3 bench reports</span></div>
-      <table class="data"><thead><tr><th>Project</th><th>Case</th><th class="num">Median (ns)</th>
-        <th class="num">ci95 low (ns)</th><th class="num">ci95 high (ns)</th><th class="num">Mean (ns)</th>
-        <th class="num">Samples</th><th>Report</th></tr></thead>
-        <tbody>${micro.map(m => `<tr><td>${esc(m.project || "")}</td><td class="mono">${esc(m.suite + "." + m.case)}</td>
-          ${cell(m.median_ns, 1)}${cell(m.ci_low_ns, 1)}${cell(m.ci_high_ns, 1)}${cell(m.mean_ns, 1)}
-          <td class="num">${m.samples == null ? "—" : m.samples}</td>
-          <td class="muted">${esc(m.item || "")} · ${esc(fmtDate(m.time))}</td></tr>`).join("")}</tbody></table>
-    </div>`}
-    ${selected ? `<div class="card">
-      <div class="card-title"><h3>${esc(selected.scene)}</h3><span>${history.length} run(s)${selected.source ? " · " + esc(selected.source) : ""}</span></div>
-      <table class="data"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>
-        <th class="num">Max (ms)</th><th class="num">FPS</th><th>File</th></tr></thead>
-        <tbody>${history.slice().reverse().map(r => `<tr><td>${esc(fmtDate(r.time))}${r.time_source === "mtime" ? ' <span class="muted">(file time)</span>' : ""}</td>
-          ${cell(r.mean_ms, 3)}${cell(r.p99_ms, 3)}${cell(r.max_ms, 3)}${cell(r.fps, 0)}
-          <td class="mono">${r.url ? `<a href="${esc(r.url)}" target="_blank">${esc(r.file)}</a>` : esc(r.file)}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+    </div>`}`;
   el.querySelectorAll("[data-scene]").forEach(row => row.onclick = () => {
     state.scene = state.scene === row.dataset.scene ? null : row.dataset.scene;
     renderBenchmarks();
     saveUi();
   });
+  bindRows(el, "data-bench-suite", state.benchSuites, renderBenchmarks);
   bindTips(el);
   restoreScroll(document.getElementById("content"), state.scroll.bench);
 }
