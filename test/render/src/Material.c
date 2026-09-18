@@ -129,3 +129,96 @@ void Material_pbr_defaults(void)
     test_flt(u->data.params[1], 0.5f);
     test_flt(u->data.color[0], 1.0f);
 }
+
+void Material_tint_resolves_through_parent_component(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t parent = ecs_new(w);
+    ecs_entity_t child = ecs_new_w_parent(w, parent, "child");
+    ecs_entity_t grandchild = ecs_new_w_parent(w, child, "grandchild");
+    ecs_set(w, parent, Tint, {255, 128, 0, 255});
+    test_assert(ecs_get(w, parent, ActualTint) != NULL);
+    test_int(ecs_get(w, child, ActualTint)->g, 128);
+    test_int(ecs_get(w, grandchild, ActualTint)->r, 255);
+}
+
+void Material_tint_change_propagates_through_parent(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t parent = ecs_new(w);
+    ecs_entity_t child = ecs_new_w_parent(w, parent, "child");
+    ecs_set(w, parent, Tint, {1, 2, 3, 4});
+    test_int(ecs_get(w, child, ActualTint)->r, 1);
+    ecs_set(w, parent, Tint, {10, 20, 30, 40});
+    test_int(ecs_get(w, child, ActualTint)->r, 10);
+    test_int(ecs_get(w, child, ActualTint)->b, 30);
+}
+
+void Material_parent_child_with_own_tint_keeps_it(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t parent = ecs_new(w);
+    ecs_entity_t child = ecs_new_w_parent(w, parent, "child");
+    ecs_entity_t grandchild = ecs_new_w_parent(w, child, "grandchild");
+    ecs_set(w, child, Tint, {1, 2, 3, 4});
+    ecs_set(w, parent, Tint, {255, 128, 0, 255});
+    test_int(ecs_get(w, child, ActualTint)->r, 1);
+    test_int(ecs_get(w, grandchild, ActualTint)->r, 1);
+    test_int(ecs_get(w, parent, ActualTint)->r, 255);
+}
+
+void Material_new_parent_child_inherits_tint(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t parent = ecs_new(w);
+    ecs_set(w, parent, Tint, {10, 20, 30, 40});
+    ecs_entity_t child = ecs_new_w_parent(w, parent, "child");
+    test_assert(ecs_get(w, child, ActualTint) != NULL);
+    test_int(ecs_get(w, child, ActualTint)->b, 30);
+}
+
+void Material_tint_resolves_through_mixed_tree(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t root = ecs_new(w);
+    ecs_entity_t node = ecs_new_w_parent(w, root, "node");
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, node);
+    ecs_entity_t tip = ecs_new_w_parent(w, leaf, "tip");
+    ecs_set(w, root, Tint, {7, 8, 9, 10});
+    test_int(ecs_get(w, node, ActualTint)->r, 7);
+    test_int(ecs_get(w, leaf, ActualTint)->g, 8);
+    test_int(ecs_get(w, tip, ActualTint)->b, 9);
+    ecs_set(w, leaf, Tint, {1, 1, 1, 1});
+    test_int(ecs_get(w, tip, ActualTint)->r, 1);
+    test_int(ecs_get(w, node, ActualTint)->r, 7);
+}
+
+void Material_tint_removed_falls_back_through_parent(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t parent = ecs_new(w);
+    ecs_entity_t child = ecs_new_w_parent(w, parent, "child");
+    ecs_set(w, parent, Tint, {10, 20, 30, 40});
+    ecs_set(w, child, Tint, {1, 2, 3, 4});
+    test_int(ecs_get(w, child, ActualTint)->r, 1);
+    ecs_remove(w, child, Tint);
+    test_int(ecs_get(w, child, ActualTint)->r, 10);
+    ecs_remove(w, parent, Tint);
+    test_assert(ecs_get(w, parent, ActualTint) == NULL);
+    test_assert(ecs_get(w, child, ActualTint) == NULL);
+}
+
+void Material_tint_follows_reparent_between_storages(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t red = ecs_new(w);
+    ecs_set(w, red, Tint, {255, 0, 0, 255});
+    ecs_entity_t blue = ecs_new(w);
+    ecs_set(w, blue, Tint, {0, 0, 255, 255});
+    ecs_entity_t child = ecs_new_w_pair(w, EcsChildOf, red);
+    test_int(ecs_get(w, child, ActualTint)->r, 255);
+    ecs_set(w, child, EcsParent, { blue });
+    test_int(ecs_get(w, child, ActualTint)->b, 255);
+    ecs_add_pair(w, child, EcsChildOf, red);
+    test_int(ecs_get(w, child, ActualTint)->r, 255);
+}

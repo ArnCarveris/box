@@ -667,3 +667,29 @@ void Layers_strict_view_without_layers_shows_everything(void)
     test_bool(box_view_shows(v, 0), true);
     test_int(packet.dynamic_instances.count, 1);
 }
+
+void Layers_parent_subtree_requeued_on_change(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {0, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t node = ecs_new_w_parent(w, root, "node");
+    ecs_set(w, node, Position, {1, 0, 0});
+    ecs_set(w, node, Box, {1, 1, 1});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, node);
+    ecs_set(w, leaf, Position, {1, 0, 0});
+    ecs_set(w, leaf, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    box_packet_reset(&packet);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+
+    box_packet_reset(&packet);
+    ecs_add_pair(w, node, Layer, a);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 2);
+    test_uint(ecs_get(w, node, RenderInstance)->layer_mask, 1u);
+    test_uint(ecs_get(w, root, RenderInstance)->layer_mask, 0u);
+}

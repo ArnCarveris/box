@@ -33,7 +33,12 @@
                     "default_camera_without_entity",
                     "sun_from_directional_light",
                     "mesh_shared_between_same_shapes",
-                    "different_segments_different_mesh"
+                    "different_segments_different_mesh",
+                    "parent_tree_uploaded_once",
+                    "dynamic_parent_node_children_dynamic",
+                    "mixed_tree_only_dynamic_reuploaded",
+                    "reparent_between_storages_requeues_subtree",
+                    "delete_parent_node_frees_slots"
                 ],
                 "setup": true,
                 "teardown": true
@@ -149,7 +154,14 @@
                     "new_child_inherits_tint",
                     "instance_color_uses_tint_and_opacity",
                     "emissive_scaled_by_strength",
-                    "pbr_defaults"
+                    "pbr_defaults",
+                    "tint_resolves_through_parent_component",
+                    "tint_change_propagates_through_parent",
+                    "parent_child_with_own_tint_keeps_it",
+                    "new_parent_child_inherits_tint",
+                    "tint_resolves_through_mixed_tree",
+                    "tint_removed_falls_back_through_parent",
+                    "tint_follows_reparent_between_storages"
                 ],
                 "setup": true,
                 "teardown": true

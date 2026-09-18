@@ -501,3 +501,74 @@ void Shell_unknown_symbol_is_error(void)
     test_str(out, "unknown component 'Nope'");
     ecs_os_free(out);
 }
+
+void Shell_ls_lists_parent_children(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t scene = ecs_entity(w, { .name = "scene" });
+    ecs_new_w_parent(w, scene, "a");
+    ecs_entity_t pair_child = ecs_new_w_pair(w, EcsChildOf, scene);
+    ecs_set_name(w, pair_child, "b");
+    char *out = box_command_run(w, session, "ls scene", NULL);
+    test_str(out, "a\nb\n");
+    ecs_os_free(out);
+}
+
+void Shell_cd_into_parent_child(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t scene = ecs_entity(w, { .name = "scene" });
+    ecs_entity_t node = ecs_new_w_parent(w, scene, "node");
+    ecs_new_w_parent(w, node, "leaf");
+    char *out = box_command_run(w, session, "cd scene.node", NULL);
+    test_str(out, "scene.node");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "ls", NULL);
+    test_str(out, "leaf\n");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "cd ..", NULL);
+    test_str(out, "scene");
+    ecs_os_free(out);
+}
+
+void Shell_mv_parent_child_keeps_storage(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t scene = ecs_entity(w, { .name = "scene" });
+    ecs_entity_t other = ecs_entity(w, { .name = "other" });
+    ecs_entity_t e = ecs_new_w_parent(w, scene, "thing");
+    char *out = box_command_run(w, session, "mv scene.thing other.thing", NULL);
+    test_str(out, "other.thing");
+    ecs_os_free(out);
+    test_assert(ecs_lookup(w, "other.thing") == e);
+    test_uint(ecs_get_parent(w, e), other);
+    test_assert(ecs_has(w, e, EcsParent));
+}
+
+void Shell_mv_parent_child_to_root(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t scene = ecs_entity(w, { .name = "scene" });
+    ecs_entity_t e = ecs_new_w_parent(w, scene, "thing");
+    char *out = box_command_run(w, session, "mv scene.thing thing", NULL);
+    test_str(out, "thing");
+    ecs_os_free(out);
+    test_uint(ecs_get_parent(w, e), 0);
+    test_assert(!ecs_has(w, e, EcsParent));
+    test_assert(ecs_lookup(w, "thing") == e);
+}
+
+void Shell_touch_under_parent_child(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t scene = ecs_entity(w, { .name = "scene" });
+    ecs_entity_t node = ecs_new_w_parent(w, scene, "node");
+    char *out = box_command_run(w, session, "touch scene.node.leaf", NULL);
+    test_str(out, "scene.node.leaf");
+    ecs_os_free(out);
+    ecs_entity_t leaf = ecs_lookup(w, "scene.node.leaf");
+    test_assert(leaf != 0);
+    test_uint(ecs_get_parent(w, leaf), node);
+}

@@ -148,7 +148,12 @@
                 "unknown_entity_argument",
                 "relative_to_cwd",
                 "absolute_path",
-                "root_is_not_an_entity"
+                "root_is_not_an_entity",
+                "ls_lists_parent_children",
+                "cd_into_parent_child",
+                "mv_parent_child_keeps_storage",
+                "mv_parent_child_to_root",
+                "touch_under_parent_child"
             ],
             "setup": true,
             "teardown": true

@@ -439,3 +439,147 @@ void Extract_delete_before_first_extract_empty_batch(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 0);
 }
+
+void Extract_parent_tree_uploaded_once(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {1, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t a = ecs_new_w_parent(w, root, "a");
+    ecs_set(w, a, Position, {1, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_parent(w, a, "b");
+    ecs_set(w, b, Position, {1, 0, 0});
+    ecs_set(w, b, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 3);
+    test_int(packet.dynamic_instances.count, 0);
+    box_packet_reset(&packet);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 0);
+    box_packet_reset(&packet);
+    ecs_set(w, root, Position, {5, 0, 0});
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 3);
+}
+
+void Extract_dynamic_parent_node_children_dynamic(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, DynamicTransform);
+    ecs_set(w, root, Position, {10, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t a = ecs_new_w_parent(w, root, "a");
+    ecs_set(w, a, Position, {1, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 2);
+    box_packet_reset(&packet);
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 2);
+    box_instance_t *inst = box_vec_at(&packet.dynamic_instances, 1);
+    test_flt(inst->transform[3], 11);
+}
+
+void Extract_mixed_tree_only_dynamic_reuploaded(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {1, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t mover = ecs_new_w_parent(w, root, "mover");
+    ecs_add(w, mover, DynamicTransform);
+    ecs_set(w, mover, Position, {1, 0, 0});
+    ecs_set(w, mover, Box, {1, 1, 1});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, mover);
+    ecs_set(w, leaf, Position, {1, 0, 0});
+    ecs_set(w, leaf, Box, {1, 1, 1});
+    ecs_entity_t sibling = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, sibling, Position, {5, 0, 0});
+    ecs_set(w, sibling, Box, {1, 1, 1});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 2);
+    test_int(packet.dynamic_instances.count, 2);
+    box_packet_reset(&packet);
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 2);
+    box_packet_reset(&packet);
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 2);
+}
+
+void Extract_reparent_between_storages_requeues_subtree(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t first = ecs_new(w);
+    ecs_set(w, first, Position, {10, 0, 0});
+    ecs_entity_t second = ecs_new(w);
+    ecs_set(w, second, Position, {100, 0, 0});
+    ecs_entity_t node = ecs_new_w_pair(w, EcsChildOf, first);
+    ecs_set(w, node, Position, {1, 0, 0});
+    ecs_set(w, node, Box, {1, 1, 1});
+    ecs_entity_t leaf = ecs_new_w_parent(w, node, "leaf");
+    ecs_set(w, leaf, Position, {1, 0, 0});
+    ecs_set(w, leaf, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 2);
+    box_packet_reset(&packet);
+    ecs_set(w, node, EcsParent, { second });
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 2);
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    box_static_update_t *v = box_vec_at(&packet.static_updates, 1);
+    float x0 = u->data.transform[3], x1 = v->data.transform[3];
+    test_assert(fabsf(x0 - 101) < 1e-4f || fabsf(x0 - 102) < 1e-4f);
+    test_assert(fabsf(x1 - 101) < 1e-4f || fabsf(x1 - 102) < 1e-4f);
+}
+
+void Extract_delete_parent_node_frees_slots(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {1, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t node = ecs_new_w_parent(w, root, "node");
+    ecs_set(w, node, Position, {1, 0, 0});
+    ecs_set(w, node, Box, {1, 1, 1});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, node);
+    ecs_set(w, leaf, Position, {1, 0, 0});
+    ecs_set(w, leaf, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 3);
+    box_packet_reset(&packet);
+    ecs_delete(w, node);
+    test_assert(!ecs_is_alive(w, leaf));
+    box_render_extract(w, &packet);
+    test_int(packet.static_counts.count, 1);
+    test_int(((box_static_count_t*)box_vec_at(&packet.static_counts, 0))->count, 1);
+    test_int(ecs_get(w, root, RenderInstance)->slot, 0);
+}

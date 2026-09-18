@@ -73,7 +73,8 @@
                     "strict_view_hides_unlayered_dynamic",
                     "strict_view_hides_unlayered_transparent",
                     "strict_view_hides_unlayered_lights",
-                    "strict_view_without_layers_shows_everything"
+                    "strict_view_without_layers_shows_everything",
+                    "parent_subtree_requeued_on_change"
                 ],
                 "setup": true,
                 "teardown": true
