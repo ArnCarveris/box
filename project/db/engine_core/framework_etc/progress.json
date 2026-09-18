@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T22:42:22.821+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "engine_core/etc_install",
+    "effects/shader_component"
+  ]
+}
