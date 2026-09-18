@@ -424,6 +424,34 @@ static void box_view_environment(
     v->env_generation = box_view_env_generation(state, index, &env);
 }
 
+/** Resolve the layers a view shows and the layers that cast its shadows.
+ *
+ * A world that uses no layer skips the lists, so every view shows everything.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
+ */
+static void box_view_layers(
+    ecs_world_t *world,
+    RenderState *state,
+    ecs_entity_t e,
+    box_view_t *v)
+{
+    v->layer_mask = BOX_VIEW_LAYER_ALL;
+    v->caster_mask = BOX_VIEW_LAYER_ALL;
+    const View *view = state->layer_used && e ? ecs_get(world, e, View) : NULL;
+    if (!view) {
+        goto done;
+    }
+
+    v->layer_mask = box_render_view_layers(state, view->layers);
+    v->caster_mask = box_render_view_layers(state, view->shadow_layers);
+done:
+    return;
+}
+
 /** Fill one view of the packet from its view entity and its camera.
  *
  * @param world The world
@@ -443,12 +471,20 @@ static void box_view_fill(
     memset(v, 0, sizeof(box_view_t));
     v->shadows = 1;
     v->effects = 1;
+    box_view_layers(world, state, src->entity, v);
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
     box_view_sun(world, state, v);
     box_view_environment(world, state, src->entity, index, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
     box_render_extract_transparent(world, state, p, v);
+    v->dynamic_first = 0;
+    if (state->layer_used) {
+        v->dynamic_first = p->dynamic_batches.count;
+        box_render_extract_dynamic(world, state, p, v->layer_mask);
+    }
+
+    v->dynamic_count = p->dynamic_batches.count - v->dynamic_first;
 
     const MaterialLayerSettings *settings =
         box_render_view_setting(world, src->entity, ecs_id(MaterialLayerSettings));

@@ -24,6 +24,23 @@ done:
     return;
 }
 
+void box_render_mark_all(
+    ecs_world_t *world,
+    RenderState *state)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->instances);
+    while (ecs_query_next(&it)) {
+        RenderInstance *inst = ecs_field(&it, RenderInstance, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (!inst[i].dirty) {
+                inst[i].dirty = true;
+                ecs_vec_append_t(NULL, &state->dirty, ecs_entity_t)[0] = it.entities[i];
+            }
+        }
+    }
+}
+
 void box_render_mark_subtree(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -64,30 +81,6 @@ static void box_render_on_dynamic(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         box_render_mark_subtree(it->world, it->entities[i]);
-    }
-}
-
-void box_render_release_slot(
-    ecs_world_t *world,
-    RenderState *state,
-    ecs_entity_t e,
-    RenderInstance *inst)
-{
-    box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst->mesh);
-    int32_t last = ecs_vec_count(&batch->entities) - 1;
-    ecs_entity_t *slots = ecs_vec_first_t(&batch->entities, ecs_entity_t);
-    ecs_assert(slots[inst->slot] == e, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_entity_t moved = slots[last];
-    slots[inst->slot] = moved;
-    ecs_vec_remove_last(&batch->entities);
-    batch->count_dirty = true;
-
-    if (moved != e) {
-        RenderInstance *moved_inst = ecs_get_mut(world, moved, RenderInstance);
-        ecs_assert(moved_inst != NULL, ECS_INTERNAL_ERROR, NULL);
-        moved_inst->slot = inst->slot;
-        box_render_mark_dirty(world, moved);
     }
 }
 

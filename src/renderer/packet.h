@@ -28,6 +28,12 @@
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_LAYER_MAX (16)
 
+/** Render layers a scene can create, one bit each in the view and instance masks */
+#define BOX_VIEW_LAYER_BITS (32)
+
+/** Layer mask of a view that lists no layers, which shows every layer */
+#define BOX_VIEW_LAYER_ALL (0xFFFFFFFFu)
+
 /** Point and spot lights a packet can carry */
 #define BOX_LIGHT_MAX (4096)
 
@@ -170,6 +176,10 @@ typedef struct box_view_t {
     uint32_t shadows;       /**< The view casts and receives shadows */
     uint32_t effects;       /**< The view runs its post process effects */
     int32_t priority;       /**< Order in the frame, lower renders first */
+    uint32_t layer_mask;    /**< Layers the view shows, BOX_VIEW_LAYER_ALL for every layer */
+    uint32_t caster_mask;   /**< Layers that cast its shadows, BOX_VIEW_LAYER_ALL for all */
+    uint32_t dynamic_first; /**< First dynamic batch of the view in the packet */
+    uint32_t dynamic_count; /**< Dynamic batches of the view */
     uint32_t cpu_pad[3];    /**< Padding to the 16 byte stride */
 } box_view_t;
 
@@ -412,6 +422,19 @@ typedef struct box_static_update_t {
     box_instance_t data;    /**< New instance data */
 } box_static_update_t;
 
+/** Contiguous run of static instance slots of a mesh that share a layer mask.
+ *
+ * The runs of one mesh are contiguous in the packet array and replace the runs
+ * the renderer holds for it. A mesh without runs has no layer restriction and
+ * is drawn in one call, which is what a scene without layers produces.
+ */
+typedef struct box_static_group_t {
+    uint32_t mesh;   /**< Mesh handle */
+    uint32_t mask;   /**< Layers the slots of the run belong to, 0 for every view */
+    uint32_t first;  /**< First instance slot of the run */
+    uint32_t count;  /**< Instance slots in the run */
+} box_static_group_t;
+
 /** New static instance count of a mesh */
 typedef struct box_static_count_t {
     uint32_t mesh;          /**< Mesh handle */
@@ -458,6 +481,7 @@ typedef struct box_packet_t {
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     box_vec_t static_updates;                /**< box_static_update_t */
     box_vec_t static_counts;                 /**< box_static_count_t */
+    box_vec_t static_groups;                 /**< box_static_group_t of the meshes that regrouped */
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
     box_vec_t transparent;                   /**< box_transparent_t, sorted back to front */
@@ -485,6 +509,7 @@ static inline void box_packet_init(
     box_vec_init(&p->layer_create, sizeof(box_layer_cmd_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
+    box_vec_init(&p->static_groups, sizeof(box_static_group_t));
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
     box_vec_init(&p->transparent, sizeof(box_transparent_t));
@@ -519,6 +544,7 @@ static inline void box_packet_reset(
     p->layers_changed = false;
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
+    box_vec_clear(&p->static_groups);
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
     box_vec_clear(&p->transparent);
@@ -544,6 +570,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->layer_create);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
+    box_vec_fini(&p->static_groups);
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
     box_vec_fini(&p->transparent);

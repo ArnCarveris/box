@@ -86,6 +86,8 @@ static void box_extract_static(
     RenderInstance *inst = ecs_get_mut(world, e, RenderInstance);
     ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
+    inst->layer_mask = state->layer_used ?
+        box_render_entity_layers(world, state, e) : 0;
     bool dynamic = box_render_is_dynamic(world, e);
     bool transparent = box_render_is_transparent(world, state, e);
     bool has_slot = box_render_has_slot(state, e, inst);
@@ -109,9 +111,9 @@ static void box_extract_static(
 
     box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)mesh->handle);
     if (!has_slot) {
-        inst->slot = (uint32_t)ecs_vec_count(&batch->entities);
-        ecs_vec_append_t(NULL, &batch->entities, ecs_entity_t)[0] = e;
-        batch->count_dirty = true;
+        box_render_take_slot(world, batch, e, inst);
+    } else if (state->layer_used) {
+        box_render_regroup_slot(world, state, batch, e, inst);
     }
 
     box_static_update_t *update = box_vec_push(&p->static_updates);
@@ -145,16 +147,11 @@ static void box_extract_counts(
     }
 }
 
-/** Extract every dynamic entity, grouped by mesh.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- */
-static void box_extract_dynamic(
+void box_render_extract_dynamic(
     ecs_world_t *world,
     RenderState *state,
-    box_packet_t *p)
+    box_packet_t *p,
+    uint32_t view_mask)
 {
     ecs_iter_t it = ecs_query_iter(world, state->dynamic);
     while (ecs_query_next(&it)) {
@@ -169,6 +166,12 @@ static void box_extract_dynamic(
             }
 
             if (inst[i].transparent) {
+                continue;
+            }
+
+            if (view_mask != BOX_VIEW_LAYER_ALL &&
+                !box_render_layer_visible(inst[i].layer_mask, view_mask))
+            {
                 continue;
             }
 
@@ -233,8 +236,12 @@ void box_render_extract(
     }
 
     ecs_vec_clear(&state->dirty);
-    box_extract_dynamic(world, state, p);
+    if (!state->layer_used) {
+        box_render_extract_dynamic(world, state, p, BOX_VIEW_LAYER_ALL);
+    }
+
     box_extract_counts(state, p);
+    box_render_extract_groups(state, p);
     box_render_extract_views(world, state, p, capture);
     box_render_extract_emitters(world, state, p);
     box_render_validate(world);

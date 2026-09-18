@@ -11,6 +11,11 @@
  * so a singleton is the default of every view and a component on a view
  * overrides it for that view only. BakeSettings follows the same rule through
  * the first view of the frame, because the probe bake is shared by every view.
+ *
+ * A layer is any entity an entity or a light joins with the pair (Layer, layer).
+ * A view lists the layers it shows and the layers that cast its shadows; both
+ * lists hold at most BOX_VIEW_LAYER_MAX entries, end at the first zero and show
+ * every layer when they are empty. An entity in no layer is drawn by every view.
  */
 
 #ifndef BOX_VIEW_H
@@ -38,6 +43,8 @@ ECS_STRUCT(RenderTarget, {
 ECS_STRUCT(View, {
     ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
     ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
+    ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
+    ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
     rgb clear;            /**< Color the target is cleared to */
     float clear_alpha;    /**< Alpha the target is cleared to */
     int32_t priority;     /**< Order in the frame, lower renders first */
@@ -46,6 +53,18 @@ ECS_STRUCT(View, {
     bool material_layers; /**< The view applies material layers, default true */
     bool enabled;         /**< The view is rendered, default true */
 });
+
+/** Entries of the layer lists of a view, which the ECS_STRUCT above spells out */
+#define BOX_VIEW_LAYER_MAX (8)
+
+/** Membership of an entity or a light in a layer, given as the pair (Layer, layer).
+ *
+ * The relationship fragments, so a view finds the entities of a layer without
+ * testing every entity, and it is not exclusive, so an entity may hold more than
+ * one pair. It is inherited on instantiation, so an instance of a prefab joins
+ * the layers of that prefab.
+ */
+extern ECS_TAG_DECLARE(Layer);
 
 /** Red channel of the clear color a view starts out with */
 #define BOX_VIEW_CLEAR_R (39)

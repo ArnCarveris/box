@@ -315,7 +315,7 @@ static void box_frame_view(
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
-    box_scene_draw(r, p, pass);
+    box_scene_draw(r, view, p, pass);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 

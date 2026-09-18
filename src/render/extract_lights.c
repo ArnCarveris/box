@@ -3,7 +3,9 @@
  * @brief Extracts the point and spot lights inside the view frustum into the packet.
  *
  * Static lights are marked so baked instances skip them, and are carried
- * unculled in a second array that the bake accumulates into its probes.
+ * unculled in a second array that the bake accumulates into its probes. Layer
+ * membership is read once per table, because the relationship fragments, and a
+ * light the view does not show is still handed to the shared bake.
  */
 
 #include "render_internal.h"
@@ -193,6 +195,7 @@ static void box_light_cone(
  * @param i Index of the entity in the table
  * @param planes The frustum planes
  * @param is_static Neither the light nor an ancestor carries a dynamic tag
+ * @param visible The view shows the layers of the light
  * @param bake The unculled static lights of the bake are collected too
  * @param p The packet
  */
@@ -201,6 +204,7 @@ static void box_light_extract(
     int32_t i,
     const box_plane_t *planes,
     bool is_static,
+    bool visible,
     bool bake,
     box_packet_t *p)
 {
@@ -224,7 +228,7 @@ static void box_light_extract(
 
     light.is_static = is_static ? 1u : 0u;
     vec3 center = vec3_new(light.position[0], light.position[1], light.position[2]);
-    if (box_light_visible(planes, center, light.range)) {
+    if (visible && box_light_visible(planes, center, light.range)) {
         *(box_light_t*)box_vec_push(&p->lights) = light;
     }
 
@@ -254,9 +258,19 @@ void box_render_extract_lights(
         }
 
         bool is_static = !box_render_is_dynamic(world, it.entities[0]);
+        bool visible = true;
+        if (v->layer_mask != BOX_VIEW_LAYER_ALL) {
+            visible = box_render_layer_visible(
+                box_render_entity_layers(world, state, it.entities[0]), v->layer_mask);
+        }
+
+        if (!visible && !bake) {
+            continue;
+        }
+
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
-            box_light_extract(&it, i, planes, is_static, bake, p);
+            box_light_extract(&it, i, planes, is_static, visible, bake, p);
         }
     }
 

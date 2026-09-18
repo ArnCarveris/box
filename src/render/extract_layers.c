@@ -43,28 +43,6 @@ static char* box_layer_copy(
     return result;
 }
 
-/** Queue every instance for extraction, used when the layer indices changed.
- *
- * @param world The world
- * @param state The registry
- */
-static void box_layer_mark_all(
-    ecs_world_t *world,
-    RenderState *state)
-{
-    ecs_iter_t it = ecs_query_iter(world, state->instances);
-    while (ecs_query_next(&it)) {
-        RenderInstance *inst = ecs_field(&it, RenderInstance, 0);
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            if (!inst[i].dirty) {
-                inst[i].dirty = true;
-                ecs_vec_append_t(NULL, &state->dirty, ecs_entity_t)[0] = it.entities[i];
-            }
-        }
-    }
-}
-
 /** Rebuild the ordered registration list from the layer entities of the world.
  *
  * @param world The world
@@ -169,7 +147,7 @@ void box_render_extract_layers(
     if (state->layers_dirty) {
         box_layer_rebuild(world, state);
         box_layer_emit(world, state, p);
-        box_layer_mark_all(world, state);
+        box_render_mark_all(world, state);
         state->layers_dirty = false;
     }
 

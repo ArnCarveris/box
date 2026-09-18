@@ -14,10 +14,19 @@
 #include "../geometry/mesh_gen.h"
 #include "../view/view_internal.h"
 
+/** Contiguous run of the static slots of a mesh that share a layer mask */
+typedef struct box_slot_group_t {
+    uint32_t mask;   /**< Layers the entities of the run belong to, 0 for every view */
+    uint32_t first;  /**< First slot of the run */
+    uint32_t count;  /**< Slots in the run */
+} box_slot_group_t;
+
 /** Static instance slots of one mesh */
 typedef struct box_batch_t {
     ecs_vec_t entities;  /**< ecs_entity_t per slot */
+    ecs_vec_t groups;    /**< box_slot_group_t, empty while no slot joined a layer */
     bool count_dirty;    /**< Instance count changed since the last packet */
+    bool groups_dirty;   /**< Group ranges changed since the last packet */
 } box_batch_t;
 
 /** Where an entity's instance lives */
@@ -25,6 +34,7 @@ typedef struct RenderInstance {
     uint32_t mesh;   /**< Mesh handle */
     uint32_t slot;   /**< Static slot, unused when dynamic or sorted */
     uint32_t sorted; /**< Index in the sorted draw list, unused when it is not in it */
+    uint32_t layer_mask; /**< Layers the entity belongs to, 0 when it is in none */
     bool dynamic;    /**< Instance is rebuilt every frame */
     bool dirty;      /**< Queued for extraction */
     bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
@@ -72,6 +82,9 @@ typedef struct RenderState {
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
+    ecs_vec_t view_layers;    /**< ecs_entity_t per render layer, the index being its bit */
+    bool layer_used;          /**< An entity or a light joined a render layer */
+    bool layer_full;          /**< The render layer limit was already logged */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
@@ -230,6 +243,110 @@ void box_render_release_slot(
     RenderState *state,
     ecs_entity_t e,
     RenderInstance *inst);
+
+/** Give an entity the static slot of its layer mask, appending one when it has none.
+ *
+ * While no entity has joined a layer the batch has no groups and a new slot is
+ * appended at the end, which is what a scene without layers has always done.
+ * Once groups exist the slot lands in the run of its mask, which costs one slot
+ * move per run between that run and the end of the batch; every moved entity is
+ * requeued so the packet carries its instance data at its new slot.
+ *
+ * @param world The world
+ * @param batch The batch of its mesh
+ * @param e The entity
+ * @param inst Its instance record
+ */
+void box_render_take_slot(
+    ecs_world_t *world,
+    box_batch_t *batch,
+    ecs_entity_t e,
+    RenderInstance *inst);
+
+/** Move an entity that already owns a slot into the run of its current mask.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param batch The batch of its mesh
+ * @param e The entity
+ * @param inst Its instance record
+ */
+void box_render_regroup_slot(
+    ecs_world_t *world,
+    RenderState *state,
+    box_batch_t *batch,
+    ecs_entity_t e,
+    RenderInstance *inst);
+
+/** Send the slot runs of every batch that regrouped since the last packet.
+ *
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_groups(
+    RenderState *state,
+    box_packet_t *p);
+
+/** Bit of a layer entity in a membership mask, assigning one on first use.
+ *
+ * @param state The registry
+ * @param layer The layer entity
+ * @return The bit of the layer, 0 when the layer limit is reached
+ */
+uint32_t box_render_layer_bit(
+    RenderState *state,
+    ecs_entity_t layer);
+
+/** Layers an entity or a light belongs to, read through its prefabs.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The entity
+ * @return One bit per layer the entity joined, 0 when it joined none
+ */
+uint32_t box_render_entity_layers(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e);
+
+/** Layer mask of one of the layer lists of a view.
+ *
+ * @param state The registry
+ * @param list The list, which ends at its first zero
+ * @return The bits of the listed layers, BOX_VIEW_LAYER_ALL when the list is empty
+ */
+uint32_t box_render_view_layers(
+    const RenderState *state,
+    const ecs_entity_t *list);
+
+/** Check whether a view shows the entities of a membership mask.
+ *
+ * @param mask The membership mask, 0 for an entity that joined no layer
+ * @param view_mask The layer mask of the view
+ * @return True when the view draws it
+ */
+static inline bool box_render_layer_visible(
+    uint32_t mask,
+    uint32_t view_mask)
+{
+    return !mask || (mask & view_mask) != 0;
+}
+
+/** Register the observer that tracks layer membership.
+ *
+ * @param world The world
+ */
+void box_render_view_layers_init(
+    ecs_world_t *world);
+
+/** Queue every instance of the world for static extraction.
+ *
+ * @param world The world
+ * @param state The registry
+ */
+void box_render_mark_all(
+    ecs_world_t *world,
+    RenderState *state);
 
 /** Fill the instance data of an entity from its components.
  *
@@ -391,6 +508,19 @@ ecs_entity_t box_render_active_camera(
 void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p);
+
+/** Append the dynamic batches a view draws, grouped by mesh.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ * @param view_mask Layers the view shows, BOX_VIEW_LAYER_ALL for every layer
+ */
+void box_render_extract_dynamic(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p,
+    uint32_t view_mask);
 
 /** Fill the light array of one view with the lights inside its frustum.
  *

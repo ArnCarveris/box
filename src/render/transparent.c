@@ -230,6 +230,13 @@ void box_render_extract_transparent(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->sort); i ++) {
         ecs_entity_t e = entities[keys[i].index];
+        if (v->layer_mask != BOX_VIEW_LAYER_ALL) {
+            const RenderInstance *inst = ecs_get(world, e, RenderInstance);
+            if (inst && !box_render_layer_visible(inst->layer_mask, v->layer_mask)) {
+                continue;
+            }
+        }
+
         const RenderMesh *mesh = ecs_get(world, e, RenderMesh);
         const WorldTransform *transform = ecs_get(world, e, WorldTransform);
         ecs_assert(mesh != NULL, ECS_INTERNAL_ERROR, NULL);

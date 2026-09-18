@@ -26,8 +26,9 @@ static void box_render_state_dtor(
     for (i = 0; i < count; i ++) {
         int32_t j;
         for (j = 0; j < ecs_vec_count(&state[i].batches); j ++) {
-            ecs_vec_fini_t(NULL, &ecs_vec_get_t(&state[i].batches, box_batch_t, j)->entities,
-                ecs_entity_t);
+            box_batch_t *batch = ecs_vec_get_t(&state[i].batches, box_batch_t, j);
+            ecs_vec_fini_t(NULL, &batch->entities, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &batch->groups, box_slot_group_t);
         }
 
         ecs_vec_fini_t(NULL, &state[i].batches, box_batch_t);
@@ -49,6 +50,7 @@ static void box_render_state_dtor(
         }
 
         ecs_vec_fini_t(NULL, &state[i].layers, box_layer_t);
+        ecs_vec_fini_t(NULL, &state[i].view_layers, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].transparent, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].sort, box_sort_key_t);
@@ -113,7 +115,9 @@ uint32_t box_render_mesh_create(
 
     box_batch_t *batch = ecs_vec_append_t(NULL, &state->batches, box_batch_t);
     ecs_vec_init_t(NULL, &batch->entities, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &batch->groups, box_slot_group_t, 0);
     batch->count_dirty = false;
+    batch->groups_dirty = false;
 
     box_mesh_cmd_t *cmd = ecs_vec_append_t(NULL, &state->pending_meshes, box_mesh_cmd_t);
     cmd->handle = handle;
@@ -184,6 +188,7 @@ void BoxRenderImport(
     }
 
     ecs_vec_init_t(NULL, &state->layers, box_layer_t, 0);
+    ecs_vec_init_t(NULL, &state->view_layers, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->transparent, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->sort, box_sort_key_t, 0);
@@ -195,6 +200,7 @@ void BoxRenderImport(
     box_render_texture_init(world);
     box_render_view_init(world);
     box_render_layers_init(world);
+    box_render_view_layers_init(world);
     box_render_instance_init(world);
     box_render_extract_init(world);
 }

@@ -147,6 +147,7 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer statics;              /**< Static instance buffer */
     uint32_t static_capacity;        /**< Instances the static buffer can hold */
     uint32_t static_count;           /**< Static instances to draw */
+    box_vec_t groups;                /**< box_static_group_t, empty when no slot has a layer */
     WGPUBuffer probe_descs;          /**< Probe grid descriptor per static slot */
     WGPUBuffer probes;               /**< Probe pool of the mesh, baked spherical harmonics */
     WGPUBuffer probe_jobs;           /**< Probes the bake pass writes this frame */
@@ -398,14 +399,16 @@ void box_scene_apply(
     box_renderer_t *r,
     const box_packet_t *p);
 
-/** Record draw calls for every mesh with instances.
+/** Record draw calls for every mesh with instances the view shows.
  *
  * @param r The renderer
+ * @param view The view being drawn
  * @param p The packet
  * @param pass The render pass
  */
 void box_scene_draw(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPURenderPassEncoder pass);
 

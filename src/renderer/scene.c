@@ -36,6 +36,7 @@ static box_gpu_mesh_t* box_scene_mesh(
     while (r->meshes.count <= handle) {
         box_gpu_mesh_t *m = box_vec_push(&r->meshes);
         memset(m, 0, sizeof(box_gpu_mesh_t));
+        box_vec_init(&m->groups, sizeof(box_static_group_t));
     }
 
     return box_vec_at(&r->meshes, handle);
@@ -52,7 +53,9 @@ static void box_scene_mesh_release(
     if (m->vertices) wgpuBufferRelease(m->vertices);
     if (m->indices) wgpuBufferRelease(m->indices);
     if (m->statics) wgpuBufferRelease(m->statics);
+    box_vec_fini(&m->groups);
     memset(m, 0, sizeof(box_gpu_mesh_t));
+    box_vec_init(&m->groups, sizeof(box_static_group_t));
 }
 
 /** Upload a mesh from a create command and free the command's arrays.
@@ -173,6 +176,20 @@ void box_scene_apply(
         m->static_count = c->count;
     }
 
+    uint32_t grouped = 0xFFFFFFFFu;
+    for (i = 0; i < p->static_groups.count; i ++) {
+        box_static_group_t *g = box_vec_at(&p->static_groups, i);
+        box_gpu_mesh_t *m = box_scene_mesh(r, g->mesh);
+        if (g->mesh != grouped) {
+            box_vec_clear(&m->groups);
+            grouped = g->mesh;
+        }
+
+        if (g->count) {
+            *(box_static_group_t*)box_vec_push(&m->groups) = *g;
+        }
+    }
+
     for (i = 0; i < p->static_updates.count; i ++) {
         box_static_update_t *u = box_vec_at(&p->static_updates, i);
         box_gpu_mesh_t *m = box_scene_mesh(r, u->mesh);
@@ -187,8 +204,58 @@ void box_scene_apply(
     box_scene_upload_dynamics(r, p);
 }
 
+/** Record the static draws of one mesh, one per run of slots the view shows.
+ *
+ * A mesh without runs is drawn in a single call, and so is a mesh whose runs a
+ * view shows all of, because its runs cover its slots without a gap.
+ *
+ * @param m The mesh entry
+ * @param view The view being drawn
+ * @param pass The render pass
+ */
+static void box_scene_draw_statics(
+    box_gpu_mesh_t *m,
+    const box_view_t *view,
+    WGPURenderPassEncoder pass)
+{
+    uint64_t stride = sizeof(box_instance_t);
+    if (!m->groups.count || view->layer_mask == BOX_VIEW_LAYER_ALL) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, m->static_count, 0, 0, 0);
+        goto done;
+    }
+
+    uint32_t first = 0;
+    uint32_t count = 0;
+    uint32_t g;
+    for (g = 0; g <= m->groups.count; g ++) {
+        box_static_group_t *run = g < m->groups.count ? box_vec_at(&m->groups, g) : NULL;
+        bool shown = run && (!run->mask || (run->mask & view->layer_mask));
+        if (shown && count && run->first == first + count) {
+            count += run->count;
+            continue;
+        }
+
+        if (count) {
+            wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, (uint64_t)first * stride,
+                (uint64_t)count * stride);
+            wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, count, 0, 0, 0);
+            count = 0;
+        }
+
+        if (shown) {
+            first = run->first;
+            count = run->count;
+        }
+    }
+
+done:
+    return;
+}
+
 void box_scene_draw(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPURenderPassEncoder pass)
 {
@@ -201,13 +268,13 @@ void box_scene_draw(
 
         wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, i, true), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
             WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, m->static_count, 0, 0, 0);
+        box_scene_draw_statics(m, view, pass);
     }
 
-    for (i = 0; i < p->dynamic_batches.count; i ++) {
+    uint32_t last = view->dynamic_first + view->dynamic_count;
+    for (i = view->dynamic_first; i < last; i ++) {
         box_dynamic_batch_t *b = box_vec_at(&p->dynamic_batches, i);
         box_gpu_mesh_t *m = box_scene_mesh(r, b->mesh);
         if (!m->alive || !b->count) {

@@ -8,6 +8,7 @@
 
 ECS_COMPONENT_DECLARE(ViewImpl);
 ECS_COMPONENT_DECLARE(RenderTargetImpl);
+ECS_TAG_DECLARE(Layer);
 
 /** View constructor: everything a view draws is on and the view is enabled.
  *
@@ -26,6 +27,8 @@ static void box_view_ctor(
     for (i = 0; i < count; i ++) {
         v[i].camera = 0;
         v[i].target = 0;
+        memset(v[i].layers, 0, sizeof(v[i].layers));
+        memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
         v[i].clear.r = BOX_VIEW_CLEAR_R;
         v[i].clear.g = BOX_VIEW_CLEAR_G;
         v[i].clear.b = BOX_VIEW_CLEAR_B;
@@ -49,6 +52,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, View);
     ECS_COMPONENT_DEFINE(world, ViewImpl);
     ECS_COMPONENT_DEFINE(world, RenderTargetImpl);
+    ECS_TAG_DEFINE(world, Layer);
 
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
     ecs_set_hooks(world, RenderTarget, { .ctor = flecs_default_ctor });
@@ -59,4 +63,5 @@ void BoxViewImport(
     ecs_add_pair(world, ecs_id(RenderTarget), EcsWith, ecs_id(RenderTargetImpl));
     ecs_add_pair(world, ecs_id(ViewImpl), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderTargetImpl), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, Layer, EcsOnInstantiate, EcsInherit);
 }
