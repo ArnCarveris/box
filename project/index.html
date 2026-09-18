@@ -1082,8 +1082,10 @@ function planLayout(epics, order) {
   order.forEach((name, i) => { rank[name] = i; });
   const at = e => (rank[e.name] == null ? order.length : rank[e.name]);
   const cols = [];
+  let last = 0;
   for (const e of epics.slice().sort((a, b) => at(a) - at(b))) {
-    const c = depth[e.name] || 0;
+    const c = Math.max(depth[e.name] || 0, last);
+    last = c;
     (cols[c] = cols[c] || []).push(e);
   }
   const rows = cols.reduce((a, col) => Math.max(a, col ? col.length : 0), 1);

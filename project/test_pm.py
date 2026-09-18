@@ -32,6 +32,7 @@ globalThis.EPICS = [
   { name: "four", title: "Four", status: "pending", locked: false, dependencies: ["two", "three"] },
 ];
 globalThis.ORDER = ["root", "core", "one", "two", "three", "four"];
+globalThis.BAD_ORDER = ["root", "core", "two", "one", "three", "four"];
 globalThis.LOCKED = ["root", "core"];
 globalThis.overlaps = list => {
   const hits = [];
@@ -567,7 +568,7 @@ const depth = planDepths(EPICS);
 const layout = planLayout(EPICS, ORDER);
 element.innerHTML = planSvg(layout, EPICS, ORDER, { x: 0, y: 0, k: 1 });
 const markup = element.innerHTML;
-const badOrder = ["root", "core", "two", "one", "three", "four"];
+const badOrder = BAD_ORDER;
 const badMarkup = planSvg(planLayout(EPICS, badOrder), EPICS, badOrder, { x: 0, y: 0, k: 1 });
 console.log(JSON.stringify({
   depth,
@@ -584,10 +585,18 @@ console.log(JSON.stringify({
   violations: planViolations(EPICS, badOrder),
   badArrows: count(badMarkup, "plan-arrow bad"),
   badTip: badMarkup.includes("Two is planned before one"),
+  xs: ORDER.map(n => [n, layout.nodes[n].x]),
+  badXs: badOrder.map(n => [n, planLayout(EPICS, badOrder).nodes[n].x]),
 }));
 """)
         self.assertEqual(out["depth"], {"root": 0, "core": 1, "one": 2, "two": 3, "three": 2, "four": 4})
-        self.assertEqual(dict(out["columns"]), out["depth"])
+        self.assertEqual(dict(out["columns"]),
+                         {"root": 0, "core": 1, "one": 2, "two": 3, "three": 3, "four": 4})
+        for name, column in out["columns"]:
+            self.assertGreaterEqual(column, out["depth"][name])
+        for xs in (out["xs"], out["badXs"]):
+            for (prev, x0), (name, x1) in zip(xs, xs[1:]):
+                self.assertGreaterEqual(x1, x0, "%s is left of %s" % (name, prev))
         self.assertEqual(out["overlaps"], [])
         self.assertEqual(out["size"], [True, True])
         self.assertEqual(dict(out["rows"])["one"], 0)
