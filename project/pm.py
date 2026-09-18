@@ -40,6 +40,8 @@ MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", 
                 "p95_ns", "p99_ns", "outliers", "iterations", "samples", "items_per_sec")
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
+PLAN_FILE = "plan.json"
+LOCKED_STATUSES = ("complete", "in progress")
 
 
 def now():
@@ -131,14 +133,88 @@ def child_dirs(path):
         yield name, full
 
 
-def start_order(item):
+def plan_path():
+    return os.path.join(DB, PLAN_FILE)
+
+
+def read_plan():
+    data = read_json(plan_path())
+    order = data.get("order") if isinstance(data, dict) else None
+    if not isinstance(order, list):
+        return []
+    return [name for name in order if isinstance(name, str)]
+
+
+def write_plan(order):
+    path = plan_path()
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"order": list(order)}, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def plan_index(order=None):
+    names = read_plan() if order is None else order
+    return {name: i for i, name in enumerate(names)}
+
+
+def start_order(item, index=None):
     started = item["start_time"] or ""
     if started:
         result = (0, started, 0, item["name"])
     else:
-        result = (1, "", item["priority"], item["created"] or "", item["name"])
+        index = index or {}
+        rank = index.get(item["name"], len(index))
+        result = (1, "", rank, item["created"] or "", item["name"])
 
     return result
+
+
+def epic_summary(name, path):
+    progress = read_json(os.path.join(path, "progress.json")) or {}
+    readme = parse_readme(read_text(os.path.join(path, "README.md")))
+    status = progress.get("status", "pending")
+    return {
+        "name": name,
+        "path": name,
+        "title": readme["title"] or name,
+        "status": status,
+        "kind": progress.get("kind", "feature"),
+        "dependencies": progress.get("dependencies", []),
+        "created": progress.get("created"),
+        "start_time": progress.get("start_time"),
+        "end_time": progress.get("end_time"),
+        "locked": status in LOCKED_STATUSES,
+    }
+
+
+def epic_summaries():
+    if not os.path.isdir(DB):
+        return []
+    return [epic_summary(name, full) for name, full in child_dirs(DB)]
+
+
+def normalize_order(order, epics):
+    by_name = {e["name"]: e for e in epics}
+    result = []
+    for name in order:
+        if not isinstance(name, str) or name not in by_name:
+            return None, f"unknown epic '{name}'"
+        if name in result:
+            return None, f"duplicate epic '{name}'"
+        result.append(name)
+    rest = sorted((e for e in epics if e["name"] not in result), key=lambda e: (e["created"] or "", e["name"]))
+    result.extend(e["name"] for e in rest)
+    locked = sorted((n for n in result if by_name[n]["locked"]), key=lambda n: (by_name[n]["start_time"] or "", n))
+    return locked + [n for n in result if not by_name[n]["locked"]], None
+
+
+def plan_state():
+    epics = epic_summaries()
+    known = {e["name"] for e in epics}
+    order, _ = normalize_order([n for n in dict.fromkeys(read_plan()) if n in known], epics)
+    return {"generated": now(), "order": order or [], "epics": epics}
 
 
 def walk_item(path, level, rel):
@@ -154,7 +230,6 @@ def walk_item(path, level, rel):
         "end_time": progress.get("end_time"),
         "dependencies": progress.get("dependencies", []),
         "created": progress.get("created"),
-        "priority": progress.get("priority", 1000),
         "deliverables": list_deliverables(path),
         "children": [],
     }
@@ -492,9 +567,10 @@ def aggregate_benchmarks(extra_dirs=None):
 def collect_state():
     epics = []
     if os.path.isdir(DB):
+        index = plan_index()
         for name, full in child_dirs(DB):
             epics.append(walk_item(full, 0, name))
-        epics.sort(key=start_order)
+        epics.sort(key=lambda item: start_order(item, index))
     return {"generated": now(), "epics": epics}
 
 
@@ -513,6 +589,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(aggregate_tests())
         if route == "/api/benchmarks":
             return self.send_json(aggregate_benchmarks())
+        if route == "/api/plan":
+            return self.send_json(plan_state())
         if route == "/inspector":
             if not os.path.isfile(INSPECTOR):
                 return self.send_error(404, "apps/box_inspector/index.html is not there yet")
@@ -525,9 +603,27 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_file(full, content_type(full))
         return self.send_error(404)
 
-    def send_json(self, payload):
+    def do_POST(self):
+        route = urllib.parse.unquote(urllib.parse.urlparse(self.path).path)
+        if route != "/api/plan":
+            return self.send_error(404)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            payload = json.loads(self.rfile.read(length) or b"null")
+        except ValueError:
+            return self.send_json({"error": "body is not valid json"}, 400)
+        order = payload.get("order") if isinstance(payload, dict) else None
+        if not isinstance(order, list):
+            return self.send_json({"error": "expected an object with an 'order' list"}, 400)
+        normalized, error = normalize_order(order, epic_summaries())
+        if error:
+            return self.send_json({"error": error}, 400)
+        write_plan(normalized)
+        return self.send_json(plan_state())
+
+    def send_json(self, payload, status=200):
         body = json.dumps(payload).encode()
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
@@ -583,6 +679,8 @@ def cmd_new(args):
         sys.exit(f"parent of {args.path} does not exist")
     os.makedirs(directory)
     deps = [d.strip() for d in (args.deps or "").split(",") if d.strip()]
+    if len(parts) == 1 and args.path not in read_plan():
+        write_plan(read_plan() + [args.path])
     write_progress(directory, {
         "kind": args.type,
         "status": "pending",
@@ -625,6 +723,28 @@ def cmd_status(args):
             show(child, depth + 1)
     for epic in collect_state()["epics"]:
         show(epic, 0)
+
+
+def check_plan(epics, problems, warnings):
+    if not os.path.isfile(plan_path()):
+        return
+    order = read_plan()
+    by_name = {e["name"]: e for e in epics}
+    seen = []
+    for name in order:
+        if name not in by_name:
+            problems.append(f"{PLAN_FILE}: unknown epic '{name}'")
+        elif name in seen:
+            problems.append(f"{PLAN_FILE}: duplicate epic '{name}'")
+        seen.append(name)
+    for name in sorted(set(by_name) - set(seen)):
+        problems.append(f"{PLAN_FILE}: missing epic '{name}'")
+    pos = {name: i for i, name in enumerate(order)}
+    for name in order:
+        for dep in by_name.get(name, {}).get("dependencies", []):
+            dep_name = str(dep).split("/")[0]
+            if dep_name in pos and pos[dep_name] > pos[name]:
+                warnings.append(f"{PLAN_FILE}: warning: {name} is planned before its dependency {dep_name}")
 
 
 def cmd_check(args):
@@ -677,6 +797,7 @@ def cmd_check(args):
 
     for epic in state["epics"]:
         visit_deps(epic)
+    check_plan(state["epics"], problems, warnings)
     for problem in problems:
         print(problem)
     for warning in warnings:

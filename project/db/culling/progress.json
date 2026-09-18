@@ -6,6 +6,5 @@
   "end_time": null,
   "dependencies": [
     "views"
-  ],
-  "priority": 5
+  ]
 }

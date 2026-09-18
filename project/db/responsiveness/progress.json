@@ -6,6 +6,5 @@
   "end_time": null,
   "dependencies": [
     "lighting"
-  ],
-  "priority": 9
+  ]
 }

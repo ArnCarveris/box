@@ -39,13 +39,14 @@ class PmTests(unittest.TestCase):
         pm.INSPECTOR = self.old_inspector
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def get(self, route):
+    def get(self, route, body=None):
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), pm.Handler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         url = "http://127.0.0.1:%d%s" % (server.server_address[1], route)
+        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"} if body else {})
         try:
-            with urllib.request.urlopen(url) as response:
+            with urllib.request.urlopen(request) as response:
                 return response.status, response.headers.get("Content-Type"), response.read()
         except urllib.error.HTTPError as err:
             return err.code, err.headers.get("Content-Type"), err.read()
@@ -53,6 +54,10 @@ class PmTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join()
+
+    def post_plan(self, order):
+        status, _, body = self.get("/api/plan", json.dumps({"order": order}).encode())
+        return status, json.loads(body)
 
     def new(self, kind, path, title, **kw):
         args = Args(kind=kind, path=path, title=title, brief=kw.get("brief", "Brief."), type=kw.get("type", "feature"), deps=kw.get("deps"))
@@ -371,16 +376,135 @@ class PmTests(unittest.TestCase):
             self.assertEqual(pm.cmd_check(None), 0)
 
 
-    def test_unstarted_items_sort_by_priority(self):
-        late = {"name": "b", "start_time": None, "created": "2026-01-01", "priority": 2}
+    def test_unstarted_items_sort_by_plan_order(self):
+        late = {"name": "b", "start_time": None, "created": "2026-01-01"}
 
-        early = {"name": "a", "start_time": None, "created": "2026-01-02", "priority": 1}
+        early = {"name": "a", "start_time": None, "created": "2026-01-02"}
 
-        started = {"name": "c", "start_time": "2026-02-01", "created": "2026-01-03", "priority": 9}
+        started = {"name": "c", "start_time": "2026-02-01", "created": "2026-01-03"}
 
-        ordered = sorted([late, early, started], key=pm.start_order)
+        index = pm.plan_index(["c", "a", "b"])
+
+        ordered = sorted([late, early, started], key=lambda i: pm.start_order(i, index))
 
         self.assertEqual([i["name"] for i in ordered], ["c", "a", "b"])
+
+    def test_plan_file_round_trip(self):
+        self.assertEqual(pm.read_plan(), [])
+        pm.write_plan(["b", "a"])
+        self.assertEqual(pm.read_plan(), ["b", "a"])
+        self.assertEqual(pm.plan_index(), {"b": 0, "a": 1})
+        with open(pm.plan_path()) as f:
+            self.assertEqual(json.load(f), {"order": ["b", "a"]})
+        self.assertEqual(sorted(os.listdir(pm.DB)), ["plan.json"])
+        with open(pm.plan_path(), "w") as f:
+            f.write("{ not json")
+        self.assertEqual(pm.read_plan(), [])
+
+    def test_epics_sort_by_plan_order_with_missing_ones_appended(self):
+        for name in ("a", "b", "c", "d"):
+            self.new("epic", name, "Epic " + name)
+        pm.write_plan(["c", "a"])
+        self.assertEqual([e["name"] for e in pm.collect_state()["epics"]], ["c", "a", "b", "d"])
+        pm.set_status("d", "in progress")
+        self.assertEqual([e["name"] for e in pm.collect_state()["epics"]], ["d", "c", "a", "b"])
+        self.assertNotIn("priority", pm.collect_state()["epics"][0])
+
+    def test_plan_api_returns_the_order_with_epic_details(self):
+        self.new("epic", "a", "Epic a")
+        self.new("epic", "b", "Epic b", deps="a")
+        pm.set_status("a", "complete")
+        pm.write_plan(["b", "a"])
+        status, ctype, body = self.get("/api/plan")
+        self.assertEqual((status, ctype), (200, "application/json"))
+        data = json.loads(body)
+        self.assertEqual(data["order"], ["a", "b"])
+        epics = {e["name"]: e for e in data["epics"]}
+        self.assertEqual(epics["a"]["title"], "Epic a")
+        self.assertEqual(epics["a"]["status"], "complete")
+        self.assertTrue(epics["a"]["locked"])
+        self.assertFalse(epics["b"]["locked"])
+        self.assertEqual(epics["b"]["dependencies"], ["a"])
+        self.assertIsNotNone(epics["a"]["start_time"])
+        self.assertEqual(pm.read_plan(), ["b", "a"])
+
+    def test_plan_post_writes_the_normalized_order(self):
+        for name in ("a", "b", "c"):
+            self.new("epic", name, "Epic " + name)
+        pm.write_plan(["a", "b", "c"])
+        status, data = self.post_plan(["c", "a", "b"])
+        self.assertEqual(status, 200)
+        self.assertEqual(data["order"], ["c", "a", "b"])
+        self.assertEqual(pm.read_plan(), ["c", "a", "b"])
+        self.assertEqual([e["name"] for e in pm.collect_state()["epics"]], ["c", "a", "b"])
+        status, data = self.post_plan(["b"])
+        self.assertEqual((status, data["order"]), (200, ["b", "a", "c"]))
+
+    def test_plan_post_rejects_unknown_and_duplicate_names(self):
+        self.new("epic", "a", "Epic a")
+        self.new("epic", "b", "Epic b")
+        pm.write_plan(["a", "b"])
+        status, data = self.post_plan(["a", "nope"])
+        self.assertEqual(status, 400)
+        self.assertEqual(data["error"], "unknown epic 'nope'")
+        status, data = self.post_plan(["a", "a", "b"])
+        self.assertEqual(status, 400)
+        self.assertEqual(data["error"], "duplicate epic 'a'")
+        status, _, body = self.get("/api/plan", b"not json")
+        self.assertEqual(status, 400)
+        self.assertIn(b"json", body)
+        status, _, body = self.get("/api/plan", b'{"order": 3}')
+        self.assertEqual(status, 400)
+        self.assertEqual(pm.read_plan(), ["a", "b"])
+
+    def test_plan_post_keeps_locked_epics_in_front(self):
+        for name in ("a", "b", "c", "d"):
+            self.new("epic", name, "Epic " + name)
+        pm.set_status("b", "complete")
+        time.sleep(0.002)
+        pm.set_status("c", "in progress")
+        status, data = self.post_plan(["d", "c", "a", "b"])
+        self.assertEqual((status, data["order"]), (200, ["b", "c", "d", "a"]))
+        self.assertEqual(pm.read_plan(), ["b", "c", "d", "a"])
+
+    def test_check_validates_the_plan_file(self):
+        self.new("epic", "a", "Epic a")
+        self.new("epic", "b", "Epic b", deps="a")
+        pm.write_plan(["b", "b", "gone"])
+        import io, contextlib
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = pm.cmd_check(None)
+        text = out.getvalue()
+        self.assertEqual(rc, 1)
+        self.assertIn("plan.json: unknown epic 'gone'", text)
+        self.assertIn("plan.json: duplicate epic 'b'", text)
+        self.assertIn("plan.json: missing epic 'a'", text)
+
+    def test_check_warns_when_an_epic_is_planned_before_its_dependency(self):
+        self.new("epic", "a", "Epic a")
+        self.new("epic", "b", "Epic b", deps="a")
+        pm.write_plan(["b", "a"])
+        import io, contextlib
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = pm.cmd_check(None)
+        text = out.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertIn("plan.json: warning: b is planned before its dependency a", text)
+        self.assertIn("0 problem(s), 1 warning(s)", text)
+        pm.write_plan(["a", "b"])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            pm.cmd_check(None)
+        self.assertIn("0 problem(s), 0 warning(s)", out.getvalue())
+
+    def test_new_epic_appends_to_the_plan(self):
+        self.new("epic", "a", "Epic a")
+        self.assertEqual(pm.read_plan(), ["a"])
+        self.new("epic", "b", "Epic b")
+        self.new("task", "b/t1", "Task")
+        self.assertEqual(pm.read_plan(), ["a", "b"])
 
     def write_wasm(self, epic):
         directory = os.path.join(pm.DB, epic, "deliverable", "wasm")

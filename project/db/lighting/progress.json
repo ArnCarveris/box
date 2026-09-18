@@ -6,6 +6,5 @@
   "end_time": null,
   "dependencies": [
     "scene_core"
-  ],
-  "priority": 1
+  ]
 }

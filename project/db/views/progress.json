@@ -7,6 +7,5 @@
   "dependencies": [
     "lighting",
     "materials"
-  ],
-  "priority": 4
+  ]
 }
