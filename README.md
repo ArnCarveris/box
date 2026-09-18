@@ -169,8 +169,12 @@ Work is tracked as epics, tasks and subtasks under `project/db`. Each item has
 a `README.md` with its goal and a `progress.json` with its status and timing;
 tasks and epics keep test reports, screenshots and notes in `deliverable/`.
 
-Besides the board and timeline, the page has a **Tests** tab (per test project a
-table of suites with the time of the latest report and a chart of time per suite
+The **Plan** tab draws the epics as a node diagram with their dependencies and a
+chain of order arrows from `project/db/plan.json`; dragging an arrow head onto an
+epic replans it after that epic with `POST /api/plan` (started epics stay first).
+
+Besides the board, timeline and plan, the page has a **Tests** tab (per test
+project a table of suites with the time of the latest report and a chart of time per suite
 over every report, expanding into cases with their own history) and a
 **Benchmarks** tab (the same breakdown for bake3 benchmark suites, expanding into
 the median, confidence interval, p99 and samples per case, plus frame timing per
@@ -186,7 +190,7 @@ local instance** opens it on `http://localhost:27750`.
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
 python3 project/pm.py start <epic>/<task>
 python3 project/pm.py done <epic>/<task>
-python3 project/pm.py check            # validates READMEs, statuses and dependencies
+python3 project/pm.py check            # validates READMEs, statuses, dependencies and plan.json
 ```
 
 ## Layout

@@ -1,8 +1,9 @@
 # Roadmap
 
-Epic order after the command and inspector epics, as general guidance (the
-`priority` field in each epic's `progress.json` orders unstarted epics on the
-status page; dependencies say what actually blocks what):
+Epic order after the command and inspector epics, as general guidance. The
+order the tool uses lives in `project/db/plan.json`, which seeded it from this
+list; it sorts unstarted epics on the status page and is edited by dragging the
+order arrows on the Plan tab (dependencies say what actually blocks what):
 
 1. lighting
 2. textures
