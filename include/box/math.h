@@ -571,6 +571,23 @@ static inline mat4 mat4_facing(
     return m;
 }
 
+/** Extract Euler angles composed as Rx * Ry * Rz from a rotation matrix.
+ *
+ * @param m The rotation matrix
+ * @return Angles about X, Y and Z
+ */
+static inline vec3 mat4_to_euler_xyz(
+    const mat4 *m)
+{
+    float sy = fminf(fmaxf(mat4_at(m, 0, 2), -1.0f), 1.0f);
+    vec3 r;
+    r.x = atan2f(-mat4_at(m, 1, 2), mat4_at(m, 2, 2));
+    r.y = asinf(sy);
+    r.z = atan2f(-mat4_at(m, 0, 1), mat4_at(m, 0, 0));
+
+    return r;
+}
+
 /** Reverse Z perspective projection with an infinite far plane.
  *
  * @param fov_y Vertical field of view in radians

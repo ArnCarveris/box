@@ -3,6 +3,9 @@
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
  * The box.transform module keeps WorldTransform equal to parent * T * R * S.
+ * Static entities are updated by observers when their pose or parent changes,
+ * entities with DynamicTransform on themselves or an ancestor are updated every
+ * frame in PostUpdate.
  */
 
 #ifndef BOX_TRANSFORM_H

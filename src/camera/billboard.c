@@ -6,23 +6,6 @@
 #include <box.h>
 #include "camera_internal.h"
 
-/** Extract Rotation angles from a facing matrix composed as Rx * Ry * Rz.
- *
- * @param m The rotation matrix
- * @return The Euler angles
- */
-static Rotation box_billboard_euler(
-    const mat4 *m)
-{
-    Rotation r;
-    float m12 = mat4_at(m, 1, 2);
-    r.x = asinf(fmaxf(-1.0f, fminf(1.0f, -m12)));
-    r.y = atan2f(mat4_at(m, 0, 2), mat4_at(m, 2, 2));
-    r.z = atan2f(mat4_at(m, 1, 0), mat4_at(m, 1, 1));
-
-    return r;
-}
-
 /** Face every billboard towards the camera position.
  *
  * @param it Iterator over billboards
@@ -48,7 +31,8 @@ static void BoxBillboard(
         vec3 dir = vec3_sub(eye, pos);
         if (vec3_length(dir) > 0) {
             mat4 facing = mat4_facing(dir, vec3_new(0, 1, 0));
-            rotation[i] = box_billboard_euler(&facing);
+            vec3 e = mat4_to_euler_xyz(&facing);
+            rotation[i] = (Rotation){ e.x, e.y, e.z };
             ecs_modified(it->world, it->entities[i], Rotation);
         }
     }
