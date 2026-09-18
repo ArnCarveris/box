@@ -275,6 +275,26 @@ nothing and binds a one texel dummy. `include/effect.wgsl` gives a pass its bind
 `test/integration/visual/effect_toggle.flecs` is the effect check: the same scene with
 the color grade enabled, which is visibly brighter and more saturated.
 
+The engine registers its own effects as entities under `box.effects.stack`, all
+disabled, so a scene turns one on and gives it parameters:
+
+```
+box { effects { stack { bloom {
+  Effect: {enabled: true}
+  Bloom: {intensity: 0.22, radius: 1, knee: 0, firefly_clamp: 8}
+} } } }
+```
+
+`fog` (order 700) integrates a height fog along the view ray it rebuilds from the
+depth, `bloom` (800) mixes in a pyramid of the image, `auto_exposure` (850) scales
+it by the exposure its histogram adapted to and `tonemap` (900) maps the result
+onto the display and dithers it. Two of them ask the frame for work through their
+own inputs: `pyramid` builds the mip chain of the image the pass reads and
+`exposure` runs the histogram and adaptation compute passes over it. Targets
+between two passes are RGBA16F, so what an earlier pass pushes past white reaches
+the tone map. `height_fog.flecs`, `bloom.flecs`, `auto_exposure.flecs` and
+`tonemap.flecs` under `test/integration/visual` show one effect each.
+
 ## Benchmarks
 
 `bench/<module>` holds one bake3 bench project per engine module, mirroring the
