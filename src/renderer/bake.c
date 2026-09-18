@@ -32,7 +32,7 @@ box_bake_mesh_t* box_bake_state_mesh(
         memset(entry, 0, sizeof(box_bake_mesh_t));
         box_vec_init(&entry->descs, sizeof(box_probe_desc_t));
         box_vec_init(&entry->dirty, sizeof(uint8_t));
-        box_vec_init(&entry->jobs, sizeof(uint32_t));
+        box_vec_init(&entry->jobs, sizeof(box_bake_slot_t));
         entry->upload_lo = UINT32_MAX;
     }
 
@@ -84,6 +84,8 @@ static void box_bake_reset(
         box_vec_clear(&m->jobs);
         m->upload_lo = UINT32_MAX;
         m->upload_hi = 0;
+        m->probe_count = 0;
+        m->pool_dirty = false;
     }
 
     box_vec_clear(&s->dirty);
@@ -177,15 +179,19 @@ static void box_bake_push_sphere(
 
 /** Build the probe descriptor of an instance from its transform and mesh bounds.
  *
+ * @param s The state
  * @param m The mesh entry
  * @param inst The instance data
- * @param out The descriptor to fill
+ * @param out The descriptor to fill, its pool index left at zero
  */
 static void box_bake_desc(
+    const box_bake_state_t *s,
     const box_bake_mesh_t *m,
     const box_instance_t *inst,
     box_probe_desc_t *out)
 {
+    memset(out, 0, sizeof(box_probe_desc_t));
+
     float center[3];
     float half[3];
     int axis;
@@ -206,6 +212,93 @@ static void box_bake_desc(
 
     out->position[3] = sqrtf(radius);
     out->extent[3] = 1.0f;
+
+    uint32_t dim[3];
+    box_probe_dims(out->extent, s->spacing, s->probe_max, dim);
+    for (axis = 0; axis < 3; axis ++) {
+        for (row = 0; row < 3; row ++) {
+            out->span[axis][row] = inst->transform[row * 4 + axis] * half[axis] * 2.0f;
+        }
+
+        out->grid[axis + 1] = dim[axis];
+    }
+}
+
+/** Lay the probe pool of a mesh out again and queue every instance whose probes moved.
+ *
+ * @param s The state
+ * @param mesh Mesh handle
+ */
+static void box_bake_layout(
+    box_bake_state_t *s,
+    uint32_t mesh)
+{
+    box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
+    uint32_t base = 0;
+    uint32_t slot;
+    for (slot = 0; slot < m->descs.count; slot ++) {
+        box_probe_desc_t *d = box_vec_at(&m->descs, slot);
+        uint32_t count = box_probe_count(d);
+        if (count && d->grid[0] != base) {
+            d->grid[0] = base;
+            m->upload_lo = slot < m->upload_lo ? slot : m->upload_lo;
+            m->upload_hi = slot + 1 > m->upload_hi ? slot + 1 : m->upload_hi;
+            box_bake_mark(s, mesh, slot);
+        }
+
+        base += count;
+    }
+
+    m->probe_count = base;
+    m->pool_dirty = false;
+}
+
+/** Lay the pool of every mesh whose probe grids changed out again.
+ *
+ * @param s The state
+ */
+static void box_bake_layout_all(
+    box_bake_state_t *s)
+{
+    uint32_t mesh;
+    for (mesh = 0; mesh < s->meshes.count; mesh ++) {
+        if (((box_bake_mesh_t*)box_vec_at(&s->meshes, mesh))->pool_dirty) {
+            box_bake_layout(s, mesh);
+        }
+    }
+}
+
+/** Give every instance the probe grid of the current settings.
+ *
+ * @param s The state
+ */
+static void box_bake_respace(
+    box_bake_state_t *s)
+{
+    uint32_t mesh;
+    for (mesh = 0; mesh < s->meshes.count; mesh ++) {
+        box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
+        uint32_t slot;
+        for (slot = 0; slot < m->descs.count; slot ++) {
+            box_probe_desc_t *d = box_vec_at(&m->descs, slot);
+            if (!box_probe_count(d)) {
+                continue;
+            }
+
+            uint32_t dim[3];
+            box_probe_dims(d->extent, s->spacing, s->probe_max, dim);
+            int axis;
+            for (axis = 0; axis < 3; axis ++) {
+                d->grid[axis + 1] = dim[axis];
+            }
+        }
+
+        m->pool_dirty = true;
+        m->upload_lo = 0;
+        m->upload_hi = m->descs.count;
+    }
+
+    box_bake_mark_all(s);
 }
 
 /** Grow the static scene bounds with the bounds of a probe.
@@ -289,6 +382,7 @@ static void box_bake_apply_counts(
             if (d->extent[3] != 0) {
                 box_bake_push_sphere(s, d->position, s->influence + d->position[3]);
                 s->grid_dirty = true;
+                m->pool_dirty = true;
             }
         }
 
@@ -321,14 +415,16 @@ static void box_bake_apply_updates(
         }
 
         box_probe_desc_t next;
-        box_bake_desc(m, &u->data, &next);
+        box_bake_desc(s, m, &u->data, &next);
         box_probe_desc_t *cur = box_vec_at(&m->descs, u->slot);
+        next.grid[0] = cur->grid[0];
         if (memcmp(cur, &next, sizeof(box_probe_desc_t))) {
             if (cur->extent[3] != 0) {
                 box_bake_push_sphere(s, cur->position, s->influence + cur->position[3]);
             }
 
             box_bake_push_sphere(s, next.position, s->influence + next.position[3]);
+            m->pool_dirty |= box_probe_count(cur) != box_probe_count(&next);
             *cur = next;
             box_bake_bounds_add(s, &next);
             m->upload_lo = u->slot < m->upload_lo ? u->slot : m->upload_lo;
@@ -408,22 +504,78 @@ static void box_bake_diff_emitters(
     }
 }
 
-/** Test a probe against every region that changed this frame.
+/** Order two changed regions by the x coordinate of their center.
  *
- * @param s The state
+ * @param a The first region
+ * @param b The second region
+ * @return -1, 0 or 1 as the first center is smaller, equal or larger
+ */
+static int box_bake_sphere_cmp(
+    const void *a,
+    const void *b)
+{
+    const box_bake_sphere_t *x = a;
+    const box_bake_sphere_t *y = b;
+    int result = 0;
+    if (x->center[0] < y->center[0]) {
+        result = -1;
+    } else if (x->center[0] > y->center[0]) {
+        result = 1;
+    }
+
+    return result;
+}
+
+/** First region of a sorted array whose center reaches a coordinate.
+ *
+ * @param spheres The regions, sorted by the x coordinate of their center
+ * @param count Regions in the array
+ * @param x The coordinate
+ * @return The index of the first region, count when none does
+ */
+static uint32_t box_bake_sphere_first(
+    const box_bake_sphere_t *spheres,
+    uint32_t count,
+    float x)
+{
+    uint32_t lo = 0;
+    uint32_t hi = count;
+    while (lo < hi) {
+        uint32_t mid = lo + (hi - lo) / 2;
+        if (spheres[mid].center[0] < x) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+
+    return lo;
+}
+
+/** Test a probe against the regions that changed this frame near it.
+ *
+ * @param spheres The regions, sorted by the x coordinate of their center
+ * @param count Regions in the array
+ * @param first Index of the first region the probe can reach
  * @param d The probe descriptor
  * @return true when a changed region reaches the probe
  */
 static bool box_bake_touched(
-    const box_bake_state_t *s,
+    const box_bake_sphere_t *spheres,
+    uint32_t count,
+    uint32_t first,
     const box_probe_desc_t *d)
 {
     bool result = false;
     uint32_t i;
-    for (i = 0; i < s->changed.count && !result; i ++) {
-        const box_bake_sphere_t *sphere = box_vec_at(&s->changed, i);
+    for (i = first; i < count && !result; i ++) {
+        const box_bake_sphere_t *sphere = &spheres[i];
         float reach = sphere->radius + d->position[3];
         float dx = sphere->center[0] - d->position[0];
+        if (dx > reach) {
+            break;
+        }
+
         float dy = sphere->center[1] - d->position[1];
         float dz = sphere->center[2] - d->position[2];
         result = dx * dx + dy * dy + dz * dz <= reach * reach;
@@ -439,8 +591,22 @@ static bool box_bake_touched(
 static void box_bake_mark_changed(
     box_bake_state_t *s)
 {
+    if (!s->changed.count) {
+        goto done;
+    }
+
+    box_bake_sphere_t *spheres = s->changed.data;
+    uint32_t count = s->changed.count;
+    qsort(spheres, count, sizeof(box_bake_sphere_t), box_bake_sphere_cmp);
+
+    float widest = 0;
+    uint32_t i;
+    for (i = 0; i < count; i ++) {
+        widest = spheres[i].radius > widest ? spheres[i].radius : widest;
+    }
+
     uint32_t mesh;
-    for (mesh = 0; mesh < s->meshes.count && s->changed.count; mesh ++) {
+    for (mesh = 0; mesh < s->meshes.count; mesh ++) {
         box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
         uint32_t slot;
         for (slot = 0; slot < m->descs.count; slot ++) {
@@ -449,13 +615,17 @@ static void box_bake_mark_changed(
                 continue;
             }
 
-            if (box_bake_touched(s, d)) {
+            float reach = widest + d->position[3];
+            uint32_t first = box_bake_sphere_first(spheres, count, d->position[0] - reach);
+            if (box_bake_touched(spheres, count, first, d)) {
                 box_bake_mark(s, mesh, slot);
             }
         }
     }
 
     box_vec_clear(&s->changed);
+done:
+    return;
 }
 
 /** Rebuild the voxel grid when the scene outgrew it or the settings changed.
@@ -496,7 +666,7 @@ done:
     return;
 }
 
-/** Count the probes of every mesh.
+/** Count the probes in the pool of every mesh.
  *
  * @param s The state
  */
@@ -506,7 +676,7 @@ static void box_bake_count(
     uint32_t result = 0;
     uint32_t i;
     for (i = 0; i < s->meshes.count; i ++) {
-        result += ((box_bake_mesh_t*)box_vec_at(&s->meshes, i))->descs.count;
+        result += ((box_bake_mesh_t*)box_vec_at(&s->meshes, i))->probe_count;
     }
 
     s->probe_count = result;
@@ -525,14 +695,23 @@ void box_bake_state_apply(
         goto done;
     }
 
+    bool respace = s->enabled &&
+        (s->spacing != p->bake.spacing || s->probe_max != p->bake.probe_max);
     s->enabled = true;
+    s->spacing = p->bake.spacing;
+    s->probe_max = p->bake.probe_max;
     s->eye[0] = p->view.eye[0];
     s->eye[1] = p->view.eye[1];
     s->eye[2] = p->view.eye[2];
+    if (respace) {
+        box_bake_respace(s);
+    }
+
     box_bake_apply_meshes(s, p);
     box_bake_influence(s, p);
     box_bake_apply_counts(s, p);
     box_bake_apply_updates(s, p);
+    box_bake_layout_all(s);
     box_bake_diff_lights(s, p);
     box_bake_diff_emitters(s, p);
     box_bake_mark_changed(s);
@@ -614,7 +793,8 @@ uint32_t box_bake_state_take(
     uint32_t kept = 0;
     for (i = 0; i < s->dirty.count; i ++) {
         box_bake_mesh_t *m = box_bake_state_mesh(s, jobs[i].mesh);
-        if (!box_bake_job_probe(s, &jobs[i])) {
+        const box_probe_desc_t *d = box_bake_job_probe(s, &jobs[i]);
+        if (!d) {
             if (jobs[i].slot < m->dirty.count) {
                 *(uint8_t*)box_vec_at(&m->dirty, jobs[i].slot) = 0;
             }
@@ -623,9 +803,16 @@ uint32_t box_bake_state_take(
         }
 
         if (result < budget) {
-            *(uint32_t*)box_vec_push(&m->jobs) = jobs[i].slot;
+            uint32_t count = box_probe_count(d);
+            uint32_t probe;
+            for (probe = 0; probe < count; probe ++) {
+                box_bake_slot_t *job = box_vec_push(&m->jobs);
+                job->slot = jobs[i].slot;
+                job->index = probe;
+            }
+
             *(uint8_t*)box_vec_at(&m->dirty, jobs[i].slot) = 0;
-            result ++;
+            result += count;
             continue;
         }
 
@@ -768,12 +955,18 @@ static void box_bake_layouts(
     WGPUBindGroupLayoutDescriptor grid_mesh_desc = { .entryCount = 2, .entries = mesh_entries };
     r->grid_mesh_layout = wgpuDeviceCreateBindGroupLayout(r->device, &grid_mesh_desc);
 
-    WGPUBindGroupLayoutEntry probe_entry = {
-        .binding = 0,
-        .visibility = WGPUShaderStage_Fragment,
-        .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+    WGPUBindGroupLayoutEntry probe_entries[2] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        }, {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        }
     };
-    WGPUBindGroupLayoutDescriptor probe_desc = { .entryCount = 1, .entries = &probe_entry };
+    WGPUBindGroupLayoutDescriptor probe_desc = { .entryCount = 2, .entries = probe_entries };
     r->probe_layout = wgpuDeviceCreateBindGroupLayout(r->device, &probe_desc);
 }
 
@@ -892,57 +1085,72 @@ static void box_bake_upload(
     }
 }
 
-/** Create or grow the probe buffers and bind groups of one mesh.
+/** Create or grow the probe buffers of one mesh.
  *
  * @param r The renderer
  * @param m The mesh entry
- * @param capacity Probes the buffers must hold
+ * @param descs Descriptors the descriptor buffer must hold
+ * @param probes Probes the probe pool must hold
  * @param jobs Jobs the job buffer must hold
+ * @return true when a buffer was recreated
  */
-static void box_bake_mesh_grow(
+static bool box_bake_mesh_grow(
     box_renderer_t *r,
     box_gpu_mesh_t *m,
-    uint32_t capacity,
+    uint32_t descs,
+    uint32_t probes,
     uint32_t jobs)
 {
-    if (capacity > m->probe_capacity) {
-        uint32_t grown = m->probe_capacity ? m->probe_capacity * 2 : BOX_BAKE_CAPACITY;
-        grown = grown < capacity ? capacity : grown;
-        WGPUBuffer descs = box_bake_buffer(r,
-            WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+    bool result = false;
+    if (descs > m->desc_capacity) {
+        uint32_t grown = m->desc_capacity ? m->desc_capacity * 2 : BOX_BAKE_CAPACITY;
+        grown = grown < descs ? descs : grown;
+        if (m->probe_descs) wgpuBufferRelease(m->probe_descs);
+        m->probe_descs = box_bake_buffer(r, WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
             (uint64_t)grown * sizeof(box_probe_desc_t));
-        WGPUBuffer probes = box_bake_buffer(r,
+        m->desc_capacity = grown;
+        result = true;
+    }
+
+    if (probes > m->probe_capacity) {
+        uint32_t grown = m->probe_capacity ? m->probe_capacity * 2 : BOX_BAKE_CAPACITY;
+        grown = grown < probes ? probes : grown;
+        WGPUBuffer buffer = box_bake_buffer(r,
             WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
             (uint64_t)grown * BOX_BAKE_PROBE_SIZE);
         if (m->probes) {
             WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
-            wgpuCommandEncoderCopyBufferToBuffer(encoder, m->probes, 0, probes, 0,
+            wgpuCommandEncoderCopyBufferToBuffer(encoder, m->probes, 0, buffer, 0,
                 (uint64_t)m->probe_capacity * BOX_BAKE_PROBE_SIZE);
             WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
             wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
             wgpuCommandBufferRelease(cmd);
             wgpuCommandEncoderRelease(encoder);
             wgpuBufferRelease(m->probes);
-            wgpuBufferRelease(m->probe_descs);
         }
 
-        m->probe_descs = descs;
-        m->probes = probes;
+        m->probes = buffer;
         m->probe_capacity = grown;
+        result = true;
     }
 
     if (jobs > m->job_capacity) {
+        uint32_t grown = m->job_capacity ? m->job_capacity * 2 : BOX_BAKE_CAPACITY;
+        grown = grown < jobs ? jobs : grown;
         if (m->probe_jobs) wgpuBufferRelease(m->probe_jobs);
         m->probe_jobs = box_bake_buffer(r,
             WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-            (uint64_t)jobs * sizeof(uint32_t));
-        m->job_capacity = jobs;
+            (uint64_t)grown * sizeof(box_bake_slot_t));
+        m->job_capacity = grown;
+        result = true;
     }
 
     if (!m->probe_info) {
         m->probe_info = box_bake_buffer(r,
             WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst, sizeof(box_bake_info_t));
     }
+
+    return result;
 }
 
 /** Rebuild the bake and draw bind groups of one mesh.
@@ -959,13 +1167,13 @@ static void box_bake_mesh_groups(
     if (m->probe_group) wgpuBindGroupRelease(m->probe_group);
 
     uint64_t probe_size = (uint64_t)m->probe_capacity * BOX_BAKE_PROBE_SIZE;
+    uint64_t desc_size = (uint64_t)m->desc_capacity * sizeof(box_probe_desc_t);
     WGPUBindGroupEntry entries[4] = {
-        { .binding = 0, .buffer = m->probe_descs,
-            .size = (uint64_t)m->probe_capacity * sizeof(box_probe_desc_t) },
+        { .binding = 0, .buffer = m->probe_descs, .size = desc_size },
         { .binding = 1, .buffer = m->probe_info, .size = sizeof(box_bake_info_t) },
         { .binding = 2, .buffer = m->probes, .size = probe_size },
         { .binding = 3, .buffer = m->probe_jobs,
-            .size = (uint64_t)m->job_capacity * sizeof(uint32_t) }
+            .size = (uint64_t)m->job_capacity * sizeof(box_bake_slot_t) }
     };
     WGPUBindGroupDescriptor bake_desc = {
         .layout = r->bake_mesh_layout,
@@ -981,11 +1189,14 @@ static void box_bake_mesh_groups(
     };
     m->grid_group = wgpuDeviceCreateBindGroup(r->device, &grid_desc);
 
-    WGPUBindGroupEntry probe_entry = { .binding = 0, .buffer = m->probes, .size = probe_size };
+    WGPUBindGroupEntry probe_entries[2] = {
+        { .binding = 0, .buffer = m->probes, .size = probe_size },
+        { .binding = 1, .buffer = m->probe_descs, .size = desc_size }
+    };
     WGPUBindGroupDescriptor probe_desc = {
         .layout = r->probe_layout,
-        .entryCount = 1,
-        .entries = &probe_entry
+        .entryCount = 2,
+        .entries = probe_entries
     };
     m->probe_group = wgpuDeviceCreateBindGroup(r->device, &probe_desc);
 }
@@ -993,11 +1204,9 @@ static void box_bake_mesh_groups(
 /** Upload the probe descriptors, counts and job lists of every mesh.
  *
  * @param r The renderer
- * @param budget Jobs a mesh job buffer must hold
  */
 static void box_bake_meshes(
-    box_renderer_t *r,
-    uint32_t budget)
+    box_renderer_t *r)
 {
     uint32_t i;
     for (i = 0; i < r->bake.meshes.count && i < r->meshes.count; i ++) {
@@ -1007,9 +1216,9 @@ static void box_bake_meshes(
             continue;
         }
 
-        uint32_t capacity = m->probe_capacity;
-        box_bake_mesh_grow(r, m, entry->descs.count, budget);
-        if (capacity != m->probe_capacity || !m->bake_group) {
+        if (box_bake_mesh_grow(r, m, entry->descs.count, entry->probe_count,
+            entry->jobs.count) || !m->bake_group)
+        {
             box_bake_mesh_groups(r, m);
             entry->upload_lo = 0;
             entry->upload_hi = entry->descs.count;
@@ -1030,7 +1239,7 @@ static void box_bake_meshes(
         wgpuQueueWriteBuffer(r->gpu_queue, m->probe_info, 0, &info, sizeof(box_bake_info_t));
         if (entry->jobs.count) {
             wgpuQueueWriteBuffer(r->gpu_queue, m->probe_jobs, 0, entry->jobs.data,
-                (size_t)entry->jobs.count * sizeof(uint32_t));
+                (size_t)entry->jobs.count * sizeof(box_bake_slot_t));
         }
     }
 }
@@ -1091,16 +1300,23 @@ void box_bake_init(
     r->occupancy = box_bake_buffer(r, storage, sizeof(uint32_t));
     r->occupancy_words = 1;
     r->probe_dummy = box_bake_buffer(r, storage, BOX_BAKE_PROBE_SIZE);
+    r->desc_dummy = box_bake_buffer(r, storage, sizeof(box_probe_desc_t));
 
     box_probe_t zero = {{0}};
     wgpuQueueWriteBuffer(r->gpu_queue, r->probe_dummy, 0, &zero, sizeof(box_probe_t));
 
-    WGPUBindGroupEntry dummy = { .binding = 0, .buffer = r->probe_dummy,
-        .size = BOX_BAKE_PROBE_SIZE };
+    box_probe_desc_t empty;
+    memset(&empty, 0, sizeof(box_probe_desc_t));
+    wgpuQueueWriteBuffer(r->gpu_queue, r->desc_dummy, 0, &empty, sizeof(box_probe_desc_t));
+
+    WGPUBindGroupEntry dummy[2] = {
+        { .binding = 0, .buffer = r->probe_dummy, .size = BOX_BAKE_PROBE_SIZE },
+        { .binding = 1, .buffer = r->desc_dummy, .size = sizeof(box_probe_desc_t) }
+    };
     WGPUBindGroupDescriptor dummy_desc = {
         .layout = r->probe_layout,
-        .entryCount = 1,
-        .entries = &dummy
+        .entryCount = 2,
+        .entries = dummy
     };
     r->probe_dummy_group = wgpuDeviceCreateBindGroup(r->device, &dummy_desc);
 
@@ -1129,7 +1345,7 @@ void box_bake_update(
     }
 
     box_bake_upload(r, p);
-    box_bake_meshes(r, budget);
+    box_bake_meshes(r);
 
     if (r->bake.grid_dirty) {
         wgpuCommandEncoderClearBuffer(encoder, r->occupancy, 0,
@@ -1177,6 +1393,7 @@ void box_bake_mesh_release(
     m->probes = NULL;
     m->probe_jobs = NULL;
     m->probe_info = NULL;
+    m->desc_capacity = 0;
     m->probe_capacity = 0;
     m->job_capacity = 0;
 }
@@ -1200,6 +1417,7 @@ void box_bake_fini(
     if (r->bake_emitters) wgpuBufferRelease(r->bake_emitters);
     if (r->occupancy) wgpuBufferRelease(r->occupancy);
     if (r->probe_dummy) wgpuBufferRelease(r->probe_dummy);
+    if (r->desc_dummy) wgpuBufferRelease(r->desc_dummy);
     r->bake_group = NULL;
     r->grid_group = NULL;
     r->probe_dummy_group = NULL;
@@ -1215,6 +1433,7 @@ void box_bake_fini(
     r->bake_emitters = NULL;
     r->occupancy = NULL;
     r->probe_dummy = NULL;
+    r->desc_dummy = NULL;
     r->bake_light_capacity = 0;
     r->bake_emitter_capacity = 0;
     r->occupancy_words = 0;

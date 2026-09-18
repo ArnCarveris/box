@@ -41,11 +41,222 @@ typedef struct box_probe_t {
     float b[BOX_SH_COEFS];  /**< Blue coefficients */
 } box_probe_t;
 
-/** World bounds of one static instance, the descriptor of its probe */
+/** World bounds and probe grid of one static instance, the descriptor of its probes */
 typedef struct box_probe_desc_t {
     float position[4];  /**< World center of the bounds, w is the bounds radius */
     float extent[4];    /**< World half extents of the bounds, w is 1 for a live probe */
+    float span[3][4];   /**< World offset across the bounds along each local axis, w unused */
+    uint32_t grid[4];   /**< Pool index of the first probe, then the probes on each axis */
 } box_probe_desc_t;
+
+/** Probes on one axis of the grid of an instance, at least one.
+ *
+ * @param d The descriptor
+ * @param axis The axis
+ * @return The probes on the axis
+ */
+static inline uint32_t box_probe_dim(
+    const box_probe_desc_t *d,
+    int axis)
+{
+    uint32_t result = d->grid[axis + 1];
+
+    return result ? result : 1u;
+}
+
+/** Probes the grid of an instance holds, zero when its slot is empty.
+ *
+ * @param d The descriptor
+ * @return The probes
+ */
+static inline uint32_t box_probe_count(
+    const box_probe_desc_t *d)
+{
+    uint32_t result = 0;
+    if (d->extent[3] != 0) {
+        result = box_probe_dim(d, 0) * box_probe_dim(d, 1) * box_probe_dim(d, 2);
+    }
+
+    return result;
+}
+
+/** Probes an instance gets on each axis of its world bounds.
+ *
+ * @param extent World half extents of the instance
+ * @param spacing World units between two probes
+ * @param max Probes an axis gets at most
+ * @param out The probes on each axis
+ */
+static inline void box_probe_dims(
+    const float extent[3],
+    float spacing,
+    uint32_t max,
+    uint32_t out[3])
+{
+    float step = spacing > BOX_BAKE_EPSILON ? spacing : BOX_BAKE_EPSILON;
+    uint32_t limit = max ? max : 1u;
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        float count = ceilf(2.0f * extent[axis] / step - BOX_BAKE_EPSILON);
+        uint32_t n = count > 1.0f ? (uint32_t)count : 1u;
+        out[axis] = n < limit ? n : limit;
+    }
+}
+
+/** Grid coordinates of a probe of an instance.
+ *
+ * @param d The descriptor
+ * @param index Probe in the grid of the instance
+ * @param out The coordinate on each axis
+ */
+static inline void box_probe_grid_coord(
+    const box_probe_desc_t *d,
+    uint32_t index,
+    uint32_t out[3])
+{
+    uint32_t nx = box_probe_dim(d, 0);
+    uint32_t ny = box_probe_dim(d, 1);
+    out[0] = index % nx;
+    out[1] = (index / nx) % ny;
+    out[2] = index / (nx * ny);
+}
+
+/** World position of one probe of the grid of an instance.
+ *
+ * @param d The descriptor
+ * @param index Probe in the grid of the instance
+ * @param out The world position
+ */
+static inline void box_probe_position(
+    const box_probe_desc_t *d,
+    uint32_t index,
+    float out[3])
+{
+    uint32_t coord[3];
+    box_probe_grid_coord(d, index, coord);
+
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        out[axis] = d->position[axis];
+    }
+
+    int a;
+    for (a = 0; a < 3; a ++) {
+        uint32_t dim = box_probe_dim(d, a);
+        float u = dim > 1 ? (float)coord[a] / ((float)dim - 1.0f) - 0.5f : 0;
+        for (axis = 0; axis < 3; axis ++) {
+            out[axis] += d->span[a][axis] * u;
+        }
+    }
+}
+
+/** Half extents of the cell one probe of an instance covers.
+ *
+ * @param d The descriptor
+ * @param out The half extents
+ */
+static inline void box_probe_own(
+    const box_probe_desc_t *d,
+    float out[3])
+{
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        out[axis] = d->extent[axis] / (float)box_probe_dim(d, axis);
+    }
+}
+
+/** Grid coordinate a world position has in the probe grid of an instance.
+ *
+ * @param d The descriptor
+ * @param point The world position
+ * @param out The coordinate on each axis, unclamped
+ */
+static inline void box_probe_coord(
+    const box_probe_desc_t *d,
+    const float point[3],
+    float out[3])
+{
+    float origin[3];
+    box_probe_position(d, 0, origin);
+
+    int a;
+    for (a = 0; a < 3; a ++) {
+        const float *span = d->span[a];
+        float len = span[0] * span[0] + span[1] * span[1] + span[2] * span[2];
+        float dot = (point[0] - origin[0]) * span[0] + (point[1] - origin[1]) * span[1] +
+            (point[2] - origin[2]) * span[2];
+        out[a] = len > BOX_BAKE_EPSILON ? dot / len * ((float)box_probe_dim(d, a) - 1.0f) : 0;
+    }
+}
+
+/** Pool indices and trilinear weights of the eight probes around a grid coordinate.
+ *
+ * @param d The descriptor
+ * @param coord The grid coordinate
+ * @param index Pool index of every corner
+ * @param weight Weight of every corner, summing to one
+ */
+static inline void box_probe_weights(
+    const box_probe_desc_t *d,
+    const float coord[3],
+    uint32_t index[8],
+    float weight[8])
+{
+    uint32_t dim[3];
+    uint32_t lo[3];
+    uint32_t hi[3];
+    float f[3];
+    int a;
+    for (a = 0; a < 3; a ++) {
+        dim[a] = box_probe_dim(d, a);
+        float last = (float)dim[a] - 1.0f;
+        float t = coord[a] < 0 ? 0 : (coord[a] > last ? last : coord[a]);
+        float base = floorf(t);
+        lo[a] = (uint32_t)base;
+        hi[a] = lo[a] + 1u < dim[a] ? lo[a] + 1u : lo[a];
+        f[a] = t - base;
+    }
+
+    int i;
+    for (i = 0; i < 8; i ++) {
+        uint32_t x = (i & 1) ? hi[0] : lo[0];
+        uint32_t y = (i & 2) ? hi[1] : lo[1];
+        uint32_t z = (i & 4) ? hi[2] : lo[2];
+        index[i] = d->grid[0] + x + y * dim[0] + z * dim[0] * dim[1];
+        weight[i] = ((i & 1) ? f[0] : 1.0f - f[0]) * ((i & 2) ? f[1] : 1.0f - f[1]) *
+            ((i & 4) ? f[2] : 1.0f - f[2]);
+    }
+}
+
+/** Interpolate the probe grid of an instance, the CPU twin of the mesh shader.
+ *
+ * @param d The descriptor
+ * @param pool The probe pool of the mesh
+ * @param coord The grid coordinate
+ * @param out The interpolated probe
+ */
+static inline void box_probe_sample(
+    const box_probe_desc_t *d,
+    const box_probe_t *pool,
+    const float coord[3],
+    box_probe_t *out)
+{
+    uint32_t index[8];
+    float weight[8];
+    box_probe_weights(d, coord, index, weight);
+    memset(out, 0, sizeof(box_probe_t));
+
+    int i;
+    for (i = 0; i < 8; i ++) {
+        const box_probe_t *p = &pool[index[i]];
+        int c;
+        for (c = 0; c < BOX_SH_COEFS; c ++) {
+            out->r[c] += p->r[c] * weight[i];
+            out->g[c] += p->g[c] * weight[i];
+            out->b[c] += p->b[c] * weight[i];
+        }
+    }
+}
 
 /** Voxel grid the occupancy bits of the static scene cover */
 typedef struct box_voxel_grid_t {
@@ -73,22 +284,30 @@ typedef struct box_bake_sphere_t {
     float radius;     /**< Radius of the region */
 } box_bake_sphere_t;
 
-/** One probe waiting to be baked */
+/** One instance whose probes wait to be baked */
 typedef struct box_bake_job_t {
     uint32_t mesh;    /**< Mesh handle */
     uint32_t slot;    /**< Static instance slot */
-    float distance;   /**< Squared distance of the probe to the camera */
+    float distance;   /**< Squared distance of the instance to the camera */
 } box_bake_job_t;
 
-/** Probes of one mesh, mirroring its static instance slots */
+/** One probe the bake pass writes this frame */
+typedef struct box_bake_slot_t {
+    uint32_t slot;   /**< Static instance slot the probe belongs to */
+    uint32_t index;  /**< Probe in the grid of the instance */
+} box_bake_slot_t;
+
+/** Probe descriptors and probe pool of one mesh, mirroring its static instance slots */
 typedef struct box_bake_mesh_t {
     box_vec_t descs;      /**< box_probe_desc_t per slot */
     box_vec_t dirty;      /**< uint8_t, slot is queued for baking */
-    box_vec_t jobs;       /**< uint32_t slots baked this frame */
+    box_vec_t jobs;       /**< box_bake_slot_t probes baked this frame */
     float bounds_min[3];  /**< Local bounds minimum of the mesh */
     float bounds_max[3];  /**< Local bounds maximum of the mesh */
+    uint32_t probe_count; /**< Probes the pool of the mesh holds */
     uint32_t upload_lo;   /**< First descriptor changed since the last upload */
     uint32_t upload_hi;   /**< Descriptor past the last one changed */
+    bool pool_dirty;      /**< The pool must be laid out again */
 } box_bake_mesh_t;
 
 /** Probe bookkeeping of the renderer: descriptors, the dirty set and the last inputs */
@@ -103,6 +322,8 @@ typedef struct box_bake_state_t {
     float bounds_max[3];   /**< World maximum of the static scene */
     float influence;       /**< Radius a changed static instance invalidates */
     float eye[3];          /**< Camera position the dirty set is sorted by */
+    float spacing;         /**< World units between two probes of an instance */
+    uint32_t probe_max;    /**< Probes an instance gets on one axis */
     uint32_t probe_count;  /**< Probes over every mesh */
     bool has_bounds;       /**< A static instance contributed to the bounds */
     bool grid_dirty;       /**< The occupancy grid must be filled again */
@@ -506,18 +727,23 @@ static inline float box_bake_emitter_range(
     return radius * sqrtf(peak / BOX_BAKE_CUTOFF) + radius;
 }
 
-/** Bake one probe of a scene, the CPU twin of the bake compute shader.
+/** Bake one probe of an instance, the CPU twin of the bake compute shader.
  *
  * @param scene The scene
- * @param probe Index of the probe in the descriptor array
+ * @param desc Descriptor of the instance
+ * @param index Probe in the grid of the instance
  * @param out The probe to fill
  */
-static inline void box_bake_probe_cpu(
+static inline void box_bake_probe_at(
     const box_bake_scene_t *scene,
-    uint32_t probe,
+    const box_probe_desc_t *desc,
+    uint32_t index,
     box_probe_t *out)
 {
-    const box_probe_desc_t *desc = &scene->probes[probe];
+    float position[3];
+    float own[3];
+    box_probe_position(desc, index, position);
+    box_probe_own(desc, own);
     memset(out, 0, sizeof(box_probe_t));
 
     uint32_t i;
@@ -525,12 +751,12 @@ static inline void box_bake_probe_cpu(
         const box_light_t *light = &scene->lights[i];
         float dir[3];
         float value[3];
-        if (!box_bake_light_sample(light, desc->position, dir, value)) {
+        if (!box_bake_light_sample(light, position, dir, value)) {
             continue;
         }
 
-        float vis = box_bake_visible(&scene->grid, scene->occupancy, desc->position,
-            desc->extent, light->position, 0, scene->steps);
+        float vis = box_bake_visible(&scene->grid, scene->occupancy, position,
+            own, light->position, 0, scene->steps);
         value[0] *= vis;
         value[1] *= vis;
         value[2] *= vis;
@@ -541,17 +767,31 @@ static inline void box_bake_probe_cpu(
         const box_emitter_t *emitter = &scene->emitters[i];
         float dir[3];
         float value[3];
-        if (!box_bake_emitter_sample(emitter, desc->position, dir, value)) {
+        if (!box_bake_emitter_sample(emitter, position, dir, value)) {
             continue;
         }
 
-        float vis = box_bake_visible(&scene->grid, scene->occupancy, desc->position,
-            desc->extent, emitter->position, emitter->radius, scene->steps);
+        float vis = box_bake_visible(&scene->grid, scene->occupancy, position,
+            own, emitter->position, emitter->radius, scene->steps);
         value[0] *= vis;
         value[1] *= vis;
         value[2] *= vis;
         box_sh_add(out, dir, value);
     }
+}
+
+/** Bake the first probe of an instance of a scene.
+ *
+ * @param scene The scene
+ * @param probe Index of the instance in the descriptor array
+ * @param out The probe to fill
+ */
+static inline void box_bake_probe_cpu(
+    const box_bake_scene_t *scene,
+    uint32_t probe,
+    box_probe_t *out)
+{
+    box_bake_probe_at(scene, &scene->probes[probe], 0, out);
 }
 
 /** Initialize the probe bookkeeping.

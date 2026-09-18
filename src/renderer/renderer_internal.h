@@ -60,9 +60,9 @@ typedef struct box_bake_uniform_t {
     uint32_t pad;           /**< Padding to the 16 byte GPU stride */
 } box_bake_uniform_t;
 
-/** Probe and job count of one mesh, the per mesh uniform of the bake passes */
+/** Descriptor and job count of one mesh, the per mesh uniform of the bake passes */
 typedef struct box_bake_info_t {
-    uint32_t probe_count; /**< Probes of the mesh */
+    uint32_t desc_count;  /**< Static instance slots of the mesh */
     uint32_t job_count;   /**< Probes the bake pass writes this frame */
     uint32_t pad[2];      /**< Padding to the 16 byte GPU stride */
 } box_bake_info_t;
@@ -75,14 +75,15 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer statics;              /**< Static instance buffer */
     uint32_t static_capacity;        /**< Instances the static buffer can hold */
     uint32_t static_count;           /**< Static instances to draw */
-    WGPUBuffer probe_descs;          /**< Probe descriptor per static slot */
-    WGPUBuffer probes;               /**< Baked spherical harmonics per static slot */
-    WGPUBuffer probe_jobs;           /**< Slots the bake pass writes this frame */
+    WGPUBuffer probe_descs;          /**< Probe grid descriptor per static slot */
+    WGPUBuffer probes;               /**< Probe pool of the mesh, baked spherical harmonics */
+    WGPUBuffer probe_jobs;           /**< Probes the bake pass writes this frame */
     WGPUBuffer probe_info;           /**< box_bake_info_t of the mesh */
-    WGPUBindGroup probe_group;       /**< Probes the mesh shader reads */
+    WGPUBindGroup probe_group;       /**< Probes and descriptors the mesh shader reads */
     WGPUBindGroup bake_group;        /**< Probe buffers of the bake pass */
     WGPUBindGroup grid_group;        /**< Probe descriptors of the occupancy pass */
-    uint32_t probe_capacity;         /**< Probes the probe buffers can hold */
+    uint32_t desc_capacity;          /**< Descriptors the descriptor buffer can hold */
+    uint32_t probe_capacity;         /**< Probes the probe buffer can hold */
     uint32_t job_capacity;           /**< Jobs the job buffer can hold */
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
@@ -169,8 +170,9 @@ struct box_renderer_t {
     WGPUBindGroup grid_group;        /**< Global bind group of the occupancy pass */
     WGPUBindGroupLayout bake_mesh_layout; /**< Per mesh layout of the bake pass */
     WGPUBindGroupLayout grid_mesh_layout; /**< Per mesh layout of the occupancy pass */
-    WGPUBindGroupLayout probe_layout; /**< Probe layout the mesh shader reads */
+    WGPUBindGroupLayout probe_layout; /**< Probe and descriptor layout the mesh shader reads */
     WGPUBuffer probe_dummy;          /**< Zero probe bound by dynamic draws */
+    WGPUBuffer desc_dummy;           /**< Zero descriptor bound by dynamic draws */
     WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
     WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
     WGPUComputePipeline grid_pipeline; /**< Occupancy fill pass */

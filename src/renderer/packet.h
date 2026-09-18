@@ -59,12 +59,14 @@ typedef struct box_emitter_t {
 
 /** Settings of the baked lighting pass, copied from the BakeSettings singleton */
 typedef struct box_bake_t {
-    uint32_t enabled; /**< Static instances read a baked probe instead of the static lights */
-    uint32_t budget;  /**< Probes rebaked per frame */
-    uint32_t x;       /**< Occupancy voxels across the scene */
-    uint32_t y;       /**< Occupancy voxels up the scene */
-    uint32_t z;       /**< Occupancy voxels through the scene */
-    uint32_t steps;   /**< Ray march samples per visibility test */
+    uint32_t enabled;   /**< Static instances read baked probes instead of the static lights */
+    uint32_t budget;    /**< Probes rebaked per frame */
+    float spacing;      /**< World units between two probes of an instance */
+    uint32_t probe_max; /**< Probes an instance gets on one axis */
+    uint32_t x;         /**< Occupancy voxels across the scene */
+    uint32_t y;         /**< Occupancy voxels up the scene */
+    uint32_t z;         /**< Occupancy voxels through the scene */
+    uint32_t steps;     /**< Ray march samples per visibility test */
 } box_bake_t;
 
 /** Froxel grid of a view, copied from the ClusterSettings singleton */

@@ -35,6 +35,8 @@ void box_render_extract_bake(
     const BakeSettings *s = ecs_singleton_get(world, BakeSettings);
     p->bake.enabled = s && s->enabled ? 1u : 0u;
     p->bake.budget = s && s->budget > 0 ? (uint32_t)s->budget : BOX_BAKE_BUDGET;
+    p->bake.spacing = s && s->probe_spacing > 0 ? s->probe_spacing : BOX_BAKE_SPACING;
+    p->bake.probe_max = s && s->probe_max > 0 ? (uint32_t)s->probe_max : BOX_BAKE_PROBE_MAX;
     p->bake.x = s && s->x > 0 ? (uint32_t)s->x : BOX_BAKE_GRID_X;
     p->bake.y = s && s->y > 0 ? (uint32_t)s->y : BOX_BAKE_GRID_Y;
     p->bake.z = s && s->z > 0 ? (uint32_t)s->z : BOX_BAKE_GRID_Z;

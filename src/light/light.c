@@ -27,8 +27,10 @@ void BoxLightImport(
     ecs_add_pair(world, ecs_id(SpotLight), EcsWith, ecs_id(WorldTransform));
 
     ecs_singleton_set(world, BakeSettings, {
-        .enabled = false,
+        .enabled = true,
         .budget = BOX_BAKE_BUDGET,
+        .probe_spacing = BOX_BAKE_SPACING,
+        .probe_max = BOX_BAKE_PROBE_MAX,
         .x = BOX_BAKE_GRID_X,
         .y = BOX_BAKE_GRID_Y,
         .z = BOX_BAKE_GRID_Z,

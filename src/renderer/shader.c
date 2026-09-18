@@ -61,6 +61,26 @@
     "const SH_A0: f32 = 0.886227;\n" \
     "const SH_A1: f32 = 1.023327;\n"
 
+/** Probe grid descriptor of one static instance, laid out as box_probe_desc_t */
+#define BOX_WGSL_DESC \
+    "struct Desc {\n" \
+    "  position: vec4<f32>,\n" \
+    "  extent: vec4<f32>,\n" \
+    "  span: array<vec4<f32>, 3>,\n" \
+    "  grid: vec4<u32>,\n" \
+    "};\n" \
+    "fn probe_dim(d: Desc) -> vec3<u32> {\n" \
+    "  return max(d.grid.yzw, vec3<u32>(1u));\n" \
+    "}\n" \
+    "fn probe_position(d: Desc, index: u32) -> vec3<f32> {\n" \
+    "  let dim = probe_dim(d);\n" \
+    "  let c = vec3<f32>(vec3<u32>(index % dim.x, (index / dim.x) % dim.y,\n" \
+    "    index / (dim.x * dim.y)));\n" \
+    "  let last = vec3<f32>(dim) - vec3(1.0);\n" \
+    "  let u = select(vec3(0.0), c / max(last, vec3(1.0)) - vec3(0.5), last > vec3(0.0));\n" \
+    "  return d.position.xyz + d.span[0].xyz * u.x + d.span[1].xyz * u.y + d.span[2].xyz * u.z;\n" \
+    "}\n"
+
 /** Uniforms and storage types of the bake passes, laid out as box_bake_uniform_t */
 #define BOX_WGSL_BAKE \
     "struct Bake {\n" \
@@ -78,12 +98,12 @@
     "  color: vec3<f32>,\n" \
     "  range: f32,\n" \
     "};\n" \
-    "struct Desc {\n" \
-    "  position: vec4<f32>,\n" \
-    "  extent: vec4<f32>,\n" \
+    "struct Job {\n" \
+    "  slot: u32,\n" \
+    "  index: u32,\n" \
     "};\n" \
     "struct Info {\n" \
-    "  probe_count: u32,\n" \
+    "  desc_count: u32,\n" \
     "  job_count: u32,\n" \
     "  pad0: u32,\n" \
     "  pad1: u32,\n" \
@@ -109,6 +129,7 @@ const char *box_mesh_shader_wgsl =
     BOX_WGSL_VIEW
     BOX_WGSL_LIGHT
     BOX_WGSL_PROBE
+    BOX_WGSL_DESC
     "@group(0) @binding(0) var<uniform> u: View;\n"
     "@group(1) @binding(0) var<storage, read> lights: array<Light>;\n"
     "@group(1) @binding(1) var<storage, read> clusters: array<vec2<u32>>;\n"
@@ -118,7 +139,24 @@ const char *box_mesh_shader_wgsl =
     "@group(2) @binding(2) var env_brdf: texture_2d<f32>;\n"
     "@group(2) @binding(3) var env_sampler: sampler;\n"
     "@group(3) @binding(0) var<storage, read> probes: array<Probe>;\n"
+    "@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;\n"
     BOX_WGSL_CLUSTER_INDEX
+    "fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {\n"
+    "  var result = 0.0;\n"
+    "  let len = dot(span, span);\n"
+    "  if (len > 1e-8) {\n"
+    "    result = dot(rel, span) / len * last;\n"
+    "  }\n"
+    "  return result;\n"
+    "}\n"
+    "fn probe_coord(slot: u32, world: vec3<f32>) -> vec3<f32> {\n"
+    "  let d = probe_descs[slot];\n"
+    "  let last = vec3<f32>(probe_dim(d)) - vec3(1.0);\n"
+    "  let rel = world - probe_position(d, 0u);\n"
+    "  return vec3(probe_axis(d.span[0].xyz, rel, last.x),\n"
+    "              probe_axis(d.span[1].xyz, rel, last.y),\n"
+    "              probe_axis(d.span[2].xyz, rel, last.z));\n"
+    "}\n"
     "struct VertexIn {\n"
     "  @builtin(instance_index) instance: u32,\n"
     "  @location(0) pos: vec3<f32>,\n"
@@ -139,7 +177,8 @@ const char *box_mesh_shader_wgsl =
     "  @location(3) color: vec4<f32>,\n"
     "  @location(4) emissive: vec3<f32>,\n"
     "  @location(5) params: vec4<f32>,\n"
-    "  @location(6) @interpolate(flat) probe: u32,\n"
+    "  @location(6) @interpolate(flat) slot: u32,\n"
+    "  @location(7) local: vec3<f32>,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -156,7 +195,11 @@ const char *box_mesh_shader_wgsl =
     "  out.color = in.color;\n"
     "  out.emissive = in.emissive.rgb;\n"
     "  out.params = in.params;\n"
-    "  out.probe = in.instance;\n"
+    "  out.slot = in.instance;\n"
+    "  out.local = vec3<f32>(0.0);\n"
+    "  if (in.params.z > 0.5) {\n"
+    "    out.local = probe_coord(in.instance, world.xyz);\n"
+    "  }\n"
     "  return out;\n"
     "}\n"
     "fn shade(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, albedo: vec3<f32>,\n"
@@ -180,10 +223,32 @@ const char *box_mesh_shader_wgsl =
     "  let ab = textureSampleLevel(env_brdf, env_sampler, vec2(ndv, roughness), 0.0).xy;\n"
     "  return diffuse + prefiltered * (f0 * ab.x + vec3(ab.y));\n"
     "}\n"
-    "fn baked(probe: u32, n: vec3<f32>, albedo: vec3<f32>, metallic: f32) -> vec3<f32> {\n"
-    "  let p = probes[probe];\n"
+    "fn baked(slot: u32, local: vec3<f32>, n: vec3<f32>, albedo: vec3<f32>,\n"
+    "    metallic: f32) -> vec3<f32> {\n"
+    "  let d = probe_descs[slot];\n"
+    "  let dim = probe_dim(d);\n"
+    "  let t = clamp(local, vec3(0.0), vec3<f32>(dim) - vec3(1.0));\n"
+    "  let f = t - floor(t);\n"
+    "  let lo = vec3<u32>(floor(t));\n"
+    "  let hi = min(lo + vec3<u32>(1u), dim - vec3<u32>(1u));\n"
+    "  var sr = vec4<f32>(0.0);\n"
+    "  var sg = vec4<f32>(0.0);\n"
+    "  var sb = vec4<f32>(0.0);\n"
+    "  for (var i = 0u; i < 8u; i = i + 1u) {\n"
+    "    let bx = (i & 1u) != 0u;\n"
+    "    let by = (i & 2u) != 0u;\n"
+    "    let bz = (i & 4u) != 0u;\n"
+    "    let c = vec3<u32>(select(lo.x, hi.x, bx), select(lo.y, hi.y, by),\n"
+    "      select(lo.z, hi.z, bz));\n"
+    "    let w = select(1.0 - f.x, f.x, bx) * select(1.0 - f.y, f.y, by) *\n"
+    "      select(1.0 - f.z, f.z, bz);\n"
+    "    let p = probes[d.grid.x + c.x + c.y * dim.x + c.z * dim.x * dim.y];\n"
+    "    sr = sr + p.r * w;\n"
+    "    sg = sg + p.g * w;\n"
+    "    sb = sb + p.b * w;\n"
+    "  }\n"
     "  let basis = vec4(SH_A0, SH_A1 * n.y, SH_A1 * n.z, SH_A1 * n.x);\n"
-    "  let irradiance = max(vec3(dot(p.r, basis), dot(p.g, basis), dot(p.b, basis)), vec3(0.0));\n"
+    "  let irradiance = max(vec3(dot(sr, basis), dot(sg, basis), dot(sb, basis)), vec3(0.0));\n"
     "  return irradiance * albedo * (1.0 - metallic);\n"
     "}\n"
     "fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,\n"
@@ -225,7 +290,7 @@ const char *box_mesh_shader_wgsl =
     "  var color = shade(n, v, l, albedo, metallic, roughness) * sun + env + in.emissive;\n"
     "  color = color + punctual(in.world_pos, n, v, albedo, metallic, roughness, is_baked);\n"
     "  if (is_baked) {\n"
-    "    color = color + baked(in.probe, n, albedo, metallic);\n"
+    "    color = color + baked(in.slot, in.local, n, albedo, metallic);\n"
     "  }\n"
     "  if (u.gamma_encode > 0.5) {\n"
     "    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));\n"
@@ -412,13 +477,14 @@ const char *box_env_filter_wgsl =
 
 const char *box_bake_grid_wgsl =
     BOX_WGSL_BAKE
+    BOX_WGSL_DESC
     "@group(0) @binding(0) var<uniform> u: Bake;\n"
     "@group(0) @binding(1) var<storage, read_write> occupancy: array<atomic<u32>>;\n"
     "@group(1) @binding(0) var<storage, read> descs: array<Desc>;\n"
     "@group(1) @binding(1) var<uniform> info: Info;\n"
     "@compute @workgroup_size(64)\n"
     "fn cs_grid(@builtin(global_invocation_id) gid: vec3<u32>) {\n"
-    "  if (gid.x >= info.probe_count || u.grid_dim.x == 0u) {\n"
+    "  if (gid.x >= info.desc_count || u.grid_dim.x == 0u) {\n"
     "    return;\n"
     "  }\n"
     "  let d = descs[gid.x];\n"
@@ -444,6 +510,7 @@ const char *box_bake_shader_wgsl =
     BOX_WGSL_LIGHT
     BOX_WGSL_BAKE
     BOX_WGSL_PROBE
+    BOX_WGSL_DESC
     "@group(0) @binding(0) var<uniform> u: Bake;\n"
     "@group(0) @binding(1) var<storage, read> lights: array<Light>;\n"
     "@group(0) @binding(2) var<storage, read> emitters: array<Emitter>;\n"
@@ -451,7 +518,7 @@ const char *box_bake_shader_wgsl =
     "@group(1) @binding(0) var<storage, read> descs: array<Desc>;\n"
     "@group(1) @binding(1) var<uniform> info: Info;\n"
     "@group(1) @binding(2) var<storage, read_write> probes: array<Probe>;\n"
-    "@group(1) @binding(3) var<storage, read> jobs: array<u32>;\n"
+    "@group(1) @binding(3) var<storage, read> jobs: array<Job>;\n"
     "fn solid(p: vec3<f32>) -> bool {\n"
     "  let t = (p - u.grid_min.xyz) / u.grid_cell.xyz;\n"
     "  let dim = vec3<f32>(u.grid_dim.xyz);\n"
@@ -501,14 +568,16 @@ const char *box_bake_shader_wgsl =
     "  if (gid.x >= info.job_count) {\n"
     "    return;\n"
     "  }\n"
-    "  let slot = jobs[gid.x];\n"
-    "  let d = descs[slot];\n"
+    "  let job = jobs[gid.x];\n"
+    "  let d = descs[job.slot];\n"
+    "  let origin = probe_position(d, job.index);\n"
+    "  let own = d.extent.xyz / vec3<f32>(probe_dim(d));\n"
     "  var sr = vec4<f32>(0.0);\n"
     "  var sg = vec4<f32>(0.0);\n"
     "  var sb = vec4<f32>(0.0);\n"
     "  for (var i = 0u; i < u.light_count; i = i + 1u) {\n"
     "    let lt = lights[i];\n"
-    "    let delta = lt.position - d.position.xyz;\n"
+    "    let delta = lt.position - origin;\n"
     "    let dist = length(delta);\n"
     "    let range = max(lt.range, 1e-4);\n"
     "    if (dist >= range) {\n"
@@ -526,7 +595,7 @@ const char *box_bake_shader_wgsl =
     "    if (atten <= 0.0) {\n"
     "      continue;\n"
     "    }\n"
-    "    let vis = visible(d.position.xyz, d.extent.xyz, lt.position, 0.0);\n"
+    "    let vis = visible(origin, own, lt.position, 0.0);\n"
     "    let value = lt.color * lt.intensity * atten * vis;\n"
     "    let basis = vec4(SH_Y0, SH_Y1 * dir.y, SH_Y1 * dir.z, SH_Y1 * dir.x);\n"
     "    sr = sr + value.r * basis;\n"
@@ -535,7 +604,7 @@ const char *box_bake_shader_wgsl =
     "  }\n"
     "  for (var i = 0u; i < u.emitter_count; i = i + 1u) {\n"
     "    let em = emitters[i];\n"
-    "    let delta = em.position - d.position.xyz;\n"
+    "    let delta = em.position - origin;\n"
     "    let dist = length(delta);\n"
     "    let range = max(em.range, 1e-4);\n"
     "    if (dist >= range) {\n"
@@ -549,12 +618,12 @@ const char *box_bake_shader_wgsl =
     "    if (atten <= 0.0) {\n"
     "      continue;\n"
     "    }\n"
-    "    let vis = visible(d.position.xyz, d.extent.xyz, em.position, radius);\n"
+    "    let vis = visible(origin, own, em.position, radius);\n"
     "    let value = em.color * atten * vis;\n"
     "    let basis = vec4(SH_Y0, SH_Y1 * dir.y, SH_Y1 * dir.z, SH_Y1 * dir.x);\n"
     "    sr = sr + value.r * basis;\n"
     "    sg = sg + value.g * basis;\n"
     "    sb = sb + value.b * basis;\n"
     "  }\n"
-    "  probes[slot] = Probe(sr, sg, sb);\n"
+    "  probes[d.grid.x + job.index] = Probe(sr, sg, sb);\n"
     "}\n";
