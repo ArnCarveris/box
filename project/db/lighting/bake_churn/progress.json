@@ -1,9 +1,9 @@
 {
   "kind": "bug",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T11:57:00.168+00:00",
   "start_time": "2026-09-18T11:57:00.203+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T12:18:36.383+00:00",
   "dependencies": [
     "lighting/bake_resolution"
   ]
