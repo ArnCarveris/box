@@ -1,0 +1,46 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+$ { CullSettings: {enabled: true, gpu_threshold: 1, occlusion: false, hiz_levels: 0} }
+
+$ { EnvironmentLight: {sky_color: {90, 110, 150}, ground_color: {40, 38, 36}, intensity: 1} }
+
+camera {
+  Position: {0, 3, -26}
+  LookAt: {0, 3, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {90, 0.5, 140}
+  Rgb: {66, 70, 78}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall {
+  Position: {0, 8.9, -14}
+  Box: {56, 18, 1}
+  Rgb: {198, 194, 186}
+  PbrMaterial: {roughness: 0.6}
+}
+
+behind {
+  for i in 0..2400 {
+    _ {
+      Position: {(i % 20) * 2 - 19, ((i / 20) % 6) * 2 + 1, (i / 120) * 2}
+      Box: {1.2, 1.2, 1.2}
+      Rgb: {220, 90, 70}
+      PbrMaterial: {roughness: 0.5}
+    }
+  }
+}

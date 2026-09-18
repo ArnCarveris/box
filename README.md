@@ -119,6 +119,13 @@ resolves into its children and grandchildren next to an untinted white box.
 boxes and spheres around the camera with a row behind it, which `CullSettings`
 on a view or as a singleton switches off for a bit identical comparison.
 
+`test/integration/visual/occlusion.flecs` is the Hi-Z occlusion check: a wall in
+front of 2400 boxes whose capture is bit identical to `occlusion_off.flecs`,
+next to `occlusion_sweep.flecs`, which `python3 tools/occlusion_sweep.py` sweeps
+past walls at 60 units per second and compares frame by frame with occlusion on
+and off; `CullSettings.occlusion` switches the test off and `hiz_levels` caps the
+depth pyramid.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.

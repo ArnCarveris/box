@@ -1,0 +1,48 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+
+$ { BakeSettings: {enabled: false} }
+
+$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.85, -0.5, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+camera {
+  Position: {-8, 2.5, -980}
+  LookAt: {-8, 14, 400}
+  Camera: {fov: 60}
+}
+
+ground {
+  Position: {0, -0.5, 0}
+  Scale: {2400, 1, 2400}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+blocks {
+  for i in 0..20000 {
+    _ {
+      Position: {
+        (i / 25 % 32) * 60 + (i % 5) * 11 - 960,
+        (10 + (i * 53) % 9 * 6) * 0.5,
+        (i / 25 / 32) * 60 + (i % 25 / 5) * 11 - 960
+      }
+      Scale: {8, 10 + (i * 53) % 9 * 6, 8}
+      Box: {1, 1, 1}
+      Rgb: {(i * 37) % 60 + 120, (i * 17) % 60 + 120, (i * 91) % 60 + 130}
+      PbrMaterial: {roughness: 0.7}
+    }
+  }
+}
