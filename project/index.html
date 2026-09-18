@@ -1599,9 +1599,17 @@ function planLayout(epics, filter) {
 }
 
 function planRelated(layout, path) {
+  const nodes = new Set([path]);
+  const stack = [path];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const dep of layout.into[cur] || []) {
+      if (!nodes.has(dep)) { nodes.add(dep); stack.push(dep); }
+    }
+  }
   return {
-    nodes: [path].concat(layout.into[path] || [], layout.out[path] || []),
-    edges: layout.edges.filter(e => e.from === path || e.to === path).map(e => e.from + " > " + e.to),
+    nodes: [...nodes],
+    edges: layout.edges.filter(e => nodes.has(e.to) && nodes.has(e.from)).map(e => e.from + " > " + e.to),
   };
 }
 
@@ -1637,13 +1645,9 @@ function planNodeSvg(node, layout) {
   const task = node.task;
   const status = String(task.status).replace(" ", "-");
   const label = task.title.length > 23 ? task.title.slice(0, 22) + "…" : task.title;
-  const deps = layout.into[task.path] || [], dependents = layout.out[task.path] || [];
   const sub = task.name + (task.subs ? " · " + task.subs + (task.subs > 1 ? " subtasks" : " subtask") : "");
-  const tip = " · " + task.epicTitle + " · " + task.status
-    + (deps.length ? " · after " + deps.join(", ") : "")
-    + (dependents.length ? " · blocks " + dependents.join(", ") : "");
   return `<g class="plan-node ${status}" data-node="${esc(task.path)}" data-epic="${esc(task.epic)}"
-      transform="translate(${node.x},${node.y})" data-tip="${esc(task.title)}" data-sub="${esc(tip)}">
+      transform="translate(${node.x},${node.y})">
     <rect class="box" width="${node.w}" height="${node.h}" rx="9"/>
     <rect class="bar" x="1" y="9" width="4" height="${node.h - 18}" rx="2"/>
     <text class="title" x="15" y="20">${esc(label)}</text>
@@ -1804,7 +1808,7 @@ function renderPlan(force) {
   const options = planEpics(epics).map(e =>
     `<option value="${esc(e.name)}"${filter.epic === e.name ? " selected" : ""}>${esc(planTitle(e))}</option>`).join("");
   el.innerHTML = `<div class="plan-tools">
-      <span class="hint">drag to pan · scroll to zoom · hover a task for its links</span>
+      <span class="hint">drag to pan · scroll to zoom · hover a task for everything it depends on</span>
       <select id="plan-epic" title="Show one epic"><option value="">all epics</option>${options}</select>
       <label title="Hide complete and discarded tasks">
         <input type="checkbox" id="plan-open"${filter.open ? " checked" : ""}>unfinished only</label>

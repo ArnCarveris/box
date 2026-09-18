@@ -819,10 +819,9 @@ console.log(JSON.stringify({
         self.assertTrue(out["svg"])
         self.assertTrue(out["epicTag"])
         self.assertEqual(sorted(out["related"]["nodes"]),
-                         ["core/loop", "render/pipeline", "render/post", "render/shadows"])
+                         ["core/boot", "core/loop", "render/pipeline"])
         self.assertEqual(sorted(out["related"]["edges"]),
-                         ["core/loop > render/pipeline", "render/pipeline > render/post",
-                          "render/pipeline > render/shadows"])
+                         ["core/boot > core/loop", "core/loop > render/pipeline"])
 
     def test_plan_page_filters_by_epic_and_unfinished_tasks(self):
         out = self.run_plan_js("""
