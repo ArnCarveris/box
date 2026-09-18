@@ -75,6 +75,18 @@ void box_render_mark_dirty(
 void box_render_instance_init(
     ecs_world_t *world);
 
+/** Check whether an entity owns the static slot its record points at.
+ *
+ * @param state The registry
+ * @param e The entity
+ * @param inst Its instance record
+ * @return True when the record names a live slot of the entity
+ */
+bool box_render_has_slot(
+    const RenderState *state,
+    ecs_entity_t e,
+    const RenderInstance *inst);
+
 /** Take an entity out of its static batch.
  *
  * @param world The world

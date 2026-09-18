@@ -93,11 +93,7 @@ static void box_extract_static(
     ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
     bool dynamic = box_render_is_dynamic(world, e);
-    bool has_slot = !inst->dynamic && inst->mesh < (uint32_t)ecs_vec_count(&state->batches) &&
-        inst->slot < (uint32_t)ecs_vec_count(
-            &ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst->mesh)->entities) &&
-        ecs_vec_get_t(&ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst->mesh)->entities,
-            ecs_entity_t, (int32_t)inst->slot)[0] == e;
+    bool has_slot = box_render_has_slot(state, e, inst);
 
     if (has_slot && (dynamic || inst->mesh != mesh->handle)) {
         box_render_release_slot(world, state, e, inst);

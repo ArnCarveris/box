@@ -72,6 +72,26 @@ static void box_render_on_dynamic(
     }
 }
 
+bool box_render_has_slot(
+    const RenderState *state,
+    ecs_entity_t e,
+    const RenderInstance *inst)
+{
+    bool result = false;
+    if (inst->dynamic || inst->mesh >= (uint32_t)ecs_vec_count(&state->batches)) {
+        goto done;
+    }
+
+    const box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst->mesh);
+    if (inst->slot >= (uint32_t)ecs_vec_count(&batch->entities)) {
+        goto done;
+    }
+
+    result = ecs_vec_get_t(&batch->entities, ecs_entity_t, (int32_t)inst->slot)[0] == e;
+done:
+    return result;
+}
+
 void box_render_release_slot(
     ecs_world_t *world,
     RenderState *state,
@@ -107,7 +127,7 @@ static void box_render_on_remove(
     RenderInstance *inst = ecs_field(it, RenderInstance, 0);
     int32_t i;
     for (i = 0; state && i < it->count; i ++) {
-        if (!inst[i].dynamic && inst[i].mesh < (uint32_t)ecs_vec_count(&state->batches)) {
+        if (box_render_has_slot(state, it->entities[i], &inst[i])) {
             box_render_release_slot(it->world, state, it->entities[i], &inst[i]);
         }
     }
