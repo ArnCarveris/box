@@ -11,6 +11,27 @@
 #include <stdio.h>
 #include <string.h>
 
+/** Return a packet the renderer will not render, freeing the arrays it owns.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+static void box_renderer_discard(
+    box_renderer_t *r,
+    box_packet_t *p)
+{
+    uint32_t i;
+    for (i = 0; i < p->mesh_create.count; i ++) {
+        box_mesh_cmd_t *cmd = box_vec_at(&p->mesh_create, i);
+        free(cmd->vertices);
+        free(cmd->indices);
+        cmd->vertices = NULL;
+        cmd->indices = NULL;
+    }
+
+    box_queue_release(&r->queue, p);
+}
+
 /** Render one packet if the device is ready, then return it to the queue.
  *
  * @param r The renderer
@@ -20,17 +41,57 @@ static void box_renderer_consume(
     box_renderer_t *r,
     box_packet_t *p)
 {
-    if (r->ready) {
-        box_frame_render(r, p);
-        r->frames ++;
-#ifdef BOX_PLATFORM_WEB
-        if (r->frames == 1) {
-            emscripten_run_script("window.dispatchEvent(new Event('box-first-frame'))");
-        }
-#endif
+    if (!r->ready) {
+        box_renderer_discard(r, p);
+        goto done;
     }
 
+    box_frame_render(r, p);
+    r->frames ++;
+#ifdef BOX_PLATFORM_WEB
+    if (r->frames == 1) {
+        emscripten_run_script("window.dispatchEvent(new Event('box-first-frame'))");
+    }
+#endif
     box_queue_release(&r->queue, p);
+done:
+    return;
+}
+
+/** Check whether submitted packets are rendered on the thread that submits them.
+ *
+ * @param r The renderer
+ * @return true when the queue is drained inline
+ */
+static bool box_renderer_inline(
+    const box_renderer_t *r)
+{
+#ifdef BOX_PLATFORM_WEB
+    (void)r;
+    bool result = true;
+#else
+    bool result = !r->desc.threaded;
+#endif
+
+    return result;
+}
+
+/** Render every queued packet, oldest first, but only once the device exists.
+ *
+ * The web device is created asynchronously while the game already produces
+ * packets. Their mesh uploads and static instance deltas are emitted once, so
+ * the packets stay queued until the device can apply them; the game side then
+ * finds no free packet and skips extraction, which keeps those deltas pending.
+ *
+ * @param r The renderer
+ */
+static void box_renderer_drain(
+    box_renderer_t *r)
+{
+    box_packet_t *p;
+    while (r->ready && (p = box_queue_poll(&r->queue))) {
+        box_renderer_consume(r, p);
+    }
 }
 
 #ifndef BOX_PLATFORM_WEB
@@ -117,6 +178,11 @@ void box_renderer_destroy(
         pthread_join(r->thread, NULL);
     }
 #endif
+    box_packet_t *p;
+    while ((p = box_queue_poll(&r->queue))) {
+        box_renderer_discard(r, p);
+    }
+
     box_device_fini(r);
     box_queue_fini(&r->queue);
     free((void*)r->desc.canvas_selector);
@@ -126,6 +192,10 @@ void box_renderer_destroy(
 box_packet_t* box_renderer_acquire(
     box_renderer_t *r)
 {
+    if (box_renderer_inline(r)) {
+        box_renderer_drain(r);
+    }
+
     box_packet_t *p = box_queue_acquire(&r->queue);
     if (p) {
         box_packet_reset(p);
@@ -139,15 +209,8 @@ void box_renderer_submit(
     box_packet_t *p)
 {
     box_queue_submit(&r->queue, p);
-    bool threaded = false;
-#ifndef BOX_PLATFORM_WEB
-    threaded = r->desc.threaded;
-#endif
-    if (!threaded) {
-        box_packet_t *ready;
-        while ((ready = box_queue_poll(&r->queue))) {
-            box_renderer_consume(r, ready);
-        }
+    if (box_renderer_inline(r)) {
+        box_renderer_drain(r);
     }
 }
 
