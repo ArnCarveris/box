@@ -1,0 +1,140 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {255, 255, 255}, ground_color: {235, 238, 245}, intensity: 1.4}
+}
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.3, 0.2, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+icons {
+  gear_64 {
+    Svg: {file: "etc/svg/gear.svg", width: 64, height: 64}
+  }
+
+  gear_256 {
+    Svg: {file: "etc/svg/gear.svg", width: 256, height: 256}
+  }
+
+  gear_1024 {
+    Svg: {file: "etc/svg/gear.svg", width: 1024, height: 1024}
+  }
+
+  warning_64 {
+    Svg: {file: "etc/svg/warning.svg", width: 64, height: 64}
+  }
+
+  warning_256 {
+    Svg: {file: "etc/svg/warning.svg", width: 256, height: 256}
+  }
+
+  warning_1024 {
+    Svg: {file: "etc/svg/warning.svg", width: 1024, height: 1024}
+  }
+
+  badge_64 {
+    Svg: {file: "etc/svg/badge.svg", width: 64, height: 64}
+  }
+
+  badge_256 {
+    Svg: {file: "etc/svg/badge.svg", width: 256, height: 256}
+  }
+
+  badge_1024 {
+    Svg: {file: "etc/svg/badge.svg", width: 1024, height: 1024}
+  }
+}
+
+row_gear {
+  small {
+    Position: {-2.9, 2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.gear_64}
+  }
+  medium {
+    Position: {0, 2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.gear_256}
+  }
+  large {
+    Position: {2.9, 2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.gear_1024}
+  }
+}
+
+row_warning {
+  small {
+    Position: {-2.9, 0, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.warning_64}
+  }
+  medium {
+    Position: {0, 0, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.warning_256}
+  }
+  large {
+    Position: {2.9, 0, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.warning_1024}
+  }
+}
+
+row_badge {
+  small {
+    Position: {-2.9, -2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.badge_64}
+  }
+  medium {
+    Position: {0, -2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.badge_256}
+  }
+  large {
+    Position: {2.9, -2.9, 0}
+    Rotation: {0, 0, 3.14159}
+    Quad: {2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.badge_1024}
+  }
+}
