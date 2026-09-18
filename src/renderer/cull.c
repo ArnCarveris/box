@@ -207,6 +207,27 @@ done:
     return;
 }
 
+/** Count the instances of a range the frustum keeps.
+ *
+ * @param f The frustum of the view
+ * @param src The instances to test
+ * @param count Instances in the array
+ * @return Instances the frustum keeps
+ */
+static uint32_t box_cull_test(
+    const box_frustum_t *f,
+    const box_instance_t *src,
+    uint32_t count)
+{
+    uint32_t result = 0;
+    uint32_t i;
+    for (i = 0; i < count; i ++) {
+        result += box_frustum_sphere(f, src[i].bounds, src[i].bounds[3]) ? 1u : 0u;
+    }
+
+    return result;
+}
+
 /** Copy the instances of a range that the frustum keeps into the staging array.
  *
  * @param f The frustum of the view
@@ -250,12 +271,23 @@ static void box_cull_static_cpu(
 {
     box_cull_draw_t *draw = box_vec_push(&r->v->draws);
     draw->mesh = mesh;
-    draw->first = r->v->staging.count;
+    draw->first = 0;
     draw->count = 0;
     draw->args = BOX_CULL_NO_ARGS;
     draw->baked = 1;
+    draw->stage = r->v->staging.count;
+    draw->src = NULL;
 
     const box_instance_t *mirror = box_vec_at(&m->mirror, 0);
+    box_cull_range_t *one = box_vec_at(&r->cull_ranges, 0);
+    if (r->cull_ranges.count == 1 &&
+        box_cull_test(f, mirror + one->first, one->count) == one->count)
+    {
+        draw->src = mirror + one->first;
+        draw->count = one->count;
+        goto done;
+    }
+
     uint32_t tested = 0;
     uint32_t i;
     for (i = 0; i < r->cull_ranges.count; i ++) {
@@ -265,9 +297,10 @@ static void box_cull_static_cpu(
         tested += range->count;
     }
 
+    r->cull_culled += tested - draw->count;
+done:
     draw->limit = draw->count;
     r->cull_drawn += draw->count;
-    r->cull_culled += tested - draw->count;
 }
 
 /** Add the compute culled draw of one static mesh and the dispatches it needs.
@@ -326,42 +359,85 @@ static void box_cull_dynamic(
             continue;
         }
 
+        const box_instance_t *src = box_vec_at(&p->dynamic_instances, b->first);
         box_cull_draw_t *draw = box_vec_push(&r->v->draws);
         draw->mesh = b->mesh;
-        draw->first = r->v->staging.count;
+        draw->first = 0;
         draw->args = BOX_CULL_NO_ARGS;
         draw->baked = 0;
-        draw->count = box_cull_compact(f, box_vec_at(&p->dynamic_instances, b->first),
-            b->count, &r->v->staging);
+        draw->stage = r->v->staging.count;
+        draw->src = NULL;
+        draw->count = box_cull_test(f, src, b->count);
+        if (draw->count == b->count) {
+            draw->src = src;
+        } else {
+            draw->count = box_cull_compact(f, src, b->count, &r->v->staging);
+        }
+
         draw->limit = draw->count;
         r->cull_drawn += draw->count;
         r->cull_culled += b->count - draw->count;
     }
 }
 
-/** Give every compute culled draw its slice of the visible buffer and seed its arguments.
+/** Give every draw of the view its slice of the visible buffer.
+ *
+ * The CPU culled draws take the front of the buffer, so the compute pass writes
+ * behind what the upload of the frame fills.
  *
  * @param r The renderer
- * @param base First instance of the visible buffer the compute pass may write
  * @return Instances the visible buffer of the view must hold
  */
 static uint32_t box_cull_reserve(
-    box_renderer_t *r,
-    uint32_t base)
+    box_renderer_t *r)
 {
-    uint32_t result = base;
+    uint32_t result = 0;
     uint32_t i;
     for (i = 0; i < r->v->draws.count; i ++) {
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
         if (draw->args == BOX_CULL_NO_ARGS) {
-            continue;
+            draw->first = result;
+            result += draw->count;
         }
+    }
 
-        draw->first = result;
-        result += draw->limit;
+    for (i = 0; i < r->v->draws.count; i ++) {
+        box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
+        if (draw->args != BOX_CULL_NO_ARGS) {
+            draw->first = result;
+            result += draw->limit;
+        }
     }
 
     return result;
+}
+
+/** Upload the instances every CPU culled draw of the view kept.
+ *
+ * A draw the frustum kept whole is written straight out of its source, so only
+ * a partly visible range pays for a copy into the staging array.
+ *
+ * @param r The renderer
+ */
+static void box_cull_write(
+    box_renderer_t *r)
+{
+    uint64_t stride = sizeof(box_instance_t);
+    uint32_t i;
+    for (i = 0; i < r->v->draws.count; i ++) {
+        box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
+        if (draw->args != BOX_CULL_NO_ARGS || !draw->count) {
+            continue;
+        }
+
+        const box_instance_t *src = draw->src;
+        if (!src) {
+            src = box_vec_at(&r->v->staging, draw->stage);
+        }
+
+        wgpuQueueWriteBuffer(r->gpu_queue, r->v->visible, (uint64_t)draw->first * stride,
+            src, (size_t)draw->count * stride);
+    }
 }
 
 /** Write the uniform of every dispatch and the arguments of every draw of the view.
@@ -469,14 +545,9 @@ void box_cull_view(
     }
 
     box_cull_dynamic(r, view, p, &frustum);
-    uint32_t base = r->v->staging.count;
-    uint32_t total = box_cull_reserve(r, base);
+    uint32_t total = box_cull_reserve(r);
     box_cull_grow(r, total ? total : 1);
-    if (base) {
-        wgpuQueueWriteBuffer(r->gpu_queue, r->v->visible, 0, r->v->staging.data,
-            (size_t)base * sizeof(box_instance_t));
-    }
-
+    box_cull_write(r);
     box_cull_upload(r, &frustum);
     r->v->culled = true;
 done:

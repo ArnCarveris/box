@@ -133,6 +133,8 @@ typedef struct box_cull_draw_t {
     uint32_t limit;  /**< Instances the slice of the visible buffer holds at most */
     uint32_t args;   /**< Byte offset of its arguments, BOX_CULL_NO_ARGS on the CPU path */
     uint32_t baked;  /**< The draw reads the probes of its mesh */
+    uint32_t stage;  /**< First instance of the staging array a compacted draw wrote */
+    const box_instance_t *src; /**< Source of a draw the frustum kept whole, NULL otherwise */
 } box_cull_draw_t;
 
 /** Contiguous range of static slots a view shows */
