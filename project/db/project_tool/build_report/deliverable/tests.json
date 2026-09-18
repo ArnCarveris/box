@@ -1,0 +1,46 @@
+{
+ "project": "bake3",
+ "pass": 6,
+ "fail": 0,
+ "empty": 0,
+ "elapsed": 0,
+ "tests": [
+  {
+   "suite": "BuildReport",
+   "name": "native_report",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "BuildReport",
+   "name": "failure_case",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "BuildReport",
+   "name": "git_inside_repository",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "BuildReport",
+   "name": "git_outside_repository",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "BuildReport",
+   "name": "run_and_test_accept_option",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "BuildReport",
+   "name": "wasm_target",
+   "status": "pass",
+   "time": 0
+  }
+ ],
+ "timestamp": null
+}
