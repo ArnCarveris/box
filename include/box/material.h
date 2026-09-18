@@ -33,20 +33,27 @@ ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
 });
 
-/** Color multiplier, also applies to descendants that have no tint of their own */
+/** Color the surface mixes toward, composed with the tints down the hierarchy */
 ECS_STRUCT(Tint, {
-    uint8_t r; /**< Red multiplier */
-    uint8_t g; /**< Green multiplier */
-    uint8_t b; /**< Blue multiplier */
-    uint8_t a; /**< Opacity multiplier */
+    uint8_t r;  /**< Red of the tint color */
+    uint8_t g;  /**< Green of the tint color */
+    uint8_t b;  /**< Blue of the tint color */
+    uint8_t a;  /**< Tint strength, 0 leaves the color and 255 replaces it */
 });
 
-/** Resolved tint written by the engine from Tint on the entity or an ancestor */
+/** Tint of an entity composed with those of its ancestors, written by the engine.
+ *
+ * Mixing toward one color and then toward another is one mix, so a chain of
+ * tints resolves into a single color and strength: the strength is one minus
+ * the product of what every level leaves, and the color is the contribution the
+ * levels add together divided by that strength. Views mix the surface color
+ * toward this color by this strength; transparency stays with Opacity.
+ */
 ECS_STRUCT(ActualTint, {
-    uint8_t r; /**< Red multiplier */
-    uint8_t g; /**< Green multiplier */
-    uint8_t b; /**< Blue multiplier */
-    uint8_t a; /**< Opacity multiplier */
+    uint8_t r;  /**< Red of the composed color */
+    uint8_t g;  /**< Green of the composed color */
+    uint8_t b;  /**< Blue of the composed color */
+    uint8_t a;  /**< Composed strength, 1 - the product of the strengths left */
 });
 
 /** Physically based surface parameters, default roughness 0.5 */

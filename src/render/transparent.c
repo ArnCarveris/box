@@ -29,24 +29,19 @@ uint32_t box_render_back_mode(
     return mode ? (uint32_t)*mode : (uint32_t)BOX_BACK_CULL;
 }
 
-/** Opacity of an entity times the alpha of its resolved tint.
+/** Opacity of an entity, the only component that makes it translucent.
  *
  * @param world The world
  * @param e The entity
- * @return The effective alpha, 1 when neither component is present
+ * @return The opacity, 1 when the component is not present
  */
 static float box_render_alpha(
     ecs_world_t *world,
     ecs_entity_t e)
 {
     const Opacity *opacity = ecs_get(world, e, Opacity);
-    const ActualTint *tint = ecs_get(world, e, ActualTint);
-    float result = opacity ? opacity->value : 1.0f;
-    if (tint) {
-        result *= (float)tint->a / 255.0f;
-    }
 
-    return result;
+    return opacity ? opacity->value : 1.0f;
 }
 
 bool box_render_is_transparent(

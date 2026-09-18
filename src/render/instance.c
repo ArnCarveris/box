@@ -152,7 +152,7 @@ static void box_render_on_shadowless(
     }
 }
 
-/** An opacity or tint exists, so extract resolves the alpha of changed entities.
+/** An opacity exists, so extract resolves the alpha of changed entities.
  *
  * @param it Iterator over the entities that gained the component
  */
@@ -225,6 +225,9 @@ static void box_render_watch(
 
 /** Convert a color and tint to linear rgba.
  *
+ * The tint mixes the color toward its own by its strength, so the alpha of the
+ * instance is the opacity alone.
+ *
  * @param color The base color, NULL for white
  * @param tint The resolved tint, NULL for none
  * @param opacity The opacity
@@ -241,10 +244,10 @@ static void box_render_color(
     out[2] = color ? box_srgb_to_linear(color->b) : 1.0f;
     out[3] = opacity;
     if (tint) {
-        out[0] *= (float)tint->r / 255.0f;
-        out[1] *= (float)tint->g / 255.0f;
-        out[2] *= (float)tint->b / 255.0f;
-        out[3] *= (float)tint->a / 255.0f;
+        float a = (float)tint->a / 255.0f;
+        out[0] += ((float)tint->r / 255.0f - out[0]) * a;
+        out[1] += ((float)tint->g / 255.0f - out[1]) * a;
+        out[2] += ((float)tint->b / 255.0f - out[2]) * a;
     }
 }
 
@@ -392,8 +395,6 @@ void box_render_instance_init(
     box_render_watch_flag(world, ecs_id(BlendMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(BackFaceMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
-    box_render_watch_flag(world, ecs_id(Tint), box_render_on_translucent);
-    box_render_watch_flag(world, ecs_id(ActualTint), box_render_on_translucent);
     box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
 
     ecs_observer(world, {

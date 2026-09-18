@@ -79,7 +79,7 @@ typedef struct RenderState {
     bool textured;            /**< A texture handle was allocated, slots need resolving */
     bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
     bool blended;             /**< A blend or back face mode exists, so instances read them */
-    bool translucent;         /**< An opacity or tint exists, so instances resolve their alpha */
+    bool translucent;         /**< An opacity exists, so instances resolve their alpha */
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
@@ -466,9 +466,9 @@ uint32_t box_render_back_mode(
 
 /** Check whether an entity leaves the opaque batches for the sorted pass.
  *
- * An instance is sorted when its blend mode is not opaque, when its opacity
- * times the alpha of its resolved tint is below one, or when it shows its back
- * faces, which the batched draws cannot do. The registry flags say which of
+ * An instance is sorted when its blend mode is not opaque, when its opacity is
+ * below one, or when it shows its back faces, which the batched draws cannot
+ * do. The registry flags say which of
  * those components the world holds at all, so a scene without them pays
  * nothing per changed entity.
  *
