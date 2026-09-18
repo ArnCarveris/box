@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:19.396+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "geometry_extensions/mesh3",
+    "textures_and_materials/textures",
+    "responsiveness/job_system"
+  ]
+}

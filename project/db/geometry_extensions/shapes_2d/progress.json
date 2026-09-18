@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:19.365+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "textures_and_materials/textures"
+  ]
+}
