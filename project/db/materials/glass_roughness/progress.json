@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T17:27:34.805+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "materials/blending"
+  ]
+}
