@@ -1,0 +1,17 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T13:24:07Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.039767,
+  "tests": [
+    {"suite": "Svg", "case": "inline_data_rasterizes", "status": "pass", "elapsed": 0.014414},
+    {"suite": "Svg", "case": "file_rasterizes", "status": "pass", "elapsed": 0.015272},
+    {"suite": "Svg", "case": "zero_height_follows_the_width", "status": "pass", "elapsed": 0.039159},
+    {"suite": "Svg", "case": "resize_rerasterizes", "status": "pass", "elapsed": 0.039675},
+    {"suite": "Svg", "case": "removing_the_component_destroys_the_handle", "status": "pass", "elapsed": 0.014390},
+    {"suite": "Svg", "case": "handle_reaches_a_pbr_slot", "status": "pass", "elapsed": 0.015550},
+    {"suite": "Svg", "case": "texture_and_svg_is_an_error", "status": "pass", "elapsed": 0.014377}
+  ]
+}
