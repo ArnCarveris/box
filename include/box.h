@@ -21,5 +21,6 @@
 #include "box/render.h"
 #include "box/movement.h"
 #include "box/surface.h"
+#include "box/command.h"
 
 #endif

@@ -17,6 +17,7 @@ int main(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxCommand);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxCamera);
