@@ -14,31 +14,42 @@ engine reacts to component changes. See `design/DESIGN.md` for the full brief.
 ## Build and run
 
 ```sh
-bake3 --local-env                                   # build everything
-bake3 run box --local-env --cfg release             # run the engine with the default scene
-bake3 run box --local-env -- --headless --frames 10 # headless run, exits after 10 frames
+bake3 --local-env                                          # build the library, app and tests
+bake3 run box_app --local-env --cfg release                # open a window with the default scene
+bake3 run box_app --local-env -- etc/scenes/capture.flecs  # run a scene (paths are relative to apps/box_app)
+bake3 run box_app --local-env -- --headless --frames 10    # headless run, exits after 10 frames
 ```
 
-Headless runs write their temporary files to `/tmp/box/<pid>`.
+Options: `--headless`, `--frames <n>`, `--timeout <s|infinite>`, `--cpu-budget <0..1>`,
+`--fps <n>`. Headless runs require `--frames` or `--timeout`, write their temporary
+files to `/tmp/box/<pid>` and refuse to start when the machine's load exceeds its
+core count. A scene that sets `Surface.write_to_file` writes each frame as PNG:
+
+```
+using box.surface
+$ { Surface: {width: 640, height: 360, write_to_file: "/tmp/frame.png"} }
+```
 
 ## Tests
 
 ```sh
 bake3 run test/core --local-env -- -j 12                     # all unit tests
-bake3 run test/core --local-env -- Transform -j 12           # one suite
-bake3 run test/core --local-env -- Transform.parent_child    # one case
+bake3 run test/core --local-env -- Args -j 12                # one suite
+bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
 ```
 
 ## WebAssembly
 
 ```sh
-bake3 build box --target em --local-env --cfg release
-bake3 run box --target em --local-env --cfg release   # serves the page on http://localhost:8080
+bake3 build box_app --target em --local-env --cfg release
+bake3 run box_app --target em --local-env --cfg release   # serves the page on http://localhost:8080
 ```
 
-Every completed epic ships a wasm build under its deliverable folder, see
-`project/db/<epic>/deliverable/`.
+The page accepts engine arguments in the URL hash, e.g. `box_app.html#--frames 600`.
+Every completed epic ships a wasm build under `project/db/<epic>/deliverable/wasm/`;
+serve that folder with any static file server and open `box_app.html` in a
+WebGPU-capable browser.
 
 ## Project status page
 
@@ -61,10 +72,11 @@ python3 project/pm.py check            # validates READMEs, statuses and depende
 ## Layout
 
 ```
-design/     design brief and datamodel sketches (documentation only)
-project/    project management tool and its database
-src/        engine sources, one directory per flecs module
-include/    public headers
-test/       unit test projects
-etc/        default scenes and assets
+apps/box_app/   the engine executable, its scenes under etc/ and the wasm shell page
+design/         design brief and datamodel sketches (documentation only)
+docs/           architecture notes
+include/box/    public headers, one per module
+project/        project management tool and its database
+src/            engine sources, one directory per flecs module (see docs/ARCHITECTURE.md)
+test/           unit test projects
 ```
