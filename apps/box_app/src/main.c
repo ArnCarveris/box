@@ -24,6 +24,7 @@ int main(
     ECS_IMPORT(world, BoxMaterial);
     ECS_IMPORT(world, BoxRender);
     ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxMovement);
 
     if (box_parse_args(world, argc, argv)) {
         goto error;
