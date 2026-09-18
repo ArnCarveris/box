@@ -161,8 +161,6 @@ void box_render_extract_layers(
     RenderState *state,
     box_packet_t *p)
 {
-    const MaterialLayerSettings *settings = ecs_singleton_get(world, MaterialLayerSettings);
-    p->view.layers_enabled = !settings || settings->enabled ? 1u : 0u;
     p->layer_count = 0;
     if (!state->layered) {
         goto done;

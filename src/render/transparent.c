@@ -179,15 +179,15 @@ static void box_render_sort_radix(
  *
  * @param world The world
  * @param state The registry
- * @param p The packet
+ * @param v The view the draws are sorted for
  */
 static void box_render_sort_keys(
     ecs_world_t *world,
     RenderState *state,
-    box_packet_t *p)
+    const box_view_t *v)
 {
     mat4 view;
-    memcpy(view.v, p->view.view, sizeof(view.v));
+    memcpy(view.v, v->view, sizeof(view.v));
     int32_t count = ecs_vec_count(&state->transparent);
     ecs_vec_set_count_t(NULL, &state->sort, box_sort_key_t, count);
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
@@ -214,13 +214,16 @@ static void box_render_sort_keys(
 void box_render_extract_transparent(
     ecs_world_t *world,
     RenderState *state,
-    box_packet_t *p)
+    box_packet_t *p,
+    box_view_t *v)
 {
+    v->transparent_first = p->transparent.count;
+    v->transparent_count = 0;
     if (!ecs_vec_count(&state->transparent)) {
         goto done;
     }
 
-    box_render_sort_keys(world, state, p);
+    box_render_sort_keys(world, state, v);
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
     ecs_entity_t *entities = ecs_vec_first_t(&state->transparent, ecs_entity_t);
 
@@ -245,6 +248,8 @@ void box_render_extract_transparent(
 
         box_instance_set_shading(&entry->data, entry->blend, entry->back);
     }
+
+    v->transparent_count = p->transparent.count - v->transparent_first;
 done:
     return;
 }

@@ -9,6 +9,7 @@
 #define BOX_RENDERER_PACKET_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include "vec.h"
 
@@ -133,7 +134,13 @@ typedef struct box_cluster_t {
     float far_;           /**< View depth of the last slice boundary */
 } box_cluster_t;
 
-/** Camera and lighting of one view */
+/** Camera, target and lighting of one view.
+ *
+ * The fields up to and including the padding are the view uniform the shaders
+ * read and must keep their layout; the fields after it stay on the CPU and tell
+ * the renderer where the view draws and which slice of the packet arrays is
+ * its own.
+ */
 typedef struct box_view_t {
     float view[16];         /**< World to view matrix */
     float proj[16];         /**< View to clip matrix */
@@ -146,11 +153,32 @@ typedef struct box_view_t {
     float env_sky[4];       /**< Linear color of the upper hemisphere, w unused */
     float env_ground[4];    /**< Linear color of the lower hemisphere, w unused */
     box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
-    uint32_t light_count;   /**< Lights in the packet light array */
+    uint32_t light_count;   /**< Lights of the view in the packet light array */
     uint32_t env_generation; /**< Changes when the extracted environment changes */
     uint32_t layers_enabled; /**< The view applies the registered material layers */
     uint32_t pad[3];        /**< Padding to the 16 byte GPU stride */
+    uint32_t target;        /**< Render target handle, 0 draws into the surface */
+    uint32_t width;         /**< Target width in pixels */
+    uint32_t height;        /**< Target height in pixels */
+    float clear[4];         /**< Clear color of the target, linear RGBA */
+    uint32_t light_first;   /**< First light of the view in the packet light array */
+    uint32_t transparent_first; /**< First sorted draw of the view in the packet */
+    uint32_t transparent_count; /**< Sorted draws of the view */
+    uint32_t shadows;       /**< The view casts and receives shadows */
+    uint32_t effects;       /**< The view runs its post process effects */
+    int32_t priority;       /**< Order in the frame, lower renders first */
+    uint32_t cpu_pad[3];    /**< Padding to the 16 byte stride */
 } box_view_t;
+
+/** Bytes of a view that the view uniform buffer holds */
+#define BOX_VIEW_UNIFORM_SIZE (offsetof(box_view_t, target))
+
+/** Render target to create or resize, the renderer owns the texture */
+typedef struct box_target_cmd_t {
+    uint32_t handle;  /**< Target handle */
+    uint32_t width;   /**< Width in pixels */
+    uint32_t height;  /**< Height in pixels */
+} box_target_cmd_t;
 
 /** Mesh to upload, the renderer takes ownership of the arrays */
 typedef struct box_mesh_cmd_t {
@@ -411,8 +439,12 @@ typedef struct box_packet_t {
     uint32_t height;                         /**< Target height in pixels */
     float clear[4];                          /**< Clear color, linear RGBA */
     char capture_path[BOX_CAPTURE_PATH_MAX]; /**< PNG to write, empty for none */
-    box_view_t view;                         /**< Main view */
-    bool has_view;                           /**< A camera was extracted */
+    box_view_t view;                         /**< Copy of the first view, for readers of one view */
+    bool has_view;                           /**< The packet holds at least one view */
+    box_vec_t views;                         /**< box_view_t sorted by priority */
+    uint32_t capture_view;                   /**< View the capture path reads its target from */
+    box_vec_t target_create;                 /**< box_target_cmd_t, also resizes a handle */
+    box_vec_t target_destroy;                /**< uint32_t handles */
     box_vec_t mesh_create;                   /**< box_mesh_cmd_t */
     box_vec_t mesh_destroy;                  /**< uint32_t handles */
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
@@ -440,6 +472,9 @@ static inline void box_packet_init(
     box_packet_t *p)
 {
     memset(p, 0, sizeof(box_packet_t));
+    box_vec_init(&p->views, sizeof(box_view_t));
+    box_vec_init(&p->target_create, sizeof(box_target_cmd_t));
+    box_vec_init(&p->target_destroy, sizeof(uint32_t));
     box_vec_init(&p->mesh_create, sizeof(box_mesh_cmd_t));
     box_vec_init(&p->mesh_destroy, sizeof(uint32_t));
     box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
@@ -468,6 +503,11 @@ static inline void box_packet_reset(
     p->height = 0;
     p->capture_path[0] = '\0';
     p->has_view = false;
+    p->capture_view = 0;
+    memset(&p->view, 0, sizeof(box_view_t));
+    box_vec_clear(&p->views);
+    box_vec_clear(&p->target_create);
+    box_vec_clear(&p->target_destroy);
     box_vec_clear(&p->mesh_create);
     box_vec_clear(&p->mesh_destroy);
     box_vec_clear(&p->texture_create);
@@ -491,6 +531,9 @@ static inline void box_packet_reset(
 static inline void box_packet_fini(
     box_packet_t *p)
 {
+    box_vec_fini(&p->views);
+    box_vec_fini(&p->target_create);
+    box_vec_fini(&p->target_destroy);
     box_vec_fini(&p->mesh_create);
     box_vec_fini(&p->mesh_destroy);
     box_vec_fini(&p->texture_create);

@@ -53,6 +53,11 @@ static void box_render_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].transparent, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].sort, box_sort_key_t);
         ecs_vec_fini_t(NULL, &state[i].sort_tmp, box_sort_key_t);
+        ecs_vec_fini_t(NULL, &state[i].view_list, box_view_src_t);
+        ecs_vec_fini_t(NULL, &state[i].view_env, box_view_env_t);
+        ecs_vec_fini_t(NULL, &state[i].dead_targets, uint32_t);
+        if (state[i].views) ecs_query_fini(state[i].views);
+        if (state[i].targets) ecs_query_fini(state[i].targets);
         if (state[i].dynamic) ecs_query_fini(state[i].dynamic);
         if (state[i].cameras) ecs_query_fini(state[i].cameras);
         if (state[i].captures) ecs_query_fini(state[i].captures);
@@ -147,6 +152,7 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxCamera);
+    ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxMaterial);
 
@@ -182,8 +188,12 @@ void BoxRenderImport(
     ecs_vec_init_t(NULL, &state->transparent, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->sort, box_sort_key_t, 0);
     ecs_vec_init_t(NULL, &state->sort_tmp, box_sort_key_t, 0);
+    ecs_vec_init_t(NULL, &state->view_list, box_view_src_t, 0);
+    ecs_vec_init_t(NULL, &state->view_env, box_view_env_t, 0);
+    ecs_vec_init_t(NULL, &state->dead_targets, uint32_t, 0);
 
     box_render_texture_init(world);
+    box_render_target_init(world);
     box_render_layers_init(world);
     box_render_instance_init(world);
     box_render_extract_init(world);

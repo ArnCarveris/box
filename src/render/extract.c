@@ -189,199 +189,6 @@ static void box_extract_dynamic(
     }
 }
 
-/** Take the capture request of the first camera that has one.
- *
- * The path of the request replaces the one the surface wrote and the component
- * is removed, so a next frame honors the request of another camera. The
- * component owns its path, which is released with the request.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- * @return The camera that requested the capture, 0 when no camera did
- */
-static ecs_entity_t box_extract_capture(
-    ecs_world_t *world,
-    RenderState *state,
-    box_packet_t *p)
-{
-    ecs_entity_t result = 0;
-    ecs_iter_t it = ecs_query_iter(world, state->captures);
-    if (ecs_query_next(&it)) {
-        Capture *capture = ecs_field(&it, Capture, 0);
-        result = it.entities[0];
-        ecs_os_snprintf(p->capture_path, BOX_CAPTURE_PATH_MAX, "%s",
-            capture->path ? capture->path : "");
-        ecs_os_free(capture->path);
-        capture->path = NULL;
-        ecs_iter_fini(&it);
-    }
-
-    if (result) {
-        ecs_remove(world, result, Capture);
-    }
-
-    return result;
-}
-
-/** Fill the packet view from the capture or active camera, or a default one.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- */
-static void box_extract_camera(
-    ecs_world_t *world,
-    RenderState *state,
-    box_packet_t *p)
-{
-    float aspect = p->height ? (float)p->width / (float)p->height : 1.0f;
-    mat4 view = mat4_look_at(vec3_new(0, 3, -8), vec3_new(0, 0, 0), vec3_new(0, 1, 0));
-    mat4 proj = mat4_perspective(60.0f * 3.14159265f / 180.0f, aspect, 0.1f);
-    vec3 eye = vec3_new(0, 3, -8);
-    float near = 0.1f;
-    float far = 1000.0f;
-
-    ecs_entity_t e = box_extract_capture(world, state, p);
-    if (!e) {
-        e = box_render_active_camera(world);
-    }
-
-    const Camera *camera = e ? ecs_get(world, e, Camera) : NULL;
-    const WorldTransform *transform = e ? ecs_get(world, e, WorldTransform) : NULL;
-    if (camera && transform) {
-        view = mat4_inverse(&transform->m);
-        eye = mat4_get_translation(&transform->m);
-        float fov = camera->fov > 0 ? camera->fov : 60.0f;
-        near = camera->near_ > 0 ? camera->near_ : near;
-        far = camera->far_ > 0 ? camera->far_ : far;
-        float ratio = camera->aspect_ratio > 0 ? camera->aspect_ratio : aspect;
-        if (camera->orthographic) {
-            float height = camera->ortho_height > 0 ? camera->ortho_height : 10.0f;
-            proj = mat4_orthographic(height, ratio, near, far);
-        } else {
-            proj = mat4_perspective(fov * 3.14159265f / 180.0f, ratio, near);
-        }
-    }
-
-    memcpy(p->view.view, view.v, sizeof(view.v));
-    memcpy(p->view.proj, proj.v, sizeof(proj.v));
-    p->view.eye[0] = eye.x;
-    p->view.eye[1] = eye.y;
-    p->view.eye[2] = eye.z;
-    p->view.cluster.near_ = near;
-    p->view.cluster.far_ = far;
-    p->has_view = true;
-}
-
-/** Fill the packet sun light from the first directional light, or a default one.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- */
-static void box_extract_sun(
-    ecs_world_t *world,
-    RenderState *state,
-    box_packet_t *p)
-{
-    vec3 dir = vec3_normalize(vec3_new(0.4f, -1.0f, 0.3f));
-    float intensity = 3.0f;
-    vec3 color = vec3_new(1, 1, 1);
-
-    ecs_iter_t it = ecs_query_iter(world, state->suns);
-    if (ecs_query_next(&it)) {
-        DirectionalLight *light = ecs_field(&it, DirectionalLight, 0);
-        WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
-        dir = vec3_normalize(mat4_transform_dir(&transform->m, vec3_new(0, 0, 1)));
-        intensity = light->intensity;
-        const Rgb *rgb = ecs_get(world, it.entities[0], Rgb);
-        if (rgb) {
-            color = vec3_new(box_srgb_to_linear(rgb->r), box_srgb_to_linear(rgb->g),
-                box_srgb_to_linear(rgb->b));
-        }
-
-        ecs_iter_fini(&it);
-    }
-
-    p->view.sun_dir[0] = dir.x;
-    p->view.sun_dir[1] = dir.y;
-    p->view.sun_dir[2] = dir.z;
-    p->view.sun_intensity = intensity;
-    p->view.sun_color[0] = color.x;
-    p->view.sun_color[1] = color.y;
-    p->view.sun_color[2] = color.z;
-}
-
-/** Check whether two environment lights hold the same values.
- *
- * @param a The first environment
- * @param b The second environment
- * @return true when every field matches
- */
-static bool box_extract_env_equal(
-    const EnvironmentLight *a,
-    const EnvironmentLight *b)
-{
-    return a->sky_color.r == b->sky_color.r && a->sky_color.g == b->sky_color.g &&
-        a->sky_color.b == b->sky_color.b && a->ground_color.r == b->ground_color.r &&
-        a->ground_color.g == b->ground_color.g && a->ground_color.b == b->ground_color.b &&
-        a->intensity == b->intensity && a->source == b->source;
-}
-
-/** Write a display encoded color to a view field as a linear color.
- *
- * @param color The color
- * @param out The four floats to fill, the fourth stays zero
- */
-static void box_extract_env_color(
-    rgb color,
-    float *out)
-{
-    out[0] = box_srgb_to_linear(color.r);
-    out[1] = box_srgb_to_linear(color.g);
-    out[2] = box_srgb_to_linear(color.b);
-    out[3] = 0;
-}
-
-/** Copy the environment light singleton into the view, or the default gradient.
- *
- * The generation counts the environments the world has had, so it only changes
- * when the extracted values differ from those of the previous packet and the
- * renderer knows when to prefilter again.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- */
-static void box_extract_environment(
-    ecs_world_t *world,
-    RenderState *state,
-    box_packet_t *p)
-{
-    EnvironmentLight env = {
-        .sky_color = { BOX_ENV_SKY, BOX_ENV_SKY, BOX_ENV_SKY },
-        .ground_color = { BOX_ENV_GROUND, BOX_ENV_GROUND, BOX_ENV_GROUND },
-        .intensity = BOX_ENV_INTENSITY
-    };
-
-    const EnvironmentLight *set = ecs_singleton_get(world, EnvironmentLight);
-    if (set) {
-        env = *set;
-        env.intensity = env.intensity > 0 ? env.intensity : 1.0f;
-    }
-
-    if (!box_extract_env_equal(&env, &state->env)) {
-        state->env = env;
-        state->env_generation ++;
-    }
-
-    box_extract_env_color(env.sky_color, p->view.env_sky);
-    box_extract_env_color(env.ground_color, p->view.env_ground);
-    p->view.env_intensity = env.intensity;
-    p->view.env_generation = state->env_generation;
-}
-
 ecs_entity_t box_render_active_camera(
     ecs_world_t *world)
 {
@@ -411,6 +218,7 @@ void box_render_extract(
     box_packet_t *p)
 {
     RenderState *state = box_render_state(world);
+    ecs_entity_t capture = box_render_collect_views(world, state, p);
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
     box_extract_meshes(state, p);
@@ -427,11 +235,7 @@ void box_render_extract(
     ecs_vec_clear(&state->dirty);
     box_extract_dynamic(world, state, p);
     box_extract_counts(state, p);
-    box_extract_camera(world, state, p);
-    box_render_extract_transparent(world, state, p);
-    box_extract_sun(world, state, p);
-    box_extract_environment(world, state, p);
-    box_render_extract_lights(world, state, p);
+    box_render_extract_views(world, state, p, capture);
     box_render_extract_emitters(world, state, p);
     box_render_validate(world);
 }
@@ -510,6 +314,20 @@ void box_render_extract_init(
             { .id = ecs_id(RenderInstance) },
             { .id = DynamicTransform, .src.id = EcsSelf | EcsUp, .oper = EcsOr },
             { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+    state->views = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(View), .inout = EcsIn },
+            { .id = ecs_id(ViewImpl), .inout = EcsInOut }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+    state->targets = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(RenderTarget), .inout = EcsIn },
+            { .id = ecs_id(RenderTargetImpl), .inout = EcsInOut }
         },
         .cache_kind = EcsQueryCacheAuto
     });

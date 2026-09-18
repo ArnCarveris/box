@@ -101,17 +101,19 @@ static bool box_light_visible(
     return result;
 }
 
-/** Copy the cluster settings singleton into the view, filling in defaults.
+/** Copy the cluster settings of a view into it, filling in defaults.
  *
  * @param world The world
- * @param p The packet
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
  */
 static void box_light_settings(
     ecs_world_t *world,
-    box_packet_t *p)
+    ecs_entity_t e,
+    box_view_t *v)
 {
-    const ClusterSettings *s = ecs_singleton_get(world, ClusterSettings);
-    box_cluster_t *c = &p->view.cluster;
+    const ClusterSettings *s = box_render_view_setting(world, e, ecs_id(ClusterSettings));
+    box_cluster_t *c = &v->cluster;
     c->x = s && s->x > 0 ? (uint32_t)s->x : BOX_CLUSTER_X;
     c->y = s && s->y > 0 ? (uint32_t)s->y : BOX_CLUSTER_Y;
     c->z = s && s->z > 0 ? (uint32_t)s->z : BOX_CLUSTER_Z;
@@ -191,6 +193,7 @@ static void box_light_cone(
  * @param i Index of the entity in the table
  * @param planes The frustum planes
  * @param is_static Neither the light nor an ancestor carries a dynamic tag
+ * @param bake The unculled static lights of the bake are collected too
  * @param p The packet
  */
 static void box_light_extract(
@@ -198,6 +201,7 @@ static void box_light_extract(
     int32_t i,
     const box_plane_t *planes,
     bool is_static,
+    bool bake,
     box_packet_t *p)
 {
     bool spot = ecs_field_id(it, 0) == ecs_id(SpotLight);
@@ -224,7 +228,7 @@ static void box_light_extract(
         *(box_light_t*)box_vec_push(&p->lights) = light;
     }
 
-    if (is_static && p->bake.enabled && p->bake_lights.count < BOX_LIGHT_MAX) {
+    if (bake && is_static && p->bake.enabled && p->bake_lights.count < BOX_LIGHT_MAX) {
         *(box_light_t*)box_vec_push(&p->bake_lights) = light;
     }
 }
@@ -232,25 +236,29 @@ static void box_light_extract(
 void box_render_extract_lights(
     ecs_world_t *world,
     RenderState *state,
-    box_packet_t *p)
+    box_packet_t *p,
+    ecs_entity_t e,
+    box_view_t *v,
+    bool bake)
 {
-    box_light_settings(world, p);
+    box_light_settings(world, e, v);
+    v->light_first = p->lights.count;
 
     box_plane_t planes[BOX_FRUSTUM_PLANES];
     bool has_planes = false;
     ecs_iter_t it = ecs_query_iter(world, state->lights);
     while (ecs_query_next(&it)) {
         if (!has_planes) {
-            box_light_planes(&p->view, planes);
+            box_light_planes(v, planes);
             has_planes = true;
         }
 
         bool is_static = !box_render_is_dynamic(world, it.entities[0]);
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
-            box_light_extract(&it, i, planes, is_static, p);
+            box_light_extract(&it, i, planes, is_static, bake, p);
         }
     }
 
-    p->view.light_count = p->lights.count;
+    v->light_count = p->lights.count - v->light_first;
 }

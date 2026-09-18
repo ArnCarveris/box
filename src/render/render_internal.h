@@ -12,6 +12,7 @@
 #include "../renderer/tiling.h"
 #include "../renderer/bake.h"
 #include "../geometry/mesh_gen.h"
+#include "../view/view_internal.h"
 
 /** Static instance slots of one mesh */
 typedef struct box_batch_t {
@@ -34,6 +35,19 @@ typedef struct box_layer_t {
     ecs_entity_t entity; /**< The layer entity */
     int32_t order;       /**< Application order the list was sorted by */
 } box_layer_t;
+
+/** One view of the frame, in the order the views are rendered */
+typedef struct box_view_src_t {
+    ecs_entity_t entity;  /**< The View entity, 0 for the view a world without views gets */
+    ecs_entity_t camera;  /**< Camera the view renders */
+    int32_t priority;     /**< Order in the frame, lower renders first */
+} box_view_src_t;
+
+/** Environment one view was extracted with, kept to number the generations */
+typedef struct box_view_env_t {
+    EnvironmentLight env; /**< Values of the previous packet */
+    uint32_t generation;  /**< Generation those values were given, 0 when unused */
+} box_view_env_t;
 
 /** Depth and index of one entry of the sorted draw list */
 typedef struct box_sort_key_t {
@@ -62,6 +76,12 @@ typedef struct RenderState {
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
     ecs_vec_t sort_tmp;       /**< Scratch of the radix sort, reused every frame */
+    ecs_vec_t view_list;      /**< box_view_src_t of the views of this frame */
+    ecs_vec_t view_env;       /**< box_view_env_t of the previous packet, per view index */
+    ecs_vec_t dead_targets;   /**< uint32_t render target handles waiting for the next packet */
+    uint32_t target_count;    /**< Render target handles handed out so far */
+    ecs_query_t *views;       /**< View entities */
+    ecs_query_t *targets;     /**< Render target entities */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *captures;    /**< Camera entities that request a capture */
@@ -328,16 +348,18 @@ void box_render_set_transparent(
     RenderInstance *inst,
     bool transparent);
 
-/** Fill the packet list of sorted draws and order it back to front.
+/** Fill the sorted draws of one view and order them back to front.
  *
  * @param world The world
  * @param state The registry
  * @param p The packet
+ * @param v The view the draws are sorted for
  */
 void box_render_extract_transparent(
     ecs_world_t *world,
     RenderState *state,
-    box_packet_t *p);
+    box_packet_t *p,
+    box_view_t *v);
 
 /** Check whether an entity or an ancestor carries a dynamic tag.
  *
@@ -368,16 +390,78 @@ void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p);
 
-/** Fill the packet light array with the point and spot lights inside the frustum.
+/** Fill the light array of one view with the lights inside its frustum.
+ *
+ * The lights of every view live in the same packet array; the view names the
+ * range that is its own. Only the first view collects the unculled static
+ * lights of the bake, which is shared by every view.
  *
  * @param world The world
  * @param state The registry
  * @param p The packet
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
+ * @param bake The view also collects the unculled static lights of the bake
  */
 void box_render_extract_lights(
     ecs_world_t *world,
     RenderState *state,
+    box_packet_t *p,
+    ecs_entity_t e,
+    box_view_t *v,
+    bool bake);
+
+/** Component of a view entity, or its singleton when the view does not carry it.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param id The component
+ * @return The component, NULL when neither the view nor the world has it
+ */
+const void* box_render_view_setting(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_id_t id);
+
+/** Collect the views of the frame and the render targets they draw into.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ * @return The camera that requested a capture, 0 when no camera did
+ */
+ecs_entity_t box_render_collect_views(
+    ecs_world_t *world,
+    RenderState *state,
     box_packet_t *p);
+
+/** The view entity the settings shared by every view are read from.
+ *
+ * @param state The registry
+ * @return The first view of the frame, 0 when the world has no views
+ */
+ecs_entity_t box_render_primary_view(
+    RenderState *state);
+
+/** Fill the view array of the packet, one entry per view that renders.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ * @param capture The camera that requested a capture, 0 when no camera did
+ */
+void box_render_extract_views(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p,
+    ecs_entity_t capture);
+
+/** Register the observer that releases the handle of a removed render target.
+ *
+ * @param world The world
+ */
+void box_render_target_init(
+    ecs_world_t *world);
 
 /** Copy the bake settings into the packet and requeue every instance when they toggled.
  *
