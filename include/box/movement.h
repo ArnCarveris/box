@@ -19,14 +19,14 @@ extern "C" {
 #endif
 
 /** Units per second added to Position */
-ECS_STRUCT(Velocity3, {
+ECS_STRUCT(Velocity, {
     float x; /**< X velocity */
     float y; /**< Y velocity */
     float z; /**< Z velocity */
 });
 
 /** Radians per second added to Rotation */
-ECS_STRUCT(AngularVelocity3, {
+ECS_STRUCT(AngularVelocity, {
     float x; /**< Angular velocity about X */
     float y; /**< Angular velocity about Y */
     float z; /**< Angular velocity about Z */

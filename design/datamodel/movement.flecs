@@ -2,13 +2,13 @@ module box.movement
 using box.transform
 
 @brief Units per second, added to Position
-struct Velocity3(x: f32, y: f32, z: f32) {
+struct Velocity(x: f32, y: f32, z: f32) {
   (With, Position)
   (With, DynamicTransform)
 }
 
 @brief Radians per second, added to Rotation
-struct AngularVelocity3(x: f32, y: f32, z: f32) {
+struct AngularVelocity(x: f32, y: f32, z: f32) {
   (With, Rotation)
   (With, DynamicTransform)
 }

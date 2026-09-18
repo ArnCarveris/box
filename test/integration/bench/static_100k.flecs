@@ -21,8 +21,8 @@ for i in 0..100000 {
 for i in 0..10000 {
   _ {
     Position: {(i % 100) - 50, 60, (i / 100) - 50}
-    Velocity3: {0, -1, 0}
-    AngularVelocity3: {0, 1, 0}
+    Velocity: {0, -1, 0}
+    AngularVelocity: {0, 1, 0}
     Sphere: {segments: 8, smooth: true, radius: 0.4}
     Rgb: {255, 200, 50}
   }

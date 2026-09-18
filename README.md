@@ -47,7 +47,7 @@ sphere { Position: {-3, 1, 0}  Sphere: {segments: 32, smooth: true, radius: 1}  
 
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
-`Velocity3` and `AngularVelocity3` from `box.movement` mark entities dynamic.
+`Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.
 
 ## Tests
 
