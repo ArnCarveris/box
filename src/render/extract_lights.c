@@ -178,9 +178,9 @@ void box_render_extract_lights(
 
         bool is_static = !box_render_is_dynamic(world, it.entities[0]);
         bool visible = true;
-        if (v->layer_mask != BOX_VIEW_LAYER_ALL) {
-            visible = box_render_layer_visible(
-                box_render_entity_layers(world, state, it.entities[0]), v->layer_mask);
+        if (v->layer_mask != BOX_VIEW_LAYER_ALL || v->strict_layers) {
+            visible = box_view_shows(v,
+                box_render_entity_layers(world, state, it.entities[0]));
         }
 
         if (!visible && !bake) {

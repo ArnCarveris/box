@@ -200,6 +200,7 @@
                 "instantiates_a_template",
                 "cleans_up_when_the_image_appears",
                 "live_entity_joins_and_leaves_the_layer",
+                    "live_subject_is_rendered_alone",
                 "headless_run_writes_the_png"
             ],
             "setup": true,

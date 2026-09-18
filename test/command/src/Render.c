@@ -10,6 +10,7 @@
 #include <math.h>
 #include "../../../src/command/command_internal.h"
 #include "../../../src/surface/surface_internal.h"
+#include "../../../src/render/render_internal.h"
 
 static ecs_world_t *w;
 static ecs_entity_t session;
@@ -325,4 +326,45 @@ void Render_headless_run_writes_the_png(void)
         ecs_os_free(file);
         ecs_os_free(out);
     }
+}
+
+void Render_live_subject_is_rendered_alone(void)
+{
+    // views/strict_layers
+    ecs_entity_t thing = ecs_entity(w, { .name = "thing" });
+    ecs_set(w, thing, Position, {0, 0, 0});
+    ecs_set(w, thing, Box, {1, 1, 1});
+    ecs_entity_t floor = ecs_entity(w, { .name = "floor" });
+    ecs_set(w, floor, Position, {10, 0, 0});
+    ecs_set(w, floor, Box, {1, 1, 1});
+    ecs_entity_t ghost = ecs_entity(w, { .name = "ghost" });
+    ecs_set(w, ghost, Position, {0, 0, 10});
+    ecs_set(w, ghost, Box, {1, 1, 1});
+    ecs_add_id(w, ghost, DynamicTransform);
+
+    ecs_os_free(box_command_run(w, session, "render thing", NULL));
+    ecs_progress(w, 0);
+
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 512;
+    packet.height = 512;
+    box_render_extract(w, &packet);
+
+    box_view_t *v = NULL;
+    uint32_t i;
+    for (i = 0; i < packet.views.count; i ++) {
+        box_view_t *candidate = box_vec_at(&packet.views, i);
+        if (candidate->strict_layers) {
+            v = candidate;
+        }
+    }
+
+    test_assert(v != NULL);
+    test_assert(v->layer_mask != BOX_VIEW_LAYER_ALL);
+    test_int(v->dynamic_count, 0);
+    test_bool(box_view_shows(v, 0), false);
+    test_bool(box_view_shows(v, ecs_get(w, thing, RenderInstance)->layer_mask), true);
+    test_bool(box_view_shows(v, ecs_get(w, floor, RenderInstance)->layer_mask), false);
+    box_packet_fini(&packet);
 }

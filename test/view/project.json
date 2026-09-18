@@ -67,7 +67,13 @@
                     "past_the_bit_limit_get_no_bit",
                     "prefab_layer_is_inherited",
                     "caster_mask_comes_from_shadow_layers",
-                    "scene_without_layers_keeps_its_packet"
+                    "scene_without_layers_keeps_its_packet",
+                    "strict_view_defaults_to_off",
+                    "strict_view_hides_unlayered_static_runs",
+                    "strict_view_hides_unlayered_dynamic",
+                    "strict_view_hides_unlayered_transparent",
+                    "strict_view_hides_unlayered_lights",
+                    "strict_view_without_layers_shows_everything"
                 ],
                 "setup": true,
                 "teardown": true

@@ -18,7 +18,9 @@
  * A layer is any entity an entity or a light joins with the pair (Layer, layer).
  * A view lists the layers it shows and the layers that cast its shadows; both
  * lists hold at most BOX_VIEW_LAYER_MAX entries, end at the first zero and show
- * every layer when they are empty. An entity in no layer is drawn by every view.
+ * every layer when they are empty. An entity in no layer is drawn by every view,
+ * unless the view sets strict_layers and lists layers, which draws its members
+ * only.
  */
 
 #ifndef BOX_VIEW_H
@@ -51,6 +53,7 @@ ECS_STRUCT(View, {
     rgb clear;            /**< Color the target is cleared to */
     float clear_alpha;    /**< Alpha the target is cleared to */
     int32_t priority;     /**< Order in the frame, lower renders first */
+    bool strict_layers;   /**< A view with layers draws only members, default false */
     bool shadows;         /**< The view casts and receives shadows, default true */
     bool effects;         /**< The view runs its post process effects, default true */
     bool material_layers; /**< The view applies material layers, default true */

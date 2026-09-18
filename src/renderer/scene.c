@@ -251,8 +251,9 @@ void box_scene_apply(
 
 /** Record the static draws of one mesh, one per run of slots the view shows.
  *
- * A mesh without runs is drawn in a single call, and so is a mesh whose runs a
- * view shows all of, because its runs cover its slots without a gap.
+ * A mesh without runs holds slots of no layer only, which a strict view skips
+ * and every other view draws in a single call; so is a mesh whose runs a view
+ * shows all of, because its runs cover its slots without a gap.
  *
  * @param m The mesh entry
  * @param view The view being drawn
@@ -264,7 +265,16 @@ static void box_scene_draw_statics(
     WGPURenderPassEncoder pass)
 {
     uint64_t stride = sizeof(box_instance_t);
-    if (!m->groups.count || view->layer_mask == BOX_VIEW_LAYER_ALL) {
+    if (!m->groups.count) {
+        if (box_view_shows(view, 0)) {
+            wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, 0, WGPU_WHOLE_SIZE);
+            wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, m->static_count, 0, 0, 0);
+        }
+
+        goto done;
+    }
+
+    if (view->layer_mask == BOX_VIEW_LAYER_ALL) {
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, m->static_count, 0, 0, 0);
         goto done;
@@ -275,7 +285,7 @@ static void box_scene_draw_statics(
     uint32_t g;
     for (g = 0; g <= m->groups.count; g ++) {
         box_static_group_t *run = g < m->groups.count ? box_vec_at(&m->groups, g) : NULL;
-        bool shown = run && (!run->mask || (run->mask & view->layer_mask));
+        bool shown = run && box_view_shows(view, run->mask);
         if (shown && count && run->first == first + count) {
             count += run->count;
             continue;

@@ -427,6 +427,7 @@ static void box_view_environment(
 /** Resolve the layers a view shows and the layers that cast its shadows.
  *
  * A world that uses no layer skips the lists, so every view shows everything.
+ * A strict view only restricts what it draws while it lists layers of its own.
  *
  * @param world The world
  * @param state The registry
@@ -441,6 +442,7 @@ static void box_view_layers(
 {
     v->layer_mask = BOX_VIEW_LAYER_ALL;
     v->caster_mask = BOX_VIEW_LAYER_ALL;
+    v->strict_layers = 0;
     const View *view = state->layer_used && e ? ecs_get(world, e, View) : NULL;
     if (!view) {
         goto done;
@@ -448,6 +450,7 @@ static void box_view_layers(
 
     v->layer_mask = box_render_view_layers(state, view->layers);
     v->caster_mask = box_render_view_layers(state, view->shadow_layers);
+    v->strict_layers = view->strict_layers && v->layer_mask != BOX_VIEW_LAYER_ALL ? 1u : 0u;
 done:
     return;
 }
@@ -499,7 +502,7 @@ static void box_view_fill(
     v->dynamic_first = 0;
     if (state->layer_used) {
         v->dynamic_first = p->dynamic_batches.count;
-        box_render_extract_dynamic(world, state, p, v->layer_mask);
+        box_render_extract_dynamic(world, state, p, v->layer_mask, v->strict_layers != 0);
     }
 
     v->dynamic_count = p->dynamic_batches.count - v->dynamic_first;

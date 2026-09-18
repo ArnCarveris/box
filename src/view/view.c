@@ -34,6 +34,7 @@ static void box_view_ctor(
         v[i].clear.b = BOX_VIEW_CLEAR_B;
         v[i].clear_alpha = 1.0f;
         v[i].priority = 0;
+        v[i].strict_layers = false;
         v[i].shadows = true;
         v[i].effects = true;
         v[i].material_layers = true;

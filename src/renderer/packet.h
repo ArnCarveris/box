@@ -194,11 +194,43 @@ typedef struct box_view_t {
     uint32_t dynamic_count; /**< Dynamic batches of the view */
     uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
     uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
-    uint32_t cpu_pad[1];    /**< Padding to the 16 byte stride */
+    uint32_t strict_layers; /**< A view that lists layers draws its members only */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */
 #define BOX_VIEW_UNIFORM_SIZE (offsetof(box_view_t, target))
+
+/** Check whether a view with a layer mask draws a membership mask.
+ *
+ * An entity that joined no layer is drawn by every view, which is what a scene
+ * with one restricted view needs for its floor and props; a strict view lists
+ * layers and draws their members only.
+ *
+ * @param mask The membership mask, 0 for an entity that joined no layer
+ * @param view_mask The layer mask of the view
+ * @param strict The view draws the members of its layers only
+ * @return True when the view draws it
+ */
+static inline bool box_layer_shown(
+    uint32_t mask,
+    uint32_t view_mask,
+    bool strict)
+{
+    return mask ? (mask & view_mask) != 0 : !strict;
+}
+
+/** Check whether a view draws the entities of a membership mask.
+ *
+ * @param v The view
+ * @param mask The membership mask, 0 for an entity that joined no layer
+ * @return True when the view draws it
+ */
+static inline bool box_view_shows(
+    const box_view_t *v,
+    uint32_t mask)
+{
+    return box_layer_shown(mask, v->layer_mask, v->strict_layers != 0);
+}
 
 /** Render target to create or resize, the renderer owns the texture */
 typedef struct box_target_cmd_t {

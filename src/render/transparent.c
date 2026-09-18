@@ -267,9 +267,9 @@ void box_render_extract_transparent(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->sort); i ++) {
         ecs_entity_t e = entities[keys[i].index];
-        if (v->layer_mask != BOX_VIEW_LAYER_ALL) {
+        if (v->layer_mask != BOX_VIEW_LAYER_ALL || v->strict_layers) {
             const RenderInstance *inst = ecs_get(world, e, RenderInstance);
-            if (inst && !box_render_layer_visible(inst->layer_mask, v->layer_mask)) {
+            if (inst && !box_view_shows(v, inst->layer_mask)) {
                 continue;
             }
         }

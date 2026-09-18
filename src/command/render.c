@@ -247,6 +247,9 @@ static void box_render_cmd_frame(
 
 /** Create the view that renders the layer of a render into its target.
  *
+ * The view is strict, so it draws the members of the layer of the render only
+ * and a live subject renders without the scene around it.
+ *
  * @param world The world
  * @param job The render
  * @return The view entity
@@ -261,6 +264,7 @@ static ecs_entity_t box_render_cmd_view(
     view->target = job->target;
     view->layers[0] = job->layer;
     view->shadow_layers[0] = job->layer;
+    view->strict_layers = true;
     view->priority = BOX_RENDER_CMD_PRIORITY;
     ecs_modified(world, result, View);
 

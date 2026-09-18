@@ -480,3 +480,190 @@ void Layers_scene_without_layers_keeps_its_packet(void)
     box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, 0);
     test_int(ecs_vec_count(&batch->groups), 0);
 }
+
+void Layers_strict_view_defaults_to_off(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {0, 0, 0});
+    ecs_set(w, plain, Box, {1, 1, 1});
+    ecs_entity_t member = ecs_new(w);
+    ecs_set(w, member, Position, {2, 0, 0});
+    ecs_set(w, member, Box, {1, 1, 1});
+    ecs_add_pair(w, member, Layer, a);
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->layers[0] = a;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    test_bool(ecs_get(w, view, View)->strict_layers, false);
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_uint(v->strict_layers, 0);
+    test_bool(box_view_shows(v, 0), true);
+    test_bool(box_view_shows(v, 1u), true);
+    test_bool(box_view_shows(v, 2u), false);
+}
+
+void Layers_strict_view_hides_unlayered_static_runs(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {0, 0, 0});
+    ecs_set(w, plain, Box, {1, 1, 1});
+    ecs_entity_t member = ecs_new(w);
+    ecs_set(w, member, Position, {2, 0, 0});
+    ecs_set(w, member, Box, {1, 1, 1});
+    ecs_add_pair(w, member, Layer, a);
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->layers[0] = a;
+    settings->strict_layers = true;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_uint(v->strict_layers, 1);
+    test_int(packet.static_groups.count, 2);
+    box_static_group_t *first = box_vec_at(&packet.static_groups, 0);
+    box_static_group_t *second = box_vec_at(&packet.static_groups, 1);
+    test_uint(first->mask, 0);
+    test_bool(box_view_shows(v, first->mask), false);
+    test_uint(second->mask, 1u);
+    test_bool(box_view_shows(v, second->mask), true);
+}
+
+void Layers_strict_view_hides_unlayered_dynamic(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t shown = ecs_new(w);
+    ecs_set(w, shown, Position, {0, 0, 0});
+    ecs_set(w, shown, Box, {1, 1, 1});
+    ecs_add_id(w, shown, DynamicTransform);
+    ecs_add_pair(w, shown, Layer, a);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {2, 0, 0});
+    ecs_set(w, plain, Box, {1, 1, 1});
+    ecs_add_id(w, plain, DynamicTransform);
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->layers[0] = a;
+    settings->strict_layers = true;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_int(packet.dynamic_instances.count, 1);
+    test_int(v->dynamic_count, 1);
+    box_instance_t *inst = box_vec_at(&packet.dynamic_instances, 0);
+    test_flt(inst->transform[3], 0);
+}
+
+void Layers_strict_view_hides_unlayered_transparent(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t shown = ecs_new(w);
+    ecs_set(w, shown, Position, {0, 0, 0});
+    ecs_set(w, shown, Box, {1, 1, 1});
+    ecs_set(w, shown, Opacity, {0.5f});
+    ecs_add_pair(w, shown, Layer, a);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {2, 0, 0});
+    ecs_set(w, plain, Box, {1, 1, 1});
+    ecs_set(w, plain, Opacity, {0.5f});
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->layers[0] = a;
+    settings->strict_layers = true;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_int(v->transparent_count, 1);
+    test_int(packet.transparent.count, 1);
+    box_transparent_t *entry = box_vec_at(&packet.transparent, 0);
+    test_flt(entry->data.transform[3], 0);
+}
+
+void Layers_strict_view_hides_unlayered_lights(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t shown = ecs_new(w);
+    ecs_set(w, shown, Position, {0, 1, 0});
+    ecs_set(w, shown, PointLight, {.intensity = 1, .range = 5});
+    ecs_add_pair(w, shown, Layer, a);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {1, 1, 0});
+    ecs_set(w, plain, PointLight, {.intensity = 1, .range = 5});
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->layers[0] = a;
+    settings->strict_layers = true;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_int(v->light_count, 1);
+    box_light_t *light = box_vec_at(&packet.lights, v->light_first);
+    test_flt(light->position[0], 0);
+}
+
+void Layers_strict_view_without_layers_shows_everything(void)
+{
+    // views/strict_layers
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t member = ecs_new(w);
+    ecs_set(w, member, Position, {0, 0, 0});
+    ecs_set(w, member, Box, {1, 1, 1});
+    ecs_add_pair(w, member, Layer, a);
+    ecs_entity_t plain = ecs_new(w);
+    ecs_set(w, plain, Position, {2, 0, 0});
+    ecs_set(w, plain, Box, {1, 1, 1});
+    ecs_add_id(w, plain, DynamicTransform);
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->strict_layers = true;
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_uint(v->layer_mask, BOX_VIEW_LAYER_ALL);
+    test_uint(v->strict_layers, 0);
+    test_bool(box_view_shows(v, 0), true);
+    test_int(packet.dynamic_instances.count, 1);
+}

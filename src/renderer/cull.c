@@ -177,7 +177,17 @@ static void box_cull_ranges_of(
     const box_view_t *view)
 {
     box_vec_clear(&r->cull_ranges);
-    if (!m->groups.count || view->layer_mask == BOX_VIEW_LAYER_ALL) {
+    if (!m->groups.count) {
+        if (box_view_shows(view, 0)) {
+            box_cull_range_t *all = box_vec_push(&r->cull_ranges);
+            all->first = 0;
+            all->count = m->static_count;
+        }
+
+        goto done;
+    }
+
+    if (view->layer_mask == BOX_VIEW_LAYER_ALL) {
         box_cull_range_t *all = box_vec_push(&r->cull_ranges);
         all->first = 0;
         all->count = m->static_count;
@@ -188,7 +198,7 @@ static void box_cull_ranges_of(
     uint32_t g;
     for (g = 0; g < m->groups.count; g ++) {
         box_static_group_t *run = box_vec_at(&m->groups, g);
-        if (run->mask && !(run->mask & view->layer_mask)) {
+        if (!box_view_shows(view, run->mask)) {
             open = NULL;
             continue;
         }

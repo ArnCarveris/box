@@ -320,7 +320,7 @@ uint32_t box_render_view_layers(
     const RenderState *state,
     const ecs_entity_t *list);
 
-/** Check whether a view shows the entities of a membership mask.
+/** Check whether a view that lists layers shows the entities of a membership mask.
  *
  * @param mask The membership mask, 0 for an entity that joined no layer
  * @param view_mask The layer mask of the view
@@ -330,7 +330,7 @@ static inline bool box_render_layer_visible(
     uint32_t mask,
     uint32_t view_mask)
 {
-    return !mask || (mask & view_mask) != 0;
+    return box_layer_shown(mask, view_mask, false);
 }
 
 /** Register the observer that tracks layer membership.
@@ -530,12 +530,14 @@ void box_render_extract(
  * @param state The registry
  * @param p The packet
  * @param view_mask Layers the view shows, BOX_VIEW_LAYER_ALL for every layer
+ * @param strict The view draws the members of its layers only
  */
 void box_render_extract_dynamic(
     ecs_world_t *world,
     RenderState *state,
     box_packet_t *p,
-    uint32_t view_mask);
+    uint32_t view_mask,
+    bool strict);
 
 /** Fill the light array of one view with the lights inside its frustum.
  *
