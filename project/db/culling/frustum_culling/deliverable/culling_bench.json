@@ -1,0 +1,15 @@
+{
+  "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/visual/culling.flecs",
+  "entities": 37,
+  "static": 37,
+  "dynamic": 0,
+  "churn": [0, 0],
+  "frames": 120,
+  "mean_ms": 0.122,
+  "p50_ms": 0.124,
+  "p99_ms": 0.205,
+  "max_ms": 0.300,
+  "fps": 8227.7,
+  "drawn": 14,
+  "culled": 23
+}

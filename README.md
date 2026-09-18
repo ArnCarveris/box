@@ -106,6 +106,10 @@ its camera captures. A layer is any entity an entity or a light joins with the
 pair `(box.view.Layer, layer)`; `View.layers` and `View.shadow_layers` hold up to
 eight layers each and show every layer when they are empty.
 
+`test/integration/visual/culling.flecs` is the frustum culling check: a ring of
+boxes and spheres around the camera with a row behind it, which `CullSettings`
+on a view or as a singleton switches off for a bit identical comparison.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.

@@ -1,0 +1,43 @@
+{
+  "kind": "bench",
+  "results": [
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/material_100k.flecs",
+      "status": "pass",
+      "entities": 110000,
+      "static": 100000,
+      "dynamic": 10000,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 1.701,
+      "p50_ms": 1.706,
+      "p99_ms": 3.537,
+      "max_ms": 4.177,
+      "fps": 587.9,
+      "drawn": 93866,
+      "culled": 16134
+    },
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/static_100k.flecs",
+      "status": "pass",
+      "entities": 110000,
+      "static": 100000,
+      "dynamic": 10000,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 1.786,
+      "p50_ms": 1.696,
+      "p99_ms": 3.818,
+      "max_ms": 4.236,
+      "fps": 559.8,
+      "drawn": 93866,
+      "culled": 16134
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T17:16:30Z",
+  "pass": 12,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.027931,
+  "tests": [
+    {"suite": "Frustum", "case": "planes_of_a_known_projection", "status": "pass", "elapsed": 0.014086},
+    {"suite": "Frustum", "case": "infinite_far_keeps_a_distant_point", "status": "pass", "elapsed": 0.013875},
+    {"suite": "Frustum", "case": "sphere_at_the_boundary", "status": "pass", "elapsed": 0.014016},
+    {"suite": "Frustum", "case": "aabb_at_the_boundary", "status": "pass", "elapsed": 0.014601},
+    {"suite": "Frustum", "case": "static_instance_carries_its_bounds", "status": "pass", "elapsed": 0.018231},
+    {"suite": "Frustum", "case": "dynamic_instance_carries_its_bounds", "status": "pass", "elapsed": 0.014125},
+    {"suite": "Frustum", "case": "bounds_refresh_when_the_entity_changes", "status": "pass", "elapsed": 0.014075},
+    {"suite": "Frustum", "case": "settings_fall_back_to_the_singleton", "status": "pass", "elapsed": 0.015134},
+    {"suite": "Frustum", "case": "settings_of_a_view_override_the_singleton", "status": "pass", "elapsed": 0.013654},
+    {"suite": "Frustum", "case": "view_without_settings_culls_by_default", "status": "pass", "elapsed": 0.013708},
+    {"suite": "Frustum", "case": "sorted_draws_behind_the_camera_are_culled", "status": "pass", "elapsed": 0.013668},
+    {"suite": "Frustum", "case": "disabled_culling_keeps_every_sorted_draw", "status": "pass", "elapsed": 0.013733}
+  ]
+}
