@@ -128,6 +128,32 @@ static void box_render_on_tiling(
     }
 }
 
+/** A blend or back face mode exists, so extract reads it from changed entities.
+ *
+ * @param it Iterator over the entities that gained the component
+ */
+static void box_render_on_blended(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->blended = true;
+    }
+}
+
+/** An opacity or tint exists, so extract resolves the alpha of changed entities.
+ *
+ * @param it Iterator over the entities that gained the component
+ */
+static void box_render_on_translucent(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->translucent = true;
+    }
+}
+
 /** Register an OnAdd observer that flags the world as holding tiling components.
  *
  * Prefabs are matched too, because a tiling component often lives on a prefab
@@ -145,6 +171,25 @@ static void box_render_watch_tiling(
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnAdd },
         .callback = box_render_on_tiling
+    });
+}
+
+/** Register an OnAdd observer that sets a registry flag, prefabs included.
+ *
+ * @param world The world
+ * @param component The component to watch
+ * @param callback The observer body
+ */
+static void box_render_watch_flag(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    ecs_iter_action_t callback)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = component }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd },
+        .callback = callback
     });
 }
 
@@ -299,6 +344,11 @@ void box_render_instance_init(
     box_render_watch_tiling(world, ecs_id(TextureTransform));
     box_render_watch_tiling(world, ecs_id(TextureTiling));
     box_render_watch_tiling(world, ecs_id(TextureWrap));
+    box_render_watch_flag(world, ecs_id(BlendMode), box_render_on_blended);
+    box_render_watch_flag(world, ecs_id(BackFaceMode), box_render_on_blended);
+    box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
+    box_render_watch_flag(world, ecs_id(Tint), box_render_on_translucent);
+    box_render_watch_flag(world, ecs_id(ActualTint), box_render_on_translucent);
 
     ecs_observer(world, {
         .query.terms = {{ .id = DynamicTransform }},

@@ -46,6 +46,8 @@ typedef struct RenderState {
     uint32_t layer_count[BOX_TEXTURE_CLASSES];  /**< Layers handed out per size class */
     bool textured;            /**< A texture handle was allocated, slots need resolving */
     bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
+    bool blended;             /**< A blend or back face mode exists, so instances read them */
+    bool translucent;         /**< An opacity or tint exists, so instances resolve their alpha */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
@@ -275,14 +277,18 @@ uint32_t box_render_back_mode(
  *
  * An instance is sorted when its blend mode is not opaque, when its opacity
  * times the alpha of its resolved tint is below one, or when it shows its back
- * faces, which the batched draws cannot do.
+ * faces, which the batched draws cannot do. The registry flags say which of
+ * those components the world holds at all, so a scene without them pays
+ * nothing per changed entity.
  *
  * @param world The world
+ * @param state The registry
  * @param e The entity
  * @return True when the sorted pass draws the entity
  */
 bool box_render_is_transparent(
     ecs_world_t *world,
+    const RenderState *state,
     ecs_entity_t e);
 
 /** Add an entity to the sorted draw list or take it out.

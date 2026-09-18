@@ -51,11 +51,16 @@ static float box_render_alpha(
 
 bool box_render_is_transparent(
     ecs_world_t *world,
+    const RenderState *state,
     ecs_entity_t e)
 {
-    bool result = box_render_blend_mode(world, e) != BOX_BLEND_OPAQUE ||
-        box_render_back_mode(world, e) != BOX_BACK_CULL;
-    if (!result) {
+    bool result = false;
+    if (state->blended) {
+        result = box_render_blend_mode(world, e) != BOX_BLEND_OPAQUE ||
+            box_render_back_mode(world, e) != BOX_BACK_CULL;
+    }
+
+    if (!result && state->translucent) {
         result = box_render_alpha(world, e) < 1.0f;
     }
 

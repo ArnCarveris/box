@@ -87,7 +87,7 @@ static void box_extract_static(
     ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
     bool dynamic = box_render_is_dynamic(world, e);
-    bool transparent = box_render_is_transparent(world, e);
+    bool transparent = box_render_is_transparent(world, state, e);
     bool has_slot = box_render_has_slot(state, e, inst);
 
     if (has_slot && (dynamic || transparent || inst->mesh != mesh->handle)) {
