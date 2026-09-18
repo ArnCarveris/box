@@ -5,6 +5,28 @@
 
 #include <box.h>
 
+/** Load the default scene when the command line named none.
+ *
+ * @param world The world
+ */
+static void box_load_default_scene(
+    ecs_world_t *world)
+{
+    ecs_iter_t it = ecs_each(world, EcsScript);
+    bool loaded = false;
+    while (ecs_each_next(&it)) {
+        const EcsScript *s = ecs_field(&it, EcsScript, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            loaded |= s[i].filename != NULL;
+        }
+    }
+
+    if (!loaded) {
+        ecs_script(world, { .filename = "etc/scenes/default.flecs" });
+    }
+}
+
 /** Start the engine, load the scene passed on the command line and run it.
  *
  * @param argc Argument count
@@ -32,6 +54,8 @@ int main(
     if (box_parse_args(world, argc, argv)) {
         goto error;
     }
+
+    box_load_default_scene(world);
 
     if (!ecs_singleton_get(world, Surface)) {
         Surface *s = ecs_singleton_ensure(world, Surface);
