@@ -452,6 +452,23 @@ done:
     return;
 }
 
+/** Copy the culling settings of a view into it, the view first and the singleton after.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
+ */
+static void box_view_cull(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_view_t *v)
+{
+    const CullSettings *s = box_render_view_setting(world, e, ecs_id(CullSettings));
+    v->cull_enabled = !s || s->enabled ? 1u : 0u;
+    v->cull_threshold = s && s->gpu_threshold > 0 ?
+        (uint32_t)s->gpu_threshold : BOX_CULL_GPU_THRESHOLD;
+}
+
 /** Fill one view of the packet from its view entity and its camera.
  *
  * @param world The world
@@ -474,6 +491,7 @@ static void box_view_fill(
     box_view_layers(world, state, src->entity, v);
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
+    box_view_cull(world, src->entity, v);
     box_view_sun(world, state, v);
     box_view_environment(world, state, src->entity, index, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);

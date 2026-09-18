@@ -41,6 +41,26 @@ static void box_view_ctor(
     }
 }
 
+/** CullSettings constructor: culling is on and the compute pass takes large batches.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_cull_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    CullSettings *s = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        s[i].enabled = true;
+        s[i].gpu_threshold = BOX_CULL_GPU_THRESHOLD;
+    }
+}
+
 void BoxViewImport(
     ecs_world_t *world)
 {
@@ -50,11 +70,13 @@ void BoxViewImport(
 
     ECS_META_COMPONENT(world, RenderTarget);
     ECS_META_COMPONENT(world, View);
+    ECS_META_COMPONENT(world, CullSettings);
     ECS_COMPONENT_DEFINE(world, ViewImpl);
     ECS_COMPONENT_DEFINE(world, RenderTargetImpl);
     ECS_TAG_DEFINE(world, Layer);
 
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
+    ecs_set_hooks(world, CullSettings, { .ctor = box_cull_ctor });
     ecs_set_hooks(world, RenderTarget, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ViewImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderTargetImpl, { .ctor = flecs_default_ctor });

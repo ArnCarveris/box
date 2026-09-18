@@ -175,7 +175,33 @@ static void box_render_sort_radix(
     }
 }
 
-/** Fill the sort keys with the view space depth of every listed instance.
+/** Check whether the frustum of a view holds the bounds of a sorted instance.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param frustum The frustum of the view
+ * @return True when the view can see the entity
+ */
+static bool box_render_sort_visible(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const box_frustum_t *frustum)
+{
+    const RenderMesh *mesh = ecs_get(world, e, RenderMesh);
+    const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    ecs_assert(mesh != NULL, ECS_INTERNAL_ERROR, NULL);
+    mat4 scale = mat4_scaling(mesh->scale);
+    mat4 m = mat4_mul(&transform->m, &scale);
+    float bounds[4];
+    box_render_instance_bounds(mesh, &m, bounds);
+
+    return box_frustum_sphere(frustum, bounds, bounds[3]);
+}
+
+/** Fill the sort keys with the view space depth of every instance the view sees.
+ *
+ * Instances outside the frustum are left out before the keys are ordered, so
+ * the sort and the packet only carry what the view draws.
  *
  * @param world The world
  * @param state The registry
@@ -188,21 +214,32 @@ static void box_render_sort_keys(
 {
     mat4 view;
     memcpy(view.v, v->view, sizeof(view.v));
-    int32_t count = ecs_vec_count(&state->transparent);
-    ecs_vec_set_count_t(NULL, &state->sort, box_sort_key_t, count);
+    int32_t total = ecs_vec_count(&state->transparent);
+    ecs_vec_set_count_t(NULL, &state->sort, box_sort_key_t, total);
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
     ecs_entity_t *entities = ecs_vec_first_t(&state->transparent, ecs_entity_t);
+    box_frustum_t frustum;
+    if (v->cull_enabled) {
+        box_frustum_of_view(v, &frustum);
+    }
 
+    int32_t count = 0;
     int32_t i;
-    for (i = 0; i < count; i ++) {
+    for (i = 0; i < total; i ++) {
+        if (v->cull_enabled && !box_render_sort_visible(world, entities[i], &frustum)) {
+            continue;
+        }
+
         const WorldTransform *transform = ecs_get(world, entities[i], WorldTransform);
         ecs_assert(transform != NULL, ECS_INTERNAL_ERROR, NULL);
         vec3 origin = mat4_transform_point(&view, mat4_get_translation(&transform->m));
-        keys[i].depth = origin.z;
-        keys[i].key = box_render_sort_bits(origin.z);
-        keys[i].index = (uint32_t)i;
+        keys[count].depth = origin.z;
+        keys[count].key = box_render_sort_bits(origin.z);
+        keys[count].index = (uint32_t)i;
+        count ++;
     }
 
+    ecs_vec_set_count_t(NULL, &state->sort, box_sort_key_t, count);
     if (count <= BOX_SORT_SMALL) {
         box_render_sort_small(keys, count);
     } else {

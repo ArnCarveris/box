@@ -12,6 +12,9 @@
  * overrides it for that view only. BakeSettings follows the same rule through
  * the first view of the frame, because the probe bake is shared by every view.
  *
+ * CullSettings follows the same rule: a view without one culls with the settings
+ * of the singleton, and a world without either culls with the defaults.
+ *
  * A layer is any entity an entity or a light joins with the pair (Layer, layer).
  * A view lists the layers it shows and the layers that cast its shadows; both
  * lists hold at most BOX_VIEW_LAYER_MAX entries, end at the first zero and show
@@ -65,6 +68,15 @@ ECS_STRUCT(View, {
  * the layers of that prefab.
  */
 extern ECS_TAG_DECLARE(Layer);
+
+/** Frustum culling of a view, with the singleton as its default */
+ECS_STRUCT(CullSettings, {
+    bool enabled;          /**< Instances outside the view frustum are skipped, default true */
+    int32_t gpu_threshold; /**< Static instances a batch needs before a compute pass culls it */
+});
+
+/** Static instances a batch needs before the renderer culls it in a compute pass */
+#define BOX_CULL_GPU_THRESHOLD (2048)
 
 /** Red channel of the clear color a view starts out with */
 #define BOX_VIEW_CLEAR_R (39)
