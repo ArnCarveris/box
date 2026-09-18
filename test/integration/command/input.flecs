@@ -1,0 +1,37 @@
+using box.transform
+using box.geometry
+using box.material
+using box.input
+using box.command
+
+scene {
+  floor {
+    Position: {0, -0.5, 0}
+    Box: {10, 0.2, 10}
+    Rgb: {180, 180, 190}
+  }
+
+  sphere {
+    Position: {0, 1, 0}
+    Sphere: {radius: 1, segments: 16}
+    Rgb: {80, 160, 240}
+  }
+}
+
+actions {
+  Forward { InputAction: {description: "Move forward"} }
+  Fire { InputAction: {description: "Fire at the cursor"} }
+}
+
+input_map {
+  InputMap
+  (keys.W, actions.Forward)
+  (keys.MouseLeft, actions.Fire)
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/input.cmd"}
+  }
+}

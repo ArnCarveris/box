@@ -1,0 +1,34 @@
+$ key.type box
+typed 3 characters over 3 frames
+$ key.press W 3
+W down for 3 frames
+$ key.down ShiftLeft
+ShiftLeft down
+$ key.up ShiftLeft
+ShiftLeft up
+$ mouse.move 320,180
+cursor 320,180
+$ mouse.click left 320,180
+left click for 1 frame
+$ mouse.drag left 100,100 300,200 4 4
+left drag 100,100 to 300,200 in 4 steps over 4 frames
+$ mouse.scroll 0 2
+scroll 0,2
+$ mouse.release
+cursor released
+$ action.press actions.Forward 2
+Forward down for 2 frames
+$ action.down actions.Fire
+Fire down
+$ action.up actions.Fire
+Fire up
+$ action.list
+actions.Forward	W	Move forward
+actions.Fire	MouseLeft	Fire at the cursor
+
+$ input.wait
+20 events pending
+$ input.reset
+input reset
+$ input.wait
+queue drained

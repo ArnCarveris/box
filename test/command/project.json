@@ -4,267 +4,315 @@
     "value": {
         "description": "Unit tests for box.command terminal sessions and command dispatch",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "test": {
-        "testsuites": [{
-            "id": "Terminal",
-            "testcases": [
-                "folder_created_and_removed",
-                "resources_subfolder",
-                "session_dir_under_process_dir",
-                "session_dir_kept_after_set",
-                "log_contains_line_and_result",
-                "commands_lists_last_lines",
-                "commands_defaults_to_all_lines",
-                "output_written_on_input",
-                "script_session_runs_command"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Dispatch",
-            "testcases": [
-                "command_with_arguments",
-                "quoted_argument",
-                "unknown_command",
-                "too_many_arguments",
-                "missing_argument",
-                "invalid_i32_argument",
-                "f64_argument",
-                "entity_argument",
-                "entity_relative_to_cwd",
-                "unknown_entity_argument",
-                "optional_argument_omitted",
-                "help_lists_commands"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Script",
-            "testcases": [
-                "read_source",
-                "read_by_basename",
-                "unknown_file",
-                "write_changes_world",
-                "write_parse_error_keeps_state",
-                "grep_lines",
-                "patch_changes_world",
-                "patch_compounds",
-                "patch_hunk_mismatch"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Patch",
-            "testcases": [
-                "single_hunk",
-                "multiple_hunks",
-                "addition_at_end",
-                "deletion",
-                "diff_headers_ignored",
-                "context_mismatch",
-                "no_hunks"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Logs",
-            "testcases": [
-                "filter_by_level",
-                "numeric_level",
-                "oldest_first",
-                "count_cap",
-                "wrap_around",
-                "log_file_in_process_dir",
-                "default_arguments",
-                "invalid_level_name"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Http",
-            "testcases": [
-                "new_returns_session",
-                "new_names_are_unique",
-                "close_deletes_session",
-                "close_unknown_session",
-                "exec_returns_output",
-                "exec_url_encoded_cmd",
-                "exec_post_body",
-                "exec_unknown_session",
-                "exec_error_gives_400",
-                "exec_without_cmd",
-                "resource_returns_file",
-                "resource_png_content_type",
-                "resource_traversal_refused",
-                "resource_missing_gives_404",
-                "unknown_endpoint_gives_404",
-                "dequeue_system_runs",
-                "app_port_starts_server",
-                "port_zero_stops_server"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Shell",
-            "testcases": [
-                "cd_changes_cwd",
-                "cd_parent",
-                "cd_root",
-                "cd_unknown_entity",
-                "ls_lists_children",
-                "ls_hides_components",
-                "cat_shows_components",
-                "cat_missing_entity",
-                "pwd_root",
-                "pwd_after_cd",
-                "ls_relative_to_cwd",
-                "touch_creates_entity",
-                "touch_nested_path",
-                "rm_deletes_entity",
-                "mv_renames_entity",
-                "mv_reparents_entity",
-                "mv_existing_target",
-                "add_component",
-                "add_pair",
-                "add_unknown_component",
-                "remove_component",
-                "path_raw_id",
-                "path_escaped_dot",
-                "path_child_of_dotted_name",
-                "ls_escapes_dots",
-                "component_by_symbol",
-                "pair_by_symbol",
-                "unknown_symbol_is_error",
-                "set_component_value",
-                "set_invalid_value",
-                "get_component_value",
-                "get_all_components",
-                "get_missing_component",
-                "clear_removes_components",
-                "has_component",
-                "has_query_expression",
-                "has_invalid_query",
-                "man_prints_doc",
-                "man_command_brief",
-                "man_unknown_entity",
-                "unknown_entity_argument",
-                "relative_to_cwd",
-                "absolute_path",
-                "root_is_not_an_entity",
-                "ls_lists_parent_children",
-                "cd_into_parent_child",
-                "mv_parent_child_keeps_storage",
-                "mv_parent_child_to_root",
-                "touch_under_parent_child"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Search",
-            "testcases": [
-                "query_creates_query",
-                "query_replaces_query",
-                "query_invalid_expression",
-                "iter_and_next_in_chunks",
-                "next_past_the_end",
-                "next_without_iter",
-                "done_finishes_iterator",
-                "other_command_exits_iteration",
-                "grep_matches_names",
-                "grep_matches_component_names",
-                "grep_matches_values",
-                "grep_with_component_filter",
-                "grep_unknown_component",
-                "grep_recur_nested_children",
-                "output_capped_at_limit",
-                "delete_session_while_iterating"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Capture",
-            "testcases": [
-                "prints_path_of_the_active_camera",
-                "path_uses_the_frame_number",
-                "named_camera",
-                "multiple_cameras",
-                "camera_relative_to_cwd",
-                "unknown_camera",
-                "entity_without_camera",
-                "without_active_camera",
-                "second_request_replaces_the_first",
-                "headless_run_writes_the_png"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Render",
-            "testcases": [
-                "prints_the_image_path",
-                "numbers_the_images_per_session",
-                "unknown_subject",
-                "without_a_subject",
-                "subject_relative_to_cwd",
-                "frames_the_camera_on_the_bounds",
-                "instantiates_a_prefab",
-                "instantiates_a_template",
-                "cleans_up_when_the_image_appears",
-                "live_entity_joins_and_leaves_the_layer",
+        "testsuites": [
+            {
+                "id": "Terminal",
+                "testcases": [
+                    "folder_created_and_removed",
+                    "resources_subfolder",
+                    "session_dir_under_process_dir",
+                    "session_dir_kept_after_set",
+                    "log_contains_line_and_result",
+                    "commands_lists_last_lines",
+                    "commands_defaults_to_all_lines",
+                    "output_written_on_input",
+                    "script_session_runs_command"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Dispatch",
+                "testcases": [
+                    "command_with_arguments",
+                    "quoted_argument",
+                    "unknown_command",
+                    "too_many_arguments",
+                    "missing_argument",
+                    "invalid_i32_argument",
+                    "f64_argument",
+                    "entity_argument",
+                    "entity_relative_to_cwd",
+                    "unknown_entity_argument",
+                    "optional_argument_omitted",
+                    "help_lists_commands"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Script",
+                "testcases": [
+                    "read_source",
+                    "read_by_basename",
+                    "unknown_file",
+                    "write_changes_world",
+                    "write_parse_error_keeps_state",
+                    "grep_lines",
+                    "patch_changes_world",
+                    "patch_compounds",
+                    "patch_hunk_mismatch"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Patch",
+                "testcases": [
+                    "single_hunk",
+                    "multiple_hunks",
+                    "addition_at_end",
+                    "deletion",
+                    "diff_headers_ignored",
+                    "context_mismatch",
+                    "no_hunks"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Logs",
+                "testcases": [
+                    "filter_by_level",
+                    "numeric_level",
+                    "oldest_first",
+                    "count_cap",
+                    "wrap_around",
+                    "log_file_in_process_dir",
+                    "default_arguments",
+                    "invalid_level_name"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Http",
+                "testcases": [
+                    "new_returns_session",
+                    "new_names_are_unique",
+                    "close_deletes_session",
+                    "close_unknown_session",
+                    "exec_returns_output",
+                    "exec_url_encoded_cmd",
+                    "exec_post_body",
+                    "exec_unknown_session",
+                    "exec_error_gives_400",
+                    "exec_without_cmd",
+                    "resource_returns_file",
+                    "resource_png_content_type",
+                    "resource_traversal_refused",
+                    "resource_missing_gives_404",
+                    "unknown_endpoint_gives_404",
+                    "dequeue_system_runs",
+                    "app_port_starts_server",
+                    "port_zero_stops_server"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Shell",
+                "testcases": [
+                    "cd_changes_cwd",
+                    "cd_parent",
+                    "cd_root",
+                    "cd_unknown_entity",
+                    "ls_lists_children",
+                    "ls_hides_components",
+                    "cat_shows_components",
+                    "cat_missing_entity",
+                    "pwd_root",
+                    "pwd_after_cd",
+                    "ls_relative_to_cwd",
+                    "touch_creates_entity",
+                    "touch_nested_path",
+                    "rm_deletes_entity",
+                    "mv_renames_entity",
+                    "mv_reparents_entity",
+                    "mv_existing_target",
+                    "add_component",
+                    "add_pair",
+                    "add_unknown_component",
+                    "remove_component",
+                    "path_raw_id",
+                    "path_escaped_dot",
+                    "path_child_of_dotted_name",
+                    "ls_escapes_dots",
+                    "component_by_symbol",
+                    "pair_by_symbol",
+                    "unknown_symbol_is_error",
+                    "set_component_value",
+                    "set_invalid_value",
+                    "get_component_value",
+                    "get_all_components",
+                    "get_missing_component",
+                    "clear_removes_components",
+                    "has_component",
+                    "has_query_expression",
+                    "has_invalid_query",
+                    "man_prints_doc",
+                    "man_command_brief",
+                    "man_unknown_entity",
+                    "unknown_entity_argument",
+                    "relative_to_cwd",
+                    "absolute_path",
+                    "root_is_not_an_entity",
+                    "ls_lists_parent_children",
+                    "cd_into_parent_child",
+                    "mv_parent_child_keeps_storage",
+                    "mv_parent_child_to_root",
+                    "touch_under_parent_child"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Search",
+                "testcases": [
+                    "query_creates_query",
+                    "query_replaces_query",
+                    "query_invalid_expression",
+                    "iter_and_next_in_chunks",
+                    "next_past_the_end",
+                    "next_without_iter",
+                    "done_finishes_iterator",
+                    "other_command_exits_iteration",
+                    "grep_matches_names",
+                    "grep_matches_component_names",
+                    "grep_matches_values",
+                    "grep_with_component_filter",
+                    "grep_unknown_component",
+                    "grep_recur_nested_children",
+                    "output_capped_at_limit",
+                    "delete_session_while_iterating"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Capture",
+                "testcases": [
+                    "prints_path_of_the_active_camera",
+                    "path_uses_the_frame_number",
+                    "named_camera",
+                    "multiple_cameras",
+                    "camera_relative_to_cwd",
+                    "unknown_camera",
+                    "entity_without_camera",
+                    "without_active_camera",
+                    "second_request_replaces_the_first",
+                    "headless_run_writes_the_png"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Render",
+                "testcases": [
+                    "prints_the_image_path",
+                    "numbers_the_images_per_session",
+                    "unknown_subject",
+                    "without_a_subject",
+                    "subject_relative_to_cwd",
+                    "frames_the_camera_on_the_bounds",
+                    "instantiates_a_prefab",
+                    "instantiates_a_template",
+                    "cleans_up_when_the_image_appears",
+                    "live_entity_joins_and_leaves_the_layer",
                     "live_subject_is_rendered_alone",
-                "headless_run_writes_the_png"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "CaptureEndpoint",
-            "testcases": [
-                "unknown_session_gives_404",
-                "unknown_camera_gives_400",
-                "without_camera_gives_400",
-                "first_request_sets_capture",
-                "second_request_keeps_the_capture",
-                "named_camera",
-                "reply_allows_any_origin",
-                "preflight_lists_methods",
-                "headless_run_returns_the_png"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "WasmRequest",
-            "testcases": [
-                "help_round_trip",
-                "unknown_path_gives_404",
-                "bad_command_gives_error_status",
-                "png_reply_is_base64"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "Base64",
-            "testcases": [
-                "empty",
-                "one_byte",
-                "two_bytes",
-                "three_bytes",
-                "longer_text",
-                "binary_bytes"
-            ],
-            "setup": true,
-            "teardown": true
-        }, {
-            "id": "CommandScript",
-            "testcases": [
-                "runs_lines_in_order",
-                "skips_comments_and_blanks",
-                "missing_file_is_error",
-                "quoted_argument_spans_lines",
-                "log_copied_to_file"
-            ],
-            "setup": true,
-            "teardown": true
-        }]
+                    "headless_run_writes_the_png"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "CaptureEndpoint",
+                "testcases": [
+                    "unknown_session_gives_404",
+                    "unknown_camera_gives_400",
+                    "without_camera_gives_400",
+                    "first_request_sets_capture",
+                    "second_request_keeps_the_capture",
+                    "named_camera",
+                    "reply_allows_any_origin",
+                    "preflight_lists_methods",
+                    "headless_run_returns_the_png"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "WasmRequest",
+                "testcases": [
+                    "help_round_trip",
+                    "unknown_path_gives_404",
+                    "bad_command_gives_error_status",
+                    "png_reply_is_base64"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Base64",
+                "testcases": [
+                    "empty",
+                    "one_byte",
+                    "two_bytes",
+                    "three_bytes",
+                    "longer_text",
+                    "binary_bytes"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "CommandScript",
+                "testcases": [
+                    "runs_lines_in_order",
+                    "skips_comments_and_blanks",
+                    "missing_file_is_error",
+                    "quoted_argument_spans_lines",
+                    "log_copied_to_file"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "InputCommands",
+                "testcases": [
+                    "key_press_queues_a_tap",
+                    "key_press_takes_a_duration",
+                    "key_down_and_up_hold_the_key",
+                    "an_unknown_key_is_an_error",
+                    "key_type_presses_one_key_per_character",
+                    "mouse_move_pins_the_cursor",
+                    "mouse_move_takes_normalized_coordinates",
+                    "an_invalid_position_is_an_error",
+                    "mouse_sweep_spreads_over_frames",
+                    "mouse_sweep_defaults_to_eight_steps",
+                    "mouse_click_presses_the_button",
+                    "mouse_drag_holds_the_button_over_the_sweep",
+                    "mouse_scroll_queues_the_offset",
+                    "input_reset_empties_the_queue",
+                    "input_focus_changes_the_flag",
+                    "input_wait_reports_the_pending_events",
+                    "action_press_holds_the_action_for_a_frame",
+                    "action_down_and_up_hold_the_action",
+                    "action_up_without_a_hold_is_an_error",
+                    "an_action_command_needs_an_action",
+                    "action_drag_holds_the_action_while_the_cursor_sweeps",
+                    "action_list_shows_the_bindings",
+                    "the_help_listing_includes_the_input_commands",
+                    "an_unknown_input_command_is_an_error"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
     }
 }

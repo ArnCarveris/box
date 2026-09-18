@@ -4,17 +4,28 @@
     "value": {
         "description": "Benchmarks for box.command dispatch, path lookup and value parsing",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "bench": {
-        "benchsuites": [{
-            "id": "Dispatch",
-            "benchcases": [
-                "help",
-                "ls_scope",
-                "path_lookup",
-                "set_expression"
-            ]
-        }]
+        "benchsuites": [
+            {
+                "id": "Dispatch",
+                "benchcases": [
+                    "help",
+                    "ls_scope",
+                    "path_lookup",
+                    "set_expression"
+                ]
+            },
+            {
+                "id": "InputCommands",
+                "benchcases": [
+                    "key_press_10",
+                    "action_list_100"
+                ]
+            }
+        ]
     }
 }
