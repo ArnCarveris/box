@@ -2,7 +2,7 @@
     "id": "input",
     "type": "application",
     "value": {
-        "description": "Unit tests for the box.input device layer",
+        "description": "Unit tests for the box.input device and action layers",
         "public": false,
         "use": [
             "box"
@@ -74,6 +74,29 @@
                     "glfw_named_keys_map_to_spare_codes",
                     "glfw_unknown_keys_map_to_none",
                     "reflection_describes_the_singleton"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Actions",
+                "testcases": [
+                    "a_binding_presses_holds_and_releases",
+                    "a_modifier_binding_matches_its_side",
+                    "a_family_modifier_matches_either_side",
+                    "a_more_specific_binding_wins",
+                    "a_pure_modifier_binding_fires_while_it_is_held",
+                    "a_key_binding_claims_the_modifier_of_a_pure_binding",
+                    "two_actions_share_one_mask",
+                    "two_masks_share_one_action",
+                    "rebinding_moves_the_action_to_another_key",
+                    "unbinding_releases_the_action",
+                    "a_disabled_map_stops_its_bindings",
+                    "a_key_pair_on_a_map_binds_an_action",
+                    "emitting_fires_an_action_without_a_key",
+                    "the_event_list_holds_the_phases_of_the_frame",
+                    "a_script_authors_the_map",
+                    "the_scene_map_binds_its_actions"
                 ],
                 "setup": true,
                 "teardown": true
