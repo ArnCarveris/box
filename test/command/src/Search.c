@@ -342,3 +342,26 @@ void Search_output_capped_at_limit(void)
     test_assert(strstr(out, "(no more)\n") != NULL);
     ecs_os_free(out);
 }
+
+void Search_delete_session_while_iterating(void)
+{
+    // command/search
+    ecs_entity_t a = ecs_entity(w, { .name = "scene.a" });
+    ecs_entity_t b = ecs_entity(w, { .name = "scene.b" });
+    ecs_set_id(w, a, point, sizeof(int32_t) * 2, (int32_t[]){ 1, 2 });
+    ecs_set_id(w, b, point, sizeof(int32_t) * 2, (int32_t[]){ 3, 4 });
+
+    char *out = box_command_run(w, session, "query q Point", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "iter q", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "next", NULL);
+    test_str(out, "scene.a\t{x: 1, y: 2}\n");
+    ecs_os_free(out);
+
+    ecs_delete(w, session);
+    test_assert(!ecs_is_alive(w, session));
+    test_assert(ecs_lookup(w, "agent0.q") == 0);
+}

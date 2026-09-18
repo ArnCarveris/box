@@ -162,7 +162,8 @@
                 "grep_with_component_filter",
                 "grep_unknown_component",
                 "grep_recur_nested_children",
-                "output_capped_at_limit"
+                "output_capped_at_limit",
+                "delete_session_while_iterating"
             ],
             "setup": true,
             "teardown": true
