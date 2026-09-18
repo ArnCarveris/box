@@ -508,6 +508,61 @@ describe("Query", () => {
   });
 });
 
+/* ---------- tab completion ---------- */
+
+describe("Completion", () => {
+  test("command_names_are_filtered_by_prefix", () => {
+    equal(I.completeCommand(["cat", "cd", "clear", "logs"], "c"), ["cat", "cd", "clear"], "matches");
+    equal(I.completeCommand(["cat", "cd", "clear"], "ca"), ["cat"], "single match");
+  });
+
+  test("no_prefix_match_is_an_empty_list", () => {
+    equal(I.completeCommand(["cat", "cd"], "zz"), [], "candidates");
+  });
+
+  test("several_matches_cycle_forward_and_wrap", () => {
+    const candidates = I.completeCommand(["cat", "cd", "clear"], "c");
+    let index = I.cycle(candidates, -1, true);
+    equal(candidates[index], "cat", "first tab");
+    index = I.cycle(candidates, index, true);
+    equal(candidates[index], "cd", "second tab");
+    index = I.cycle(candidates, index, true);
+    equal(candidates[index], "clear", "third tab");
+    index = I.cycle(candidates, index, true);
+    equal(candidates[index], "cat", "wraps forward");
+  });
+
+  test("shift_tab_cycles_backwards", () => {
+    const candidates = ["cat", "cd", "clear"];
+    const index = I.cycle(candidates, 0, false);
+    equal(candidates[index], "clear", "wraps backward from the first entry");
+  });
+
+  test("cycle_of_an_empty_list_is_negative_one", () => {
+    equal(I.cycle([], 0, true), -1, "empty");
+  });
+
+  test("path_splits_at_the_last_unescaped_dot", () => {
+    equal(I.splitPath("box.scene.cam"), { parent: "box.scene", partial: "cam" }, "plain dots");
+    equal(I.splitPath("box\\.scene.cam"), { parent: "box\\.scene", partial: "cam" }, "escaped dot in parent");
+    equal(I.splitPath("box\\.scene"), { parent: "", partial: "box\\.scene" }, "escaped dot is not a separator");
+    equal(I.splitPath("cam"), { parent: "", partial: "cam" }, "no dot at all");
+  });
+
+  test("children_are_completed_under_a_scope", () => {
+    const children = ["camera", "cube", "scene"];
+    const parts = I.splitPath("box.ca");
+    equal(parts, { parent: "box", partial: "ca" }, "scope and partial");
+    equal(I.completePath(children, parts.partial), ["camera"], "single child match");
+  });
+
+  test("escaped_child_names_are_matched_and_kept_escaped", () => {
+    const children = ["light\\.rig", "light2"];
+    equal(I.completePath(children, "light\\."), ["light\\.rig"], "matches the escaped form");
+    equal(I.completePath(children, "light"), ["light\\.rig", "light2"], "both children");
+  });
+});
+
 /* ---------- run ---------- */
 
 async function run() {

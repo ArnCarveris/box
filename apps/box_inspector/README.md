@@ -4,7 +4,9 @@
 talks to a running instance over the HTTP command API, or to a wasm image loaded in the page
 through its `box_request` export, and both transports present the same `request(method, path,
 body)` interface, so the page code never knows which one it uses. The console opens a terminal
-session on connect, runs `help` and sends every line to `/terminal/exec`; file names in a reply
+session on connect, runs `help` and sends every line to `/terminal/exec`; Tab completes the
+command name or, elsewhere in the line, the last element of an entity path against `ls` on its
+parent, cycling through several matches (Shift+Tab goes back); file names in a reply
 are fetched from `/resource` and shown as thumbnails. The render pane asks `/capture` on a timer
 (1 Hz, pausable, 0.5 - 5 s) and shows the PNG with the frame number; a wasm image also renders
 live in the canvas, toggled with **Show capture** / **Show live**.

@@ -494,6 +494,52 @@ function wasmArguments(scene) {
   return text ? text.split(/\s+/) : [];
 }
 
+function completeCommand(names, partial) {
+  var text = String(partial == null ? "" : partial);
+  return (names || []).filter(function (name) {
+    return String(name).indexOf(text) === 0;
+  });
+}
+
+function splitPath(token) {
+  var text = String(token == null ? "" : token);
+  var dot = -1;
+  var i = 0;
+  while (i < text.length) {
+    var ch = text.charAt(i);
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === ".") {
+      dot = i;
+    }
+    i += 1;
+  }
+  if (dot < 0) {
+    return { parent: "", partial: text };
+  }
+
+  return { parent: text.slice(0, dot), partial: text.slice(dot + 1) };
+}
+
+function completePath(children, partial) {
+  var text = String(partial == null ? "" : partial);
+  return (children || []).filter(function (name) {
+    return String(name).indexOf(text) === 0;
+  });
+}
+
+function cycle(candidates, index, forward) {
+  var list = candidates || [];
+  if (!list.length) {
+    return -1;
+  }
+  var step = forward ? 1 : -1;
+
+  return ((index + step) % list.length + list.length) % list.length;
+}
+
 function createStore(storage, key) {
   return {
     load: function () {
@@ -718,7 +764,11 @@ return {
   parseQuery: parseQuery,
   wasmModuleName: wasmModuleName,
   wasmArguments: wasmArguments,
-  createStore: createStore
+  createStore: createStore,
+  completeCommand: completeCommand,
+  splitPath: splitPath,
+  completePath: completePath,
+  cycle: cycle
 };
 })();
 
@@ -764,8 +814,10 @@ var state = {
   live: false,
   canvasLive: false,
   imageUrl: null,
-  runtime: null
+  runtime: null,
+  commandNames: []
 };
+var tabState = null;
 
 endpointEl.value = query.endpoint || saved.endpoint || DEFAULT_ENDPOINT;
 imageEl.value = query.image || saved.image || DEFAULT_IMAGE;
@@ -1024,6 +1076,7 @@ function connect() {
     cmdEl.focus();
     return state.session.exec("help");
   }).then(function (reply) {
+    state.commandNames = parseHelpNames(reply.body);
     showReply(reply, "help");
     append("info", "clear (page only) - empty this log pane");
     endResult();
@@ -1115,7 +1168,109 @@ liveEl.onclick = function () {
     startTimer();
   }
 };
+function parseHelpNames(text) {
+  var names = [];
+  String(text || "").split("\n").forEach(function (line) {
+    var trimmed = line.trim();
+    if (trimmed) {
+      names.push(trimmed.split(/\s+/)[0]);
+    }
+  });
+
+  return names;
+}
+
+function wordAt(value, caret) {
+  var start = caret;
+  var end = caret;
+  while (start > 0 && !/\s/.test(value.charAt(start - 1))) {
+    start--;
+  }
+  while (end < value.length && !/\s/.test(value.charAt(end))) {
+    end++;
+  }
+
+  return { start: start, end: end, text: value.slice(start, end) };
+}
+
+function applyCompletion(start, len, completion, suffix) {
+  var value = cmdEl.value;
+  var before = value.slice(0, start);
+  var after = value.slice(start + len);
+  cmdEl.value = before + completion + suffix + after;
+  var caret = start + completion.length + suffix.length;
+  cmdEl.setSelectionRange(caret, caret);
+
+  return completion.length + suffix.length;
+}
+
+function pathCompletion(parts, match) {
+  return parts.parent ? parts.parent + "." + match : match;
+}
+
+function applyCandidates(candidates, word, isCommand, parts) {
+  if (!candidates.length) {
+    tabState = null;
+    return;
+  }
+  var single = candidates.length === 1;
+  var match = candidates[0];
+  var completion = isCommand ? match : pathCompletion(parts, match);
+  var suffix = isCommand && single ? " " : "";
+  var len = applyCompletion(word.start, word.text.length, completion, suffix);
+  if (single) {
+    tabState = null;
+    return;
+  }
+  tabState = { start: word.start, len: len, isCommand: isCommand, parts: parts,
+    candidates: candidates, index: 0 };
+  append("info", candidates.join("  "));
+}
+
+function cycleCompletion(forward) {
+  tabState.index = I.cycle(tabState.candidates, tabState.index, forward);
+  var match = tabState.candidates[tabState.index];
+  var completion = tabState.isCommand ? match : pathCompletion(tabState.parts, match);
+  tabState.len = applyCompletion(tabState.start, tabState.len, completion, "");
+}
+
+function beginCompletion() {
+  var value = cmdEl.value;
+  var caret = cmdEl.selectionStart;
+  var word = wordAt(value, caret);
+  var before = value.slice(0, word.start);
+  if (!/\S/.test(before)) {
+    applyCandidates(I.completeCommand(state.commandNames, word.text), word, true, null);
+    return;
+  }
+  var parts = I.splitPath(word.text);
+  var lsCmd = parts.parent ? "ls " + parts.parent : "ls";
+  state.session.exec(lsCmd).then(function (reply) {
+    var children = String(reply.body || "").split("\n").map(function (line) {
+      return line.trim();
+    }).filter(function (line) { return line !== ""; });
+    applyCandidates(I.completePath(children, parts.partial), word, false, parts);
+  }).catch(function () {
+    tabState = null;
+  });
+}
+
 cmdEl.onkeydown = function (ev) {
+  if (ev.key === "Tab") {
+    ev.preventDefault();
+    if (!state.session) {
+      return;
+    }
+    if (tabState && tabState.candidates.length > 1) {
+      cycleCompletion(!ev.shiftKey);
+      return;
+    }
+    beginCompletion();
+    return;
+  }
+  if (ev.key !== "Shift" && ev.key !== "Control" && ev.key !== "Alt" && ev.key !== "Meta") {
+    tabState = null;
+  }
   if (ev.key === "Enter") {
     var line = cmdEl.value.trim();
     cmdEl.value = "";
