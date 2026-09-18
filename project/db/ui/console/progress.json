@@ -1,0 +1,14 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:25.868+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "ui/text",
+    "ui/layout",
+    "ui/ui_events",
+    "input_and_controllers/device_layer",
+    "command/terminal"
+  ]
+}

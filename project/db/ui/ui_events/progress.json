@@ -1,0 +1,13 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:25.832+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "ui/ui_view",
+    "ui/layout",
+    "interaction/picking",
+    "input_and_controllers/action_layer"
+  ]
+}
