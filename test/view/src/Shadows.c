@@ -383,19 +383,18 @@ void Shadows_static_delta_inside_a_cascade_marks_it_dirty(void)
     memset(&cache, 0, sizeof(cache));
     box_shadow_cache_view(&cache, v);
     test_bool(cache.dirty[0], true);
-    test_int(box_shadow_cache_next(&cache, v, 0), 0);
+    test_uint(box_shadow_cache_pick(&cache, v), 0xFu);
 
     uint32_t i;
     for (i = 0; i < v->shadow_cascades; i ++) {
-        box_shadow_cache_done(&cache, v, (int32_t)i);
+        box_shadow_cache_done(&cache, v, i);
     }
 
-    test_int(box_shadow_cache_next(&cache, v, 0), -1);
+    test_uint(box_shadow_cache_pick(&cache, v), 0);
     float inside[4] = { v->shadow_bounds[0], v->shadow_bounds[1], v->shadow_bounds[2], 0.5f };
     box_shadow_cache_delta(&cache, v, inside);
     test_bool(cache.dirty[0], true);
-    test_int(box_shadow_cache_next(&cache, v, 0), 0);
-    test_int(box_shadow_cache_next(&cache, v, 1), -1);
+    test_uint(box_shadow_cache_pick(&cache, v), 1u);
 }
 
 void Shadows_static_delta_outside_a_cascade_keeps_it(void)
@@ -419,7 +418,7 @@ void Shadows_static_delta_outside_a_cascade_keeps_it(void)
     box_shadow_cache_view(&cache, v);
     uint32_t i;
     for (i = 0; i < v->shadow_cascades; i ++) {
-        box_shadow_cache_done(&cache, v, (int32_t)i);
+        box_shadow_cache_done(&cache, v, i);
     }
 
     float radius = v->shadow_bounds[3];
@@ -432,7 +431,7 @@ void Shadows_static_delta_outside_a_cascade_keeps_it(void)
     box_shadow_cache_delta(&cache, v, outside);
     test_bool(cache.dirty[0], false);
     test_bool(box_shadow_in_cascade(v, 0, outside), false);
-    test_int(box_shadow_cache_next(&cache, v, 0), -1);
+    test_uint(box_shadow_cache_pick(&cache, v), 0);
 }
 
 void Shadows_camera_rotation_marks_every_cascade(void)
@@ -456,7 +455,7 @@ void Shadows_camera_rotation_marks_every_cascade(void)
     box_shadow_cache_view(&cache, v);
     uint32_t i;
     for (i = 0; i < v->shadow_cascades; i ++) {
-        box_shadow_cache_done(&cache, v, (int32_t)i);
+        box_shadow_cache_done(&cache, v, i);
     }
 
     box_packet_reset(&packet);
@@ -470,4 +469,6 @@ void Shadows_camera_rotation_marks_every_cascade(void)
     for (i = 0; i < v->shadow_cascades; i ++) {
         test_bool(cache.dirty[i], true);
     }
+
+    test_uint(box_shadow_cache_pick(&cache, v), 1u);
 }
