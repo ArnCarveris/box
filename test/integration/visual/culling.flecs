@@ -1,0 +1,73 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+camera {
+  Position: {0, 7, -7}
+  LookAt: {0, 0, 6}
+  Camera: {fov: 55}
+  Capture: {path: "/tmp/box/culling.png"}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+$ { EnvironmentLight: {sky_color: {90, 110, 150}, ground_color: {40, 38, 36}, intensity: 1} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {60, 0.5, 60}
+  Rgb: {66, 70, 78}
+  PbrMaterial: {roughness: 0.9}
+}
+
+ring {
+  for i in 0..7 {
+    _ {
+      Position: {i * 4 - 12, 1, 12}
+      Box: {1.6, 2, 1.6}
+      Rgb: {220, 90, 70}
+      PbrMaterial: {roughness: 0.5}
+    }
+  }
+  for i in 0..7 {
+    _ {
+      Position: {12, 1, 12 - i * 4}
+      Sphere: {segments: 24, smooth: true, radius: 1}
+      Rgb: {90, 180, 230}
+      PbrMaterial: {roughness: 0.4}
+    }
+  }
+  for i in 0..7 {
+    _ {
+      Position: {12 - i * 4, 1, -12}
+      Box: {1.6, 2, 1.6}
+      Rgb: {120, 220, 110}
+      PbrMaterial: {roughness: 0.5}
+    }
+  }
+  for i in 0..7 {
+    _ {
+      Position: {-12, 1, i * 4 - 12}
+      Sphere: {segments: 24, smooth: true, radius: 1}
+      Rgb: {240, 200, 80}
+      PbrMaterial: {roughness: 0.4}
+    }
+  }
+}
+
+behind {
+  for i in 0..8 {
+    _ {
+      Position: {i * 5 - 18, 1.5, -24}
+      Box: {2, 3, 2}
+      Rgb: {200, 120, 220}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+}
