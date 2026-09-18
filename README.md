@@ -30,6 +30,25 @@ using box.surface
 $ { Surface: {width: 640, height: 360, write_to_file: "/tmp/frame.png"} }
 ```
 
+## Scenes
+
+Scenes are flecs scripts. `apps/box_app/etc/scenes/primitives.flecs` shows every
+primitive shape with materials, a camera and a directional light:
+
+```
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+
+camera { Position: {0, 4, -12}  LookAt: {0, 0.5, 0}  Camera: {fov: 55} }
+sphere { Position: {-3, 1, 0}  Sphere: {segments: 32, smooth: true, radius: 1}  Rgb: {80, 160, 240} }
+```
+
+Entities are static unless they or an ancestor have `DynamicTransform` or
+`DynamicMaterial`; static entities are only re-uploaded when a component changes.
+`Velocity3` and `AngularVelocity3` from `box.movement` mark entities dynamic.
+
 ## Tests
 
 ```sh
@@ -37,6 +56,16 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
+bake3 run test/transform --local-env -- -j 12                # other test projects: geometry, render
+```
+
+Integration scenes live under `test/integration`: `visual/` scenes are rendered
+headless to screenshots and `bench/` scenes are run by the benchmark app:
+
+```sh
+python3 tools/integration.py visual            # writes test/integration/out/<scene>.png
+python3 tools/integration.py bench             # writes test/integration/out/<scene>.json
+bake3 run box_bench --local-env --cfg release -- ../../test/integration/bench/static_100k.flecs --churn 1-1000
 ```
 
 ## WebAssembly
