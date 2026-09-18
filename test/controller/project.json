@@ -1,0 +1,37 @@
+{
+    "id": "controller",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.controller camera and character controllers",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Camera",
+                "testcases": [
+                    "the_module_binds_the_movement_actions",
+                    "forward_moves_along_the_view",
+                    "back_moves_against_the_view",
+                    "strafing_moves_sideways",
+                    "up_and_down_move_the_height",
+                    "the_fast_modifier_multiplies_the_speed",
+                    "the_mouse_turns_the_camera_while_captured",
+                    "the_mouse_is_ignored_without_capture",
+                    "the_look_action_turns_without_capture",
+                    "sensitivity_scales_the_turn",
+                    "pitch_stops_short_of_straight_down",
+                    "yaw_turns_the_movement_with_the_view",
+                    "clearance_keeps_the_camera_above_the_terrain",
+                    "a_scene_rebinds_an_action",
+                    "the_controller_writes_orientation_and_lookat"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}
