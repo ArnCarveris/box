@@ -16,6 +16,11 @@
                 "dynamic_10k"
             ]
         }, {
+            "id": "Environment",
+            "benchcases": [
+                "extract"
+            ]
+        }, {
             "id": "Lights",
             "benchcases": [
                 "extract_1000_moving",
