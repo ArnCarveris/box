@@ -287,7 +287,19 @@
                     "dynamic_transparent_leaves_the_dynamic_batches",
                     "deleted_entity_leaves_the_sorted_list",
                     "prefab_blend_mode_is_inherited",
-                    "opaque_scene_packet_is_unchanged"
+                    "opaque_scene_packet_is_unchanged",
+                    "blur_level_of_zero_roughness_is_the_first_level",
+                    "blur_level_of_full_roughness_is_the_last_level",
+                    "blur_level_grows_with_roughness",
+                    "blur_level_of_a_quarter_roughness_is_half_the_chain",
+                    "blur_level_of_half_roughness_follows_the_curve",
+                    "blur_level_clamps_roughness_to_the_chain",
+                    "blur_chain_keeps_its_coarsest_level_large",
+                    "opaque_view_does_not_request_the_blur_chain",
+                    "alpha_blended_instance_requests_the_blur_chain",
+                    "premultiplied_instance_requests_the_blur_chain",
+                    "additive_instance_does_not_request_the_blur_chain",
+                    "translucent_count_covers_the_alpha_blended_instances"
                 ],
                 "setup": true,
                 "teardown": true

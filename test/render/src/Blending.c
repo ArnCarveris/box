@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "../../../src/render/render_internal.h"
+#include "../../../src/renderer/blur.h"
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -349,4 +350,130 @@ void Blending_opaque_scene_packet_is_unchanged(void)
     test_flt(u->data.color[3], 1.0f);
     box_instance_t *dyn = box_vec_at(&packet.dynamic_instances, 0);
     test_int(dyn->uv_mode, 0);
+}
+
+void Blending_blur_level_of_zero_roughness_is_the_first_level(void)
+{
+    // materials/glass_roughness
+    test_flt(box_blur_level(0.0f, 5), 0.0f);
+    test_flt(box_blur_level(0.0f, 9), 0.0f);
+}
+
+void Blending_blur_level_of_full_roughness_is_the_last_level(void)
+{
+    // materials/glass_roughness
+    test_flt(box_blur_level(1.0f, 5), 4.0f);
+    test_flt(box_blur_level(1.0f, 9), 8.0f);
+}
+
+void Blending_blur_level_grows_with_roughness(void)
+{
+    // materials/glass_roughness
+    float previous = -1.0f;
+    int32_t i;
+    for (i = 0; i <= 20; i ++) {
+        float level = box_blur_level((float)i / 20.0f, 5);
+        test_assert(level > previous);
+        test_assert(level <= 4.0f);
+        previous = level;
+    }
+}
+
+void Blending_blur_level_of_a_quarter_roughness_is_half_the_chain(void)
+{
+    // materials/glass_roughness
+    test_flt(box_blur_level(0.25f, 5), 2.0f);
+    test_flt(box_blur_level(0.25f, 9), 4.0f);
+}
+
+void Blending_blur_level_of_half_roughness_follows_the_curve(void)
+{
+    // materials/glass_roughness
+    test_assert(fabsf(box_blur_level(0.5f, 5) - sqrtf(0.5f) * 4.0f) < 1e-5f);
+    test_assert(fabsf(box_blur_level(0.5f, 9) - sqrtf(0.5f) * 8.0f) < 1e-5f);
+}
+
+void Blending_blur_level_clamps_roughness_to_the_chain(void)
+{
+    // materials/glass_roughness
+    test_flt(box_blur_level(-1.0f, 5), 0.0f);
+    test_flt(box_blur_level(4.0f, 5), 4.0f);
+}
+
+void Blending_blur_chain_keeps_its_coarsest_level_large(void)
+{
+    // materials/glass_roughness
+    uint32_t levels = box_blur_levels(960, 540);
+    test_int(levels, 5);
+    test_assert((540u >> (levels - 1)) >= BOX_BLUR_MIN_SIZE);
+    test_assert((540u >> levels) < BOX_BLUR_MIN_SIZE);
+    test_int(box_blur_levels(1280, 720), 5);
+    test_int(box_blur_levels(32, 32), 1);
+    test_assert(box_blur_levels(8192, 8192) <= BOX_BLUR_LEVELS_MAX);
+}
+
+void Blending_opaque_view_does_not_request_the_blur_chain(void)
+{
+    // materials/glass_roughness
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    test_int(packet.view.transparent_count, 0);
+    test_int(packet.view.translucent_count, 0);
+}
+
+void Blending_alpha_blended_instance_requests_the_blur_chain(void)
+{
+    // materials/glass_roughness
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    ecs_set(w, e, Opacity, {0.5f});
+    box_render_extract(w, &packet);
+    test_int(packet.view.transparent_count, 1);
+    test_int(packet.view.translucent_count, 1);
+}
+
+void Blending_premultiplied_instance_requests_the_blur_chain(void)
+{
+    // materials/glass_roughness
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    ecs_set(w, e, BlendMode, {PremultipliedAlpha});
+    box_render_extract(w, &packet);
+    test_int(packet.view.translucent_count, 1);
+}
+
+void Blending_additive_instance_does_not_request_the_blur_chain(void)
+{
+    // materials/glass_roughness
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    ecs_set(w, e, BlendMode, {Additive});
+    box_render_extract(w, &packet);
+    test_int(packet.view.transparent_count, 1);
+    test_int(packet.view.translucent_count, 0);
+}
+
+void Blending_translucent_count_covers_the_alpha_blended_instances(void)
+{
+    // materials/glass_roughness
+    ecs_entity_t a = ecs_new(w);
+    ecs_set(w, a, Position, {0, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    ecs_set(w, a, Opacity, {0.5f});
+    ecs_entity_t b = ecs_new(w);
+    ecs_set(w, b, Position, {2, 0, 0});
+    ecs_set(w, b, Box, {1, 1, 1});
+    ecs_set(w, b, BlendMode, {AlphaBlend});
+    ecs_entity_t c = ecs_new(w);
+    ecs_set(w, c, Position, {4, 0, 0});
+    ecs_set(w, c, Box, {1, 1, 1});
+    ecs_set(w, c, BlendMode, {Screen});
+    box_render_extract(w, &packet);
+    test_int(packet.view.transparent_count, 3);
+    test_int(packet.view.translucent_count, 2);
 }
