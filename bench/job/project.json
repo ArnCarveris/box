@@ -1,0 +1,18 @@
+{
+    "id": "bench_job",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.job worker pool",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Job",
+            "benchcases": [
+                "submit_100k",
+                "frame_drain"
+            ]
+        }]
+    }
+}
