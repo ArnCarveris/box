@@ -843,6 +843,8 @@ function bindTips(host) {
 }
 
 // --- tree logic (extracted by test_pm.py, keep free of DOM access) ---
+const STALE_SERVER = `<div class="empty-state">This server predates this page. Restart it:
+  <code>python3 project/pm.py serve</code></div>`;
 const TREE_MAX_ROWS = 1200;
 const TREE_SERIES = 12;
 const TREE_RANK = { fail: 3, empty: 2, pass: 1 };
@@ -1302,7 +1304,7 @@ function renderTests() {
   const el = document.getElementById("tests");
   const d = state.tests;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading test reports…</div>`; return; }
-  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
+  if (d.stale || !d.overall) { el.innerHTML = STALE_SERVER; return; }
   if (!d.reports.length) { el.innerHTML = `<div class="empty-state">No test reports under project/db</div>`; return; }
   const w = chartWidth(el);
   const ui = state.testsUi;
@@ -1422,7 +1424,7 @@ function renderBenchmarks() {
   const el = document.getElementById("benchmarks");
   const d = state.bench;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
-  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
+  if (d.stale || !d.micro_overall) { el.innerHTML = STALE_SERVER; return; }
   if (!d.scenes.length && !(d.micro_suites || []).length) {
     el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`;
     return;
