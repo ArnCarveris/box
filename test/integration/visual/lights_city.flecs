@@ -1,0 +1,96 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+camera {
+  Position: {0, 30, -60}
+  LookAt: {0, 0, -2}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 0.2}
+  Rgb: {120, 140, 200}
+}
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {90, 0.5, 90}
+  Rgb: {70, 72, 80}
+  PbrMaterial: {roughness: 0.8}
+}
+
+city {
+  for i in 0..324 {
+    _ {
+      Position: {(i % 18) * 4 - 34, (((i * 7) % 5) + 1), (i / 18) * 4 - 34}
+      Box: {2.6, (((i * 7) % 5) + 1) * 2, 2.6}
+      Rgb: {80 + (i * 13) % 40, 84 + (i * 7) % 40, 96 + (i * 11) % 40}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+}
+
+lamps {
+  for i in 0..54 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {255, 70, 50}
+    }
+  }
+
+  for i in 54..108 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {60, 255, 120}
+    }
+  }
+
+  for i in 108..162 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {70, 130, 255}
+    }
+  }
+
+  for i in 162..216 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {255, 205, 60}
+    }
+  }
+
+  for i in 216..270 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {235, 80, 255}
+    }
+  }
+
+  for i in 270..324 {
+    _ {
+      Position: {(i % 20) * 3.6 - 34, 1 + (i % 4) * 2.2, (i / 20) * 4 - 32}
+      PointLight: {intensity: 12, range: 9}
+      Rgb: {60, 235, 235}
+    }
+  }
+}
+
+spots {
+  for i in 0..6 {
+    _ {
+      Position: {i * 13 - 32, 17, (i % 2) * 24 - 12}
+      Rotation: {1.5708, 0, 0}
+      SpotLight: {intensity: 280, range: 30, inner_angle: 9, outer_angle: 20}
+      Rgb: {255, 240, 200}
+    }
+  }
+}
