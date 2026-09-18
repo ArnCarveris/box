@@ -1,0 +1,45 @@
+{
+    "id": "command",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for box.command terminal sessions and command dispatch",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Terminal",
+            "testcases": [
+                "folder_created_and_removed",
+                "resources_subfolder",
+                "session_dir_under_process_dir",
+                "session_dir_kept_after_set",
+                "log_contains_line_and_result",
+                "commands_lists_last_lines",
+                "commands_defaults_to_all_lines",
+                "output_written_on_input",
+                "script_session_runs_command"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
+            "id": "Dispatch",
+            "testcases": [
+                "command_with_arguments",
+                "quoted_argument",
+                "unknown_command",
+                "too_many_arguments",
+                "missing_argument",
+                "invalid_i32_argument",
+                "f64_argument",
+                "entity_argument",
+                "entity_relative_to_cwd",
+                "unknown_entity_argument",
+                "optional_argument_omitted",
+                "help_lists_commands"
+            ],
+            "setup": true,
+            "teardown": true
+        }]
+    }
+}
