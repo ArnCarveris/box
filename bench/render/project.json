@@ -45,6 +45,18 @@
                 "benchcases": [
                     "extract_1000_materials"
                 ]
+            },
+            {
+                "id": "Tiling",
+                "benchcases": [
+                    "extract_10k"
+                ]
+            },
+            {
+                "id": "Svg",
+                "benchcases": [
+                    "rasterize_256"
+                ]
             }
         ]
     }
