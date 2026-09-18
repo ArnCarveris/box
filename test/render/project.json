@@ -232,6 +232,30 @@
                 ]
             },
             {
+                "id": "Layers",
+                "testcases": [
+                    "built_in_layers_are_registered",
+                    "registration_produces_the_ordered_command",
+                    "command_is_sent_once",
+                    "order_sorts_the_command",
+                    "unregistration_renumbers_and_resends",
+                    "material_pair_sets_the_layer_bit",
+                    "two_layers_set_two_bits",
+                    "removing_the_pair_clears_the_bit",
+                    "inherited_from_a_prefab",
+                    "dynamic_instance_gets_the_bit",
+                    "transparent_instance_keeps_the_bit",
+                    "params_reach_the_packet",
+                    "params_update_on_change",
+                    "settings_flag_reaches_the_view",
+                    "project_layer_gets_a_bit",
+                    "limit_is_an_error_logged_once",
+                    "scene_without_layers_keeps_the_flag_off"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Blending",
                 "testcases": [
                     "opaque_entity_stays_in_its_batch",
