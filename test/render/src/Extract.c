@@ -358,3 +358,47 @@ void Extract_different_segments_different_mesh(void)
         free(cmd->indices);
     }
 }
+
+void Extract_delete_before_first_extract(void)
+{
+    // command/integration
+    ecs_entity_t a = ecs_new(w);
+    ecs_set(w, a, Position, {1, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 1);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    box_packet_reset(&packet);
+    ecs_entity_t b = ecs_new(w);
+    ecs_set(w, b, Position, {2, 0, 0});
+    ecs_set(w, b, Box, {1, 1, 1});
+    ecs_delete(w, b);
+    test_int(ecs_get(w, a, RenderInstance)->slot, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(ecs_get(w, a, RenderInstance)->slot, 0);
+}
+
+void Extract_delete_before_first_extract_empty_batch(void)
+{
+    // command/integration
+    ecs_entity_t a = ecs_new(w);
+    ecs_set(w, a, Position, {1, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    box_packet_reset(&packet);
+    ecs_delete(w, a);
+    box_render_extract(w, &packet);
+    box_packet_reset(&packet);
+    ecs_entity_t b = ecs_new(w);
+    ecs_set(w, b, Position, {2, 0, 0});
+    ecs_set(w, b, Sphere, {.segments = 8, .radius = 1});
+    ecs_delete(w, b);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+}

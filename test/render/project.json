@@ -19,6 +19,8 @@
                     "position_change_reextracts_static",
                     "color_change_reextracts_static",
                     "delete_swaps_last_into_slot",
+                "delete_before_first_extract",
+                "delete_before_first_extract_empty_batch",
                     "dynamic_entity_extracted_every_frame",
                     "dynamic_child_of_dynamic_parent",
                     "static_to_dynamic_releases_slot",
