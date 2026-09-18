@@ -66,6 +66,12 @@
                 ]
             },
             {
+                "id": "SvgJobs",
+                "benchcases": [
+                    "rasterize_1000_while_rendering"
+                ]
+            },
+            {
                 "id": "Blending",
                 "benchcases": [
                     "transparent_10k"

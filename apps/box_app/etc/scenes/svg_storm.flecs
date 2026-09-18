@@ -1,0 +1,50 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+using box.script
+
+template Tile {
+  icon {
+    Svg: {file: "etc/svg/badge.svg", width: 64, height: 64}
+  }
+
+  Quad: {1, 1}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 1}
+  PbrTextures: {albedo: icon}
+}
+
+$ {
+  ScriptSettings: {enabled: false}
+}
+
+$ {
+  EnvironmentLight: {sky_color: {255, 255, 255}, ground_color: {235, 238, 245}, intensity: 1.4}
+}
+
+camera {
+  Position: {0, 0, -20}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 60}
+}
+
+sun {
+  Rotation: {0.3, 0.2, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+backdrop {
+  Position: {0, 0, 2}
+  Box: {30, 20, 0.5}
+  Rgb: {26, 30, 38}
+}
+
+for i in 0..240 {
+  _ {
+    Position: {(i % 20) * 1.15 - 10.9, (i / 20) * 1.15 - 6.3, 0}
+    Tile: {}
+  }
+}

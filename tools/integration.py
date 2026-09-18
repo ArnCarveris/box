@@ -143,7 +143,7 @@ def run_visual(scenes, out, env, frames, width, height, update=False):
         name = os.path.splitext(os.path.basename(scene))[0]
         png = os.path.abspath(os.path.join(out, name + ".png"))
         with tempfile.NamedTemporaryFile("w", suffix=".flecs", delete=False) as harness:
-            harness.write("using box.surface\nusing box.script\n$ { ScriptSettings: {enabled: false} }\n$ { Surface: {width: %d, height: %d, write_to_file: \"%s\"} }\n"
+            harness.write("using box.surface\nusing box.script\nusing box.job\n$ { ScriptSettings: {enabled: false} }\n$ { JobSettings: {workers: -1, budget_ms: 0} }\n$ { Surface: {width: %d, height: %d, write_to_file: \"%s\"} }\n"
                           % (width, height, png))
             harness_path = harness.name
         proc = bake(["run", "box_app", env_flag(env), "--cfg", "release", "--",
