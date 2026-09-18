@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:13.452+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "views_and_culling",
+    "textures_and_materials",
+    "responsiveness"
+  ]
+}
