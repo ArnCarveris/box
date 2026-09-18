@@ -54,13 +54,7 @@ static void box_texture_refs_dtor(
     }
 }
 
-/** Read the texture settings of the surface, or the engine defaults.
- *
- * @param world The world
- * @param cap Receives the largest edge length a texture is scaled to
- * @param keep Receives whether the loaded pixels stay in memory
- */
-static void box_texture_settings(
+void box_texture_settings(
     ecs_world_t *world,
     uint32_t *cap,
     bool *keep)
@@ -101,6 +95,74 @@ static void box_texture_keep(
     }
 }
 
+void box_texture_publish(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const box_image_t *img,
+    bool keep)
+{
+    RenderTexture *rt = ecs_get_mut(world, e, RenderTexture);
+    ecs_assert(rt != NULL, ECS_INTERNAL_ERROR, "texture source without RenderTexture");
+    uint32_t reuse = 0;
+    if (rt->handle) {
+        reuse = (uint32_t)rt->width == img->size ? rt->handle : 0;
+        if (!reuse) {
+            box_render_texture_destroy(world, rt->handle);
+        }
+    }
+
+    box_texture_keep(world, e, img, keep);
+    rt->handle = box_render_texture_create(world, reuse, img->size, img->pixels, true);
+    rt->width = (int32_t)img->size;
+    rt->height = (int32_t)img->size;
+    ecs_modified(world, e, RenderTexture);
+    box_texture_refs_mark(world, e);
+}
+
+bool box_texture_claim(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t id)
+{
+    TextureImpl *impl = ecs_get_mut(world, e, TextureImpl);
+    ecs_assert(impl != NULL, ECS_INTERNAL_ERROR, "texture source without TextureImpl");
+    bool result = true;
+    if (!impl->source) {
+        impl->source = id;
+    } else if (impl->source != id) {
+        result = false;
+        if (!impl->conflict) {
+            impl->conflict = true;
+            const char *name = ecs_get_name(world, e);
+            ecs_err("texture '%s' has both a Texture and an Svg, '%s' is ignored",
+                name ? name : "<unnamed>", ecs_get_name(world, id));
+        }
+    }
+
+    return result;
+}
+
+void box_texture_release(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t e,
+    ecs_entity_t id,
+    bool deleting)
+{
+    const TextureImpl *impl = ecs_get(world, e, TextureImpl);
+    if (impl && impl->source && impl->source != id) {
+        goto done;
+    }
+
+    box_texture_refs_unbind(world, e);
+    if (!deleting) {
+        ecs_remove(stage, e, RenderTexture);
+        ecs_remove(stage, e, TextureImpl);
+    }
+done:
+    return;
+}
+
 /** Load the image of a texture entity and hand it to the renderer.
  *
  * @param world The world
@@ -118,6 +180,10 @@ static void box_texture_reload(
         goto done;
     }
 
+    if (!box_texture_claim(world, e, ecs_id(Texture))) {
+        goto done;
+    }
+
     uint32_t cap;
     bool keep;
     box_texture_settings(world, &cap, &keep);
@@ -127,22 +193,7 @@ static void box_texture_reload(
         goto done;
     }
 
-    RenderTexture *rt = ecs_get_mut(world, e, RenderTexture);
-    ecs_assert(rt != NULL, ECS_INTERNAL_ERROR, "Texture without RenderTexture");
-    uint32_t reuse = 0;
-    if (rt->handle) {
-        reuse = (uint32_t)rt->width == img.size ? rt->handle : 0;
-        if (!reuse) {
-            box_render_texture_destroy(world, rt->handle);
-        }
-    }
-
-    box_texture_keep(world, e, &img, keep);
-    rt->handle = box_render_texture_create(world, reuse, img.size, img.pixels, true);
-    rt->width = (int32_t)img.size;
-    rt->height = (int32_t)img.size;
-    ecs_modified(world, e, RenderTexture);
-    box_texture_refs_mark(world, e);
+    box_texture_publish(world, e, &img, keep);
 done:
     return;
 }
@@ -179,12 +230,7 @@ static void box_texture_on_remove(
     bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        ecs_entity_t e = it->entities[i];
-        box_texture_refs_unbind(it->world, e);
-        if (!deleting) {
-            ecs_remove(it->stage, e, RenderTexture);
-            ecs_remove(it->stage, e, TextureImpl);
-        }
+        box_texture_release(it->world, it->stage, it->entities[i], ecs_id(Texture), deleting);
     }
 done:
     return;
@@ -197,6 +243,7 @@ void BoxTextureImport(
     ECS_IMPORT(world, BoxRender);
 
     ECS_META_COMPONENT(world, Texture);
+    ECS_META_COMPONENT(world, Svg);
     ECS_COMPONENT_DEFINE(world, TextureImpl);
     ECS_COMPONENT_DEFINE(world, TextureRefs);
 
@@ -226,5 +273,6 @@ void BoxTextureImport(
         .callback = box_texture_on_remove
     });
 
+    box_svg_init(world);
     box_texture_refs_init(world);
 }

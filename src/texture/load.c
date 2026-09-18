@@ -150,6 +150,24 @@ static void box_texture_chain(
     }
 }
 
+void box_texture_image(
+    const uint8_t *src,
+    int32_t width,
+    int32_t height,
+    int32_t request,
+    uint32_t cap,
+    box_image_t *out)
+{
+    uint32_t size = box_texture_target_size(request, width, height, cap);
+    out->pixels = malloc(box_texture_bytes(size));
+    out->size = size;
+    out->mips = box_texture_mips(size);
+    out->source_width = width;
+    out->source_height = height;
+    box_texture_scale(src, (uint32_t)width, (uint32_t)height, size, out->pixels);
+    box_texture_chain(out->pixels, size);
+}
+
 int box_texture_load(
     const char *path,
     int32_t request,
@@ -164,14 +182,7 @@ int box_texture_load(
         goto done;
     }
 
-    uint32_t size = box_texture_target_size(request, width, height, cap);
-    out->pixels = malloc(box_texture_bytes(size));
-    out->size = size;
-    out->mips = box_texture_mips(size);
-    out->source_width = width;
-    out->source_height = height;
-    box_texture_scale(source, (uint32_t)width, (uint32_t)height, size, out->pixels);
-    box_texture_chain(out->pixels, size);
+    box_texture_image(source, width, height, request, cap, out);
     stbi_image_free(source);
     result = 0;
 done:
