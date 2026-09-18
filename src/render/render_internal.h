@@ -38,6 +38,8 @@ typedef struct RenderState {
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
     uint32_t mesh_count;      /**< Handles allocated so far */
+    EnvironmentLight env;     /**< Environment of the previous packet */
+    uint32_t env_generation;  /**< Times the environment changed since startup */
 } RenderState;
 
 extern ECS_COMPONENT_DECLARE(RenderInstance);

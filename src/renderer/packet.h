@@ -63,14 +63,16 @@ typedef struct box_view_t {
     float view[16];         /**< World to view matrix */
     float proj[16];         /**< View to clip matrix */
     float eye[3];           /**< Camera position */
-    float ambient;          /**< Ambient light intensity */
+    float env_intensity;    /**< Radiance scale of the environment colors */
     float sun_dir[3];       /**< Direction the sun light travels */
     float sun_intensity;    /**< Sun intensity */
     float sun_color[3];     /**< Sun color */
     float gamma_encode;     /**< 1 when the target is not an sRGB format */
+    float env_sky[4];       /**< Linear color of the upper hemisphere, w unused */
+    float env_ground[4];    /**< Linear color of the lower hemisphere, w unused */
     box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
     uint32_t light_count;   /**< Lights in the packet light array */
-    float pad;              /**< Padding to the 16 byte GPU stride */
+    uint32_t env_generation; /**< Changes when the extracted environment changes */
 } box_view_t;
 
 /** Mesh to upload, the renderer takes ownership of the arrays */

@@ -304,7 +304,75 @@ static void box_extract_sun(
     p->view.sun_color[0] = color.x;
     p->view.sun_color[1] = color.y;
     p->view.sun_color[2] = color.z;
-    p->view.ambient = 0.25f;
+}
+
+/** Check whether two environment lights hold the same values.
+ *
+ * @param a The first environment
+ * @param b The second environment
+ * @return true when every field matches
+ */
+static bool box_extract_env_equal(
+    const EnvironmentLight *a,
+    const EnvironmentLight *b)
+{
+    return a->sky_color.r == b->sky_color.r && a->sky_color.g == b->sky_color.g &&
+        a->sky_color.b == b->sky_color.b && a->ground_color.r == b->ground_color.r &&
+        a->ground_color.g == b->ground_color.g && a->ground_color.b == b->ground_color.b &&
+        a->intensity == b->intensity && a->source == b->source;
+}
+
+/** Write a display encoded color to a view field as a linear color.
+ *
+ * @param color The color
+ * @param out The four floats to fill, the fourth stays zero
+ */
+static void box_extract_env_color(
+    rgb color,
+    float *out)
+{
+    out[0] = box_srgb_to_linear(color.r);
+    out[1] = box_srgb_to_linear(color.g);
+    out[2] = box_srgb_to_linear(color.b);
+    out[3] = 0;
+}
+
+/** Copy the environment light singleton into the view, or the default gradient.
+ *
+ * The generation counts the environments the world has had, so it only changes
+ * when the extracted values differ from those of the previous packet and the
+ * renderer knows when to prefilter again.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+static void box_extract_environment(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p)
+{
+    EnvironmentLight env = {
+        .sky_color = { BOX_ENV_SKY, BOX_ENV_SKY, BOX_ENV_SKY },
+        .ground_color = { BOX_ENV_GROUND, BOX_ENV_GROUND, BOX_ENV_GROUND },
+        .intensity = BOX_ENV_INTENSITY
+    };
+
+    const EnvironmentLight *set = ecs_singleton_get(world, EnvironmentLight);
+    if (set) {
+        env = *set;
+        env.intensity = env.intensity > 0 ? env.intensity : 1.0f;
+    }
+
+    if (!box_extract_env_equal(&env, &state->env)) {
+        state->env = env;
+        state->env_generation ++;
+    }
+
+    box_extract_env_color(env.sky_color, p->view.env_sky);
+    box_extract_env_color(env.ground_color, p->view.env_ground);
+    p->view.env_intensity = env.intensity;
+    p->view.env_generation = state->env_generation;
 }
 
 ecs_entity_t box_render_active_camera(
@@ -351,6 +419,7 @@ void box_render_extract(
     box_extract_counts(state, p);
     box_extract_camera(world, state, p);
     box_extract_sun(world, state, p);
+    box_extract_environment(world, state, p);
     box_render_extract_lights(world, state, p);
     box_render_validate(world);
 }
