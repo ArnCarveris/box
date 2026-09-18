@@ -26,7 +26,7 @@ LEVELS = ("epic", "task", "subtask")
 
 
 def now():
-    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="milliseconds")
 
 
 def read_json(path):
