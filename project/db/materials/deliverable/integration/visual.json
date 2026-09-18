@@ -1,0 +1,70 @@
+{
+  "kind": "visual",
+  "results": [
+    {
+      "scene": "test/integration/visual/back_faces.flecs",
+      "status": "pass",
+      "image": "test/integration/out/back_faces.png"
+    },
+    {
+      "scene": "test/integration/visual/baked_room.flecs",
+      "status": "pass",
+      "image": "test/integration/out/baked_room.png"
+    },
+    {
+      "scene": "test/integration/visual/blending.flecs",
+      "status": "pass",
+      "image": "test/integration/out/blending.png"
+    },
+    {
+      "scene": "test/integration/visual/dynamic_room.flecs",
+      "status": "pass",
+      "image": "test/integration/out/dynamic_room.png"
+    },
+    {
+      "scene": "test/integration/visual/layers.flecs",
+      "status": "pass",
+      "image": "test/integration/out/layers.png"
+    },
+    {
+      "scene": "test/integration/visual/lights_city.flecs",
+      "status": "pass",
+      "image": "test/integration/out/lights_city.png"
+    },
+    {
+      "scene": "test/integration/visual/milk_glass.flecs",
+      "status": "pass",
+      "image": "test/integration/out/milk_glass.png"
+    },
+    {
+      "scene": "test/integration/visual/normal_bump.flecs",
+      "status": "pass",
+      "image": "test/integration/out/normal_bump.png"
+    },
+    {
+      "scene": "test/integration/visual/pbr_spheres.flecs",
+      "status": "pass",
+      "image": "test/integration/out/pbr_spheres.png"
+    },
+    {
+      "scene": "test/integration/visual/primitives.flecs",
+      "status": "pass",
+      "image": "test/integration/out/primitives.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_icons.flecs",
+      "status": "pass",
+      "image": "test/integration/out/svg_icons.png"
+    },
+    {
+      "scene": "test/integration/visual/textured.flecs",
+      "status": "pass",
+      "image": "test/integration/out/textured.png"
+    },
+    {
+      "scene": "test/integration/visual/tiling.flecs",
+      "status": "pass",
+      "image": "test/integration/out/tiling.png"
+    }
+  ]
+}
