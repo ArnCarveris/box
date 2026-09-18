@@ -20,6 +20,9 @@
 /** Range of the static lights, the radius a changed instance invalidates */
 #define BENCH_LIGHT_RANGE (10.0f)
 
+/** Static entities moved per frame by the churn case */
+#define BENCH_CHURN_COUNT (1000)
+
 void Bake_invalidate_one_of_100k(bench_t *b)
 {
     // lighting/light_baking
@@ -127,5 +130,71 @@ void Bake_probe_count_100k(bench_t *b)
 
     box_bake_state_fini(&state);
     box_packet_fini(&packet);
+    ecs_fini(world);
+}
+
+void Bake_churn_1000_of_100k(bench_t *b)
+{
+    // lighting/bake_churn
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 1920;
+    packet.height = 1080;
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 60, -160});
+    ecs_set(world, camera, Camera, {.fov = 60});
+
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Position, {0, 100, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 3});
+
+    ecs_entity_t *moved = ecs_os_malloc_n(ecs_entity_t, BENCH_STATIC_COUNT);
+    int32_t i;
+    for (i = 0; i < BENCH_STATIC_COUNT; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)(i % BENCH_STATIC_ROW) - 200.0f,
+            (float)((i / BENCH_STATIC_ROW) % 25) * 2, (float)(i / 10000) * 6 - 30});
+        ecs_set(world, e, Box, {0.8f, 0.8f, 0.8f});
+        moved[i] = e;
+    }
+
+    ecs_progress(world, 0.016f);
+    box_render_extract(world, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    box_bake_state_take(&state, BENCH_STATIC_COUNT);
+    float offset = 0;
+
+    bench_set_items(b, BENCH_CHURN_COUNT);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_bake_state_take(&state, BENCH_STATIC_COUNT);
+        box_packet_reset(&packet);
+        packet.width = 1920;
+        packet.height = 1080;
+        offset += 0.001f;
+        int32_t j;
+        for (j = 0; j < BENCH_CHURN_COUNT; j ++) {
+            ecs_entity_t e = moved[(j * 97) % BENCH_STATIC_COUNT];
+            const Position *pos = ecs_get(world, e, Position);
+            ecs_set(world, e, Position, {pos->x, pos->y + offset, pos->z});
+        }
+
+        ecs_progress(world, 0.016f);
+        bench_resume(b);
+        box_render_extract(world, &packet);
+        box_bake_state_apply(&state, &packet);
+        bench_keep(state.dirty.count);
+    }
+
+    box_bake_state_fini(&state);
+    box_packet_fini(&packet);
+    ecs_os_free(moved);
     ecs_fini(world);
 }
