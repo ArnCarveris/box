@@ -21,11 +21,19 @@ typedef struct box_batch_t {
 
 /** Where an entity's instance lives */
 typedef struct RenderInstance {
-    uint32_t mesh;  /**< Mesh handle */
-    uint32_t slot;  /**< Static slot, unused when dynamic */
-    bool dynamic;   /**< Instance is rebuilt every frame */
-    bool dirty;     /**< Queued for extraction */
+    uint32_t mesh;   /**< Mesh handle */
+    uint32_t slot;   /**< Static slot, unused when dynamic or sorted */
+    uint32_t sorted; /**< Index in the sorted draw list, unused when it is not in it */
+    bool dynamic;    /**< Instance is rebuilt every frame */
+    bool dirty;      /**< Queued for extraction */
+    bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
 } RenderInstance;
+
+/** Depth and index of one entry of the sorted draw list */
+typedef struct box_sort_key_t {
+    float depth;    /**< View space depth of the instance origin */
+    uint32_t index; /**< Index in the sorted draw list */
+} box_sort_key_t;
 
 /** Module wide registry, stored as a singleton */
 typedef struct RenderState {
@@ -38,6 +46,8 @@ typedef struct RenderState {
     bool textured;            /**< A texture handle was allocated, slots need resolving */
     bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
+    ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
+    ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *captures;    /**< Camera entities that request a capture */
@@ -216,6 +226,88 @@ void box_render_fill_uv(
     const mat4 *m,
     bool tiled,
     box_instance_t *out);
+
+/** Check whether an entity belongs to the sorted draw list.
+ *
+ * @param state The registry
+ * @param e The entity
+ * @param inst Its instance record
+ * @return True when the record names the entry of the entity
+ */
+static inline bool box_render_in_list(
+    const RenderState *state,
+    ecs_entity_t e,
+    const RenderInstance *inst)
+{
+    bool result = false;
+    if (!inst->transparent || inst->sorted >= (uint32_t)ecs_vec_count(&state->transparent)) {
+        goto done;
+    }
+
+    result = ecs_vec_get_t(&state->transparent, ecs_entity_t, (int32_t)inst->sorted)[0] == e;
+done:
+    return result;
+}
+
+/** Blend mode of an entity, read through its prefab when it inherits one.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return One of the BOX_BLEND constants
+ */
+uint32_t box_render_blend_mode(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Back face mode of an entity, read through its prefab when it inherits one.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return One of the BOX_BACK constants
+ */
+uint32_t box_render_back_mode(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Check whether an entity leaves the opaque batches for the sorted pass.
+ *
+ * An instance is sorted when its blend mode is not opaque, when its opacity
+ * times the alpha of its resolved tint is below one, or when it shows its back
+ * faces, which the batched draws cannot do.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return True when the sorted pass draws the entity
+ */
+bool box_render_is_transparent(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Add an entity to the sorted draw list or take it out.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The entity
+ * @param inst Its instance record
+ * @param transparent True to put the entity in the list
+ */
+void box_render_set_transparent(
+    ecs_world_t *world,
+    RenderState *state,
+    ecs_entity_t e,
+    RenderInstance *inst,
+    bool transparent);
+
+/** Fill the packet list of sorted draws and order it back to front.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_transparent(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
 
 /** Check whether an entity or an ancestor carries a dynamic tag.
  *

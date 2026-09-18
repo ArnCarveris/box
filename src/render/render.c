@@ -49,6 +49,8 @@ static void box_render_state_dtor(
         }
 
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &state[i].transparent, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &state[i].sort, box_sort_key_t);
         if (state[i].dynamic) ecs_query_fini(state[i].dynamic);
         if (state[i].cameras) ecs_query_fini(state[i].cameras);
         if (state[i].captures) ecs_query_fini(state[i].captures);
@@ -144,6 +146,8 @@ void BoxRenderImport(
     }
 
     ecs_vec_init_t(NULL, &state->dirty, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->transparent, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->sort, box_sort_key_t, 0);
 
     box_render_texture_init(world);
     box_render_instance_init(world);

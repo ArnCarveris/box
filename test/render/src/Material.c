@@ -86,7 +86,7 @@ void Material_instance_color_uses_tint_and_opacity(void)
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
     free(cmd->indices);
-    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    box_transparent_t *u = box_vec_at(&packet.transparent, 0);
     test_flt(u->data.color[0], 1.0f);
     test_flt(u->data.color[1], 0.0f);
     test_flt(u->data.color[2], 1.0f);

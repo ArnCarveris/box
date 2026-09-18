@@ -110,6 +110,8 @@ static void box_render_on_remove(
         if (box_render_has_slot(state, it->entities[i], &inst[i])) {
             box_render_release_slot(it->world, state, it->entities[i], &inst[i]);
         }
+
+        box_render_set_transparent(it->world, state, it->entities[i], &inst[i], false);
     }
 }
 
@@ -289,6 +291,8 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(PbrMaterial));
     box_render_watch(world, ecs_id(Emissive));
     box_render_watch(world, ecs_id(PbrTextures));
+    box_render_watch(world, ecs_id(BlendMode));
+    box_render_watch(world, ecs_id(BackFaceMode));
     box_render_watch(world, ecs_id(TextureTransform));
     box_render_watch(world, ecs_id(TextureTiling));
     box_render_watch(world, ecs_id(TextureWrap));

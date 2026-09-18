@@ -87,16 +87,23 @@ static void box_extract_static(
     ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
     bool dynamic = box_render_is_dynamic(world, e);
+    bool transparent = box_render_is_transparent(world, e);
     bool has_slot = box_render_has_slot(state, e, inst);
 
-    if (has_slot && (dynamic || inst->mesh != mesh->handle)) {
+    if (has_slot && (dynamic || transparent || inst->mesh != mesh->handle)) {
         box_render_release_slot(world, state, e, inst);
         has_slot = false;
     }
 
+    box_render_set_transparent(world, state, e, inst, transparent);
     inst->dynamic = dynamic;
     inst->mesh = mesh->handle;
     if (dynamic) {
+        goto done;
+    }
+
+    if (transparent) {
+        box_render_update_aabb(world, e, mesh, transform);
         goto done;
     }
 
@@ -158,6 +165,10 @@ static void box_extract_dynamic(
         for (i = 0; i < it.count; i ++) {
             if (!inst[i].dynamic) {
                 box_render_mark_dirty(world, it.entities[i]);
+                continue;
+            }
+
+            if (inst[i].transparent) {
                 continue;
             }
 
@@ -416,6 +427,7 @@ void box_render_extract(
     box_extract_dynamic(world, state, p);
     box_extract_counts(state, p);
     box_extract_camera(world, state, p);
+    box_render_extract_transparent(world, state, p);
     box_extract_sun(world, state, p);
     box_extract_environment(world, state, p);
     box_render_extract_lights(world, state, p);
@@ -439,7 +451,7 @@ void box_render_validate(
                     ecs_get_name(world, e));
             }
 
-            if (inst[i].dynamic) {
+            if (inst[i].dynamic || inst[i].transparent) {
                 continue;
             }
 

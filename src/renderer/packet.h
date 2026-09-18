@@ -39,6 +39,33 @@
 /** Texture slots a material binds: albedo, emissive, roughness and normal */
 #define BOX_TEXTURE_SLOTS (4)
 
+/** Blend equations a material can pick, the values of the BlendMode component */
+#define BOX_BLEND_COUNT (9)
+
+/** No blending, a draw that only left the opaque batches for its back faces */
+#define BOX_BLEND_OPAQUE (0)
+
+/** Source over with a straight alpha, the mode a translucent Opaque material gets */
+#define BOX_BLEND_ALPHA (1)
+
+/** Source over with a color that already holds its alpha */
+#define BOX_BLEND_PREMULTIPLIED (2)
+
+/** Back face modes, the values of the BackFaceMode component */
+#define BOX_BACK_TEXTURED (0)
+
+/** Back faces show the material constants without textures */
+#define BOX_BACK_PLAIN (1)
+
+/** Back faces are culled, the mode of an instance without the component */
+#define BOX_BACK_CULL (2)
+
+/** Bit the blend mode of an instance starts at in its mode word */
+#define BOX_MODE_BLEND_SHIFT (8)
+
+/** Bit the back face mode of an instance starts at in its mode word */
+#define BOX_MODE_BACK_SHIFT (12)
+
 /** Layers a size class can hold, the packed instance slot is sixteen bits wide */
 #define BOX_TEXTURE_LAYER_MAX (0x3FFF - 1)
 
@@ -50,7 +77,7 @@ typedef struct box_instance_t {
     float params[4];       /**< Metallic, roughness, baked, unused */
     uint32_t textures[BOX_TEXTURE_SLOTS / 2]; /**< Two packed texture slots per word */
     float uv_transform[4]; /**< Uv scale x, scale y, offset x and offset y */
-    uint32_t uv_mode;      /**< Tiling projection and wrap mode, see tiling.h */
+    uint32_t uv_mode;      /**< Tiling, wrap, blend and back face mode of the instance */
 } box_instance_t;
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
@@ -263,6 +290,43 @@ static inline uint32_t box_instance_texture(
     return result;
 }
 
+/** Write the blend and back face mode of an instance into its mode word.
+ *
+ * @param inst The instance
+ * @param blend One of the BOX_BLEND constants
+ * @param back One of the BOX_BACK constants
+ */
+static inline void box_instance_set_shading(
+    box_instance_t *inst,
+    uint32_t blend,
+    uint32_t back)
+{
+    inst->uv_mode &= 0xFFu;
+    inst->uv_mode |= (blend << BOX_MODE_BLEND_SHIFT) | (back << BOX_MODE_BACK_SHIFT);
+}
+
+/** Blend mode the mode word of an instance holds.
+ *
+ * @param inst The instance
+ * @return One of the BOX_BLEND constants
+ */
+static inline uint32_t box_instance_blend(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode >> BOX_MODE_BLEND_SHIFT) & 0xFu;
+}
+
+/** Back face mode the mode word of an instance holds.
+ *
+ * @param inst The instance
+ * @return One of the BOX_BACK constants
+ */
+static inline uint32_t box_instance_back(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode >> BOX_MODE_BACK_SHIFT) & 0x3u;
+}
+
 /** Instance data written to a slot of a mesh's static buffer */
 typedef struct box_static_update_t {
     uint32_t mesh;          /**< Mesh handle */
@@ -275,6 +339,15 @@ typedef struct box_static_count_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t count;         /**< Instances in use */
 } box_static_count_t;
+
+/** One instance the sorted pass draws after the opaque batches */
+typedef struct box_transparent_t {
+    uint32_t mesh;       /**< Mesh handle */
+    uint32_t blend;      /**< Blend equation, BOX_BLEND_OPAQUE for a two sided opaque draw */
+    uint32_t back;       /**< Back face mode of the instance */
+    float depth;         /**< View space depth of its origin, larger is farther away */
+    box_instance_t data; /**< Instance data */
+} box_transparent_t;
 
 /** Range of dynamic instances sharing a mesh */
 typedef struct box_dynamic_batch_t {
@@ -301,6 +374,7 @@ typedef struct box_packet_t {
     box_vec_t static_counts;                 /**< box_static_count_t */
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
+    box_vec_t transparent;                   /**< box_transparent_t, sorted back to front */
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
     box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
@@ -323,6 +397,7 @@ static inline void box_packet_init(
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
+    box_vec_init(&p->transparent, sizeof(box_transparent_t));
     box_vec_init(&p->lights, sizeof(box_light_t));
     box_vec_init(&p->bake_lights, sizeof(box_light_t));
     box_vec_init(&p->emitters, sizeof(box_emitter_t));
@@ -349,6 +424,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
+    box_vec_clear(&p->transparent);
     box_vec_clear(&p->lights);
     box_vec_clear(&p->bake_lights);
     box_vec_clear(&p->emitters);
@@ -369,6 +445,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
+    box_vec_fini(&p->transparent);
     box_vec_fini(&p->lights);
     box_vec_fini(&p->bake_lights);
     box_vec_fini(&p->emitters);
