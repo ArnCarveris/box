@@ -135,37 +135,6 @@ static char* box_shell_id(
     return result;
 }
 
-/** Append the component ids of an entity after a tab, hiding name and parent.
- *
- * @param world The world
- * @param e The entity
- * @param buf The buffer
- */
-static void box_shell_append_ids(
-    ecs_world_t *world,
-    ecs_entity_t e,
-    ecs_strbuf_t *buf)
-{
-    const ecs_type_t *type = ecs_get_type(world, e);
-    int32_t i, count = type ? type->count : 0;
-    bool first = true;
-    for (i = 0; i < count; i ++) {
-        ecs_id_t id = type->array[i];
-        if (ECS_IS_PAIR(id) && (ECS_PAIR_FIRST(id) == ecs_id(EcsIdentifier) ||
-            ECS_PAIR_FIRST(id) == EcsChildOf))
-        {
-            continue;
-        }
-
-        ecs_strbuf_appendstr(buf, first ? "\t" : ", ");
-        first = false;
-
-        char *str = ecs_id_str(world, id);
-        ecs_strbuf_appendstr(buf, str);
-        ecs_os_free(str);
-    }
-}
-
 /** Append a listed child to a vector of children.
  *
  * @param world The world
@@ -347,6 +316,25 @@ done:
     *(char**)result->ptr = out;
 }
 
+/** The pwd command: print the current path of the session.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Receives the output string
+ */
+static void box_shell_pwd(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
+    *(char**)result->ptr = box_path_str(world, box_path_cwd(world, session));
+}
+
 /** The ls command: list the children of the current path or of a path.
  *
  * @param ctx The call context
@@ -379,7 +367,6 @@ static void box_shell_ls(
     for (i = 0; i < count; i ++) {
         box_shell_child_t *child = ecs_vec_get_t(&children, box_shell_child_t, i);
         ecs_strbuf_appendstr(&buf, child->name);
-        box_shell_append_ids(world, child->e, &buf);
         ecs_strbuf_appendstr(&buf, "\n");
         ecs_os_free(child->name);
     }
@@ -687,6 +674,35 @@ done:
     *(char**)result->ptr = out;
 }
 
+/** The cat command: print every component of an entity with its value.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments
+ * @param result Receives the output string
+ */
+static void box_shell_cat(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
+    const char *path = *(char**)argv[1].ptr;
+    ecs_entity_t e = 0;
+    char *out = box_shell_target(world, session, path, &e);
+    if (out) {
+        goto done;
+    }
+
+    out = box_shell_values(world, e);
+
+done:
+    *(char**)result->ptr = out;
+}
+
 /** The clear command: remove every component of an entity.
  *
  * @param ctx The call context
@@ -849,9 +865,16 @@ void box_shell_init(
     box_command_register(world, "cd",
         "Change the current path of the session", path_opt, 1, box_shell_cd);
 
+    box_command_register(world, "pwd",
+        "Print the current path of the session", NULL, 0, box_shell_pwd);
+
     box_command_register(world, "ls",
-        "List the children of the current path with their components",
+        "List the names of the children of the current path or a path",
         path_opt, 1, box_shell_ls);
+
+    box_command_register(world, "cat",
+        "Print every component of an entity with its value", path, 1,
+        box_shell_cat);
 
     box_command_register(world, "touch",
         "Create the entity of a path", path, 1, box_shell_touch);

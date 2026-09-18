@@ -103,14 +103,57 @@ void Shell_ls_lists_children(void)
     ecs_os_free(out);
 }
 
-void Shell_ls_shows_components(void)
+void Shell_ls_hides_components(void)
 {
     // command/shell
     ecs_entity_t e = ecs_entity(w, { .name = "scene.a" });
     ecs_add_id(w, e, tag);
     ecs_add_pair(w, e, likes, bob);
     char *out = box_command_run(w, session, "ls scene", NULL);
-    test_str(out, "a\tTag, (Likes,Bob)\n");
+    test_str(out, "a\n");
+    ecs_os_free(out);
+}
+
+void Shell_cat_shows_components(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_add_id(w, e, tag);
+    char *out = box_command_run(w, session, "set thing Point {10,20}", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "cat thing", NULL);
+    test_str(out, "Point: {x: 10, y: 20}\nTag\n");
+    ecs_os_free(out);
+}
+
+void Shell_pwd_root(void)
+{
+    // command/shell
+    char *out = box_command_run(w, session, "pwd", NULL);
+    test_str(out, "/");
+    ecs_os_free(out);
+}
+
+void Shell_pwd_after_cd(void)
+{
+    // command/shell
+    ecs_entity(w, { .name = "scene.a" });
+    char *out = box_command_run(w, session, "cd scene.a", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "pwd", NULL);
+    test_str(out, "scene.a");
+    ecs_os_free(out);
+}
+
+void Shell_cat_missing_entity(void)
+{
+    // command/shell
+    bool error = false;
+    char *out = box_command_run(w, session, "cat nope", &error);
+    test_bool(error, true);
+    test_str(out, "unknown entity 'nope'");
     ecs_os_free(out);
 }
 
