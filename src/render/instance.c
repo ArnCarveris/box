@@ -275,18 +275,17 @@ void box_render_instance_bounds(
 {
     vec3 center = vec3_scale(vec3_add(mesh->bounds_min, mesh->bounds_max), 0.5f);
     vec3 extent = vec3_scale(vec3_sub(mesh->bounds_max, mesh->bounds_min), 0.5f);
-    vec3 world = mat4_transform_point(m, center);
     float radius = 0;
     int axis;
     for (axis = 0; axis < 3; axis ++) {
-        float e = fabsf(m->v[axis]) * extent.x + fabsf(m->v[4 + axis]) * extent.y +
-            fabsf(m->v[8 + axis]) * extent.z;
+        float x = m->v[axis];
+        float y = m->v[4 + axis];
+        float z = m->v[8 + axis];
+        float e = fabsf(x) * extent.x + fabsf(y) * extent.y + fabsf(z) * extent.z;
         radius += e * e;
+        out[axis] = x * center.x + y * center.y + z * center.z + m->v[12 + axis];
     }
 
-    out[0] = world.x;
-    out[1] = world.y;
-    out[2] = world.z;
     out[3] = sqrtf(radius);
 }
 
