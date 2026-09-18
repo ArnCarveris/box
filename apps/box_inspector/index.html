@@ -114,6 +114,10 @@ main {
 .log .out { color: var(--ink); }
 .log .err { color: var(--bad); }
 .log .info { color: var(--ink-3); }
+.log .thumb {
+  max-width: 160px; height: auto; display: block; margin: 4px 0;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--stage);
+}
 .input-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
 .input-row span { color: var(--ink-3); font-family: var(--mono); }
 #cmd { flex: 1; background: none; border: 0; font-family: var(--mono); font-size: 12px; padding: 2px 0; }
@@ -125,6 +129,7 @@ main {
 }
 #shot { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 #canvas { width: 100%; height: 100%; display: block; }
+.stage.overlay #shot { position: absolute; inset: 0; margin: auto; background: var(--stage); }
 #canvas:focus { outline: none; }
 .stage .placeholder { color: var(--ink-3); font-size: 12px; padding: 20px; text-align: center; }
 .caption {
@@ -198,6 +203,9 @@ var BoxInspector = (function () {
 var IMAGE_TYPE = "image/png";
 var POST_THRESHOLD = 1500;
 var HISTORY_MAX = 200;
+var IMAGE_FILE = /\.(png|jpe?g|gif|webp|bmp)$/i;
+var RESOURCE_TRIES = 6;
+var RESOURCE_DELAY = 500;
 
 function isImage(type) {
   return String(type || "").split(";")[0].trim() === IMAGE_TYPE;
@@ -236,6 +244,7 @@ function httpTransport(endpoint, io) {
   return {
     mode: "http",
     label: base,
+    url: function (path) { return joinUrl(base, path); },
     request: function (method, path, body) {
       var init = { method: method, cache: "no-store" };
       if (body) {
@@ -264,6 +273,7 @@ function wasmTransport(boxRequest) {
   return {
     mode: "wasm",
     label: "wasm image",
+    url: function () { return null; },
     request: function (method, path, body) {
       return new Promise(function (resolve) {
         var reply = parseReply(boxRequest(method, path, body || ""));
@@ -283,6 +293,46 @@ function execRequest(session, line) {
     return { method: "POST", path: base, body: String(line) };
   }
   return { method: "GET", path: base + "&cmd=" + encodeURIComponent(line), body: "" };
+}
+
+function resourcePaths(text) {
+  var out = [];
+  String(text == null ? "" : text).split("\n").forEach(function (line) {
+    var file = line.trim();
+    if (file && !/\s/.test(file) && IMAGE_FILE.test(file) && file.indexOf("..") < 0) {
+      out.push(file);
+    }
+  });
+  return out;
+}
+
+function resourcePath(session, file) {
+  return "/resource/" + String(file).split("/").map(encodeURIComponent).join("/") +
+    "?session=" + encodeURIComponent(session);
+}
+
+function fetchResource(transport, session, file, options) {
+  var opts = options || {};
+  var attempts = opts.attempts || RESOURCE_TRIES;
+  var delay = opts.delay === undefined ? RESOURCE_DELAY : opts.delay;
+  var wait = opts.wait || function (ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  };
+  var path = resourcePath(session, file);
+  var attempt = function (left) {
+    return transport.request("GET", path, "").then(function (reply) {
+      if (reply.image || left <= 1) {
+        return reply;
+      }
+      return wait(delay).then(function () { return attempt(left - 1); });
+    });
+  };
+
+  return attempt(attempts);
+}
+
+function localCommand(line) {
+  return String(line == null ? "" : line).trim() === "clear" ? "clear" : null;
 }
 
 function capturePath(session, camera) {
@@ -440,6 +490,10 @@ return {
   httpTransport: httpTransport,
   wasmTransport: wasmTransport,
   execRequest: execRequest,
+  localCommand: localCommand,
+  resourcePaths: resourcePaths,
+  resourcePath: resourcePath,
+  fetchResource: fetchResource,
   capturePath: capturePath,
   closePath: closePath,
   parseFrame: parseFrame,
@@ -466,6 +520,7 @@ var I = BoxInspector;
 var STORE_KEY = "box-inspector";
 var DEFAULT_ENDPOINT = "http://localhost:27750";
 var DEFAULT_IMAGE = "box_app.js";
+var APP_COMMAND = "get box.core.App App";
 
 var storage = null;
 try { storage = window.localStorage; } catch (e) { storage = null; }
@@ -491,6 +546,7 @@ var state = {
   busy: false,
   paused: false,
   live: false,
+  canvasLive: false,
   imageUrl: null,
   runtime: null
 };
@@ -541,12 +597,50 @@ function append(kind, text) {
 
 function showReply(reply) {
   append(reply.status >= 400 ? "err" : "out", reply.body);
+  if (reply.status < 400) {
+    showResources(reply.body);
+  }
+}
+
+function showResources(text) {
+  if (!state.session || !state.transport) {
+    return;
+  }
+  var session = state.session.name();
+  I.resourcePaths(text).forEach(function (file) {
+    var line = document.createElement("div");
+    line.className = "line info";
+    line.textContent = file + ": pending";
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    I.fetchResource(state.transport, session, file).then(function (reply) {
+      if (!reply.image) {
+        line.textContent = file + ": " + (reply.status === 404 ? "not found" : "pending");
+        return;
+      }
+      var link = document.createElement("a");
+      link.href = state.transport.url(I.resourcePath(session, file)) || reply.image;
+      link.target = "_blank";
+      link.rel = "noopener";
+      var img = document.createElement("img");
+      img.className = "thumb";
+      img.src = reply.image;
+      img.alt = file;
+      link.appendChild(img);
+      line.textContent = "";
+      line.appendChild(link);
+      logEl.scrollTop = logEl.scrollHeight;
+    }).catch(function (err) {
+      line.textContent = file + ": " + (err && err.message ? err.message : err);
+    });
+  });
 }
 
 function showStage(what) {
-  placeholderEl.hidden = what !== "none";
+  placeholderEl.hidden = what !== "none" || state.canvasLive;
   shotEl.hidden = what !== "image";
-  canvasEl.hidden = what !== "canvas";
+  canvasEl.hidden = !state.canvasLive;
+  stageEl.classList.toggle("overlay", state.canvasLive && what === "image");
 }
 
 function setImage(url) {
@@ -577,7 +671,7 @@ function startTimer() {
 }
 
 function readFrame() {
-  return state.session.exec("get App").then(function (reply) {
+  return state.session.exec(APP_COMMAND).then(function (reply) {
     var frame = I.parseFrame(reply.body);
     frameEl.textContent = frame === null ? "" : "frame " + frame;
   }).catch(function () {
@@ -620,6 +714,7 @@ function loadWasm(url, scene) {
         reject(new Error("no module factory '" + name + "' in " + url));
         return;
       }
+      state.canvasLive = true;
       showStage("canvas");
       factory({
         canvas: canvasEl,
@@ -685,6 +780,7 @@ function connect() {
     return state.session.exec("help");
   }).then(function (reply) {
     showReply(reply);
+    append("info", "clear (page only) - empty this log pane");
     startTimer();
   }).catch(function (err) {
     state.transport = null;
@@ -717,9 +813,13 @@ function disconnect(quiet) {
 }
 
 function send(line) {
-  append("cmd", "$ " + line);
   history.push(line);
   persist();
+  if (I.localCommand(line) === "clear") {
+    logEl.textContent = "";
+    return;
+  }
+  append("cmd", "$ " + line);
   state.session.exec(line).then(showReply).catch(function (err) {
     append("err", String(err && err.message ? err.message : err));
   });

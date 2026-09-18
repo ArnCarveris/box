@@ -238,9 +238,55 @@ describe("Paths", () => {
     equal(req.body, line, "body");
   });
 
+  test("bare_clear_is_handled_by_the_page", () => {
+    equal(I.localCommand("clear"), "clear", "bare clear");
+    equal(I.localCommand("  clear  "), "clear", "padded clear");
+    equal(I.localCommand("clear camera"), null, "clear with an argument goes to the engine");
+    equal(I.localCommand("ls"), null, "other commands go to the engine");
+  });
+
   test("capture_takes_an_optional_camera", () => {
     equal(I.capturePath("s1", ""), "/capture?session=s1", "without camera");
     equal(I.capturePath("s1", "scene.cam"), "/capture?session=s1&camera=scene.cam", "with camera");
+  });
+
+  test("resource_lines_are_detected", () => {
+    equal(I.resourcePaths("capture_12_0.png\ncapture_12_1.png\n"),
+      ["capture_12_0.png", "capture_12_1.png"], "capture output");
+    equal(I.resourcePaths("camera\nok"), [], "plain output");
+    equal(I.resourcePaths("wrote a file to shot.png"), [], "line with spaces");
+    equal(I.resourcePaths("shots/live.PNG\nnotes.txt"), ["shots/live.PNG"], "nested path");
+    equal(I.resourcePaths("../secret.png"), [], "path that escapes the folder");
+  });
+
+  test("resource_path_carries_the_session", () => {
+    equal(I.resourcePath("s1", "capture_12_0.png"),
+      "/resource/capture_12_0.png?session=s1", "path");
+  });
+
+  test("resource_is_retried_until_it_is_ready", () => {
+    const replies = ["404\ntext/plain\nresource not found", "404\ntext/plain\nresource not found",
+      "200\nimage/png\niVBORw0KGgo="];
+    const request = stubBoxRequest(() => replies.shift());
+    const waits = [];
+    return I.fetchResource(I.wasmTransport(request), "s1", "capture_12_0.png",
+      { attempts: 5, delay: 500, wait: (ms) => { waits.push(ms); return Promise.resolve(); } })
+      .then((reply) => {
+        equal(request.calls.length, 3, "requests");
+        equal(waits, [500, 500], "retry delays");
+        equal(reply.image, "data:image/png;base64,iVBORw0KGgo=", "image");
+      });
+  });
+
+  test("resource_gives_up_after_the_last_attempt", () => {
+    const request = stubBoxRequest("404\ntext/plain\nresource not found");
+    return I.fetchResource(I.wasmTransport(request), "s1", "capture_12_0.png",
+      { attempts: 3, delay: 0, wait: () => Promise.resolve() })
+      .then((reply) => {
+        equal(request.calls.length, 3, "requests");
+        equal(reply.status, 404, "status");
+        equal(reply.image, null, "no image");
+      });
   });
 
   test("frame_is_read_from_get_app", () => {
@@ -361,7 +407,7 @@ describe("Query", () => {
 /* ---------- run ---------- */
 
 async function run() {
-  const started = Date.now();
+  const started = process.hrtime.bigint();
   for (const item of cases) {
     const at = process.hrtime.bigint();
     let status = "pass";
@@ -387,7 +433,7 @@ async function run() {
     pass,
     fail,
     empty: 0,
-    elapsed: Math.round((Date.now() - started) / 10) / 100,
+    elapsed: Math.round(Number(process.hrtime.bigint() - started) / 1e3) / 1e6,
     tests: results
   };
 
