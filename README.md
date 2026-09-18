@@ -54,6 +54,10 @@ PNG once and removes the component again.
 hundred colored point lights and a handful of spot lights, which the clustered
 forward path shades in one pass.
 
+`test/integration/visual/pbr_spheres.flecs` is the image based lighting check: a
+7 by 7 grid of spheres with roughness across the columns and metallic up the
+rows under an `EnvironmentLight` with a blue sky and a warm ground.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.

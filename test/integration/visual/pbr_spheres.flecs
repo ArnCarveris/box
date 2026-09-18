@@ -1,0 +1,38 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ {
+  EnvironmentLight: {
+    sky_color: {110, 160, 235}
+    ground_color: {150, 110, 70}
+    intensity: 1.4
+  }
+}
+
+camera {
+  Position: {0, 0, -23}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 42}
+}
+
+sun {
+  Rotation: {0.8, -0.5, 0}
+  DirectionalLight: {intensity: 0.6}
+  Rgb: {255, 244, 224}
+}
+
+grid {
+  for row in 0..7 {
+    for col in 0..7 {
+      _ {
+        Position: {col * 2.2 - 6.6, row * 2.2 - 6.6, 0}
+        Sphere: {segments: 48, smooth: true, radius: 0.9}
+        Rgb: {230, 190, 130}
+        PbrMaterial: {metallic: row * 0.1667, roughness: 0.05 + col * 0.15}
+      }
+    }
+  }
+}
