@@ -1,0 +1,17 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-18T19:43:24Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.093118,
+  "tests": [
+    {"suite": "Stats", "case": "setting_the_component_imports_the_addon", "status": "pass", "elapsed": 0.011174},
+    {"suite": "Stats", "case": "collects_after_the_period", "status": "pass", "elapsed": 0.011526},
+    {"suite": "Stats", "case": "period_holds_back_the_collection", "status": "pass", "elapsed": 0.011764},
+    {"suite": "Stats", "case": "entity_count_follows_the_world", "status": "pass", "elapsed": 0.011643},
+    {"suite": "Stats", "case": "frame_time_window_is_averaged", "status": "pass", "elapsed": 0.031982},
+    {"suite": "Stats", "case": "slowest_systems_are_listed", "status": "pass", "elapsed": 0.093027},
+    {"suite": "Stats", "case": "removing_the_component_stops_collection", "status": "pass", "elapsed": 0.011899}
+  ]
+}
