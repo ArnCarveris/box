@@ -22,7 +22,7 @@ template Cluster {
 
 sun {
   Rotation: {0.9, -0.6, 0}
-  DirectionalLight: {intensity: 3}
+  DirectionalLight: {intensity: 1}
 }
 
 camera {

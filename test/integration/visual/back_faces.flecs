@@ -23,7 +23,7 @@ camera {
 
 sun {
   Rotation: {0.85, -0.5, 0}
-  DirectionalLight: {intensity: 3}
+  DirectionalLight: {intensity: 1}
 }
 
 floor {
