@@ -25,7 +25,10 @@ Rules for adding one:
 - The captured frame is an early one, so anything that needs history across
   frames cannot be guarded by a baseline; cover that with a C test.
 - The scene is deterministic run to run; every scene below renders within the
-  tolerance on repeat runs.
+  tolerance on repeat runs. Headless frames step with a fixed delta and the
+  runner's harness sets `ScriptSettings: {enabled: false}` so templates expand
+  in one frame; `budget_ms: 0` with a `templates_per_frame` limit is the
+  deterministic way to test incremental loading itself.
 - A task only inspects and updates the baseline of the scene it works on; every
   other scene must keep matching.
 

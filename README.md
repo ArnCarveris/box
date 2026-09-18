@@ -177,6 +177,10 @@ prefab and a template; the runner copies the PNGs of a session to
 `test/integration/out/<scene>_<image>.png` while the scene runs, because the
 process removes its folder when it exits.
 
+Integration harnesses disable incremental template loading (`ScriptSettings: {enabled: false}`)
+so captures and command logs are deterministic; `templates_per_frame` with `budget_ms: 0` gives a
+deterministic incremental run when that is what a test needs.
+
 ## Benchmarks
 
 `bench/<module>` holds one bake3 bench project per engine module, mirroring the
