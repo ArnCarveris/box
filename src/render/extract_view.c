@@ -105,7 +105,6 @@ static void box_view_collect(
     ecs_world_t *world,
     RenderState *state)
 {
-    ecs_vec_clear(&state->view_list);
     ecs_iter_t it = ecs_query_iter(world, state->views);
     while (ecs_query_next(&it)) {
         View *view = ecs_field(&it, View, 0);
@@ -471,8 +470,14 @@ ecs_entity_t box_render_collect_views(
     box_packet_t *p)
 {
     ecs_entity_t result = box_view_capture(world, state, p);
-    box_view_collect(world, state);
-    box_view_targets(world, state, p);
+    ecs_vec_clear(&state->view_list);
+    if (state->view_count) {
+        box_view_collect(world, state);
+    }
+
+    if (state->target_live || ecs_vec_count(&state->dead_targets)) {
+        box_view_targets(world, state, p);
+    }
 
     return result;
 }
@@ -521,14 +526,31 @@ done:
     }
 }
 
-/** RenderTargetImpl on_remove observer: queue the destroy of its handle.
+/** ViewImpl observer: count the views so an empty world skips the view query.
  *
- * @param it Iterator over the removed components
+ * @param it Iterator over the added or removed components
  */
-static void BoxRenderTargetRemove(
+static void BoxRenderViewCount(
     ecs_iter_t *it)
 {
     RenderState *state = box_render_state(it->world);
+    state->view_count += it->event == EcsOnAdd ? it->count : -it->count;
+}
+
+/** RenderTargetImpl observer: count the targets and queue the destroy of a handle.
+ *
+ * @param it Iterator over the added or removed components
+ */
+static void BoxRenderTargetCount(
+    ecs_iter_t *it)
+{
+    RenderState *state = box_render_state(it->world);
+    if (it->event == EcsOnAdd) {
+        state->target_live += it->count;
+        goto done;
+    }
+
+    state->target_live -= it->count;
     RenderTargetImpl *impl = ecs_field(it, RenderTargetImpl, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
@@ -536,14 +558,22 @@ static void BoxRenderTargetRemove(
             ecs_vec_append_t(NULL, &state->dead_targets, uint32_t)[0] = impl[i].handle;
         }
     }
+
+done:
+    return;
 }
 
-void box_render_target_init(
+void box_render_view_init(
     ecs_world_t *world)
 {
     ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ViewImpl) }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxRenderViewCount
+    });
+    ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(RenderTargetImpl) }},
-        .events = { EcsOnRemove },
-        .callback = BoxRenderTargetRemove
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxRenderTargetCount
     });
 }

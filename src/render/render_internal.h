@@ -80,6 +80,8 @@ typedef struct RenderState {
     ecs_vec_t view_env;       /**< box_view_env_t of the previous packet, per view index */
     ecs_vec_t dead_targets;   /**< uint32_t render target handles waiting for the next packet */
     uint32_t target_count;    /**< Render target handles handed out so far */
+    int32_t view_count;       /**< View entities the world holds */
+    int32_t target_live;      /**< RenderTarget entities the world holds */
     ecs_query_t *views;       /**< View entities */
     ecs_query_t *targets;     /**< Render target entities */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
@@ -456,11 +458,11 @@ void box_render_extract_views(
     box_packet_t *p,
     ecs_entity_t capture);
 
-/** Register the observer that releases the handle of a removed render target.
+/** Register the observers that count the views and release removed targets.
  *
  * @param world The world
  */
-void box_render_target_init(
+void box_render_view_init(
     ecs_world_t *world);
 
 /** Copy the bake settings into the packet and requeue every instance when they toggled.

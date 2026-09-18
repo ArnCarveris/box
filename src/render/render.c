@@ -193,7 +193,7 @@ void BoxRenderImport(
     ecs_vec_init_t(NULL, &state->dead_targets, uint32_t, 0);
 
     box_render_texture_init(world);
-    box_render_target_init(world);
+    box_render_view_init(world);
     box_render_layers_init(world);
     box_render_instance_init(world);
     box_render_extract_init(world);
