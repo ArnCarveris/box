@@ -103,4 +103,10 @@ void BoxCommandImport(
     box_terminal_init(world);
     box_dispatch_init(world);
     box_command_builtin_init(world);
+    box_shell_init(world);
+    box_search_init(world);
+    box_logs_init(world);
+    box_script_init(world);
+    box_capture_init(world);
+    box_http_init(world);
 }

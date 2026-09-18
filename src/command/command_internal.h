@@ -131,4 +131,46 @@ void box_dispatch_init(
 void box_command_builtin_init(
     ecs_world_t *world);
 
+/** Register the shell command group.
+ *
+ * @param world The world
+ */
+void box_shell_init(
+    ecs_world_t *world);
+
+/** Register the search command group.
+ *
+ * @param world The world
+ */
+void box_search_init(
+    ecs_world_t *world);
+
+/** Register the logs command group.
+ *
+ * @param world The world
+ */
+void box_logs_init(
+    ecs_world_t *world);
+
+/** Register the script command group.
+ *
+ * @param world The world
+ */
+void box_script_init(
+    ecs_world_t *world);
+
+/** Register the capture command group.
+ *
+ * @param world The world
+ */
+void box_capture_init(
+    ecs_world_t *world);
+
+/** Register the http command group.
+ *
+ * @param world The world
+ */
+void box_http_init(
+    ecs_world_t *world);
+
 #endif
