@@ -67,7 +67,10 @@ through `PbrTextures`. `apps/box_app/etc/textures/` holds the PNGs it loads, whi
 `test/integration/visual/svg_icons.flecs` is the SVG check: the three hand written
 icons in `apps/box_app/etc/svg/` rasterized by `Svg` at 64, 256 and 1024 pixels and
 shown side by side on quads, so the same vector art is blocky on the left and crisp
-on the right.
+on the right. `svg_text`, `svg_mask`, `svg_clip`, `svg_gradient` and `svg_filter` are
+the resvg feature checks, one per SVG in `apps/box_app/etc/svg/`, with text set in the
+fallback font `apps/box_app/etc/fonts/B612-Regular.ttf` that the engine loads next to
+the system fonts.
 
 `test/integration/visual/tiling.flecs` is the tiling check: one checker texture
 at one meter over boxes of one, two and six meters, a cylinder and a sphere, with a
