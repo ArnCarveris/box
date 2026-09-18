@@ -11,7 +11,7 @@ camera {
 }
 
 for i in 0..100000 {
-  static_box() {
+  _ {
     Position: {(i % 400) - 200, ((i / 400) % 25) * 2, (i / 10000) * 6 - 30}
     Box: {0.8, 0.8, 0.8}
     Rgb: {(i * 37) % 256, (i * 91) % 256, (i * 53) % 256}
@@ -20,7 +20,7 @@ for i in 0..100000 {
 }
 
 for i in 0..10000 {
-  changing_box() {
+  _ {
     Position: {(i % 100) - 50, 60, (i / 100) - 50}
     DynamicMaterial
     Box: {0.8, 0.8, 0.8}

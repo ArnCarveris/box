@@ -221,7 +221,15 @@ int main(
         goto fini;
     }
 
-    printf("loaded %s in %.2f s\n", bench.scene, ecs_time_measure(&load_start));
+    int32_t loaded = ecs_count_id(world, ecs_id(RenderMesh));
+    printf("loaded %s in %.2f s, %d renderable entities\n", bench.scene,
+        ecs_time_measure(&load_start), loaded);
+    if (!loaded) {
+        ecs_err("scene '%s' has no renderable entities", bench.scene);
+        result = -1;
+        goto fini;
+    }
+
     bench.statics = ecs_query(world, {
         .expr = "box.render.RenderMesh, box.transform.Position, "
             "!box.transform.DynamicTransform(self|up)"
