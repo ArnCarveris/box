@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Box Project</title>
+<style>
+:root {
+  --bg: #f4f4f1;
+  --surface: #ffffff;
+  --surface-2: #f9f9f7;
+  --border: #e3e2dc;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #8a8983;
+  --accent: #2a78d6;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --bad: #d63a2a;
+  --pending: #b3b2ab;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.18);
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+:root:not([data-theme="light"]) { color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+    --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
+  --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+  --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: var(--accent); }
+
+header {
+  display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+header .meta { color: var(--ink-3); font-size: 12px; }
+.tiles { display: flex; gap: 8px; margin-left: auto; }
+.tile {
+  display: flex; flex-direction: column; padding: 6px 12px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); min-width: 84px;
+}
+.tile b { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tile span { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.tabs { display: flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.tabs button { padding: 4px 12px; border-radius: 6px; color: var(--ink-2); }
+.tabs button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.icon-btn { padding: 6px; border-radius: 8px; color: var(--ink-2); }
+.icon-btn:hover { background: var(--surface-2); }
+
+main { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+aside { border-right: 1px solid var(--border); overflow: auto; padding: 12px; background: var(--surface); }
+aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin: 8px 8px 6px; font-weight: 600; }
+.epic {
+  display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 10px; margin-bottom: 4px;
+}
+.epic:hover { background: var(--surface-2); }
+.epic.active { background: var(--surface-2); outline: 1px solid var(--border); }
+.epic .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.epic .sub { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+.bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 8px; display: flex; overflow: hidden; gap: 1px; }
+.bar i { display: block; height: 100%; }
+.bar .done { background: var(--good); }
+.bar .active { background: var(--accent); }
+
+.content { overflow: auto; min-height: 0; position: relative; }
+.board { padding: 20px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-content: start; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.card.pending { opacity: .85; }
+.card-head { display: flex; align-items: flex-start; gap: 10px; }
+.card-head h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; cursor: pointer; }
+.card-head h3:hover { color: var(--accent); }
+.brief { color: var(--ink-2); font-size: 13px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; color: var(--ink-2);
+}
+.chip svg { width: 10px; height: 10px; }
+.chip.complete { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.chip.in-progress { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.chip.pending { color: var(--ink-3); border-color: var(--border); }
+.chip.discarded { color: var(--ink-3); border-color: var(--border); text-decoration: line-through; }
+.kind { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.subtasks { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 0; padding: 0; list-style: none; }
+.subtasks li {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.subtasks li:hover { background: var(--surface-2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pending); flex: none; }
+.dot.complete { background: var(--good); }
+.dot.in-progress { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.dot.discarded { background: transparent; border: 1px solid var(--ink-3); }
+.subtasks li .t { flex: 1; }
+.subtasks li.discarded .t { text-decoration: line-through; color: var(--ink-3); }
+.subtasks li time { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tests { display: flex; gap: 10px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; align-items: center; }
+.tests b.ok { color: var(--good); } .tests b.bad { color: var(--bad); } .tests b.empty { color: var(--warn); }
+.deps { font-size: 12px; color: var(--ink-3); }
+.deps code { font-family: var(--mono); font-size: 11px; }
+.empty-state { color: var(--ink-3); padding: 60px; text-align: center; }
+
+.panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 90%); background: var(--surface);
+  border-left: 1px solid var(--border); box-shadow: var(--shadow); overflow: auto; padding: 20px 24px;
+  transform: translateX(100%); transition: transform .18s ease; z-index: 5;
+}
+.panel.open { transform: none; }
+.panel .close { position: absolute; top: 12px; right: 12px; }
+.panel .path { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.panel h1 { font-size: 20px; margin: 4px 0 8px; }
+.panel .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.md { font-size: 14px; }
+.md h1 { display: none; }
+.md h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); margin: 18px 0 6px; }
+.md p { margin: 0 0 10px; }
+.md ul { padding-left: 20px; margin: 0 0 10px; }
+.md code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+.md pre { background: var(--surface-2); padding: 10px 12px; border-radius: 8px; overflow: auto; font-size: 12px; }
+.deliverables { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.deliverables li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.deliverables li .n { flex: 1; font-family: var(--mono); font-size: 12px; }
+.deliverables img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
+.readme-deliverable { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+
+.timeline { display: grid; grid-template-columns: 300px 1fr; height: 100%; min-height: 0; }
+.tl-labels { overflow: hidden; border-right: 1px solid var(--border); background: var(--surface); }
+.tl-scroll { overflow: auto; position: relative; }
+.tl-row { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 13px; }
+.tl-row.epic-row { background: var(--surface-2); font-weight: 600; }
+.tl-row.task-row { padding-left: 24px; }
+.tl-row.sub-row { padding-left: 44px; color: var(--ink-2); font-size: 12px; }
+.tl-row .lbl { overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.tl-row .lbl:hover { color: var(--accent); }
+.tl-head { position: sticky; top: 0; height: 40px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 2; }
+.tl-head .day { position: absolute; top: 0; height: 100%; border-left: 1px solid var(--border); padding: 4px 6px; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.tl-head .day small { display: block; color: var(--ink-3); }
+.tl-body { position: relative; }
+.tl-grid-row { height: 30px; border-bottom: 1px solid var(--border); position: relative; }
+.tl-grid-row.epic-row { background: var(--surface-2); }
+.tl-bar { position: absolute; top: 8px; height: 14px; border-radius: 4px; background: var(--pending); min-width: 3px; cursor: pointer; }
+.tl-bar.complete { background: var(--good); }
+.tl-bar.in-progress { background: var(--accent); }
+.tl-bar.in-progress::after {
+  content: ""; position: absolute; right: -1px; top: 0; bottom: 0; width: 14px; border-radius: 0 4px 4px 0;
+  background: repeating-linear-gradient(135deg, transparent 0 3px, rgba(255,255,255,.45) 3px 6px);
+}
+.tl-bar.discarded { background: transparent; border: 1px dashed var(--ink-3); }
+.tl-bar.epic-bar { top: 11px; height: 8px; opacity: .6; }
+.tl-now { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid var(--bad); z-index: 1; pointer-events: none; }
+.tl-vline { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); pointer-events: none; }
+.tl-tools { position: absolute; right: 16px; top: 8px; z-index: 3; display: flex; gap: 4px; }
+.tl-tools button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+.tooltip {
+  position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 6px;
+  font-size: 12px; z-index: 20; display: none; white-space: nowrap; box-shadow: var(--shadow);
+}
+.tooltip b { display: block; }
+@media (max-width: 800px) {
+  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  aside { border-right: 0; border-bottom: 1px solid var(--border); max-height: 200px; }
+  .tiles { display: none; }
+  .timeline { grid-template-columns: 160px 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Box</h1>
+  <span class="meta" id="generated"></span>
+  <div class="tabs">
+    <button data-view="board" class="active">Board</button>
+    <button data-view="timeline">Timeline</button>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <button class="icon-btn" id="theme" title="Toggle theme">◐</button>
+</header>
+<main>
+  <aside>
+    <h2>Epics</h2>
+    <div id="epics"></div>
+  </aside>
+  <div class="content" id="content">
+    <div id="board" class="board"></div>
+    <div id="timeline" class="timeline" hidden></div>
+    <div class="panel" id="panel"></div>
+  </div>
+</main>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const state = { data: null, epic: null, view: "board", zoom: 6, item: null };
+const ICONS = {
+  complete: '<svg viewBox="0 0 10 10"><path d="M1.5 5.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  "in progress": '<svg viewBox="0 0 10 10"><path d="M2 1.5v7l6-3.5z" fill="currentColor"/></svg>',
+  pending: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  discarded: '<svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+};
+const cls = s => s.replace(" ", "-");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtDate = iso => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const dur = (a, b) => {
+  if (!a) return "";
+  const ms = (b ? new Date(b) : new Date()) - new Date(a);
+  const h = ms / 36e5;
+  if (h < 1) return Math.round(ms / 6e4) + "m";
+  if (h < 48) return h.toFixed(1) + "h";
+  return (h / 24).toFixed(1) + "d";
+};
+
+function chip(status) {
+  return `<span class="chip ${cls(status)}">${ICONS[status] || ""}${esc(status)}</span>`;
+}
+
+function markdown(src) {
+  const lines = src.split("\n");
+  let html = "", inList = false, inCode = false;
+  const inline = t => esc(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  for (const line of lines) {
+    if (line.startsWith("```")) { inCode = !inCode; html += inCode ? "<pre>" : "</pre>"; continue; }
+    if (inCode) { html += esc(line) + "\n"; continue; }
+    const li = line.match(/^\s*[-*] (.*)/);
+    if (li) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${inline(li[1])}</li>`; continue; }
+    if (inList) { html += "</ul>"; inList = false; }
+    const h = line.match(/^(#+) (.*)/);
+    if (h) { html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; continue; }
+    if (line.trim()) html += `<p>${inline(line)}</p>`;
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+
+function flatten(items, out = []) {
+  for (const it of items) { out.push(it); flatten(it.children, out); }
+  return out;
+}
+
+function counts(items) {
+  const c = { complete: 0, "in progress": 0, pending: 0, discarded: 0, total: 0 };
+  for (const it of items) { c[it.status] = (c[it.status] || 0) + 1; c.total++; }
+  return c;
+}
+
+function findItem(path) {
+  return flatten(state.data.epics).find(i => i.path === path);
+}
+
+function testSummary(item) {
+  const t = item.deliverables.map(d => d.tests).filter(Boolean);
+  if (!t.length) return "";
+  const last = t[t.length - 1];
+  return `<div class="tests" title="${esc(last.project)} · ${esc(last.timestamp)}">
+    <span>${last.count} tests</span>
+    <b class="ok">${last.pass} pass</b>
+    ${last.fail ? `<b class="bad">${last.fail} fail</b>` : ""}
+    ${last.empty ? `<b class="empty">${last.empty} empty</b>` : ""}
+    <span>${(+last.elapsed).toFixed(1)}s</span></div>`;
+}
+
+function renderHeader() {
+  const all = flatten(state.data.epics);
+  const tasks = all.filter(i => i.level === "task");
+  const subs = all.filter(i => i.level === "subtask");
+  const ct = counts(tasks), cs = counts(subs);
+  document.getElementById("tiles").innerHTML = `
+    <div class="tile"><b>${state.data.epics.length}</b><span>epics</span></div>
+    <div class="tile"><b>${ct.complete}<small style="color:var(--ink-3)">/${ct.total}</small></b><span>tasks done</span></div>
+    <div class="tile"><b>${cs.complete}<small style="color:var(--ink-3)">/${cs.total}</small></b><span>subtasks done</span></div>
+    <div class="tile"><b>${ct["in progress"] + cs["in progress"]}</b><span>active</span></div>`;
+  document.getElementById("generated").textContent = "updated " + new Date(state.data.generated).toLocaleTimeString();
+}
+
+function renderEpics() {
+  const el = document.getElementById("epics");
+  el.innerHTML = state.data.epics.map(e => {
+    const c = counts(flatten(e.children).filter(i => i.level === "task"));
+    const pct = n => c.total ? (100 * n / c.total) + "%" : "0%";
+    return `<button class="epic ${e.path === state.epic ? "active" : ""}" data-epic="${esc(e.path)}">
+      <div class="name"><span class="dot ${cls(e.status)}"></span>${esc(e.readme.title || e.name)}</div>
+      <div class="sub">${c.complete}/${c.total} tasks · ${esc(e.status)}</div>
+      <div class="bar"><i class="done" style="width:${pct(c.complete)}"></i><i class="active" style="width:${pct(c["in progress"])}"></i></div>
+    </button>`;
+  }).join("") || `<div class="empty-state">No epics yet</div>`;
+  el.querySelectorAll(".epic").forEach(b => b.onclick = () => { state.epic = b.dataset.epic; render(); });
+}
+
+function renderBoard() {
+  const board = document.getElementById("board");
+  const epic = state.data.epics.find(e => e.path === state.epic);
+  if (!epic) { board.innerHTML = `<div class="empty-state">Select an epic</div>`; return; }
+  const cards = epic.children.map(t => `
+    <div class="card ${cls(t.status)}">
+      <div class="card-head">
+        <h3 data-item="${esc(t.path)}">${esc(t.readme.title || t.name)}</h3>
+        ${chip(t.status)}
+      </div>
+      <div class="kind">${esc(t.kind)} · ${esc(t.name)}${t.start_time ? " · " + dur(t.start_time, t.end_time) : ""}</div>
+      <div class="brief">${esc(t.readme.brief || "")}</div>
+      ${t.dependencies.length ? `<div class="deps">after ${t.dependencies.map(d => `<code>${esc(d)}</code>`).join(", ")}</div>` : ""}
+      ${testSummary(t)}
+      ${t.children.length ? `<ul class="subtasks">${t.children.map(s => `
+        <li class="${cls(s.status)}" data-item="${esc(s.path)}">
+          <span class="dot ${cls(s.status)}"></span><span class="t">${esc(s.readme.title || s.name)}</span>
+          <time>${s.start_time ? dur(s.start_time, s.end_time) : ""}</time>
+        </li>`).join("")}</ul>` : ""}
+    </div>`);
+  const epicCard = `
+    <div class="card" style="grid-column: 1 / -1">
+      <div class="card-head"><h3 data-item="${esc(epic.path)}">${esc(epic.readme.title || epic.name)}</h3>${chip(epic.status)}</div>
+      <div class="brief">${esc(epic.readme.brief || "")}</div>
+      ${testSummary(epic)}
+    </div>`;
+  board.innerHTML = epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
+  board.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
+}
+
+function openPanel(path) {
+  state.item = path;
+  const item = findItem(path);
+  const panel = document.getElementById("panel");
+  if (!item) { panel.classList.remove("open"); return; }
+  const deliverables = item.deliverables.map(d => {
+    const img = /\.(png|jpe?g|gif|webp|svg)$/i.test(d.name);
+    const t = d.tests;
+    return `<li><span class="n"><a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a></span>
+      ${t ? `<span class="tests"><b class="ok">${t.pass}</b>${t.fail ? `<b class="bad">${t.fail}</b>` : ""}${t.empty ? `<b class="empty">${t.empty}</b>` : ""}</span>` : `<span style="color:var(--ink-3);font-size:11px">${(d.size / 1024).toFixed(1)} KB</span>`}
+      </li>${img ? `<li style="display:block;border:0;padding:0"><img src="${esc(d.url)}" alt="${esc(d.name)}"></li>` : ""}`;
+  }).join("");
+  panel.innerHTML = `
+    <button class="close icon-btn" id="close">✕</button>
+    <div class="path">${esc(item.level)} · ${esc(item.path)}</div>
+    <h1>${esc(item.readme.title || item.name)}</h1>
+    <div class="meta">${chip(item.status)}<span class="kind">${esc(item.kind)}</span>
+      <span style="color:var(--ink-3);font-size:12px">${item.start_time ? fmtDate(item.start_time) + " → " + (item.end_time ? fmtDate(item.end_time) : "now") + " (" + dur(item.start_time, item.end_time) + ")" : "not started"}</span></div>
+    ${item.dependencies.length ? `<div class="deps">Depends on ${item.dependencies.map(d => `<code>${esc(d)}</code>`).join(", ")}</div>` : ""}
+    <div class="md">${markdown(item.readme.markdown)}</div>
+    ${deliverables ? `<h2>Deliverables</h2><ul class="deliverables">${deliverables}</ul>` : ""}
+    ${item.children.length ? `<h2>${item.children[0].level}s</h2><ul class="subtasks">${item.children.map(s => `
+      <li class="${cls(s.status)}" data-item="${esc(s.path)}"><span class="dot ${cls(s.status)}"></span><span class="t">${esc(s.readme.title || s.name)}</span><time>${s.start_time ? dur(s.start_time, s.end_time) : ""}</time></li>`).join("")}</ul>` : ""}`;
+  panel.classList.add("open");
+  document.getElementById("close").onclick = () => { state.item = null; panel.classList.remove("open"); };
+  panel.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
+  const readme = item.deliverables.find(d => /readme\.md$/i.test(d.name));
+  if (readme) fetch(readme.url).then(r => r.text()).then(t => {
+    const div = document.createElement("div");
+    div.className = "readme-deliverable md";
+    div.innerHTML = `<h2>Completion report</h2>` + markdown(t);
+    panel.querySelector(".deliverables")?.after(div);
+  });
+}
+
+function renderTimeline() {
+  const tl = document.getElementById("timeline");
+  const rows = [];
+  for (const e of state.data.epics) {
+    rows.push({ item: e, kind: "epic-row" });
+    for (const t of e.children) {
+      rows.push({ item: t, kind: "task-row" });
+      for (const s of t.children) rows.push({ item: s, kind: "sub-row" });
+    }
+  }
+  const now = Date.now();
+  const times = flatten(state.data.epics).flatMap(i => [i.start_time, i.end_time]).filter(Boolean).map(t => +new Date(t));
+  const t0 = new Date(Math.min(now, ...times)); t0.setHours(0, 0, 0, 0);
+  const t1 = new Date(Math.max(now, ...times) + 36e5 * 12);
+  const pxPerHour = state.zoom;
+  const x = t => (t - t0) / 36e5 * pxPerHour;
+  const width = Math.max(x(t1), 800);
+  const days = [];
+  for (let d = new Date(t0); d < t1; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+  const bar = it => {
+    if (!it.start_time) return "";
+    const s = +new Date(it.start_time), e = it.end_time ? +new Date(it.end_time) : now;
+    return `<div class="tl-bar ${cls(it.status)} ${it.level === "epic" ? "epic-bar" : ""}" data-item="${esc(it.path)}" style="left:${x(s)}px;width:${Math.max(3, x(e) - x(s))}px"></div>`;
+  };
+  tl.innerHTML = `
+    <div class="tl-labels"><div style="height:40px;border-bottom:1px solid var(--border)"></div><div id="tl-label-rows">
+      ${rows.map(r => `<div class="tl-row ${r.kind}"><span class="dot ${cls(r.item.status)}"></span><span class="lbl" data-item="${esc(r.item.path)}">${esc(r.item.readme.title || r.item.name)}</span></div>`).join("")}
+    </div></div>
+    <div class="tl-scroll" id="tl-scroll">
+      <div class="tl-tools"><button id="zoom-out">−</button><button id="zoom-in">+</button><button id="zoom-now">now</button></div>
+      <div class="tl-head" style="width:${width}px">${days.map(d => `<div class="day" style="left:${x(d)}px">${d.toLocaleDateString([], { weekday: "short" })}<small>${d.toLocaleDateString([], { month: "short", day: "numeric" })}</small></div>`).join("")}</div>
+      <div class="tl-body" style="width:${width}px">
+        ${days.map(d => `<div class="tl-vline" style="left:${x(d)}px"></div>`).join("")}
+        <div class="tl-now" style="left:${x(now)}px"></div>
+        ${rows.map(r => `<div class="tl-grid-row ${r.kind}">${bar(r.item)}</div>`).join("")}
+      </div>
+    </div>`;
+  const scroll = document.getElementById("tl-scroll");
+  const labels = document.getElementById("tl-label-rows");
+  scroll.onscroll = () => { labels.style.transform = `translateY(${-scroll.scrollTop}px)`; };
+  document.getElementById("zoom-in").onclick = () => { state.zoom = Math.min(120, state.zoom * 1.5); renderTimeline(); };
+  document.getElementById("zoom-out").onclick = () => { state.zoom = Math.max(1, state.zoom / 1.5); renderTimeline(); };
+  document.getElementById("zoom-now").onclick = () => { scroll.scrollLeft = x(now) - scroll.clientWidth * .7; };
+  scroll.scrollLeft = Math.max(0, x(now) - scroll.clientWidth * .7);
+  const tip = document.getElementById("tooltip");
+  tl.querySelectorAll("[data-item]").forEach(el => {
+    el.onclick = () => openPanel(el.dataset.item);
+    if (!el.classList.contains("tl-bar")) return;
+    el.onmousemove = ev => {
+      const it = findItem(el.dataset.item);
+      tip.style.display = "block"; tip.style.left = ev.clientX + 12 + "px"; tip.style.top = ev.clientY + 12 + "px";
+      tip.innerHTML = `<b>${esc(it.readme.title || it.name)}</b>${esc(it.status)} · ${fmtDate(it.start_time)} → ${it.end_time ? fmtDate(it.end_time) : "now"} · ${dur(it.start_time, it.end_time)}`;
+    };
+    el.onmouseleave = () => tip.style.display = "none";
+  });
+}
+
+function render() {
+  if (!state.data) return;
+  if (!state.epic && state.data.epics.length) {
+    state.epic = (state.data.epics.find(e => e.status === "in progress") || state.data.epics[0]).path;
+  }
+  renderHeader();
+  renderEpics();
+  document.getElementById("board").hidden = state.view !== "board";
+  document.getElementById("timeline").hidden = state.view !== "timeline";
+  if (state.view === "board") renderBoard(); else renderTimeline();
+  if (state.item) openPanel(state.item);
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/state");
+    state.data = await r.json();
+    render();
+  } catch (e) {
+    document.getElementById("generated").textContent = "server unreachable";
+  }
+}
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
+  state.view = b.dataset.view; render();
+});
+document.getElementById("theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme;
+  const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("theme", document.documentElement.dataset.theme); } catch (e) {}
+};
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+function applyHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("view")) { state.view = h.get("view"); document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x.dataset.view === state.view)); }
+  if (h.get("epic")) state.epic = h.get("epic");
+  if (h.get("item")) state.item = h.get("item");
+  render();
+}
+window.onhashchange = applyHash;
+applyHash();
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
