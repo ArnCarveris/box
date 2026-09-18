@@ -60,6 +60,39 @@ ECS_STRUCT(Emissive, {
     Rgb color;      /**< Emission color */
 });
 
+/** Projection a TextureTiling derives its UVs from */
+ECS_ENUM(TilingShape, {
+    TilingBox = 0,      /**< Planar per face, picked by the dominant axis of the local normal */
+    TilingCylinder = 1, /**< Arc length around the local Y axis and height along it */
+    TilingRadial = 2,   /**< Distance from the local Y axis and arc length around it */
+    TilingMeters = 3    /**< Mesh UVs stretched over the world size */
+});
+
+/** What a sampler does with UVs outside the 0..1 range */
+ECS_ENUM(TextureWrap, {
+    WrapRepeat = 0, /**< The texture tiles */
+    WrapClamp = 1,  /**< The edge texel is held */
+    WrapMirror = 2  /**< Every other tile is mirrored */
+});
+
+/** Scale and offset applied to the UVs of a material, defaults to 1, 1, 0, 0 */
+ECS_STRUCT(TextureTransform, {
+    float scale_x;  /**< U multiplier */
+    float scale_y;  /**< V multiplier */
+    float offset_x; /**< U addend, applied after the scale */
+    float offset_y; /**< V addend, applied after the scale */
+});
+
+/** Tiles textures at a physical size in meters instead of stretching them over the mesh */
+ECS_STRUCT(TextureTiling, {
+    float meters_x;     /**< World meters one tile spans along U */
+    float meters_y;     /**< World meters one tile spans along V */
+    bool fit;           /**< Round the tile count so the pattern ends on a tile boundary */
+    bool allow_partial; /**< Keep the fractional tile count that fit would round away */
+    int32_t min_tiles;  /**< Lower bound of the tile count on both axes, 0 for none */
+    TilingShape shape;  /**< Projection the UVs come from */
+});
+
 /** Texture entities for each PBR layer, 0 for none, inherited by instances */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color, display encoded */

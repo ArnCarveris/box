@@ -52,6 +52,52 @@ static void box_pbr_ctor(
     }
 }
 
+/** TextureTransform constructor setting the identity transform.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_transform_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    TextureTransform *t = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        t[i].scale_x = 1.0f;
+        t[i].scale_y = 1.0f;
+        t[i].offset_x = 0.0f;
+        t[i].offset_y = 0.0f;
+    }
+}
+
+/** TextureTiling constructor setting one meter tiles of the box projection.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_tiling_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    TextureTiling *t = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        t[i].meters_x = 1.0f;
+        t[i].meters_y = 1.0f;
+        t[i].fit = false;
+        t[i].allow_partial = false;
+        t[i].min_tiles = 0;
+        t[i].shape = TilingBox;
+    }
+}
+
 float box_srgb_to_linear(
     uint8_t value)
 {
@@ -77,12 +123,21 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, PbrTextures);
+    ECS_META_COMPONENT(world, TilingShape);
+    ECS_META_COMPONENT(world, TextureWrap);
+    ECS_META_COMPONENT(world, TextureTransform);
+    ECS_META_COMPONENT(world, TextureTiling);
     ECS_TAG_DEFINE(world, DynamicMaterial);
 
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_ctor });
     ecs_set_hooks(world, PbrTextures, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
+    ecs_set_hooks(world, TextureTiling, { .ctor = box_texture_tiling_ctor });
 
+    ecs_add_pair(world, ecs_id(TextureTransform), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(TextureTiling), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(TextureWrap), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Rgb), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Tint), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrMaterial), EcsOnInstantiate, EcsInherit);
