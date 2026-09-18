@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:20.026+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "interaction/spatial_index",
+    "input_and_controllers/device_layer",
+    "views_and_culling/view"
+  ]
+}

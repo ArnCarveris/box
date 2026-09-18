@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:19.892+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "input_and_controllers",
+    "views_and_culling"
+  ]
+}
