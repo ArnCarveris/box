@@ -16,6 +16,12 @@
 /** Command lines listed when no count is given */
 #define BOX_COMMAND_LOG_DEFAULT (20)
 
+/** A command result starting with this prefix sets the error flag, the prefix is stripped */
+#define BOX_COMMAND_ERROR_PREFIX "error: "
+
+/** Length of BOX_COMMAND_ERROR_PREFIX */
+#define BOX_COMMAND_ERROR_PREFIX_LEN (7)
+
 /** Slot of a ring buffer that holds the entry with an absolute index.
  *
  * Rings count every append, so entry i lives in slot i modulo the ring size.

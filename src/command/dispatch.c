@@ -216,6 +216,12 @@ static char* box_dispatch_call(
         goto done;
     }
 
+    if (out && !strncmp(out, BOX_COMMAND_ERROR_PREFIX, BOX_COMMAND_ERROR_PREFIX_LEN)) {
+        result = ecs_os_strdup(out + BOX_COMMAND_ERROR_PREFIX_LEN);
+        ecs_os_free(out);
+        goto done;
+    }
+
     error[0] = false;
     result = out;
 
