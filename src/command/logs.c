@@ -285,7 +285,7 @@ static void box_log_command(
     int32_t level = BOX_LOG_LEVEL;
     char *out = NULL;
     if (box_log_parse_level(name, &level)) {
-        out = flecs_asprintf("unknown log level '%s'", name);
+        out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "unknown log level '%s'", name);
         goto done;
     }
 

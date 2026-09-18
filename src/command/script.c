@@ -84,9 +84,9 @@ static char* box_script_unknown(
 {
     char *result = NULL;
     if (ambiguous) {
-        result = flecs_asprintf("ambiguous script '%s'", path);
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "ambiguous script '%s'", path);
     } else {
-        result = flecs_asprintf("unknown script '%s'", path);
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "unknown script '%s'", path);
     }
 
     return result;
@@ -114,7 +114,8 @@ static char* box_script_update(
 
     EcsScript *updated = ecs_get_mut(world, script, EcsScript);
     ecs_assert(updated != NULL, ECS_INVALID_OPERATION, "script was deleted");
-    result = ecs_os_strdup(updated->error ? updated->error : "failed to update");
+    result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "%s",
+        updated->error ? updated->error : "failed to update");
     ecs_os_strset(&updated->code, old);
 
 done:
@@ -278,7 +279,8 @@ static void box_script_patch(
         char *patched = box_patch_apply(
             code->code ? code->code : "", patch ? patch : "", &error);
         if (!patched) {
-            out = error;
+            out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "%s", error);
+            ecs_os_free(error);
         } else {
             out = box_script_update(world, script, patched);
             ecs_os_free(patched);
