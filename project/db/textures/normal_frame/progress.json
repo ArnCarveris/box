@@ -1,9 +1,9 @@
 {
   "kind": "bug",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T13:42:00.840+00:00",
   "start_time": "2026-09-18T13:42:00.878+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T13:55:23.829+00:00",
   "dependencies": [
     "textures/uv_orientation"
   ]

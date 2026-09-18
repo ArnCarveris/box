@@ -1,0 +1,18 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T13:54:32Z",
+  "pass": 8,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.005370,
+  "tests": [
+    {"suite": "NormalMap", "case": "frame_of_a_camera_facing_surface", "status": "pass", "elapsed": 0.005295},
+    {"suite": "NormalMap", "case": "frame_is_the_same_with_screen_y_up", "status": "pass", "elapsed": 0.004700},
+    {"suite": "NormalMap", "case": "frame_is_the_same_for_a_flipped_normal", "status": "pass", "elapsed": 0.004477},
+    {"suite": "NormalMap", "case": "frame_follows_swapped_uv_axes", "status": "pass", "elapsed": 0.005032},
+    {"suite": "NormalMap", "case": "flat_sample_keeps_the_normal", "status": "pass", "elapsed": 0.005147},
+    {"suite": "NormalMap", "case": "sample_leans_along_the_u_tangent", "status": "pass", "elapsed": 0.004448},
+    {"suite": "NormalMap", "case": "sample_leans_along_the_v_tangent", "status": "pass", "elapsed": 0.004503},
+    {"suite": "NormalMap", "case": "degenerate_derivatives_keep_the_normal", "status": "pass", "elapsed": 0.004706}
+  ]
+}
