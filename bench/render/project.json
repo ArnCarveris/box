@@ -21,6 +21,11 @@
                 "extract"
             ]
         }, {
+            "id": "Bake",
+            "benchcases": [
+                "invalidate_one_of_100k"
+            ]
+        }, {
             "id": "Lights",
             "benchcases": [
                 "extract_1000_moving",
