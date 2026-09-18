@@ -1,0 +1,133 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+camera {
+  Position: {0, 7, -16}
+  LookAt: {0, 1.5, 0}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+$ { EnvironmentLight: {sky_color: {200, 210, 230}, ground_color: {90, 90, 90}, intensity: 1} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {160, 160, 165}
+  PbrMaterial: {roughness: 0.9}
+}
+
+single_plain {
+  Position: {-9, 1, 4}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+}
+
+single_tinted {
+  Position: {-6.5, 1, 4}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+  Tint: {80, 220, 80, 255}
+}
+
+childof_tree {
+  Position: {-3, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+  Tint: {80, 120, 255, 255}
+
+  child {
+    Position: {0, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+
+    grandchild {
+      Position: {0, 1.4, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+}
+
+@tree Parent
+
+parent_tree {
+  Position: {0.5, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+  Tint: {80, 120, 255, 255}
+
+  child {
+    Position: {0, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+
+    grandchild {
+      Position: {0, 1.4, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+}
+
+levels {
+  Position: {4, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+  Tint: {80, 120, 255, 255}
+
+  red_child {
+    Position: {-1.2, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+    Tint: {255, 80, 80, 255}
+
+    grandchild {
+      Position: {0, 1.4, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+
+  @tree ChildOf
+
+  plain_child {
+    Position: {1.2, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+
+    grandchild {
+      Position: {0, 1.4, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+}
+
+mixed {
+  Position: {8, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {255, 255, 255}
+  Tint: {255, 200, 60, 255}
+
+  child {
+    Position: {0, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Rgb: {255, 255, 255}
+
+    @tree Parent
+
+    grandchild {
+      Position: {0, 1.4, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {255, 255, 255}
+    }
+  }
+}

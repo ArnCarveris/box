@@ -120,6 +120,8 @@ Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.
 
+`test/integration/visual/tint.flecs` checks tint on single objects and on ChildOf, Parent and mixed hierarchies with tints set at different levels.
+
 ## Tests
 
 ```sh
