@@ -9,6 +9,7 @@
 #include <box.h>
 #include "../renderer/packet.h"
 #include "../renderer/cluster.h"
+#include "../renderer/frustum.h"
 #include "../renderer/tiling.h"
 #include "../renderer/bake.h"
 #include "../geometry/mesh_gen.h"
@@ -347,6 +348,20 @@ void box_render_view_layers_init(
 void box_render_mark_all(
     ecs_world_t *world,
     RenderState *state);
+
+/** World space bounding sphere of a mesh under an instance matrix.
+ *
+ * The local bounds of the mesh are transformed into a center, and the radius is
+ * the circumradius of the transformed box, which never underestimates it.
+ *
+ * @param mesh The render mesh, its bounds are the unscaled ones
+ * @param m The instance matrix, the world transform times the shape scale
+ * @param out Center xyz and radius
+ */
+void box_render_instance_bounds(
+    const RenderMesh *mesh,
+    const mat4 *m,
+    float *out);
 
 /** Fill the instance data of an entity from its components.
  *
