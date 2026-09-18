@@ -143,6 +143,9 @@ under the `actions` scope with an `InputAction`, an entity with `InputMap` binds
 like `keys.Ctrl|keys.S`, and a UI button or a command fires the same action without a key.
 A script task awaits an action with `await on.pressed(actions.Forward)` inside an `async`
 block, next to `on.down` and `on.up`; the await returns the source that fired the action.
+A terminal drives both layers with the `key.*`, `mouse.*`, `input.*` and `action.*` commands,
+which queue injected events over frames; `test/integration/command/input.flecs` types, clicks
+and drags through them.
 
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG

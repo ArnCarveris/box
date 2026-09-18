@@ -94,7 +94,7 @@ with a `Terminal` component that owns a folder `/tmp/box/<pid>/<session>` with a
 Setting `TerminalInput` runs a command line: the dispatcher splits it, looks the
 name up as a script function under `box.command.commands`, converts the arguments
 and writes the text result to `TerminalOutput`. Commands are grouped per file:
-shell, search, logs, script, capture and render.
+shell, search, logs, script, capture, render and input.
 
 The HTTP layer is glue over those components. `/terminal/new`, `/terminal/close`,
 `/terminal/exec` and `/resource/<path>` are served by an `HttpServer` singleton
