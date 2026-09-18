@@ -1,0 +1,19 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-18T19:43:15Z",
+  "pass": 9,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.776731,
+  "tests": [
+    {"suite": "Cpu", "case": "absent_monitor_is_not_sampled", "status": "pass", "elapsed": 0.019257},
+    {"suite": "Cpu", "case": "sample_reports_the_cores", "status": "pass", "elapsed": 0.016592},
+    {"suite": "Cpu", "case": "busy_loop_raises_the_process_percent", "status": "pass", "elapsed": 0.398953},
+    {"suite": "Cpu", "case": "system_percent_stays_in_range", "status": "pass", "elapsed": 0.083528},
+    {"suite": "Cpu", "case": "short_window_follows_the_load", "status": "pass", "elapsed": 0.112011},
+    {"suite": "Cpu", "case": "long_window_lags_the_load", "status": "pass", "elapsed": 0.117307},
+    {"suite": "Cpu", "case": "removing_the_monitor_stops_sampling", "status": "pass", "elapsed": 0.140889},
+    {"suite": "Cpu", "case": "budget_sleep_is_published", "status": "pass", "elapsed": 0.698363},
+    {"suite": "Cpu", "case": "budget_slows_a_synthetic_load", "status": "pass", "elapsed": 0.759832}
+  ]
+}
