@@ -58,6 +58,11 @@ forward path shades in one pass.
 7 by 7 grid of spheres with roughness across the columns and metallic up the
 rows under an `EnvironmentLight` with a blue sky and a warm ground.
 
+`test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
+room with static point lights, emissive boxes and a pillar whose shadow the bake
+resolves, next to `dynamic_room.flecs` which lights the same room with the lights
+marked `DynamicTransform`.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.
