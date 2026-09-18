@@ -1,0 +1,26 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T16:32:31Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.028705,
+  "tests": [
+    {"suite": "Layers", "case": "membership_assigns_a_bit", "status": "pass", "elapsed": 0.013711},
+    {"suite": "Layers", "case": "entity_in_two_layers_has_both_bits", "status": "pass", "elapsed": 0.014186},
+    {"suite": "Layers", "case": "entity_without_a_layer_has_no_bits", "status": "pass", "elapsed": 0.013701},
+    {"suite": "Layers", "case": "empty_view_list_shows_everything", "status": "pass", "elapsed": 0.013823},
+    {"suite": "Layers", "case": "view_list_restricts_the_mask", "status": "pass", "elapsed": 0.014337},
+    {"suite": "Layers", "case": "static_slots_are_grouped_by_mask", "status": "pass", "elapsed": 0.015064},
+    {"suite": "Layers", "case": "leaving_a_layer_regroups_the_slots", "status": "pass", "elapsed": 0.014317},
+    {"suite": "Layers", "case": "dynamic_instances_are_filtered_per_view", "status": "pass", "elapsed": 0.013815},
+    {"suite": "Layers", "case": "transparent_entries_are_filtered_per_view", "status": "pass", "elapsed": 0.013767},
+    {"suite": "Layers", "case": "lights_are_restricted_to_a_layer", "status": "pass", "elapsed": 0.013761},
+    {"suite": "Layers", "case": "two_views_show_their_own_layer", "status": "pass", "elapsed": 0.013699},
+    {"suite": "Layers", "case": "view_list_holds_eight_entries", "status": "pass", "elapsed": 0.013873},
+    {"suite": "Layers", "case": "past_the_bit_limit_get_no_bit", "status": "pass", "elapsed": 0.014183},
+    {"suite": "Layers", "case": "prefab_layer_is_inherited", "status": "pass", "elapsed": 0.013478},
+    {"suite": "Layers", "case": "caster_mask_comes_from_shadow_layers", "status": "pass", "elapsed": 0.013111},
+    {"suite": "Layers", "case": "scene_without_layers_keeps_its_packet", "status": "pass", "elapsed": 0.013522}
+  ]
+}
