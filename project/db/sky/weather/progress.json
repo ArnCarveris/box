@@ -6,8 +6,6 @@
   "end_time": null,
   "dependencies": [
     "sky/sky_ibl",
-    "particles/appearance",
-    "textures_and_materials/material_layers",
-    "transitions/transition_params"
+    "textures_and_materials/material_layers"
   ]
 }

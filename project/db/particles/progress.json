@@ -7,6 +7,8 @@
   "dependencies": [
     "views_and_culling",
     "textures_and_materials",
-    "effects"
-  ]
+    "effects",
+    "sky"
+  ],
+  "priority": 14
 }

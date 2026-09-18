@@ -4,5 +4,7 @@
   "created": "2026-09-18T08:27:56.130+00:00",
   "start_time": null,
   "end_time": null,
-  "dependencies": []
+  "dependencies": [
+    "textures_and_materials/material_layers"
+  ]
 }

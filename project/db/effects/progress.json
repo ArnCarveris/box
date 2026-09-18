@@ -7,5 +7,6 @@
   "dependencies": [
     "views_and_culling",
     "lighting"
-  ]
+  ],
+  "priority": 4
 }

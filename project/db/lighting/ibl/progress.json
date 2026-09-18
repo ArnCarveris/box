@@ -4,8 +4,5 @@
   "created": "2026-09-18T08:28:13.551+00:00",
   "start_time": null,
   "end_time": null,
-  "dependencies": [
-    "textures_and_materials/textures",
-    "views_and_culling/view"
-  ]
+  "dependencies": []
 }

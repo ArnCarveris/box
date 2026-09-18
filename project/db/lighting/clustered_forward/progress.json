@@ -4,8 +4,5 @@
   "created": "2026-09-18T08:28:13.485+00:00",
   "start_time": null,
   "end_time": null,
-  "dependencies": [
-    "views_and_culling/view",
-    "views_and_culling/layers"
-  ]
+  "dependencies": []
 }

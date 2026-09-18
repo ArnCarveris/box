@@ -8,5 +8,6 @@
     "textures_and_materials",
     "responsiveness",
     "effects"
-  ]
+  ],
+  "priority": 7
 }

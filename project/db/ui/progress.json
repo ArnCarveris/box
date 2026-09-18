@@ -10,5 +10,6 @@
     "interaction",
     "input_and_controllers",
     "command"
-  ]
+  ],
+  "priority": 10
 }

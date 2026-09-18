@@ -6,8 +6,7 @@
   "end_time": null,
   "dependencies": [
     "effects",
-    "lighting",
-    "particles",
-    "transitions"
-  ]
+    "lighting"
+  ],
+  "priority": 5
 }

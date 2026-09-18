@@ -9,5 +9,6 @@
     "responsiveness",
     "interaction",
     "geometry_extensions"
-  ]
+  ],
+  "priority": 13
 }

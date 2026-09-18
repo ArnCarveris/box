@@ -113,7 +113,12 @@ def child_dirs(path):
 
 def start_order(item):
     started = item["start_time"] or ""
-    return (0 if started else 1, started or item["created"] or "", item["name"])
+    if started:
+        result = (0, started, 0, item["name"])
+    else:
+        result = (1, "", item["priority"], item["created"] or "", item["name"])
+
+    return result
 
 
 def walk_item(path, level, rel):
@@ -129,6 +134,7 @@ def walk_item(path, level, rel):
         "end_time": progress.get("end_time"),
         "dependencies": progress.get("dependencies", []),
         "created": progress.get("created"),
+        "priority": progress.get("priority", 1000),
         "deliverables": list_deliverables(path),
         "children": [],
     }

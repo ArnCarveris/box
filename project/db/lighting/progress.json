@@ -5,8 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling",
-    "textures_and_materials",
-    "responsiveness"
-  ]
+    "scene_core"
+  ],
+  "priority": 1
 }

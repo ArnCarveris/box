@@ -399,5 +399,18 @@ def main():
     sys.exit(0 if result.wasSuccessful() else 1)
 
 
+
+    def test_unstarted_items_sort_by_priority(self):
+
+        late = {"name": "b", "start_time": None, "created": "2026-01-01", "priority": 2}
+
+        early = {"name": "a", "start_time": None, "created": "2026-01-02", "priority": 1}
+
+        started = {"name": "c", "start_time": "2026-02-01", "created": "2026-01-03", "priority": 9}
+
+        ordered = sorted([late, early, started], key=pm.start_order)
+
+        self.assertEqual([i["name"] for i in ordered], ["c", "a", "b"])
+
 if __name__ == "__main__":
     main()

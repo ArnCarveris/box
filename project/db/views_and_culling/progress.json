@@ -5,6 +5,8 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "scene_core"
-  ]
+    "lighting",
+    "textures_and_materials"
+  ],
+  "priority": 3
 }

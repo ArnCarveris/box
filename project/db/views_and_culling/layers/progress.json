@@ -5,6 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling/view"
+    "views_and_culling/view",
+    "lighting/clustered_forward"
   ]
 }

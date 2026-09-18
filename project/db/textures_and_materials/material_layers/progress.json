@@ -5,7 +5,6 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "textures_and_materials/textures",
-    "views_and_culling/view"
+    "textures_and_materials/textures"
   ]
 }
