@@ -24,6 +24,7 @@
 #include "box/shader.h"
 #include "box/texture.h"
 #include "box/movement.h"
+#include "box/controller.h"
 #include "box/surface.h"
 #include "box/input.h"
 #include "box/command.h"
