@@ -1,0 +1,14 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T08:47:45Z",
+  "pass": 4,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.016444,
+  "tests": [
+    {"suite": "WasmRequest", "case": "help_round_trip", "status": "pass", "elapsed": 0.016352},
+    {"suite": "WasmRequest", "case": "unknown_path_gives_404", "status": "pass", "elapsed": 0.014880},
+    {"suite": "WasmRequest", "case": "bad_command_gives_error_status", "status": "pass", "elapsed": 0.016139},
+    {"suite": "WasmRequest", "case": "png_reply_is_base64", "status": "pass", "elapsed": 0.016167}
+  ]
+}

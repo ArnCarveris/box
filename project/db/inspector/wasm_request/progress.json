@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:36:31.102+00:00",
   "start_time": "2026-09-18T08:37:25.639+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T08:48:07.281+00:00",
   "dependencies": [
     "command/http"
   ]
