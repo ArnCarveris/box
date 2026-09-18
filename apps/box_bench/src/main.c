@@ -6,6 +6,7 @@
 #include <box.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../../../src/surface/surface_internal.h"
 
 /** Benchmark settings and results */
 typedef struct box_bench_t {
@@ -21,8 +22,39 @@ typedef struct box_bench_t {
     double *samples;       /**< Frame times in seconds */
     int32_t sample_count;  /**< Samples recorded */
     ecs_query_t *statics;  /**< Query over static renderable entities */
+    ecs_query_t *surfaces; /**< Query over the surfaces that own a renderer */
     ecs_vec_t entities;    /**< ecs_entity_t snapshot of static entities */
+    double drawn;          /**< Instances the measured frames drew */
+    double culled;         /**< Instances the measured frames skipped */
+    int32_t stat_count;    /**< Frames the instance counts were read on */
 } box_bench_t;
+
+/** Add the instance counts of the last rendered frame to the totals.
+ *
+ * @param world The world
+ * @param bench The benchmark
+ */
+static void box_bench_stats(
+    ecs_world_t *world,
+    box_bench_t *bench)
+{
+    ecs_iter_t it = ecs_query_iter(world, bench->surfaces);
+    while (ecs_query_next(&it)) {
+        SurfaceImpl *impl = ecs_field(&it, SurfaceImpl, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (!impl[i].renderer) {
+                continue;
+            }
+
+            box_renderer_stats_t stats;
+            box_renderer_stats(impl[i].renderer, &stats);
+            bench->drawn += stats.drawn;
+            bench->culled += stats.culled;
+            bench->stat_count ++;
+        }
+    }
+}
 
 /** Parse benchmark options.
  *
@@ -168,17 +200,21 @@ static void box_bench_report(
     int32_t static_count = ecs_vec_count(&bench->entities);
 
     FILE *f = bench->report ? fopen(bench->report, "w") : stdout;
+    double scale = bench->stat_count ? 1.0 / bench->stat_count : 0;
     fprintf(f, "{\n  \"scene\": \"%s\",\n  \"entities\": %d,\n  \"static\": %d,\n"
         "  \"dynamic\": %d,\n  \"churn\": [%d, %d],\n  \"frames\": %d,\n"
         "  \"mean_ms\": %.3f,\n  \"p50_ms\": %.3f,\n  \"p99_ms\": %.3f,\n  \"max_ms\": %.3f,\n"
-        "  \"fps\": %.1f\n}\n",
+        "  \"fps\": %.1f,\n  \"drawn\": %.0f,\n  \"culled\": %.0f\n}\n",
         bench->scene, entity_count, static_count, entity_count - static_count,
         bench->churn_min, bench->churn_max, bench->sample_count,
-        mean * 1000, p50 * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0);
+        mean * 1000, p50 * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0,
+        bench->drawn * scale, bench->culled * scale);
     if (f != stdout) {
         fclose(f);
-        printf("entities %d, mean %.3f ms, p99 %.3f ms, max %.3f ms, %.1f fps\n",
-            entity_count, mean * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0);
+        printf("entities %d, mean %.3f ms, p99 %.3f ms, max %.3f ms, %.1f fps, "
+            "drawn %.0f, culled %.0f\n",
+            entity_count, mean * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0,
+            bench->drawn * scale, bench->culled * scale);
     }
 }
 
@@ -235,6 +271,9 @@ int main(
         .expr = "box.render.RenderMesh, box.transform.Position, "
             "!box.transform.DynamicTransform(self|up), !box.material.DynamicMaterial(self|up)"
     });
+    bench.surfaces = ecs_query(world, {
+        .terms = {{ .id = ecs_id(SurfaceImpl) }}
+    });
     box_bench_collect(world, &bench);
     bench.samples = ecs_os_malloc_n(double, bench.frames);
 
@@ -247,6 +286,7 @@ int main(
         double elapsed = ecs_time_measure(&start);
         if (frame >= bench.warmup) {
             bench.samples[bench.sample_count ++] = elapsed;
+            box_bench_stats(world, &bench);
         }
     }
 
@@ -254,6 +294,7 @@ int main(
     ecs_os_free(bench.samples);
     ecs_vec_fini_t(NULL, &bench.entities, ecs_entity_t);
     ecs_query_fini(bench.statics);
+    ecs_query_fini(bench.surfaces);
 fini:
     ecs_fini(world);
 done:
