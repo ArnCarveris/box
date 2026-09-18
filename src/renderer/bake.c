@@ -11,9 +11,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-/** Probes one compute workgroup covers */
-#define BOX_BAKE_GROUP (64)
-
 /** Probes a probe buffer starts out with */
 #define BOX_BAKE_CAPACITY (64)
 
@@ -956,7 +953,7 @@ static WGPUBuffer box_bake_buffer(
 /** Compile a WGSL source into a compute pipeline over two bind group layouts.
  *
  * @param r The renderer
- * @param source The WGSL source
+ * @param handle Shader slot of the pass
  * @param entry Name of the compute entry point
  * @param globals Layout of the first bind group
  * @param meshes Layout of the second bind group
@@ -964,17 +961,12 @@ static WGPUBuffer box_bake_buffer(
  */
 static WGPUComputePipeline box_bake_pipeline(
     box_renderer_t *r,
-    const char *source,
+    uint32_t handle,
     const char *entry,
     WGPUBindGroupLayout globals,
     WGPUBindGroupLayout meshes)
 {
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = source, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor shader_desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-    WGPUShaderModule shader = wgpuDeviceCreateShaderModule(r->device, &shader_desc);
+    WGPUShaderModule shader = box_shader_module(r, handle);
 
     WGPUBindGroupLayout layouts[2] = { globals, meshes };
     WGPUPipelineLayoutDescriptor layout_desc = {
@@ -1435,9 +1427,9 @@ void box_bake_init(
     r->probe_dummy_group = wgpuDeviceCreateBindGroup(r->device, &dummy_desc);
 
     box_bake_groups(r);
-    r->grid_pipeline = box_bake_pipeline(r, box_bake_grid_wgsl, "cs_grid", r->grid_layout,
+    r->grid_pipeline = box_bake_pipeline(r, BOX_SHADER_BAKE_GRID, "cs_grid", r->grid_layout,
         r->grid_mesh_layout);
-    r->bake_pipeline = box_bake_pipeline(r, box_bake_shader_wgsl, "cs_bake", r->bake_layout,
+    r->bake_pipeline = box_bake_pipeline(r, BOX_SHADER_BAKE, "cs_bake", r->bake_layout,
         r->bake_mesh_layout);
 }
 

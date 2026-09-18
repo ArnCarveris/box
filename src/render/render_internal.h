@@ -182,6 +182,16 @@ void box_render_extract_textures(
     RenderState *state,
     box_packet_t *p);
 
+/** Material layer registrations in application order, rebuilt when they changed.
+ *
+ * @param world The world
+ * @param count Receives the number of registrations
+ * @return The registrations, NULL when there are none
+ */
+const box_layer_t* box_render_layers(
+    ecs_world_t *world,
+    int32_t *count);
+
 /** Queue an entity for static extraction.
  *
  * @param world The world

@@ -22,23 +22,11 @@
 /** Edge length of the environment and prefiltered specular cubemaps */
 #define BOX_ENV_SIZE (64)
 
-/** Mip levels of the prefiltered specular cubemap, one per roughness step */
-#define BOX_ENV_MIPS (5)
-
 /** Edge length of the irradiance cubemap */
 #define BOX_ENV_IRRADIANCE_SIZE (16)
 
 /** Edge length of the split sum BRDF lookup texture */
 #define BOX_ENV_BRDF_SIZE (64)
-
-/** Samples the specular prefilter takes per texel */
-#define BOX_ENV_SPECULAR_SAMPLES (64)
-
-/** Samples the irradiance convolution takes per texel */
-#define BOX_ENV_IRRADIANCE_SAMPLES (128)
-
-/** Samples the BRDF integration takes per texel */
-#define BOX_ENV_BRDF_SAMPLES (128)
 
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
@@ -51,9 +39,6 @@
 
 /** Entries of the shared fragment bind group */
 #define BOX_MESH_BINDINGS (BOX_SCENE_BINDING + 2)
-
-/** Screen heights a translucent surface bends the background sample it reads by */
-#define BOX_GLASS_REFRACT (0.03)
 
 /** Prefiltered environments the renderer keeps, shared by the views that match one */
 #define BOX_ENV_SLOTS (4)
@@ -70,12 +55,6 @@
 /** Byte stride between two culling uniforms, the alignment a dynamic offset needs */
 #define BOX_CULL_UNIFORM_STRIDE (256)
 
-/** Words of one indexed indirect draw argument */
-#define BOX_CULL_ARG_WORDS (5)
-
-/** Instances one workgroup of the culling pass tests */
-#define BOX_CULL_GROUP (64)
-
 /** Argument offset of a draw the CPU culled, which needs no indirect arguments */
 #define BOX_CULL_NO_ARGS (0xFFFFFFFFu)
 
@@ -84,9 +63,6 @@
 
 /** Counters the occlusion pass keeps: instances tested and instances found hidden */
 #define BOX_HIZ_STAT_WORDS (2)
-
-/** Instances one workgroup of the occlusion pass tests */
-#define BOX_HIZ_GROUP (64)
 
 /** Draw of a view that holds the instances the previous frame already saw */
 #define BOX_HIZ_PASS_VISIBLE (0)
@@ -354,9 +330,9 @@ struct box_renderer_t {
     WGPURenderPipeline blur_down;    /**< Thirteen tap downsample of a level into the next */
     WGPURenderPipeline blur_up;      /**< Eight tap tent upsample, mixed into the level above */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
-    char *layer_wgsl[BOX_LAYER_MAX]; /**< Body of every layer the shader was composed from */
-    uint32_t layer_count;            /**< Layers the composed shader holds */
-    bool layer_failed;               /**< A recomposition failed and was already reported */
+    char *shader_src[BOX_SHADER_BUILTIN_MAX]; /**< Preprocessed WGSL of every builtin slot */
+    bool shader_failed;              /**< A shader did not compile and was already reported */
+    bool initialized;                /**< The pipelines were built from the builtin sources */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
@@ -883,18 +859,7 @@ void box_shadow_fini(
 void box_layers_init(
     box_renderer_t *r);
 
-/** Compose the mesh shader out of the layers the renderer holds.
- *
- * @param r The renderer
- * @return The shader module, NULL when the source did not compile
- */
-WGPUShaderModule box_layers_shader(
-    box_renderer_t *r);
-
-/** Take the layer registrations of a packet and upload its layer parameters.
- *
- * A new registration list recomposes the mesh shader and rebuilds every mesh
- * pipeline; the previous pipelines stay in use when the new source fails.
+/** Upload the layer parameters a packet carries.
  *
  * @param r The renderer
  * @param p The packet
@@ -903,11 +868,70 @@ void box_layers_apply(
     box_renderer_t *r,
     const box_packet_t *p);
 
-/** Release the layer uniform buffer and the sources of the registered layers.
+/** Release the layer uniform buffer.
  *
  * @param r The renderer
  */
 void box_layers_fini(
+    box_renderer_t *r);
+
+/** Take the shader sources a packet carries and rebuild what they feed.
+ *
+ * @param r The renderer
+ * @param p The packet, whose sources move into the renderer
+ */
+void box_shader_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Preprocessed source of a shader slot.
+ *
+ * @param r The renderer
+ * @param handle The shader handle
+ * @return The source, NULL when the slot never received one
+ */
+const char* box_shader_source(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Compile the source of a shader slot into a module.
+ *
+ * @param r The renderer
+ * @param handle The shader handle
+ * @return The module, NULL when there is no source or it does not compile
+ */
+WGPUShaderModule box_shader_module(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Check whether every builtin shader slot holds a source.
+ *
+ * @param r The renderer
+ * @return true when the pipelines can be built
+ */
+bool box_shader_ready(
+    box_renderer_t *r);
+
+/** Release the shader sources the renderer holds.
+ *
+ * @param r The renderer
+ */
+void box_shader_fini(
+    box_renderer_t *r);
+
+/** Create the resource tables that do not need a shader to exist.
+ *
+ * @param r The renderer
+ */
+void box_frame_resources(
+    box_renderer_t *r);
+
+/** Recompile the mesh shader and rebuild every pipeline built from it.
+ *
+ * @param r The renderer
+ * @return true when the new source compiled into a pipeline
+ */
+bool box_frame_rebuild(
     box_renderer_t *r);
 
 /** Release the lazily built pipelines of the sorted pass.
@@ -1182,45 +1206,6 @@ void box_bake_mesh_release(
  */
 void box_bake_fini(
     box_renderer_t *r);
-
-/** WGSL source of the lit instanced mesh shader up to the material layers */
-extern const char *box_mesh_shader_head;
-
-/** WGSL source of the fragment stage, which the composed layers precede */
-extern const char *box_mesh_shader_tail;
-
-/** WGSL source of the frustum culling compute shader */
-extern const char *box_cull_shader_wgsl;
-
-/** WGSL source of the pass that copies a depth target into the first pyramid level */
-extern const char *box_hiz_copy_wgsl;
-
-/** WGSL source of the pass that reduces one pyramid level into the next */
-extern const char *box_hiz_reduce_wgsl;
-
-/** WGSL source of the two occlusion culling passes of a view */
-extern const char *box_hiz_shader_wgsl;
-
-/** WGSL source of the depth only vertex stage of the shadow pass */
-extern const char *box_shadow_shader_wgsl;
-
-/** WGSL source of the cluster assignment compute shader */
-extern const char *box_cluster_shader_wgsl;
-
-/** WGSL source of the environment gradient and BRDF integration shader */
-extern const char *box_env_shader_wgsl;
-
-/** WGSL source of the specular prefilter and irradiance convolution shader */
-extern const char *box_env_filter_wgsl;
-
-/** WGSL source of the occupancy grid fill shader */
-extern const char *box_bake_grid_wgsl;
-
-/** WGSL source of the probe bake shader */
-extern const char *box_bake_shader_wgsl;
-
-/** WGSL source of the pass that halves one mip of the scene copy into the next */
-extern const char *box_blur_wgsl;
 
 /** Read back a texture and write it as PNG.
  *

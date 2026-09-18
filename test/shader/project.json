@@ -1,0 +1,53 @@
+{
+    "id": "shader",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.shader preprocessor and the Shader component",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Preprocess",
+                "testcases": [
+                    "include_is_resolved_next_to_its_file",
+                    "nested_includes_are_expanded",
+                    "cyclic_include_reports_the_file_and_line",
+                    "pragma_once_includes_a_file_once",
+                    "macro_is_defined_and_substituted",
+                    "conditional_block_picks_a_branch",
+                    "ifdef_follows_a_definition",
+                    "undefined_macro_is_zero_in_a_condition",
+                    "missing_include_reports_the_file_and_line",
+                    "error_line_counts_inside_the_include",
+                    "engine_constants_are_predefined",
+                    "component_macro_overrides_a_file_define",
+                    "generated_layers_include_is_empty_without_layers",
+                    "missing_file_is_an_error"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Shader",
+                "testcases": [
+                    "builtin_shaders_are_entities_under_builtin",
+                    "builtin_mesh_shader_reaches_the_packet",
+                    "setting_a_shader_sends_a_command",
+                    "changing_the_path_sends_the_new_source",
+                    "unchanged_shader_is_sent_once",
+                    "failing_file_keeps_the_previous_shader",
+                    "status_holds_the_error_with_file_and_line",
+                    "macros_of_the_component_reach_the_source",
+                    "mesh_shader_carries_the_material_layers",
+                    "macro_change_reloads_the_mesh_shader"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}

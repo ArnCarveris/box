@@ -70,12 +70,7 @@ static void box_cull_pipeline(
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = entries };
     r->cull_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_cull_shader_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor shader_desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-    WGPUShaderModule shader = wgpuDeviceCreateShaderModule(r->device, &shader_desc);
+    WGPUShaderModule shader = box_shader_module(r, BOX_SHADER_CULL);
 
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
         .bindGroupLayoutCount = 1,

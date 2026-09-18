@@ -7,6 +7,7 @@
  */
 
 #include "render_internal.h"
+#include "../shader/shader_internal.h"
 
 /** Order two registrations by their order and then by their entity.
  *
@@ -24,21 +25,6 @@ static int box_layer_compare(
     if (!result) {
         result = (l->entity > r->entity) - (l->entity < r->entity);
     }
-
-    return result;
-}
-
-/** Copy a string with the allocator the renderer releases it with.
- *
- * @param str The string
- * @return The copy
- */
-static char* box_layer_copy(
-    const char *str)
-{
-    size_t len = strlen(str) + 1;
-    char *result = malloc(len);
-    memcpy(result, str, len);
 
     return result;
 }
@@ -79,30 +65,31 @@ static void box_layer_rebuild(
     }
 }
 
-/** Move the ordered registration list into the packet.
- *
- * @param world The world
- * @param state The registry
- * @param p The packet
- */
-static void box_layer_emit(
+const box_layer_t* box_render_layers(
     ecs_world_t *world,
-    RenderState *state,
-    box_packet_t *p)
+    int32_t *count)
 {
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&state->layers); i ++) {
-        const box_layer_t *entry = ecs_vec_get_t(&state->layers, box_layer_t, i);
-        const MaterialLayer *layer = ecs_get(world, entry->entity, MaterialLayer);
-        ecs_assert(layer != NULL, ECS_INTERNAL_ERROR, NULL);
-
-        box_layer_cmd_t *cmd = box_vec_push(&p->layer_create);
-        cmd->index = (uint32_t)i;
-        cmd->order = entry->order;
-        cmd->wgsl = box_layer_copy(layer->wgsl ? layer->wgsl : "");
+    *count = 0;
+    const box_layer_t *result = NULL;
+    ecs_entity_t id = ecs_lookup(world, "box.render.RenderState");
+    if (!id) {
+        goto done;
     }
 
-    p->layers_changed = true;
+    RenderState *state = ecs_get_mut_id(world, id, id);
+    if (!state) {
+        goto done;
+    }
+
+    if (state->layers_dirty && state->layer_query) {
+        box_layer_rebuild(world, state);
+        state->layers_dirty = false;
+    }
+
+    *count = ecs_vec_count(&state->layers);
+    result = ecs_vec_first_t(&state->layers, box_layer_t);
+done:
+    return result;
 }
 
 uint32_t box_render_layer_mask(
@@ -145,10 +132,8 @@ void box_render_extract_layers(
     }
 
     if (state->layers_dirty) {
-        box_layer_rebuild(world, state);
-        box_layer_emit(world, state, p);
+        box_shader_layers_changed(world);
         box_render_mark_all(world, state);
-        state->layers_dirty = false;
     }
 
     int32_t i;

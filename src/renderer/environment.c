@@ -88,25 +88,6 @@ static WGPUTextureView box_env_face(
     return wgpuTextureCreateView(texture, &desc);
 }
 
-/** Compile a WGSL source into a shader module.
- *
- * @param r The renderer
- * @param source The WGSL source
- * @return The module
- */
-static WGPUShaderModule box_env_module(
-    box_renderer_t *r,
-    const char *source)
-{
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = source, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-
-    return wgpuDeviceCreateShaderModule(r->device, &desc);
-}
-
 /** Create a full screen pipeline that writes one environment target.
  *
  * @param r The renderer
@@ -474,8 +455,8 @@ void box_environment_init(
     box_env_resources(r);
     box_env_groups(r);
 
-    WGPUShaderModule source = box_env_module(r, box_env_shader_wgsl);
-    WGPUShaderModule filter = box_env_module(r, box_env_filter_wgsl);
+    WGPUShaderModule source = box_shader_module(r, BOX_SHADER_ENV);
+    WGPUShaderModule filter = box_shader_module(r, BOX_SHADER_ENV_FILTER);
     r->env_gradient_pipeline =
         box_env_pipeline(r, source, "fs_gradient", r->env_pass_layout);
     r->env_brdf_pipeline = box_env_pipeline(r, source, "fs_brdf", r->env_pass_layout);

@@ -31,14 +31,14 @@
 /** Create the layout and the pipeline of one pass of a depth pyramid.
  *
  * @param r The renderer
- * @param wgsl Source of the pass
+ * @param handle Shader slot of the pass
  * @param sample Sample type of the texture the pass reads
  * @param out_layout The bind group layout to fill
  * @return The pipeline
  */
 static WGPURenderPipeline box_hiz_level_pipeline(
     box_renderer_t *r,
-    const char *wgsl,
+    uint32_t handle,
     WGPUTextureSampleType sample,
     WGPUBindGroupLayout *out_layout)
 {
@@ -50,12 +50,7 @@ static WGPURenderPipeline box_hiz_level_pipeline(
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 1, .entries = &entry };
     *out_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUShaderSourceWGSL source = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor module_desc = { .nextInChain = (WGPUChainedStruct*)&source };
-    WGPUShaderModule module = wgpuDeviceCreateShaderModule(r->device, &module_desc);
+    WGPUShaderModule module = box_shader_module(r, handle);
 
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
         .bindGroupLayoutCount = 1,
@@ -183,18 +178,13 @@ void box_hiz_init(
     box_renderer_t *r)
 {
     box_vec_init(&r->hiz_jobs, sizeof(box_cull_job_t));
-    r->hiz_copy = box_hiz_level_pipeline(r, box_hiz_copy_wgsl, WGPUTextureSampleType_Depth,
+    r->hiz_copy = box_hiz_level_pipeline(r, BOX_SHADER_HIZ_COPY, WGPUTextureSampleType_Depth,
         &r->hiz_depth_layout);
-    r->hiz_reduce = box_hiz_level_pipeline(r, box_hiz_reduce_wgsl,
+    r->hiz_reduce = box_hiz_level_pipeline(r, BOX_SHADER_HIZ_REDUCE,
         WGPUTextureSampleType_UnfilterableFloat, &r->hiz_level_layout);
     box_hiz_cull_layout(r);
 
-    WGPUShaderSourceWGSL source = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_hiz_shader_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor module_desc = { .nextInChain = (WGPUChainedStruct*)&source };
-    WGPUShaderModule module = wgpuDeviceCreateShaderModule(r->device, &module_desc);
+    WGPUShaderModule module = box_shader_module(r, BOX_SHADER_HIZ);
     r->hiz_first = box_hiz_pass_pipeline(r, module, "cs_first");
     r->hiz_second = box_hiz_pass_pipeline(r, module, "cs_second");
     wgpuShaderModuleRelease(module);

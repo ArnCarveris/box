@@ -28,6 +28,78 @@
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_LAYER_MAX (16)
 
+/** Planes of a view frustum: left, right, bottom, top, near and far */
+#define BOX_FRUSTUM_PLANES (6)
+
+/** Words of one indexed indirect draw argument */
+#define BOX_CULL_ARG_WORDS (5)
+
+/** Instances one workgroup of the culling pass tests */
+#define BOX_CULL_GROUP (64)
+
+/** Instances one workgroup of the occlusion pass tests */
+#define BOX_HIZ_GROUP (64)
+
+/** Probes one workgroup of the bake passes fills */
+#define BOX_BAKE_GROUP (64)
+
+/** Mip levels of the prefiltered specular cubemap, one per roughness step */
+#define BOX_ENV_MIPS (5)
+
+/** Samples the specular prefilter takes per texel */
+#define BOX_ENV_SPECULAR_SAMPLES (64)
+
+/** Samples the irradiance convolution takes per texel */
+#define BOX_ENV_IRRADIANCE_SAMPLES (128)
+
+/** Samples the BRDF integration takes per texel */
+#define BOX_ENV_BRDF_SAMPLES (128)
+
+/** Screen heights a translucent surface bends the background sample it reads by */
+#define BOX_GLASS_REFRACT (0.03)
+
+/** Shader slot of the mesh pipelines, which the material layers compose */
+#define BOX_SHADER_MESH (0)
+
+/** Shader slot of the light cluster pass */
+#define BOX_SHADER_CLUSTER (1)
+
+/** Shader slot of the frustum culling pass */
+#define BOX_SHADER_CULL (2)
+
+/** Shader slot of the depth target halving of the occlusion pyramid */
+#define BOX_SHADER_HIZ_COPY (3)
+
+/** Shader slot of the level reduction of the occlusion pyramid */
+#define BOX_SHADER_HIZ_REDUCE (4)
+
+/** Shader slot of the two occlusion passes */
+#define BOX_SHADER_HIZ (5)
+
+/** Shader slot of the shadow cascade pass */
+#define BOX_SHADER_SHADOW (6)
+
+/** Shader slot of the environment gradient and BRDF passes */
+#define BOX_SHADER_ENV (7)
+
+/** Shader slot of the environment prefilter passes */
+#define BOX_SHADER_ENV_FILTER (8)
+
+/** Shader slot of the occupancy grid pass of the light bake */
+#define BOX_SHADER_BAKE_GRID (9)
+
+/** Shader slot of the probe pass of the light bake */
+#define BOX_SHADER_BAKE (10)
+
+/** Shader slot of the blur chain of the background copy */
+#define BOX_SHADER_BLUR (11)
+
+/** Shader slots the renderer builds its own pipelines from */
+#define BOX_SHADER_BUILTIN_MAX (12)
+
+/** Shader handle of a shader that has none yet, which asks for a new one */
+#define BOX_SHADER_NONE (0xFFFFFFFFu)
+
 /** Render layers a scene can create, one bit each in the view and instance masks */
 #define BOX_VIEW_LAYER_BITS (32)
 
@@ -291,12 +363,11 @@ typedef struct box_mesh_cmd_t {
     float bounds_max[3];    /**< Local bounds maximum of the unscaled mesh */
 } box_mesh_cmd_t;
 
-/** Registration of one material layer, the renderer takes ownership of the source */
-typedef struct box_layer_cmd_t {
-    uint32_t index; /**< Bit the layer takes in the instance layer mask */
-    int32_t order;  /**< Application order the registrations were sorted by */
-    char *wgsl;     /**< Body of the layer function, freed by the renderer */
-} box_layer_cmd_t;
+/** WGSL module to compile, the renderer takes ownership of the source */
+typedef struct box_shader_cmd_t {
+    uint32_t handle; /**< Shader handle, a BOX_SHADER constant for a builtin one */
+    char *source;    /**< Preprocessed WGSL, freed by the renderer */
+} box_shader_cmd_t;
 
 /** Scene global parameters of one material layer, as the layer uniform expects them */
 typedef struct box_layer_params_t {
@@ -589,8 +660,7 @@ typedef struct box_packet_t {
     box_vec_t mesh_destroy;                  /**< uint32_t handles */
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
     box_vec_t texture_destroy;               /**< uint32_t handles */
-    box_vec_t layer_create;                  /**< box_layer_cmd_t, the whole list when it changed */
-    bool layers_changed;                     /**< layer_create holds a new registration list */
+    box_vec_t shader_create;                 /**< box_shader_cmd_t of the shaders that changed */
     uint32_t layer_count;                    /**< Layers the scene has registered */
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     box_vec_t static_updates;                /**< box_static_update_t */
@@ -620,7 +690,7 @@ static inline void box_packet_init(
     box_vec_init(&p->mesh_destroy, sizeof(uint32_t));
     box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
     box_vec_init(&p->texture_destroy, sizeof(uint32_t));
-    box_vec_init(&p->layer_create, sizeof(box_layer_cmd_t));
+    box_vec_init(&p->shader_create, sizeof(box_shader_cmd_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->static_groups, sizeof(box_static_group_t));
@@ -654,8 +724,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->mesh_destroy);
     box_vec_clear(&p->texture_create);
     box_vec_clear(&p->texture_destroy);
-    box_vec_clear(&p->layer_create);
-    p->layers_changed = false;
+    box_vec_clear(&p->shader_create);
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->static_groups);
@@ -681,7 +750,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->mesh_destroy);
     box_vec_fini(&p->texture_create);
     box_vec_fini(&p->texture_destroy);
-    box_vec_fini(&p->layer_create);
+    box_vec_fini(&p->shader_create);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->static_groups);

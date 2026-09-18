@@ -7,6 +7,7 @@
 #include <box.h>
 #include <string.h>
 #include "surface_internal.h"
+#include "../shader/shader_internal.h"
 
 ECS_COMPONENT_DECLARE(SurfaceImpl);
 
@@ -244,6 +245,7 @@ static void BoxSurfaceSubmit(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (impl[i].packet) {
+            box_shader_extract(it->world, impl[i].packet);
             box_renderer_submit(impl[i].renderer, impl[i].packet);
             impl[i].packet = NULL;
         }
@@ -255,6 +257,7 @@ void BoxSurfaceImport(
 {
     ECS_MODULE(world, BoxSurface);
     ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxShader);
 
     ECS_META_COMPONENT(world, Anisotropy);
     ECS_META_COMPONENT(world, TextureQuality);

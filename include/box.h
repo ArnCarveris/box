@@ -21,6 +21,7 @@
 #include "box/material.h"
 #include "box/geometry.h"
 #include "box/render.h"
+#include "box/shader.h"
 #include "box/texture.h"
 #include "box/movement.h"
 #include "box/surface.h"

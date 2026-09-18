@@ -171,6 +171,7 @@ static void box_device_complete(
     r->gpu_queue = wgpuDeviceGetQueue(r->device);
     box_device_select_format(r);
     box_device_resize(r, r->desc.width, r->desc.height);
+    box_frame_resources(r);
 }
 
 #ifdef BOX_PLATFORM_WEB
@@ -193,7 +194,6 @@ static void box_on_device_web(
     box_renderer_t *r = userdata1;
     if (r->device) {
         box_device_complete(r);
-        box_frame_init(r);
         box_renderer_set_ready(r, true);
     }
 }
@@ -296,6 +296,7 @@ void box_device_fini(
     box_cull_fini(r);
     box_shadow_fini(r);
     box_layers_fini(r);
+    box_shader_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
     if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);

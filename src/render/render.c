@@ -203,4 +203,5 @@ void BoxRenderImport(
     box_render_view_layers_init(world);
     box_render_instance_init(world);
     box_render_extract_init(world);
+    ECS_IMPORT(world, BoxShader);
 }

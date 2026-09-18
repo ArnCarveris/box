@@ -126,12 +126,17 @@ WGPURenderPipeline box_frame_pipeline(
     return wgpuDeviceCreateRenderPipeline(r->device, &desc);
 }
 
-void box_frame_init(
+void box_frame_resources(
     box_renderer_t *r)
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
     box_vec_init(&r->views, sizeof(box_gpu_view_t));
     box_vec_init(&r->targets, sizeof(box_gpu_target_t));
+}
+
+void box_frame_init(
+    box_renderer_t *r)
+{
     box_layers_init(r);
     box_shadow_init(r);
     box_frame_init_view(r);
@@ -143,7 +148,7 @@ void box_frame_init(
     box_cull_init(r);
     box_hiz_init(r);
 
-    r->mesh_shader = box_layers_shader(r);
+    r->mesh_shader = box_shader_module(r, BOX_SHADER_MESH);
 
     WGPUBindGroupLayout group_layouts[4] = {
         r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
@@ -154,6 +159,38 @@ void box_frame_init(
     r->mesh_layout = wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
     r->pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
         true, NULL);
+}
+
+bool box_frame_rebuild(
+    box_renderer_t *r)
+{
+    WGPUShaderModule module = box_shader_module(r, BOX_SHADER_MESH);
+    bool result = module != NULL;
+    if (!result) {
+        goto done;
+    }
+
+    WGPUShaderModule previous = r->mesh_shader;
+    r->mesh_shader = module;
+    r->device_error = false;
+    WGPURenderPipeline pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0,
+        WGPUCullMode_Back, true, NULL);
+    result = pipeline != NULL && !r->device_error;
+    if (result) {
+        box_transparent_reset(r);
+        wgpuRenderPipelineRelease(r->pipeline);
+        wgpuShaderModuleRelease(previous);
+        r->pipeline = pipeline;
+    } else {
+        r->mesh_shader = previous;
+        wgpuShaderModuleRelease(module);
+        if (pipeline) {
+            wgpuRenderPipelineRelease(pipeline);
+        }
+    }
+
+done:
+    return result;
 }
 
 /** Acquire the texture the surface views render into.
@@ -458,6 +495,18 @@ void box_frame_render(
     const box_packet_t *p)
 {
     box_device_resize(r, p->width, p->height);
+    box_shader_apply(r, p);
+    if (!r->initialized && box_shader_ready(r)) {
+        box_frame_init(r);
+        r->initialized = true;
+    }
+
+    if (!r->initialized) {
+        box_target_apply(r, p);
+        box_scene_apply(r, p);
+        goto done;
+    }
+
     box_layers_apply(r, p);
     box_texture_apply(r, p);
     box_target_apply(r, p);

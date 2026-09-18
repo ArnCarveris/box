@@ -43,8 +43,8 @@ void Layers_extract_10k_with_layers(bench_t *b)
     free(cmd->vertices);
     free(cmd->indices);
     uint32_t layer;
-    for (layer = 0; layer < packet.layer_create.count; layer ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, layer))->wgsl);
+    for (layer = 0; layer < packet.shader_create.count; layer ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, layer))->source);
     }
 
     bench_set_items(b, BENCH_LAYER_COUNT);

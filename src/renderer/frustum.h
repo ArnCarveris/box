@@ -14,9 +14,6 @@
 #include <math.h>
 #include "packet.h"
 
-/** Planes of a view frustum: left, right, bottom, top, near and far */
-#define BOX_FRUSTUM_PLANES (6)
-
 /** Index of the left plane */
 #define BOX_FRUSTUM_LEFT (0)
 

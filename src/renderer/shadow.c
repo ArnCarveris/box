@@ -121,12 +121,7 @@ static void box_shadow_pipeline(
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 1, .entries = &entry };
     r->shadow_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_shadow_shader_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor shader_desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-    r->shadow_shader = wgpuDeviceCreateShaderModule(r->device, &shader_desc);
+    r->shadow_shader = box_shader_module(r, BOX_SHADER_SHADOW);
 
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
         .bindGroupLayoutCount = 1,

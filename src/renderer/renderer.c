@@ -35,10 +35,10 @@ static void box_renderer_discard(
         cmd->pixels = NULL;
     }
 
-    for (i = 0; i < p->layer_create.count; i ++) {
-        box_layer_cmd_t *cmd = box_vec_at(&p->layer_create, i);
-        free(cmd->wgsl);
-        cmd->wgsl = NULL;
+    for (i = 0; i < p->shader_create.count; i ++) {
+        box_shader_cmd_t *cmd = box_vec_at(&p->shader_create, i);
+        free(cmd->source);
+        cmd->source = NULL;
     }
 
     box_queue_release(&r->queue, p);
@@ -120,7 +120,6 @@ static void* box_renderer_thread(
         r->failed = true;
         box_queue_stop(&r->queue);
     } else {
-        box_frame_init(r);
         r->ready = true;
     }
 
@@ -170,7 +169,6 @@ box_renderer_t* box_renderer_create(
 #endif
     } else {
 #ifndef BOX_PLATFORM_WEB
-        box_frame_init(r);
         r->ready = true;
 #endif
     }

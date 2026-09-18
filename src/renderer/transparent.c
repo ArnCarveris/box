@@ -227,12 +227,7 @@ void box_transparent_init(
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 2, .entries = entries };
     r->blur_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_blur_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor module_desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-    WGPUShaderModule module = wgpuDeviceCreateShaderModule(r->device, &module_desc);
+    WGPUShaderModule module = box_shader_module(r, BOX_SHADER_BLUR);
 
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
         .bindGroupLayoutCount = 1,

@@ -4,6 +4,7 @@
  */
 
 #include "render_internal.h"
+#include "../shader/shader_internal.h"
 #include "../surface/surface_internal.h"
 
 bool box_render_is_dynamic(
@@ -246,6 +247,7 @@ void box_render_extract(
     ecs_entity_t capture = box_render_collect_views(world, state, p);
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
+    box_shader_extract(world, p);
     box_extract_meshes(state, p);
     box_render_extract_textures(state, p);
 

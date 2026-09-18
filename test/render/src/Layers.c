@@ -54,8 +54,8 @@ void Layers_teardown(void)
         free(cmd->indices);
     }
 
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_fini(&packet);
@@ -93,22 +93,21 @@ void Layers_registration_produces_the_ordered_command(void)
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
 
-    test_bool(packet.layers_changed, true);
-    test_int(packet.layer_create.count, 4);
-    uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        box_layer_cmd_t *cmd = box_vec_at(&packet.layer_create, i);
-        test_int(cmd->index, i);
-        test_assert(cmd->wgsl != NULL);
-        test_assert(cmd->wgsl[0] != '\0');
-        if (i) {
-            test_assert(cmd->order >= ((box_layer_cmd_t*)box_vec_at(&packet.layer_create,
-                i - 1))->order);
-        }
+    int32_t count = 0;
+    const box_layer_t *layers = box_render_layers(w, &count);
+    test_int(count, 4);
+    int32_t i;
+    for (i = 1; i < count; i ++) {
+        test_assert(layers[i].order >= layers[i - 1].order);
     }
 
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 0))->order, 0);
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 3))->order, 30);
+    test_int(layers[0].order, 0);
+    test_int(layers[3].order, 30);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
+    box_shader_cmd_t *cmd = box_vec_at(&packet.shader_create, 0);
+    test_uint(cmd->handle, BOX_SHADER_MESH);
+    test_assert(strstr(cmd->source, "fn layer_3(") != NULL);
+    test_assert(strstr(cmd->source, "fn layer_4(") == NULL);
 }
 
 void Layers_command_is_sent_once(void)
@@ -119,17 +118,16 @@ void Layers_command_is_sent_once(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.layer_create.count, 4);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
 
     uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_reset(&packet);
     box_render_extract(w, &packet);
-    test_bool(packet.layers_changed, false);
-    test_int(packet.layer_create.count, 0);
+    test_int(packet.shader_create.count, 0);
     test_int(packet.layer_count, 4);
 }
 
@@ -145,10 +143,12 @@ void Layers_order_sorts_the_command(void)
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
 
-    test_int(packet.layer_create.count, 5);
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 0))->order, -5);
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 1))->order, 0);
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 4))->order, 30);
+    int32_t count = 0;
+    const box_layer_t *layers = box_render_layers(w, &count);
+    test_int(count, 5);
+    test_int(layers[0].order, -5);
+    test_int(layers[1].order, 0);
+    test_int(layers[4].order, 30);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
     test_int(box_instance_layers(&u->data), 1u << 2);
 }
@@ -164,21 +164,25 @@ void Layers_unregistration_renumbers_and_resends(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.layer_create.count, 5);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
     test_int(box_instance_layers(&((box_static_update_t*)box_vec_at(&packet.static_updates,
         0))->data), 1u << 2);
 
     uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_reset(&packet);
     ecs_delete(w, mine);
     box_render_extract(w, &packet);
-    test_bool(packet.layers_changed, true);
-    test_int(packet.layer_create.count, 4);
-    test_int(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, 0))->order, 0);
+    test_int(packet.shader_create.count, 1);
+    test_uint(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, 0))->handle,
+        BOX_SHADER_MESH);
+    int32_t count = 0;
+    const box_layer_t *layers = box_render_layers(w, &count);
+    test_int(count, 4);
+    test_int(layers[0].order, 0);
     test_int(packet.static_updates.count, 1);
     test_int(box_instance_layers(&((box_static_update_t*)box_vec_at(&packet.static_updates,
         0))->data), 1u << 1);
@@ -226,8 +230,8 @@ void Layers_removing_the_pair_clears_the_bit(void)
         0))->data), 1u << 1);
 
     uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_reset(&packet);
@@ -311,15 +315,15 @@ void Layers_params_update_on_change(void)
     test_flt(packet.layer_params[1].a[3], 0.85f);
 
     uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_reset(&packet);
     ecs_set(w, dust, LayerParams, { .a = {0.1f, 0.2f, 0.3f, 0.4f},
         .b = {0.5f, 0.6f, 0.7f, 0.8f} });
     box_render_extract(w, &packet);
-    test_bool(packet.layers_changed, false);
+    test_int(packet.shader_create.count, 0);
     test_flt(packet.layer_params[1].a[0], 0.1f);
     test_flt(packet.layer_params[1].a[3], 0.4f);
     test_flt(packet.layer_params[1].b[2], 0.7f);
@@ -336,8 +340,8 @@ void Layers_settings_flag_reaches_the_view(void)
     test_int(packet.view.layers_enabled, 1);
 
     uint32_t i;
-    for (i = 0; i < packet.layer_create.count; i ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, i))->wgsl);
+    for (i = 0; i < packet.shader_create.count; i ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
     box_packet_reset(&packet);
@@ -360,11 +364,14 @@ void Layers_project_layer_gets_a_bit(void)
     ecs_add_pair(w, e, MaterialLayerOn, mine);
     box_render_extract(w, &packet);
 
-    test_int(packet.layer_create.count, 5);
-    box_layer_cmd_t *cmd = box_vec_at(&packet.layer_create, 4);
-    test_int(cmd->index, 4);
-    test_int(cmd->order, 100);
-    test_str(cmd->wgsl, "(*s).albedo = p.a.rgb;\n");
+    int32_t count = 0;
+    const box_layer_t *layers = box_render_layers(w, &count);
+    test_int(count, 5);
+    test_int(layers[4].order, 100);
+    box_shader_cmd_t *cmd = box_vec_at(&packet.shader_create, 0);
+    test_assert(strstr(cmd->source,
+        "fn layer_4(s: ptr<function, Surface>, p: LayerParams) {\n"
+        "(*s).albedo = p.a.rgb;\n") != NULL);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
     test_int(box_instance_layers(&u->data), 1u << 4);
     test_flt(packet.layer_params[4].a[0], 1.0f);
@@ -386,14 +393,13 @@ void Layers_limit_is_an_error_logged_once(void)
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
 
-    test_int(packet.layer_create.count, BOX_LAYER_MAX);
     test_int(packet.layer_count, BOX_LAYER_MAX);
     test_int(layer_errors, 1);
     test_bool(box_render_state(w)->layers_reported, true);
 
     uint32_t cmd;
-    for (cmd = 0; cmd < packet.layer_create.count; cmd ++) {
-        free(((box_layer_cmd_t*)box_vec_at(&packet.layer_create, cmd))->wgsl);
+    for (cmd = 0; cmd < packet.shader_create.count; cmd ++) {
+        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, cmd))->source);
     }
 
     box_packet_reset(&packet);
@@ -401,7 +407,7 @@ void Layers_limit_is_an_error_logged_once(void)
     ecs_set(w, extra, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).alpha = p.a.w;\n"),
         .order = 200 });
     box_render_extract(w, &packet);
-    test_int(packet.layer_create.count, BOX_LAYER_MAX);
+    test_int(packet.layer_count, BOX_LAYER_MAX);
     test_int(layer_errors, 1);
 }
 
@@ -415,8 +421,6 @@ void Layers_scene_without_layers_keeps_the_flag_off(void)
     box_render_extract(w, &packet);
 
     test_bool(box_render_state(w)->layered, false);
-    test_bool(packet.layers_changed, false);
-    test_int(packet.layer_create.count, 0);
     test_int(packet.layer_count, 0);
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
