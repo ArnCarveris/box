@@ -417,10 +417,27 @@ local instance** opens it on `http://localhost:27750`.
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
 python3 project/pm.py new epic <epic> "Title" --priority 65   # lower runs first, 100 by default
+python3 project/pm.py next 5           # the ready unstarted tasks in the derived order
 python3 project/pm.py start <epic>/<task>
+python3 project/pm.py brief <epic>/<task> --files src/sky/sky.c,include/box/sky.h
+python3 project/pm.py deliver <epic>/<task> --tests render:Atmosphere,core --bench render
 python3 project/pm.py done <epic>/<task>
 python3 project/pm.py check            # READMEs, statuses, dependencies, priorities and dependency cycles
 ```
+
+`brief` prints the whole agent prompt for a task: its README, the README of its
+epic, the deliverable reports of its dependencies and the house rules, with the
+private environment named after the task (`--env`), the files the agent owns
+(`--files`) and a `--worktree` note when another agent is editing the tree.
+
+`deliver` runs `bake3 run test/<project> -- [<suite>] -j 8 --json` once per
+project into the task's `deliverable/`, merges the reports into `tests.json`,
+copies the `tools/bench.py` report to `bench.json` and exits non zero when a test
+fails. `done` then refuses a task without `tests.json` and `bench.json` (unless
+its `progress.json` says `"bench": false`) and an epic without its report in the
+four section format, the merged tests, the benchmarks, the integration outputs
+and the wasm image, printing every missing item; `--force` overrides with a
+warning. `docs/PROCESS.md` describes the loop these commands encode.
 
 ## Layout
 
@@ -428,7 +445,7 @@ python3 project/pm.py check            # READMEs, statuses, dependencies, priori
 apps/box_app/   the engine executable, its scenes under etc/ and the wasm shell page
 bench/          bake3 bench projects, one per engine module
 design/         design brief and datamodel sketches (documentation only)
-docs/           architecture notes
+docs/           architecture notes and the coordination process
 include/box/    public headers, one per module
 project/        project management tool and its database
 src/            engine sources, one directory per flecs module (see docs/ARCHITECTURE.md)

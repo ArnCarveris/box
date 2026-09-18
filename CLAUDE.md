@@ -51,6 +51,10 @@ Work is tracked with `project/pm.py` (see README). A task is complete only when
 its `deliverable/tests.json` exists, produced with `--json` from the affected
 test suites.
 
+`docs/PROCESS.md` describes the coordination loop that `pm next`, `pm brief`,
+`pm deliver` and `pm done` encode; brief every agent with `python3 project/pm.py
+brief <epic>/<task> --files <owned paths>` instead of writing a prompt by hand.
+
 A task that touches a hot path (transform propagation, mesh generation, extract,
 command dispatch) adds or updates a benchcase under `bench/<module>` and attaches
 the report of the affected bench project as `deliverable/bench.json`:
