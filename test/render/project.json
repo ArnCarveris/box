@@ -77,6 +77,37 @@
                 "teardown": true
             },
             {
+                "id": "Bake",
+                "testcases": [
+                    "static_light_is_static",
+                    "dynamic_light_is_not_static",
+                    "light_under_dynamic_parent_is_dynamic",
+                    "static_lights_are_listed_unculled",
+                    "dynamic_light_not_in_bake_lights",
+                    "bake_lights_empty_when_disabled",
+                    "settings_defaults",
+                    "settings_override",
+                    "emissive_static_is_an_emitter",
+                    "emissive_dynamic_is_not_an_emitter",
+                    "emitters_empty_when_disabled",
+                    "static_instance_is_flagged_baked",
+                    "toggle_requeues_every_instance",
+                    "sh_reconstructs_the_light_direction",
+                    "voxel_grid_marks_static_geometry",
+                    "probe_behind_a_wall_is_darker",
+                    "probe_is_not_occluded_by_its_own_bounds",
+                    "emitter_lights_a_probe",
+                    "moved_instance_marks_its_probe",
+                    "moved_instance_marks_only_its_neighbourhood",
+                    "moved_light_marks_the_probes_in_range",
+                    "budget_limits_the_probes_per_frame",
+                    "nearest_probes_are_baked_first",
+                    "disabled_settings_drop_the_probes"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "component_consumed_by_extract",
