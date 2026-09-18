@@ -48,6 +48,29 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Layers",
+                "testcases": [
+                    "membership_assigns_a_bit",
+                    "entity_in_two_layers_has_both_bits",
+                    "entity_without_a_layer_has_no_bits",
+                    "empty_view_list_shows_everything",
+                    "view_list_restricts_the_mask",
+                    "static_slots_are_grouped_by_mask",
+                    "leaving_a_layer_regroups_the_slots",
+                    "dynamic_instances_are_filtered_per_view",
+                    "transparent_entries_are_filtered_per_view",
+                    "lights_are_restricted_to_a_layer",
+                    "two_views_show_their_own_layer",
+                    "view_list_holds_eight_entries",
+                    "past_the_bit_limit_get_no_bit",
+                    "prefab_layer_is_inherited",
+                    "caster_mask_comes_from_shadow_layers",
+                    "scene_without_layers_keeps_its_packet"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
