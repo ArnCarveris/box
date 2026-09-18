@@ -1,0 +1,18 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T10:43:56Z",
+  "pass": 8,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.020264,
+  "tests": [
+    {"suite": "Environment", "case": "defaults_without_component", "status": "pass", "elapsed": 0.019116},
+    {"suite": "Environment", "case": "colors_are_linear", "status": "pass", "elapsed": 0.019188},
+    {"suite": "Environment", "case": "intensity_copied_into_view", "status": "pass", "elapsed": 0.019392},
+    {"suite": "Environment", "case": "zero_intensity_is_one", "status": "pass", "elapsed": 0.019427},
+    {"suite": "Environment", "case": "generation_stable_without_change", "status": "pass", "elapsed": 0.020115},
+    {"suite": "Environment", "case": "generation_changes_on_change", "status": "pass", "elapsed": 0.019082},
+    {"suite": "Environment", "case": "removed_component_restores_defaults", "status": "pass", "elapsed": 0.019301},
+    {"suite": "Environment", "case": "source_is_reserved", "status": "pass", "elapsed": 0.019127}
+  ]
+}
