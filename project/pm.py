@@ -23,7 +23,7 @@ REPO = os.path.dirname(ROOT)
 INTEGRATION_OUT = os.path.join(REPO, "test", "integration", "out")
 INSPECTOR = os.path.join(REPO, "apps", "box_inspector", "index.html")
 WASM_IMAGE = "deliverable/wasm/box_app.js"
-DEFAULT_SCENE = "etc/scenes/default.flecs"
+DEFAULT_SCENE = "etc/scenes/primitives.flecs"
 CONTENT_TYPES = {
     ".wasm": "application/wasm",
     ".js": "application/javascript",

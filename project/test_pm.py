@@ -648,7 +648,7 @@ console.log(JSON.stringify({
         self.assertEqual(epics["e1"]["wasm_url"], "/deliverable/e1/deliverable/wasm/box_app.js")
         self.assertEqual(epics["e1"]["inspect_url"],
                          "/inspector?wasm=/deliverable/e1/deliverable/wasm/box_app.js"
-                         "&scene=etc/scenes/default.flecs")
+                         "&scene=etc/scenes/primitives.flecs")
         self.assertIsNone(epics["e2"]["wasm_url"])
         self.assertIsNone(epics["e2"]["inspect_url"])
         self.assertNotIn("inspect_url", epics["e1"]["children"][0])
