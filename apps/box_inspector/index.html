@@ -18,6 +18,10 @@
   --warn: #fab219;
   --bad: #d63a2a;
   --pending: #b3b2ab;
+  --syn-path: #0b6f66;
+  --syn-type: #7348b8;
+  --syn-num: #1a7f37;
+  --syn-str: #9c5d1b;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.18);
   --radius: 12px;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -28,12 +32,14 @@
   :root:not([data-theme="light"]) {
     --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
     --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+    --syn-path: #4fc2b4; --syn-type: #b78ceb; --syn-num: #6ecf8b; --syn-str: #dda75f;
     --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
   --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+  --syn-path: #4fc2b4; --syn-type: #b78ceb; --syn-num: #6ecf8b; --syn-str: #dda75f;
   --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
 }
 * { box-sizing: border-box; }
@@ -114,6 +120,19 @@ main {
 .log .out { color: var(--ink); }
 .log .err { color: var(--bad); }
 .log .info { color: var(--ink-3); }
+.log .t-prompt { color: var(--accent); }
+.log .t-cmd { color: var(--accent); font-weight: 700; }
+.log .t-path { color: var(--syn-path); }
+.log .t-type { color: var(--syn-type); }
+.log .t-num { color: var(--syn-num); }
+.log .t-str { color: var(--syn-str); }
+.log .t-key, .log .t-brief { color: var(--ink-3); }
+.log .t-lvl { font-weight: 600; color: var(--ink-3); }
+.log .t-lvl-fatal, .log .t-lvl-error { color: var(--bad); }
+.log .t-lvl-warning { color: var(--syn-str); }
+.log .t-lvl-info { color: var(--accent); }
+.log .cols { display: grid; gap: 0 14px; }
+.log .cols > .col { min-width: 0; }
 .log .thumb {
   max-width: 160px; height: auto; display: block; margin: 4px 0;
   border: 1px solid var(--border); border-radius: 6px; background: var(--stage);
@@ -206,6 +225,19 @@ var HISTORY_MAX = 200;
 var IMAGE_FILE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 var RESOURCE_TRIES = 6;
 var RESOURCE_DELAY = 500;
+var COLUMN_MAX = 6;
+var ERROR_LINE = /^error:/;
+var LOG_LEVEL = /^(fatal|error|warning|info|debug|trace)$/;
+var PATH_LINE = /^(\/|[A-Za-z_#][A-Za-z0-9_#]*(?:\.[A-Za-z_#][A-Za-z0-9_#]*)*)$/;
+var PAIR_LINE = /^\([^()]*\)$/;
+var PROMPT_LINE = /^(\$)( +)(\S+)(.*)$/;
+var HELP_LINE = /^([A-Za-z_][A-Za-z0-9_.-]*)((?:\s+[<[][^<>[\]]*[\]>])*)(\s+- ?)(.*)$/;
+var COMPONENT_LINE = /^([A-Za-z_#(][^\s:]*):([ \t]?)(.*)$/;
+var PARAM_TOKEN = /([<[])([^:\]>]*):([^\]>]*)([\]>])/g;
+var VALUE_TOKEN = new RegExp("\"(?:[^\"\\\\]|\\\\.)*\"?|'(?:[^'\\\\]|\\\\.)*'?|" +
+  "[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_#][A-Za-z0-9_]*)*[ \\t]*:|" +
+  "[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_#][A-Za-z0-9_]*)*|" +
+  "-?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?", "g");
 
 function isImage(type) {
   return String(type || "").split(";")[0].trim() === IMAGE_TYPE;
@@ -480,11 +512,194 @@ function createStore(storage, key) {
   };
 }
 
+function escapeHtml(text) {
+  return String(text == null ? "" : text)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function tag(name, text) {
+  return "<span class=\"" + name + "\">" + escapeHtml(text) + "</span>";
+}
+
+function valueToken(token) {
+  var head = token.charAt(0);
+  if (head === "\"" || head === "'") {
+    return tag("t-str", token);
+  }
+  if (/^[-.0-9]/.test(token)) {
+    return tag("t-num", token);
+  }
+  if (/:$/.test(token)) {
+    var name = token.replace(/[ \t]*:$/, "");
+    return tag("t-key", name) + escapeHtml(token.slice(name.length));
+  }
+  if (/^(true|false|null)$/.test(token)) {
+    return tag("t-num", token);
+  }
+  if (/^[A-Z]/.test(token)) {
+    return tag("t-type", token);
+  }
+  if (token.indexOf(".") > 0) {
+    return tag("t-path", token);
+  }
+  return escapeHtml(token);
+}
+
+function colorValue(text) {
+  var out = "";
+  var last = 0;
+  var match;
+  VALUE_TOKEN.lastIndex = 0;
+  while ((match = VALUE_TOKEN.exec(text)) !== null) {
+    out += escapeHtml(text.slice(last, match.index)) + valueToken(match[0]);
+    last = match.index + match[0].length;
+  }
+
+  return out + escapeHtml(text.slice(last));
+}
+
+function colorParams(text) {
+  var out = "";
+  var last = 0;
+  var match;
+  PARAM_TOKEN.lastIndex = 0;
+  while ((match = PARAM_TOKEN.exec(text)) !== null) {
+    out += escapeHtml(text.slice(last, match.index)) + escapeHtml(match[1]) +
+      tag("t-key", match[2]) + ":" + tag("t-type", match[3]) + escapeHtml(match[4]);
+    last = match.index + match[0].length;
+  }
+
+  return out + escapeHtml(text.slice(last));
+}
+
+function colorName(text) {
+  if (text.charAt(0) === "(") {
+    return tag("t-type", text);
+  }
+  var dot = text.lastIndexOf(".");
+  var last = dot >= 0 ? text.slice(dot + 1) : text;
+  if (!/^[A-Z]/.test(last)) {
+    return tag("t-path", text);
+  }
+
+  return (dot > 0 ? tag("t-key", text.slice(0, dot + 1)) : "") + tag("t-type", last);
+}
+
+function colorLine(line) {
+  var match = PROMPT_LINE.exec(line);
+  if (match) {
+    return tag("t-prompt", match[1]) + escapeHtml(match[2]) +
+      tag("t-cmd", match[3]) + escapeHtml(match[4]);
+  }
+  match = HELP_LINE.exec(line);
+  if (match) {
+    return tag("t-cmd", match[1]) + colorParams(match[2]) + escapeHtml(match[3]) +
+      tag("t-brief", match[4]);
+  }
+  match = COMPONENT_LINE.exec(line);
+  if (match) {
+    return colorName(match[1]) + ":" + escapeHtml(match[2]) + colorValue(match[3]);
+  }
+  if (PATH_LINE.test(line) || PAIR_LINE.test(line)) {
+    return colorName(line);
+  }
+
+  return colorValue(line);
+}
+
+function columnWidth(rows) {
+  var width = 1;
+  rows.forEach(function (row) {
+    width = row.length > width ? row.length : width;
+  });
+
+  return width > COLUMN_MAX ? COLUMN_MAX : width;
+}
+
+function columnCell(text, index, logs) {
+  if (logs) {
+    var level = LOG_LEVEL.test(text) ? text : "info";
+    return index ? escapeHtml(text) : tag("t-lvl t-lvl-" + level, text);
+  }
+  if (text === "") {
+    return "";
+  }
+  if (index === 0) {
+    return tag("t-path", text);
+  }
+  if (PATH_LINE.test(text) || PAIR_LINE.test(text)) {
+    return colorName(text);
+  }
+
+  return colorValue(text);
+}
+
+function colorColumns(rows, command) {
+  var width = columnWidth(rows);
+  var logs = (command === "logs" || width === 2) && rows.every(function (row) {
+    return LOG_LEVEL.test(row[0]);
+  });
+  var template = [];
+  var cells = "";
+  while (template.length < width - 1) {
+    template.push("max-content");
+  }
+
+  template.push("minmax(0, 1fr)");
+  rows.forEach(function (row) {
+    var i;
+    for (i = 0; i < width; i ++) {
+      var text = i === width - 1 ? row.slice(i).join(" ") : row[i];
+      cells += "<span class=\"col\">" + columnCell(text === undefined ? "" : text, i, logs) +
+        "</span>";
+    }
+  });
+
+  return "<div class=\"cols\" style=\"grid-template-columns: " + template.join(" ") + "\">" +
+    cells + "</div>";
+}
+
+function colorize(text, command) {
+  var raw = String(text == null ? "" : text).replace(/^\n+/, "").replace(/\s+$/, "");
+  var name = String(command == null ? "" : command).trim().split(/\s+/)[0].toLowerCase();
+  if (raw === "") {
+    return "";
+  }
+  if (ERROR_LINE.test(raw)) {
+    return escapeHtml(raw);
+  }
+  var html = "";
+  var run = [];
+  var rows = [];
+  var flush = function () {
+    if (rows.length) {
+      html += run.join("\n") + colorColumns(rows, name);
+      run = [];
+      rows = [];
+    }
+  };
+
+  raw.split("\n").forEach(function (line) {
+    if (line.indexOf("\t") >= 0) {
+      rows.push(line.split("\t"));
+      return;
+    }
+
+    flush();
+    run.push(colorLine(line));
+  });
+
+  flush();
+
+  return html + run.join("\n");
+}
+
 return {
   IMAGE_TYPE: IMAGE_TYPE,
   POST_THRESHOLD: POST_THRESHOLD,
   isImage: isImage,
   parseReply: parseReply,
+  colorize: colorize,
   dataUrl: dataUrl,
   joinUrl: joinUrl,
   httpTransport: httpTransport,
@@ -595,11 +810,24 @@ function append(kind, text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-function showReply(reply) {
-  append(reply.status >= 400 ? "err" : "out", reply.body);
-  if (reply.status < 400) {
-    showResources(reply.body);
+function appendHtml(kind, html) {
+  if (!html) {
+    return;
   }
+  var line = document.createElement("div");
+  line.className = "line " + kind;
+  line.innerHTML = html;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function showReply(reply, command) {
+  if (reply.status >= 400) {
+    append("err", reply.body);
+    return;
+  }
+  appendHtml("out", I.colorize(reply.body, command));
+  showResources(reply.body);
 }
 
 function showResources(text) {
@@ -784,7 +1012,7 @@ function connect() {
     cmdEl.focus();
     return state.session.exec("help");
   }).then(function (reply) {
-    showReply(reply);
+    showReply(reply, "help");
     append("info", "clear (page only) - empty this log pane");
     startTimer();
   }).catch(function (err) {
@@ -824,8 +1052,10 @@ function send(line) {
     logEl.textContent = "";
     return;
   }
-  append("cmd", "$ " + line);
-  state.session.exec(line).then(showReply).catch(function (err) {
+  appendHtml("cmd", I.colorize("$ " + line, line));
+  state.session.exec(line).then(function (reply) {
+    showReply(reply, line);
+  }).catch(function (err) {
     append("err", String(err && err.message ? err.message : err));
   });
 }

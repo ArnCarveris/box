@@ -126,6 +126,110 @@ describe("Reply", () => {
   });
 });
 
+/* ---------- result colouring ---------- */
+
+function has(text, needle, message) {
+  assert(String(text).indexOf(needle) >= 0,
+    (message || "html") + ": expected " + JSON.stringify(needle) +
+    " in " + JSON.stringify(text));
+}
+
+describe("Colors", () => {
+  test("ls_splits_entities_from_types", () => {
+    equal(I.colorize("camera\nPosition\n", "ls"),
+      "<span class=\"t-path\">camera</span>\n<span class=\"t-type\">Position</span>",
+      "ls output");
+  });
+
+  test("cat_colors_the_component_and_its_value", () => {
+    const html = I.colorize("Position: {x: 1, y: -2.5}\nPrefab", "cat camera");
+    has(html, "<span class=\"t-type\">Position</span>:", "component name");
+    has(html, "<span class=\"t-key\">x</span>", "member name");
+    has(html, "<span class=\"t-num\">1</span>", "number");
+    has(html, "<span class=\"t-num\">-2.5</span>", "negative number");
+    has(html, "<span class=\"t-type\">Prefab</span>", "bare tag");
+  });
+
+  test("a_qualified_component_keeps_its_namespace_quiet", () => {
+    const html = I.colorize("box.transform.Position: {x: 0}\n(flecs.script.Script,scene)",
+      "cat camera");
+    has(html, "<span class=\"t-key\">box.transform.</span><span class=\"t-type\">Position</span>:",
+      "qualified name");
+    has(html, "<span class=\"t-type\">(flecs.script.Script,scene)</span>", "pair");
+  });
+
+  test("strings_keep_their_own_color", () => {
+    const html = I.colorize("Doc: {value: \"scene root\"}", "get box Doc");
+    has(html, "<span class=\"t-str\">\"scene root\"</span>", "string value");
+  });
+
+  test("help_shows_parameters_and_brief", () => {
+    const html = I.colorize("cat <path:string> [component:string] - Show components", "help");
+    has(html, "<span class=\"t-cmd\">cat</span>", "command name");
+    has(html, "&lt;<span class=\"t-key\">path</span>:<span class=\"t-type\">string</span>&gt;",
+      "required parameter");
+    has(html, "[<span class=\"t-key\">component</span>:<span class=\"t-type\">string</span>]",
+      "optional parameter");
+    has(html, "<span class=\"t-brief\">Show components</span>", "brief");
+  });
+
+  test("tab_columns_become_an_aligned_grid", () => {
+    const html = I.colorize("box.camera\tPosition\t{x: 0, y: 4}\nbox.light\tPosition\t{x: 1}\n",
+      "grep Position");
+    has(html, "<div class=\"cols\" style=\"grid-template-columns: max-content max-content " +
+      "minmax(0, 1fr)\">", "grid template");
+    has(html, "<span class=\"col\"><span class=\"t-path\">box.camera</span></span>", "path cell");
+    has(html, "<span class=\"col\"><span class=\"t-type\">Position</span></span>", "type cell");
+    has(html, "<span class=\"t-num\">4</span>", "value cell");
+    equal(html.split("<span class=\"col\">").length - 1, 6, "cell count");
+  });
+
+  test("log_levels_are_colored_by_severity", () => {
+    const html = I.colorize("error\tcould not open file\nwarning\tslow frame\ninfo\tready\n",
+      "logs");
+    has(html, "<span class=\"t-lvl t-lvl-error\">error</span>", "error level");
+    has(html, "<span class=\"t-lvl t-lvl-warning\">warning</span>", "warning level");
+    has(html, "<span class=\"t-lvl t-lvl-info\">info</span>", "info level");
+    has(html, "<span class=\"col\">could not open file</span>", "message stays plain");
+  });
+
+  test("errors_pass_through_unstyled", () => {
+    equal(I.colorize("error: unknown command 'nope'", "nope"),
+      "error: unknown command 'nope'", "error line");
+    equal(I.colorize("error: '<a>' is not a valid path", "cd <a>"),
+      "error: '&lt;a&gt;' is not a valid path", "escaped, no spans");
+  });
+
+  test("the_prompt_bolds_the_command_name", () => {
+    equal(I.colorize("$ cat camera", "cat camera"),
+      "<span class=\"t-prompt\">$</span> <span class=\"t-cmd\">cat</span> camera", "prompt");
+  });
+
+  test("paths_share_one_color", () => {
+    equal(I.colorize("box.scene.camera", "pwd"),
+      "<span class=\"t-path\">box.scene.camera</span>", "path");
+    equal(I.colorize("/", "cd /"), "<span class=\"t-path\">/</span>", "root");
+  });
+
+  test("markup_in_a_value_is_escaped", () => {
+    const html = I.colorize("Doc: {value: \"a < b & <img src=x onerror=boom>\"}", "cat box");
+    has(html, "a &lt; b &amp; &lt;img src=x onerror=boom&gt;", "escaped value");
+    assert(html.indexOf("<img") < 0, "no raw markup");
+    assert(html.indexOf("<b ") < 0, "no raw tag");
+  });
+
+  test("a_leading_blank_line_is_dropped", () => {
+    equal(I.colorize("\napps\nbox\n", "ls"),
+      "<span class=\"t-path\">apps</span>\n<span class=\"t-path\">box</span>", "ls at the root");
+  });
+
+  test("empty_output_stays_empty", () => {
+    equal(I.colorize("", "ls"), "", "empty");
+    equal(I.colorize(null, "ls"), "", "null");
+    equal(I.colorize("\n\n", "ls"), "", "blank lines");
+  });
+});
+
 /* ---------- http transport ---------- */
 
 describe("Http", () => {

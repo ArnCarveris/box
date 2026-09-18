@@ -9,6 +9,17 @@ are fetched from `/resource` and shown as thumbnails. The render pane asks `/cap
 (1 Hz, pausable, 0.5 - 5 s) and shows the PNG with the frame number; a wasm image also renders
 live in the canvas, toggled with **Show capture** / **Show live**.
 
+## Console output
+
+`colorize(text, command)` in `inspector-core` turns a result into HTML with one span per
+token, never one per character, so a long log stays cheap. The echoed `$ line` shows the
+command name in bold accent; entity paths get one colour and component or type names
+another, with the namespace before the last dot kept quiet; `<name:type>` in `help`, member
+names, numbers and strings inside `{...}` each get their own token; tab separated output
+(`next`, `grep`, `logs`) becomes an aligned grid; `logs` levels are coloured by severity.
+An error (status 400) stays plain text in the error colour. The colours are `--syn-path`,
+`--syn-type`, `--syn-num` and `--syn-str` on `:root`, with a dark mode variant of each.
+
 ## Query parameters
 
 - `http=<url>`: HTTP mode on that endpoint, connects on load
@@ -46,7 +57,8 @@ transports. In the browser: connect, run `help`, `pwd`, `ls`, `cd box`, `cd /` a
 run `set camera Position "{2, 6, -14}"` and watch the render pane show the new view within a
 second; run `capture` and open the thumbnail, which links to a `/resource/<file>?session=<id>`
 PNG; run `render sphere` and open the thumbnail it prints once that frame rendered; run
-`clear` to empty the log without a request; press **Disconnect**.
+`clear` to empty the log without a request; press **Disconnect**. Run `grep Position` and
+`logs` and check the columns line up, and toggle the theme to read the log in both.
 
 ## Known limitations
 
