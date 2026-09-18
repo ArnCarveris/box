@@ -34,6 +34,7 @@ box_bake_mesh_t* box_bake_state_mesh(
         box_vec_init(&entry->dirty, sizeof(uint8_t));
         box_vec_init(&entry->jobs, sizeof(box_bake_slot_t));
         entry->upload_lo = UINT32_MAX;
+        entry->stale_lo = UINT32_MAX;
     }
 
     return box_vec_at(&s->meshes, mesh);
@@ -84,6 +85,8 @@ static void box_bake_reset(
         box_vec_clear(&m->jobs);
         m->upload_lo = UINT32_MAX;
         m->upload_hi = 0;
+        m->stale_lo = UINT32_MAX;
+        m->stale_hi = 0;
         m->probe_count = 0;
         m->pool_dirty = false;
     }
@@ -116,6 +119,97 @@ static void box_bake_copy(
     dst->count = src->count;
 }
 
+/** Check whether two world points lie closer together than a distance.
+ *
+ * @param a The first point
+ * @param b The second point
+ * @param reach The distance
+ * @return true when the points are closer than the distance
+ */
+static bool box_bake_near(
+    const float a[3],
+    const float b[3],
+    float reach)
+{
+    float dx = a[0] - b[0];
+    float dy = a[1] - b[1];
+    float dz = a[2] - b[2];
+
+    return dx * dx + dy * dy + dz * dz < reach * reach;
+}
+
+/** Check whether a static light or emitter of a packet reaches a bounding sphere.
+ *
+ * A light can only be occluded by geometry it reaches itself, so an instance no
+ * light reaches changes nothing outside its own probes when it moves.
+ *
+ * @param p The packet
+ * @param center World center of the sphere
+ * @param radius Radius of the sphere
+ * @return true when a static light or emitter reaches the sphere
+ */
+static bool box_bake_reaches(
+    const box_packet_t *p,
+    const float center[3],
+    float radius)
+{
+    bool result = false;
+    uint32_t i;
+    for (i = 0; i < p->bake_lights.count && !result; i ++) {
+        const box_light_t *light = box_vec_at(&p->bake_lights, i);
+        result = box_bake_near(light->position, center, light->range + radius);
+    }
+
+    for (i = 0; i < p->emitters.count && !result; i ++) {
+        const box_emitter_t *emitter = box_vec_at(&p->emitters, i);
+        result = box_bake_near(emitter->position, center, emitter->range + radius);
+    }
+
+    return result;
+}
+
+/** Widen the upload range of a mesh with a descriptor, or park it as stale.
+ *
+ * The probes of an instance no light reaches stay zero whatever its descriptor
+ * holds, so its upload waits until a light or emitter comes into range.
+ *
+ * @param m The mesh entry
+ * @param slot The descriptor
+ * @param lit A static light or emitter reaches the instance
+ */
+static void box_bake_touch(
+    box_bake_mesh_t *m,
+    uint32_t slot,
+    bool lit)
+{
+    uint32_t *lo = lit ? &m->upload_lo : &m->stale_lo;
+    uint32_t *hi = lit ? &m->upload_hi : &m->stale_hi;
+    *lo = slot < *lo ? slot : *lo;
+    *hi = slot + 1 > *hi ? slot + 1 : *hi;
+}
+
+/** Move the descriptors parked while unlit into the upload range of every mesh.
+ *
+ * @param s The state
+ */
+static void box_bake_flush(
+    box_bake_state_t *s)
+{
+    uint32_t i;
+    for (i = 0; i < s->meshes.count; i ++) {
+        box_bake_mesh_t *m = box_vec_at(&s->meshes, i);
+        if (m->stale_lo >= m->stale_hi) {
+            continue;
+        }
+
+        m->upload_lo = m->stale_lo < m->upload_lo ? m->stale_lo : m->upload_lo;
+        m->upload_hi = m->stale_hi > m->upload_hi ? m->stale_hi : m->upload_hi;
+        m->stale_lo = UINT32_MAX;
+        m->stale_hi = 0;
+        s->grid_dirty = true;
+    }
+}
+
 /** Queue a probe for baking unless it already is.
  *
  * @param s The state
@@ -146,6 +240,8 @@ static void box_bake_mark(
 static void box_bake_mark_all(
     box_bake_state_t *s)
 {
+    box_bake_flush(s);
+
     uint32_t mesh;
     for (mesh = 0; mesh < s->meshes.count; mesh ++) {
         box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
@@ -379,11 +475,16 @@ static void box_bake_apply_counts(
         uint32_t slot;
         for (slot = c->count; slot < m->descs.count; slot ++) {
             const box_probe_desc_t *d = box_vec_at(&m->descs, slot);
-            if (d->extent[3] != 0) {
+            if (d->extent[3] == 0) {
+                continue;
+            }
+
+            if (box_bake_reaches(p, d->position, d->position[3])) {
                 box_bake_push_sphere(s, d->position, s->influence + d->position[3]);
                 s->grid_dirty = true;
-                m->pool_dirty = true;
             }
+
+            m->pool_dirty = true;
         }
 
         while (m->descs.count < c->count) {
@@ -419,17 +520,26 @@ static void box_bake_apply_updates(
         box_probe_desc_t *cur = box_vec_at(&m->descs, u->slot);
         next.grid[0] = cur->grid[0];
         if (memcmp(cur, &next, sizeof(box_probe_desc_t))) {
+            bool lit = box_bake_reaches(p, next.position, next.position[3]);
             if (cur->extent[3] != 0) {
-                box_bake_push_sphere(s, cur->position, s->influence + cur->position[3]);
+                lit = lit || box_bake_reaches(p, cur->position, cur->position[3]);
             }
 
-            box_bake_push_sphere(s, next.position, s->influence + next.position[3]);
+            if (lit) {
+                if (cur->extent[3] != 0) {
+                    box_bake_push_sphere(s, cur->position, s->influence + cur->position[3]);
+                }
+
+                box_bake_push_sphere(s, next.position, s->influence + next.position[3]);
+                s->grid_dirty = true;
+            }
+
+            bool grid_same = cur->extent[3] != 0 &&
+                !memcmp(cur->grid, next.grid, sizeof(cur->grid));
             m->pool_dirty |= box_probe_count(cur) != box_probe_count(&next);
             *cur = next;
             box_bake_bounds_add(s, &next);
-            m->upload_lo = u->slot < m->upload_lo ? u->slot : m->upload_lo;
-            m->upload_hi = u->slot + 1 > m->upload_hi ? u->slot + 1 : m->upload_hi;
-            s->grid_dirty = true;
+            box_bake_touch(m, u->slot, lit || !grid_same);
         }
 
         box_bake_mark(s, u->mesh, u->slot);
@@ -594,6 +704,8 @@ static void box_bake_mark_changed(
     if (!s->changed.count) {
         goto done;
     }
+
+    box_bake_flush(s);
 
     box_bake_sphere_t *spheres = s->changed.data;
     uint32_t count = s->changed.count;
@@ -1222,6 +1334,8 @@ static void box_bake_meshes(
             box_bake_mesh_groups(r, m);
             entry->upload_lo = 0;
             entry->upload_hi = entry->descs.count;
+            entry->stale_lo = UINT32_MAX;
+            entry->stale_hi = 0;
         }
 
         if (entry->upload_lo < entry->upload_hi) {

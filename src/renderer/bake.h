@@ -307,6 +307,8 @@ typedef struct box_bake_mesh_t {
     uint32_t probe_count; /**< Probes the pool of the mesh holds */
     uint32_t upload_lo;   /**< First descriptor changed since the last upload */
     uint32_t upload_hi;   /**< Descriptor past the last one changed */
+    uint32_t stale_lo;    /**< First descriptor parked because no light reaches it */
+    uint32_t stale_hi;    /**< Descriptor past the last parked one */
     bool pool_dirty;      /**< The pool must be laid out again */
 } box_bake_mesh_t;
 
