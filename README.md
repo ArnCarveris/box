@@ -63,6 +63,11 @@ sphere and floor, a normal mapped box and a panel with a roughness ramp, bound
 through `PbrTextures`. `apps/box_app/etc/textures/` holds the PNGs it loads, which
 `python3 tools/gen_textures.py` regenerates.
 
+`test/integration/visual/svg_icons.flecs` is the SVG check: the three hand written
+icons in `apps/box_app/etc/svg/` rasterized by `Svg` at 64, 256 and 1024 pixels and
+shown side by side on quads, so the same vector art is blocky on the left and crisp
+on the right.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights
