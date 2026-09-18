@@ -1,0 +1,12 @@
+{
+  "project": "jsonsample",
+  "timestamp": "2026-09-18T05:12:19Z",
+  "pass": 2,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.005057,
+  "tests": [
+    {"suite": "Report", "case": "pass_case", "status": "pass", "elapsed": 0.004826},
+    {"suite": "Report", "case": "another_pass", "status": "pass", "elapsed": 0.004813}
+  ]
+}

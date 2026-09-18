@@ -1,0 +1,46 @@
+{
+  "project": "project_tool",
+  "timestamp": "2026-09-18T05:13:22Z",
+  "pass": 6,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.006553999846801162,
+  "tests": [
+    {
+      "suite": "PmTests",
+      "case": "test_check_passes_clean_tree",
+      "status": "pass",
+      "elapsed": 0.0016084159724414349
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_reports_problems",
+      "status": "pass",
+      "elapsed": 0.0012872919905930758
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliverables_summarize_test_reports",
+      "status": "pass",
+      "elapsed": 0.0012289162259548903
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_new_creates_tree",
+      "status": "pass",
+      "elapsed": 0.0012529580853879452
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_new_rejects_wrong_depth_and_missing_parent",
+      "status": "pass",
+      "elapsed": 0.00025216699577867985
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_status_transitions_set_times",
+      "status": "pass",
+      "elapsed": 0.0008173328824341297
+    }
+  ]
+}
