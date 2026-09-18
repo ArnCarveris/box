@@ -1,0 +1,37 @@
+{
+  "kind": "command",
+  "results": [
+    {
+      "scene": "test/integration/command/render.flecs",
+      "status": "pass",
+      "log": "test/integration/out/render.log",
+      "expected": "test/integration/command/render.expected",
+      "images": [
+        "render_render_0_0.png",
+        "render_render_0_1.png",
+        "render_render_0_2.png"
+      ]
+    },
+    {
+      "scene": "test/integration/command/script.flecs",
+      "status": "pass",
+      "log": "test/integration/out/script.log",
+      "expected": "test/integration/command/script.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/search.flecs",
+      "status": "pass",
+      "log": "test/integration/out/search.log",
+      "expected": "test/integration/command/search.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/shell.flecs",
+      "status": "pass",
+      "log": "test/integration/out/shell.log",
+      "expected": "test/integration/command/shell.expected",
+      "images": []
+    }
+  ]
+}
