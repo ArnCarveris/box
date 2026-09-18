@@ -35,7 +35,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VISUAL_DIR = os.path.join(ROOT, "test", "integration", "visual")
 BENCH_DIR = os.path.join(ROOT, "test", "integration", "bench")
 COMMAND_DIR = os.path.join(ROOT, "test", "integration", "command")
-HARNESS = "using box.command\n\nterminals {\n  agent0 {\n    Terminal: {log: \"%s\"}\n  }\n}\n"
+HARNESS = "using box.command\nusing box.script\n$ { ScriptSettings: {enabled: false} }\n\nterminals {\n  agent0 {\n    Terminal: {log: \"%s\"}\n  }\n}\n"
 DOTTED_ROOT = ROOT.replace(".", "\\.").replace("/", ".") + "."
 PNG_END = b"IEND\xaeB`\x82"
 
