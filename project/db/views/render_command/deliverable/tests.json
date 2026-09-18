@@ -1,0 +1,21 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T16:37:20Z",
+  "pass": 11,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.106704,
+  "tests": [
+    {"suite": "Render", "case": "prints_the_image_path", "status": "pass", "elapsed": 0.022920},
+    {"suite": "Render", "case": "numbers_the_images_per_session", "status": "pass", "elapsed": 0.023730},
+    {"suite": "Render", "case": "unknown_subject", "status": "pass", "elapsed": 0.021692},
+    {"suite": "Render", "case": "without_a_subject", "status": "pass", "elapsed": 0.021354},
+    {"suite": "Render", "case": "subject_relative_to_cwd", "status": "pass", "elapsed": 0.021326},
+    {"suite": "Render", "case": "frames_the_camera_on_the_bounds", "status": "pass", "elapsed": 0.022083},
+    {"suite": "Render", "case": "instantiates_a_prefab", "status": "pass", "elapsed": 0.022510},
+    {"suite": "Render", "case": "instantiates_a_template", "status": "pass", "elapsed": 0.025869},
+    {"suite": "Render", "case": "cleans_up_when_the_image_appears", "status": "pass", "elapsed": 0.015502},
+    {"suite": "Render", "case": "live_entity_joins_and_leaves_the_layer", "status": "pass", "elapsed": 0.015414},
+    {"suite": "Render", "case": "headless_run_writes_the_png", "status": "pass", "elapsed": 0.084819}
+  ]
+}
