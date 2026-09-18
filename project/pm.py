@@ -20,9 +20,14 @@ import urllib.parse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(ROOT, "db")
+REPO = os.path.dirname(ROOT)
+INTEGRATION_OUT = os.path.join(REPO, "test", "integration", "out")
 STATUSES = ("pending", "in progress", "complete", "discarded")
 KINDS = ("bug", "feature", "refactor")
 LEVELS = ("epic", "task", "subtask")
+TEST_STATUSES = ("pass", "fail", "empty")
+BENCH_METRICS = ("mean_ms", "p50_ms", "p99_ms", "max_ms", "fps")
+BENCH_FIELDS = ("entities", "static", "dynamic", "frames")
 
 
 def now():
@@ -125,6 +130,197 @@ def walk_item(path, level, rel):
     return item
 
 
+def mtime_iso(path):
+    try:
+        stamp = os.path.getmtime(path)
+    except OSError:
+        return None
+    return dt.datetime.fromtimestamp(stamp, dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def report_time(path, data):
+    stamp = data.get("timestamp") if isinstance(data, dict) else None
+    if isinstance(stamp, str) and stamp.strip():
+        return stamp.strip(), "report"
+    return mtime_iso(path), "mtime"
+
+
+def time_value(stamp):
+    if not isinstance(stamp, str):
+        return 0.0
+    try:
+        return dt.datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def number(value, default=0):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+
+
+def deliverable_reports():
+    result = []
+    if not os.path.isdir(DB):
+        return result
+    for root, dirs, files in os.walk(DB):
+        dirs.sort()
+        parts = os.path.relpath(root, DB).split(os.sep)
+        if "deliverable" not in parts:
+            continue
+        for name in sorted(files):
+            if name.startswith(".") or not name.endswith(".json"):
+                continue
+            full = os.path.join(root, name)
+            data = read_json(full)
+            if not isinstance(data, dict):
+                continue
+            rel = os.path.relpath(full, DB).replace(os.sep, "/")
+            result.append({
+                "item": "/".join(parts[:parts.index("deliverable")]),
+                "file": rel,
+                "url": "/deliverable/" + rel,
+                "full": full,
+                "data": data,
+            })
+    return result
+
+
+def suite_rows(data):
+    suites = {}
+    for case in data.get("tests") or []:
+        if not isinstance(case, dict):
+            continue
+        name = case.get("suite") or "(none)"
+        row = suites.setdefault(name, {
+            "suite": name, "cases": 0, "pass": 0, "fail": 0, "empty": 0, "time": 0.0, "case_list": [],
+        })
+        status = case.get("status") if case.get("status") in TEST_STATUSES else "empty"
+        elapsed = round(number(case.get("elapsed")), 6)
+        row["cases"] += 1
+        row[status] += 1
+        row["time"] = round(row["time"] + elapsed, 6)
+        row["case_list"].append({"case": case.get("case"), "status": status, "time": elapsed})
+    return [suites[name] for name in sorted(suites)]
+
+
+def aggregate_tests():
+    reports = []
+    for entry in deliverable_reports():
+        data = entry["data"]
+        if not isinstance(data.get("tests"), list):
+            continue
+        stamp, source = report_time(entry["full"], data)
+        suites = suite_rows(data)
+        counts = {key: sum(s[key] for s in suites) for key in TEST_STATUSES}
+        for key in TEST_STATUSES:
+            if key in data:
+                counts[key] = number(data.get(key))
+        reports.append({
+            "item": entry["item"],
+            "file": entry["file"],
+            "url": entry["url"],
+            "project": data.get("project") or "unknown",
+            "time": stamp,
+            "time_source": source,
+            "cases": sum(s["cases"] for s in suites),
+            "elapsed": round(number(data.get("elapsed")), 6),
+            "suites": [{k: v for k, v in s.items() if k != "case_list"} for s in suites],
+            "case_time": round(sum(s["time"] for s in suites), 6),
+            **counts,
+        })
+        reports[-1]["suite_count"] = len(suites)
+        for suite in suites:
+            reports[-1].setdefault("_suites", []).append(suite)
+    reports.sort(key=lambda r: (time_value(r["time"]), r["file"]))
+
+    latest = {}
+    for report in reports:
+        for suite in report.pop("_suites", []):
+            key = (report["project"], suite["suite"])
+            row = dict(suite)
+            row.update({
+                "project": report["project"],
+                "item": report["item"],
+                "file": report["file"],
+                "url": report["url"],
+                "report_time": report["time"],
+                "time_source": report["time_source"],
+                "cases_detail": row.pop("case_list"),
+            })
+            latest[key] = row
+    suites = [latest[key] for key in sorted(latest)]
+
+    projects = {}
+    for suite in suites:
+        row = projects.setdefault(suite["project"], {
+            "project": suite["project"], "suites": 0, "cases": 0, "pass": 0, "fail": 0, "empty": 0, "time": 0.0,
+        })
+        row["suites"] += 1
+        row["cases"] += suite["cases"]
+        row["time"] = round(row["time"] + suite["time"], 6)
+        for key in TEST_STATUSES:
+            row[key] += suite[key]
+    return {
+        "generated": now(),
+        "reports": reports,
+        "suites": suites,
+        "projects": [projects[name] for name in sorted(projects)],
+    }
+
+
+def bench_runs(full, data, origin, item, url):
+    if not isinstance(data, dict):
+        return []
+    if isinstance(data.get("results"), list):
+        runs = []
+        for result in data["results"]:
+            runs.extend(bench_runs(full, result, origin, item, url))
+        return runs
+    if not any(key in data for key in BENCH_METRICS):
+        return []
+    source = data.get("scene") if isinstance(data.get("scene"), str) else None
+    name = os.path.splitext(os.path.basename(source))[0] if source else os.path.splitext(os.path.basename(full))[0]
+    stamp, time_source = report_time(full, data)
+    run = {
+        "scene": name,
+        "source": source,
+        "origin": origin,
+        "item": item,
+        "file": os.path.relpath(full, REPO).replace(os.sep, "/"),
+        "url": url,
+        "time": stamp,
+        "time_source": time_source,
+    }
+    for key in BENCH_METRICS + BENCH_FIELDS:
+        if key in data:
+            run[key] = number(data.get(key), None)
+    return [run]
+
+
+def aggregate_benchmarks(extra_dirs=None):
+    runs = []
+    for entry in deliverable_reports():
+        runs.extend(bench_runs(entry["full"], entry["data"], "db", entry["item"], entry["url"]))
+    for directory in (INTEGRATION_OUT,) if extra_dirs is None else extra_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for name in sorted(os.listdir(directory)):
+            if name.startswith(".") or not name.endswith(".json"):
+                continue
+            full = os.path.join(directory, name)
+            item = os.path.relpath(directory, REPO).replace(os.sep, "/")
+            runs.extend(bench_runs(full, read_json(full), "integration", item, None))
+    runs.sort(key=lambda r: (time_value(r["time"]), r["scene"], r["file"]))
+    latest = {}
+    for run in runs:
+        latest[run["scene"]] = run
+    return {
+        "generated": now(),
+        "runs": runs,
+        "scenes": [latest[name] for name in sorted(latest)],
+    }
+
+
 def collect_state():
     epics = []
     if os.path.isdir(DB):
@@ -144,14 +340,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if route == "/" or route == "/index.html":
             return self.send_file(os.path.join(ROOT, "index.html"), "text/html; charset=utf-8")
         if route == "/api/state":
-            body = json.dumps(collect_state()).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
+            return self.send_json(collect_state())
+        if route == "/api/tests":
+            return self.send_json(aggregate_tests())
+        if route == "/api/benchmarks":
+            return self.send_json(aggregate_benchmarks())
         if route.startswith("/deliverable/"):
             rel = os.path.normpath(route[len("/deliverable/"):])
             full = os.path.join(DB, rel)
@@ -160,6 +353,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
             return self.send_file(full, ctype)
         return self.send_error(404)
+
+    def send_json(self, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def send_file(self, path, ctype):
         try:

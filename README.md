@@ -21,7 +21,8 @@ bake3 run box_app --local-env -- --headless --frames 10    # headless run, exits
 ```
 
 Options: `--headless`, `--frames <n>`, `--timeout <s|infinite>`, `--cpu-budget <0..1>`,
-`--fps <n>`. Headless runs require `--frames` or `--timeout`, write their temporary
+`--fps <n>`, `--port <n>` (command endpoints, default 27750, 0 disables the server).
+Headless runs require `--frames` or `--timeout`, write their temporary
 files to `/tmp/box/<pid>` and refuse to start when the machine's load exceeds its
 core count. A scene that sets `Surface.write_to_file` writes each frame as PNG:
 
@@ -96,6 +97,12 @@ python3 project/pm.py status           # print the tree in the terminal
 Work is tracked as epics, tasks and subtasks under `project/db`. Each item has
 a `README.md` with its goal and a `progress.json` with its status and timing;
 tasks and epics keep test reports, screenshots and notes in `deliverable/`.
+
+Besides the board and timeline, the page has a **Tests** tab (pass/fail/time per
+test project and suite from every `tests.json`, with charts of cases and run time
+over time and per-suite case lists) and a **Benchmarks** tab (latest frame timing
+per bench scene with mean and p99 over time). Both read the aggregated
+`/api/tests` and `/api/benchmarks` endpoints served by `pm.py serve`.
 
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>

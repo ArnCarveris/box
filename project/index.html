@@ -21,6 +21,8 @@
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.18);
   --radius: 12px;
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
 }
 :root:not([data-theme="light"]) { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
@@ -28,12 +30,16 @@
     --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
     --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
     --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
   --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
   --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -100,6 +106,9 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .chip.in-progress { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); text-decoration: none; }
 .chip.pending { color: var(--ink-3); border-color: var(--border); }
 .chip.discarded { color: var(--ink-3); border-color: var(--border); text-decoration: line-through; }
+.chip.pass { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.chip.fail { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.chip.empty { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .kind { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
 .subtasks { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 0; padding: 0; list-style: none; }
 .subtasks li {
@@ -170,6 +179,35 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .tl-vline { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); pointer-events: none; }
 .tl-tools { position: absolute; right: 16px; top: 8px; z-index: 3; display: flex; gap: 4px; }
 .tl-tools button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+.page { padding: 20px; display: grid; gap: 16px; align-content: start; }
+.page .card { gap: 12px; overflow-x: auto; }
+.page h2 { margin: 0; }
+.card-title { display: flex; align-items: baseline; gap: 10px; }
+.card-title h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.card-title span { color: var(--ink-3); font-size: 12px; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-3); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.data td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.data tr:last-child td { border-bottom: 0; }
+table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.data td.mono { font-family: var(--mono); font-size: 12px; }
+table.data tbody tr.pick { cursor: pointer; }
+table.data tbody tr.pick:hover { background: var(--surface-2); }
+table.data tbody tr.sel { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--accent); }
+td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color: var(--warn); }
+.muted { color: var(--ink-3); }
+.chart { display: flex; flex-direction: column; gap: 6px; }
+.chart svg { display: block; max-width: 100%; overflow: visible; }
+.chart .ax { fill: var(--ink-3); font-size: 10px; }
+.chart .ax-title { fill: var(--ink-3); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: default; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
 .tooltip {
   position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 6px;
   font-size: 12px; z-index: 20; display: none; white-space: nowrap; box-shadow: var(--shadow);
@@ -190,6 +228,8 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
   <div class="tabs">
     <button data-view="board" class="active">Board</button>
     <button data-view="timeline">Timeline</button>
+    <button data-view="tests">Tests</button>
+    <button data-view="benchmarks">Benchmarks</button>
   </div>
   <div class="tiles" id="tiles"></div>
   <button class="icon-btn" id="theme" title="Toggle theme">◐</button>
@@ -202,13 +242,21 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
   <div class="content" id="content">
     <div id="board" class="board"></div>
     <div id="timeline" class="timeline" hidden></div>
+    <div id="tests" class="page" hidden></div>
+    <div id="benchmarks" class="page" hidden></div>
     <div class="panel" id="panel"></div>
   </div>
 </main>
 <div class="tooltip" id="tooltip"></div>
 
 <script>
-const state = { data: null, epic: null, view: "board", zoom: 6, item: null, scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0 } };
+const state = {
+  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, suite: null, scene: null,
+  scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0 },
+};
+const VIEWS = ["board", "timeline", "tests", "benchmarks"];
+const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench" };
+const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
 let saveTimer = 0, restoring = false;
 const ICONS = {
@@ -233,6 +281,7 @@ function saveUi() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
+      suite: state.suite, scene: state.scene,
     }));
   } catch (e) {}
 }
@@ -246,23 +295,24 @@ function loadUi() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(UI_KEY) || "null"); } catch (e) {}
   if (!saved) return;
-  if (saved.view === "board" || saved.view === "timeline") state.view = saved.view;
+  if (VIEWS.includes(saved.view)) state.view = saved.view;
   if (saved.epic) state.epic = saved.epic;
   if (saved.item) state.item = saved.item;
+  if (saved.suite) state.suite = saved.suite;
+  if (saved.scene) state.scene = saved.scene;
   if (saved.zoom > 0) state.zoom = saved.zoom;
   if (saved.scroll) Object.assign(state.scroll, saved.scroll);
 }
 
 function applyView() {
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
-  document.getElementById("board").hidden = state.view !== "board";
-  document.getElementById("timeline").hidden = state.view !== "timeline";
+  for (const view of VIEWS) document.getElementById(view).hidden = state.view !== view;
 }
 
 function trackScroll(el, key) {
   el.onscroll = () => {
     if (restoring) return;
-    state.scroll[key] = el.scrollTop;
+    state.scroll[typeof key === "function" ? key() : key] = el.scrollTop;
     saveSoon();
   };
 }
@@ -276,6 +326,12 @@ function restoreScroll(el, top, left) {
 
 function chip(status) {
   return `<span class="chip ${cls(status)}">${ICONS[status] || ""}${esc(status)}</span>`;
+}
+
+const CASE_ICON = { pass: "complete", fail: "discarded", empty: "pending" };
+
+function caseChip(status) {
+  return `<span class="chip ${esc(status)}">${ICONS[CASE_ICON[status]] || ""}${esc(status)}</span>`;
 }
 
 function markdown(src) {
@@ -497,6 +553,220 @@ function renderTimeline() {
   });
 }
 
+function niceTicks(max, count) {
+  if (!(max > 0)) return [0, 1];
+  const raw = max / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm > 5 ? 10 : norm > 2 ? 5 : norm > 1 ? 2 : 1) * mag;
+  const top = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let i = 0; i * step <= top + step * 1e-9; i++) ticks.push(+(i * step).toPrecision(12));
+  return ticks;
+}
+
+function chartWidth(el) {
+  return Math.max(320, (el.clientWidth || 900) - 74);
+}
+
+function lineChart(spec) {
+  const series = (spec.series || []).filter(s => s.points.length);
+  if (!series.length) return `<div class="chart"><div class="empty-state">No data points</div></div>`;
+  const w = spec.width, h = spec.height || 210;
+  const pad = { l: 56, r: 18, t: 22, b: 40 };
+  const iw = Math.max(120, w - pad.l - pad.r), ih = Math.max(70, h - pad.t - pad.b);
+  const ts = series.flatMap(s => s.points.map(p => p.t));
+  let t0 = Math.min(...ts), t1 = Math.max(...ts);
+  if (t1 - t0 < 6e5) { t0 -= 9e5; t1 += 9e5; }
+  const ticks = niceTicks(Math.max(...series.flatMap(s => s.points.map(p => p.v)), 0), 4);
+  const top = ticks[ticks.length - 1] || 1;
+  const X = t => +(pad.l + (t - t0) / (t1 - t0) * iw).toFixed(1);
+  const Y = v => +(pad.t + ih - Math.max(0, Math.min(v, top)) / top * ih).toFixed(1);
+  const fmt = spec.yFormat || (v => String(+v.toPrecision(3)));
+  const grid = ticks.map(v => `<line class="grid" x1="${pad.l}" y1="${Y(v)}" x2="${pad.l + iw}" y2="${Y(v)}"/>
+    <text class="ax" x="${pad.l - 8}" y="${Y(v) + 3.5}" text-anchor="end">${esc(fmt(v))}</text>`).join("");
+  let lastDay = "";
+  const xAxis = [0, 1, 2, 3, 4].map(i => {
+    const t = t0 + (t1 - t0) * i / 4, d = new Date(t);
+    const day = d.toLocaleDateString([], { month: "short", day: "numeric" });
+    const show = day !== lastDay;
+    const anchor = i === 0 ? "start" : i === 4 ? "end" : "middle";
+    lastDay = day;
+    return `<text class="ax" x="${X(t)}" y="${pad.t + ih + 15}" text-anchor="${anchor}">${esc(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}${show ? `<tspan x="${X(t)}" dy="12">${esc(day)}</tspan>` : ""}</text>`;
+  }).join("");
+  const marks = series.map(s => {
+    const pts = s.points.map(p => `${X(p.t)},${Y(p.v)}`).join(" ");
+    const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : "";
+    const line = s.points.length > 1
+      ? `<polyline fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"${dash} points="${pts}"/>` : "";
+    return line + s.points.map(p => `<circle cx="${X(p.t)}" cy="${Y(p.v)}" r="3.5" fill="var(--surface)" stroke="${s.color}" stroke-width="2"/>`).join("");
+  }).join("");
+  const hits = series.flatMap(s => s.points.map(p =>
+    `<circle class="hit" cx="${X(p.t)}" cy="${Y(p.v)}" r="9" data-tip="${esc(p.tip)}" data-sub="${esc(p.sub || "")}"/>`)).join("");
+  const items = spec.legend || (series.length > 1 ? series : []);
+  const legend = items.length ? `<div class="legend">${items.map(s =>
+    `<span><svg width="18" height="8" aria-hidden="true"><line x1="1" y1="4" x2="17" y2="4" stroke="${s.color}" stroke-width="2"${s.dash ? ` stroke-dasharray="${s.dash}"` : ""}/></svg>${esc(s.name)}</span>`).join("")}</div>` : "";
+  return `<div class="chart">${legend}
+    <svg width="${w}" height="${h}" role="img" aria-label="${esc(spec.label || "time series")}">
+      ${grid}<line class="grid" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${pad.t + ih}"/>
+      <text class="ax-title" x="${pad.l}" y="${pad.t - 10}">${esc(spec.yLabel || "")}</text>
+      ${xAxis}${marks}${hits}
+    </svg></div>`;
+}
+
+function bindTips(host) {
+  const tip = document.getElementById("tooltip");
+  host.querySelectorAll("[data-tip]").forEach(el => {
+    el.onmousemove = ev => {
+      tip.style.display = "block";
+      tip.style.left = Math.min(ev.clientX + 12, innerWidth - 260) + "px";
+      tip.style.top = ev.clientY + 12 + "px";
+      const b = document.createElement("b");
+      b.textContent = el.dataset.tip;
+      tip.replaceChildren(b, document.createTextNode(el.dataset.sub || ""));
+    };
+    el.onmouseleave = () => { tip.style.display = "none"; };
+  });
+}
+
+function renderTests() {
+  const el = document.getElementById("tests");
+  const d = state.tests;
+  if (!d) { el.innerHTML = `<div class="empty-state">Loading test reports…</div>`; return; }
+  if (!d.reports.length) { el.innerHTML = `<div class="empty-state">No test reports under project/db</div>`; return; }
+  const w = chartWidth(el);
+  const reports = d.reports.filter(r => r.time);
+  const point = (r, v) => ({
+    t: +new Date(r.time), v,
+    tip: `${r.project} · ${r.item || "db"}`,
+    sub: `${fmtDate(r.time)}${r.time_source === "mtime" ? " (file time)" : ""} · ${r.pass} pass · ${r.fail} fail · ${r.cases} cases · ${(+r.elapsed).toFixed(2)}s`,
+  });
+  const anyEmpty = reports.some(r => r.empty > 0);
+  const counts = lineChart({
+    width: w, label: "test cases per report over time", yLabel: "cases", yFormat: v => String(Math.round(v)),
+    series: [
+      { name: "pass", color: "var(--good)", points: reports.map(r => point(r, r.pass)) },
+      { name: "fail", color: "var(--bad)", points: reports.map(r => point(r, r.fail)) },
+      ...(anyEmpty ? [{ name: "empty", color: "var(--warn)", points: reports.map(r => point(r, r.empty)) }] : []),
+    ],
+  });
+  const timing = lineChart({
+    width: w, label: "total run time per report over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
+    series: [{ name: "run time", color: "var(--accent)", points: reports.map(r => point(r, r.elapsed)) }],
+  });
+  const totals = d.projects.reduce((a, p) => ({
+    cases: a.cases + p.cases, pass: a.pass + p.pass, fail: a.fail + p.fail, empty: a.empty + p.empty, time: a.time + p.time,
+  }), { cases: 0, pass: 0, fail: 0, empty: 0, time: 0 });
+  const num = (v, n) => `<td class="num">${(+v).toFixed(n)}</td>`;
+  const selected = d.suites.find(s => s.project + "|" + s.suite === state.suite);
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title"><h3>Latest test run</h3>
+        <span>${d.reports.length} reports · ${d.suites.length} suites · ${totals.cases} cases ·
+        <b class="ok">${totals.pass} pass</b>${totals.fail ? ` · <b class="bad">${totals.fail} fail</b>` : ""}${totals.empty ? ` · <b class="empty">${totals.empty} empty</b>` : ""} ·
+        ${totals.time.toFixed(2)}s</span></div>
+      <table class="data"><thead><tr><th>Project</th><th class="num">Suites</th><th class="num">Cases</th>
+        <th class="num">Passed</th><th class="num">Failed</th><th class="num">Empty</th><th class="num">Time (s)</th></tr></thead>
+        <tbody>${d.projects.map(p => `<tr><td>${esc(p.project)}</td><td class="num">${p.suites}</td><td class="num">${p.cases}</td>
+          <td class="num ok">${p.pass}</td><td class="num${p.fail ? " bad" : ""}">${p.fail}</td>
+          <td class="num${p.empty ? " empty" : ""}">${p.empty}</td>${num(p.time, 3)}</tr>`).join("")}</tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-title"><h3>Cases over time</h3><span>one point per report, ${esc(fmtDate(reports.length ? reports[reports.length - 1].time : null))} latest</span></div>
+      ${counts}
+      <div class="card-title"><h3>Run time over time</h3><span>report total, seconds</span></div>
+      ${timing}
+    </div>
+    <div class="card">
+      <div class="card-title"><h3>Suites</h3><span>latest report per suite · click a row for its cases</span></div>
+      <table class="data"><thead><tr><th>Project</th><th>Suite</th><th class="num">Cases</th><th class="num">Passed</th>
+        <th class="num">Failed</th><th class="num">Time (s)</th><th>Report</th></tr></thead>
+        <tbody>${d.suites.map(s => {
+          const key = s.project + "|" + s.suite;
+          return `<tr class="pick ${key === state.suite ? "sel" : ""}" data-suite="${esc(key)}">
+            <td>${esc(s.project)}</td><td class="mono">${esc(s.suite)}</td><td class="num">${s.cases}</td>
+            <td class="num ok">${s.pass}</td><td class="num${s.fail ? " bad" : ""}">${s.fail}</td>${num(s.time, 3)}
+            <td class="muted">${esc(s.item || "db")} · ${esc(fmtDate(s.report_time))}</td></tr>`;
+        }).join("")}</tbody></table>
+    </div>
+    ${selected ? `<div class="card">
+      <div class="card-title"><h3>${esc(selected.suite)}</h3>
+        <span>${esc(selected.project)} · <a href="${esc(selected.url)}" target="_blank">${esc(selected.file)}</a></span></div>
+      <table class="data"><thead><tr><th>Case</th><th>Status</th><th class="num">Time (s)</th></tr></thead>
+        <tbody>${selected.cases_detail.map(c => `<tr><td class="mono">${esc(c.case)}</td>
+          <td>${caseChip(c.status)}</td>
+          ${num(c.time, 4)}</tr>`).join("")}</tbody></table></div>` : ""}`;
+  el.querySelectorAll("[data-suite]").forEach(row => row.onclick = () => {
+    state.suite = state.suite === row.dataset.suite ? null : row.dataset.suite;
+    renderTests();
+    saveUi();
+  });
+  bindTips(el);
+  restoreScroll(document.getElementById("content"), state.scroll.tests);
+}
+
+function renderBenchmarks() {
+  const el = document.getElementById("benchmarks");
+  const d = state.bench;
+  if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
+  if (!d.scenes.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
+  const w = chartWidth(el);
+  const color = {};
+  d.scenes.forEach((s, i) => { color[s.scene] = SERIES[i % SERIES.length]; });
+  const metric = (run, key) => (run[key] == null ? null : {
+    t: +new Date(run.time), v: run[key],
+    tip: `${run.scene} · ${key === "mean_ms" ? "mean" : "p99"} ${(+run[key]).toFixed(3)} ms`,
+    sub: `${fmtDate(run.time)}${run.time_source === "mtime" ? " (file time)" : ""} · ${run.entities != null ? (+run.entities).toLocaleString() + " entities · " : ""}${run.fps != null ? (+run.fps).toFixed(0) + " fps" : ""}`,
+  });
+  const series = [];
+  for (const scene of d.scenes.map(s => s.scene)) {
+    const runs = d.runs.filter(r => r.scene === scene && r.time);
+    series.push({ name: scene + " mean", color: color[scene], points: runs.map(r => metric(r, "mean_ms")).filter(Boolean) });
+    series.push({ name: scene + " p99", color: color[scene], dash: "5 4", points: runs.map(r => metric(r, "p99_ms")).filter(Boolean) });
+  }
+  const legend = d.scenes.map(s => ({ name: s.scene, color: color[s.scene] }))
+    .concat([{ name: "mean", color: "var(--ink-3)" }, { name: "p99", color: "var(--ink-3)", dash: "5 4" }]);
+  const chart = lineChart({
+    width: w, label: "frame time per scene over time", yLabel: "frame time (ms)",
+    yFormat: v => v.toFixed(2), series, legend,
+  });
+  const cell = (v, n) => `<td class="num">${v == null ? "—" : (+v).toFixed(n)}</td>`;
+  const selected = d.scenes.find(s => s.scene === state.scene);
+  const history = selected ? d.runs.filter(r => r.scene === selected.scene) : [];
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title"><h3>Latest benchmark per scene</h3>
+        <span>${d.scenes.length} scenes · ${d.runs.length} runs · click a row for its history</span></div>
+      <table class="data"><thead><tr><th>Scene</th><th class="num">Entities</th><th class="num">Frames</th>
+        <th class="num">Mean (ms)</th><th class="num">p50 (ms)</th><th class="num">p99 (ms)</th><th class="num">Max (ms)</th>
+        <th class="num">FPS</th><th>Report</th></tr></thead>
+        <tbody>${d.scenes.map(s => `<tr class="pick ${s.scene === state.scene ? "sel" : ""}" data-scene="${esc(s.scene)}">
+          <td><span class="dot" style="background:${color[s.scene]}"></span> ${esc(s.scene)}</td>
+          <td class="num">${s.entities == null ? "—" : (+s.entities).toLocaleString()}</td>
+          <td class="num">${s.frames == null ? "—" : s.frames}</td>
+          ${cell(s.mean_ms, 3)}${cell(s.p50_ms, 3)}${cell(s.p99_ms, 3)}${cell(s.max_ms, 3)}${cell(s.fps, 0)}
+          <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>`).join("")}</tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-title"><h3>Frame time over time</h3><span>one line per scene, solid mean and dashed p99</span></div>
+      ${chart}
+    </div>
+    ${selected ? `<div class="card">
+      <div class="card-title"><h3>${esc(selected.scene)}</h3><span>${history.length} run(s)${selected.source ? " · " + esc(selected.source) : ""}</span></div>
+      <table class="data"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>
+        <th class="num">Max (ms)</th><th class="num">FPS</th><th>File</th></tr></thead>
+        <tbody>${history.slice().reverse().map(r => `<tr><td>${esc(fmtDate(r.time))}${r.time_source === "mtime" ? ' <span class="muted">(file time)</span>' : ""}</td>
+          ${cell(r.mean_ms, 3)}${cell(r.p99_ms, 3)}${cell(r.max_ms, 3)}${cell(r.fps, 0)}
+          <td class="mono">${r.url ? `<a href="${esc(r.url)}" target="_blank">${esc(r.file)}</a>` : esc(r.file)}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+  el.querySelectorAll("[data-scene]").forEach(row => row.onclick = () => {
+    state.scene = state.scene === row.dataset.scene ? null : row.dataset.scene;
+    renderBenchmarks();
+    saveUi();
+  });
+  bindTips(el);
+  restoreScroll(document.getElementById("content"), state.scroll.bench);
+}
+
 function render() {
   if (!state.data) return;
   if (!state.epic && state.data.epics.length) {
@@ -505,15 +775,25 @@ function render() {
   renderHeader();
   renderEpics();
   applyView();
-  if (state.view === "board") renderBoard(); else renderTimeline();
-  if (state.item) openPanel(state.item);
+  if (state.view === "board") renderBoard();
+  else if (state.view === "timeline") renderTimeline();
+  else if (state.view === "tests") renderTests();
+  else renderBenchmarks();
+  if (state.item && (state.view === "board" || state.view === "timeline")) openPanel(state.item);
+  else document.getElementById("panel").classList.remove("open");
   saveUi();
+}
+
+async function loadView() {
+  if (state.view === "tests") state.tests = await fetch("/api/tests").then(r => r.json());
+  if (state.view === "benchmarks") state.bench = await fetch("/api/benchmarks").then(r => r.json());
 }
 
 async function refresh() {
   try {
     const r = await fetch("/api/state");
     state.data = await r.json();
+    await loadView();
     render();
   } catch (e) {
     document.getElementById("generated").textContent = "server unreachable";
@@ -525,6 +805,7 @@ document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
   applyView();
   render();
   saveSoon();
+  refresh();
 });
 document.getElementById("theme").onclick = () => {
   const cur = document.documentElement.dataset.theme;
@@ -541,12 +822,19 @@ function applyHash() {
   applyView();
   render();
 }
+let resizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (state.data && (state.view === "tests" || state.view === "benchmarks")) render();
+  }, 150);
+});
 loadUi();
 applyView();
-trackScroll(document.getElementById("content"), "content");
+trackScroll(document.getElementById("content"), () => CONTENT_KEY[state.view] || "content");
 trackScroll(document.querySelector("aside"), "aside");
 trackScroll(document.getElementById("panel"), "panel");
-window.onhashchange = applyHash;
+window.onhashchange = () => { applyHash(); refresh(); };
 window.addEventListener("pagehide", saveUi);
 applyHash();
 refresh();
