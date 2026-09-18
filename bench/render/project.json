@@ -73,7 +73,8 @@
             {
                 "id": "Layers",
                 "benchcases": [
-                    "extract_10k_with_layers"
+                    "extract_10k_with_layers",
+                    "extract_10k_two_views"
                 ]
             }
         ]

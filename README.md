@@ -98,6 +98,14 @@ room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights
 marked `DynamicTransform`.
 
+`test/integration/visual/layers_views.flecs` is the render layer check: red
+objects in layer `a`, blue objects in layer `b`, a green pillar in both and a
+light per layer, drawn by two views of the same camera. The main view lists
+layer `a` and the second view lists layer `b` and renders into a `RenderTarget`
+its camera captures. A layer is any entity an entity or a light joins with the
+pair `(box.view.Layer, layer)`; `View.layers` and `View.shadow_layers` hold up to
+eight layers each and show every layer when they are empty.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.

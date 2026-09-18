@@ -1,0 +1,105 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+layers {
+  a {}
+  b {}
+}
+
+main_camera {
+  Position: {0, 5, -14}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 50}
+}
+
+side_camera {
+  Position: {0, 5, -14}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 50}
+  Capture: {path: "/tmp/box/layers_views_b.png"}
+}
+
+main_view {
+  View: {camera: main_camera, priority: 0, layers: [layers.a]}
+}
+
+side_target {
+  RenderTarget: {960, 540}
+}
+
+side_view {
+  View: {camera: side_camera, target: side_target, priority: -1, layers: [layers.b]}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 0.35}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {20, 0.2, 20}
+  Rgb: {180, 180, 190}
+  PbrMaterial: {roughness: 0.9}
+}
+
+red_box {
+  (Layer, layers.a)
+  Position: {-4, 1, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1.6, 2, 1.6}
+  Rgb: {220, 70, 60}
+}
+
+red_sphere {
+  (Layer, layers.a)
+  Position: {-1.8, 1, 2}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {235, 95, 70}
+  PbrMaterial: {roughness: 0.4}
+}
+
+blue_box {
+  (Layer, layers.b)
+  Position: {4, 1, 0}
+  Rotation: {0, -0.4, 0}
+  Box: {1.6, 2, 1.6}
+  Rgb: {60, 110, 230}
+}
+
+blue_sphere {
+  (Layer, layers.b)
+  Position: {1.8, 1, 2}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 140, 245}
+  PbrMaterial: {roughness: 0.4}
+}
+
+green_pillar {
+  (Layer, layers.a)
+  (Layer, layers.b)
+  Position: {0, 1.6, -1}
+  Box: {1.2, 3.2, 1.2}
+  Rgb: {90, 200, 110}
+  PbrMaterial: {roughness: 0.5}
+}
+
+light_a {
+  (Layer, layers.a)
+  DynamicTransform
+  Position: {-2.5, 3.5, -1.5}
+  PointLight: {intensity: 60, range: 14}
+  Rgb: {255, 150, 60}
+}
+
+light_b {
+  (Layer, layers.b)
+  DynamicTransform
+  Position: {2.5, 3.5, -1.5}
+  PointLight: {intensity: 60, range: 14}
+  Rgb: {70, 190, 255}
+}
