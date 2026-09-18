@@ -1,0 +1,26 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T14:37:18Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.026857,
+  "tests": [
+    {"suite": "Blending", "case": "opaque_entity_stays_in_its_batch", "status": "pass", "elapsed": 0.013477},
+    {"suite": "Blending", "case": "blend_mode_moves_to_the_sorted_list", "status": "pass", "elapsed": 0.013140},
+    {"suite": "Blending", "case": "opacity_moves_to_the_sorted_list", "status": "pass", "elapsed": 0.013469},
+    {"suite": "Blending", "case": "full_opacity_stays_in_its_batch", "status": "pass", "elapsed": 0.013469},
+    {"suite": "Blending", "case": "tint_alpha_moves_to_the_sorted_list", "status": "pass", "elapsed": 0.012298},
+    {"suite": "Blending", "case": "translucent_opaque_mode_blends_as_alpha", "status": "pass", "elapsed": 0.013452},
+    {"suite": "Blending", "case": "back_face_mode_moves_to_the_sorted_list", "status": "pass", "elapsed": 0.013931},
+    {"suite": "Blending", "case": "back_face_modes_reach_the_packet", "status": "pass", "elapsed": 0.013639},
+    {"suite": "Blending", "case": "every_blend_mode_reaches_the_packet", "status": "pass", "elapsed": 0.012129},
+    {"suite": "Blending", "case": "sorted_back_to_front", "status": "pass", "elapsed": 0.013015},
+    {"suite": "Blending", "case": "static_entity_leaves_and_regains_its_slot", "status": "pass", "elapsed": 0.013280},
+    {"suite": "Blending", "case": "sorted_entity_extracted_every_frame", "status": "pass", "elapsed": 0.011910},
+    {"suite": "Blending", "case": "dynamic_transparent_leaves_the_dynamic_batches", "status": "pass", "elapsed": 0.012675},
+    {"suite": "Blending", "case": "deleted_entity_leaves_the_sorted_list", "status": "pass", "elapsed": 0.012652},
+    {"suite": "Blending", "case": "prefab_blend_mode_is_inherited", "status": "pass", "elapsed": 0.012821},
+    {"suite": "Blending", "case": "opaque_scene_packet_is_unchanged", "status": "pass", "elapsed": 0.012621}
+  ]
+}

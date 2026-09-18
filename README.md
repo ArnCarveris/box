@@ -73,6 +73,13 @@ at one meter over boxes of one, two and six meters, a cylinder and a sphere, wit
 second row that offsets the texture transform, mirrors and clamps the wrap mode and
 tiles the same material at three sizes.
 
+`test/integration/visual/blending.flecs` is the blend mode check: alpha blended,
+additive, multiply, screen and subtractive panels overlapping each other and the
+primitives behind them, drawn back to front. `milk_glass.flecs` holds a frosted
+panel with opacity 0.5 and roughness 0.8 next to a clear one over the same
+textured geometry, and `back_faces.flecs` shows three open boxes of quads, one
+per `BackFaceMode`, with the camera looking into them.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights
