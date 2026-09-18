@@ -377,12 +377,19 @@ class PmTests(unittest.TestCase):
         self.new("epic", "e1", "Epic")
         self.new("task", "e1/t1", "Task")
         self.new("task", "e1/t2", "Other task")
+        self.new("task", "e1/t3", "Page task")
         self.new("epic", "project_tool", "Tooling")
         self.new("task", "project_tool/t1", "Tool task")
-        for path in ("e1/t1", "e1/t2", "project_tool/t1"):
+        for path in ("e1/t1", "e1/t2", "e1/t3", "project_tool/t1"):
             pm.set_status(path, "complete")
             self.write_report(path + "/deliverable/tests.json", {"project": "core", "tests": []})
         self.write_report("e1/t2/deliverable/bench.json", {"project": "bench_transform", "benchmarks": []})
+        progress_path = os.path.join(pm.DB, "e1", "t3", "progress.json")
+        with open(progress_path) as f:
+            progress = json.load(f)
+        progress["bench"] = False
+        with open(progress_path, "w") as f:
+            json.dump(progress, f)
         import io, contextlib
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -391,6 +398,7 @@ class PmTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("e1/t1: warning: complete without deliverable/bench.json", text)
         self.assertNotIn("e1/t2: warning", text)
+        self.assertNotIn("e1/t3: warning", text)
         self.assertNotIn("project_tool/t1: warning", text)
         self.assertIn("1 warning(s)", text)
 

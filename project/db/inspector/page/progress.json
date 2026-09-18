@@ -6,5 +6,6 @@
   "end_time": "2026-09-18T09:24:20.377+00:00",
   "dependencies": [
     "inspector/capture_endpoint"
-  ]
+  ],
+  "bench": false
 }

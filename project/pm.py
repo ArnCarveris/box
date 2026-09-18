@@ -230,6 +230,7 @@ def walk_item(path, level, rel):
         "end_time": progress.get("end_time"),
         "dependencies": progress.get("dependencies", []),
         "created": progress.get("created"),
+        "bench": progress.get("bench", True),
         "deliverables": list_deliverables(path),
         "children": [],
     }
@@ -756,7 +757,7 @@ def cmd_check(args):
     def wants_bench(item):
         if bench_since is None or item["level"] != "task" or item["status"] != "complete":
             return False
-        if item["path"].split("/")[0] == BENCH_EXEMPT_EPIC:
+        if item["path"].split("/")[0] == BENCH_EXEMPT_EPIC or item["bench"] is False:
             return False
         return time_value(item["end_time"]) > bench_since
 
