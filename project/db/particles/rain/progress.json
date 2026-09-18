@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "sky/weather",
+    "weather/states",
     "particles/appearance",
     "particles/control"
   ]

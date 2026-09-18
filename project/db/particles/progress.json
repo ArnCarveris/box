@@ -8,7 +8,7 @@
     "culling",
     "materials",
     "effects",
-    "sky"
+    "weather"
   ],
   "priority": 14
 }
