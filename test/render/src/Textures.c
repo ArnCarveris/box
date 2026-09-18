@@ -221,10 +221,10 @@ void Textures_albedo_slot_reaches_the_instance(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_int(u->data.textures[0], ecs_get(w, t, RenderTexture)->handle);
-    test_int(u->data.textures[1], 0);
-    test_int(u->data.textures[2], 0);
-    test_int(u->data.textures[3], 0);
+    test_int(box_instance_texture(&u->data, 0), ecs_get(w, t, RenderTexture)->handle);
+    test_int(box_instance_texture(&u->data, 1), 0);
+    test_int(box_instance_texture(&u->data, 2), 0);
+    test_int(box_instance_texture(&u->data, 3), 0);
 }
 
 void Textures_every_slot_reaches_the_instance(void)
@@ -249,8 +249,9 @@ void Textures_every_slot_reaches_the_instance(void)
     box_render_extract(w, &packet);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
     for (i = 0; i < 4; i ++) {
-        test_int(u->data.textures[i], ecs_get(w, slots[i], RenderTexture)->handle);
-        test_int(box_texture_layer(u->data.textures[i]), (uint32_t)i);
+        uint32_t handle = box_instance_texture(&u->data, (uint32_t)i);
+        test_int(handle, ecs_get(w, slots[i], RenderTexture)->handle);
+        test_int(box_texture_layer(handle), (uint32_t)i);
     }
 }
 
@@ -270,7 +271,7 @@ void Textures_prefab_slots_are_inherited(void)
     ecs_set(w, e, Box, {1, 1, 1});
     box_render_extract(w, &packet);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_int(u->data.textures[0], ecs_get(w, t, RenderTexture)->handle);
+    test_int(box_instance_texture(&u->data, 0), ecs_get(w, t, RenderTexture)->handle);
 }
 
 void Textures_reload_reextracts_dependents(void)
@@ -301,7 +302,7 @@ void Textures_reload_reextracts_dependents(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_int(u->data.textures[0], ecs_get(w, t, RenderTexture)->handle);
+    test_int(box_instance_texture(&u->data, 0), ecs_get(w, t, RenderTexture)->handle);
 }
 
 void Textures_deleting_a_texture_unbinds_and_warns(void)
@@ -329,7 +330,7 @@ void Textures_deleting_a_texture_unbinds_and_warns(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_int(u->data.textures[0], 0);
+    test_int(box_instance_texture(&u->data, 0), 0);
     test_int(packet.texture_destroy.count, 1);
 }
 

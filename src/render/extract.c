@@ -110,7 +110,8 @@ static void box_extract_static(
     box_static_update_t *update = box_vec_push(&p->static_updates);
     update->mesh = mesh->handle;
     update->slot = inst->slot;
-    box_render_fill_instance(world, e, mesh, transform, state->bake_enabled, &update->data);
+    box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
+        state->textured, &update->data);
     box_render_update_aabb(world, e, mesh, transform);
 done:
     return;
@@ -170,7 +171,8 @@ static void box_extract_dynamic(
             }
 
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
-            box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false, data);
+            box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false,
+                state->textured, data);
             batch->count ++;
         }
     }

@@ -69,7 +69,7 @@ void box_frame_init(
         { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 },
-        { .format = WGPUVertexFormat_Uint32x4, .offset = 96, .shaderLocation = 9 }
+        { .format = WGPUVertexFormat_Uint32x2, .offset = 96, .shaderLocation = 9 }
     };
     WGPUVertexBufferLayout layouts[2] = {
         {

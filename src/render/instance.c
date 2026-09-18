@@ -188,10 +188,16 @@ static void box_render_fill_textures(
     box_instance_t *out)
 {
     const PbrTextures *tex = ecs_get(world, e, PbrTextures);
-    out->textures[0] = tex ? box_render_texture_of(world, tex->albedo) : 0;
-    out->textures[1] = tex ? box_render_texture_of(world, tex->emissive) : 0;
-    out->textures[2] = tex ? box_render_texture_of(world, tex->roughness) : 0;
-    out->textures[3] = tex ? box_render_texture_of(world, tex->normal) : 0;
+    if (!tex) {
+        goto done;
+    }
+
+    box_instance_set_texture(out, 0, box_render_texture_of(world, tex->albedo));
+    box_instance_set_texture(out, 1, box_render_texture_of(world, tex->emissive));
+    box_instance_set_texture(out, 2, box_render_texture_of(world, tex->roughness));
+    box_instance_set_texture(out, 3, box_render_texture_of(world, tex->normal));
+done:
+    return;
 }
 
 void box_render_fill_instance(
@@ -200,6 +206,7 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
+    bool textured,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -229,7 +236,10 @@ void box_render_fill_instance(
     out->params[2] = baked ? 1.0f : 0.0f;
     out->params[3] = 0.0f;
 
-    box_render_fill_textures(world, e, out);
+    memset(out->textures, 0, sizeof(out->textures));
+    if (textured) {
+        box_render_fill_textures(world, e, out);
+    }
 }
 
 void box_render_instance_init(

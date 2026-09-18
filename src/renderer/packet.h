@@ -39,13 +39,16 @@
 /** Texture slots a material binds: albedo, emissive, roughness and normal */
 #define BOX_TEXTURE_SLOTS (4)
 
+/** Layers a size class can hold, the packed instance slot is sixteen bits wide */
+#define BOX_TEXTURE_LAYER_MAX (0x3FFF - 1)
+
 /** Per instance data as laid out in GPU instance buffers */
 typedef struct box_instance_t {
     float transform[12];   /**< Rows of the 3x4 world matrix, each x y z w */
     float color[4];        /**< Linear albedo rgb and opacity */
     float emissive[4];     /**< Linear emissive rgb, w is the emission strength */
     float params[4];       /**< Metallic, roughness, baked, unused */
-    uint32_t textures[BOX_TEXTURE_SLOTS]; /**< Texture handle per slot, 0 for none */
+    uint32_t textures[BOX_TEXTURE_SLOTS / 2]; /**< Two packed texture slots per word */
 } box_instance_t;
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
@@ -210,6 +213,49 @@ static inline size_t box_texture_bytes(
         }
 
         level >>= 1;
+    }
+
+    return result;
+}
+
+/** Write a texture handle into one of the packed texture slots of an instance.
+ *
+ * A slot holds the size class in its top two bits and the layer plus one below
+ * them, so a slot of zero binds no texture and two slots fit in one word.
+ *
+ * @param inst The instance
+ * @param slot Slot index, 0 albedo, 1 emissive, 2 roughness and 3 normal
+ * @param handle The texture handle, 0 for none
+ */
+static inline void box_instance_set_texture(
+    box_instance_t *inst,
+    uint32_t slot,
+    uint32_t handle)
+{
+    uint32_t packed = 0;
+    if (handle) {
+        packed = (box_texture_class(handle) << 14) | (box_texture_layer(handle) + 1);
+    }
+
+    uint32_t shift = (slot & 1) * 16;
+    uint32_t word = inst->textures[slot >> 1] & ~(0xFFFFu << shift);
+    inst->textures[slot >> 1] = word | (packed << shift);
+}
+
+/** Texture handle one of the packed texture slots of an instance names.
+ *
+ * @param inst The instance
+ * @param slot Slot index, 0 albedo, 1 emissive, 2 roughness and 3 normal
+ * @return The texture handle, 0 when the slot binds none
+ */
+static inline uint32_t box_instance_texture(
+    const box_instance_t *inst,
+    uint32_t slot)
+{
+    uint32_t packed = (inst->textures[slot >> 1] >> ((slot & 1) * 16)) & 0xFFFF;
+    uint32_t result = 0;
+    if (packed) {
+        result = box_texture_handle(packed >> 14, (packed & 0x3FFF) - 1);
     }
 
     return result;

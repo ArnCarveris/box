@@ -120,8 +120,8 @@
     "@group(2) @binding(10) var samp2: sampler;\n" \
     "@group(2) @binding(11) var samp3: sampler;\n" \
     "fn tex_sample(slot: u32, uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> {\n" \
-    "  let cls = slot >> 24u;\n" \
-    "  let layer = (slot & 0xFFFFFFu) - 1u;\n" \
+    "  let cls = slot >> 14u;\n" \
+    "  let layer = (slot & 0x3FFFu) - 1u;\n" \
     "  var result = vec4<f32>(1.0);\n" \
     "  if (cls == 0u) {\n" \
     "    result = textureSampleGrad(tex0, samp0, uv, layer, ddx, ddy);\n" \
@@ -209,7 +209,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(6) color: vec4<f32>,\n"
     "  @location(7) emissive: vec4<f32>,\n"
     "  @location(8) params: vec4<f32>,\n"
-    "  @location(9) textures: vec4<u32>,\n"
+    "  @location(9) textures: vec2<u32>,\n"
     "};\n"
     "struct VertexOut {\n"
     "  @builtin(position) clip: vec4<f32>,\n"
@@ -221,7 +221,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(5) params: vec4<f32>,\n"
     "  @location(6) @interpolate(flat) slot: u32,\n"
     "  @location(7) local: vec3<f32>,\n"
-    "  @location(8) @interpolate(flat) textures: vec4<u32>,\n"
+    "  @location(8) @interpolate(flat) textures: vec2<u32>,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -330,18 +330,22 @@ const char *box_mesh_shader_wgsl =
     "  var albedo = in.color.rgb;\n"
     "  var emitted = in.emissive.rgb;\n"
     "  var rough = in.params.y;\n"
-    "  if (in.textures.x != 0u) {\n"
-    "    albedo = albedo * srgb_to_linear(tex_sample(in.textures.x, in.uv, ddx, ddy).rgb);\n"
+    "  let slot_albedo = in.textures.x & 0xFFFFu;\n"
+    "  let slot_emissive = in.textures.x >> 16u;\n"
+    "  let slot_rough = in.textures.y & 0xFFFFu;\n"
+    "  let slot_normal = in.textures.y >> 16u;\n"
+    "  if (slot_albedo != 0u) {\n"
+    "    albedo = albedo * srgb_to_linear(tex_sample(slot_albedo, in.uv, ddx, ddy).rgb);\n"
     "  }\n"
-    "  if (in.textures.y != 0u) {\n"
-    "    let t = srgb_to_linear(tex_sample(in.textures.y, in.uv, ddx, ddy).rgb);\n"
+    "  if (slot_emissive != 0u) {\n"
+    "    let t = srgb_to_linear(tex_sample(slot_emissive, in.uv, ddx, ddy).rgb);\n"
     "    emitted = emitted + t * in.emissive.w;\n"
     "  }\n"
-    "  if (in.textures.z != 0u) {\n"
-    "    rough = rough * tex_sample(in.textures.z, in.uv, ddx, ddy).g;\n"
+    "  if (slot_rough != 0u) {\n"
+    "    rough = rough * tex_sample(slot_rough, in.uv, ddx, ddy).g;\n"
     "  }\n"
-    "  if (in.textures.w != 0u) {\n"
-    "    let ts = tex_sample(in.textures.w, in.uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
+    "  if (slot_normal != 0u) {\n"
+    "    let ts = tex_sample(slot_normal, in.uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
     "    n = perturb(n, dp1, dp2, ddx, ddy, ts);\n"
     "  }\n"
     "  let l = normalize(-u.sun_dir);\n"

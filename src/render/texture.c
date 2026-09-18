@@ -59,8 +59,13 @@ uint32_t box_render_texture_create(
         "replaced texture handle is of another size class");
 
     if (!handle) {
-        handle = box_texture_handle(cls, box_render_texture_layer_alloc(state, cls));
+        uint32_t layer = box_render_texture_layer_alloc(state, cls);
+        ecs_assert(layer <= BOX_TEXTURE_LAYER_MAX, ECS_OUT_OF_RANGE,
+            "texture size class is out of layers");
+        handle = box_texture_handle(cls, layer);
     }
+
+    state->textured = true;
 
     box_texture_cmd_t *cmd = ecs_vec_append_t(NULL, &state->pending_textures, box_texture_cmd_t);
     cmd->handle = handle;

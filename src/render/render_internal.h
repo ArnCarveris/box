@@ -34,6 +34,7 @@ typedef struct RenderState {
     ecs_vec_t dead_textures;  /**< uint32_t texture handles waiting for the next packet */
     ecs_vec_t free_layers[BOX_TEXTURE_CLASSES]; /**< uint32_t free layers per size class */
     uint32_t layer_count[BOX_TEXTURE_CLASSES];  /**< Layers handed out per size class */
+    bool textured;            /**< A texture handle was allocated, slots need resolving */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
@@ -179,6 +180,7 @@ void box_render_release_slot(
  * @param mesh Its render mesh
  * @param transform Its world transform
  * @param baked The instance reads a baked probe instead of the static lights
+ * @param textured The world holds textures, so the PBR slots are resolved
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -187,6 +189,7 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
+    bool textured,
     box_instance_t *out);
 
 /** Check whether an entity or an ancestor carries a dynamic tag.
