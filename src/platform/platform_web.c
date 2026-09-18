@@ -44,6 +44,7 @@ box_window_t* box_window_create(
     box_window_t *w = calloc(1, sizeof(box_window_t));
     w->canvas = "#canvas";
     box_window_sync_size(w);
+
     return w;
 }
 
@@ -63,6 +64,7 @@ bool box_window_should_close(
     const box_window_t *w)
 {
     (void)w;
+
     return false;
 }
 
@@ -99,6 +101,7 @@ void* box_window_metal_layer(
     box_window_t *w)
 {
     (void)w;
+
     return NULL;
 }
 

@@ -29,6 +29,7 @@ static void box_renderer_consume(
         }
 #endif
     }
+
     box_queue_release(&r->queue, p);
 }
 
@@ -71,6 +72,7 @@ box_renderer_t* box_renderer_create(
         memcpy(copy, desc->canvas_selector, len);
         r->desc.canvas_selector = copy;
     }
+
     box_queue_init(&r->queue);
 
 #ifndef BOX_PLATFORM_WEB
@@ -82,6 +84,7 @@ box_renderer_t* box_renderer_create(
         } else {
             r->thread_started = true;
         }
+
         goto done;
     }
 #endif
@@ -127,6 +130,7 @@ box_packet_t* box_renderer_acquire(
     if (p) {
         memset(p, 0, sizeof(box_packet_t));
     }
+
     return p;
 }
 
@@ -135,14 +139,15 @@ void box_renderer_submit(
     box_packet_t *p)
 {
     box_queue_submit(&r->queue, p);
+    bool threaded = false;
 #ifndef BOX_PLATFORM_WEB
-    if (r->desc.threaded) {
-        return;
-    }
+    threaded = r->desc.threaded;
 #endif
-    box_packet_t *ready;
-    while ((ready = box_queue_poll(&r->queue))) {
-        box_renderer_consume(r, ready);
+    if (!threaded) {
+        box_packet_t *ready;
+        while ((ready = box_queue_poll(&r->queue))) {
+            box_renderer_consume(r, ready);
+        }
     }
 }
 

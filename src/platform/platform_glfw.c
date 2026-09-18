@@ -110,6 +110,7 @@ const char* box_window_canvas(
     const box_window_t *w)
 {
     (void)w;
+
     return NULL;
 }
 

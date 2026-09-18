@@ -24,6 +24,7 @@ static void box_rmtree(
             if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) {
                 continue;
             }
+
             char *child = flecs_asprintf("%s/%s", path, entry->d_name);
             struct stat st;
             if (!lstat(child, &st) && S_ISDIR(st.st_mode)) {
@@ -31,10 +32,13 @@ static void box_rmtree(
             } else {
                 unlink(child);
             }
+
             ecs_os_free(child);
         }
+
         closedir(dir);
     }
+
     rmdir(path);
 }
 
@@ -60,6 +64,7 @@ void box_process_init(
     if (mkdir(dir, 0777) && errno != EEXIST) {
         ecs_warn("failed to create process folder %s", dir);
     }
+
     App *app = ecs_singleton_ensure(world, App);
     ecs_os_free(app->process_dir);
     app->process_dir = ecs_os_strdup(dir);

@@ -23,6 +23,7 @@ void box_queue_init(
     for (i = 0; i < BOX_QUEUE_SIZE; i ++) {
         q->free_list[i] = &q->packets[i];
     }
+
     q->free_count = BOX_QUEUE_SIZE;
 #ifndef BOX_PLATFORM_WEB
     pthread_mutex_init(&q->lock, NULL);
@@ -56,7 +57,9 @@ box_packet_t* box_queue_acquire(
     if (q->free_count && !q->stopped) {
         result = q->free_list[-- q->free_count];
     }
+
     box_queue_unlock(q);
+
     return result;
 }
 
@@ -88,6 +91,7 @@ static box_packet_t* box_queue_pop_ready(
         memmove(&q->ready_list[0], &q->ready_list[1],
             (size_t)q->ready_count * sizeof(box_packet_t*));
     }
+
     return result;
 }
 
@@ -102,6 +106,7 @@ box_packet_t* box_queue_wait(
 #endif
     box_packet_t *result = box_queue_pop_ready(q);
     box_queue_unlock(q);
+
     return result;
 }
 
@@ -111,6 +116,7 @@ box_packet_t* box_queue_poll(
     box_queue_lock(q);
     box_packet_t *result = box_queue_pop_ready(q);
     box_queue_unlock(q);
+
     return result;
 }
 

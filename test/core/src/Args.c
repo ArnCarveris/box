@@ -1,14 +1,22 @@
+/**
+ * @file Args.c
+ * @brief Tests for command line parsing into the App singleton.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
 
-static ecs_world_t* args_world(void) {
+static ecs_world_t* args_world(void)
+{
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
+
     return world;
 }
 
-void Args_no_args_defaults(void) {
+void Args_no_args_defaults(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box" };
@@ -23,7 +31,8 @@ void Args_no_args_defaults(void) {
     ecs_fini(world);
 }
 
-void Args_headless_requires_stop_condition(void) {
+void Args_headless_requires_stop_condition(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     ecs_log_set_level(-4);
@@ -33,7 +42,8 @@ void Args_headless_requires_stop_condition(void) {
     ecs_fini(world);
 }
 
-void Args_headless_with_frames(void) {
+void Args_headless_with_frames(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box", "--headless", "--frames", "12" };
@@ -44,7 +54,8 @@ void Args_headless_with_frames(void) {
     ecs_fini(world);
 }
 
-void Args_timeout_seconds(void) {
+void Args_timeout_seconds(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box", "--headless", "--timeout", "1.5" };
@@ -53,7 +64,8 @@ void Args_timeout_seconds(void) {
     ecs_fini(world);
 }
 
-void Args_timeout_infinite(void) {
+void Args_timeout_infinite(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box", "--headless", "--timeout", "infinite" };
@@ -62,7 +74,8 @@ void Args_timeout_infinite(void) {
     ecs_fini(world);
 }
 
-void Args_cpu_budget(void) {
+void Args_cpu_budget(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box", "--cpu-budget", "0.5" };
@@ -71,7 +84,8 @@ void Args_cpu_budget(void) {
     ecs_fini(world);
 }
 
-void Args_fps(void) {
+void Args_fps(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     char *argv[] = { "box", "--fps", "30" };
@@ -80,7 +94,8 @@ void Args_fps(void) {
     ecs_fini(world);
 }
 
-void Args_unknown_option_fails(void) {
+void Args_unknown_option_fails(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     ecs_log_set_level(-4);
@@ -90,7 +105,8 @@ void Args_unknown_option_fails(void) {
     ecs_fini(world);
 }
 
-void Args_scene_file_loads(void) {
+void Args_scene_file_loads(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     const char *path = "/tmp/box_args_scene.flecs";
@@ -105,7 +121,8 @@ void Args_scene_file_loads(void) {
     ecs_fini(world);
 }
 
-void Args_missing_scene_fails(void) {
+void Args_missing_scene_fails(void)
+{
     // engine_core/app
     ecs_world_t *world = args_world();
     ecs_log_set_level(-4);

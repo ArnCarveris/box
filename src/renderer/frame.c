@@ -11,7 +11,8 @@ static const char *box_triangle_wgsl =
     "struct Out { @builtin(position) pos: vec4<f32>, @location(0) color: vec3<f32> };\n"
     "@vertex fn vs_main(@builtin(vertex_index) i: u32) -> Out {\n"
     "  var p = array<vec2<f32>, 3>(vec2(0.0, 0.6), vec2(-0.6, -0.5), vec2(0.6, -0.5));\n"
-    "  var c = array<vec3<f32>, 3>(vec3(1.0, 0.3, 0.2), vec3(0.2, 1.0, 0.3), vec3(0.2, 0.4, 1.0));\n"
+    "  var c = array<vec3<f32>, 3>(\n"
+    "    vec3(1.0, 0.3, 0.2), vec3(0.2, 1.0, 0.3), vec3(0.2, 0.4, 1.0));\n"
     "  var out: Out;\n"
     "  out.pos = vec4(p[i], 0.5, 1.0);\n"
     "  out.color = c[i];\n"
@@ -70,18 +71,20 @@ void box_frame_init(
 static WGPUTexture box_frame_target(
     box_renderer_t *r)
 {
-    if (!r->surface) {
-        return r->offscreen;
+    WGPUTexture result = r->offscreen;
+    if (r->surface) {
+        WGPUSurfaceTexture st = {0};
+        wgpuSurfaceGetCurrentTexture(r->surface, &st);
+        bool ok = st.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal ||
+            st.status == WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal;
+        result = st.texture;
+        if (!ok && st.texture) {
+            wgpuTextureRelease(st.texture);
+            result = NULL;
+        }
     }
-    WGPUSurfaceTexture st = {0};
-    wgpuSurfaceGetCurrentTexture(r->surface, &st);
-    if (st.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal &&
-        st.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)
-    {
-        if (st.texture) wgpuTextureRelease(st.texture);
-        return NULL;
-    }
-    return st.texture;
+
+    return result;
 }
 
 void box_frame_render(
@@ -92,7 +95,7 @@ void box_frame_render(
 
     WGPUTexture target = box_frame_target(r);
     if (!target) {
-        return;
+        goto done;
     }
 
     WGPUTextureView view = wgpuTextureCreateView(target, NULL);
@@ -137,5 +140,8 @@ void box_frame_render(
 #endif
         wgpuTextureRelease(target);
     }
+
     wgpuTextureViewRelease(view);
+done:
+    return;
 }

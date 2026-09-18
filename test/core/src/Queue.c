@@ -1,9 +1,15 @@
+/**
+ * @file Queue.c
+ * @brief Tests for the renderer packet queue.
+ */
+
 #include <bake_test.h>
 #include <pthread.h>
 #include <unistd.h>
 #include "../../../src/renderer/queue.h"
 
-void Queue_init_all_free(void) {
+void Queue_init_all_free(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -13,7 +19,8 @@ void Queue_init_all_free(void) {
     box_queue_fini(&q);
 }
 
-void Queue_acquire_submit_wait_release(void) {
+void Queue_acquire_submit_wait_release(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -32,7 +39,8 @@ void Queue_acquire_submit_wait_release(void) {
     box_queue_fini(&q);
 }
 
-void Queue_poll_returns_null_when_empty(void) {
+void Queue_poll_returns_null_when_empty(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -44,7 +52,8 @@ void Queue_poll_returns_null_when_empty(void) {
     box_queue_fini(&q);
 }
 
-void Queue_fifo_order(void) {
+void Queue_fifo_order(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -61,7 +70,8 @@ void Queue_fifo_order(void) {
     box_queue_fini(&q);
 }
 
-void Queue_acquire_returns_null_after_stop(void) {
+void Queue_acquire_returns_null_after_stop(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -71,15 +81,19 @@ void Queue_acquire_returns_null_after_stop(void) {
     box_queue_fini(&q);
 }
 
-static void* release_later(void *arg) {
+static void* release_later(
+    void *arg)
+{
     box_queue_t *q = arg;
     usleep(50000);
     box_packet_t *p = box_queue_wait(q);
     box_queue_release(q, p);
+
     return NULL;
 }
 
-void Queue_acquire_blocks_until_release(void) {
+void Queue_acquire_blocks_until_release(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);
@@ -87,6 +101,7 @@ void Queue_acquire_blocks_until_release(void) {
     for (i = 0; i < BOX_QUEUE_SIZE; i ++) {
         box_queue_submit(&q, box_queue_acquire(&q));
     }
+
     test_int(q.free_count, 0);
     pthread_t thread;
     pthread_create(&thread, NULL, release_later, &q);
@@ -96,16 +111,20 @@ void Queue_acquire_blocks_until_release(void) {
     box_queue_fini(&q);
 }
 
-static void* submit_later(void *arg) {
+static void* submit_later(
+    void *arg)
+{
     box_queue_t *q = arg;
     usleep(50000);
     box_packet_t *p = box_queue_acquire(q);
     p->frame = 9;
     box_queue_submit(q, p);
+
     return NULL;
 }
 
-void Queue_wait_blocks_until_submit(void) {
+void Queue_wait_blocks_until_submit(void)
+{
     // engine_core/surface
     box_queue_t q;
     box_queue_init(&q);

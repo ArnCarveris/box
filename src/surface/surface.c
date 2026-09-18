@@ -77,17 +77,21 @@ static void box_surface_apply(
     SurfaceImpl *impl)
 {
     if (!impl->window) {
-        return;
+        goto done;
     }
+
     if (s->width != impl->width || s->height != impl->height) {
         box_window_set_size(impl->window, s->width, s->height);
     }
+
     const char *title = s->title ? s->title : "box";
     if (!impl->title || strcmp(title, impl->title)) {
         box_window_set_title(impl->window, title);
         ecs_os_free(impl->title);
         impl->title = ecs_os_strdup(title);
     }
+done:
+    return;
 }
 
 /** Surface on_set hook: open or reconfigure the window and renderer.
@@ -106,6 +110,7 @@ static void box_surface_on_set(
         if (!impl->renderer) {
             box_surface_open(world, e, &s[i], impl);
         }
+
         box_surface_apply(&s[i], impl);
         impl->width = s[i].width;
         impl->height = s[i].height;
@@ -130,9 +135,11 @@ static void box_surface_impl_dtor(
         if (impl[i].renderer) {
             box_renderer_destroy(impl[i].renderer);
         }
+
         if (impl[i].window) {
             box_window_destroy(impl[i].window);
         }
+
         ecs_os_free(impl[i].title);
     }
 }
@@ -155,6 +162,7 @@ static void BoxSurfacePoll(
             s[i].point_height = s[i].height;
             continue;
         }
+
         box_window_poll(impl[i].window);
         box_window_size(impl[i].window, &s[i].actual_width, &s[i].actual_height,
             &s[i].point_width, &s[i].point_height);
@@ -179,19 +187,24 @@ static void box_surface_capture_path(
 {
     out[0] = '\0';
     if (!s->write_to_file) {
-        return;
+        goto done;
     }
+
     if (s->write_nth <= 0) {
         ecs_os_snprintf(out, (ecs_size_t)size, "%s", s->write_to_file);
-        return;
+        goto done;
     }
+
     if (frame % s->write_nth) {
-        return;
+        goto done;
     }
+
     const char *ext = strrchr(s->write_to_file, '.');
     int32_t base_len = ext ? (int32_t)(ext - s->write_to_file) : (int32_t)strlen(s->write_to_file);
     ecs_os_snprintf(out, (ecs_size_t)size, "%.*s_%05d%s",
         base_len, s->write_to_file, frame, ext ? ext : "");
+done:
+    return;
 }
 
 /** Fill a packet with the frame's parameters and submit it to the renderer.
@@ -209,10 +222,12 @@ static void BoxSurfaceSubmit(
         if (!impl[i].renderer) {
             continue;
         }
+
         box_packet_t *p = box_renderer_acquire(impl[i].renderer);
         if (!p) {
             continue;
         }
+
         p->frame = (uint32_t)app->frame;
         p->time = ecs_get_world_info(it->world)->world_time_total;
         p->width = (uint32_t)s[i].actual_width;
@@ -236,7 +251,10 @@ void BoxSurfaceImport(
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
 
     ecs_set_hooks(world, Surface, { .on_set = box_surface_on_set });
-    ecs_set_hooks(world, SurfaceImpl, { .ctor = flecs_default_ctor, .dtor = box_surface_impl_dtor });
+    ecs_set_hooks(world, SurfaceImpl, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_surface_impl_dtor
+    });
     ecs_add_pair(world, ecs_id(SurfaceImpl), EcsOnInstantiate, EcsDontInherit);
 
     ECS_SYSTEM(world, BoxSurfacePoll, EcsOnLoad, Surface, SurfaceImpl);

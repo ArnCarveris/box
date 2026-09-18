@@ -27,7 +27,7 @@ static void box_tick(
     ecs_world_t *world = loop->world;
     if (!ecs_progress(world, 0)) {
         loop->done = true;
-        return;
+        goto done;
     }
 
     App *app = ecs_singleton_ensure(world, App);
@@ -36,13 +36,17 @@ static void box_tick(
     if (app->frames && app->frame >= app->frames) {
         loop->done = true;
     }
+
     ecs_time_t start = loop->start;
     if (app->timeout > 0 && ecs_time_measure(&start) >= app->timeout) {
         loop->done = true;
     }
+
     if (app->cpu_budget > 0 && app->cpu_budget < 1.0) {
         box_cpu_pace(&loop->cpu, app->cpu_budget);
     }
+done:
+    return;
 }
 
 #ifdef BOX_PLATFORM_WEB
@@ -66,9 +70,11 @@ static void box_tick_web(
 int box_run(
     ecs_world_t *world)
 {
+    int result = 0;
     App *app = ecs_singleton_ensure(world, App);
     if (app->headless && box_cpu_oversubscribed()) {
-        return -1;
+        result = -1;
+        goto done;
     }
 
     ecs_set_target_fps(world, (float)app->target_fps);
@@ -83,7 +89,9 @@ int box_run(
     while (!loop->done) {
         box_tick(loop);
     }
+
     ecs_os_free(loop);
 #endif
-    return 0;
+done:
+    return result;
 }

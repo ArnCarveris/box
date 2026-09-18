@@ -39,5 +39,6 @@ int main(
     return ecs_fini(world);
 error:
     ecs_fini(world);
+
     return -1;
 }

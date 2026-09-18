@@ -22,6 +22,7 @@ void* box_macos_metal_layer(
     CAMetalLayer *layer = [CAMetalLayer layer];
     layer.contentsScale = [window backingScaleFactor];
     [view setLayer:layer];
+
     return (__bridge void*)layer;
 }
 

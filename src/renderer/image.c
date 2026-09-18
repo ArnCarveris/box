@@ -31,12 +31,15 @@ int box_image_write_png(
     uint32_t stride,
     const void *pixels)
 {
+    int ok = 0;
     FILE *f = fopen(path, "wb");
-    if (!f) {
+    if (f) {
+        ok = stbi_write_png_to_func(
+            box_png_write, f, (int)width, (int)height, 4, pixels, (int)stride);
+        fclose(f);
+    } else {
         fprintf(stderr, "box: cannot write '%s'\n", path);
-        return -1;
     }
-    int ok = stbi_write_png_to_func(box_png_write, f, (int)width, (int)height, 4, pixels, (int)stride);
-    fclose(f);
+
     return ok ? 0 : -1;
 }

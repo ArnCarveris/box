@@ -1,19 +1,28 @@
+/**
+ * @file Surface.c
+ * @brief Tests for headless surfaces and PNG capture.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <sys/stat.h>
 #include <stdio.h>
 
-static ecs_world_t* surface_world(int32_t frames) {
+static ecs_world_t* surface_world(
+    int32_t frames)
+{
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxSurface);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = frames;
+
     return world;
 }
 
-void Surface_headless_surface_reports_size(void) {
+void Surface_headless_surface_reports_size(void)
+{
     // engine_core/surface
     ecs_world_t *world = surface_world(2);
     Surface *s = ecs_singleton_ensure(world, Surface);
@@ -29,7 +38,8 @@ void Surface_headless_surface_reports_size(void) {
     ecs_fini(world);
 }
 
-void Surface_headless_surface_writes_png(void) {
+void Surface_headless_surface_writes_png(void)
+{
     // engine_core/surface
     const char *path = "/tmp/box_test_surface.png";
     remove(path);
@@ -54,7 +64,8 @@ void Surface_headless_surface_writes_png(void) {
     remove(path);
 }
 
-void Surface_write_nth_adds_frame_suffix(void) {
+void Surface_write_nth_adds_frame_suffix(void)
+{
     // engine_core/surface
     remove("/tmp/box_test_nth_00000.png");
     remove("/tmp/box_test_nth_00002.png");

@@ -1,15 +1,23 @@
+/**
+ * @file App.c
+ * @brief Tests for the App singleton loop: stop conditions, process folder and CPU budget.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <sys/stat.h>
 #include <string.h>
 
-static void QuitAfterTwo(ecs_iter_t *it) {
+static void QuitAfterTwo(
+    ecs_iter_t *it)
+{
     if (ecs_singleton_get(it->world, App)->frame == 2) {
         ecs_quit(it->world);
     }
 }
 
-void App_stops_after_frames(void) {
+void App_stops_after_frames(void)
+{
     // engine_core/app
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
@@ -20,7 +28,8 @@ void App_stops_after_frames(void) {
     ecs_fini(world);
 }
 
-void App_stops_after_timeout(void) {
+void App_stops_after_timeout(void)
+{
     // engine_core/app
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
@@ -36,7 +45,8 @@ void App_stops_after_timeout(void) {
     ecs_fini(world);
 }
 
-void App_stops_on_quit(void) {
+void App_stops_on_quit(void)
+{
     // engine_core/app
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
@@ -46,7 +56,8 @@ void App_stops_on_quit(void) {
     ecs_fini(world);
 }
 
-void App_process_dir_created_and_removed(void) {
+void App_process_dir_created_and_removed(void)
+{
     // engine_core/app
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
@@ -62,7 +73,8 @@ void App_process_dir_created_and_removed(void) {
     ecs_os_free(dir);
 }
 
-void App_cpu_budget_slows_loop(void) {
+void App_cpu_budget_slows_loop(void)
+{
     // engine_core/app
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);

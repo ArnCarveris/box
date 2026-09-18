@@ -52,6 +52,7 @@ int box_capture_texture(
 {
 #ifdef BOX_PLATFORM_WEB
     (void)r; (void)texture; (void)path;
+
     return -1;
 #else
     int result = -1;
@@ -91,6 +92,7 @@ int box_capture_texture(
         wgpuDevicePoll(r->device, true, NULL);
         wgpuInstanceProcessEvents(r->instance);
     }
+
     if (failed) {
         fprintf(stderr, "box: failed to map capture buffer\n");
         goto done;
@@ -101,7 +103,9 @@ int box_capture_texture(
     memcpy(pixels, mapped, (size_t)size);
     wgpuBufferUnmap(buffer);
 
-    if (r->format == WGPUTextureFormat_BGRA8Unorm || r->format == WGPUTextureFormat_BGRA8UnormSrgb) {
+    bool bgra = r->format == WGPUTextureFormat_BGRA8Unorm ||
+        r->format == WGPUTextureFormat_BGRA8UnormSrgb;
+    if (bgra) {
         uint32_t y;
         for (y = 0; y < height; y ++) {
             box_bgra_to_rgba(pixels + (size_t)y * stride, width);
@@ -112,6 +116,7 @@ int box_capture_texture(
     free(pixels);
 done:
     wgpuBufferRelease(buffer);
+
     return result;
 #endif
 }

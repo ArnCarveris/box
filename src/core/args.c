@@ -61,6 +61,7 @@ int box_parse_args(
                 ecs_err("failed to load scene '%s'", arg);
                 goto error;
             }
+
             app = ecs_singleton_ensure(world, App);
         }
     }
@@ -71,6 +72,7 @@ int box_parse_args(
     }
 
     ecs_singleton_modified(world, App);
+
     return 0;
 error:
     return -1;

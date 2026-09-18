@@ -101,24 +101,22 @@ static void box_device_create_surface(
     box_renderer_t *r)
 {
 #ifdef BOX_PLATFORM_WEB
-    if (!r->desc.canvas_selector) {
-        return;
-    }
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector source = {
         .chain = { .sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector },
         .selector = { .data = r->desc.canvas_selector, .length = WGPU_STRLEN }
     };
+    bool has_source = r->desc.canvas_selector != NULL;
 #else
-    if (!r->desc.metal_layer) {
-        return;
-    }
     WGPUSurfaceSourceMetalLayer source = {
         .chain = { .sType = WGPUSType_SurfaceSourceMetalLayer },
         .layer = r->desc.metal_layer
     };
+    bool has_source = r->desc.metal_layer != NULL;
 #endif
-    WGPUSurfaceDescriptor desc = { .nextInChain = (WGPUChainedStruct*)&source };
-    r->surface = wgpuInstanceCreateSurface(r->instance, &desc);
+    if (has_source) {
+        WGPUSurfaceDescriptor desc = { .nextInChain = (WGPUChainedStruct*)&source };
+        r->surface = wgpuInstanceCreateSurface(r->instance, &desc);
+    }
 }
 
 /** Configure the surface for the current size and format.
@@ -148,11 +146,9 @@ static void box_device_select_format(
     box_renderer_t *r)
 {
     r->format = WGPUTextureFormat_BGRA8Unorm;
-    if (!r->surface) {
-        return;
-    }
     WGPUSurfaceCapabilities caps = {0};
-    if (wgpuSurfaceGetCapabilities(r->surface, r->adapter, &caps) == WGPUStatus_Success &&
+    if (r->surface &&
+        wgpuSurfaceGetCapabilities(r->surface, r->adapter, &caps) == WGPUStatus_Success &&
         caps.formatCount)
     {
         r->format = caps.formats[0];
@@ -214,17 +210,16 @@ static void box_on_adapter_web(
 {
     box_on_adapter(status, adapter, message, userdata1, userdata2);
     box_renderer_t *r = userdata1;
-    if (!r->adapter) {
-        return;
+    if (r->adapter) {
+        WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
+        desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
+        WGPURequestDeviceCallbackInfo info = {
+            .mode = WGPUCallbackMode_AllowSpontaneous,
+            .callback = box_on_device_web,
+            .userdata1 = r
+        };
+        wgpuAdapterRequestDevice(r->adapter, &desc, info);
     }
-    WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
-    desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
-    WGPURequestDeviceCallbackInfo info = {
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .callback = box_on_device_web,
-        .userdata1 = r
-    };
-    wgpuAdapterRequestDevice(r->adapter, &desc, info);
 }
 #endif
 
@@ -301,11 +296,9 @@ void box_device_resize(
     uint32_t width,
     uint32_t height)
 {
-    if (width == r->width && height == r->height && r->depth) {
-        return;
-    }
-    if (!width || !height) {
-        return;
+    bool unchanged = width == r->width && height == r->height && r->depth;
+    if (unchanged || !width || !height) {
+        goto done;
     }
 
     r->width = width;
@@ -326,7 +319,7 @@ void box_device_resize(
 
     if (r->surface) {
         box_device_configure_surface(r);
-        return;
+        goto done;
     }
 
     if (r->offscreen_view) wgpuTextureViewRelease(r->offscreen_view);
@@ -341,4 +334,6 @@ void box_device_resize(
     };
     r->offscreen = wgpuDeviceCreateTexture(r->device, &color_desc);
     r->offscreen_view = wgpuTextureCreateView(r->offscreen, NULL);
+done:
+    return;
 }
