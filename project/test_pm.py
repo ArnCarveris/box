@@ -793,7 +793,7 @@ console.log(JSON.stringify({
   complete: count(markup, "plan-node complete"),
   inProgress: count(markup, "plan-node in-progress"),
   svg: markup.startsWith("<svg") && markup.includes('id="plan-zoom"'),
-  epicTag: markup.includes("Render \u00b7 in progress"),
+  epicTag: markup.includes('data-epic="render"'),
   related: planRelated(layout, "render/pipeline"),
   handles: count(markup, "data-handle="),
 }));
