@@ -120,6 +120,27 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "HiZ",
+                "testcases": [
+                    "levels_of_a_view",
+                    "reduction_of_a_four_by_four_block",
+                    "reduction_covers_an_odd_edge",
+                    "sphere_on_the_axis_projects_to_the_center",
+                    "sphere_off_the_axis_projects_beside_it",
+                    "sphere_across_the_near_plane_takes_the_view",
+                    "mip_holds_the_rectangle_in_two_texels",
+                    "pyramid_hides_a_sphere_behind_a_wall",
+                    "pyramid_keeps_a_sphere_in_front_of_a_wall",
+                    "pyramid_keeps_a_sphere_that_straddles_a_wall",
+                    "a_clamped_rectangle_is_never_hidden",
+                    "settings_fall_back_to_the_singleton",
+                    "view_without_settings_occludes_by_default",
+                    "disabled_culling_disables_occlusion"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
