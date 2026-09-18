@@ -58,6 +58,11 @@ forward path shades in one pass.
 7 by 7 grid of spheres with roughness across the columns and metallic up the
 rows under an `EnvironmentLight` with a blue sky and a warm ground.
 
+`test/integration/visual/textured.flecs` is the texture check: a checkered box,
+sphere and floor, a normal mapped box and a panel with a roughness ramp, bound
+through `PbrTextures`. `apps/box_app/etc/textures/` holds the PNGs it loads, which
+`python3 tools/gen_textures.py` regenerates.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights
@@ -217,5 +222,5 @@ include/box/    public headers, one per module
 project/        project management tool and its database
 src/            engine sources, one directory per flecs module (see docs/ARCHITECTURE.md)
 test/           unit test projects
-tools/          lint, integration and benchmark scripts
+tools/          lint, integration, benchmark and texture generation scripts
 ```
