@@ -9,12 +9,19 @@ void box_render_mark_dirty(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    RenderState *state = ecs_singleton_ensure(world, RenderState);
-    RenderInstance *inst = ecs_ensure(world, e, RenderInstance);
+    RenderState *state = ecs_get_mut(world, ecs_id(RenderState), RenderState);
+    if (!state) {
+        goto done;
+    }
+
+    RenderInstance *inst = ecs_get_mut(world, e, RenderInstance);
+    ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, "RenderMesh entity without RenderInstance");
     if (!inst->dirty) {
         inst->dirty = true;
         ecs_vec_append_t(NULL, &state->dirty, ecs_entity_t)[0] = e;
     }
+done:
+    return;
 }
 
 /** Queue an entity and every descendant with a mesh for extraction.
@@ -82,7 +89,8 @@ void box_render_release_slot(
     batch->count_dirty = true;
 
     if (moved != e) {
-        RenderInstance *moved_inst = ecs_ensure(world, moved, RenderInstance);
+        RenderInstance *moved_inst = ecs_get_mut(world, moved, RenderInstance);
+        ecs_assert(moved_inst != NULL, ECS_INTERNAL_ERROR, NULL);
         moved_inst->slot = inst->slot;
         box_render_mark_dirty(world, moved);
     }
@@ -95,10 +103,10 @@ void box_render_release_slot(
 static void box_render_on_remove(
     ecs_iter_t *it)
 {
-    RenderState *state = ecs_singleton_ensure(it->world, RenderState);
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
     RenderInstance *inst = ecs_field(it, RenderInstance, 0);
     int32_t i;
-    for (i = 0; i < it->count; i ++) {
+    for (i = 0; state && i < it->count; i ++) {
         if (!inst[i].dynamic && inst[i].mesh < (uint32_t)ecs_vec_count(&state->batches)) {
             box_render_release_slot(it->world, state, it->entities[i], &inst[i]);
         }

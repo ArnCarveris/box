@@ -33,11 +33,20 @@ typedef struct RenderState {
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *suns;        /**< Directional light entities */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
+    ecs_query_t *instances;   /**< All instances, used by the debug validation */
     uint32_t mesh_count;      /**< Handles allocated so far */
 } RenderState;
 
 extern ECS_COMPONENT_DECLARE(RenderInstance);
 extern ECS_COMPONENT_DECLARE(RenderState);
+
+/** Direct pointer to the registry singleton, never a deferred copy.
+ *
+ * @param world The world
+ * @return The registry
+ */
+RenderState* box_render_state(
+    ecs_world_t *world);
 
 /** Upload a mesh with the next packet and return its handle.
  *
@@ -101,6 +110,13 @@ void box_render_fill_instance(
 void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p);
+
+/** Assert that every instance record matches the batch slot tables, debug builds only.
+ *
+ * @param world The world
+ */
+void box_render_validate(
+    ecs_world_t *world);
 
 /** Register the Extract system.
  *

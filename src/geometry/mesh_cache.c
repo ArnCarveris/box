@@ -78,7 +78,8 @@ uint32_t box_mesh_cache_get(
     vec3 *bounds_min,
     vec3 *bounds_max)
 {
-    GeometryState *state = ecs_singleton_ensure(world, GeometryState);
+    GeometryState *state = ecs_get_mut(world, ecs_id(GeometryState), GeometryState);
+    ecs_assert(state != NULL, ECS_INVALID_OPERATION, "box.geometry is not imported");
     box_mesh_entry_t *entry = NULL;
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->entries) && !entry; i ++) {

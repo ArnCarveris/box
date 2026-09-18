@@ -43,14 +43,24 @@ static void box_render_state_dtor(
         if (state[i].cameras) ecs_query_fini(state[i].cameras);
         if (state[i].suns) ecs_query_fini(state[i].suns);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
+        if (state[i].instances) ecs_query_fini(state[i].instances);
     }
+}
+
+RenderState* box_render_state(
+    ecs_world_t *world)
+{
+    RenderState *state = ecs_get_mut(world, ecs_id(RenderState), RenderState);
+    ecs_assert(state != NULL, ECS_INVALID_OPERATION, "box.render is not imported");
+
+    return state;
 }
 
 uint32_t box_render_mesh_create(
     ecs_world_t *world,
     const box_mesh_data_t *data)
 {
-    RenderState *state = ecs_singleton_ensure(world, RenderState);
+    RenderState *state = box_render_state(world);
     uint32_t handle = state->mesh_count ++;
 
     box_batch_t *batch = ecs_vec_append_t(NULL, &state->batches, box_batch_t);
@@ -95,9 +105,11 @@ void BoxRenderImport(
         .ctor = flecs_default_ctor,
         .dtor = box_render_state_dtor
     });
+    ecs_set_hooks(world, RenderInstance, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(RenderInstance), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(WorldTransform));
+    ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(RenderInstance));
 
     RenderState *state = ecs_singleton_ensure(world, RenderState);
     ecs_vec_init_t(NULL, &state->batches, box_batch_t, 0);

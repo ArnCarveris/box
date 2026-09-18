@@ -40,7 +40,11 @@ static void box_render_update_aabb(
     const RenderMesh *mesh,
     const WorldTransform *transform)
 {
-    AABB *aabb = ecs_ensure(world, e, AABB);
+    AABB *aabb = ecs_get_mut(world, e, AABB);
+    if (!aabb) {
+        aabb = ecs_ensure(world, e, AABB);
+    }
+
     vec3 lo = vec3_mul(mesh->bounds_min, mesh->scale);
     vec3 hi = vec3_mul(mesh->bounds_max, mesh->scale);
     int corner;
@@ -85,7 +89,8 @@ static void box_extract_static(
 {
     const RenderMesh *mesh = ecs_get(world, e, RenderMesh);
     const WorldTransform *transform = ecs_get(world, e, WorldTransform);
-    RenderInstance *inst = ecs_ensure(world, e, RenderInstance);
+    RenderInstance *inst = ecs_get_mut(world, e, RenderInstance);
+    ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
     bool dynamic = box_render_is_dynamic(world, e);
     bool has_slot = !inst->dynamic && inst->mesh < (uint32_t)ecs_vec_count(&state->batches) &&
@@ -269,7 +274,7 @@ void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p)
 {
-    RenderState *state = ecs_singleton_ensure(world, RenderState);
+    RenderState *state = box_render_state(world);
     box_extract_meshes(state, p);
 
     int32_t i;
@@ -285,6 +290,43 @@ void box_render_extract(
     box_extract_counts(state, p);
     box_extract_camera(world, state, p);
     box_extract_sun(world, state, p);
+    box_render_validate(world);
+}
+
+void box_render_validate(
+    ecs_world_t *world)
+{
+#ifndef NDEBUG
+    RenderState *state = box_render_state(world);
+    ecs_iter_t it = ecs_query_iter(world, state->instances);
+    while (ecs_query_next(&it)) {
+        RenderInstance *inst = ecs_field(&it, RenderInstance, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t e = it.entities[i];
+            if (inst[i].dirty) {
+                ecs_abort(ECS_INTERNAL_ERROR, "entity %s still dirty after extract",
+                    ecs_get_name(world, e));
+            }
+
+            if (inst[i].dynamic) {
+                continue;
+            }
+
+            box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)inst[i].mesh);
+            ecs_entity_t *slots = ecs_vec_first_t(&batch->entities, ecs_entity_t);
+            if (inst[i].slot >= (uint32_t)ecs_vec_count(&batch->entities) ||
+                slots[inst[i].slot] != e)
+            {
+                ecs_abort(ECS_INTERNAL_ERROR, "entity %s has slot %u of mesh %u but slot holds %s",
+                    ecs_get_name(world, e), inst[i].slot, inst[i].mesh,
+                    ecs_get_name(world, slots[inst[i].slot]));
+            }
+        }
+    }
+#else
+    (void)world;
+#endif
 }
 
 /** Extract system body: fill the packet of the frame's surface.
@@ -295,7 +337,7 @@ static void BoxRenderExtract(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->world;
-    RenderState *state = ecs_singleton_ensure(world, RenderState);
+    RenderState *state = box_render_state(world);
     box_packet_t *p = NULL;
 
     ecs_iter_t sit = ecs_query_iter(world, state->surfaces);
@@ -339,6 +381,12 @@ void box_render_extract_init(
     });
     state->surfaces = ecs_query(world, {
         .terms = {{ .id = ecs_id(SurfaceImpl) }}
+    });
+    state->instances = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(RenderInstance), .inout = EcsIn },
+            { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
+        }
     });
 
     ECS_SYSTEM(world, BoxRenderExtract, EcsPreStore, 0);
