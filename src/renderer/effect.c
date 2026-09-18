@@ -12,6 +12,12 @@
  * from a second attachment of the mesh pass and the motion vectors from a pass
  * that reprojects the depth with the view projection of the previous frame. An
  * input no pass asked for binds a one texel dummy instead of a target.
+ *
+ * Two inputs are work the frame does for a pass: the pyramid input blurs the
+ * image the pass reads through the mip chain of bloom.c and the exposure input
+ * measures it with the compute passes of exposure.c. The targets between two
+ * passes are float ones, so a pass that brightens the image keeps what it
+ * pushed past white for the pass that maps it back onto the display.
  */
 
 #include "renderer_internal.h"
@@ -107,7 +113,7 @@ static void box_effect_release(
 static void box_effect_layout(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry entries[6] = {
+    WGPUBindGroupLayoutEntry entries[8] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -148,9 +154,23 @@ static void box_effect_layout(
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        }, {
+            .binding = 6,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_ReadOnlyStorage,
+                .minBindingSize = sizeof(box_exposure_state_t)
+            }
+        }, {
+            .binding = 7,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor desc = { .entryCount = 6, .entries = entries };
+    WGPUBindGroupLayoutDescriptor desc = { .entryCount = 8, .entries = entries };
     r->effect_layout = wgpuDeviceCreateBindGroupLayout(r->device, &desc);
 
     WGPUPipelineLayoutDescriptor layout_desc = {
@@ -257,6 +277,8 @@ void box_effect_init(
     box_effect_layout(r);
     box_effect_dummies(r);
     box_effect_motion_pipeline(r);
+    box_exposure_init(r);
+    box_bloom_init(r);
 
     WGPUSamplerDescriptor sampler_desc = {
         .addressModeU = WGPUAddressMode_ClampToEdge,
@@ -285,44 +307,51 @@ void box_effect_invalidate(
     }
 
     box_gpu_effect_t *entry = box_vec_at(&r->effect_pipelines, handle);
-    if (entry->pipeline) {
-        wgpuRenderPipelineRelease(entry->pipeline);
+    uint32_t i;
+    for (i = 0; i < BOX_EFFECT_FORMATS; i ++) {
+        if (entry->pipeline[i]) {
+            wgpuRenderPipelineRelease(entry->pipeline[i]);
+        }
+
+        entry->pipeline[i] = NULL;
+        entry->tried[i] = false;
     }
 
-    entry->pipeline = NULL;
-    entry->tried = false;
 done:
     return;
 }
 
-/** Pipeline of an effect shader, compiled the first time the pass runs.
+/** Pipeline of an effect shader, compiled the first time the pass writes a format.
  *
  * @param r The renderer
  * @param handle The shader handle
+ * @param hdr The pass writes an intermediate target instead of the view target
  * @return The pipeline, NULL when the source is missing or does not compile
  */
 static WGPURenderPipeline box_effect_pipeline(
     box_renderer_t *r,
-    uint32_t handle)
+    uint32_t handle,
+    bool hdr)
 {
     while (r->effect_pipelines.count <= handle) {
         box_gpu_effect_t *created = box_vec_push(&r->effect_pipelines);
-        created->pipeline = NULL;
-        created->tried = false;
+        memset(created, 0, sizeof(box_gpu_effect_t));
     }
 
+    uint32_t slot = hdr ? 1 : 0;
     box_gpu_effect_t *entry = box_vec_at(&r->effect_pipelines, handle);
-    if (entry->tried) {
+    if (entry->tried[slot]) {
         goto done;
     }
 
-    entry->tried = true;
+    entry->tried[slot] = true;
     WGPUShaderModule module = box_shader_module(r, handle);
     if (!module) {
         goto done;
     }
 
-    WGPUColorTargetState target = { .format = r->format, .writeMask = WGPUColorWriteMask_All };
+    WGPUColorTargetState target = { .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
+        .writeMask = WGPUColorWriteMask_All };
     WGPUFragmentState fragment = {
         .module = module,
         .entryPoint = { .data = "fs_main", .length = WGPU_STRLEN },
@@ -340,15 +369,15 @@ static WGPURenderPipeline box_effect_pipeline(
         .multisample = { .count = 1, .mask = 0xFFFFFFFF }
     };
     r->device_error = false;
-    entry->pipeline = wgpuDeviceCreateRenderPipeline(r->device, &desc);
-    if (r->device_error && entry->pipeline) {
-        wgpuRenderPipelineRelease(entry->pipeline);
-        entry->pipeline = NULL;
+    entry->pipeline[slot] = wgpuDeviceCreateRenderPipeline(r->device, &desc);
+    if (r->device_error && entry->pipeline[slot]) {
+        wgpuRenderPipelineRelease(entry->pipeline[slot]);
+        entry->pipeline[slot] = NULL;
     }
 
     wgpuShaderModuleRelease(module);
 done:
-    return entry->pipeline;
+    return entry->pipeline[slot];
 }
 
 void box_effect_frame(
@@ -388,7 +417,7 @@ uint32_t box_effect_prepare(
     uint32_t i;
     for (i = 0; i < view->effect_count && r->effect_run_count < BOX_EFFECT_MAX; i ++) {
         const box_effect_t *fx = box_vec_at(&p->effects, view->effect_first + i);
-        if (box_effect_pipeline(r, fx->shader)) {
+        if (box_effect_pipeline(r, fx->shader, false)) {
             r->effect_run[r->effect_run_count ++] = view->effect_first + i;
         }
     }
@@ -471,6 +500,8 @@ done:
  * @param src The target the pass reads
  * @param dst The render target view the pass writes
  * @param encoder The command encoder
+ * @param hdr The pass writes an intermediate target instead of the view target
+ * @param pyramid Blurred pyramid of the image, NULL when the pass asked for none
  */
 static void box_effect_pass(
     box_renderer_t *r,
@@ -478,9 +509,16 @@ static void box_effect_pass(
     uint32_t slot,
     box_gpu_pool_t *src,
     WGPUTextureView dst,
-    WGPUCommandEncoder encoder)
+    WGPUCommandEncoder encoder,
+    bool hdr,
+    WGPUTextureView pyramid)
 {
-    WGPUBindGroupEntry entries[6] = {
+    WGPURenderPipeline pipeline = box_effect_pipeline(r, fx->shader, hdr);
+    if (!pipeline) {
+        goto done;
+    }
+
+    WGPUBindGroupEntry entries[8] = {
         { .binding = 0, .buffer = r->effect_uniform, .size = sizeof(box_effect_uniform_t) },
         { .binding = 1, .textureView = src->view },
         { .binding = 2, .sampler = r->effect_sampler },
@@ -489,11 +527,14 @@ static void box_effect_pass(
         { .binding = 4, .textureView = r->effect_normal ?
             r->effect_normal->view : r->effect_dummy_view },
         { .binding = 5, .textureView = r->effect_motion ?
-            r->effect_motion->view : r->effect_dummy_view }
+            r->effect_motion->view : r->effect_dummy_view },
+        { .binding = 6, .buffer = box_exposure_buffer(r),
+            .size = sizeof(box_exposure_state_t) },
+        { .binding = 7, .textureView = pyramid ? pyramid : r->effect_dummy_view }
     };
     WGPUBindGroupDescriptor group_desc = {
         .layout = r->effect_layout,
-        .entryCount = 6,
+        .entryCount = 8,
         .entries = entries
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
@@ -508,12 +549,54 @@ static void box_effect_pass(
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     uint32_t offset = slot * BOX_EFFECT_UNIFORM_STRIDE;
-    wgpuRenderPassEncoderSetPipeline(pass, box_effect_pipeline(r, fx->shader));
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     wgpuBindGroupRelease(group);
+done:
+    return;
+}
+
+/** Fill the uniform block of one pass of a chain.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @param fx The pass
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param width Width of the target it writes
+ * @param height Height of that target
+ */
+static void box_effect_uniform_write(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    const box_effect_t *fx,
+    uint32_t slot,
+    uint32_t width,
+    uint32_t height)
+{
+    bool srgb = r->format == WGPUTextureFormat_BGRA8UnormSrgb ||
+        r->format == WGPUTextureFormat_RGBA8UnormSrgb;
+    box_effect_uniform_t u;
+    memcpy(u.params, fx->params, sizeof(u.params));
+    u.size[0] = (float)width;
+    u.size[1] = (float)height;
+    u.size[2] = width ? 1.0f / (float)width : 0.0f;
+    u.size[3] = height ? 1.0f / (float)height : 0.0f;
+    u.eye[0] = view->eye[0];
+    u.eye[1] = view->eye[1];
+    u.eye[2] = view->eye[2];
+    u.eye[3] = srgb ? 0.0f : 1.0f;
+    u.frame[0] = p->delta;
+    u.frame[1] = (float)p->time;
+    u.frame[2] = 0.0f;
+    u.frame[3] = 0.0f;
+    memcpy(u.inv_clip, view->inv_clip, sizeof(u.inv_clip));
+    wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
+        (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE, &u, sizeof(u));
 }
 
 void box_effect_run(
@@ -535,7 +618,7 @@ void box_effect_run(
         WGPUTextureView out = dst;
         if (!last) {
             box_effect_size(view->width, view->height, fx->scale, &width, &height);
-            target = box_effect_acquire(r, width, height, r->format);
+            target = box_effect_acquire(r, width, height, BOX_EFFECT_HDR_FORMAT);
             if (!target) {
                 break;
             }
@@ -543,15 +626,17 @@ void box_effect_run(
             out = target->view;
         }
 
-        box_effect_uniform_t u;
-        memcpy(u.params, fx->params, sizeof(u.params));
-        u.size[0] = (float)width;
-        u.size[1] = (float)height;
-        u.size[2] = width ? 1.0f / (float)width : 0.0f;
-        u.size[3] = height ? 1.0f / (float)height : 0.0f;
-        wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
-            (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE, &u, sizeof(u));
-        box_effect_pass(r, fx, slot, src, out, encoder);
+        box_effect_uniform_write(r, view, p, fx, slot, width, height);
+        WGPUTextureView pyramid = NULL;
+        if (fx->inputs & BOX_EFFECT_EXPOSURE) {
+            box_exposure_dispatch(r, slot, src, encoder);
+        }
+
+        if (fx->inputs & BOX_EFFECT_PYRAMID) {
+            pyramid = box_bloom_build(r, fx, slot, src, encoder);
+        }
+
+        box_effect_pass(r, fx, slot, src, out, encoder, !last, pyramid);
         if (src != r->effect_scene) {
             box_effect_release(src);
         }
@@ -575,10 +660,15 @@ void box_effect_run(
 void box_effect_fini(
     box_renderer_t *r)
 {
+    box_exposure_fini(r);
+    box_bloom_fini(r);
     uint32_t i;
     for (i = 0; i < r->effect_pipelines.count; i ++) {
         box_gpu_effect_t *entry = box_vec_at(&r->effect_pipelines, i);
-        if (entry->pipeline) wgpuRenderPipelineRelease(entry->pipeline);
+        uint32_t format;
+        for (format = 0; format < BOX_EFFECT_FORMATS; format ++) {
+            if (entry->pipeline[format]) wgpuRenderPipelineRelease(entry->pipeline[format]);
+        }
     }
 
     box_vec_fini(&r->effect_pipelines);

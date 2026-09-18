@@ -30,10 +30,91 @@ static int box_effect_compare(
     return result;
 }
 
+/** Read one reflected scalar as the float the shader block holds.
+ *
+ * @param kind Primitive kind of the value
+ * @param ptr The value
+ * @return The value as a float, 0 for a kind no parameter block carries
+ */
+static float box_effect_scalar(
+    ecs_primitive_kind_t kind,
+    const void *ptr)
+{
+    float result = 0.0f;
+    switch (kind) {
+    case EcsBool: result = *(const bool*)ptr ? 1.0f : 0.0f; break;
+    case EcsU8: result = (float)*(const uint8_t*)ptr; break;
+    case EcsU16: result = (float)*(const uint16_t*)ptr; break;
+    case EcsU32: result = (float)*(const uint32_t*)ptr; break;
+    case EcsI8: result = (float)*(const int8_t*)ptr; break;
+    case EcsI16: result = (float)*(const int16_t*)ptr; break;
+    case EcsI32: result = (float)*(const int32_t*)ptr; break;
+    case EcsF32: result = *(const float*)ptr; break;
+    case EcsF64: result = (float)*(const double*)ptr; break;
+    default: break;
+    }
+
+    return result;
+}
+
+/** Append a reflected value to the parameter block as floats.
+ *
+ * Bools and integers reach the shader as floats and nested structs and inline
+ * arrays are flattened, so the block holds the fields of a parameter component
+ * tightly packed in the order its shader reads them.
+ *
+ * @param world The world
+ * @param type Type of the value
+ * @param ptr The value
+ * @param out The parameter block
+ * @param at Index of the next float, raised by what the value wrote
+ */
+static void box_effect_floats(
+    ecs_world_t *world,
+    ecs_entity_t type,
+    const void *ptr,
+    float *out,
+    int32_t *at)
+{
+    const EcsPrimitive *primitive = ecs_get(world, type, EcsPrimitive);
+    if (primitive) {
+        if (*at < BOX_EFFECT_PARAM_MAX) {
+            out[*at] = box_effect_scalar(primitive->kind, ptr);
+        }
+
+        (*at) ++;
+        goto done;
+    }
+
+    const EcsStruct *desc = ecs_get(world, type, EcsStruct);
+    if (!desc) {
+        goto done;
+    }
+
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&desc->members); i ++) {
+        const ecs_member_t *member = ecs_vec_get_t(&desc->members, ecs_member_t, i);
+        const ecs_type_info_t *ti = ecs_get_type_info(world, member->type);
+        if (!ti) {
+            continue;
+        }
+
+        int32_t count = member->count > 1 ? member->count : 1;
+        int32_t element;
+        for (element = 0; element < count; element ++) {
+            const char *value = (const char*)ptr + member->offset + element * ti->size;
+            box_effect_floats(world, member->type, value, out, at);
+        }
+    }
+
+done:
+    return;
+}
+
 /** Copy the parameters of an effect out of its parameter component.
  *
  * The parameters are the first reflected struct on the entity that is not the
- * Effect itself, copied as the floats the shader reads.
+ * Effect itself, flattened into the floats the shader reads.
  *
  * @param world The world
  * @param e The effect entity
@@ -61,15 +142,13 @@ static void box_effect_params(
             continue;
         }
 
-        const ecs_type_info_t *ti = ecs_get_type_info(world, id);
         const void *ptr = ecs_get_id(world, e, id);
-        if (!ti || !ptr) {
+        if (!ptr) {
             continue;
         }
 
-        size_t size = (size_t)ti->size;
-        size_t limit = BOX_EFFECT_PARAM_MAX * sizeof(float);
-        memcpy(out, ptr, size < limit ? size : limit);
+        int32_t at = 0;
+        box_effect_floats(world, id, ptr, out, &at);
         goto done;
     }
 
@@ -111,6 +190,8 @@ static void box_effect_append(
     pass->inputs |= fx->depth ? BOX_EFFECT_DEPTH : 0u;
     pass->inputs |= fx->normals ? BOX_EFFECT_NORMALS : 0u;
     pass->inputs |= fx->motion ? BOX_EFFECT_MOTION : 0u;
+    pass->inputs |= fx->pyramid ? BOX_EFFECT_PYRAMID : 0u;
+    pass->inputs |= fx->exposure ? BOX_EFFECT_EXPOSURE : 0u;
     box_effect_params(world, e, pass->params);
     v->effect_inputs |= pass->inputs;
     v->effect_count ++;

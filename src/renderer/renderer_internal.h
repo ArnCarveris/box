@@ -12,6 +12,8 @@
 #include "bake.h"
 #include "shadow.h"
 #include "blur.h"
+#include "bloom.h"
+#include "exposure.h"
 #include "hiz.h"
 #include "queue.h"
 #include "gpu.h"
@@ -36,6 +38,17 @@
 
 /** Format of the motion vector target, which holds a signed uv delta per texel */
 #define BOX_EFFECT_MOTION_FORMAT (WGPUTextureFormat_RG16Float)
+
+/** Format the passes of a chain hand their image to the next pass in.
+ *
+ * Every target between two passes is a float one, so a pass that brightens the
+ * image keeps what it pushed past white for the tone map at the end of the
+ * chain; the last pass writes the target of the view in its own format.
+ */
+#define BOX_EFFECT_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
+
+/** Target formats a pass is compiled for: the view format and the float one */
+#define BOX_EFFECT_FORMATS (2)
 
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
@@ -241,6 +254,16 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup scene_down[BOX_BLUR_LEVELS_MAX]; /**< Downsample source, the finer level */
     WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
     uint32_t scene_mips_count;       /**< Levels its blur chain holds */
+    WGPUBuffer exposure_state;       /**< Adapted exposure of the view, kept between frames */
+    WGPUBuffer exposure_hist;        /**< Log luminance histogram its compute pass fills */
+    WGPUTexture bloom;               /**< Pyramid of the image a bloom pass of the view reads */
+    WGPUTextureView bloom_view;      /**< View of its finest level, which the pass samples */
+    WGPUTextureView bloom_mips[BOX_BLOOM_LEVELS_MAX]; /**< Attachment view of one level */
+    WGPUBindGroup bloom_down[BOX_BLOOM_LEVELS_MAX]; /**< Downsample source, the finer level */
+    WGPUBindGroup bloom_up[BOX_BLOOM_LEVELS_MAX];   /**< Upsample source, the coarser level */
+    uint32_t bloom_levels;           /**< Levels its pyramid holds, 0 until it has one */
+    uint32_t bloom_width;            /**< Width of the finest level of its pyramid */
+    uint32_t bloom_height;           /**< Height of the finest level of its pyramid */
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
@@ -326,17 +349,28 @@ typedef struct box_gpu_pool_t {
     bool in_use;         /**< A pass of the current view holds it */
 } box_gpu_pool_t;
 
-/** Pipeline of one effect shader, built the first time the pass runs */
+/** Pipelines of one effect shader, built the first time the pass writes a format */
 typedef struct box_gpu_effect_t {
-    WGPURenderPipeline pipeline; /**< The pass pipeline, NULL when it did not compile */
-    bool tried;                  /**< The source was compiled once already */
+    WGPURenderPipeline pipeline[BOX_EFFECT_FORMATS]; /**< Pipeline per target format */
+    bool tried[BOX_EFFECT_FORMATS];                  /**< The format was compiled once */
 } box_gpu_effect_t;
 
 /** Uniform block of one post process pass */
 typedef struct box_effect_uniform_t {
     float params[BOX_EFFECT_PARAM_MAX]; /**< Parameters of its parameter component */
     float size[4];                      /**< Target width, height and their reciprocals */
+    float eye[4];                       /**< Camera position, w is the display encode flag */
+    float frame[4];                     /**< Seconds the frame advanced and seconds since start */
+    float inv_clip[16];                 /**< Clip to world of the view */
 } box_effect_uniform_t;
+
+/** Adapted exposure of a view, which its compute passes keep between frames */
+typedef struct box_exposure_state_t {
+    float ev;      /**< Exposure in stops */
+    float scale;   /**< Multiplier the exposure asks for */
+    float average; /**< Average luminance the histogram measured */
+    float pad;     /**< Padding to the 16 byte GPU stride */
+} box_exposure_state_t;
 
 /** Uniform block of the motion vector pass */
 typedef struct box_motion_uniform_t {
@@ -387,6 +421,13 @@ struct box_renderer_t {
     WGPUTextureView effect_dummy_view; /**< View of that texture */
     WGPUTexture effect_depth_dummy;  /**< One texel depth target bound to an unused input */
     WGPUTextureView effect_depth_dummy_view; /**< View of that texture */
+    WGPUComputePipeline exposure_histogram; /**< Log luminance histogram of the image */
+    WGPUComputePipeline exposure_average;   /**< Weighted average and the adaptation step */
+    WGPUBindGroupLayout exposure_layout;    /**< Uniform, image, histogram and state */
+    WGPUBindGroupLayout pyramid_layout;     /**< Uniform, source level and sampler */
+    WGPURenderPipeline pyramid_first;  /**< Karis weighted downsample of the image */
+    WGPURenderPipeline pyramid_down;   /**< Thirteen tap downsample of a level into the next */
+    WGPURenderPipeline pyramid_up;     /**< Eight tap tent upsample, mixed into the level above */
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
     WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
@@ -1047,6 +1088,85 @@ void box_effect_run(
     const box_packet_t *p,
     WGPUCommandEncoder encoder,
     WGPUTextureView dst);
+
+/** Create the compute pipelines of the automatic exposure.
+ *
+ * @param r The renderer
+ */
+void box_exposure_init(
+    box_renderer_t *r);
+
+/** Release the pipelines of the automatic exposure.
+ *
+ * @param r The renderer
+ */
+void box_exposure_fini(
+    box_renderer_t *r);
+
+/** Release the buffers the exposure of one view keeps.
+ *
+ * @param v The view
+ */
+void box_exposure_view_fini(
+    box_gpu_view_t *v);
+
+/** Buffer holding the adapted exposure of the current view, created on demand.
+ *
+ * @param r The renderer
+ * @return The buffer, which starts at an exposure of one
+ */
+WGPUBuffer box_exposure_buffer(
+    box_renderer_t *r);
+
+/** Measure the image of a pass and adapt the exposure of its view.
+ *
+ * @param r The renderer
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param src The image the histogram is built from
+ * @param encoder The command encoder
+ */
+void box_exposure_dispatch(
+    box_renderer_t *r,
+    uint32_t slot,
+    box_gpu_pool_t *src,
+    WGPUCommandEncoder encoder);
+
+/** Create the pipelines of the bloom pyramid.
+ *
+ * @param r The renderer
+ */
+void box_bloom_init(
+    box_renderer_t *r);
+
+/** Release the pipelines of the bloom pyramid.
+ *
+ * @param r The renderer
+ */
+void box_bloom_fini(
+    box_renderer_t *r);
+
+/** Release the pyramid of one view.
+ *
+ * @param v The view
+ */
+void box_bloom_view_fini(
+    box_gpu_view_t *v);
+
+/** Fill the pyramid of the current view from the image of a pass.
+ *
+ * @param r The renderer
+ * @param fx The pass, whose parameters the filter reads
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param src The image the pyramid is built from
+ * @param encoder The command encoder
+ * @return The view of the finest level, NULL when the pyramid could not be built
+ */
+WGPUTextureView box_bloom_build(
+    box_renderer_t *r,
+    const box_effect_t *fx,
+    uint32_t slot,
+    box_gpu_pool_t *src,
+    WGPUCommandEncoder encoder);
 
 /** Create the resource tables that do not need a shader to exist.
  *

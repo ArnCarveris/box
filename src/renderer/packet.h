@@ -97,8 +97,14 @@
 /** Shader slot of the pass that writes the motion vectors of a view */
 #define BOX_SHADER_MOTION (12)
 
+/** Shader slot of the histogram and adaptation passes of the auto exposure */
+#define BOX_SHADER_EXPOSURE (13)
+
+/** Shader slot of the downsample and upsample passes of the bloom pyramid */
+#define BOX_SHADER_PYRAMID (14)
+
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (13)
+#define BOX_SHADER_BUILTIN_MAX (15)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -120,6 +126,24 @@
 
 /** The pass reads the motion vectors of the view */
 #define BOX_EFFECT_MOTION (8u)
+
+/** The frame blurs the image the pass reads into a pyramid and binds it */
+#define BOX_EFFECT_PYRAMID (16u)
+
+/** The frame adapts the exposure of the view from the parameters of the pass */
+#define BOX_EFFECT_EXPOSURE (32u)
+
+/** Bins of the log luminance histogram the exposure pass builds */
+#define BOX_EXPOSURE_BINS (256)
+
+/** Texels one workgroup of the histogram pass covers on each axis */
+#define BOX_EXPOSURE_GROUP (16)
+
+/** Log2 luminance the first histogram bin above black starts at */
+#define BOX_EXPOSURE_MIN_LOG (-10.0f)
+
+/** Stops the histogram bins above black cover */
+#define BOX_EXPOSURE_LOG_RANGE (16.0f)
 
 /** Shader handle of a shader that has none yet, which asks for a new one */
 #define BOX_SHADER_NONE (0xFFFFFFFFu)
@@ -705,6 +729,7 @@ typedef struct box_dynamic_batch_t {
 typedef struct box_packet_t {
     uint32_t frame;                          /**< Frame number */
     double time;                             /**< Seconds since start */
+    float delta;                             /**< Seconds the frame advanced the world */
     uint32_t width;                          /**< Target width in pixels */
     uint32_t height;                         /**< Target height in pixels */
     float clear[4];                          /**< Clear color, linear RGBA */
@@ -772,6 +797,7 @@ static inline void box_packet_reset(
 {
     p->frame = 0;
     p->time = 0;
+    p->delta = 0;
     p->width = 0;
     p->height = 0;
     p->capture_path[0] = '\0';

@@ -480,11 +480,12 @@ static void box_view_cull(
     v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
-/** Fill the reprojection matrices a motion vector pass of a view reads.
+/** Fill the clip to world and the reprojection matrices a chain of a view reads.
  *
- * The previous world to clip of a view is kept per view index, so a view that
- * appears for the first time reports no motion instead of a jump. Only a chain
- * that asked for motion pays for the inverse, so a view without one does not.
+ * A pass reconstructs a world position from the depth with the inverse and the
+ * motion pass reprojects it with the world to clip of the previous frame, which
+ * is kept per view index so a view that appears for the first time reports no
+ * motion instead of a jump. A view without a chain pays for neither.
  *
  * @param state The registry
  * @param index Index of the view in the packet
@@ -542,7 +543,7 @@ static void box_view_fill(
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
     box_render_extract_transparent(world, state, p, v);
     box_effects_extract(world, src->entity, p, v);
-    if (v->effect_inputs & BOX_EFFECT_MOTION) {
+    if (v->effect_count) {
         box_view_motion(state, index, v);
     }
 

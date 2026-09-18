@@ -1,0 +1,76 @@
+#pragma once
+
+// Uniform block of a post process pass and the values every pass of a chain
+// shares: the parameters of its component, the size of its target, the camera
+// and the clip to world matrix of the view.
+struct Effect {
+  params: array<vec4<f32>, EFFECT_PARAM_VECS>,
+  size: vec4<f32>,
+  eye: vec4<f32>,
+  frame: vec4<f32>,
+  inv_clip: mat4x4<f32>,
+};
+
+// Adapted exposure of a view, written by the exposure compute passes.
+struct Exposure {
+  ev: f32,
+  scale: f32,
+  average: f32,
+  pad: f32,
+};
+
+// The chain carries display encoded values: a pass that works in linear light
+// decodes what it reads and encodes what it writes, which keeps a pass that
+// does neither bit identical to the image it was handed.
+fn fx_decode(c: vec3<f32>, encode: f32) -> vec3<f32> {
+  let positive = max(c, vec3(0.0));
+  if (encode > 0.5) {
+    return pow(positive, vec3(2.2));
+  }
+
+  return positive;
+}
+
+fn fx_encode(c: vec3<f32>, encode: f32) -> vec3<f32> {
+  let positive = max(c, vec3(0.0));
+  if (encode > 0.5) {
+    return pow(positive, vec3(1.0 / 2.2));
+  }
+
+  return positive;
+}
+
+fn fx_luma(c: vec3<f32>) -> f32 {
+  return dot(max(c, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
+}
+
+// Bin of the log luminance histogram a luminance lands in; bin zero holds every
+// texel below the range, the rest spread EXPOSURE_LOG_RANGE stops.
+fn fx_exposure_bin(luma: f32) -> u32 {
+  if (luma < 0.00001) {
+    return 0u;
+  }
+
+  let t = (log2(luma) - EXPOSURE_MIN_LOG) / EXPOSURE_LOG_RANGE;
+  return u32(clamp(t, 0.0, 1.0) * f32(EXPOSURE_BINS - 2) + 1.5);
+}
+
+// Luminance a bin of the histogram stands for, the inverse of the mapping.
+fn fx_exposure_luma(bin: f32) -> f32 {
+  let t = (bin - 1.0) / f32(EXPOSURE_BINS - 2);
+  return exp2(t * EXPOSURE_LOG_RANGE + EXPOSURE_MIN_LOG);
+}
+
+// Ordered 8 by 8 Bayer threshold of a pixel, zero to one.
+fn fx_bayer(p: vec2<u32>) -> f32 {
+  let x = p.x & 7u;
+  let y = p.y & 7u;
+  let a = x ^ y;
+  var v = ((y >> 2u) & 1u);
+  v = v | (((a >> 2u) & 1u) << 1u);
+  v = v | (((y >> 1u) & 1u) << 2u);
+  v = v | (((a >> 1u) & 1u) << 3u);
+  v = v | ((y & 1u) << 4u);
+  v = v | ((a & 1u) << 5u);
+  return f32(v) / 64.0;
+}

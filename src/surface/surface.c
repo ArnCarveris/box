@@ -223,6 +223,7 @@ static void BoxSurfaceAcquire(
 
         p->frame = (uint32_t)app->frame;
         p->time = ecs_get_world_info(it->world)->world_time_total;
+        p->delta = ecs_get_world_info(it->world)->delta_time;
         p->width = (uint32_t)s[i].actual_width;
         p->height = (uint32_t)s[i].actual_height;
         p->clear[0] = 0.02f;
