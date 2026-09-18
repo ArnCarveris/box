@@ -1,0 +1,44 @@
+{
+    "id": "render",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.render extract path and the material module",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Extract",
+            "testcases": [
+                "mesh_uploaded_once",
+                "static_entity_gets_slot_and_update",
+                "unchanged_entity_not_reextracted",
+                "position_change_reextracts_static",
+                "color_change_reextracts_static",
+                "delete_swaps_last_into_slot",
+                "dynamic_entity_extracted_every_frame",
+                "dynamic_child_of_dynamic_parent",
+                "static_to_dynamic_releases_slot",
+                "dynamic_to_static_gets_slot",
+                "instance_transform_includes_shape_scale",
+                "aabb_written_for_static",
+                "camera_fills_view",
+                "default_camera_without_entity",
+                "sun_from_directional_light",
+                "mesh_shared_between_same_shapes",
+                "different_segments_different_mesh"
+            ]
+        }, {
+            "id": "Material",
+            "testcases": [
+                "tint_resolves_to_children",
+                "child_with_own_tint_keeps_it",
+                "tint_removed_falls_back_to_parent",
+                "new_child_inherits_tint",
+                "instance_color_uses_tint_and_opacity",
+                "emissive_scaled_by_strength",
+                "pbr_defaults"
+            ]
+        }]
+    }
+}
