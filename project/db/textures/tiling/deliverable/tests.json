@@ -1,0 +1,25 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T13:35:13Z",
+  "pass": 15,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.026998,
+  "tests": [
+    {"suite": "Tiling", "case": "component_defaults", "status": "pass", "elapsed": 0.013240},
+    {"suite": "Tiling", "case": "untiled_instance_is_the_identity", "status": "pass", "elapsed": 0.013750},
+    {"suite": "Tiling", "case": "transform_reaches_the_instance", "status": "pass", "elapsed": 0.013836},
+    {"suite": "Tiling", "case": "box_projection_tiles_every_face", "status": "pass", "elapsed": 0.014154},
+    {"suite": "Tiling", "case": "cylinder_projection_tiles_the_circumference", "status": "pass", "elapsed": 0.013273},
+    {"suite": "Tiling", "case": "radial_projection_tiles_radius_and_arc", "status": "pass", "elapsed": 0.013702},
+    {"suite": "Tiling", "case": "meters_projection_stretches_the_mesh_uv", "status": "pass", "elapsed": 0.013245},
+    {"suite": "Tiling", "case": "fit_rounds_the_tile_count", "status": "pass", "elapsed": 0.013371},
+    {"suite": "Tiling", "case": "partial_tiles_keep_the_fraction", "status": "pass", "elapsed": 0.012383},
+    {"suite": "Tiling", "case": "min_tiles_raises_the_count", "status": "pass", "elapsed": 0.013431},
+    {"suite": "Tiling", "case": "wrap_mode_reaches_the_instance", "status": "pass", "elapsed": 0.013368},
+    {"suite": "Tiling", "case": "mirror_wrap_folds_the_uv", "status": "pass", "elapsed": 0.013241},
+    {"suite": "Tiling", "case": "clamp_wrap_holds_the_range", "status": "pass", "elapsed": 0.012797},
+    {"suite": "Tiling", "case": "inherited_from_a_prefab", "status": "pass", "elapsed": 0.013043},
+    {"suite": "Tiling", "case": "scale_change_updates_the_tiling", "status": "pass", "elapsed": 0.011783}
+  ]
+}
