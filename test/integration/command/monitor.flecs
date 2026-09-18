@@ -1,0 +1,15 @@
+using box.monitor
+using box.command
+
+$ {
+  CpuMonitor: {window_s: 1}
+  EcsStats: {period_s: 1, history: 60}
+  SystemMonitor: {enabled: true}
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/monitor.cmd"}
+  }
+}

@@ -1,0 +1,25 @@
+{
+    "id": "bench_monitor",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the per frame cost of the box.monitor sources",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Monitor",
+                "benchcases": [
+                    "no_monitor",
+                    "cpu_monitor",
+                    "ecs_stats",
+                    "system_monitor",
+                    "sample_cost"
+                ]
+            }
+        ]
+    }
+}

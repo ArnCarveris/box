@@ -1,0 +1,53 @@
+{
+    "id": "monitor",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.monitor CPU, statistics and system monitors",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Cpu",
+                "testcases": [
+                    "absent_monitor_is_not_sampled",
+                    "sample_reports_the_cores",
+                    "busy_loop_raises_the_process_percent",
+                    "system_percent_stays_in_range",
+                    "short_window_follows_the_load",
+                    "long_window_lags_the_load",
+                    "removing_the_monitor_stops_sampling",
+                    "budget_sleep_is_published",
+                    "budget_slows_a_synthetic_load"
+                ]
+            },
+            {
+                "id": "Stats",
+                "testcases": [
+                    "setting_the_component_imports_the_addon",
+                    "collects_after_the_period",
+                    "period_holds_back_the_collection",
+                    "entity_count_follows_the_world",
+                    "frame_time_window_is_averaged",
+                    "slowest_systems_are_listed",
+                    "removing_the_component_stops_collection"
+                ]
+            },
+            {
+                "id": "Systems",
+                "testcases": [
+                    "off_by_default",
+                    "disabled_monitor_collects_nothing",
+                    "slow_system_is_attributed_to_itself",
+                    "frame_total_covers_the_systems",
+                    "phase_totals_are_kept_per_phase",
+                    "disabling_stops_collection",
+                    "removing_the_monitor_stops_measurement"
+                ]
+            }
+        ]
+    }
+}
