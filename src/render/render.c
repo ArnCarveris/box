@@ -43,6 +43,8 @@ static void box_render_state_dtor(
         if (state[i].cameras) ecs_query_fini(state[i].cameras);
         if (state[i].captures) ecs_query_fini(state[i].captures);
         if (state[i].suns) ecs_query_fini(state[i].suns);
+        if (state[i].lights) ecs_query_fini(state[i].lights);
+        if (state[i].emitters) ecs_query_fini(state[i].emitters);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);
     }
@@ -75,6 +77,12 @@ uint32_t box_render_mesh_create(
     cmd->vertices = malloc((size_t)data->vertex_count * BOX_VERTEX_FLOATS * sizeof(float));
     cmd->indices = malloc((size_t)data->index_count * sizeof(uint32_t));
     memcpy(cmd->indices, data->indices, (size_t)data->index_count * sizeof(uint32_t));
+    cmd->bounds_min[0] = data->bounds_min.x;
+    cmd->bounds_min[1] = data->bounds_min.y;
+    cmd->bounds_min[2] = data->bounds_min.z;
+    cmd->bounds_max[0] = data->bounds_max.x;
+    cmd->bounds_max[1] = data->bounds_max.y;
+    cmd->bounds_max[2] = data->bounds_max.z;
 
     uint32_t v;
     for (v = 0; v < data->vertex_count; v ++) {

@@ -47,6 +47,7 @@ void box_frame_init(
     box_frame_init_view(r);
     box_lights_init(r);
     box_environment_init(r);
+    box_bake_init(r);
 
     WGPUShaderSourceWGSL wgsl = {
         .chain = { .sType = WGPUSType_ShaderSourceWGSL },
@@ -82,9 +83,10 @@ void box_frame_init(
         }
     };
 
-    WGPUBindGroupLayout group_layouts[3] = { r->view_layout, r->light_layout, r->env_layout };
+    WGPUBindGroupLayout group_layouts[4] = {
+        r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
-        .bindGroupLayoutCount = 3,
+        .bindGroupLayoutCount = 4,
         .bindGroupLayouts = group_layouts
     };
     WGPUPipelineLayout pipeline_layout =
@@ -192,6 +194,7 @@ void box_frame_render(
     if (p->has_view) {
         box_environment_update(r, p, encoder);
         box_lights_dispatch(r, p, encoder);
+        box_bake_update(r, p, encoder);
     }
 
     WGPURenderPassColorAttachment color = {
@@ -218,6 +221,7 @@ void box_frame_render(
         wgpuRenderPassEncoderSetBindGroup(pass, 0, r->view_group, 0, NULL);
         wgpuRenderPassEncoderSetBindGroup(pass, 1, r->light_group, 0, NULL);
         wgpuRenderPassEncoderSetBindGroup(pass, 2, r->env_group, 0, NULL);
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
         box_scene_draw(r, p, pass);
     }
 

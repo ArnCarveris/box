@@ -45,7 +45,48 @@
     "  cos_inner: f32,\n" \
     "  cos_outer: f32,\n" \
     "  kind: u32,\n" \
-    "  pad: vec2<f32>,\n" \
+    "  is_static: u32,\n" \
+    "  pad: f32,\n" \
+    "};\n"
+
+/** Order 1 spherical harmonics probe, laid out as box_probe_t */
+#define BOX_WGSL_PROBE \
+    "struct Probe {\n" \
+    "  r: vec4<f32>,\n" \
+    "  g: vec4<f32>,\n" \
+    "  b: vec4<f32>,\n" \
+    "};\n" \
+    "const SH_Y0: f32 = 0.282095;\n" \
+    "const SH_Y1: f32 = 0.488603;\n" \
+    "const SH_A0: f32 = 0.886227;\n" \
+    "const SH_A1: f32 = 1.023327;\n"
+
+/** Uniforms and storage types of the bake passes, laid out as box_bake_uniform_t */
+#define BOX_WGSL_BAKE \
+    "struct Bake {\n" \
+    "  grid_min: vec4<f32>,\n" \
+    "  grid_cell: vec4<f32>,\n" \
+    "  grid_dim: vec4<u32>,\n" \
+    "  light_count: u32,\n" \
+    "  emitter_count: u32,\n" \
+    "  steps: u32,\n" \
+    "  pad: u32,\n" \
+    "};\n" \
+    "struct Emitter {\n" \
+    "  position: vec3<f32>,\n" \
+    "  radius: f32,\n" \
+    "  color: vec3<f32>,\n" \
+    "  range: f32,\n" \
+    "};\n" \
+    "struct Desc {\n" \
+    "  position: vec4<f32>,\n" \
+    "  extent: vec4<f32>,\n" \
+    "};\n" \
+    "struct Info {\n" \
+    "  probe_count: u32,\n" \
+    "  job_count: u32,\n" \
+    "  pad0: u32,\n" \
+    "  pad1: u32,\n" \
     "};\n"
 
 /** Cluster a view space position falls in, the shader side of box_cluster_index */
@@ -67,6 +108,7 @@
 const char *box_mesh_shader_wgsl =
     BOX_WGSL_VIEW
     BOX_WGSL_LIGHT
+    BOX_WGSL_PROBE
     "@group(0) @binding(0) var<uniform> u: View;\n"
     "@group(1) @binding(0) var<storage, read> lights: array<Light>;\n"
     "@group(1) @binding(1) var<storage, read> clusters: array<vec2<u32>>;\n"
@@ -75,8 +117,10 @@ const char *box_mesh_shader_wgsl =
     "@group(2) @binding(1) var env_specular: texture_cube<f32>;\n"
     "@group(2) @binding(2) var env_brdf: texture_2d<f32>;\n"
     "@group(2) @binding(3) var env_sampler: sampler;\n"
+    "@group(3) @binding(0) var<storage, read> probes: array<Probe>;\n"
     BOX_WGSL_CLUSTER_INDEX
     "struct VertexIn {\n"
+    "  @builtin(instance_index) instance: u32,\n"
     "  @location(0) pos: vec3<f32>,\n"
     "  @location(1) normal: vec3<f32>,\n"
     "  @location(2) uv: vec2<f32>,\n"
@@ -95,6 +139,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(3) color: vec4<f32>,\n"
     "  @location(4) emissive: vec3<f32>,\n"
     "  @location(5) params: vec4<f32>,\n"
+    "  @location(6) @interpolate(flat) probe: u32,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -111,6 +156,7 @@ const char *box_mesh_shader_wgsl =
     "  out.color = in.color;\n"
     "  out.emissive = in.emissive.rgb;\n"
     "  out.params = in.params;\n"
+    "  out.probe = in.instance;\n"
     "  return out;\n"
     "}\n"
     "fn shade(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, albedo: vec3<f32>,\n"
@@ -134,13 +180,22 @@ const char *box_mesh_shader_wgsl =
     "  let ab = textureSampleLevel(env_brdf, env_sampler, vec2(ndv, roughness), 0.0).xy;\n"
     "  return diffuse + prefiltered * (f0 * ab.x + vec3(ab.y));\n"
     "}\n"
+    "fn baked(probe: u32, n: vec3<f32>, albedo: vec3<f32>, metallic: f32) -> vec3<f32> {\n"
+    "  let p = probes[probe];\n"
+    "  let basis = vec4(SH_A0, SH_A1 * n.y, SH_A1 * n.z, SH_A1 * n.x);\n"
+    "  let irradiance = max(vec3(dot(p.r, basis), dot(p.g, basis), dot(p.b, basis)), vec3(0.0));\n"
+    "  return irradiance * albedo * (1.0 - metallic);\n"
+    "}\n"
     "fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,\n"
-    "    metallic: f32, roughness: f32) -> vec3<f32> {\n"
+    "    metallic: f32, roughness: f32, skip_static: bool) -> vec3<f32> {\n"
     "  var sum = vec3<f32>(0.0);\n"
     "  let vp = (u.view * vec4(world_pos, 1.0)).xyz;\n"
     "  let entry = clusters[cluster_index(vp)];\n"
     "  for (var i = 0u; i < entry.y; i = i + 1u) {\n"
     "    let lt = lights[light_indices[entry.x + i]];\n"
+    "    if (skip_static && lt.is_static != 0u) {\n"
+    "      continue;\n"
+    "    }\n"
     "    let delta = lt.position - world_pos;\n"
     "    let dist = length(delta);\n"
     "    let l = delta / max(dist, 1e-4);\n"
@@ -166,8 +221,12 @@ const char *box_mesh_shader_wgsl =
     "  let albedo = in.color.rgb;\n"
     "  let sun = u.sun_color * u.sun_intensity;\n"
     "  let env = environment(n, v, albedo, metallic, roughness);\n"
+    "  let is_baked = in.params.z > 0.5;\n"
     "  var color = shade(n, v, l, albedo, metallic, roughness) * sun + env + in.emissive;\n"
-    "  color = color + punctual(in.world_pos, n, v, albedo, metallic, roughness);\n"
+    "  color = color + punctual(in.world_pos, n, v, albedo, metallic, roughness, is_baked);\n"
+    "  if (is_baked) {\n"
+    "    color = color + baked(in.probe, n, albedo, metallic);\n"
+    "  }\n"
     "  if (u.gamma_encode > 0.5) {\n"
     "    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));\n"
     "  }\n"
@@ -349,4 +408,153 @@ const char *box_env_filter_wgsl =
     "    sum = sum + textureSampleLevel(src, src_sampler, l, 0.0).rgb;\n"
     "  }\n"
     "  return vec4(sum / f32(count), 1.0);\n"
+    "}\n";
+
+const char *box_bake_grid_wgsl =
+    BOX_WGSL_BAKE
+    "@group(0) @binding(0) var<uniform> u: Bake;\n"
+    "@group(0) @binding(1) var<storage, read_write> occupancy: array<atomic<u32>>;\n"
+    "@group(1) @binding(0) var<storage, read> descs: array<Desc>;\n"
+    "@group(1) @binding(1) var<uniform> info: Info;\n"
+    "@compute @workgroup_size(64)\n"
+    "fn cs_grid(@builtin(global_invocation_id) gid: vec3<u32>) {\n"
+    "  if (gid.x >= info.probe_count || u.grid_dim.x == 0u) {\n"
+    "    return;\n"
+    "  }\n"
+    "  let d = descs[gid.x];\n"
+    "  if (d.extent.w == 0.0) {\n"
+    "    return;\n"
+    "  }\n"
+    "  let limit = vec3<f32>(u.grid_dim.xyz) - vec3(1.0);\n"
+    "  let lo = (d.position.xyz - d.extent.xyz - u.grid_min.xyz) / u.grid_cell.xyz;\n"
+    "  let hi = (d.position.xyz + d.extent.xyz - u.grid_min.xyz) / u.grid_cell.xyz;\n"
+    "  let a = vec3<u32>(clamp(lo, vec3(0.0), limit));\n"
+    "  let b = vec3<u32>(clamp(hi, vec3(0.0), limit));\n"
+    "  for (var z = a.z; z <= b.z; z = z + 1u) {\n"
+    "    for (var y = a.y; y <= b.y; y = y + 1u) {\n"
+    "      for (var x = a.x; x <= b.x; x = x + 1u) {\n"
+    "        let index = x + y * u.grid_dim.x + z * u.grid_dim.x * u.grid_dim.y;\n"
+    "        atomicOr(&occupancy[index >> 5u], 1u << (index & 31u));\n"
+    "      }\n"
+    "    }\n"
+    "  }\n"
+    "}\n";
+
+const char *box_bake_shader_wgsl =
+    BOX_WGSL_LIGHT
+    BOX_WGSL_BAKE
+    BOX_WGSL_PROBE
+    "@group(0) @binding(0) var<uniform> u: Bake;\n"
+    "@group(0) @binding(1) var<storage, read> lights: array<Light>;\n"
+    "@group(0) @binding(2) var<storage, read> emitters: array<Emitter>;\n"
+    "@group(0) @binding(3) var<storage, read> occupancy: array<u32>;\n"
+    "@group(1) @binding(0) var<storage, read> descs: array<Desc>;\n"
+    "@group(1) @binding(1) var<uniform> info: Info;\n"
+    "@group(1) @binding(2) var<storage, read_write> probes: array<Probe>;\n"
+    "@group(1) @binding(3) var<storage, read> jobs: array<u32>;\n"
+    "fn solid(p: vec3<f32>) -> bool {\n"
+    "  let t = (p - u.grid_min.xyz) / u.grid_cell.xyz;\n"
+    "  let dim = vec3<f32>(u.grid_dim.xyz);\n"
+    "  if (any(t < vec3(0.0)) || any(t >= dim)) {\n"
+    "    return false;\n"
+    "  }\n"
+    "  let c = vec3<u32>(t);\n"
+    "  let index = c.x + c.y * u.grid_dim.x + c.z * u.grid_dim.x * u.grid_dim.y;\n"
+    "  return (occupancy[index >> 5u] & (1u << (index & 31u))) != 0u;\n"
+    "}\n"
+    "fn box_exit(extent: vec3<f32>, dir: vec3<f32>) -> f32 {\n"
+    "  var result = 0.0;\n"
+    "  let a = abs(dir);\n"
+    "  for (var i = 0u; i < 3u; i = i + 1u) {\n"
+    "    if (a[i] > 1e-4) {\n"
+    "      let t = extent[i] / a[i];\n"
+    "      if (result == 0.0 || t < result) {\n"
+    "        result = t;\n"
+    "      }\n"
+    "    }\n"
+    "  }\n"
+    "  return result;\n"
+    "}\n"
+    "fn visible(origin: vec3<f32>, own: vec3<f32>, dest: vec3<f32>, radius: f32) -> f32 {\n"
+    "  let delta = dest - origin;\n"
+    "  let dist = length(delta);\n"
+    "  if (dist < 1e-4 || u.steps == 0u) {\n"
+    "    return 1.0;\n"
+    "  }\n"
+    "  let dir = delta / dist;\n"
+    "  let margin = u.grid_cell.w;\n"
+    "  let t0 = box_exit(own, dir) + margin;\n"
+    "  let t1 = dist - radius - margin;\n"
+    "  if (t1 <= t0) {\n"
+    "    return 1.0;\n"
+    "  }\n"
+    "  let step = (t1 - t0) / f32(u.steps);\n"
+    "  for (var i = 0u; i < u.steps; i = i + 1u) {\n"
+    "    if (solid(origin + dir * (t0 + (f32(i) + 0.5) * step))) {\n"
+    "      return 0.0;\n"
+    "    }\n"
+    "  }\n"
+    "  return 1.0;\n"
+    "}\n"
+    "@compute @workgroup_size(64)\n"
+    "fn cs_bake(@builtin(global_invocation_id) gid: vec3<u32>) {\n"
+    "  if (gid.x >= info.job_count) {\n"
+    "    return;\n"
+    "  }\n"
+    "  let slot = jobs[gid.x];\n"
+    "  let d = descs[slot];\n"
+    "  var sr = vec4<f32>(0.0);\n"
+    "  var sg = vec4<f32>(0.0);\n"
+    "  var sb = vec4<f32>(0.0);\n"
+    "  for (var i = 0u; i < u.light_count; i = i + 1u) {\n"
+    "    let lt = lights[i];\n"
+    "    let delta = lt.position - d.position.xyz;\n"
+    "    let dist = length(delta);\n"
+    "    let range = max(lt.range, 1e-4);\n"
+    "    if (dist >= range) {\n"
+    "      continue;\n"
+    "    }\n"
+    "    let dir = delta / max(dist, 1e-4);\n"
+    "    let window = clamp(1.0 - pow(dist / range, 4.0), 0.0, 1.0);\n"
+    "    var atten = window * window / (dist * dist + 1.0);\n"
+    "    if (lt.kind == 1u) {\n"
+    "      let cd = dot(-dir, lt.direction);\n"
+    "      let span = max(lt.cos_inner - lt.cos_outer, 1e-4);\n"
+    "      let cone = clamp((cd - lt.cos_outer) / span, 0.0, 1.0);\n"
+    "      atten = atten * cone * cone;\n"
+    "    }\n"
+    "    if (atten <= 0.0) {\n"
+    "      continue;\n"
+    "    }\n"
+    "    let vis = visible(d.position.xyz, d.extent.xyz, lt.position, 0.0);\n"
+    "    let value = lt.color * lt.intensity * atten * vis;\n"
+    "    let basis = vec4(SH_Y0, SH_Y1 * dir.y, SH_Y1 * dir.z, SH_Y1 * dir.x);\n"
+    "    sr = sr + value.r * basis;\n"
+    "    sg = sg + value.g * basis;\n"
+    "    sb = sb + value.b * basis;\n"
+    "  }\n"
+    "  for (var i = 0u; i < u.emitter_count; i = i + 1u) {\n"
+    "    let em = emitters[i];\n"
+    "    let delta = em.position - d.position.xyz;\n"
+    "    let dist = length(delta);\n"
+    "    let range = max(em.range, 1e-4);\n"
+    "    if (dist >= range) {\n"
+    "      continue;\n"
+    "    }\n"
+    "    let dir = delta / max(dist, 1e-4);\n"
+    "    let radius = max(em.radius, 1e-4);\n"
+    "    let reach = max(dist, radius);\n"
+    "    let window = clamp(1.0 - pow(dist / range, 4.0), 0.0, 1.0);\n"
+    "    let atten = window * window * radius * radius / (reach * reach);\n"
+    "    if (atten <= 0.0) {\n"
+    "      continue;\n"
+    "    }\n"
+    "    let vis = visible(d.position.xyz, d.extent.xyz, em.position, radius);\n"
+    "    let value = em.color * atten * vis;\n"
+    "    let basis = vec4(SH_Y0, SH_Y1 * dir.y, SH_Y1 * dir.z, SH_Y1 * dir.x);\n"
+    "    sr = sr + value.r * basis;\n"
+    "    sg = sg + value.g * basis;\n"
+    "    sb = sb + value.b * basis;\n"
+    "  }\n"
+    "  probes[slot] = Probe(sr, sg, sb);\n"
     "}\n";

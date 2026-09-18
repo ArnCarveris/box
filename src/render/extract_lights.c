@@ -1,6 +1,9 @@
 /**
  * @file render/extract_lights.c
  * @brief Extracts the point and spot lights inside the view frustum into the packet.
+ *
+ * Static lights are marked so baked instances skip them, and are carried
+ * unculled in a second array that the bake accumulates into its probes.
  */
 
 #include "render_internal.h"
@@ -152,8 +155,8 @@ static void box_light_fill(
     out->cos_inner = 1.0f;
     out->cos_outer = -1.0f;
     out->type = BOX_LIGHT_POINT;
-    out->pad[0] = 0;
-    out->pad[1] = 0;
+    out->is_static = 0;
+    out->pad = 0;
 }
 
 /** Turn a light into a spot light: forward axis of the transform and cone cosines.
@@ -187,12 +190,14 @@ static void box_light_cone(
  * @param it The light query iterator
  * @param i Index of the entity in the table
  * @param planes The frustum planes
+ * @param is_static Neither the light nor an ancestor carries a dynamic tag
  * @param p The packet
  */
 static void box_light_extract(
     const ecs_iter_t *it,
     int32_t i,
     const box_plane_t *planes,
+    bool is_static,
     box_packet_t *p)
 {
     bool spot = ecs_field_id(it, 0) == ecs_id(SpotLight);
@@ -213,9 +218,14 @@ static void box_light_extract(
         box_light_fill(transform, rgb, l->intensity, l->range, &light);
     }
 
+    light.is_static = is_static ? 1u : 0u;
     vec3 center = vec3_new(light.position[0], light.position[1], light.position[2]);
     if (box_light_visible(planes, center, light.range)) {
         *(box_light_t*)box_vec_push(&p->lights) = light;
+    }
+
+    if (is_static && p->bake.enabled && p->bake_lights.count < BOX_LIGHT_MAX) {
+        *(box_light_t*)box_vec_push(&p->bake_lights) = light;
     }
 }
 
@@ -235,9 +245,10 @@ void box_render_extract_lights(
             has_planes = true;
         }
 
+        bool is_static = !ecs_field_is_set(&it, 3) && !ecs_field_is_set(&it, 4);
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
-            box_light_extract(&it, i, planes, p);
+            box_light_extract(&it, i, planes, is_static, p);
         }
     }
 

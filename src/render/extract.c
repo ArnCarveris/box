@@ -6,13 +6,7 @@
 #include "render_internal.h"
 #include "../surface/surface_internal.h"
 
-/** Check whether an entity or an ancestor carries a dynamic tag.
- *
- * @param world The world
- * @param e The entity
- * @return true when the entity is extracted every frame
- */
-static bool box_render_is_dynamic(
+bool box_render_is_dynamic(
     ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -116,7 +110,7 @@ static void box_extract_static(
     box_static_update_t *update = box_vec_push(&p->static_updates);
     update->mesh = mesh->handle;
     update->slot = inst->slot;
-    box_render_fill_instance(world, e, mesh, transform, &update->data);
+    box_render_fill_instance(world, e, mesh, transform, state->bake_enabled, &update->data);
     box_render_update_aabb(world, e, mesh, transform);
 done:
     return;
@@ -176,7 +170,7 @@ static void box_extract_dynamic(
             }
 
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
-            box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], data);
+            box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false, data);
             batch->count ++;
         }
     }
@@ -404,6 +398,7 @@ void box_render_extract(
     box_packet_t *p)
 {
     RenderState *state = box_render_state(world);
+    box_render_extract_bake(world, state, p);
     box_extract_meshes(state, p);
 
     int32_t i;
@@ -421,6 +416,7 @@ void box_render_extract(
     box_extract_sun(world, state, p);
     box_extract_environment(world, state, p);
     box_render_extract_lights(world, state, p);
+    box_render_extract_emitters(world, state, p);
     box_render_validate(world);
 }
 
@@ -524,7 +520,11 @@ void box_render_extract_init(
             { .id = ecs_id(PointLight), .inout = EcsIn, .oper = EcsOr },
             { .id = ecs_id(SpotLight), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
+            { .id = DynamicTransform, .src.id = EcsSelf | EcsUp,
+                .oper = EcsOptional, .inout = EcsInOutNone },
+            { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp,
+                .oper = EcsOptional, .inout = EcsInOutNone }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -533,9 +533,21 @@ void box_render_extract_init(
     });
     state->instances = ecs_query(world, {
         .terms = {
-            { .id = ecs_id(RenderInstance), .inout = EcsIn },
+            { .id = ecs_id(RenderInstance), .inout = EcsInOut },
             { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
         }
+    });
+    state->emitters = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(Emissive), .inout = EcsIn },
+            { .id = ecs_id(RenderMesh), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
+            { .id = DynamicTransform, .src.id = EcsSelf | EcsUp,
+                .oper = EcsOptional, .inout = EcsInOutNone },
+            { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp,
+                .oper = EcsOptional, .inout = EcsInOutNone }
+        },
+        .cache_kind = EcsQueryCacheAuto
     });
 
     ECS_SYSTEM(world, BoxRenderExtract, EcsPreStore, 0);

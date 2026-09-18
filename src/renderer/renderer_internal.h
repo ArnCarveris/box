@@ -8,6 +8,7 @@
 
 #include "renderer.h"
 #include "cluster.h"
+#include "bake.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -48,6 +49,24 @@ typedef struct box_env_uniform_t {
     float params[4];  /**< Cube face, roughness, unused, unused */
 } box_env_uniform_t;
 
+/** Uniforms shared by the occupancy and probe bake passes */
+typedef struct box_bake_uniform_t {
+    float grid_min[4];      /**< World minimum corner of the occupancy grid */
+    float grid_cell[4];     /**< World size of one voxel, w is its diagonal */
+    uint32_t grid_dim[4];   /**< Voxels on each axis, w unused */
+    uint32_t light_count;   /**< Static lights in the bake light buffer */
+    uint32_t emitter_count; /**< Emitters in the emitter buffer */
+    uint32_t steps;         /**< Ray march samples per visibility test */
+    uint32_t pad;           /**< Padding to the 16 byte GPU stride */
+} box_bake_uniform_t;
+
+/** Probe and job count of one mesh, the per mesh uniform of the bake passes */
+typedef struct box_bake_info_t {
+    uint32_t probe_count; /**< Probes of the mesh */
+    uint32_t job_count;   /**< Probes the bake pass writes this frame */
+    uint32_t pad[2];      /**< Padding to the 16 byte GPU stride */
+} box_bake_info_t;
+
 /** GPU resources of one mesh and its static instances */
 typedef struct box_gpu_mesh_t {
     WGPUBuffer vertices;             /**< Interleaved vertex buffer */
@@ -56,6 +75,15 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer statics;              /**< Static instance buffer */
     uint32_t static_capacity;        /**< Instances the static buffer can hold */
     uint32_t static_count;           /**< Static instances to draw */
+    WGPUBuffer probe_descs;          /**< Probe descriptor per static slot */
+    WGPUBuffer probes;               /**< Baked spherical harmonics per static slot */
+    WGPUBuffer probe_jobs;           /**< Slots the bake pass writes this frame */
+    WGPUBuffer probe_info;           /**< box_bake_info_t of the mesh */
+    WGPUBindGroup probe_group;       /**< Probes the mesh shader reads */
+    WGPUBindGroup bake_group;        /**< Probe buffers of the bake pass */
+    WGPUBindGroup grid_group;        /**< Probe descriptors of the occupancy pass */
+    uint32_t probe_capacity;         /**< Probes the probe buffers can hold */
+    uint32_t job_capacity;           /**< Jobs the job buffer can hold */
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
 
@@ -127,6 +155,25 @@ struct box_renderer_t {
     WGPUBindGroupLayout env_layout;  /**< Layout of the environment group of the mesh shader */
     WGPUBindGroup env_group;         /**< Irradiance, specular, lookup table and sampler */
     uint32_t env_generation;         /**< View generation the prefilter was built for */
+    box_bake_state_t bake;           /**< Probe descriptors, dirty set and previous inputs */
+    WGPUBuffer bake_uniform;         /**< Grid and count uniforms of the bake passes */
+    WGPUBuffer bake_lights;          /**< Static lights the bake accumulates */
+    uint32_t bake_light_capacity;    /**< Lights the bake light buffer can hold */
+    WGPUBuffer bake_emitters;        /**< Emissive static instances the bake accumulates */
+    uint32_t bake_emitter_capacity;  /**< Emitters the emitter buffer can hold */
+    WGPUBuffer occupancy;            /**< Occupancy bits of the static scene */
+    uint32_t occupancy_words;        /**< Words the occupancy buffer holds */
+    WGPUBindGroupLayout bake_layout; /**< Uniform, lights, emitters and occupancy */
+    WGPUBindGroup bake_group;        /**< Global bind group of the bake pass */
+    WGPUBindGroupLayout grid_layout; /**< Uniform and writable occupancy */
+    WGPUBindGroup grid_group;        /**< Global bind group of the occupancy pass */
+    WGPUBindGroupLayout bake_mesh_layout; /**< Per mesh layout of the bake pass */
+    WGPUBindGroupLayout grid_mesh_layout; /**< Per mesh layout of the occupancy pass */
+    WGPUBindGroupLayout probe_layout; /**< Probe layout the mesh shader reads */
+    WGPUBuffer probe_dummy;          /**< Zero probe bound by dynamic draws */
+    WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
+    WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
+    WGPUComputePipeline grid_pipeline; /**< Occupancy fill pass */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -268,6 +315,50 @@ void box_environment_update(
 void box_environment_fini(
     box_renderer_t *r);
 
+/** Create the bake pipelines, their layouts and the probe bookkeeping.
+ *
+ * @param r The renderer
+ */
+void box_bake_init(
+    box_renderer_t *r);
+
+/** Apply the bake inputs of a packet and record the occupancy and bake passes.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param encoder The command encoder
+ */
+void box_bake_update(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder);
+
+/** Bind group a draw of a mesh reads its probes through.
+ *
+ * @param r The renderer
+ * @param mesh Mesh handle, ignored when the mesh has no probes
+ * @param baked Draw is a static batch with probes
+ * @return The bind group, the zero probe group when the mesh has none
+ */
+WGPUBindGroup box_bake_group(
+    box_renderer_t *r,
+    uint32_t mesh,
+    bool baked);
+
+/** Release the probe buffers and bind groups of a mesh.
+ *
+ * @param m The mesh entry
+ */
+void box_bake_mesh_release(
+    box_gpu_mesh_t *m);
+
+/** Release the bake pipelines, buffers and bookkeeping.
+ *
+ * @param r The renderer
+ */
+void box_bake_fini(
+    box_renderer_t *r);
+
 /** WGSL source of the lit instanced mesh shader */
 extern const char *box_mesh_shader_wgsl;
 
@@ -279,6 +370,12 @@ extern const char *box_env_shader_wgsl;
 
 /** WGSL source of the specular prefilter and irradiance convolution shader */
 extern const char *box_env_filter_wgsl;
+
+/** WGSL source of the occupancy grid fill shader */
+extern const char *box_bake_grid_wgsl;
+
+/** WGSL source of the probe bake shader */
+extern const char *box_bake_shader_wgsl;
 
 /** Read back a texture and write it as PNG.
  *

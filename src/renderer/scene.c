@@ -48,6 +48,7 @@ static box_gpu_mesh_t* box_scene_mesh(
 static void box_scene_mesh_release(
     box_gpu_mesh_t *m)
 {
+    box_bake_mesh_release(m);
     if (m->vertices) wgpuBufferRelease(m->vertices);
     if (m->indices) wgpuBufferRelease(m->indices);
     if (m->statics) wgpuBufferRelease(m->statics);
@@ -198,6 +199,7 @@ void box_scene_draw(
             continue;
         }
 
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, i, true), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, m->statics, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
@@ -212,6 +214,7 @@ void box_scene_draw(
             continue;
         }
 
+        wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, b->mesh, false), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->dynamics,
             (uint64_t)b->first * sizeof(box_instance_t),

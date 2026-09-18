@@ -162,6 +162,7 @@ void box_render_fill_instance(
     ecs_entity_t e,
     const RenderMesh *mesh,
     const WorldTransform *transform,
+    bool baked,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -188,7 +189,7 @@ void box_render_fill_instance(
     const PbrMaterial *pbr = ecs_get(world, e, PbrMaterial);
     out->params[0] = pbr ? pbr->metallic : 0.0f;
     out->params[1] = pbr ? pbr->roughness : 0.5f;
-    out->params[2] = 0.0f;
+    out->params[2] = baked ? 1.0f : 0.0f;
     out->params[3] = 0.0f;
 }
 

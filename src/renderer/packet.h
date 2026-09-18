@@ -45,8 +45,27 @@ typedef struct box_light_t {
     float cos_inner;     /**< Cosine of the full intensity cone half angle */
     float cos_outer;     /**< Cosine of the zero intensity cone half angle */
     uint32_t type;       /**< BOX_LIGHT_POINT or BOX_LIGHT_SPOT */
-    float pad[2];        /**< Padding to the 16 byte GPU stride */
+    uint32_t is_static;  /**< Light and its ancestors have no dynamic tag */
+    float pad;           /**< Padding to the 16 byte GPU stride */
 } box_light_t;
+
+/** One emissive static instance, treated as a sphere light by the bake */
+typedef struct box_emitter_t {
+    float position[3];  /**< World space center of the instance bounds */
+    float radius;       /**< Radius of the sphere the instance is treated as */
+    float color[3];     /**< Linear emissive color times its strength */
+    float range;        /**< Distance at which the emitted light reaches zero */
+} box_emitter_t;
+
+/** Settings of the baked lighting pass, copied from the BakeSettings singleton */
+typedef struct box_bake_t {
+    uint32_t enabled; /**< Static instances read a baked probe instead of the static lights */
+    uint32_t budget;  /**< Probes rebaked per frame */
+    uint32_t x;       /**< Occupancy voxels across the scene */
+    uint32_t y;       /**< Occupancy voxels up the scene */
+    uint32_t z;       /**< Occupancy voxels through the scene */
+    uint32_t steps;   /**< Ray march samples per visibility test */
+} box_bake_t;
 
 /** Froxel grid of a view, copied from the ClusterSettings singleton */
 typedef struct box_cluster_t {
@@ -82,6 +101,8 @@ typedef struct box_mesh_cmd_t {
     uint32_t index_count;   /**< Indices in the array */
     float *vertices;        /**< Interleaved BOX_VERTEX_FLOATS per vertex */
     uint32_t *indices;      /**< Triangle indices */
+    float bounds_min[3];    /**< Local bounds minimum of the unscaled mesh */
+    float bounds_max[3];    /**< Local bounds maximum of the unscaled mesh */
 } box_mesh_cmd_t;
 
 /** Instance data written to a slot of a mesh's static buffer */
@@ -121,6 +142,9 @@ typedef struct box_packet_t {
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
+    box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
+    box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
+    box_bake_t bake;                         /**< Settings of the baked lighting pass */
 } box_packet_t;
 
 /** Initialize the vectors of a packet.
@@ -138,6 +162,8 @@ static inline void box_packet_init(
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
     box_vec_init(&p->lights, sizeof(box_light_t));
+    box_vec_init(&p->bake_lights, sizeof(box_light_t));
+    box_vec_init(&p->emitters, sizeof(box_emitter_t));
 }
 
 /** Reset per frame fields while keeping vector storage.
@@ -160,6 +186,8 @@ static inline void box_packet_reset(
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
     box_vec_clear(&p->lights);
+    box_vec_clear(&p->bake_lights);
+    box_vec_clear(&p->emitters);
 }
 
 /** Release the vectors of a packet.
@@ -176,6 +204,8 @@ static inline void box_packet_fini(
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
     box_vec_fini(&p->lights);
+    box_vec_fini(&p->bake_lights);
+    box_vec_fini(&p->emitters);
 }
 
 #endif

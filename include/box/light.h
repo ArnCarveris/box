@@ -50,6 +50,16 @@ ECS_STRUCT(EnvironmentLight, {
     ecs_entity_t source; /**< Reserved for a cubemap or sky entity, 0 for now */
 });
 
+/** GPU bake of static lights and emissive surfaces into per instance probes, a singleton */
+ECS_STRUCT(BakeSettings, {
+    bool enabled;   /**< Static instances read a baked probe instead of the static lights */
+    int32_t budget; /**< Probes rebaked per frame, zero takes the default */
+    int32_t x;      /**< Occupancy voxels across the scene, zero takes the default */
+    int32_t y;      /**< Occupancy voxels up the scene, zero takes the default */
+    int32_t z;      /**< Occupancy voxels through the scene, zero takes the default */
+    int32_t steps;  /**< Ray march samples per visibility test, zero takes the default */
+});
+
 /** Froxel grid the renderer assigns point and spot lights to, a singleton */
 ECS_STRUCT(ClusterSettings, {
     int32_t x;          /**< Clusters across the view, default 16 */
@@ -69,6 +79,21 @@ ECS_STRUCT(ClusterSettings, {
 
 /** Default lights stored per cluster */
 #define BOX_CLUSTER_MAX_LIGHTS (64)
+
+/** Default probes rebaked per frame */
+#define BOX_BAKE_BUDGET (64)
+
+/** Default occupancy voxels across the scene */
+#define BOX_BAKE_GRID_X (128)
+
+/** Default occupancy voxels up the scene */
+#define BOX_BAKE_GRID_Y (32)
+
+/** Default occupancy voxels through the scene */
+#define BOX_BAKE_GRID_Z (128)
+
+/** Default ray march samples per visibility test */
+#define BOX_BAKE_STEPS (32)
 
 /** Sky color channel of the environment light a world without one gets */
 #define BOX_ENV_SKY (255)

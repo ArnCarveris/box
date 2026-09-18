@@ -9,6 +9,7 @@
 #include <box.h>
 #include "../renderer/packet.h"
 #include "../renderer/cluster.h"
+#include "../renderer/bake.h"
 #include "../geometry/mesh_gen.h"
 
 /** Static instance slots of one mesh */
@@ -35,11 +36,13 @@ typedef struct RenderState {
     ecs_query_t *captures;    /**< Camera entities that request a capture */
     ecs_query_t *suns;        /**< Directional light entities */
     ecs_query_t *lights;      /**< Point and spot light entities */
+    ecs_query_t *emitters;    /**< Static entities with an Emissive material */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
+    bool bake_enabled;        /**< Baking was enabled by the previous packet */
 } RenderState;
 
 extern ECS_COMPONENT_DECLARE(RenderInstance);
@@ -125,6 +128,7 @@ void box_render_release_slot(
  * @param e The entity
  * @param mesh Its render mesh
  * @param transform Its world transform
+ * @param baked The instance reads a baked probe instead of the static lights
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -132,7 +136,18 @@ void box_render_fill_instance(
     ecs_entity_t e,
     const RenderMesh *mesh,
     const WorldTransform *transform,
+    bool baked,
     box_instance_t *out);
+
+/** Check whether an entity or an ancestor carries a dynamic tag.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when the entity is extracted every frame
+ */
+bool box_render_is_dynamic(
+    ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Get the camera that extract renders when no camera requests a capture.
  *
@@ -160,6 +175,28 @@ void box_render_extract(
  * @param p The packet
  */
 void box_render_extract_lights(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Copy the bake settings into the packet and requeue every instance when they toggled.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_bake(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Fill the packet emitter array with the emissive static instances of the bake.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_emitters(
     ecs_world_t *world,
     RenderState *state,
     box_packet_t *p);
