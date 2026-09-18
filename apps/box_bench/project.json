@@ -1,0 +1,9 @@
+{
+    "id": "box_bench",
+    "type": "application",
+    "value": {
+        "description": "Headless benchmark that loads a scene, perturbs static entities and reports frame times",
+        "public": false,
+        "use": ["box"]
+    }
+}
