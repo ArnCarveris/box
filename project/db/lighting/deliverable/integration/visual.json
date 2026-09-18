@@ -1,0 +1,30 @@
+{
+  "kind": "visual",
+  "results": [
+    {
+      "scene": "test/integration/visual/baked_room.flecs",
+      "status": "pass",
+      "image": "test/integration/out/baked_room.png"
+    },
+    {
+      "scene": "test/integration/visual/dynamic_room.flecs",
+      "status": "pass",
+      "image": "test/integration/out/dynamic_room.png"
+    },
+    {
+      "scene": "test/integration/visual/lights_city.flecs",
+      "status": "pass",
+      "image": "test/integration/out/lights_city.png"
+    },
+    {
+      "scene": "test/integration/visual/pbr_spheres.flecs",
+      "status": "pass",
+      "image": "test/integration/out/pbr_spheres.png"
+    },
+    {
+      "scene": "test/integration/visual/primitives.flecs",
+      "status": "pass",
+      "image": "test/integration/out/primitives.png"
+    }
+  ]
+}
