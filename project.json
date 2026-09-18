@@ -63,11 +63,14 @@
             "commit": "28d546d5eb77d4585506a20480f4de2e706dff4c",
             "header-only": true
         },
-        "nanosvg": {
-            "repository": "https://github.com/memononen/nanosvg.git",
-            "commit": "239e102ec2c691f2902e20ace2ed36ee4a35cfe6",
-            "header-only": true,
-            "include": ["src"]
+        "resvg": {
+            "repository": "https://github.com/linebender/resvg.git",
+            "tag": "v0.47.0",
+            "subdir": "crates/c-api",
+            "build-system": "cargo",
+            "library": "resvg",
+            "cargo-args": ["--no-default-features", "--features=text,system-fonts,memmap-fonts"],
+            "include": ["."]
         }
     },
     "${os Darwin}": {

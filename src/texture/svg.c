@@ -1,60 +1,157 @@
 /**
  * @file texture/svg.c
- * @brief Rasterizes an Svg component with nanosvg and uploads it as a texture.
+ * @brief Rasterizes an Svg component with resvg and uploads it as a texture.
  */
 
 #include "texture_internal.h"
-
-#define NANOSVG_IMPLEMENTATION
-#define NANOSVG_ALL_COLOR_KEYWORDS
-#include <nanosvg.h>
-
-#define NANOSVGRAST_IMPLEMENTATION
-#include <nanosvgrast.h>
+#include "../shader/shader_internal.h"
+#include <resvg.h>
+#include <math.h>
+#include <stdio.h>
 
 /** Largest edge length an SVG is rasterized at before it is scaled to its class */
 #define BOX_SVG_MAX_SIZE (BOX_TEXTURE_MAX_SIZE)
 
-/** Dots per inch nanosvg converts absolute SVG units with */
+/** Dots per inch resvg converts absolute SVG units with */
 #define BOX_SVG_DPI (96.0f)
+
+/** Fallback font the engine ships, relative to the search path */
+#define BOX_SVG_FONT "etc/fonts/B612-Regular.ttf"
+
+/** Family name of the fallback font */
+#define BOX_SVG_FONT_FAMILY "B612"
+
+/** Parser and font options, shared by every rasterization and never mutated */
+static resvg_options *box_svg_opts;
+
+/** Read a file into a newly allocated buffer.
+ *
+ * @param path The file
+ * @param size Receives the byte count
+ * @return The bytes, owned by the caller, or NULL when the file cannot be read
+ */
+static uint8_t* box_svg_read(
+    const char *path,
+    long *size)
+{
+    uint8_t *result = NULL;
+    *size = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        goto done;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long bytes = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (bytes <= 0) {
+        fclose(f);
+        goto done;
+    }
+
+    result = ecs_os_malloc((ecs_size_t)bytes);
+    size_t read = fread(result, 1, (size_t)bytes, f);
+    fclose(f);
+    *size = (long)read;
+done:
+    return result;
+}
+
+/** Load the fallback font the engine ships into the font database.
+ *
+ * The font makes text render the same on a machine without fonts and on the web
+ * build, where the file comes out of the embedded `etc` folder.
+ *
+ * @param opts The options to load the font into
+ */
+static void box_svg_load_font(
+    resvg_options *opts)
+{
+    char path[BOX_SHADER_PATH_MAX];
+    if (!box_shader_resolve(BOX_SVG_FONT, path, sizeof(path))) {
+        ecs_warn("svg: no fallback font at '%s', text needs a system font", BOX_SVG_FONT);
+        goto done;
+    }
+
+    long size = 0;
+    uint8_t *data = box_svg_read(path, &size);
+    if (!data) {
+        goto done;
+    }
+
+    resvg_options_load_font_data(opts, (const char*)data, (uintptr_t)size);
+    ecs_os_free(data);
+    resvg_options_set_font_family(opts, BOX_SVG_FONT_FAMILY);
+    resvg_options_set_sans_serif_family(opts, BOX_SVG_FONT_FAMILY);
+done:
+    return;
+}
+
+/** Build the shared options once, with the system fonts and the fallback font.
+ *
+ * The options are read only afterwards, which is what lets a worker thread parse
+ * an SVG with them while another one does the same.
+ */
+static void box_svg_options(void)
+{
+    if (box_svg_opts) {
+        goto done;
+    }
+
+    box_svg_opts = resvg_options_create();
+    ecs_assert(box_svg_opts != NULL, ECS_OUT_OF_MEMORY, NULL);
+    resvg_options_set_dpi(box_svg_opts, BOX_SVG_DPI);
+#ifndef __EMSCRIPTEN__
+    resvg_options_load_system_fonts(box_svg_opts);
+#endif
+    box_svg_load_font(box_svg_opts);
+done:
+    return;
+}
 
 /** Parse the file or the inline data of an Svg component.
  *
- * The inline data is parsed from a copy because nanosvg writes into the string
- * it is given, and the copy is released again because the parsed image holds no
- * pointers into it.
- *
  * @param svg The component
- * @return The parsed image, or NULL when neither source parses
+ * @return The parsed tree, or NULL when neither source parses
  */
-static NSVGimage* box_svg_parse(
+static resvg_render_tree* box_svg_parse(
     const Svg *svg)
 {
-    NSVGimage *result = NULL;
+    resvg_render_tree *result = NULL;
+    int32_t err = RESVG_OK;
     if (svg->file && svg->file[0]) {
-        result = nsvgParseFromFile(svg->file, "px", BOX_SVG_DPI);
-        if (!result) {
-            ecs_err("svg: cannot parse '%s'", svg->file);
+        char path[BOX_SHADER_PATH_MAX];
+        box_shader_resolve(svg->file, path, sizeof(path));
+        err = resvg_parse_tree_from_file(path, box_svg_opts, &result);
+        if (err != RESVG_OK) {
+            ecs_err("svg: cannot parse '%s' (%d)", svg->file, err);
         }
     } else if (svg->data && svg->data[0]) {
-        char *copy = ecs_os_strdup(svg->data);
-        result = nsvgParse(copy, "px", BOX_SVG_DPI);
-        ecs_os_free(copy);
-        if (!result) {
-            ecs_err("svg: cannot parse the inline data");
+        uintptr_t len = (uintptr_t)ecs_os_strlen(svg->data);
+        err = resvg_parse_tree_from_data(svg->data, len, box_svg_opts, &result);
+        if (err != RESVG_OK) {
+            ecs_err("svg: cannot parse the inline data (%d)", err);
         }
     }
 
-    if (result && (result->width < 1.0f || result->height < 1.0f)) {
-        ecs_err("svg: image has no size");
-        nsvgDelete(result);
+    if (result && err != RESVG_OK) {
+        resvg_tree_destroy(result);
         result = NULL;
+    }
+
+    if (result) {
+        resvg_size size = resvg_get_image_size(result);
+        if (!(size.width >= 1.0f) || !(size.height >= 1.0f)) {
+            ecs_err("svg: image has no size");
+            resvg_tree_destroy(result);
+            result = NULL;
+        }
     }
 
     return result;
 }
 
-/** Clamp a rasterization edge length to the range nanosvg is called with.
+/** Clamp a rasterization edge length to the range resvg is called with.
  *
  * @param size The edge length in pixels
  * @return The edge length, at least one and at most BOX_SVG_MAX_SIZE
@@ -73,19 +170,19 @@ static int32_t box_svg_clamp(
  * both zero keep the size of the SVG. A requested size of another aspect ratio
  * fits the SVG in it, so the art is never distorted.
  *
- * @param image The parsed SVG
+ * @param source The size of the parsed SVG
  * @param svg The component
  * @param size Receives the width and the height in pixels
- * @param scale Receives the uniform scale nanosvg rasterizes with
+ * @param scale Receives the uniform scale resvg rasterizes with
  */
 static void box_svg_target(
-    const NSVGimage *image,
+    resvg_size source,
     const Svg *svg,
     int32_t *size,
     float *scale)
 {
-    float sw = image->width;
-    float sh = image->height;
+    float sw = source.width;
+    float sh = source.height;
     int32_t want_w = box_svg_clamp(svg->width > 0 ? svg->width : 1) * (svg->width > 0);
     int32_t want_h = box_svg_clamp(svg->height > 0 ? svg->height : 1) * (svg->height > 0);
     float by_w = want_w ? (float)want_w / sw : 1.0f;
@@ -98,10 +195,120 @@ static void box_svg_target(
     *scale = fit_w < fit_h ? fit_w : fit_h;
 }
 
-/** Rasterize an SVG and hand the pixels to the texture upload path.
+/** Turn the premultiplied pixels resvg writes into straight alpha.
  *
- * nanosvg returns straight alpha with its own edge defringing, which is what
- * the texture path expects, so the pixels are uploaded as they come out.
+ * @param pixels RGBA8 texels
+ * @param count Number of texels
+ */
+static void box_svg_unpremultiply(
+    uint8_t *pixels,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        uint8_t *p = &pixels[(size_t)i * 4];
+        uint32_t a = p[3];
+        if (!a) {
+            continue;
+        }
+
+        int32_t c;
+        for (c = 0; c < 3; c ++) {
+            uint32_t v = ((uint32_t)p[c] * 255u + a / 2u) / a;
+            p[c] = (uint8_t)(v > 255u ? 255u : v);
+        }
+    }
+}
+
+/** Give a fully transparent texel the average color of its opaque neighbours.
+ *
+ * nanosvg defringed its output, and the mip chain and the box filter average
+ * straight RGBA, so a transparent texel that keeps its black would darken the
+ * edge of the artwork at every smaller size.
+ *
+ * @param pixels RGBA8 texels
+ * @param width Width of the image
+ * @param height Height of the image
+ */
+static void box_svg_bleed(
+    uint8_t *pixels,
+    int32_t width,
+    int32_t height)
+{
+    ecs_size_t bytes = (ecs_size_t)(width * height * 4);
+    uint8_t *src = ecs_os_malloc(bytes);
+    ecs_os_memcpy(src, pixels, bytes);
+
+    int32_t y;
+    for (y = 0; y < height; y ++) {
+        int32_t x;
+        for (x = 0; x < width; x ++) {
+            uint8_t *dst = &pixels[((size_t)y * width + x) * 4];
+            if (dst[3]) {
+                continue;
+            }
+
+            uint32_t sum[3] = {0, 0, 0};
+            uint32_t n = 0;
+            int32_t sy;
+            for (sy = y ? y - 1 : 0; sy <= y + 1 && sy < height; sy ++) {
+                int32_t sx;
+                for (sx = x ? x - 1 : 0; sx <= x + 1 && sx < width; sx ++) {
+                    const uint8_t *s = &src[((size_t)sy * width + sx) * 4];
+                    if (!s[3]) {
+                        continue;
+                    }
+
+                    sum[0] += s[0];
+                    sum[1] += s[1];
+                    sum[2] += s[2];
+                    n ++;
+                }
+            }
+
+            if (n) {
+                dst[0] = (uint8_t)((sum[0] + n / 2) / n);
+                dst[1] = (uint8_t)((sum[1] + n / 2) / n);
+                dst[2] = (uint8_t)((sum[2] + n / 2) / n);
+            }
+        }
+    }
+
+    ecs_os_free(src);
+}
+
+/** Render a parsed SVG into a straight alpha RGBA8 buffer.
+ *
+ * @param tree The parsed SVG, destroyed by the call
+ * @param svg The component
+ * @param size Receives the width and the height in pixels
+ * @return The texels, owned by the caller
+ */
+static uint8_t* box_svg_render(
+    resvg_render_tree *tree,
+    const Svg *svg,
+    int32_t *size)
+{
+    resvg_size source = resvg_get_image_size(tree);
+    float scale;
+    box_svg_target(source, svg, size, &scale);
+
+    uint8_t *pixels = ecs_os_calloc((ecs_size_t)(size[0] * size[1] * 4));
+    resvg_transform xform = resvg_transform_identity();
+    xform.a = scale;
+    xform.d = scale;
+    xform.e = ((float)size[0] - source.width * scale) * 0.5f;
+    xform.f = ((float)size[1] - source.height * scale) * 0.5f;
+    resvg_render(tree, xform, (uint32_t)size[0], (uint32_t)size[1], (char*)pixels);
+    resvg_tree_destroy(tree);
+
+    box_svg_unpremultiply(pixels, size[0] * size[1]);
+    box_svg_bleed(pixels, size[0], size[1]);
+
+    return pixels;
+}
+
+/** Rasterize an SVG and hand the pixels to the texture upload path.
  *
  * @param world The world
  * @param e The texture entity
@@ -112,23 +319,13 @@ static void box_svg_rasterize(
     ecs_entity_t e,
     const Svg *svg)
 {
-    NSVGimage *image = box_svg_parse(svg);
-    if (!image) {
+    resvg_render_tree *tree = box_svg_parse(svg);
+    if (!tree) {
         goto done;
     }
 
     int32_t size[2];
-    float scale;
-    box_svg_target(image, svg, size, &scale);
-
-    NSVGrasterizer *rast = nsvgCreateRasterizer();
-    ecs_assert(rast != NULL, ECS_OUT_OF_MEMORY, NULL);
-    uint8_t *pixels = ecs_os_calloc((ecs_size_t)(size[0] * size[1] * 4));
-    float tx = ((float)size[0] - image->width * scale) * 0.5f;
-    float ty = ((float)size[1] - image->height * scale) * 0.5f;
-    nsvgRasterize(rast, image, tx, ty, scale, pixels, size[0], size[1], size[0] * 4);
-    nsvgDeleteRasterizer(rast);
-    nsvgDelete(image);
+    uint8_t *pixels = box_svg_render(tree, svg, size);
 
     uint32_t cap;
     bool keep;
@@ -190,6 +387,8 @@ done:
 void box_svg_init(
     ecs_world_t *world)
 {
+    box_svg_options();
+
     ecs_add_pair(world, ecs_id(Svg), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(Svg), EcsWith, ecs_id(TextureImpl));
     ecs_add_pair(world, ecs_id(Svg), EcsWith, ecs_id(RenderTexture));

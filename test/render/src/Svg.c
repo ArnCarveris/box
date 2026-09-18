@@ -19,6 +19,22 @@ static const char *svg_circle =
     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\">"
     "<circle cx=\"32\" cy=\"32\" r=\"30\" fill=\"#ff0000\"/></svg>";
 
+static const char *svg_text =
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"
+    "<rect width=\"64\" height=\"64\" fill=\"#000000\"/>"
+    "<text x=\"32\" y=\"48\" font-family=\"B612\" font-size=\"64\" fill=\"#ffffff\""
+    " text-anchor=\"middle\">I</text></svg>";
+
+static const char *svg_mask =
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"
+    "<defs><mask id=\"m\"><rect width=\"64\" height=\"32\" fill=\"#ffffff\"/></mask></defs>"
+    "<rect width=\"64\" height=\"64\" fill=\"#00ff00\" mask=\"url(#m)\"/></svg>";
+
+static const char *svg_clip =
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"
+    "<defs><clipPath id=\"c\"><rect width=\"32\" height=\"64\"/></clipPath></defs>"
+    "<rect width=\"64\" height=\"64\" fill=\"#ff0000\" clip-path=\"url(#c)\"/></svg>";
+
 static ecs_world_t *w;
 static box_packet_t packet;
 static int32_t svg_errors;
@@ -249,5 +265,69 @@ void Svg_row_zero_is_the_bottom_of_the_image(void)
     test_int(top[0], 255);
     test_int(top[1], 0);
     test_int(top[2], 0);
+    test_int(svg_errors, 0);
+}
+
+void Svg_text_rasterizes(void)
+{
+    // textures/svg_resvg
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_text), .width = 256, .height = 256 });
+    box_render_extract(w, &packet);
+    test_int(packet.texture_create.count, 1);
+    box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
+    const uint8_t *stem = cmd->pixels + ((size_t)127 * 256 + 128) * 4;
+    test_int(stem[0], 255);
+    test_int(stem[1], 255);
+    test_int(stem[2], 255);
+    test_int(stem[3], 255);
+    const uint8_t *corner = cmd->pixels + ((size_t)8 * 256 + 8) * 4;
+    test_int(corner[0], 0);
+    test_int(corner[3], 255);
+
+    int32_t bright = 0;
+    int32_t i;
+    for (i = 0; i < 256 * 256; i ++) {
+        bright += cmd->pixels[(size_t)i * 4] > 200;
+    }
+
+    test_assert(bright > 2000);
+    test_assert(bright < 20000);
+    test_int(svg_errors, 0);
+}
+
+void Svg_mask_hides_half(void)
+{
+    // textures/svg_resvg
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_mask), .width = 256, .height = 256 });
+    box_render_extract(w, &packet);
+    test_int(packet.texture_create.count, 1);
+    box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
+    const uint8_t *shown = cmd->pixels + ((size_t)200 * 256 + 128) * 4;
+    test_int(shown[0], 0);
+    test_int(shown[1], 255);
+    test_int(shown[2], 0);
+    test_int(shown[3], 255);
+    const uint8_t *hidden = cmd->pixels + ((size_t)40 * 256 + 128) * 4;
+    test_int(hidden[3], 0);
+    test_int(svg_errors, 0);
+}
+
+void Svg_clip_path_keeps_the_clipped_half(void)
+{
+    // textures/svg_resvg
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_clip), .width = 256, .height = 256 });
+    box_render_extract(w, &packet);
+    test_int(packet.texture_create.count, 1);
+    box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
+    const uint8_t *kept = cmd->pixels + ((size_t)128 * 256 + 64) * 4;
+    test_int(kept[0], 255);
+    test_int(kept[1], 0);
+    test_int(kept[2], 0);
+    test_int(kept[3], 255);
+    const uint8_t *clipped = cmd->pixels + ((size_t)128 * 256 + 192) * 4;
+    test_int(clipped[3], 0);
     test_int(svg_errors, 0);
 }

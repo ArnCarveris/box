@@ -213,7 +213,10 @@
                     "removing_the_component_destroys_the_handle",
                     "handle_reaches_a_pbr_slot",
                     "texture_and_svg_is_an_error",
-                    "row_zero_is_the_bottom_of_the_image"
+                    "row_zero_is_the_bottom_of_the_image",
+                    "text_rasterizes",
+                    "mask_hides_half",
+                    "clip_path_keeps_the_clipped_half"
                 ],
                 "setup": true,
                 "teardown": true
