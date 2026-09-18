@@ -2,7 +2,8 @@
  * @file box/material.h
  * @brief Material components: color, opacity, tint, PBR parameters and emission.
  *
- * The box.material module resolves tints through the hierarchy.
+ * The box.material module resolves tints through the hierarchy and registers
+ * the material layers a scene applies on top of the sampled surface.
  */
 
 #ifndef BOX_MATERIAL_H
@@ -120,6 +121,38 @@ ECS_STRUCT(PbrTextures, {
     ecs_entity_t roughness; /**< Multiplied with the roughness, green channel */
     ecs_entity_t normal;    /**< Tangent space normal perturbation */
 });
+
+/** Material layers a scene can register, one bit each in the instance layer mask */
+#define BOX_MATERIAL_LAYER_MAX (16)
+
+/** Body of a WGSL function that changes a surface, registered as a scene layer.
+ *
+ * The source is the body of `fn layer(s: ptr<function, Surface>, p: LayerParams)`,
+ * so it writes `(*s).albedo`, `(*s).roughness`, `(*s).metallic`, `(*s).normal`,
+ * `(*s).emissive`, `(*s).occlusion` and `(*s).alpha`, and reads `(*s).world_pos`,
+ * `(*s).local` (the position in the mesh bounds, 0 to 1 on each axis) and
+ * `(*s).geo_normal` (the world normal before normal mapping). The parameters
+ * come from the LayerParams of the same entity and `box_noise(p: vec3<f32>)`
+ * returns hash based value noise in 0 to 1.
+ */
+ECS_STRUCT(MaterialLayer, {
+    char *wgsl;    /**< Body of the layer function */
+    int32_t order; /**< Application order, the lowest runs first */
+});
+
+/** Scene global parameters of a material layer, read as p.a and p.b by its body */
+ECS_STRUCT(LayerParams, {
+    vec4 a; /**< First parameter vector */
+    vec4 b; /**< Second parameter vector */
+});
+
+/** Whether views apply material layers at all, a singleton that defaults to enabled */
+ECS_STRUCT(MaterialLayerSettings, {
+    bool enabled; /**< Layers registered by the scene are applied */
+});
+
+/** Enables a registered layer on a material as (MaterialLayerOn, layer), inherited */
+extern ECS_TAG_DECLARE(MaterialLayerOn);
 
 /** Material properties may change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
