@@ -57,6 +57,51 @@
                 "static_sibling_not_updated_by_system"
             ]
         }, {
+            "id": "Parent",
+            "testcases": [
+                "child_of_moved_parent",
+                "set_component_parents_entity",
+                "grandchild_of_moved_parent",
+                "scale_inherited_three_levels",
+                "child_set_does_not_move_parent",
+                "reparent_to_new_parent",
+                "remove_parent_makes_root",
+                "manual_transform_parent_propagates",
+                "one_on_set_for_new_child",
+                "only_changed_subtree_written",
+                "delete_parent_deletes_subtree",
+                "deep_chain",
+                "dynamic_parent_static_child",
+                "static_parent_dynamic_child",
+                "dynamic_subtree_under_static_root",
+                "dynamic_node_between_static_levels",
+                "dynamic_emits_no_events",
+                "add_then_remove_dynamic",
+                "prefab_tree_instantiation",
+                "lookat_under_parent",
+                "name_lookup_through_parent"
+            ]
+        }, {
+            "id": "Mixed",
+            "testcases": [
+                "childof_child_under_parent_node",
+                "parent_child_under_childof_node",
+                "deep_chain_alternating",
+                "scale_inherited_alternating",
+                "reparent_childof_to_parent",
+                "reparent_parent_to_childof",
+                "reparent_back_and_forth",
+                "reparent_subtree_keeps_descendants",
+                "reparent_dynamic_node",
+                "dynamic_parent_root_childof_child",
+                "dynamic_childof_node_under_parent_root",
+                "dynamic_cascade_order_alternating",
+                "dynamic_node_between_static_levels",
+                "delete_parent_node_with_children",
+                "only_changed_subtree_written",
+                "manual_transform_between_storages"
+            ]
+        }, {
             "id": "LookAt",
             "testcases": [
                 "target_in_front",
