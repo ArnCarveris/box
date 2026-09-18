@@ -21,6 +21,12 @@
                 "benchcases": [
                     "resolve_100_bindings"
                 ]
+            },
+            {
+                "id": "Events",
+                "benchcases": [
+                    "resume_100_waiters"
+                ]
             }
         ]
     }

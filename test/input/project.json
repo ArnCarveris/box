@@ -100,6 +100,20 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Events",
+                "testcases": [
+                    "a_script_resumes_on_the_pressed_frame",
+                    "on_down_resumes_while_the_action_is_held",
+                    "on_up_resumes_when_the_action_is_released",
+                    "several_waiters_resume_on_one_action",
+                    "an_emitted_action_resumes_a_waiter",
+                    "the_wait_carries_the_source",
+                    "deleting_the_entity_of_a_task_cancels_the_wait"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
