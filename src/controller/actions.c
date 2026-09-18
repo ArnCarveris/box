@@ -23,7 +23,7 @@ ecs_entity_t box_controller_action(
     ecs_entity_t action = ecs_entity(world, { .name = name, .parent = scope });
     if (!ecs_has(world, action, InputAction)) {
         ecs_set(world, action, InputAction, {
-            .description = ECS_CONST_CAST(char*, description) });
+            .description = ecs_os_strdup(description) });
     }
 
     uint64_t bound[1];
