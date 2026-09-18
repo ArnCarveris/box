@@ -3,6 +3,10 @@
  * @brief The terminal and resource endpoints served by the command server.
  */
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+
 #include "command_internal.h"
 #include <sys/stat.h>
 #include <string.h>
