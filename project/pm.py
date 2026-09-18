@@ -28,8 +28,8 @@ LEVELS = ("epic", "task", "subtask")
 TEST_STATUSES = ("pass", "fail", "empty")
 BENCH_METRICS = ("mean_ms", "p50_ms", "p99_ms", "max_ms", "fps")
 BENCH_FIELDS = ("entities", "static", "dynamic", "frames")
-MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns",
-                "iterations", "samples", "items_per_sec")
+MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", "min_ns", "max_ns",
+                "p95_ns", "p99_ns", "outliers", "iterations", "samples", "items_per_sec")
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
 
@@ -238,11 +238,24 @@ def aggregate_tests():
     reports.sort(key=lambda r: (time_value(r["time"]), r["file"]))
 
     latest = {}
+    suite_history = {}
+    case_history = {}
     for report in reports:
         for suite in report.pop("_suites", []):
-            key = (report["project"], suite["suite"])
+            key = report["project"] + "|" + suite["suite"]
+            point = {
+                "time": report["time"],
+                "time_source": report["time_source"],
+                "item": report["item"],
+                "url": report["url"],
+                "cases": suite["cases"],
+                "elapsed": suite["time"],
+            }
+            point.update({status: suite[status] for status in TEST_STATUSES})
+            suite_history.setdefault(key, []).append(point)
             row = dict(suite)
             row.update({
+                "key": key,
                 "project": report["project"],
                 "item": report["item"],
                 "file": report["file"],
@@ -251,6 +264,14 @@ def aggregate_tests():
                 "time_source": report["time_source"],
                 "cases_detail": row.pop("case_list"),
             })
+            for case in row["cases_detail"]:
+                case_history.setdefault(key + "|" + str(case["case"]), []).append({
+                    "time": report["time"],
+                    "time_source": report["time_source"],
+                    "item": report["item"],
+                    "status": case["status"],
+                    "elapsed": case["time"],
+                })
             latest[key] = row
     suites = [latest[key] for key in sorted(latest)]
 
@@ -268,6 +289,8 @@ def aggregate_tests():
         "generated": now(),
         "reports": reports,
         "suites": suites,
+        "suite_history": suite_history,
+        "case_history": case_history,
         "projects": [projects[name] for name in sorted(projects)],
     }
 
@@ -330,6 +353,60 @@ def micro_runs(full, data, item, url):
     return runs
 
 
+def micro_case_row(run):
+    row = {"case": run["case"]}
+    row.update({field: run[field] for field in MICRO_FIELDS if field in run})
+    return row
+
+
+def micro_aggregates(micro):
+    reports = {}
+    case_history = {}
+    for run in micro:
+        reports.setdefault((run["file"], run["project"], run["suite"]), []).append(run)
+        key = run["project"] + "|" + run["suite"] + "|" + run["case"]
+        point = {"time": run["time"], "time_source": run["time_source"], "item": run["item"], "url": run["url"]}
+        point.update({field: run[field] for field in MICRO_FIELDS if field in run})
+        case_history.setdefault(key, []).append(point)
+    suite_history = {}
+    latest = {}
+    for (_, project, suite), rows in reports.items():
+        key = project + "|" + suite
+        point = {
+            "time": rows[0]["time"],
+            "time_source": rows[0]["time_source"],
+            "item": rows[0]["item"],
+            "file": rows[0]["file"],
+            "url": rows[0]["url"],
+            "cases": len(rows),
+            "median_ns": round(sum(number(row.get("median_ns")) for row in rows), 3),
+            "mean_ns": round(sum(number(row.get("mean_ns")) for row in rows), 3),
+        }
+        suite_history.setdefault(key, []).append(point)
+        latest[key] = dict(point, key=key, project=project, suite=suite,
+                           cases_detail=[micro_case_row(row) for row in rows])
+    for points in list(suite_history.values()) + list(case_history.values()):
+        points.sort(key=lambda p: time_value(p["time"]))
+    projects = {}
+    for key in sorted(latest):
+        row = latest[key]
+        project = projects.setdefault(row["project"], {
+            "project": row["project"], "suites": 0, "cases": 0, "median_ns": 0.0,
+            "time": row["time"], "item": row["item"], "url": row["url"],
+        })
+        project["suites"] += 1
+        project["cases"] += row["cases"]
+        project["median_ns"] = round(project["median_ns"] + row["median_ns"], 3)
+        if time_value(row["time"]) >= time_value(project["time"]):
+            project.update({"time": row["time"], "item": row["item"], "url": row["url"]})
+    return {
+        "micro_projects": [projects[name] for name in sorted(projects)],
+        "micro_suites": [latest[key] for key in sorted(latest)],
+        "micro_suite_history": suite_history,
+        "micro_case_history": case_history,
+    }
+
+
 def is_bench_report(name):
     return name.startswith("bench") and name.endswith(".json")
 
@@ -375,6 +452,7 @@ def aggregate_benchmarks(extra_dirs=None):
         "scenes": [latest[name] for name in sorted(latest)],
         "micro_runs": micro,
         "micro": [latest_micro[key] for key in sorted(latest_micro)],
+        **micro_aggregates(micro),
     }
 
 

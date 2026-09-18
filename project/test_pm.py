@@ -157,6 +157,79 @@ class PmTests(unittest.TestCase):
         self.assertEqual((project["project"], project["suites"], project["cases"]), ("core", 2, 3))
         self.assertEqual((project["pass"], project["fail"], project["empty"]), (2, 0, 1))
 
+    def test_aggregate_tests_builds_suite_and_case_history(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/tests.json", {
+            "project": "core", "timestamp": "2026-01-01T10:00:00Z", "elapsed": 0.5,
+            "tests": [
+                {"suite": "A", "case": "one", "status": "pass", "elapsed": 0.1},
+                {"suite": "A", "case": "two", "status": "fail", "elapsed": 0.2},
+            ],
+        })
+        self.write_report("e1/deliverable/tests.json", {
+            "project": "core", "timestamp": "2026-01-02T10:00:00Z", "elapsed": 0.7,
+            "tests": [
+                {"suite": "A", "case": "one", "status": "pass", "elapsed": 0.3},
+                {"suite": "A", "case": "two", "status": "pass", "elapsed": 0.4},
+            ],
+        })
+        agg = pm.aggregate_tests()
+        self.assertEqual(agg["suites"][0]["key"], "core|A")
+        history = agg["suite_history"]["core|A"]
+        self.assertEqual([p["time"] for p in history], ["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"])
+        self.assertEqual([p["item"] for p in history], ["e1/t1", "e1"])
+        self.assertAlmostEqual(history[0]["elapsed"], 0.3)
+        self.assertAlmostEqual(history[1]["elapsed"], 0.7)
+        self.assertEqual((history[0]["pass"], history[0]["fail"], history[0]["cases"]), (1, 1, 2))
+        self.assertEqual(history[1]["url"], "/deliverable/e1/deliverable/tests.json")
+        cases = agg["case_history"]["core|A|two"]
+        self.assertEqual([p["status"] for p in cases], ["fail", "pass"])
+        self.assertAlmostEqual(cases[1]["elapsed"], 0.4)
+        self.assertEqual(len(agg["case_history"]["core|A|one"]), 2)
+
+    def test_aggregate_benchmarks_builds_micro_suite_history(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/bench.json", {
+            "project": "bench_transform", "timestamp": "2026-01-01T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf", "median_ns": 200.0, "mean_ns": 201.0,
+                 "ci_low_ns": 198.0, "ci_high_ns": 204.0, "p99_ns": 260.0, "outliers": 3, "samples": 100},
+                {"suite": "Static", "case": "read_leaf", "median_ns": 100.0, "mean_ns": 101.0, "samples": 100},
+                {"suite": "Dynamic", "case": "propagate", "median_ns": 9000.0, "mean_ns": 9100.0, "samples": 20},
+            ],
+        })
+        self.write_report("e1/deliverable/bench.json", {
+            "project": "bench_transform", "timestamp": "2026-01-02T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf", "median_ns": 180.0, "mean_ns": 181.0,
+                 "ci_low_ns": 178.0, "ci_high_ns": 184.0, "p99_ns": 240.0, "outliers": 1, "samples": 100},
+                {"suite": "Static", "case": "read_leaf", "median_ns": 90.0, "mean_ns": 91.0, "samples": 100},
+            ],
+        })
+        agg = pm.aggregate_benchmarks(extra_dirs=[])
+        self.assertEqual([p["project"] for p in agg["micro_projects"]], ["bench_transform"])
+        project = agg["micro_projects"][0]
+        self.assertEqual((project["suites"], project["cases"]), (2, 3))
+        self.assertEqual(project["median_ns"], 9270.0)
+        self.assertEqual([s["key"] for s in agg["micro_suites"]],
+                         ["bench_transform|Dynamic", "bench_transform|Static"])
+        static = [s for s in agg["micro_suites"] if s["suite"] == "Static"][0]
+        self.assertEqual((static["cases"], static["median_ns"], static["time"]),
+                         (2, 270.0, "2026-01-02T10:00:00Z"))
+        self.assertEqual([c["case"] for c in static["cases_detail"]], ["read_leaf", "set_leaf"])
+        self.assertEqual(static["cases_detail"][1]["p99_ns"], 240.0)
+        self.assertEqual(static["cases_detail"][1]["outliers"], 1)
+        history = agg["micro_suite_history"]["bench_transform|Static"]
+        self.assertEqual([(p["time"], p["median_ns"], p["cases"]) for p in history],
+                         [("2026-01-01T10:00:00Z", 300.0, 2), ("2026-01-02T10:00:00Z", 270.0, 2)])
+        self.assertEqual(len(agg["micro_suite_history"]["bench_transform|Dynamic"]), 1)
+        cases = agg["micro_case_history"]["bench_transform|Static|set_leaf"]
+        self.assertEqual([(p["median_ns"], p["ci_low_ns"], p["ci_high_ns"]) for p in cases],
+                         [(200.0, 198.0, 204.0), (180.0, 178.0, 184.0)])
+        self.assertEqual(cases[1]["url"], "/deliverable/e1/deliverable/bench.json")
+
     def test_aggregate_tests_falls_back_to_mtime(self):
         self.new("epic", "e1", "Epic")
         self.write_report("e1/deliverable/tests.json", {
