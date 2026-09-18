@@ -283,7 +283,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
-    bool layered,
+    const RenderState *layers,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -319,9 +319,8 @@ void box_render_fill_instance(
     }
 
     box_render_fill_uv(world, e, mesh, &m, tiled, out);
-    if (layered) {
-        RenderState *state = box_render_state(world);
-        box_instance_set_layers(out, box_render_layer_mask(world, state, e));
+    if (layers) {
+        box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
     }
 }
 

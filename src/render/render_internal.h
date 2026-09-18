@@ -218,7 +218,7 @@ void box_render_release_slot(
  * @param baked The instance reads a baked probe instead of the static lights
  * @param textured The world holds textures, so the PBR slots are resolved
  * @param tiled The world holds tiling components, so the uv transform is derived
- * @param layered The world enables material layers, so the layer mask is resolved
+ * @param layers The registry when a material enables a layer, NULL when none does
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -229,7 +229,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
-    bool layered,
+    const RenderState *layers,
     box_instance_t *out);
 
 /** Fill the uv transform and mode of an instance from its material components.
