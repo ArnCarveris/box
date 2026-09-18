@@ -8,6 +8,6 @@
     "ui/ui_view",
     "ui/layout",
     "interaction/picking",
-    "input_and_controllers/action_layer"
+    "input/action_layer"
   ]
 }

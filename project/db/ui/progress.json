@@ -8,7 +8,7 @@
     "views",
     "geometry_extensions",
     "interaction",
-    "input_and_controllers",
+    "input",
     "command"
   ],
   "priority": 10

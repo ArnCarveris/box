@@ -6,7 +6,7 @@
   "end_time": null,
   "dependencies": [
     "interaction/spatial_index",
-    "input_and_controllers/device_layer",
+    "input/device_layer",
     "views/view"
   ]
 }

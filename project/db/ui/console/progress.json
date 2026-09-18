@@ -8,7 +8,7 @@
     "ui/text",
     "ui/layout",
     "ui/ui_events",
-    "input_and_controllers/device_layer",
+    "input/device_layer",
     "command/terminal"
   ]
 }

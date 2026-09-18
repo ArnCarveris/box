@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "input_and_controllers/action_layer",
-    "input_and_controllers/camera_controller"
+    "input/action_layer",
+    "controllers/camera_controller"
   ]
 }
