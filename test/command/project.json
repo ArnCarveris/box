@@ -145,6 +145,27 @@
             ],
             "setup": true,
             "teardown": true
+        }, {
+            "id": "Search",
+            "testcases": [
+                "query_creates_query",
+                "query_replaces_query",
+                "query_invalid_expression",
+                "iter_and_next_in_chunks",
+                "next_past_the_end",
+                "next_without_iter",
+                "done_finishes_iterator",
+                "other_command_exits_iteration",
+                "grep_matches_names",
+                "grep_matches_component_names",
+                "grep_matches_values",
+                "grep_with_component_filter",
+                "grep_unknown_component",
+                "grep_recur_nested_children",
+                "output_capped_at_limit"
+            ],
+            "setup": true,
+            "teardown": true
         }]
     }
 }
