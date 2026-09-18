@@ -11,6 +11,43 @@
 #include "queue.h"
 #include "gpu.h"
 
+/** Faces of a cubemap */
+#define BOX_ENV_FACES (6)
+
+/** Edge length of the environment and prefiltered specular cubemaps */
+#define BOX_ENV_SIZE (64)
+
+/** Mip levels of the prefiltered specular cubemap, one per roughness step */
+#define BOX_ENV_MIPS (5)
+
+/** Edge length of the irradiance cubemap */
+#define BOX_ENV_IRRADIANCE_SIZE (16)
+
+/** Edge length of the split sum BRDF lookup texture */
+#define BOX_ENV_BRDF_SIZE (64)
+
+/** Samples the specular prefilter takes per texel */
+#define BOX_ENV_SPECULAR_SAMPLES (64)
+
+/** Samples the irradiance convolution takes per texel */
+#define BOX_ENV_IRRADIANCE_SAMPLES (128)
+
+/** Samples the BRDF integration takes per texel */
+#define BOX_ENV_BRDF_SAMPLES (128)
+
+/** Bytes between the uniforms of two environment passes */
+#define BOX_ENV_STRIDE (256)
+
+/** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
+#define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
+
+/** Uniforms of one environment pass, written at a dynamic offset */
+typedef struct box_env_uniform_t {
+    float sky[4];     /**< Linear radiance of the upper hemisphere */
+    float ground[4];  /**< Linear radiance of the lower hemisphere */
+    float params[4];  /**< Cube face, roughness, unused, unused */
+} box_env_uniform_t;
+
 /** GPU resources of one mesh and its static instances */
 typedef struct box_gpu_mesh_t {
     WGPUBuffer vertices;             /**< Interleaved vertex buffer */
@@ -69,6 +106,27 @@ struct box_renderer_t {
     WGPUBindGroupLayout light_layout; /**< Layout of the fragment light bind group */
     WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads */
     box_cluster_t grid;              /**< Grid the cluster buffers were built for */
+    WGPUTexture env_source;          /**< Cubemap the environment gradient is rendered into */
+    WGPUTextureView env_source_view; /**< Cube view of the environment */
+    WGPUTexture env_specular;        /**< Specular cubemap, one mip per roughness step */
+    WGPUTextureView env_specular_view; /**< Cube view of the specular mip chain */
+    WGPUTexture env_irradiance;      /**< Diffuse irradiance cubemap */
+    WGPUTextureView env_irradiance_view; /**< Cube view of the irradiance */
+    WGPUTexture env_brdf;            /**< Split sum BRDF lookup table */
+    WGPUTextureView env_brdf_view;   /**< View of the lookup table */
+    WGPUSampler env_sampler;         /**< Linear sampler of the environment textures */
+    WGPUBuffer env_uniform;          /**< Uniforms of every prefilter pass */
+    WGPUBindGroupLayout env_pass_layout;   /**< Uniform only layout of the gradient and BRDF */
+    WGPUBindGroup env_pass_group;    /**< Uniform bind group of the gradient and BRDF */
+    WGPUBindGroupLayout env_filter_layout; /**< Uniform, source cube and sampler layout */
+    WGPUBindGroup env_filter_group;  /**< Bind group of the specular and irradiance passes */
+    WGPURenderPipeline env_gradient_pipeline;   /**< Sky and ground gradient into a face */
+    WGPURenderPipeline env_specular_pipeline;   /**< GGX prefilter of one mip face */
+    WGPURenderPipeline env_irradiance_pipeline; /**< Cosine convolution of one face */
+    WGPURenderPipeline env_brdf_pipeline; /**< Split sum integration of the lookup table */
+    WGPUBindGroupLayout env_layout;  /**< Layout of the environment group of the mesh shader */
+    WGPUBindGroup env_group;         /**< Irradiance, specular, lookup table and sampler */
+    uint32_t env_generation;         /**< View generation the prefilter was built for */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -185,11 +243,42 @@ void box_lights_dispatch(
 void box_lights_fini(
     box_renderer_t *r);
 
+/** Create the environment textures, pipelines and bind groups and integrate the BRDF.
+ *
+ * @param r The renderer
+ */
+void box_environment_init(
+    box_renderer_t *r);
+
+/** Prefilter the environment of a packet when its generation changed.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param encoder The command encoder
+ */
+void box_environment_update(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder);
+
+/** Release the environment textures, pipelines and bind groups.
+ *
+ * @param r The renderer
+ */
+void box_environment_fini(
+    box_renderer_t *r);
+
 /** WGSL source of the lit instanced mesh shader */
 extern const char *box_mesh_shader_wgsl;
 
 /** WGSL source of the cluster assignment compute shader */
 extern const char *box_cluster_shader_wgsl;
+
+/** WGSL source of the environment gradient and BRDF integration shader */
+extern const char *box_env_shader_wgsl;
+
+/** WGSL source of the specular prefilter and irradiance convolution shader */
+extern const char *box_env_filter_wgsl;
 
 /** Read back a texture and write it as PNG.
  *
