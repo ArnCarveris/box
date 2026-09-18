@@ -273,13 +273,13 @@ the filter bar shows one epic or only unfinished tasks, and the diagram pans and
 zooms. The priority box in an epic's detail panel writes the new value with
 `POST /api/priority` and reorders the page.
 
-Besides the board, timeline and plan, the page has a **Tests** tab (per test
-project a table of suites with the time of the latest report and a chart of time per suite
-over every report, expanding into cases with their own history) and a
-**Benchmarks** tab (the same breakdown for bake3 benchmark suites, expanding into
-the median, confidence interval, p99 and samples per case, plus frame timing per
-bench scene). Both read the aggregated `/api/tests` and `/api/benchmarks`
-endpoints served by `pm.py serve`.
+Besides the board, timeline and plan, the **Tests** and **Benchmarks** tabs open
+with a summary panel of totals and sparklines and then one sortable, searchable
+project to suite to case tree, where an open row carries its own chart: time per
+suite and per case for tests, median per suite and per case with its confidence
+interval for bake3 benchmarks, plus a scene section with frame timing. Both read
+the aggregated `/api/tests` and `/api/benchmarks` endpoints served by `pm.py
+serve`, which summarize every level of that tree.
 
 The server also serves `apps/box_inspector/index.html` at `/inspector`. An epic
 with a `deliverable/wasm/` build gets an **Inspect** link on its card and in its
