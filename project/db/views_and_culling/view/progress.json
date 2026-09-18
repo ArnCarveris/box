@@ -5,6 +5,6 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "textures_and_materials/material_layers"
+    "materials/material_layers"
   ]
 }

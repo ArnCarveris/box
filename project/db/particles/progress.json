@@ -6,7 +6,7 @@
   "end_time": null,
   "dependencies": [
     "views_and_culling",
-    "textures_and_materials",
+    "materials",
     "effects",
     "sky"
   ],
