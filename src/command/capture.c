@@ -25,46 +25,32 @@ static char* box_capture_cameras(
     ecs_vec_t *out)
 {
     char *result = NULL;
-    if (!arg || !arg[0]) {
-        ecs_entity_t active = box_render_active_camera(world);
-        if (!active) {
-            result = ecs_os_strdup(BOX_COMMAND_ERROR_PREFIX "no active camera");
-        } else {
-            ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = active;
-        }
-
-        goto done;
-    }
-
-    ecs_entity_t cwd = box_path_cwd(world, session);
-    char *copy = ecs_os_strdup(arg);
+    char *copy = (arg && arg[0]) ? ecs_os_strdup(arg) : NULL;
     char *token = copy;
-    while (token) {
-        char *next = strchr(token, ',');
-        if (next) {
-            next[0] = '\0';
-            next ++;
+    do {
+        char *next = NULL;
+        if (token) {
+            next = strchr(token, ',');
+            if (next) {
+                next[0] = '\0';
+                next ++;
+            }
         }
 
         ecs_entity_t camera = 0;
-        if (box_path_lookup(world, cwd, token, &camera) || !camera) {
-            result = flecs_asprintf(
-                BOX_COMMAND_ERROR_PREFIX "unknown camera '%s'", token);
-            break;
-        }
-
-        if (!ecs_has(world, camera, Camera)) {
-            result = flecs_asprintf(
-                BOX_COMMAND_ERROR_PREFIX "'%s' is not a camera", token);
+        char *error = box_capture_camera(world, session, token, &camera);
+        if (error) {
+            result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "%s", error);
+            ecs_os_free(error);
             break;
         }
 
         ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = camera;
         token = next;
-    }
+    } while (token);
 
     ecs_os_free(copy);
-done:
+
     return result;
 }
 
@@ -105,16 +91,7 @@ static void box_capture_command(
     for (i = 0; i < count; i ++) {
         ecs_entity_t camera = ecs_vec_get_t(&cameras, ecs_entity_t, i)[0];
         char *file = flecs_asprintf("capture_%d_%d.png", app->frame, i);
-        Capture *pending = ecs_get_mut(world, camera, Capture);
-        if (pending) {
-            ecs_os_free(pending->path);
-            pending->path = NULL;
-        }
-
-        ecs_set(world, camera, Capture, {
-            .path = flecs_asprintf("%s/resources/%s", s->dir, file)
-        });
-
+        box_capture_request(world, camera, box_capture_path(world, session, file));
         ecs_strbuf_append(&buf, "%s\n", file);
         ecs_os_free(file);
     }
@@ -123,6 +100,67 @@ static void box_capture_command(
 done:
     ecs_vec_fini_t(NULL, &cameras, ecs_entity_t);
     *(char**)result->ptr = out;
+}
+
+char* box_capture_camera(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path,
+    ecs_entity_t *out)
+{
+    char *result = NULL;
+    ecs_entity_t camera = 0;
+    if (!path || !path[0]) {
+        camera = box_render_active_camera(world);
+        if (!camera) {
+            result = ecs_os_strdup("no active camera");
+        }
+
+        goto done;
+    }
+
+    ecs_entity_t cwd = box_path_cwd(world, session);
+    if (box_path_lookup(world, cwd, path, &camera) || !camera) {
+        result = flecs_asprintf("unknown camera '%s'", path);
+        camera = 0;
+        goto done;
+    }
+
+    if (!ecs_has(world, camera, Camera)) {
+        result = flecs_asprintf("'%s' is not a camera", path);
+        camera = 0;
+    }
+
+done:
+    out[0] = camera;
+
+    return result;
+}
+
+char* box_capture_path(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *file)
+{
+    const Terminal *t = ecs_get(world, session, Terminal);
+    ecs_assert(t != NULL, ECS_INVALID_PARAMETER, "entity is not a terminal session");
+    ecs_assert(t->session_dir != NULL, ECS_INVALID_OPERATION, "session without folder");
+
+    return flecs_asprintf("%s/resources/%s", t->session_dir, file);
+}
+
+void box_capture_request(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    char *path)
+{
+    Capture *pending = ecs_get_mut(world, camera, Capture);
+    if (pending) {
+        ecs_os_free(pending->path);
+        pending->path = NULL;
+    }
+
+    ecs_set(world, camera, Capture, { .path = path });
 }
 
 void box_capture_init(
