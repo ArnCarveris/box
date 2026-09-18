@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Box Inspector</title>
+<style>
+:root {
+  --bg: #f4f4f1;
+  --surface: #ffffff;
+  --surface-2: #f9f9f7;
+  --border: #e3e2dc;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #8a8983;
+  --accent: #2a78d6;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --bad: #d63a2a;
+  --pending: #b3b2ab;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px -12px rgba(0,0,0,.18);
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --stage: #101014;
+}
+:root:not([data-theme="light"]) { color-scheme: light dark; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+    --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
+  --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
+  --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow-x: hidden; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  display: grid; grid-template-rows: auto 1fr; min-height: 100%;
+}
+button, input, select { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+
+header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+.conn { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.tabs { display: flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.tabs button { padding: 4px 12px; border-radius: 6px; color: var(--ink-2); }
+.tabs button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.icon-btn { padding: 6px; border-radius: 8px; color: var(--ink-2); }
+.icon-btn:hover { background: var(--surface-2); }
+input[type="text"], select {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 9px; min-width: 0;
+}
+input[type="text"]:focus, select:focus { outline: 1px solid var(--accent); }
+#endpoint, #image { flex: 1; min-width: 180px; max-width: 420px; font-family: var(--mono); font-size: 12px; }
+.btn {
+  padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--ink-2); font-weight: 600; font-size: 13px;
+}
+.btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-3);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pending); }
+.pill.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.pill.ok::before { background: var(--good); }
+.pill.busy { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.pill.busy::before { background: var(--accent); }
+.pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.pill.bad::before { background: var(--bad); }
+
+main {
+  display: grid; gap: 16px; padding: 16px; min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.pane {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.pane-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+.pane-head h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-3); margin: 0 auto 0 0; font-weight: 600;
+}
+.pane-head .btn { padding: 3px 9px; font-size: 12px; font-weight: 500; }
+.pane-head select, .pane-head input[type="text"] { padding: 3px 7px; font-size: 12px; }
+#camera { width: 130px; font-family: var(--mono); }
+
+.log {
+  flex: 1; overflow: auto; overflow-wrap: anywhere; padding: 10px 12px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap;
+}
+.log .line { padding: 1px 0; }
+.log .cmd { color: var(--accent); font-weight: 600; }
+.log .out { color: var(--ink); }
+.log .err { color: var(--bad); }
+.log .info { color: var(--ink-3); }
+.input-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.input-row span { color: var(--ink-3); font-family: var(--mono); }
+#cmd { flex: 1; background: none; border: 0; font-family: var(--mono); font-size: 12px; padding: 2px 0; }
+#cmd:focus { outline: none; }
+
+.stage {
+  flex: 1; position: relative; min-height: 260px; background: var(--stage);
+  display: flex; align-items: center; justify-content: center;
+}
+#shot { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#canvas { width: 100%; height: 100%; display: block; }
+#canvas:focus { outline: none; }
+.stage .placeholder { color: var(--ink-3); font-size: 12px; padding: 20px; text-align: center; }
+.caption {
+  display: flex; gap: 10px; flex-wrap: wrap; padding: 7px 12px; border-top: 1px solid var(--border);
+  color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+  .pane { min-height: 55vh; }
+  #endpoint, #image { max-width: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Box Inspector</h1>
+  <div class="conn">
+    <div class="tabs" id="mode">
+      <button type="button" data-mode="http" class="active">HTTP</button>
+      <button type="button" data-mode="wasm">wasm</button>
+    </div>
+    <input id="endpoint" type="text" spellcheck="false" autocomplete="off" placeholder="http://localhost:27750">
+    <input id="image" type="text" spellcheck="false" autocomplete="off" placeholder="box_app.js url" hidden>
+    <button class="btn primary" type="button" id="connect">Connect</button>
+    <button class="btn" type="button" id="disconnect" disabled>Disconnect</button>
+    <span class="pill" id="status">disconnected</span>
+  </div>
+  <button class="icon-btn" type="button" id="theme" title="Toggle theme">◐</button>
+</header>
+<main>
+  <section class="pane">
+    <div class="pane-head">
+      <h2>Console</h2>
+      <button class="btn" type="button" id="clear">Clear</button>
+    </div>
+    <div class="log" id="log"></div>
+    <div class="input-row">
+      <span>$</span>
+      <input id="cmd" type="text" spellcheck="false" autocomplete="off" placeholder="type a command, Enter to run" disabled>
+    </div>
+  </section>
+  <section class="pane">
+    <div class="pane-head">
+      <h2>Render</h2>
+      <button class="btn" type="button" id="live" hidden>Show capture</button>
+      <input id="camera" type="text" spellcheck="false" autocomplete="off" placeholder="camera">
+      <select id="interval" title="Refresh interval">
+        <option value="0.5">0.5 s</option>
+        <option value="1" selected>1 s</option>
+        <option value="2">2 s</option>
+        <option value="5">5 s</option>
+      </select>
+      <button class="btn" type="button" id="pause">Pause</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="placeholder" id="placeholder">Not connected</div>
+      <img id="shot" alt="capture" hidden>
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" hidden></canvas>
+    </div>
+    <div class="caption"><span id="refreshed">no capture yet</span><span id="frame"></span></div>
+  </section>
+</main>
+
+<script id="inspector-core">
+/* Transports, endpoint paths, reply parsing, session and console history.
+   This part never touches the DOM so a node script can exercise it. */
+var BoxInspector = (function () {
+"use strict";
+
+var IMAGE_TYPE = "image/png";
+var POST_THRESHOLD = 1500;
+var HISTORY_MAX = 200;
+
+function isImage(type) {
+  return String(type || "").split(";")[0].trim() === IMAGE_TYPE;
+}
+
+function parseReply(text) {
+  var raw = text == null ? "" : String(text);
+  var head = raw.indexOf("\n");
+  var split = head < 0 ? -1 : raw.indexOf("\n", head + 1);
+  if (head < 0 || split < 0) {
+    return { status: 0, type: "text/plain", body: raw, image: null };
+  }
+  var status = parseInt(raw.slice(0, head), 10);
+  return {
+    status: isNaN(status) ? 0 : status,
+    type: raw.slice(head + 1, split) || "text/plain",
+    body: raw.slice(split + 1),
+    image: null
+  };
+}
+
+function dataUrl(base64) {
+  return "data:" + IMAGE_TYPE + ";base64," + String(base64).replace(/\s+/g, "");
+}
+
+function joinUrl(endpoint, path) {
+  var base = String(endpoint || "").replace(/\/+$/, "");
+  return base + (path.charAt(0) === "/" ? path : "/" + path);
+}
+
+function httpTransport(endpoint, io) {
+  var opts = io || {};
+  var doFetch = opts.fetch;
+  var toObjectUrl = opts.createObjectURL;
+  var base = String(endpoint || "").replace(/\/+$/, "");
+  return {
+    mode: "http",
+    label: base,
+    request: function (method, path, body) {
+      var init = { method: method, cache: "no-store" };
+      if (body) {
+        init.body = body;
+        init.headers = { "Content-Type": "text/plain" };
+      }
+      return doFetch(joinUrl(base, path), init).then(function (res) {
+        var type = "text/plain";
+        if (res.headers && res.headers.get) {
+          type = res.headers.get("content-type") || type;
+        }
+        if (isImage(type) && res.blob) {
+          return res.blob().then(function (blob) {
+            return { status: res.status, type: IMAGE_TYPE, body: "", image: toObjectUrl(blob) };
+          });
+        }
+        return res.text().then(function (text) {
+          return { status: res.status, type: type, body: text, image: null };
+        });
+      });
+    }
+  };
+}
+
+function wasmTransport(boxRequest) {
+  return {
+    mode: "wasm",
+    label: "wasm image",
+    request: function (method, path, body) {
+      return new Promise(function (resolve) {
+        var reply = parseReply(boxRequest(method, path, body || ""));
+        if (isImage(reply.type) && reply.body) {
+          reply.type = IMAGE_TYPE;
+          reply.image = dataUrl(reply.body);
+        }
+        resolve(reply);
+      });
+    }
+  };
+}
+
+function execRequest(session, line) {
+  var base = "/terminal/exec?session=" + encodeURIComponent(session);
+  if (String(line).length > POST_THRESHOLD) {
+    return { method: "POST", path: base, body: String(line) };
+  }
+  return { method: "GET", path: base + "&cmd=" + encodeURIComponent(line), body: "" };
+}
+
+function capturePath(session, camera) {
+  var path = "/capture?session=" + encodeURIComponent(session);
+  if (camera) {
+    path += "&camera=" + encodeURIComponent(camera);
+  }
+  return path;
+}
+
+function closePath(session) {
+  return "/terminal/close?session=" + encodeURIComponent(session);
+}
+
+function parseFrame(text) {
+  var match = /\bframe:\s*(\d+)/.exec(String(text || ""));
+  return match ? parseInt(match[1], 10) : null;
+}
+
+function createSession(transport) {
+  var name = null;
+  return {
+    name: function () { return name; },
+    open: function () {
+      return transport.request("GET", "/terminal/new", "").then(function (reply) {
+        if (reply.status !== 200) {
+          throw new Error(reply.body || ("status " + reply.status));
+        }
+        name = String(reply.body).trim();
+        return name;
+      });
+    },
+    exec: function (line) {
+      if (!name) {
+        return Promise.reject(new Error("not connected"));
+      }
+      var req = execRequest(name, line);
+      return transport.request(req.method, req.path, req.body);
+    },
+    capture: function (camera) {
+      if (!name) {
+        return Promise.reject(new Error("not connected"));
+      }
+      return transport.request("GET", capturePath(name, camera), "");
+    },
+    close: function () {
+      if (!name) {
+        return Promise.resolve(null);
+      }
+      var path = closePath(name);
+      name = null;
+      return transport.request("GET", path, "");
+    }
+  };
+}
+
+function createHistory(items, limit) {
+  var max = limit || HISTORY_MAX;
+  var list = (items || []).slice(-max);
+  var index = list.length;
+  return {
+    items: function () { return list.slice(); },
+    push: function (line) {
+      if (!line) {
+        return;
+      }
+      if (list[list.length - 1] !== line) {
+        list.push(line);
+      }
+      if (list.length > max) {
+        list = list.slice(list.length - max);
+      }
+      index = list.length;
+    },
+    prev: function () {
+      if (!list.length) {
+        return null;
+      }
+      if (index > 0) {
+        index --;
+      }
+      return list[index];
+    },
+    next: function () {
+      if (index >= list.length) {
+        return null;
+      }
+      index ++;
+      return index >= list.length ? "" : list[index];
+    },
+    reset: function () { index = list.length; }
+  };
+}
+
+function parseQuery(search) {
+  var params = {};
+  String(search || "").replace(/^\?/, "").split("&").forEach(function (part) {
+    if (!part) {
+      return;
+    }
+    var eq = part.indexOf("=");
+    var key = eq < 0 ? part : part.slice(0, eq);
+    var value = eq < 0 ? "" : part.slice(eq + 1);
+    params[decodeURIComponent(key.replace(/\+/g, " "))] = decodeURIComponent(value.replace(/\+/g, " "));
+  });
+  var out = { mode: null, endpoint: "", image: "", scene: params.scene || "", connect: false };
+  if (params.wasm) {
+    out.mode = "wasm";
+    out.image = params.wasm;
+    out.connect = true;
+  } else if (params.http) {
+    out.mode = "http";
+    out.endpoint = params.http;
+    out.connect = true;
+  }
+  return out;
+}
+
+function wasmModuleName(url) {
+  var file = String(url || "").split(/[?#]/)[0].split("/").pop();
+  return file.replace(/\.js$/, "").replace(/[^A-Za-z0-9_$]/g, "_") || "box_app";
+}
+
+function wasmArguments(scene) {
+  var text = String(scene || "").trim();
+  return text ? text.split(/\s+/) : [];
+}
+
+function createStore(storage, key) {
+  return {
+    load: function () {
+      try {
+        return JSON.parse(storage.getItem(key) || "null") || {};
+      } catch (e) {
+        return {};
+      }
+    },
+    save: function (value) {
+      try {
+        storage.setItem(key, JSON.stringify(value));
+      } catch (e) {
+        return;
+      }
+    }
+  };
+}
+
+return {
+  IMAGE_TYPE: IMAGE_TYPE,
+  POST_THRESHOLD: POST_THRESHOLD,
+  isImage: isImage,
+  parseReply: parseReply,
+  dataUrl: dataUrl,
+  joinUrl: joinUrl,
+  httpTransport: httpTransport,
+  wasmTransport: wasmTransport,
+  execRequest: execRequest,
+  capturePath: capturePath,
+  closePath: closePath,
+  parseFrame: parseFrame,
+  createSession: createSession,
+  createHistory: createHistory,
+  parseQuery: parseQuery,
+  wasmModuleName: wasmModuleName,
+  wasmArguments: wasmArguments,
+  createStore: createStore
+};
+})();
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = BoxInspector;
+}
+</script>
+
+<script>
+/* UI: connection bar, command console and render pane. */
+(function () {
+"use strict";
+
+var I = BoxInspector;
+var STORE_KEY = "box-inspector";
+var DEFAULT_ENDPOINT = "http://localhost:27750";
+var DEFAULT_IMAGE = "box_app.js";
+
+var storage = null;
+try { storage = window.localStorage; } catch (e) { storage = null; }
+var store = I.createStore(storage || {}, STORE_KEY);
+
+var el = function (id) { return document.getElementById(id); };
+var modeEl = el("mode"), endpointEl = el("endpoint"), imageEl = el("image");
+var connectEl = el("connect"), disconnectEl = el("disconnect"), statusEl = el("status");
+var logEl = el("log"), cmdEl = el("cmd"), clearEl = el("clear");
+var stageEl = el("stage"), shotEl = el("shot"), canvasEl = el("canvas"), placeholderEl = el("placeholder");
+var liveEl = el("live"), cameraEl = el("camera"), intervalEl = el("interval"), pauseEl = el("pause");
+var refreshedEl = el("refreshed"), frameEl = el("frame");
+
+var saved = store.load();
+var query = I.parseQuery(location.search);
+var history = I.createHistory(saved.history || [], 200);
+var state = {
+  mode: query.mode || saved.mode || "http",
+  scene: query.scene,
+  transport: null,
+  session: null,
+  timer: 0,
+  busy: false,
+  paused: false,
+  live: false,
+  imageUrl: null,
+  runtime: null
+};
+
+endpointEl.value = query.endpoint || saved.endpoint || DEFAULT_ENDPOINT;
+imageEl.value = query.image || saved.image || DEFAULT_IMAGE;
+cameraEl.value = saved.camera || "";
+if (saved.interval) {
+  intervalEl.value = String(saved.interval);
+}
+
+function persist() {
+  store.save({
+    mode: state.mode,
+    endpoint: endpointEl.value,
+    image: imageEl.value,
+    camera: cameraEl.value,
+    interval: intervalEl.value,
+    history: history.items()
+  });
+}
+
+function setMode(mode) {
+  state.mode = mode === "wasm" ? "wasm" : "http";
+  Array.prototype.forEach.call(modeEl.children, function (b) {
+    b.classList.toggle("active", b.dataset.mode === state.mode);
+  });
+  endpointEl.hidden = state.mode !== "http";
+  imageEl.hidden = state.mode !== "wasm";
+  persist();
+}
+
+function setStatus(kind, text) {
+  statusEl.className = "pill" + (kind ? " " + kind : "");
+  statusEl.textContent = text;
+}
+
+function append(kind, text) {
+  if (text == null || text === "") {
+    return;
+  }
+  var line = document.createElement("div");
+  line.className = "line " + kind;
+  line.textContent = String(text).replace(/\s+$/, "");
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function showReply(reply) {
+  append(reply.status >= 400 ? "err" : "out", reply.body);
+}
+
+function showStage(what) {
+  placeholderEl.hidden = what !== "none";
+  shotEl.hidden = what !== "image";
+  canvasEl.hidden = what !== "canvas";
+}
+
+function setImage(url) {
+  if (state.imageUrl && state.imageUrl.indexOf("blob:") === 0) {
+    URL.revokeObjectURL(state.imageUrl);
+  }
+  state.imageUrl = url;
+  shotEl.src = url;
+  if (!state.live) {
+    showStage("image");
+  }
+}
+
+function stopTimer() {
+  if (state.timer) {
+    clearInterval(state.timer);
+    state.timer = 0;
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  if (!state.session || state.paused || state.live) {
+    return;
+  }
+  state.timer = setInterval(tick, Number(intervalEl.value) * 1000);
+  tick();
+}
+
+function readFrame() {
+  return state.session.exec("get App").then(function (reply) {
+    var frame = I.parseFrame(reply.body);
+    frameEl.textContent = frame === null ? "" : "frame " + frame;
+  }).catch(function () {
+    frameEl.textContent = "";
+  });
+}
+
+function tick() {
+  if (!state.session || state.busy || state.paused) {
+    return;
+  }
+  state.busy = true;
+  state.session.capture(cameraEl.value.trim()).then(function (reply) {
+    if (reply.status === 200 && reply.image) {
+      setImage(reply.image);
+      refreshedEl.textContent = "updated " + new Date().toLocaleTimeString();
+    } else if (reply.status === 202) {
+      refreshedEl.textContent = "capture pending…";
+    } else if (reply.status >= 400) {
+      refreshedEl.textContent = "capture failed: " + String(reply.body).split("\n")[0];
+    }
+    return readFrame();
+  }).catch(function (err) {
+    refreshedEl.textContent = "capture failed: " + (err && err.message ? err.message : err);
+  }).then(function () {
+    state.busy = false;
+  });
+}
+
+function loadWasm(url, scene) {
+  return new Promise(function (resolve, reject) {
+    if (state.runtime && state.runtime.url === url) {
+      resolve(state.runtime.request);
+      return;
+    }
+    var name = I.wasmModuleName(url);
+    var start = function () {
+      var factory = window[name];
+      if (typeof factory !== "function") {
+        reject(new Error("no module factory '" + name + "' in " + url));
+        return;
+      }
+      showStage("canvas");
+      factory({
+        canvas: canvasEl,
+        arguments: I.wasmArguments(scene),
+        print: function (text) { console.log(text); },
+        printErr: function (text) { console.error(text); }
+      }).then(function (Module) {
+        window.Module = Module;
+        window.boxRequest = function (method, path, body) {
+          return Module.ccall("box_request", "string",
+            ["string", "string", "string"], [method, path, body || ""]);
+        };
+        state.runtime = { url: url, request: window.boxRequest };
+        resolve(window.boxRequest);
+      }).catch(reject);
+    };
+    if (window[name]) {
+      start();
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = url;
+    script.onload = start;
+    script.onerror = function () { reject(new Error("could not load " + url)); };
+    document.head.appendChild(script);
+  });
+}
+
+function makeTransport() {
+  if (state.mode === "wasm") {
+    return loadWasm(imageEl.value.trim(), state.scene).then(function (request) {
+      return I.wasmTransport(request);
+    });
+  }
+  return Promise.resolve(I.httpTransport(endpointEl.value.trim(), {
+    fetch: function (url, init) { return window.fetch(url, init); },
+    createObjectURL: function (blob) { return URL.createObjectURL(blob); }
+  }));
+}
+
+function connect() {
+  if (state.transport) {
+    return;
+  }
+  connectEl.disabled = true;
+  setStatus("busy", "connecting");
+  persist();
+  makeTransport().then(function (transport) {
+    state.transport = transport;
+    state.session = I.createSession(transport);
+    return state.session.open();
+  }).then(function (name) {
+    disconnectEl.disabled = false;
+    cmdEl.disabled = false;
+    setStatus("ok", name + " connected");
+    append("info", "connected to " + state.transport.label + " as " + name);
+    state.live = state.mode === "wasm";
+    liveEl.hidden = state.mode !== "wasm";
+    liveEl.textContent = "Show capture";
+    placeholderEl.textContent = "waiting for a capture";
+    showStage(state.live ? "canvas" : "none");
+    cmdEl.focus();
+    return state.session.exec("help");
+  }).then(function (reply) {
+    showReply(reply);
+    startTimer();
+  }).catch(function (err) {
+    state.transport = null;
+    state.session = null;
+    connectEl.disabled = false;
+    setStatus("bad", "error");
+    append("err", "connect failed: " + (err && err.message ? err.message : err));
+  });
+}
+
+function disconnect(quiet) {
+  stopTimer();
+  var session = state.session;
+  state.session = null;
+  state.transport = null;
+  state.live = false;
+  connectEl.disabled = false;
+  disconnectEl.disabled = true;
+  cmdEl.disabled = true;
+  liveEl.hidden = true;
+  setStatus("", "disconnected");
+  placeholderEl.textContent = "Not connected";
+  showStage("none");
+  if (session && session.name()) {
+    session.close().catch(function () { return null; });
+  }
+  if (!quiet) {
+    append("info", "disconnected");
+  }
+}
+
+function send(line) {
+  append("cmd", "$ " + line);
+  history.push(line);
+  persist();
+  state.session.exec(line).then(showReply).catch(function (err) {
+    append("err", String(err && err.message ? err.message : err));
+  });
+}
+
+modeEl.onclick = function (ev) {
+  var button = ev.target.closest("button[data-mode]");
+  if (button && !state.transport) {
+    setMode(button.dataset.mode);
+  }
+};
+connectEl.onclick = function () { connect(); };
+disconnectEl.onclick = function () { disconnect(false); };
+clearEl.onclick = function () { logEl.textContent = ""; };
+endpointEl.onchange = persist;
+imageEl.onchange = persist;
+cameraEl.onchange = function () {
+  persist();
+  tick();
+};
+intervalEl.onchange = function () {
+  persist();
+  startTimer();
+};
+pauseEl.onclick = function () {
+  state.paused = !state.paused;
+  pauseEl.textContent = state.paused ? "Resume" : "Pause";
+  if (state.paused) {
+    stopTimer();
+  } else {
+    startTimer();
+  }
+};
+liveEl.onclick = function () {
+  state.live = !state.live;
+  liveEl.textContent = state.live ? "Show capture" : "Show live";
+  if (state.live) {
+    stopTimer();
+    showStage("canvas");
+  } else {
+    showStage(state.imageUrl ? "image" : "none");
+    startTimer();
+  }
+};
+cmdEl.onkeydown = function (ev) {
+  if (ev.key === "Enter") {
+    var line = cmdEl.value.trim();
+    cmdEl.value = "";
+    history.reset();
+    if (line && state.session) {
+      send(line);
+    }
+  } else if (ev.key === "ArrowUp") {
+    var prev = history.prev();
+    if (prev !== null) {
+      cmdEl.value = prev;
+      ev.preventDefault();
+    }
+  } else if (ev.key === "ArrowDown") {
+    var next = history.next();
+    if (next !== null) {
+      cmdEl.value = next;
+      ev.preventDefault();
+    }
+  }
+};
+el("theme").onclick = function () {
+  var current = document.documentElement.dataset.theme;
+  var dark = current ? current === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("theme", document.documentElement.dataset.theme); } catch (e) { return; }
+};
+window.addEventListener("pagehide", function () {
+  var session = state.session;
+  if (!session || !session.name()) {
+    return;
+  }
+  if (state.mode === "http" && navigator.sendBeacon) {
+    navigator.sendBeacon(I.joinUrl(endpointEl.value.trim(), I.closePath(session.name())));
+    state.session = null;
+  }
+  disconnect(true);
+});
+
+try {
+  var theme = localStorage.getItem("theme");
+  if (theme) {
+    document.documentElement.dataset.theme = theme;
+  }
+} catch (e) {
+  void e;
+}
+
+setMode(state.mode);
+if (query.connect) {
+  connect();
+}
+})();
+</script>
+</body>
+</html>
