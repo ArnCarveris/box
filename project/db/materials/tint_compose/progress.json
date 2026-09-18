@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T19:20:40.446+00:00",
   "start_time": "2026-09-18T19:20:40.480+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T19:55:04.096+00:00",
   "dependencies": [
     "scene_core/parent_hierarchy",
     "materials/blending"
