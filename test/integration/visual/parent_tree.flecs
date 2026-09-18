@@ -1,0 +1,127 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+
+camera {
+  Position: {0, 8, -14}
+  LookAt: {0, 2.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.8, -0.5, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+$ { EnvironmentLight: {sky_color: {90, 110, 150}, ground_color: {40, 38, 36}, intensity: 1} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {150, 150, 155}
+  PbrMaterial: {roughness: 0.9}
+}
+
+@tree Parent
+
+spinner {
+  Position: {-5, 3, 0}
+  Rotation: {0, 0.6, 0}
+  AngularVelocity: {0, 0.9, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {235, 235, 240}
+  PbrMaterial: {roughness: 0.4}
+  Tint: {255, 140, 80, 255}
+
+  arm_a {
+    Position: {3, 0, 0}
+    Box: {2.4, 0.5, 0.5}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.5}
+
+    hand_a {
+      Position: {1.6, 0, 0}
+      Sphere: {segments: 24, smooth: true, radius: 0.7}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 0.3, metallic: 0.3}
+    }
+  }
+
+  arm_b {
+    Position: {-3, 0, 0}
+    Box: {2.4, 0.5, 0.5}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.5}
+
+    hand_b {
+      Position: {-1.6, 0, 0}
+      Sphere: {segments: 24, smooth: true, radius: 0.7}
+      Rgb: {255, 255, 255}
+      PbrMaterial: {roughness: 0.3, metallic: 0.3}
+    }
+  }
+
+  bob {
+    Position: {0, -1.8, 0}
+    AngularVelocity: {1.6, 0, 0}
+    Box: {0.9, 0.9, 0.9}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 0.6}
+  }
+}
+
+tower {
+  Position: {5, 0, 0}
+
+  @tree ChildOf
+
+  base {
+    Position: {0, 0.8, 0}
+    Box: {3, 1.6, 3}
+    Rgb: {120, 180, 140}
+    PbrMaterial: {roughness: 0.5}
+
+    shaft {
+      Position: {0, 2.4, 0}
+      Cylinder: {segments: 24, smooth: true, length: 3.2, radius: 0.8}
+      Rgb: {90, 160, 220}
+      PbrMaterial: {roughness: 0.4}
+
+      cap {
+        Position: {0, 2.2, 0}
+        AngularVelocity: {0, 2.2, 0}
+        Box: {2.2, 0.6, 0.6}
+        Rgb: {240, 220, 120}
+        PbrMaterial: {roughness: 0.3, metallic: 0.4}
+      }
+    }
+  }
+}
+
+reference {
+  Position: {-9.5, 0.8, 1}
+  Box: {1.6, 1.6, 1.6}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.4}
+}
+
+posts {
+  Position: {0, 0, 6}
+
+  left {
+    Position: {-2.5, 1.2, 0}
+    Box: {0.6, 2.4, 0.6}
+    Rgb: {210, 90, 70}
+    PbrMaterial: {roughness: 0.6}
+  }
+
+  right {
+    Position: {2.5, 1.2, 0}
+    Box: {0.6, 2.4, 0.6}
+    Rgb: {210, 90, 70}
+    PbrMaterial: {roughness: 0.6}
+  }
+}

@@ -106,6 +106,12 @@ its camera captures. A layer is any entity an entity or a light joins with the
 pair `(box.view.Layer, layer)`; `View.layers` and `View.shadow_layers` hold up to
 eight layers each and show every layer when they are empty.
 
+`test/integration/visual/parent_tree.flecs` is the hierarchy check: a spinning
+node whose children use the non fragmenting `Parent` storage (`@tree Parent` in
+the script) carries two arms with spheres and a tumbling box, a tower mixes a
+`Parent` child with a `ChildOf` subtree under it, and a `Tint` on the spinner
+resolves into its children and grandchildren next to an untinted white box.
+
 `test/integration/visual/culling.flecs` is the frustum culling check: a ring of
 boxes and spheres around the camera with a row behind it, which `CullSettings`
 on a view or as a singleton switches off for a bit identical comparison.
