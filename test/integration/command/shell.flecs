@@ -1,0 +1,25 @@
+using box.transform
+using box.geometry
+using box.material
+using box.command
+
+scene {
+  floor {
+    Position: {0, -0.5, 0}
+    Box: {10, 0.2, 10}
+    Rgb: {180, 180, 190}
+  }
+
+  sphere {
+    Position: {0, 1, 0}
+    Sphere: {radius: 1, segments: 16}
+    Rgb: {80, 160, 240}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/shell.cmd"}
+  }
+}

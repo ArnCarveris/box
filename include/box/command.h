@@ -25,6 +25,12 @@ extern "C" {
 ECS_STRUCT(Terminal, {
     char *cwd;          /**< Scope that entity arguments resolve against, NULL for root */
     char *session_dir;  /**< Folder with the session files, written by the engine */
+    char *log;          /**< File the session log is copied to, NULL for none */
+});
+
+/** A file with command lines that a session runs when the component is set */
+ECS_STRUCT(CommandScript, {
+    char *path;  /**< The file, relative paths resolve against the working directory */
 });
 
 /** A command line to run on a terminal session */

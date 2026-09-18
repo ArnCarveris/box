@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""Runs integration test scenes: visual scenes to screenshots, bench scenes to JSON reports.
+"""Runs integration test scenes: visual scenes to screenshots, bench scenes to JSON
+reports and command scenes to session command logs.
 
 Usage:
-  integration.py visual [--out dir] [--env name] [--frames n] [scene.flecs ...]
-  integration.py bench  [--out dir] [--env name] [--frames n] [scene.flecs ...]
+  integration.py visual  [--out dir] [--env name] [--frames n] [scene.flecs ...]
+  integration.py bench   [--out dir] [--env name] [--frames n] [scene.flecs ...]
+  integration.py command [--out dir] [--env name] [--frames n] [scene.flecs ...]
+
+A command scene holds a terminal named terminals.agent0 with a CommandScript that
+points at the <scene>.cmd next to it. The scene runs headless with a generated
+harness scene that sets Terminal.log, so the session log survives the process
+folder; the log is written to <out>/<scene>.log, with the absolute path of the
+repository stripped from it, and compared with the <scene>.expected next to the
+scene when that file exists. A <scene>_content.flecs
+next to a scene is loaded before it, which keeps scripts that commands patch out
+of the scene that holds the terminal.
 """
 import argparse
+import difflib
 import glob
 import json
 import os
@@ -16,6 +28,9 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VISUAL_DIR = os.path.join(ROOT, "test", "integration", "visual")
 BENCH_DIR = os.path.join(ROOT, "test", "integration", "bench")
+COMMAND_DIR = os.path.join(ROOT, "test", "integration", "command")
+HARNESS = "using box.command\n\nterminals {\n  agent0 {\n    Terminal: {log: \"%s\"}\n  }\n}\n"
+DOTTED_ROOT = ROOT.replace(".", "\\.").replace("/", ".") + "."
 
 
 def bake(args, cwd=None):
@@ -66,9 +81,61 @@ def run_bench(scenes, out, env, frames, extra):
     return results
 
 
+def command_scripts(scene):
+    content = os.path.splitext(scene)[0] + "_content.flecs"
+    scripts = [content] if os.path.isfile(content) else []
+    return [os.path.abspath(f) for f in scripts + [scene]]
+
+
+def command_normalize(log):
+    text = open(log).read()
+    stripped = text.replace(DOTTED_ROOT, "").replace(ROOT + "/", "")
+    if stripped != text:
+        open(log, "w").write(stripped)
+
+
+def command_diff(log, expected):
+    actual = [line.rstrip() for line in open(log).read().splitlines()]
+    want = [line.rstrip() for line in open(expected).read().splitlines()]
+    return list(difflib.unified_diff(want, actual, os.path.basename(expected),
+                                     os.path.basename(log), lineterm=""))
+
+
+def run_command(scenes, out, env, frames):
+    os.makedirs(out, exist_ok=True)
+    results = []
+    for scene in scenes:
+        name = os.path.splitext(os.path.basename(scene))[0]
+        log = os.path.abspath(os.path.join(out, name + ".log"))
+        if os.path.exists(log):
+            os.unlink(log)
+        with tempfile.NamedTemporaryFile("w", suffix=".flecs", delete=False) as harness:
+            harness.write(HARNESS % log)
+            harness_path = harness.name
+        proc = bake(["run", "box_app", env_flag(env), "--cfg", "release", "--",
+                     "--headless", "--frames", str(frames), "--port", "0",
+                     *command_scripts(scene), harness_path])
+        os.unlink(harness_path)
+        ok = proc.returncode == 0 and os.path.isfile(log)
+        if os.path.isfile(log):
+            command_normalize(log)
+        expected = os.path.join(os.path.dirname(scene), name + ".expected")
+        diff = command_diff(log, expected) if ok and os.path.isfile(expected) else []
+        ok = ok and not diff
+        results.append({"scene": os.path.relpath(scene, ROOT), "status": "pass" if ok else "fail",
+                        "log": os.path.relpath(log, ROOT) if os.path.isfile(log) else None,
+                        "expected": os.path.relpath(expected, ROOT) if os.path.isfile(expected) else None})
+        print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)}")
+        if diff:
+            print("\n".join(diff))
+        elif not ok:
+            print(proc.stdout[-2000:], proc.stderr[-2000:])
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("kind", choices=["visual", "bench"])
+    parser.add_argument("kind", choices=["visual", "bench", "command"])
     parser.add_argument("scenes", nargs="*")
     parser.add_argument("--out")
     parser.add_argument("--env")
@@ -83,6 +150,11 @@ def main():
         width, height = (int(v) for v in args.size.split("x"))
         results = run_visual(scenes, args.out or os.path.join(ROOT, "test", "integration", "out"), args.env,
                              args.frames or 3, width, height)
+    elif args.kind == "command":
+        scenes = args.scenes or sorted(s for s in glob.glob(os.path.join(COMMAND_DIR, "*.flecs"))
+                                       if not s.endswith("_content.flecs"))
+        results = run_command(scenes, args.out or os.path.join(ROOT, "test", "integration", "out"), args.env,
+                              args.frames or 5)
     else:
         scenes = args.scenes or sorted(glob.glob(os.path.join(BENCH_DIR, "*.flecs")))
         extra = ["--churn", args.churn] + (["--churn-color"] if args.churn_color else [])

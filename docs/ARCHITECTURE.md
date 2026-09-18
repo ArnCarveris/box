@@ -84,6 +84,27 @@ in a separate instance buffer. Materials follow the same split with
 `DynamicMaterial`. Shadows and culling structures are built on the static buffer
 and only patched for changed entries.
 
+## Command interface
+
+Agents drive a running instance through terminal sessions. A session is an entity
+with a `Terminal` component that owns a folder `/tmp/box/<pid>/<session>` with a
+`resources` subfolder and a `commands.log` holding every command and its result.
+Setting `TerminalInput` runs a command line: the dispatcher splits it, looks the
+name up as a script function under `box.command.commands`, converts the arguments
+and writes the text result to `TerminalOutput`. Commands are grouped per file:
+shell, search, logs, script and capture.
+
+The HTTP layer is glue over those components. `/terminal/new`, `/terminal/close`,
+`/terminal/exec` and `/resource/<path>` are served by an `HttpServer` singleton
+whose port comes from `--port`; requests are dequeued in OnLoad so handlers run on
+the main thread.
+
+`CommandScript` runs a file of command lines on a session when it is set, one
+command per line, skipping blank lines and `#` comments; a quoted argument that a
+line leaves open continues on the next line. `Terminal.log` copies the session log
+to a file outside the process folder, which is how the command integration tests
+collect it.
+
 ## Headless and agents
 
 Every process creates `/tmp/box/<pid>` and removes it on exit. `--headless`

@@ -86,6 +86,7 @@ void BoxCommandImport(
     ECS_META_COMPONENT(world, Terminal);
     ECS_META_COMPONENT(world, TerminalInput);
     ECS_META_COMPONENT(world, TerminalOutput);
+    ECS_META_COMPONENT(world, CommandScript);
     ECS_COMPONENT_DEFINE(world, TerminalSession);
     ECS_COMPONENT_DEFINE(world, CommandInfo);
 
@@ -102,6 +103,7 @@ void BoxCommandImport(
 
     box_terminal_init(world);
     box_dispatch_init(world);
+    box_command_script_init(world);
     box_command_builtin_init(world);
     box_shell_init(world);
     box_search_init(world);

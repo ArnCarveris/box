@@ -1,0 +1,11 @@
+using box.transform
+
+path {
+  a {
+    Position: {0, 0, 0}
+  }
+
+  b {
+    Position: {2, 0, 0}
+  }
+}

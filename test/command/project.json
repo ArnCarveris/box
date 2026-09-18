@@ -183,6 +183,17 @@
             ],
             "setup": true,
             "teardown": true
+        }, {
+            "id": "CommandScript",
+            "testcases": [
+                "runs_lines_in_order",
+                "skips_comments_and_blanks",
+                "missing_file_is_error",
+                "quoted_argument_spans_lines",
+                "log_copied_to_file"
+            ],
+            "setup": true,
+            "teardown": true
         }]
     }
 }

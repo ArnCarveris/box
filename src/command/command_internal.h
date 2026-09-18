@@ -79,6 +79,8 @@ typedef struct box_command_param_t {
 typedef struct TerminalSession {
     char *dir;                                      /**< The session folder */
     FILE *log;                                      /**< Open commands.log */
+    FILE *copy;                                     /**< Open copy of the log, NULL for none */
+    char *copy_path;                                /**< File the copy is written to */
     box_command_entry_t ring[BOX_COMMAND_LOG_MAX];  /**< Last executed lines */
     int32_t count;                                  /**< Lines executed so far */
 } TerminalSession;
@@ -147,6 +149,15 @@ void box_terminal_init(
 void box_terminal_session_fini(
     TerminalSession *session);
 
+/** Copy the session log to a file and keep copying every later command.
+ *
+ * @param session The session state
+ * @param path The file, NULL or empty to stop copying
+ */
+void box_terminal_copy(
+    TerminalSession *session,
+    const char *path);
+
 /** Append a command line and its result to the session log and ring.
  *
  * @param world The world
@@ -167,6 +178,13 @@ void box_terminal_log(
  * @param world The world
  */
 void box_dispatch_init(
+    ecs_world_t *world);
+
+/** Register the observer that runs the command file of a CommandScript.
+ *
+ * @param world The world
+ */
+void box_command_script_init(
     ecs_world_t *world);
 
 /** Register the help and commands commands.

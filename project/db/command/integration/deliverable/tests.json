@@ -1,0 +1,15 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T08:19:46Z",
+  "pass": 5,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.011905,
+  "tests": [
+    {"suite": "CommandScript", "case": "runs_lines_in_order", "status": "pass", "elapsed": 0.011600},
+    {"suite": "CommandScript", "case": "skips_comments_and_blanks", "status": "pass", "elapsed": 0.011400},
+    {"suite": "CommandScript", "case": "missing_file_is_error", "status": "pass", "elapsed": 0.011063},
+    {"suite": "CommandScript", "case": "quoted_argument_spans_lines", "status": "pass", "elapsed": 0.011671},
+    {"suite": "CommandScript", "case": "log_copied_to_file", "status": "pass", "elapsed": 0.011812}
+  ]
+}

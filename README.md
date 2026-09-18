@@ -65,13 +65,23 @@ bake3 run test/transform --local-env -- -j 12                # other test projec
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
-headless to screenshots and `bench/` scenes are run by the benchmark app:
+headless to screenshots, `bench/` scenes are run by the benchmark app and
+`command/` scenes run a command file on a terminal session:
 
 ```sh
 python3 tools/integration.py visual            # writes test/integration/out/<scene>.png
 python3 tools/integration.py bench             # writes test/integration/out/<scene>.json
+python3 tools/integration.py command           # writes test/integration/out/<scene>.log
 bake3 run box_bench --local-env --cfg release -- ../../test/integration/bench/static_100k.flecs --churn 1-1000
 ```
+
+A command scene holds a terminal named `terminals.agent0` with a `CommandScript`
+that points at the `<scene>.cmd` next to it. The runner sets `Terminal.log` from a
+generated harness scene so the session log survives the process folder, strips the
+path of the repository from it and compares it with the `<scene>.expected` next to
+the scene, printing a diff when they differ. A `<scene>_content.flecs` is loaded
+before the scene, which keeps the scripts that commands patch out of the scene
+that holds the terminal.
 
 ## Benchmarks
 

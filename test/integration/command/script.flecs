@@ -1,0 +1,8 @@
+using box.command
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/script.cmd"}
+  }
+}

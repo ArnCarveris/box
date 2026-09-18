@@ -45,6 +45,28 @@ static void box_terminal_mkdir(
     }
 }
 
+/** Append the session log to the file that copies it.
+ *
+ * @param session The session state
+ */
+static void box_terminal_copy_existing(
+    TerminalSession *session)
+{
+    char *path = flecs_asprintf("%s/commands.log", session->dir);
+    FILE *file = fopen(path, "r");
+    ecs_os_free(path);
+    if (file) {
+        char buffer[1024];
+        size_t read;
+        while ((read = fread(buffer, 1, sizeof(buffer), file))) {
+            fwrite(buffer, 1, read, session->copy);
+        }
+
+        fclose(file);
+        fflush(session->copy);
+    }
+}
+
 /** Create the session folder with its resources subfolder and open the log.
  *
  * @param stage The stage that queues the session component
@@ -89,7 +111,7 @@ static void box_terminal_on_add(
     }
 }
 
-/** Terminal was set: restore the folder that the assigned value overwrote.
+/** Terminal was set: restore the folder and open the file that copies the log.
  *
  * @param it Iterator over the changed terminals
  */
@@ -102,6 +124,12 @@ static void box_terminal_on_set(
         char *dir = box_terminal_dir(it->world, it->entities[i]);
         ecs_os_free(t[i].session_dir);
         t[i].session_dir = dir;
+
+        TerminalSession *session =
+            ecs_get_mut(it->world, it->entities[i], TerminalSession);
+        if (session) {
+            box_terminal_copy(session, t[i].log);
+        }
     }
 }
 
@@ -133,6 +161,8 @@ void box_terminal_session_fini(
         session->log = NULL;
     }
 
+    box_terminal_copy(session, NULL);
+
     if (session->dir) {
         box_rmtree(session->dir);
         ecs_os_free(session->dir);
@@ -150,6 +180,33 @@ void box_terminal_session_fini(
     session->count = 0;
 }
 
+void box_terminal_copy(
+    TerminalSession *session,
+    const char *path)
+{
+    const char *want = path && path[0] ? path : NULL;
+    bool same = want && session->copy_path && !strcmp(want, session->copy_path);
+    if (!same) {
+        if (session->copy) {
+            fclose(session->copy);
+            session->copy = NULL;
+        }
+
+        ecs_os_free(session->copy_path);
+        session->copy_path = NULL;
+    }
+
+    if (want && !same) {
+        session->copy = fopen(want, "w");
+        if (session->copy) {
+            session->copy_path = ecs_os_strdup(want);
+            box_terminal_copy_existing(session);
+        } else {
+            ecs_warn("failed to open session log copy %s", want);
+        }
+    }
+}
+
 void box_terminal_log(
     ecs_world_t *world,
     ecs_entity_t session,
@@ -159,6 +216,9 @@ void box_terminal_log(
 {
     TerminalSession *s = ecs_get_mut(world, session, TerminalSession);
     ecs_assert(s != NULL, ECS_INVALID_PARAMETER, "entity is not a terminal session");
+
+    const Terminal *t = ecs_get(world, session, Terminal);
+    box_terminal_copy(s, t ? t->log : NULL);
 
     const char *text = result ? result : "";
     box_command_entry_t *entry =
@@ -173,6 +233,11 @@ void box_terminal_log(
     if (s->log) {
         fprintf(s->log, "$ %s\n%s\n", line, text);
         fflush(s->log);
+    }
+
+    if (s->copy) {
+        fprintf(s->copy, "$ %s\n%s\n", line, text);
+        fflush(s->copy);
     }
 }
 

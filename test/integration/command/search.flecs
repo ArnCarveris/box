@@ -1,0 +1,35 @@
+using box.transform
+using box.geometry
+using box.material
+using box.command
+
+scene {
+  floor {
+    Position: {0, -0.5, 0}
+    Box: {10, 1, 10}
+    Rgb: {180, 180, 190}
+  }
+
+  crates {
+    Position: {0, 0, 0}
+
+    red {
+      Position: {-2, 0.5, 0}
+      Box: {1, 1, 1}
+      Rgb: {220, 80, 60}
+    }
+
+    blue {
+      Position: {2, 0.5, 0}
+      Box: {1, 1, 1}
+      Rgb: {80, 160, 240}
+    }
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/search.cmd"}
+  }
+}

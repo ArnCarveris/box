@@ -1,0 +1,27 @@
+$ cd scene
+scene
+$ ls
+floor	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Box, (flecs.script.Script,test.integration.command.shell\.flecs)
+sphere	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Sphere, (flecs.script.Script,test.integration.command.shell\.flecs)
+
+$ touch crate
+scene.crate
+$ set crate Position "{2, 0.5, 0}"
+scene.crate
+$ get crate Position
+{x: 2, y: 0.5, z: 0}
+$ has crate Position
+true
+$ mv crate cube
+scene.cube
+$ ls
+cube	box.transform.Position, box.transform.WorldTransform, box.transform.AABB
+floor	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Box, (flecs.script.Script,test.integration.command.shell\.flecs)
+sphere	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Sphere, (flecs.script.Script,test.integration.command.shell\.flecs)
+
+$ rm cube
+scene.cube
+$ ls
+floor	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Box, (flecs.script.Script,test.integration.command.shell\.flecs)
+sphere	box.transform.Position, box.transform.WorldTransform, box.transform.AABB, box.material.Rgb, box.render.RenderMesh, box.render.RenderInstance, box.geometry.Sphere, (flecs.script.Script,test.integration.command.shell\.flecs)
+
