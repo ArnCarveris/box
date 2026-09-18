@@ -50,6 +50,10 @@ sphere { Position: {-3, 1, 0}  Sphere: {segments: 32, smooth: true, radius: 1}  
 "/tmp/box/capture_camera.png"}` to its camera, which renders that camera to the
 PNG once and removes the component again.
 
+`test/integration/visual/lights_city.flecs` lights a grid of boxes with a few
+hundred colored point lights and a handful of spot lights, which the clustered
+forward path shades in one pass.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.

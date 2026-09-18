@@ -1,0 +1,28 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T10:20:07Z",
+  "pass": 18,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.043843,
+  "tests": [
+    {"suite": "Lights", "case": "point_light_extracted", "status": "pass", "elapsed": 0.017934},
+    {"suite": "Lights", "case": "point_light_color_is_linear", "status": "pass", "elapsed": 0.014241},
+    {"suite": "Lights", "case": "spot_light_direction_and_cone", "status": "pass", "elapsed": 0.014026},
+    {"suite": "Lights", "case": "point_light_is_not_a_spot_cone", "status": "pass", "elapsed": 0.014047},
+    {"suite": "Lights", "case": "light_behind_camera_culled", "status": "pass", "elapsed": 0.014046},
+    {"suite": "Lights", "case": "light_far_to_the_side_culled", "status": "pass", "elapsed": 0.018009},
+    {"suite": "Lights", "case": "light_beyond_far_plane_culled", "status": "pass", "elapsed": 0.016091},
+    {"suite": "Lights", "case": "light_inside_frustum_kept", "status": "pass", "elapsed": 0.017615},
+    {"suite": "Lights", "case": "range_reaches_into_the_frustum", "status": "pass", "elapsed": 0.015943},
+    {"suite": "Lights", "case": "directional_light_stays_the_sun", "status": "pass", "elapsed": 0.016008},
+    {"suite": "Lights", "case": "settings_copied_into_view", "status": "pass", "elapsed": 0.016051},
+    {"suite": "Lights", "case": "settings_override_copied_into_view", "status": "pass", "elapsed": 0.015764},
+    {"suite": "Lights", "case": "camera_range_is_the_cluster_depth", "status": "pass", "elapsed": 0.015121},
+    {"suite": "Lights", "case": "cluster_index_of_view_center", "status": "pass", "elapsed": 0.015033},
+    {"suite": "Lights", "case": "cluster_index_follows_screen_position", "status": "pass", "elapsed": 0.014836},
+    {"suite": "Lights", "case": "cluster_slices_grow_with_depth", "status": "pass", "elapsed": 0.015131},
+    {"suite": "Lights", "case": "lights_land_in_expected_clusters", "status": "pass", "elapsed": 0.013628},
+    {"suite": "Lights", "case": "moved_light_is_reextracted", "status": "pass", "elapsed": 0.013683}
+  ]
+}

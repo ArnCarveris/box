@@ -227,10 +227,14 @@ void box_render_extract_lights(
     box_light_settings(world, p);
 
     box_plane_t planes[BOX_FRUSTUM_PLANES];
-    box_light_planes(&p->view, planes);
-
+    bool has_planes = false;
     ecs_iter_t it = ecs_query_iter(world, state->lights);
     while (ecs_query_next(&it)) {
+        if (!has_planes) {
+            box_light_planes(&p->view, planes);
+            has_planes = true;
+        }
+
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
             box_light_extract(&it, i, planes, p);
