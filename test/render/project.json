@@ -30,7 +30,9 @@
                     "sun_from_directional_light",
                     "mesh_shared_between_same_shapes",
                     "different_segments_different_mesh"
-                ]
+                ],
+                "setup": true,
+                "teardown": true
             },
             {
                 "id": "Material",
@@ -42,7 +44,9 @@
                     "instance_color_uses_tint_and_opacity",
                     "emissive_scaled_by_strength",
                     "pbr_defaults"
-                ]
+                ],
+                "setup": true,
+                "teardown": true
             },
             {
                 "id": "Movement",
