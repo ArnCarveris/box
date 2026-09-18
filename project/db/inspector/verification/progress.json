@@ -1,8 +1,8 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "in progress",
   "created": "2026-09-18T08:36:31.233+00:00",
-  "start_time": null,
+  "start_time": "2026-09-18T09:26:09.902+00:00",
   "end_time": null,
   "dependencies": [
     "inspector/pm_links"
