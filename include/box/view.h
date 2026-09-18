@@ -123,7 +123,7 @@ ECS_STRUCT(ShadowSettings, {
 ECS_STRUCT(CullSettings, {
     bool enabled;          /**< Instances outside the view frustum are skipped, default true */
     int32_t gpu_threshold; /**< Static instances a batch needs before a compute pass culls it */
-    bool occlusion;        /**< Compute culled batches are occlusion culled, default true */
+    bool occlusion;        /**< Compute culled batches are occlusion culled, default false */
     int32_t hiz_levels;    /**< Levels of the depth pyramid, 0 for the whole chain */
 });
 

@@ -59,7 +59,7 @@ static void box_cull_ctor(
     for (i = 0; i < count; i ++) {
         s[i].enabled = true;
         s[i].gpu_threshold = BOX_CULL_GPU_THRESHOLD;
-        s[i].occlusion = true;
+        s[i].occlusion = false;
         s[i].hiz_levels = BOX_CULL_HIZ_LEVELS;
     }
 }
