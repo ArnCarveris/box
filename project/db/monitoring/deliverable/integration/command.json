@@ -1,0 +1,51 @@
+{
+  "kind": "command",
+  "results": [
+    {
+      "scene": "test/integration/command/input.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/input.log",
+      "expected": "test/integration/command/input.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/monitor.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/monitor.log",
+      "expected": "test/integration/command/monitor.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/render.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/render.log",
+      "expected": "test/integration/command/render.expected",
+      "images": [
+        "render_render_0_0.png",
+        "render_render_0_1.png",
+        "render_render_0_2.png"
+      ]
+    },
+    {
+      "scene": "test/integration/command/script.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/script.log",
+      "expected": "test/integration/command/script.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/search.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/search.log",
+      "expected": "test/integration/command/search.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/shell.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/shell.log",
+      "expected": "test/integration/command/shell.expected",
+      "images": []
+    }
+  ]
+}

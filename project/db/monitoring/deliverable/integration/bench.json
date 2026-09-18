@@ -1,0 +1,89 @@
+{
+  "kind": "bench",
+  "results": [
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/city.flecs",
+      "status": "pass",
+      "entities": 20001,
+      "static": 20001,
+      "dynamic": 0,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 1.583,
+      "p50_ms": 1.487,
+      "p99_ms": 3.801,
+      "max_ms": 3.837,
+      "fps": 631.6,
+      "drawn": 2025,
+      "culled": 5307,
+      "occluded": 12669,
+      "shadow_static_rebuilds": 300
+    },
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/material_100k.flecs",
+      "status": "pass",
+      "entities": 110000,
+      "static": 100000,
+      "dynamic": 10000,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 2.163,
+      "p50_ms": 2.136,
+      "p99_ms": 4.3,
+      "max_ms": 4.514,
+      "fps": 462.4,
+      "drawn": 58854,
+      "culled": 16135,
+      "occluded": 35012,
+      "shadow_static_rebuilds": 300
+    },
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/static_100k.flecs",
+      "status": "pass",
+      "entities": 110000,
+      "static": 100000,
+      "dynamic": 10000,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 2.28,
+      "p50_ms": 2.104,
+      "p99_ms": 4.43,
+      "max_ms": 4.748,
+      "fps": 438.7,
+      "drawn": 58855,
+      "culled": 16135,
+      "occluded": 35012,
+      "shadow_static_rebuilds": 300
+    },
+    {
+      "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/templates_100k.flecs",
+      "status": "pass",
+      "entities": 17401,
+      "static": 1,
+      "dynamic": 17400,
+      "churn": [
+        1,
+        1000
+      ],
+      "frames": 300,
+      "mean_ms": 1.1,
+      "p50_ms": 1.077,
+      "p99_ms": 1.837,
+      "max_ms": 2.8,
+      "fps": 908.7,
+      "drawn": 2403,
+      "culled": 7338,
+      "occluded": 0,
+      "shadow_static_rebuilds": 300
+    }
+  ]
+}
