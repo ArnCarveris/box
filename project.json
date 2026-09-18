@@ -41,6 +41,7 @@
                     "-sDEFAULT_TO_CXX=1",
                     "-sALLOW_MEMORY_GROWTH=1",
                     "-sSTACK_SIZE=8388608",
+                    "-sEXPORTED_FUNCTIONS=['_main','_box_request']",
                     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
                 ]
             }

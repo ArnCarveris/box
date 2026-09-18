@@ -184,6 +184,28 @@
             "setup": true,
             "teardown": true
         }, {
+            "id": "WasmRequest",
+            "testcases": [
+                "help_round_trip",
+                "unknown_path_gives_404",
+                "bad_command_gives_error_status",
+                "png_reply_is_base64"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
+            "id": "Base64",
+            "testcases": [
+                "empty",
+                "one_byte",
+                "two_bytes",
+                "three_bytes",
+                "longer_text",
+                "binary_bytes"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
             "id": "CommandScript",
             "testcases": [
                 "runs_lines_in_order",

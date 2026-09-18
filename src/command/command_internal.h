@@ -236,6 +236,42 @@ void box_capture_init(
 void box_http_init(
     ecs_world_t *world);
 
+/** Remember the world that the box_request export routes through.
+ *
+ * A wasm image runs exactly one world, which is the world of the last import.
+ *
+ * @param world The world
+ */
+void box_wasm_init(
+    ecs_world_t *world);
+
+/** Run a request through the command endpoints and format its reply.
+ *
+ * The reply holds the status code, the content type and the body, separated by
+ * newlines. A body with content type image/png is base64 encoded.
+ *
+ * @param world The world
+ * @param method The HTTP method
+ * @param path The request path with its query parameters
+ * @param body The request body, NULL or empty for none
+ * @return The reply, owned by the module and valid until the next call
+ */
+char* box_request_format(
+    ecs_world_t *world,
+    const char *method,
+    const char *path,
+    const char *body);
+
+/** Encode bytes as standard base64 with padding.
+ *
+ * @param data The bytes
+ * @param size Number of bytes
+ * @return The encoded text, the caller frees it
+ */
+char* box_base64_encode(
+    const void *data,
+    int32_t size);
+
 /** Apply a minimal unified diff to a text.
  *
  * The patch holds one or more `@@ -a,b +c,d @@` hunks with context, added and
@@ -321,6 +357,7 @@ char* box_path_str(
 typedef struct HttpEndpoint {
     ecs_http_server_t *server;  /**< The server, NULL when no port is set */
     ecs_world_t *world;         /**< World the request handler operates on */
+    char *reply;                /**< Reply of the last box_request_format call */
     bool started;               /**< The server thread accepts connections */
     int32_t next;               /**< Counter of the generated session names */
 } HttpEndpoint;
@@ -354,5 +391,48 @@ bool box_http_endpoint_request(
     const ecs_http_request_t *req,
     ecs_http_reply_t *reply,
     void *ctx);
+
+/** Resolve the camera of a capture request.
+ *
+ * Without a path the camera is the active camera, the camera that the extract
+ * system renders. Paths resolve against the working entity of the session.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param path The camera path, NULL or empty for the active camera
+ * @param out Receives the camera entity, 0 on failure
+ * @return NULL on success, a one line error without prefix the caller frees
+ */
+char* box_capture_camera(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path,
+    ecs_entity_t *out);
+
+/** Build the path of a capture file in the resources folder of a session.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param file Name of the file in the resources folder
+ * @return The path, the caller frees it
+ */
+char* box_capture_path(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *file);
+
+/** Request a capture of a camera to a file.
+ *
+ * The path is handed to the Capture component, which owns it until the extract
+ * system consumes the request. A pending request of the camera is replaced.
+ *
+ * @param world The world
+ * @param camera The camera entity
+ * @param path The file the frame is written to
+ */
+void box_capture_request(
+    ecs_world_t *world,
+    ecs_entity_t camera,
+    char *path);
 
 #endif

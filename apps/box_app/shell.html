@@ -43,6 +43,12 @@
     print: function (text) { console.log(text); },
     printErr: function (text) { console.error(text); },
     setStatus: function (text) { if (text) { message.textContent = text; } }
+  }).then(function (Module) {
+    window.Module = Module;
+    window.boxRequest = function (m, p, b) {
+      return Module.ccall('box_request', 'string',
+        ['string', 'string', 'string'], [m, p, b || '']);
+    };
   }).catch(function (err) {
     fail('Failed to start.', String(err && err.message ? err.message : err));
     console.error(err);

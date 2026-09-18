@@ -21,6 +21,22 @@ static void box_http_stop(
     }
 }
 
+/** Test whether a server thread can accept connections on this platform.
+ *
+ * On web the page owns the socket layer, so the server object only serves the
+ * requests that box_request routes through it.
+ *
+ * @return true when the server can listen
+ */
+static bool box_http_can_listen(void)
+{
+#ifdef BOX_PLATFORM_WEB
+    return false;
+#else
+    return ecs_os_has_threading();
+#endif
+}
+
 /** Create a server on a port and start listening.
  *
  * @param ep The endpoint state
@@ -39,8 +55,8 @@ static void box_http_start(
     ep->server = ecs_http_server_init(&desc);
     if (!ep->server) {
         ecs_err("failed to create the command server on port %d", port);
-    } else if (!ecs_os_has_threading()) {
-        ecs_warn("no threading support, the command server does not listen");
+    } else if (!box_http_can_listen()) {
+        ecs_warn("the command server does not listen, requests go through box_request");
     } else if (ecs_http_server_start(ep->server)) {
         ecs_err("failed to start the command server on port %d", port);
     } else {
@@ -97,6 +113,8 @@ static void box_http_endpoint_dtor(
     int32_t i;
     for (i = 0; i < count; i ++) {
         box_http_stop(&ep[i]);
+        ecs_os_free(ep[i].reply);
+        ep[i].reply = NULL;
     }
 }
 
