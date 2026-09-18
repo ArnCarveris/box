@@ -1,0 +1,24 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T13:39:18Z",
+  "pass": 14,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.032386,
+  "tests": [
+    {"suite": "Textures", "case": "png_loads_into_a_create_command", "status": "pass", "elapsed": 0.014665},
+    {"suite": "Textures", "case": "requested_size_selects_the_class", "status": "pass", "elapsed": 0.028517},
+    {"suite": "Textures", "case": "source_size_picks_the_nearest_class", "status": "pass", "elapsed": 0.018562},
+    {"suite": "Textures", "case": "quality_caps_the_class", "status": "pass", "elapsed": 0.018080},
+    {"suite": "Textures", "case": "new_path_updates_the_same_handle", "status": "pass", "elapsed": 0.017517},
+    {"suite": "Textures", "case": "removing_the_component_destroys_the_handle", "status": "pass", "elapsed": 0.015112},
+    {"suite": "Textures", "case": "albedo_slot_reaches_the_instance", "status": "pass", "elapsed": 0.015952},
+    {"suite": "Textures", "case": "every_slot_reaches_the_instance", "status": "pass", "elapsed": 0.018611},
+    {"suite": "Textures", "case": "prefab_slots_are_inherited", "status": "pass", "elapsed": 0.014904},
+    {"suite": "Textures", "case": "reload_reextracts_dependents", "status": "pass", "elapsed": 0.015465},
+    {"suite": "Textures", "case": "deleting_a_texture_unbinds_and_warns", "status": "pass", "elapsed": 0.014413},
+    {"suite": "Textures", "case": "missing_file_leaves_no_handle", "status": "pass", "elapsed": 0.012572},
+    {"suite": "Textures", "case": "kept_source_pixels_survive_the_upload", "status": "pass", "elapsed": 0.014208},
+    {"suite": "Textures", "case": "row_zero_is_the_bottom_of_the_file", "status": "pass", "elapsed": 0.013471}
+  ]
+}
