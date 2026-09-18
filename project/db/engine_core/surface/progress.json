@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T05:20:02+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "engine_core/app"
+  ]
+}
