@@ -21,6 +21,21 @@ after every block, no `return` inside a nested block (use `goto done`), lines
 under 100 characters, functions under 200 lines, files under 2000 lines, and a
 doc comment on every type and member.
 
+## Flecs rules that bit us
+
+- This flecs has no implicit defer mode. Inside an OnAdd or OnRemove observer
+  the entity is mid table-move: structural changes to it (add, set of a missing
+  component, remove) must go through `it->stage`, never `it->world`. Reads use
+  `it->world`. OnSet observers may set components directly.
+- `ecs_ensure` in a system on a stage returns a temporary copy; use
+  `ecs_get_mut` for existing components and keep registries in heap structs.
+- Components without a ctor are not zero initialized. Register
+  `.ctor = flecs_default_ctor` for every private component with flags.
+- During deletion the OnRemove destination table is the empty root table, not
+  NULL; test `ecs_table_get_type(it->other_table)->count == 0`.
+- Never mutate entities while iterating `ecs_children`; collect them first.
+- `ecs_os_malloc` needs `ecs_os_init()` (or a world) before use.
+
 ## Build environments
 
 Use a private environment when working next to other agents:
