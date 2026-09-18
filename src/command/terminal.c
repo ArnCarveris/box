@@ -161,7 +161,8 @@ void box_terminal_log(
     ecs_assert(s != NULL, ECS_INVALID_PARAMETER, "entity is not a terminal session");
 
     const char *text = result ? result : "";
-    box_command_entry_t *entry = &s->ring[s->count % BOX_COMMAND_LOG_MAX];
+    box_command_entry_t *entry =
+        &s->ring[box_ring_slot(s->count, BOX_COMMAND_LOG_MAX)];
     ecs_os_free(entry->line);
     ecs_os_free(entry->result);
     entry->line = ecs_os_strdup(line);
