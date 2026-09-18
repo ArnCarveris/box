@@ -233,9 +233,6 @@ char* box_patch_apply(
     const char *patch,
     char **error);
 
-/** Prefix of a command result that reports a failure */
-#define BOX_COMMAND_ERROR "error: "
-
 /** Get the scope that the paths of a session resolve against.
  *
  * @param world The world

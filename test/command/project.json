@@ -106,6 +106,45 @@
             ],
             "setup": true,
             "teardown": true
+        }, {
+            "id": "Shell",
+            "testcases": [
+                "cd_changes_cwd",
+                "cd_parent",
+                "cd_root",
+                "cd_unknown_entity",
+                "ls_lists_children",
+                "ls_shows_components",
+                "ls_relative_to_cwd",
+                "touch_creates_entity",
+                "touch_nested_path",
+                "rm_deletes_entity",
+                "mv_renames_entity",
+                "mv_reparents_entity",
+                "mv_existing_target",
+                "add_component",
+                "add_pair",
+                "add_unknown_component",
+                "remove_component",
+                "set_component_value",
+                "set_invalid_value",
+                "get_component_value",
+                "get_all_components",
+                "get_missing_component",
+                "clear_removes_components",
+                "has_component",
+                "has_query_expression",
+                "has_invalid_query",
+                "man_prints_doc",
+                "man_command_brief",
+                "man_unknown_entity",
+                "unknown_entity_argument",
+                "relative_to_cwd",
+                "absolute_path",
+                "root_is_not_an_entity"
+            ],
+            "setup": true,
+            "teardown": true
         }]
     }
 }
