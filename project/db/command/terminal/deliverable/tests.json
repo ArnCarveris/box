@@ -1,0 +1,31 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T07:23:16Z",
+  "pass": 21,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.029462,
+  "tests": [
+    {"suite": "Terminal", "case": "folder_created_and_removed", "status": "pass", "elapsed": 0.011051},
+    {"suite": "Terminal", "case": "resources_subfolder", "status": "pass", "elapsed": 0.010819},
+    {"suite": "Terminal", "case": "session_dir_under_process_dir", "status": "pass", "elapsed": 0.010596},
+    {"suite": "Terminal", "case": "session_dir_kept_after_set", "status": "pass", "elapsed": 0.010957},
+    {"suite": "Terminal", "case": "log_contains_line_and_result", "status": "pass", "elapsed": 0.010552},
+    {"suite": "Terminal", "case": "commands_lists_last_lines", "status": "pass", "elapsed": 0.010974},
+    {"suite": "Terminal", "case": "commands_defaults_to_all_lines", "status": "pass", "elapsed": 0.010116},
+    {"suite": "Terminal", "case": "output_written_on_input", "status": "pass", "elapsed": 0.011147},
+    {"suite": "Terminal", "case": "script_session_runs_command", "status": "pass", "elapsed": 0.009701},
+    {"suite": "Dispatch", "case": "command_with_arguments", "status": "pass", "elapsed": 0.009748},
+    {"suite": "Dispatch", "case": "quoted_argument", "status": "pass", "elapsed": 0.008567},
+    {"suite": "Dispatch", "case": "unknown_command", "status": "pass", "elapsed": 0.009399},
+    {"suite": "Dispatch", "case": "too_many_arguments", "status": "pass", "elapsed": 0.009808},
+    {"suite": "Dispatch", "case": "missing_argument", "status": "pass", "elapsed": 0.009684},
+    {"suite": "Dispatch", "case": "invalid_i32_argument", "status": "pass", "elapsed": 0.009292},
+    {"suite": "Dispatch", "case": "f64_argument", "status": "pass", "elapsed": 0.009748},
+    {"suite": "Dispatch", "case": "entity_argument", "status": "pass", "elapsed": 0.008482},
+    {"suite": "Dispatch", "case": "entity_relative_to_cwd", "status": "pass", "elapsed": 0.008927},
+    {"suite": "Dispatch", "case": "unknown_entity_argument", "status": "pass", "elapsed": 0.008793},
+    {"suite": "Dispatch", "case": "optional_argument_omitted", "status": "pass", "elapsed": 0.008799},
+    {"suite": "Dispatch", "case": "help_lists_commands", "status": "pass", "elapsed": 0.009022}
+  ]
+}
