@@ -189,6 +189,7 @@ void box_texture_refs_init(
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(PbrTextures), .src.id = EcsSelf }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnSet },
         .callback = box_texture_on_pbr_textures
     });
