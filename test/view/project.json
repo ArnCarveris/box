@@ -166,7 +166,12 @@
                     "pinned_exposure_keeps_its_value",
                     "builtin_exposure_and_tonemap_are_off",
                     "tonemap_parameters_reach_the_pass",
-                    "exposure_pass_declares_its_input"
+                    "exposure_pass_declares_its_input",
+                    "bloom_pyramid_stops_above_the_minimum",
+                    "bloom_levels_follow_the_radius",
+                    "karis_weight_falls_with_the_luminance",
+                    "builtin_bloom_is_off_by_default",
+                    "bloom_parameters_reach_the_pass"
                 ],
                 "setup": true,
                 "teardown": true

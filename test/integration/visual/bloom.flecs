@@ -1,0 +1,81 @@
+// effects/bloom
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+
+camera {
+  Position: {0, 2.6, -12}
+  LookAt: {0, 1.6, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 0.08}
+}
+
+$ { EnvironmentLight: {sky_color: {20, 24, 34}, ground_color: {12, 11, 10}, intensity: 0.12} }
+
+floor {
+  Position: {0, -0.2, 0}
+  Box: {28, 0.4, 24}
+  Rgb: {120, 120, 130}
+  PbrMaterial: {roughness: 0.35}
+}
+
+back {
+  Position: {0, 5, 8}
+  Box: {28, 10, 0.4}
+  Rgb: {90, 88, 92}
+  PbrMaterial: {roughness: 0.8}
+}
+
+dim {
+  Position: {-6, 1.2, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {20, 20, 20}
+  Emissive: {strength: 0.6, color: {90, 170, 255}}
+}
+
+mid {
+  Position: {-2, 1.2, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {20, 20, 20}
+  Emissive: {strength: 2, color: {120, 255, 150}}
+}
+
+bright {
+  Position: {2, 1.2, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {20, 20, 20}
+  Emissive: {strength: 8, color: {255, 190, 90}}
+}
+
+fierce {
+  Position: {6, 1.2, 0}
+  Box: {1.4, 1.4, 1.4}
+  Rgb: {20, 20, 20}
+  Emissive: {strength: 40, color: {255, 90, 70}}
+}
+
+pillar {
+  Position: {0, 2, 4}
+  Box: {0.8, 4, 0.8}
+  Rgb: {160, 160, 165}
+  PbrMaterial: {roughness: 0.5}
+}
+
+spark {
+  Position: {-8.5, 3.4, 0}
+  Sphere: {segments: 12, smooth: true, radius: 0.12}
+  Rgb: {20, 20, 20}
+  Emissive: {strength: 200, color: {255, 255, 255}}
+}
+
+box { effects { stack { bloom {
+  Effect: {enabled: true}
+  Bloom: {intensity: 0.22, radius: 1, knee: 0, firefly_clamp: 8}
+} } } }

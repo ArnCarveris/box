@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../../src/render/render_internal.h"
+#include "../../../src/renderer/bloom.h"
 #include "../../../src/renderer/exposure.h"
 
 static ecs_world_t *w;
@@ -477,4 +478,84 @@ void Effects_exposure_pass_declares_its_input(void)
     test_flt(pass->params[4], 0.4f);
     test_flt(pass->params[5], 0.5f);
     test_flt(pass->params[6], 1.0f);
+}
+
+void Effects_bloom_pyramid_stops_above_the_minimum(void)
+{
+    // effects/bloom
+    test_uint(box_bloom_chain(1280, 720), 6);
+    test_uint(box_bloom_chain(1920, 1080), 7);
+    test_uint(box_bloom_chain(641, 361), 5);
+    test_uint(box_bloom_chain(16, 16), 1);
+    test_uint(box_bloom_chain(1, 1), 1);
+    test_uint(box_bloom_chain(8192, 8192), BOX_BLOOM_LEVELS_MAX);
+}
+
+void Effects_bloom_levels_follow_the_radius(void)
+{
+    // effects/bloom
+    test_uint(box_bloom_levels(1280, 720, 1.0f), 6);
+    test_uint(box_bloom_levels(1280, 720, 0.5f), 4);
+    test_uint(box_bloom_levels(1280, 720, 0.0f), 1);
+    test_uint(box_bloom_levels(1280, 720, -3.0f), 1);
+    test_uint(box_bloom_levels(1280, 720, 4.0f), 6);
+    test_uint(box_bloom_levels(16, 16, 1.0f), 1);
+}
+
+void Effects_karis_weight_falls_with_the_luminance(void)
+{
+    // effects/bloom
+    test_flt(box_bloom_karis(0.0f), 1.0f);
+    test_flt(box_bloom_karis(-2.0f), 1.0f);
+    test_flt(box_bloom_karis(1.0f), 0.5f);
+    test_flt(box_bloom_karis(3.0f), 0.25f);
+    test_assert(box_bloom_karis(100.0f) < box_bloom_karis(10.0f));
+    test_assert(box_bloom_karis(100.0f) > 0.0f);
+}
+
+void Effects_builtin_bloom_is_off_by_default(void)
+{
+    // effects/bloom
+    ecs_entity_t bloom = ecs_lookup(w, "box.effects.stack.bloom");
+    test_assert(bloom != 0);
+    const Effect *fx = ecs_get(w, bloom, Effect);
+    test_assert(fx != NULL);
+    test_bool(fx->enabled, false);
+    test_bool(fx->pyramid, true);
+    test_bool(fx->color, true);
+    test_int(fx->order, 800);
+    test_assert(fx->order < ecs_get(w, ecs_lookup(w, "box.effects.stack.tonemap"), Effect)->order);
+    test_uint(fx->shader, ecs_lookup(w, "box.effects.shaders.bloom"));
+
+    const Bloom *params = ecs_get(w, bloom, Bloom);
+    test_assert(params != NULL);
+    test_flt(params->intensity, 0.08f);
+    test_flt(params->radius, 0.7f);
+    test_flt(params->knee, 0.0f);
+    test_flt(params->firefly_clamp, 8.0f);
+
+    box_render_extract(w, &packet);
+    test_int(packet.effects.count, 0);
+}
+
+void Effects_bloom_parameters_reach_the_pass(void)
+{
+    // effects/bloom
+    ecs_entity_t bloom = ecs_lookup(w, "box.effects.stack.bloom");
+    ecs_get_mut(w, bloom, Effect)->enabled = true;
+    ecs_modified(w, bloom, Effect);
+    ecs_set(w, bloom, Bloom, { .intensity = 0.3f, .radius = 0.5f, .knee = 1.25f,
+        .firefly_clamp = 12.0f });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID);
+    test_int(packet.view.effect_inputs, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID);
+    test_flt(pass->params[0], 0.3f);
+    test_flt(pass->params[1], 0.5f);
+    test_flt(pass->params[2], 1.25f);
+    test_flt(pass->params[3], 12.0f);
+    test_uint(box_bloom_chain(packet.view.width, packet.view.height), 5);
+    test_uint(box_bloom_levels(packet.view.width, packet.view.height, pass->params[1]), 3);
 }
