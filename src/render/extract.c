@@ -10,15 +10,8 @@ bool box_render_is_dynamic(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    bool result = false;
-    ecs_entity_t cur = e;
-    while (cur && !result) {
-        result = ecs_has_id(world, cur, DynamicTransform) ||
-            ecs_has_id(world, cur, DynamicMaterial);
-        cur = ecs_get_target(world, cur, EcsChildOf, 0);
-    }
-
-    return result;
+    return box_hierarchy_ancestor_has(world, e, DynamicTransform) ||
+        box_hierarchy_ancestor_has(world, e, DynamicMaterial);
 }
 
 /** Write the world space bounds of an instance to its AABB component.

@@ -4,6 +4,7 @@
  */
 
 #include "material_internal.h"
+#include "../transform/transform_internal.h"
 
 /** Queue a resolved tint for an entity and recurse into children without their own Tint.
  *
@@ -26,19 +27,16 @@ static void box_tint_apply(
 
     ecs_vec_t children;
     ecs_vec_init_t(NULL, &children, ecs_entity_t, 0);
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            if (!ecs_has(world, it.entities[i], Tint)) {
-                ecs_vec_append_t(NULL, &children, ecs_entity_t)[0] = it.entities[i];
-            }
-        }
-    }
+    box_hierarchy_collect(world, e, &children);
 
     int32_t i;
     for (i = 0; i < ecs_vec_count(&children); i ++) {
-        box_tint_apply(world, stage, ecs_vec_get_t(&children, ecs_entity_t, i)[0], tint);
+        ecs_entity_t child = ecs_vec_get_t(&children, ecs_entity_t, i)[0];
+        if (ecs_has(world, child, Tint)) {
+            continue;
+        }
+
+        box_tint_apply(world, stage, child, tint);
     }
 
     ecs_vec_fini_t(NULL, &children, ecs_entity_t);
@@ -70,14 +68,14 @@ static void box_tint_on_remove(
     bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
     for (i = 0; i < it->count && !deleting; i ++) {
-        ecs_entity_t parent = ecs_get_target(it->world, it->entities[i], EcsChildOf, 0);
+        ecs_entity_t parent = box_hierarchy_parent(it->world, it->entities[i]);
         const ActualTint *inherited = parent ? ecs_get(it->world, parent, ActualTint) : NULL;
         box_tint_apply(it->world, it->stage, it->entities[i], inherited);
     }
 
 }
 
-/** Entity was parented under a tinted ancestor: inherit its resolved tint.
+/** Entity was parented under a tinted ancestor in either storage: inherit its tint.
  *
  * @param it Iterator over the reparented entities
  */

@@ -53,6 +53,21 @@ static void box_command_signature(
     ecs_strbuf_append(buf, " - %s", brief ? brief : "");
 }
 
+/** Append the name of one command to a vector.
+ *
+ * @param world The world
+ * @param e The command entity
+ * @param names The vector of names
+ */
+static void box_command_add_name(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    void *names)
+{
+    const char **name = ecs_vec_append_t(NULL, names, const char*);
+    name[0] = ecs_get_name(world, e);
+}
+
 /** The help command: list every command with its parameters and brief.
  *
  * @param ctx The call context
@@ -73,14 +88,7 @@ static void box_command_help(
     ecs_vec_t names;
     ecs_vec_init_t(NULL, &names, const char*, 0);
 
-    ecs_iter_t it = ecs_children(world, scope);
-    while (ecs_children_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            const char **name = ecs_vec_append_t(NULL, &names, const char*);
-            name[0] = ecs_get_name(world, it.entities[i]);
-        }
-    }
+    box_hierarchy_children(world, scope, box_command_add_name, &names);
 
     int32_t i, count = ecs_vec_count(&names);
     qsort(ecs_vec_first(&names), (size_t)count, sizeof(const char*),

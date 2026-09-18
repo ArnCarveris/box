@@ -41,6 +41,22 @@ void box_render_mark_all(
     }
 }
 
+/** Mark one child and its descendants for extraction.
+ *
+ * @param world The world
+ * @param e The child
+ * @param ctx Unused
+ */
+static void box_render_mark_child(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    void *ctx)
+{
+    (void)ctx;
+
+    box_render_mark_subtree(world, e);
+}
+
 void box_render_mark_subtree(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -49,13 +65,7 @@ void box_render_mark_subtree(
         box_render_mark_dirty(world, e);
     }
 
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            box_render_mark_subtree(world, it.entities[i]);
-        }
-    }
+    box_hierarchy_children(world, e, box_render_mark_child, NULL);
 }
 
 /** A component that feeds instance data was set.
@@ -306,14 +316,7 @@ bool box_render_casts_shadow(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    bool result = true;
-    ecs_entity_t cur = e;
-    while (cur && result) {
-        result = !ecs_has_id(world, cur, NoShadow);
-        cur = ecs_get_target(world, cur, EcsChildOf, 0);
-    }
-
-    return result;
+    return !box_hierarchy_ancestor_has(world, e, NoShadow);
 }
 
 void box_render_fill_instance(

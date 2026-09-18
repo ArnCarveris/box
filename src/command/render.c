@@ -123,17 +123,11 @@ done:
 static void box_render_cmd_collect(
     ecs_world_t *world,
     ecs_entity_t e,
-    ecs_vec_t *out)
+    void *out)
 {
     ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = e;
 
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            box_render_cmd_collect(world, it.entities[i], out);
-        }
-    }
+    box_hierarchy_children(world, e, box_render_cmd_collect, out);
 }
 
 /** Put an entity and its descendants in the layer of a render.

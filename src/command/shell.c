@@ -142,7 +142,7 @@ static char* box_shell_id(
 static void box_shell_add_child(
     ecs_world_t *world,
     ecs_entity_t e,
-    ecs_vec_t *children)
+    void *children)
 {
     box_shell_child_t *child = ecs_vec_append_t(NULL, children, box_shell_child_t);
     const char *name = ecs_get_name(world, e);
@@ -194,13 +194,7 @@ static void box_shell_collect(
     if (!scope) {
         box_shell_collect_root(world, children);
     } else {
-        ecs_iter_t it = ecs_children(world, scope);
-        while (ecs_children_next(&it)) {
-            int32_t i;
-            for (i = 0; i < it.count; i ++) {
-                box_shell_add_child(world, it.entities[i], children);
-            }
-        }
+        box_hierarchy_children(world, scope, box_shell_add_child, children);
     }
 
     qsort(ecs_vec_first(children), (size_t)ecs_vec_count(children),
@@ -473,12 +467,8 @@ static void box_shell_mv(
         goto done;
     }
 
-    if (ecs_get_parent(world, e) != scope) {
-        if (scope) {
-            ecs_add_pair(world, e, EcsChildOf, scope);
-        } else {
-            ecs_remove_pair(world, e, EcsChildOf, EcsWildcard);
-        }
+    if (box_hierarchy_parent(world, e) != scope) {
+        box_hierarchy_set_parent(world, e, scope);
     }
 
     ecs_set_name(world, e, name);

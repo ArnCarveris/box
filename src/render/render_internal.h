@@ -14,6 +14,7 @@
 #include "../renderer/bake.h"
 #include "../geometry/mesh_gen.h"
 #include "../view/view_internal.h"
+#include "../transform/transform_internal.h"
 
 /** Contiguous run of the static slots of a mesh that share a layer mask */
 typedef struct box_slot_group_t {

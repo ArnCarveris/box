@@ -3,34 +3,40 @@
  * @brief Observers that keep the world transform of static entities up to date.
  *
  * A static entity has no DynamicTransform on itself or an ancestor. Its world
- * transform is written when its pose changes and when it is reparented.
+ * transform is written when its pose changes and when it is reparented, in
+ * either hierarchy storage.
  */
 
 #include <box.h>
 #include "transform_internal.h"
 
-/** Test whether an ancestor of an entity has DynamicTransform.
+static void box_transform_write(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const mat4 *parent);
+
+/** Propagate the world matrix of a parent into one static child.
  *
  * @param world The world
- * @param e The entity
- * @return true when the entity is part of a dynamic subtree
+ * @param child The child
+ * @param ctx The world matrix of the parent
  */
-static bool box_transform_dynamic_parent(
-    const ecs_world_t *world,
-    ecs_entity_t e)
+static void box_transform_write_child(
+    ecs_world_t *world,
+    ecs_entity_t child,
+    void *ctx)
 {
-    bool result = false;
-    ecs_entity_t parent = ecs_get_parent(world, e);
-    while (parent) {
-        if (ecs_has(world, parent, DynamicTransform)) {
-            result = true;
-            break;
-        }
-
-        parent = ecs_get_parent(world, parent);
+    if (ecs_has(world, child, DynamicTransform)) {
+        goto done;
     }
 
-    return result;
+    if (!ecs_has(world, child, WorldTransform)) {
+        goto done;
+    }
+
+    box_transform_write(world, child, ctx);
+done:
+    return;
 }
 
 /** Write the world transform of an entity and of its static descendants.
@@ -58,22 +64,7 @@ static void box_transform_write(
         ecs_set(world, e, WorldTransform, { .m = m });
     }
 
-    ecs_iter_t it = ecs_children(world, e);
-    while (ecs_children_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            ecs_entity_t child = it.entities[i];
-            if (ecs_has(world, child, DynamicTransform)) {
-                continue;
-            }
-
-            if (!ecs_has(world, child, WorldTransform)) {
-                continue;
-            }
-
-            box_transform_write(world, child, &m);
-        }
-    }
+    box_hierarchy_children(world, e, box_transform_write_child, &m);
 }
 
 /** Recompute the world transform of a static entity and of its subtree.
@@ -89,7 +80,7 @@ static void box_transform_recompute(
 {
     mat4 parent = mat4_identity();
     if (!unparented) {
-        ecs_entity_t p = ecs_get_parent(world, e);
+        ecs_entity_t p = box_hierarchy_parent(world, e);
         if (p) {
             const WorldTransform *wt = ecs_get(world, p, WorldTransform);
             if (wt) {
@@ -118,7 +109,8 @@ static bool box_transform_is_static(
         goto done;
     }
 
-    if (box_transform_dynamic_parent(world, e)) {
+    ecs_entity_t parent = box_hierarchy_parent(world, e);
+    if (parent && box_hierarchy_ancestor_has(world, parent, DynamicTransform)) {
         goto done;
     }
 
@@ -146,7 +138,7 @@ static void BoxTransformOnPose(
     }
 }
 
-/** Observer for entities that get or lose a parent.
+/** Observer for entities that get or lose a parent in either storage.
  *
  * @param it Iterator over the reparented entities
  */
@@ -160,9 +152,7 @@ static void BoxTransformOnReparent(
             goto done;
         }
 
-        if (ecs_search(world, it->other_table,
-            ecs_pair(EcsChildOf, EcsWildcard), NULL) != -1)
-        {
+        if (box_hierarchy_is_child(world, it->other_table)) {
             goto done;
         }
     }

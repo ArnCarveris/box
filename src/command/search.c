@@ -91,7 +91,7 @@ static void box_search_on_query_remove(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        ecs_entity_t parent = ecs_get_parent(world, e);
+        ecs_entity_t parent = box_hierarchy_parent(world, e);
         if (!parent || !ecs_is_alive(world, parent)) {
             continue;
         }
@@ -408,7 +408,7 @@ static int box_search_compare(
 static void box_search_append_entity(
     ecs_world_t *world,
     ecs_entity_t e,
-    ecs_vec_t *out)
+    void *out)
 {
     box_search_entity_t *entry =
         ecs_vec_append_t(NULL, out, box_search_entity_t);
@@ -459,13 +459,7 @@ static void box_search_collect_children(
     if (!scope) {
         box_search_collect_root(world, out);
     } else {
-        ecs_iter_t it = ecs_children(world, scope);
-        while (ecs_children_next(&it)) {
-            int32_t i;
-            for (i = 0; i < it.count; i ++) {
-                box_search_append_entity(world, it.entities[i], out);
-            }
-        }
+        box_hierarchy_children(world, scope, box_search_append_entity, out);
     }
 }
 

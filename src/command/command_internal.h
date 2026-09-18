@@ -9,6 +9,7 @@
 #include <box.h>
 #include <stdio.h>
 #include "../core/core_internal.h"
+#include "../transform/transform_internal.h"
 
 /** Command lines kept per session */
 #define BOX_COMMAND_LOG_MAX (64)

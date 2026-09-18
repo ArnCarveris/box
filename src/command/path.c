@@ -29,7 +29,7 @@ static ecs_entity_t box_path_parent(
 {
     ecs_entity_t result = 0;
     if (scope) {
-        result = ecs_get_parent(world, scope);
+        result = box_hierarchy_parent(world, scope);
     }
 
     return result;
