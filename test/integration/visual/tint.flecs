@@ -5,8 +5,8 @@ using box.camera
 using box.light
 
 camera {
-  Position: {0, 7, -16}
-  LookAt: {0, 1.5, 0}
+  Position: {0, 8, -20}
+  LookAt: {0, 2, 0}
   Camera: {fov: 50}
 }
 
@@ -19,38 +19,53 @@ $ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, i
 
 ground {
   Position: {0, -0.25, 0}
-  Box: {40, 0.5, 40}
+  Box: {60, 0.5, 60}
   Rgb: {120, 120, 125}
   PbrMaterial: {roughness: 0.9}
 }
 
-single_plain {
-  Position: {-9, 1, 4}
+reference {
+  Position: {-7.5, 1, -4.5}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
 }
 
-single_tinted {
-  Position: {-6.5, 1, 4}
+single_red {
+  Position: {-2.5, 1, -4.5}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
-  Tint: {80, 220, 80, 255}
+  Tint: {255, 0, 0, 128}
+}
+
+single_green {
+  Position: {2.5, 1, -4.5}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {215, 215, 215}
+  Tint: {0, 255, 0, 128}
+}
+
+single_blue {
+  Position: {7.5, 1, -4.5}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {215, 215, 215}
+  Tint: {0, 0, 255, 128}
 }
 
 childof_tree {
-  Position: {-3, 1, 0}
+  Position: {-7.5, 1, 2}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
-  Tint: {80, 120, 255, 255}
+  Tint: {0, 0, 255, 128}
 
   child {
     Position: {0, 2, 0}
-    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Sphere: {segments: 24, smooth: true, radius: 0.7}
     Rgb: {215, 215, 215}
+    Tint: {0, 0, 0, 128}
 
     grandchild {
-      Position: {0, 1.4, 0}
-      Box: {0.8, 0.8, 0.8}
+      Position: {0, 1.5, 0}
+      Box: {1, 1, 1}
       Rgb: {215, 215, 215}
     }
   }
@@ -59,74 +74,66 @@ childof_tree {
 @tree Parent
 
 parent_tree {
-  Position: {0.5, 1, 0}
+  Position: {-2.5, 1, 2}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
-  Tint: {80, 120, 255, 255}
+  Tint: {0, 0, 255, 128}
 
   child {
     Position: {0, 2, 0}
-    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Sphere: {segments: 24, smooth: true, radius: 0.7}
     Rgb: {215, 215, 215}
+    Tint: {0, 0, 0, 128}
 
     grandchild {
-      Position: {0, 1.4, 0}
-      Box: {0.8, 0.8, 0.8}
+      Position: {0, 1.5, 0}
+      Box: {1, 1, 1}
       Rgb: {215, 215, 215}
     }
   }
 }
 
-levels {
-  Position: {4, 1, 0}
+childof_under_parent {
+  Position: {2.5, 1, 2}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
-  Tint: {80, 120, 255, 255}
+  Tint: {0, 0, 255, 128}
 
-  red_child {
-    Position: {-1.2, 2, 0}
-    Sphere: {segments: 24, smooth: true, radius: 0.6}
+  child {
+    Position: {0, 2, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.7}
     Rgb: {215, 215, 215}
-    Tint: {255, 80, 80, 255}
+    Tint: {0, 0, 0, 128}
+
+    @tree ChildOf
 
     grandchild {
-      Position: {0, 1.4, 0}
-      Box: {0.8, 0.8, 0.8}
-      Rgb: {215, 215, 215}
-    }
-  }
-
-  @tree ChildOf
-
-  plain_child {
-    Position: {1.2, 2, 0}
-    Sphere: {segments: 24, smooth: true, radius: 0.6}
-    Rgb: {215, 215, 215}
-
-    grandchild {
-      Position: {0, 1.4, 0}
-      Box: {0.8, 0.8, 0.8}
+      Position: {0, 1.5, 0}
+      Box: {1, 1, 1}
       Rgb: {215, 215, 215}
     }
   }
 }
 
-mixed {
-  Position: {8, 1, 0}
+@tree ChildOf
+
+parent_under_childof {
+  Position: {7.5, 1, 2}
   Box: {1.5, 1.5, 1.5}
   Rgb: {215, 215, 215}
-  Tint: {255, 200, 60, 255}
+  Tint: {0, 0, 255, 128}
 
   child {
     Position: {0, 2, 0}
-    Sphere: {segments: 24, smooth: true, radius: 0.6}
+    Sphere: {segments: 24, smooth: true, radius: 0.7}
     Rgb: {215, 215, 215}
+    Tint: {0, 0, 0, 128}
 
     @tree Parent
 
     grandchild {
-      Position: {0, 1.4, 0}
-      Box: {0.8, 0.8, 0.8}
+      Position: {0, 1.5, 0}
+      Box: {1, 1, 1}
       Rgb: {215, 215, 215}
     }
   }
