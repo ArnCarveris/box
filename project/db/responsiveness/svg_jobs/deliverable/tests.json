@@ -1,0 +1,118 @@
+{
+ "project": "render",
+ "timestamp": "2026-09-18T23:40:19Z",
+ "pass": 18,
+ "fail": 0,
+ "empty": 0,
+ "elapsed": 0.829711,
+ "tests": [
+  {
+   "suite": "Svg",
+   "case": "inline_data_rasterizes",
+   "status": "pass",
+   "elapsed": 0.029628
+  },
+  {
+   "suite": "Svg",
+   "case": "file_rasterizes",
+   "status": "pass",
+   "elapsed": 0.030464
+  },
+  {
+   "suite": "Svg",
+   "case": "zero_height_follows_the_width",
+   "status": "pass",
+   "elapsed": 0.051999
+  },
+  {
+   "suite": "Svg",
+   "case": "resize_rerasterizes",
+   "status": "pass",
+   "elapsed": 0.053492
+  },
+  {
+   "suite": "Svg",
+   "case": "removing_the_component_destroys_the_handle",
+   "status": "pass",
+   "elapsed": 0.028932
+  },
+  {
+   "suite": "Svg",
+   "case": "handle_reaches_a_pbr_slot",
+   "status": "pass",
+   "elapsed": 0.0299
+  },
+  {
+   "suite": "Svg",
+   "case": "texture_and_svg_is_an_error",
+   "status": "pass",
+   "elapsed": 0.029318
+  },
+  {
+   "suite": "Svg",
+   "case": "row_zero_is_the_bottom_of_the_image",
+   "status": "pass",
+   "elapsed": 0.02904
+  },
+  {
+   "suite": "Svg",
+   "case": "text_rasterizes",
+   "status": "pass",
+   "elapsed": 0.029915
+  },
+  {
+   "suite": "Svg",
+   "case": "mask_hides_half",
+   "status": "pass",
+   "elapsed": 0.03005
+  },
+  {
+   "suite": "Svg",
+   "case": "clip_path_keeps_the_clipped_half",
+   "status": "pass",
+   "elapsed": 0.03118
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "queues_a_job_instead_of_rasterizing",
+   "status": "pass",
+   "elapsed": 0.030777
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "previous_image_stays_while_resizing",
+   "status": "pass",
+   "elapsed": 0.037173
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "completion_uploads_on_the_main_thread",
+   "status": "pass",
+   "elapsed": 0.236112
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "new_set_supersedes_the_queued_job",
+   "status": "pass",
+   "elapsed": 0.036109
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "deleting_the_entity_cancels_the_job",
+   "status": "pass",
+   "elapsed": 0.027973
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "bands_split_a_large_image",
+   "status": "pass",
+   "elapsed": 0.055222
+  },
+  {
+   "suite": "SvgJobs",
+   "case": "nearest_texture_rasterizes_first",
+   "status": "pass",
+   "elapsed": 0.03214
+  }
+ ]
+}

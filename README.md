@@ -161,6 +161,9 @@ free flight with `Fly`; `test/integration/visual/first_person.flecs` stands it i
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
 rasterization and light baking stay off the frame; `JobStats` reports the queue.
+Setting an `Svg` queues one job per horizontal band of the image, nearest to the
+camera first, and the texture keeps its previous image until the last band lands;
+`apps/box_app/etc/scenes/svg_storm.flecs` rasterizes a wall of them at once.
 
 `apps/box_app/etc/scenes/templates.flecs` is the incremental loading demo: a ground
 that appears at once and 4096 instances of a `Pillar` template that `box.script`
@@ -207,7 +210,9 @@ process removes its folder when it exits.
 
 Integration harnesses disable incremental template loading (`ScriptSettings: {enabled: false}`)
 so captures and command logs are deterministic; `templates_per_frame` with `budget_ms: 0` gives a
-deterministic incremental run when that is what a test needs.
+deterministic incremental run when that is what a test needs. The visual harness also sets
+`JobSettings: {workers: -1, budget_ms: 0}`, which runs every queued job on the main thread before
+the captured frame, so a scene with SVG textures renders the same every run.
 
 ## Shaders
 
@@ -445,6 +450,17 @@ its `progress.json` says `"bench": false`) and an epic without its report in the
 four section format, the merged tests, the benchmarks, the integration outputs
 and the wasm image, printing every missing item; `--force` overrides with a
 warning. `docs/PROCESS.md` describes the loop these commands encode.
+
+`python3 tools/epic.py <epic> --env <name>` produces everything `done <epic>`
+wants except the README: it builds `box_app` in debug, release and wasm and keeps
+the bake3 `--build-json` reports as `build_debug.json`, `build_native.json` and
+`build_wasm.json`, runs every project under `test/` into `tests_<project>.json`
+and the merged `tests.json`, runs the visual, bench and command scenes into
+`integration/`, runs `tools/bench.py` into `bench/` against the `bench/` folder of
+the previous epic (`--baseline <epic>` picks another) and copies the web image
+into `wasm/`. It prints a line per step, exits non zero when a build, a test or a
+scene fails and ends with what is still missing; `--steps a,b` and `--skip a,b`
+rerun part of the pipeline.
 
 ## Layout
 

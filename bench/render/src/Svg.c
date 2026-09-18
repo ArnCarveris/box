@@ -7,6 +7,7 @@
 #include <bake_bench.h>
 #include <stdlib.h>
 #include "../../../src/render/render_internal.h"
+#include "../../../src/job/job_internal.h"
 
 /** Edge length the icon is rasterized at */
 #define BENCH_SVG_SIZE (256)
@@ -50,6 +51,7 @@ void Svg_rasterize_256(bench_t *b)
         bench_resume(b);
         ecs_set(world, e, Svg, { .data = ecs_os_strdup(bench_svg_icon),
             .width = BENCH_SVG_SIZE, .height = BENCH_SVG_SIZE });
+        box_job_flush(world);
         bench_keep(ecs_get(world, e, RenderTexture)->handle);
     }
 
