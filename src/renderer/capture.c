@@ -94,13 +94,14 @@ static WGPUBuffer box_capture_copy(
     };
     WGPUBuffer buffer = wgpuDeviceCreateBuffer(r->device, &buffer_desc);
 
+    uint32_t height = wgpuTextureGetHeight(texture);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
     WGPUTexelCopyTextureInfo src = { .texture = texture, .aspect = WGPUTextureAspect_All };
     WGPUTexelCopyBufferInfo dst = {
-        .layout = { .bytesPerRow = stride, .rowsPerImage = r->height },
+        .layout = { .bytesPerRow = stride, .rowsPerImage = height },
         .buffer = buffer
     };
-    WGPUExtent3D extent = { r->width, r->height, 1 };
+    WGPUExtent3D extent = { wgpuTextureGetWidth(texture), height, 1 };
     wgpuCommandEncoderCopyTextureToBuffer(encoder, &src, &dst, &extent);
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
@@ -223,9 +224,9 @@ static int box_capture_queue(
     }
 
     c->busy = true;
-    c->width = r->width;
-    c->height = r->height;
-    c->stride = box_capture_stride(r->width);
+    c->width = wgpuTextureGetWidth(texture);
+    c->height = wgpuTextureGetHeight(texture);
+    c->stride = box_capture_stride(c->width);
     c->bgra = box_capture_is_bgra(r);
     snprintf(c->path, sizeof(c->path), "%s", path);
 
@@ -276,8 +277,8 @@ static int box_capture_blocking(
     const char *path)
 {
     int result = -1;
-    uint32_t width = r->width;
-    uint32_t height = r->height;
+    uint32_t width = wgpuTextureGetWidth(texture);
+    uint32_t height = wgpuTextureGetHeight(texture);
     uint32_t stride = box_capture_stride(width);
     uint64_t size = (uint64_t)stride * height;
     WGPUBuffer buffer = box_capture_copy(r, texture, stride, size);

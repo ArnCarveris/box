@@ -6,26 +6,20 @@
 #include "renderer_internal.h"
 #include <stdio.h>
 
-/** Create the view uniform buffer, its bind group layout and bind group.
+/** Create the bind group layout the view and layer uniforms are bound through.
  *
  * @param r The renderer
  */
 static void box_frame_init_view(
     box_renderer_t *r)
 {
-    WGPUBufferDescriptor buffer_desc = {
-        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
-        .size = sizeof(box_view_t)
-    };
-    r->view_buffer = wgpuDeviceCreateBuffer(r->device, &buffer_desc);
-
     WGPUBindGroupLayoutEntry layout_entries[2] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = sizeof(box_view_t)
+                .minBindingSize = BOX_VIEW_UNIFORM_SIZE
             }
         }, {
             .binding = 1,
@@ -38,17 +32,6 @@ static void box_frame_init_view(
     };
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 2, .entries = layout_entries };
     r->view_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
-
-    WGPUBindGroupEntry group_entries[2] = {
-        { .binding = 0, .buffer = r->view_buffer, .size = sizeof(box_view_t) },
-        { .binding = 1, .buffer = r->layer_buffer, .size = BOX_LAYER_UNIFORM_SIZE }
-    };
-    WGPUBindGroupDescriptor group_desc = {
-        .layout = r->view_layout,
-        .entryCount = 2,
-        .entries = group_entries
-    };
-    r->view_group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
 }
 
 WGPURenderPipeline box_frame_pipeline(
@@ -136,6 +119,8 @@ void box_frame_init(
     box_renderer_t *r)
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
+    box_vec_init(&r->views, sizeof(box_gpu_view_t));
+    box_vec_init(&r->targets, sizeof(box_gpu_target_t));
     box_layers_init(r);
     box_frame_init_view(r);
     box_lights_init(r);
@@ -157,7 +142,7 @@ void box_frame_init(
         true, NULL);
 }
 
-/** Acquire the texture to render into: the next surface texture or the offscreen one.
+/** Acquire the texture the surface views render into.
  *
  * @param r The renderer
  * @return The texture, or NULL when the surface is not ready
@@ -181,52 +166,54 @@ static WGPUTexture box_frame_target(
     return result;
 }
 
-/** Upload the packet's view uniforms.
+/** Upload the uniforms of one view.
  *
  * @param r The renderer
- * @param p The packet
+ * @param view The view
  */
 static void box_frame_write_view(
     box_renderer_t *r,
-    const box_packet_t *p)
+    const box_view_t *view)
 {
-    box_view_t view = p->view;
+    box_view_t uniform = *view;
     bool srgb = r->format == WGPUTextureFormat_BGRA8UnormSrgb ||
         r->format == WGPUTextureFormat_RGBA8UnormSrgb;
-    view.gamma_encode = srgb ? 0.0f : 1.0f;
-    wgpuQueueWriteBuffer(r->gpu_queue, r->view_buffer, 0, &view, sizeof(box_view_t));
+    uniform.gamma_encode = srgb ? 0.0f : 1.0f;
+    wgpuQueueWriteBuffer(r->gpu_queue, r->v->view_buffer, 0, &uniform, BOX_VIEW_UNIFORM_SIZE);
 }
 
-/** Record the pass that draws the sorted instances over the opaque image.
+/** Record the pass that draws the sorted instances of a view over its image.
  *
  * The opaque target is copied and its mip chain filled first, so the blended
  * draws can read what is behind them at the blur their roughness asks for.
  *
  * @param r The renderer
+ * @param view The view
  * @param p The packet
  * @param encoder The command encoder
  * @param target The texture the opaque pass rendered into
- * @param view The render target view of that texture
+ * @param attachment The render target view of that texture
  */
 static void box_frame_sorted(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPUCommandEncoder encoder,
     WGPUTexture target,
-    WGPUTextureView view)
+    WGPUTextureView attachment)
 {
-    if (r->scene_needed) {
+    if (r->v->scene_needed) {
         box_transparent_prepare(r, encoder, target);
     }
 
     WGPURenderPassColorAttachment color = {
-        .view = view,
+        .view = attachment,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
         .loadOp = WGPULoadOp_Load,
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = r->depth_view,
+        .view = r->v->depth_view,
         .depthLoadOp = WGPULoadOp_Load,
         .depthStoreOp = WGPUStoreOp_Store
     };
@@ -236,54 +223,83 @@ static void box_frame_sorted(
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->view_group, 0, NULL);
-    wgpuRenderPassEncoderSetBindGroup(pass, 1, r->light_group, 0, NULL);
-    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->env_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
-    box_transparent_draw(r, p, pass);
+    box_transparent_draw(r, view, p, pass);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 }
 
-void box_frame_render(
-    box_renderer_t *r,
-    const box_packet_t *p)
+/** Check whether an earlier view of the frame already drew into a target.
+ *
+ * @param p The packet
+ * @param index Index of the view
+ * @return true when the target still holds what the previous frame left
+ */
+static bool box_frame_first_use(
+    const box_packet_t *p,
+    uint32_t index)
 {
-    box_device_resize(r, p->width, p->height);
-    box_layers_apply(r, p);
-    box_texture_apply(r, p);
-    box_scene_apply(r, p);
-    box_transparent_upload(r, p);
-    if (p->has_view) {
-        box_lights_update(r, p);
+    bool result = true;
+    uint32_t target = ((box_view_t*)box_vec_at(&p->views, index))->target;
+    uint32_t i;
+    for (i = 0; i < index && result; i ++) {
+        result = ((box_view_t*)box_vec_at(&p->views, i))->target != target;
     }
 
-    WGPUTexture target = box_frame_target(r);
-    if (!target) {
-        goto done;
+    return result;
+}
+
+/** Record every pass of one view into its target.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param index Index of the view in the packet
+ * @param encoder The command encoder
+ * @param surface The texture the views of the surface draw into
+ */
+static void box_frame_view(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    uint32_t index,
+    WGPUCommandEncoder encoder,
+    WGPUTexture surface)
+{
+    const box_view_t *view = box_vec_at(&p->views, index);
+    WGPUTexture target = surface;
+    if (view->target) {
+        box_gpu_target_t *t = box_target_get(r, view->target);
+        if (!t) {
+            goto done;
+        }
+
+        target = t->color;
     }
 
-    if (p->has_view) {
-        box_frame_write_view(r, p);
-    }
-
-    WGPUTextureView view = wgpuTextureCreateView(target, NULL);
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
-    if (p->has_view) {
-        box_environment_update(r, p, encoder);
-        box_lights_dispatch(r, p, encoder);
+    box_view_select(r, index);
+    box_view_prepare(r, view);
+    box_transparent_needed(r, view, p);
+    box_lights_update(r, view, p);
+    box_frame_write_view(r, view);
+    box_environment_update(r, view, encoder);
+    box_lights_dispatch(r, view, encoder);
+    if (!index) {
         box_bake_update(r, p, encoder);
     }
 
+    WGPUTextureView attachment = wgpuTextureCreateView(target, NULL);
+    bool clear = box_frame_first_use(p, index);
     WGPURenderPassColorAttachment color = {
-        .view = view,
+        .view = attachment,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = WGPULoadOp_Clear,
+        .loadOp = clear ? WGPULoadOp_Clear : WGPULoadOp_Load,
         .storeOp = WGPUStoreOp_Store,
-        .clearValue = { p->clear[0], p->clear[1], p->clear[2], p->clear[3] }
+        .clearValue = { view->clear[0], view->clear[1], view->clear[2], view->clear[3] }
     };
     WGPURenderPassDepthStencilAttachment depth = {
-        .view = r->depth_view,
+        .view = r->v->depth_view,
         .depthLoadOp = WGPULoadOp_Clear,
         .depthStoreOp = WGPUStoreOp_Store,
         .depthClearValue = 0.0f
@@ -294,19 +310,68 @@ void box_frame_render(
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
-    if (p->has_view) {
-        wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, r->view_group, 0, NULL);
-        wgpuRenderPassEncoderSetBindGroup(pass, 1, r->light_group, 0, NULL);
-        wgpuRenderPassEncoderSetBindGroup(pass, 2, r->env_group, 0, NULL);
-        wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
-        box_scene_draw(r, p, pass);
-    }
-
+    wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
+    box_scene_draw(r, p, pass);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
-    if (p->has_view && p->transparent.count) {
-        box_frame_sorted(r, p, encoder, target, view);
+
+    if (view->transparent_count) {
+        box_frame_sorted(r, view, p, encoder, target, attachment);
+    }
+
+    wgpuTextureViewRelease(attachment);
+done:
+    return;
+}
+
+/** Texture the capture of the frame reads.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param surface The texture the views of the surface drew into
+ * @return The texture to read back
+ */
+static WGPUTexture box_frame_capture_target(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPUTexture surface)
+{
+    WGPUTexture result = surface;
+    if (p->capture_view < p->views.count) {
+        uint32_t handle = ((box_view_t*)box_vec_at(&p->views, p->capture_view))->target;
+        box_gpu_target_t *t = box_target_get(r, handle);
+        if (t) {
+            result = t->color;
+        }
+    }
+
+    return result;
+}
+
+void box_frame_render(
+    box_renderer_t *r,
+    const box_packet_t *p)
+{
+    box_device_resize(r, p->width, p->height);
+    box_layers_apply(r, p);
+    box_texture_apply(r, p);
+    box_target_apply(r, p);
+    box_scene_apply(r, p);
+    box_transparent_upload(r, p);
+
+    WGPUTexture surface = box_frame_target(r);
+    if (!surface) {
+        goto done;
+    }
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
+    uint32_t i;
+    for (i = 0; i < p->views.count; i ++) {
+        box_frame_view(r, p, i, encoder, surface);
     }
 
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
@@ -315,17 +380,16 @@ void box_frame_render(
     wgpuCommandEncoderRelease(encoder);
 
     if (p->capture_path[0]) {
-        box_capture_texture(r, target, p->capture_path);
+        box_capture_texture(r, box_frame_capture_target(r, p, surface), p->capture_path);
     }
 
     if (r->surface) {
 #ifndef BOX_PLATFORM_WEB
         wgpuSurfacePresent(r->surface);
 #endif
-        wgpuTextureRelease(target);
+        wgpuTextureRelease(surface);
     }
 
-    wgpuTextureViewRelease(view);
 done:
     return;
 }

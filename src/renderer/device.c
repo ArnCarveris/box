@@ -285,6 +285,8 @@ done:
 void box_device_fini(
     box_renderer_t *r)
 {
+    box_view_fini(r);
+    box_target_fini(r);
     box_scene_fini(r);
     box_lights_fini(r);
     box_transparent_fini(r);
@@ -295,11 +297,7 @@ void box_device_fini(
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
     if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);
-    if (r->view_group) wgpuBindGroupRelease(r->view_group);
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);
-    if (r->view_buffer) wgpuBufferRelease(r->view_buffer);
-    if (r->depth_view) wgpuTextureViewRelease(r->depth_view);
-    if (r->depth) wgpuTextureRelease(r->depth);
     if (r->offscreen_view) wgpuTextureViewRelease(r->offscreen_view);
     if (r->offscreen) wgpuTextureRelease(r->offscreen);
     if (r->gpu_queue) wgpuQueueRelease(r->gpu_queue);
@@ -315,30 +313,15 @@ void box_device_resize(
     uint32_t width,
     uint32_t height)
 {
-    bool unchanged = width == r->width && height == r->height && r->depth;
+    bool unchanged = width == r->width && height == r->height;
     if (unchanged || !width || !height) {
         goto done;
     }
 
     r->width = width;
     r->height = height;
-
-    if (r->depth_view) wgpuTextureViewRelease(r->depth_view);
-    if (r->depth) wgpuTextureRelease(r->depth);
-    WGPUTextureDescriptor depth_desc = {
-        .usage = WGPUTextureUsage_RenderAttachment,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { width, height, 1 },
-        .format = WGPUTextureFormat_Depth32Float,
-        .mipLevelCount = 1,
-        .sampleCount = 1
-    };
-    r->depth = wgpuDeviceCreateTexture(r->device, &depth_desc);
-    r->depth_view = wgpuTextureCreateView(r->depth, NULL);
-
     if (r->surface) {
         box_device_configure_surface(r);
-        box_transparent_resize(r);
         goto done;
     }
 
@@ -354,7 +337,6 @@ void box_device_resize(
     };
     r->offscreen = wgpuDeviceCreateTexture(r->device, &color_desc);
     r->offscreen_view = wgpuTextureCreateView(r->offscreen, NULL);
-    box_transparent_resize(r);
 done:
     return;
 }

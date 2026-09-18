@@ -67,26 +67,22 @@ static uint32_t box_transparent_mips(
     return result;
 }
 
-/** Release the copy of the opaque target, its views and its bind groups.
- *
- * @param r The renderer
- */
-static void box_transparent_release_scene(
-    box_renderer_t *r)
+void box_transparent_view_fini(
+    box_gpu_view_t *v)
 {
     uint32_t mip;
-    for (mip = 0; mip < r->scene_mips_count; mip ++) {
-        if (r->scene_mips[mip]) wgpuTextureViewRelease(r->scene_mips[mip]);
-        if (r->scene_groups[mip]) wgpuBindGroupRelease(r->scene_groups[mip]);
-        r->scene_mips[mip] = NULL;
-        r->scene_groups[mip] = NULL;
+    for (mip = 0; mip < v->scene_mips_count; mip ++) {
+        if (v->scene_mips[mip]) wgpuTextureViewRelease(v->scene_mips[mip]);
+        if (v->scene_groups[mip]) wgpuBindGroupRelease(v->scene_groups[mip]);
+        v->scene_mips[mip] = NULL;
+        v->scene_groups[mip] = NULL;
     }
 
-    if (r->scene_view) wgpuTextureViewRelease(r->scene_view);
-    if (r->scene) wgpuTextureRelease(r->scene);
-    r->scene_view = NULL;
-    r->scene = NULL;
-    r->scene_mips_count = 0;
+    if (v->scene_view) wgpuTextureViewRelease(v->scene_view);
+    if (v->scene) wgpuTextureRelease(v->scene);
+    v->scene_view = NULL;
+    v->scene = NULL;
+    v->scene_mips_count = 0;
 }
 
 /** Create the bind group a downsample pass reads the previous mip through.
@@ -99,7 +95,7 @@ static void box_transparent_scene_group(
     uint32_t mip)
 {
     WGPUBindGroupEntry entries[2] = {
-        { .binding = 0, .textureView = r->scene_mips[mip - 1] },
+        { .binding = 0, .textureView = r->v->scene_mips[mip - 1] },
         { .binding = 1, .sampler = r->scene_sampler }
     };
     WGPUBindGroupDescriptor desc = {
@@ -107,37 +103,37 @@ static void box_transparent_scene_group(
         .entryCount = 2,
         .entries = entries
     };
-    r->scene_groups[mip] = wgpuDeviceCreateBindGroup(r->device, &desc);
+    r->v->scene_groups[mip] = wgpuDeviceCreateBindGroup(r->device, &desc);
 }
 
 void box_transparent_resize(
     box_renderer_t *r)
 {
-    box_transparent_release_scene(r);
-    r->scene_mips_count = box_transparent_mips(r->width, r->height);
+    box_transparent_view_fini(r->v);
+    r->v->scene_mips_count = box_transparent_mips(r->v->width, r->v->height);
 
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
             WGPUTextureUsage_CopyDst,
         .dimension = WGPUTextureDimension_2D,
-        .size = { r->width, r->height, 1 },
+        .size = { r->v->width, r->v->height, 1 },
         .format = r->format,
-        .mipLevelCount = r->scene_mips_count,
+        .mipLevelCount = r->v->scene_mips_count,
         .sampleCount = 1
     };
-    r->scene = wgpuDeviceCreateTexture(r->device, &desc);
+    r->v->scene = wgpuDeviceCreateTexture(r->device, &desc);
 
     WGPUTextureViewDescriptor view_desc = {
         .format = r->format,
         .dimension = WGPUTextureViewDimension_2D,
-        .mipLevelCount = r->scene_mips_count,
+        .mipLevelCount = r->v->scene_mips_count,
         .arrayLayerCount = 1,
         .aspect = WGPUTextureAspect_All
     };
-    r->scene_view = wgpuTextureCreateView(r->scene, &view_desc);
+    r->v->scene_view = wgpuTextureCreateView(r->v->scene, &view_desc);
 
     uint32_t mip;
-    for (mip = 0; mip < r->scene_mips_count; mip ++) {
+    for (mip = 0; mip < r->v->scene_mips_count; mip ++) {
         WGPUTextureViewDescriptor mip_desc = {
             .format = r->format,
             .dimension = WGPUTextureViewDimension_2D,
@@ -146,16 +142,14 @@ void box_transparent_resize(
             .arrayLayerCount = 1,
             .aspect = WGPUTextureAspect_All
         };
-        r->scene_mips[mip] = wgpuTextureCreateView(r->scene, &mip_desc);
+        r->v->scene_mips[mip] = wgpuTextureCreateView(r->v->scene, &mip_desc);
     }
 
-    for (mip = 1; r->downsample_layout && mip < r->scene_mips_count; mip ++) {
+    for (mip = 1; r->downsample_layout && mip < r->v->scene_mips_count; mip ++) {
         box_transparent_scene_group(r, mip);
     }
 
-    if (r->env_layout) {
-        box_environment_rebuild(r);
-    }
+    r->v->env_dirty = true;
 }
 
 void box_transparent_init(
@@ -228,8 +222,6 @@ void box_transparent_init(
     r->downsample_pipeline = wgpuDeviceCreateRenderPipeline(r->device, &desc);
     wgpuPipelineLayoutRelease(pipeline_layout);
     wgpuShaderModuleRelease(module);
-
-    box_transparent_resize(r);
 }
 
 void box_transparent_bind_layout(
@@ -256,8 +248,22 @@ void box_transparent_bind_group(
     WGPUBindGroupEntry *out,
     uint32_t base)
 {
-    out[0] = (WGPUBindGroupEntry){ .binding = base, .textureView = r->scene_view };
+    out[0] = (WGPUBindGroupEntry){ .binding = base, .textureView = r->v->scene_view };
     out[1] = (WGPUBindGroupEntry){ .binding = base + 1, .sampler = r->scene_sampler };
+}
+
+void box_transparent_needed(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p)
+{
+    uint32_t i;
+    r->v->scene_needed = false;
+    for (i = 0; i < view->transparent_count && !r->v->scene_needed; i ++) {
+        uint32_t index = view->transparent_first + i;
+        uint32_t blend = ((box_transparent_t*)box_vec_at(&p->transparent, index))->blend;
+        r->v->scene_needed = blend == BOX_BLEND_ALPHA || blend == BOX_BLEND_PREMULTIPLIED;
+    }
 }
 
 void box_transparent_upload(
@@ -265,15 +271,8 @@ void box_transparent_upload(
     const box_packet_t *p)
 {
     uint32_t count = p->transparent.count;
-    r->scene_needed = false;
     if (!count) {
         goto done;
-    }
-
-    uint32_t i;
-    for (i = 0; i < count && !r->scene_needed; i ++) {
-        uint32_t blend = ((box_transparent_t*)box_vec_at(&p->transparent, i))->blend;
-        r->scene_needed = blend == BOX_BLEND_ALPHA || blend == BOX_BLEND_PREMULTIPLIED;
     }
 
     if (count > r->sorted_capacity) {
@@ -303,14 +302,14 @@ void box_transparent_prepare(
     WGPUTexture target)
 {
     WGPUTexelCopyTextureInfo src = { .texture = target, .aspect = WGPUTextureAspect_All };
-    WGPUTexelCopyTextureInfo dst = { .texture = r->scene, .aspect = WGPUTextureAspect_All };
-    WGPUExtent3D extent = { r->width, r->height, 1 };
+    WGPUTexelCopyTextureInfo dst = { .texture = r->v->scene, .aspect = WGPUTextureAspect_All };
+    WGPUExtent3D extent = { r->v->width, r->v->height, 1 };
     wgpuCommandEncoderCopyTextureToTexture(encoder, &src, &dst, &extent);
 
     uint32_t mip;
-    for (mip = 1; mip < r->scene_mips_count; mip ++) {
+    for (mip = 1; mip < r->v->scene_mips_count; mip ++) {
         WGPURenderPassColorAttachment color = {
-            .view = r->scene_mips[mip],
+            .view = r->v->scene_mips[mip],
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
             .loadOp = WGPULoadOp_Clear,
             .storeOp = WGPUStoreOp_Store
@@ -318,7 +317,7 @@ void box_transparent_prepare(
         WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetPipeline(pass, r->downsample_pipeline);
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, r->scene_groups[mip], 0, NULL);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->scene_groups[mip], 0, NULL);
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
@@ -350,14 +349,16 @@ static WGPURenderPipeline box_transparent_pipeline(
 
 void box_transparent_draw(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPURenderPassEncoder pass)
 {
-    uint32_t first = 0;
-    while (first < p->transparent.count) {
+    uint32_t end = view->transparent_first + view->transparent_count;
+    uint32_t first = view->transparent_first;
+    while (first < end) {
         box_transparent_t *entry = box_vec_at(&p->transparent, first);
         uint32_t last = first + 1;
-        while (last < p->transparent.count) {
+        while (last < end) {
             box_transparent_t *next = box_vec_at(&p->transparent, last);
             if (next->mesh != entry->mesh || next->blend != entry->blend ||
                 next->back != entry->back)
@@ -405,7 +406,6 @@ void box_transparent_fini(
 {
     box_transparent_reset(r);
 
-    box_transparent_release_scene(r);
     if (r->sorted) wgpuBufferRelease(r->sorted);
     if (r->scene_sampler) wgpuSamplerRelease(r->scene_sampler);
     if (r->downsample_layout) wgpuBindGroupLayoutRelease(r->downsample_layout);

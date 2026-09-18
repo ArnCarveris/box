@@ -54,6 +54,9 @@
 /** Mip levels a rough surface blurs over, past which the copy is one flat color */
 #define BOX_SCENE_BLUR_MIPS (5)
 
+/** Prefiltered environments the renderer keeps, shared by the views that match one */
+#define BOX_ENV_SLOTS (4)
+
 /** Cull modes a sorted pipeline is built for: back faces culled or kept */
 #define BOX_CULL_MODES (2)
 
@@ -87,6 +90,54 @@ typedef struct box_bake_info_t {
     uint32_t job_count;   /**< Probes the bake pass writes this frame */
     uint32_t pad[2];      /**< Padding to the 16 byte GPU stride */
 } box_bake_info_t;
+
+/** Offscreen color texture a view renders into, created from a packet command */
+typedef struct box_gpu_target_t {
+    WGPUTexture color;     /**< Color texture of the target */
+    WGPUTextureView view;  /**< Render attachment view of the color texture */
+    uint32_t width;        /**< Width in pixels */
+    uint32_t height;       /**< Height in pixels */
+    bool alive;            /**< Handle is in use */
+} box_gpu_target_t;
+
+/** One prefiltered environment, shared by every view of its generation */
+typedef struct box_gpu_env_t {
+    WGPUTexture source;                /**< Cubemap the gradient is rendered into */
+    WGPUTextureView source_view;       /**< Cube view of the gradient */
+    WGPUTexture specular;              /**< Specular cubemap, one mip per roughness step */
+    WGPUTextureView specular_view;     /**< Cube view of the specular mip chain */
+    WGPUTexture irradiance;            /**< Diffuse irradiance cubemap */
+    WGPUTextureView irradiance_view;   /**< Cube view of the irradiance */
+    WGPUBindGroup filter_group;        /**< Bind group of the specular and irradiance passes */
+    uint32_t generation;               /**< View generation the prefilter was built for */
+    uint32_t used;                     /**< Frame the entry was last bound by a view */
+} box_gpu_env_t;
+
+/** GPU resources of one view of the frame */
+typedef struct box_gpu_view_t {
+    uint32_t width;                  /**< Width the targets of the view were created for */
+    uint32_t height;                 /**< Height the targets of the view were created for */
+    WGPUTexture depth;               /**< Depth target of the view */
+    WGPUTextureView depth_view;      /**< Attachment view of the depth target */
+    WGPUBuffer view_buffer;          /**< Uniform buffer holding the view */
+    WGPUBindGroup view_group;        /**< Bind group with the view and layer uniforms */
+    WGPUBuffer lights;               /**< Light storage buffer of the view */
+    uint32_t light_capacity;         /**< Lights the light buffer of the view can hold */
+    WGPUBuffer clusters;             /**< Light offset and count per cluster of the view */
+    WGPUBuffer light_indices;        /**< Light indices of every cluster of the view */
+    WGPUBindGroup cluster_group;     /**< View, lights and grid of its compute pass */
+    WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads for it */
+    box_cluster_t grid;              /**< Grid its cluster buffers were built for */
+    bool scene_needed;               /**< A sorted draw of the view samples the copy */
+    WGPUTexture scene;               /**< Copy of the opaque image of the view */
+    WGPUTextureView scene_view;      /**< View of its whole mip chain */
+    WGPUTextureView scene_mips[BOX_SCENE_MIPS_MAX]; /**< Attachment view of one of its mips */
+    WGPUBindGroup scene_groups[BOX_SCENE_MIPS_MAX]; /**< Source group of one of its downsamples */
+    uint32_t scene_mips_count;       /**< Mip levels its copy holds */
+    WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
+    uint32_t env_slot;               /**< Environment entry its group binds */
+    bool env_dirty;                  /**< The environment bind group must be rebuilt */
+} box_gpu_view_t;
 
 /** GPU resources of one mesh and its static instances */
 typedef struct box_gpu_mesh_t {
@@ -145,20 +196,12 @@ struct box_renderer_t {
     WGPUTextureFormat format;        /**< Color target format */
     WGPUTexture offscreen;           /**< Offscreen color target, NULL with a surface */
     WGPUTextureView offscreen_view;  /**< View of the offscreen target */
-    WGPUTexture depth;               /**< Depth target */
-    WGPUTextureView depth_view;      /**< View of the depth target */
     WGPURenderPipeline pipeline;     /**< Lit instanced mesh pipeline */
     WGPUShaderModule mesh_shader;    /**< Module every mesh pipeline is built from */
     WGPUPipelineLayout mesh_layout;  /**< Pipeline layout shared by the mesh pipelines */
     WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]; /**< Sorted pass */
     WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
-    bool scene_needed;               /**< A sorted draw of this packet samples the copy */
-    WGPUTexture scene;               /**< Copy of the opaque target with a mip chain */
-    WGPUTextureView scene_view;      /**< View of the whole mip chain */
-    WGPUTextureView scene_mips[BOX_SCENE_MIPS_MAX]; /**< Render target view of one mip */
-    WGPUBindGroup scene_groups[BOX_SCENE_MIPS_MAX]; /**< Source group of one downsample pass */
-    uint32_t scene_mips_count;       /**< Mip levels the copy holds */
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full mip range */
     WGPUBindGroupLayout downsample_layout; /**< Source texture and sampler of a downsample */
     WGPURenderPipeline downsample_pipeline; /**< Halves one mip of the copy into the next */
@@ -168,27 +211,17 @@ struct box_renderer_t {
     bool layer_failed;               /**< A recomposition failed and was already reported */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
-    WGPUBindGroup view_group;        /**< Bind group with the view uniforms */
-    WGPUBuffer view_buffer;          /**< View uniform buffer */
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
+    box_vec_t views;                 /**< box_gpu_view_t, one per view of the packet */
+    box_gpu_view_t *v;               /**< View the renderer is recording, never NULL in a pass */
+    box_vec_t targets;               /**< box_gpu_target_t indexed by target handle */
+    box_gpu_env_t envs[BOX_ENV_SLOTS]; /**< Prefiltered environments the views share */
+    uint32_t env_clock;              /**< Counts the environments bound, to pick an entry */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
-    WGPUBuffer lights;               /**< Light storage buffer of the frame */
-    uint32_t light_capacity;         /**< Lights the light buffer can hold */
-    WGPUBuffer clusters;             /**< Light offset and count per cluster */
-    WGPUBuffer light_indices;        /**< Light indices of every cluster */
     WGPUComputePipeline cluster_pipeline; /**< Cluster assignment pass */
     WGPUBindGroupLayout cluster_layout;   /**< Layout of the compute bind group */
-    WGPUBindGroup cluster_group;     /**< View, lights and grid of the compute pass */
     WGPUBindGroupLayout light_layout; /**< Layout of the fragment light bind group */
-    WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads */
-    box_cluster_t grid;              /**< Grid the cluster buffers were built for */
-    WGPUTexture env_source;          /**< Cubemap the environment gradient is rendered into */
-    WGPUTextureView env_source_view; /**< Cube view of the environment */
-    WGPUTexture env_specular;        /**< Specular cubemap, one mip per roughness step */
-    WGPUTextureView env_specular_view; /**< Cube view of the specular mip chain */
-    WGPUTexture env_irradiance;      /**< Diffuse irradiance cubemap */
-    WGPUTextureView env_irradiance_view; /**< Cube view of the irradiance */
     WGPUTexture env_brdf;            /**< Split sum BRDF lookup table */
     WGPUTextureView env_brdf_view;   /**< View of the lookup table */
     WGPUSampler env_sampler;         /**< Linear sampler of the environment textures */
@@ -196,14 +229,11 @@ struct box_renderer_t {
     WGPUBindGroupLayout env_pass_layout;   /**< Uniform only layout of the gradient and BRDF */
     WGPUBindGroup env_pass_group;    /**< Uniform bind group of the gradient and BRDF */
     WGPUBindGroupLayout env_filter_layout; /**< Uniform, source cube and sampler layout */
-    WGPUBindGroup env_filter_group;  /**< Bind group of the specular and irradiance passes */
     WGPURenderPipeline env_gradient_pipeline;   /**< Sky and ground gradient into a face */
     WGPURenderPipeline env_specular_pipeline;   /**< GGX prefilter of one mip face */
     WGPURenderPipeline env_irradiance_pipeline; /**< Cosine convolution of one face */
     WGPURenderPipeline env_brdf_pipeline; /**< Split sum integration of the lookup table */
     WGPUBindGroupLayout env_layout;  /**< Layout of the environment group of the mesh shader */
-    WGPUBindGroup env_group;         /**< Irradiance, specular, lookup table and sampler */
-    uint32_t env_generation;         /**< View generation the prefilter was built for */
     box_bake_state_t bake;           /**< Probe descriptors, dirty set and previous inputs */
     WGPUBuffer bake_uniform;         /**< Grid and count uniforms of the bake passes */
     WGPUBuffer bake_lights;          /**< Static lights the bake accumulates */
@@ -272,6 +302,64 @@ void box_device_resize(
  * @param r The renderer
  */
 void box_frame_init(
+    box_renderer_t *r);
+
+/** Make a view of the frame the one the renderer records, creating its slot.
+ *
+ * @param r The renderer
+ * @param index Index of the view in the packet
+ */
+void box_view_select(
+    box_renderer_t *r,
+    uint32_t index);
+
+/** Create or resize the targets and buffers of the current view.
+ *
+ * @param r The renderer
+ * @param view The view of the packet
+ */
+void box_view_prepare(
+    box_renderer_t *r,
+    const box_view_t *view);
+
+/** Release the GPU resources of one view.
+ *
+ * @param v The view resources
+ */
+void box_view_release(
+    box_gpu_view_t *v);
+
+/** Release the resources of every view.
+ *
+ * @param r The renderer
+ */
+void box_view_fini(
+    box_renderer_t *r);
+
+/** Create and destroy the render target textures a packet asks for.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_target_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Entry of a live render target handle.
+ *
+ * @param r The renderer
+ * @param handle The target handle
+ * @return The entry, NULL when the handle names no live target
+ */
+box_gpu_target_t* box_target_get(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Release every render target texture.
+ *
+ * @param r The renderer
+ */
+void box_target_fini(
     box_renderer_t *r);
 
 /** Create a variant of the mesh pipeline.
@@ -376,12 +464,30 @@ void box_transparent_reset(
 void box_transparent_init(
     box_renderer_t *r);
 
-/** Recreate the copy of the opaque target and its mip chain for the target size.
+/** Recreate the copy of the opaque image of the current view and its mip chain.
  *
  * @param r The renderer
  */
 void box_transparent_resize(
     box_renderer_t *r);
+
+/** Release the copy of the opaque image of one view and its bind groups.
+ *
+ * @param v The view resources
+ */
+void box_transparent_view_fini(
+    box_gpu_view_t *v);
+
+/** Note whether a sorted draw of a view reads the copy of its opaque image.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ */
+void box_transparent_needed(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p);
 
 /** Describe the scene copy half of the shared fragment bind group layout.
  *
@@ -423,14 +529,16 @@ void box_transparent_prepare(
     WGPUCommandEncoder encoder,
     WGPUTexture target);
 
-/** Record the sorted draws of a packet, back to front, one pipeline per mode.
+/** Record the sorted draws of a view, back to front, one pipeline per mode.
  *
  * @param r The renderer
+ * @param view The view
  * @param p The packet
  * @param pass The render pass
  */
 void box_transparent_draw(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPURenderPassEncoder pass);
 
@@ -491,24 +599,40 @@ void box_texture_fini(
 void box_lights_init(
     box_renderer_t *r);
 
-/** Upload the packet lights and rebuild the grid buffers when the settings changed.
+/** Create the light buffer of the current view.
  *
  * @param r The renderer
+ */
+void box_lights_view_init(
+    box_renderer_t *r);
+
+/** Release the light and cluster buffers of one view.
+ *
+ * @param v The view resources
+ */
+void box_lights_view_fini(
+    box_gpu_view_t *v);
+
+/** Upload the lights of a view and rebuild its grid buffers when they changed.
+ *
+ * @param r The renderer
+ * @param view The view
  * @param p The packet
  */
 void box_lights_update(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p);
 
-/** Record the compute pass that assigns the lights to clusters.
+/** Record the compute pass that assigns the lights of a view to its clusters.
  *
  * @param r The renderer
- * @param p The packet
+ * @param view The view
  * @param encoder The command encoder
  */
 void box_lights_dispatch(
     box_renderer_t *r,
-    const box_packet_t *p,
+    const box_view_t *view,
     WGPUCommandEncoder encoder);
 
 /** Release the light and cluster resources.
@@ -525,18 +649,25 @@ void box_lights_fini(
 void box_environment_init(
     box_renderer_t *r);
 
-/** Prefilter the environment of a packet when its generation changed.
+/** Bind the prefiltered environment of a view, prefiltering it when it is new.
  *
  * @param r The renderer
- * @param p The packet
+ * @param view The view
  * @param encoder The command encoder
  */
 void box_environment_update(
     box_renderer_t *r,
-    const box_packet_t *p,
+    const box_view_t *view,
     WGPUCommandEncoder encoder);
 
-/** Rebuild the shared fragment bind group of the environment and the texture classes.
+/** Build the shared fragment bind group of the current view.
+ *
+ * @param r The renderer
+ */
+void box_environment_group(
+    box_renderer_t *r);
+
+/** Mark the shared fragment bind group of every view as stale.
  *
  * @param r The renderer
  */

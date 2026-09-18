@@ -45,7 +45,7 @@ static void box_lights_pipeline(
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
-                .minBindingSize = sizeof(box_view_t)
+                .minBindingSize = BOX_VIEW_UNIFORM_SIZE
             }
         }, {
             .binding = 1,
@@ -123,38 +123,38 @@ static void box_lights_layout(
 static void box_lights_groups(
     box_renderer_t *r)
 {
-    if (r->cluster_group) wgpuBindGroupRelease(r->cluster_group);
-    if (r->light_group) wgpuBindGroupRelease(r->light_group);
+    if (r->v->cluster_group) wgpuBindGroupRelease(r->v->cluster_group);
+    if (r->v->light_group) wgpuBindGroupRelease(r->v->light_group);
 
-    uint64_t light_size = (uint64_t)r->light_capacity * sizeof(box_light_t);
-    uint64_t cluster_size = (uint64_t)box_cluster_count(&r->grid) * 2 * sizeof(uint32_t);
-    uint64_t index_size = (uint64_t)box_cluster_count(&r->grid) *
-        r->grid.max_lights * sizeof(uint32_t);
+    uint64_t light_size = (uint64_t)r->v->light_capacity * sizeof(box_light_t);
+    uint64_t cluster_size = (uint64_t)box_cluster_count(&r->v->grid) * 2 * sizeof(uint32_t);
+    uint64_t index_size = (uint64_t)box_cluster_count(&r->v->grid) *
+        r->v->grid.max_lights * sizeof(uint32_t);
 
     WGPUBindGroupEntry compute_entries[4] = {
-        { .binding = 0, .buffer = r->view_buffer, .size = sizeof(box_view_t) },
-        { .binding = 1, .buffer = r->lights, .size = light_size },
-        { .binding = 2, .buffer = r->clusters, .size = cluster_size },
-        { .binding = 3, .buffer = r->light_indices, .size = index_size }
+        { .binding = 0, .buffer = r->v->view_buffer, .size = BOX_VIEW_UNIFORM_SIZE },
+        { .binding = 1, .buffer = r->v->lights, .size = light_size },
+        { .binding = 2, .buffer = r->v->clusters, .size = cluster_size },
+        { .binding = 3, .buffer = r->v->light_indices, .size = index_size }
     };
     WGPUBindGroupDescriptor compute_desc = {
         .layout = r->cluster_layout,
         .entryCount = 4,
         .entries = compute_entries
     };
-    r->cluster_group = wgpuDeviceCreateBindGroup(r->device, &compute_desc);
+    r->v->cluster_group = wgpuDeviceCreateBindGroup(r->device, &compute_desc);
 
     WGPUBindGroupEntry light_entries[3] = {
-        { .binding = 0, .buffer = r->lights, .size = light_size },
-        { .binding = 1, .buffer = r->clusters, .size = cluster_size },
-        { .binding = 2, .buffer = r->light_indices, .size = index_size }
+        { .binding = 0, .buffer = r->v->lights, .size = light_size },
+        { .binding = 1, .buffer = r->v->clusters, .size = cluster_size },
+        { .binding = 2, .buffer = r->v->light_indices, .size = index_size }
     };
     WGPUBindGroupDescriptor light_desc = {
         .layout = r->light_layout,
         .entryCount = 3,
         .entries = light_entries
     };
-    r->light_group = wgpuDeviceCreateBindGroup(r->device, &light_desc);
+    r->v->light_group = wgpuDeviceCreateBindGroup(r->device, &light_desc);
 }
 
 /** Grow the light storage buffer to hold a number of lights.
@@ -166,15 +166,15 @@ static void box_lights_grow(
     box_renderer_t *r,
     uint32_t count)
 {
-    uint32_t grown = r->light_capacity ? r->light_capacity * 2 : BOX_LIGHT_CAPACITY;
+    uint32_t grown = r->v->light_capacity ? r->v->light_capacity * 2 : BOX_LIGHT_CAPACITY;
     if (grown < count) {
         grown = count;
     }
 
-    if (r->lights) wgpuBufferRelease(r->lights);
-    r->lights = box_lights_buffer(r, WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+    if (r->v->lights) wgpuBufferRelease(r->v->lights);
+    r->v->lights = box_lights_buffer(r, WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
         (uint64_t)grown * sizeof(box_light_t));
-    r->light_capacity = grown;
+    r->v->light_capacity = grown;
 }
 
 /** Create the cluster buffers for a grid.
@@ -186,14 +186,14 @@ static void box_lights_grid(
     box_renderer_t *r,
     const box_cluster_t *grid)
 {
-    if (r->clusters) wgpuBufferRelease(r->clusters);
-    if (r->light_indices) wgpuBufferRelease(r->light_indices);
+    if (r->v->clusters) wgpuBufferRelease(r->v->clusters);
+    if (r->v->light_indices) wgpuBufferRelease(r->v->light_indices);
 
-    r->grid = *grid;
+    r->v->grid = *grid;
     uint32_t count = box_cluster_count(grid);
-    r->clusters = box_lights_buffer(r, WGPUBufferUsage_Storage,
+    r->v->clusters = box_lights_buffer(r, WGPUBufferUsage_Storage,
         (uint64_t)count * 2 * sizeof(uint32_t));
-    r->light_indices = box_lights_buffer(r, WGPUBufferUsage_Storage,
+    r->v->light_indices = box_lights_buffer(r, WGPUBufferUsage_Storage,
         (uint64_t)count * grid->max_lights * sizeof(uint32_t));
 }
 
@@ -202,24 +202,47 @@ void box_lights_init(
 {
     box_lights_pipeline(r);
     box_lights_layout(r);
+}
+
+void box_lights_view_init(
+    box_renderer_t *r)
+{
     box_lights_grow(r, 0);
+}
+
+void box_lights_view_fini(
+    box_gpu_view_t *v)
+{
+    if (v->cluster_group) wgpuBindGroupRelease(v->cluster_group);
+    if (v->light_group) wgpuBindGroupRelease(v->light_group);
+    if (v->lights) wgpuBufferRelease(v->lights);
+    if (v->clusters) wgpuBufferRelease(v->clusters);
+    if (v->light_indices) wgpuBufferRelease(v->light_indices);
+    v->cluster_group = NULL;
+    v->light_group = NULL;
+    v->lights = NULL;
+    v->clusters = NULL;
+    v->light_indices = NULL;
+    v->light_capacity = 0;
+    memset(&v->grid, 0, sizeof(box_cluster_t));
 }
 
 void box_lights_update(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p)
 {
-    const box_cluster_t *grid = &p->view.cluster;
+    const box_cluster_t *grid = &view->cluster;
     assert(grid->x && grid->y && grid->z && grid->max_lights);
 
     bool rebuild = false;
-    if (p->lights.count > r->light_capacity) {
-        box_lights_grow(r, p->lights.count);
+    if (view->light_count > r->v->light_capacity) {
+        box_lights_grow(r, view->light_count);
         rebuild = true;
     }
 
-    if (grid->x != r->grid.x || grid->y != r->grid.y || grid->z != r->grid.z ||
-        grid->max_lights != r->grid.max_lights)
+    if (grid->x != r->v->grid.x || grid->y != r->v->grid.y || grid->z != r->v->grid.z ||
+        grid->max_lights != r->v->grid.max_lights)
     {
         box_lights_grid(r, grid);
         rebuild = true;
@@ -229,24 +252,25 @@ void box_lights_update(
         box_lights_groups(r);
     }
 
-    if (p->lights.count) {
-        wgpuQueueWriteBuffer(r->gpu_queue, r->lights, 0, p->lights.data,
-            (size_t)p->lights.count * sizeof(box_light_t));
+    if (view->light_count) {
+        wgpuQueueWriteBuffer(r->gpu_queue, r->v->lights, 0,
+            box_vec_at(&p->lights, view->light_first),
+            (size_t)view->light_count * sizeof(box_light_t));
     }
 }
 
 void box_lights_dispatch(
     box_renderer_t *r,
-    const box_packet_t *p,
+    const box_view_t *view,
     WGPUCommandEncoder encoder)
 {
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
     wgpuComputePassEncoderSetPipeline(pass, r->cluster_pipeline);
-    wgpuComputePassEncoderSetBindGroup(pass, 0, r->cluster_group, 0, NULL);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, r->v->cluster_group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(pass,
-        (p->view.cluster.x + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP,
-        (p->view.cluster.y + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP,
-        (p->view.cluster.z + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP);
+        (view->cluster.x + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP,
+        (view->cluster.y + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP,
+        (view->cluster.z + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP);
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
 }
@@ -254,22 +278,10 @@ void box_lights_dispatch(
 void box_lights_fini(
     box_renderer_t *r)
 {
-    if (r->cluster_group) wgpuBindGroupRelease(r->cluster_group);
-    if (r->light_group) wgpuBindGroupRelease(r->light_group);
     if (r->cluster_pipeline) wgpuComputePipelineRelease(r->cluster_pipeline);
     if (r->cluster_layout) wgpuBindGroupLayoutRelease(r->cluster_layout);
     if (r->light_layout) wgpuBindGroupLayoutRelease(r->light_layout);
-    if (r->lights) wgpuBufferRelease(r->lights);
-    if (r->clusters) wgpuBufferRelease(r->clusters);
-    if (r->light_indices) wgpuBufferRelease(r->light_indices);
-    r->cluster_group = NULL;
-    r->light_group = NULL;
     r->cluster_pipeline = NULL;
     r->cluster_layout = NULL;
     r->light_layout = NULL;
-    r->lights = NULL;
-    r->clusters = NULL;
-    r->light_indices = NULL;
-    r->light_capacity = 0;
-    memset(&r->grid, 0, sizeof(box_cluster_t));
 }

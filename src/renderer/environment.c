@@ -231,24 +231,63 @@ static void box_env_layouts(
     r->env_layout = wgpuDeviceCreateBindGroupLayout(r->device, &mesh_desc);
 }
 
-/** Create the environment textures, their views, the sampler and the uniform buffer.
+/** Create the textures, views and bind group of one prefiltered environment.
+ *
+ * @param r The renderer
+ * @param e The environment entry
+ */
+static void box_env_slot_init(
+    box_renderer_t *r,
+    box_gpu_env_t *e)
+{
+    e->source = box_env_texture(r, BOX_ENV_SIZE, 1, BOX_ENV_FACES);
+    e->specular = box_env_texture(r, BOX_ENV_SIZE, BOX_ENV_MIPS, BOX_ENV_FACES);
+    e->irradiance = box_env_texture(r, BOX_ENV_IRRADIANCE_SIZE, 1, BOX_ENV_FACES);
+    e->source_view = box_env_view(e->source,
+        WGPUTextureViewDimension_Cube, 1, BOX_ENV_FACES);
+    e->specular_view = box_env_view(e->specular,
+        WGPUTextureViewDimension_Cube, BOX_ENV_MIPS, BOX_ENV_FACES);
+    e->irradiance_view = box_env_view(e->irradiance,
+        WGPUTextureViewDimension_Cube, 1, BOX_ENV_FACES);
+
+    WGPUBindGroupEntry filter_entries[3] = {
+        { .binding = 0, .buffer = r->env_uniform, .size = sizeof(box_env_uniform_t) },
+        { .binding = 1, .textureView = e->source_view },
+        { .binding = 2, .sampler = r->env_sampler }
+    };
+    WGPUBindGroupDescriptor filter_desc = {
+        .layout = r->env_filter_layout,
+        .entryCount = 3,
+        .entries = filter_entries
+    };
+    e->filter_group = wgpuDeviceCreateBindGroup(r->device, &filter_desc);
+}
+
+/** Release the textures, views and bind group of one prefiltered environment.
+ *
+ * @param e The environment entry
+ */
+static void box_env_slot_fini(
+    box_gpu_env_t *e)
+{
+    if (e->filter_group) wgpuBindGroupRelease(e->filter_group);
+    if (e->source_view) wgpuTextureViewRelease(e->source_view);
+    if (e->specular_view) wgpuTextureViewRelease(e->specular_view);
+    if (e->irradiance_view) wgpuTextureViewRelease(e->irradiance_view);
+    if (e->source) wgpuTextureRelease(e->source);
+    if (e->specular) wgpuTextureRelease(e->specular);
+    if (e->irradiance) wgpuTextureRelease(e->irradiance);
+    memset(e, 0, sizeof(box_gpu_env_t));
+}
+
+/** Create the BRDF table, the sampler and the uniform buffer of the prefilters.
  *
  * @param r The renderer
  */
 static void box_env_resources(
     box_renderer_t *r)
 {
-    r->env_source = box_env_texture(r, BOX_ENV_SIZE, 1, BOX_ENV_FACES);
-    r->env_specular = box_env_texture(r, BOX_ENV_SIZE, BOX_ENV_MIPS, BOX_ENV_FACES);
-    r->env_irradiance = box_env_texture(r, BOX_ENV_IRRADIANCE_SIZE, 1, BOX_ENV_FACES);
     r->env_brdf = box_env_texture(r, BOX_ENV_BRDF_SIZE, 1, 1);
-
-    r->env_source_view = box_env_view(r->env_source,
-        WGPUTextureViewDimension_Cube, 1, BOX_ENV_FACES);
-    r->env_specular_view = box_env_view(r->env_specular,
-        WGPUTextureViewDimension_Cube, BOX_ENV_MIPS, BOX_ENV_FACES);
-    r->env_irradiance_view = box_env_view(r->env_irradiance,
-        WGPUTextureViewDimension_Cube, 1, BOX_ENV_FACES);
     r->env_brdf_view = box_env_view(r->env_brdf, WGPUTextureViewDimension_2D, 1, 1);
 
     WGPUSamplerDescriptor sampler_desc = {
@@ -265,12 +304,12 @@ static void box_env_resources(
 
     WGPUBufferDescriptor buffer_desc = {
         .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
-        .size = (uint64_t)BOX_ENV_PASSES * BOX_ENV_STRIDE
+        .size = (uint64_t)BOX_ENV_SLOTS * BOX_ENV_PASSES * BOX_ENV_STRIDE
     };
     r->env_uniform = wgpuDeviceCreateBuffer(r->device, &buffer_desc);
 }
 
-/** Create the bind groups of the prefilter passes and of the mesh shader.
+/** Create the uniform bind group the gradient and BRDF passes read.
  *
  * @param r The renderer
  */
@@ -288,28 +327,15 @@ static void box_env_groups(
         .entries = &uniform
     };
     r->env_pass_group = wgpuDeviceCreateBindGroup(r->device, &pass_desc);
-
-    WGPUBindGroupEntry filter_entries[3] = {
-        uniform,
-        { .binding = 1, .textureView = r->env_source_view },
-        { .binding = 2, .sampler = r->env_sampler }
-    };
-    WGPUBindGroupDescriptor filter_desc = {
-        .layout = r->env_filter_layout,
-        .entryCount = 3,
-        .entries = filter_entries
-    };
-    r->env_filter_group = wgpuDeviceCreateBindGroup(r->device, &filter_desc);
-
-    box_environment_rebuild(r);
 }
 
-void box_environment_rebuild(
+void box_environment_group(
     box_renderer_t *r)
 {
+    box_gpu_env_t *e = &r->envs[r->v->env_slot];
     WGPUBindGroupEntry mesh_entries[BOX_MESH_BINDINGS] = {
-        { .binding = 0, .textureView = r->env_irradiance_view },
-        { .binding = 1, .textureView = r->env_specular_view },
+        { .binding = 0, .textureView = e->irradiance_view },
+        { .binding = 1, .textureView = e->specular_view },
         { .binding = 2, .textureView = r->env_brdf_view },
         { .binding = 3, .sampler = r->env_sampler }
     };
@@ -320,11 +346,21 @@ void box_environment_rebuild(
         .entryCount = BOX_MESH_BINDINGS,
         .entries = mesh_entries
     };
-    if (r->env_group) {
-        wgpuBindGroupRelease(r->env_group);
+    if (r->v->env_group) {
+        wgpuBindGroupRelease(r->v->env_group);
     }
 
-    r->env_group = wgpuDeviceCreateBindGroup(r->device, &mesh_desc);
+    r->v->env_group = wgpuDeviceCreateBindGroup(r->device, &mesh_desc);
+    r->v->env_dirty = false;
+}
+
+void box_environment_rebuild(
+    box_renderer_t *r)
+{
+    uint32_t i;
+    for (i = 0; i < r->views.count; i ++) {
+        ((box_gpu_view_t*)box_vec_at(&r->views, i))->env_dirty = true;
+    }
 }
 
 /** Record a full screen pass that fills one environment target.
@@ -376,19 +412,22 @@ static void box_env_integrate_brdf(
 /** Write the uniforms of every prefilter pass: the radiance, its face and roughness.
  *
  * @param r The renderer
- * @param p The packet
+ * @param slot The environment entry the passes fill
+ * @param view The view the environment comes from
  */
 static void box_env_uniforms(
     box_renderer_t *r,
-    const box_packet_t *p)
+    uint32_t slot,
+    const box_view_t *view)
 {
     box_env_uniform_t u = {{0}};
     int32_t channel;
     for (channel = 0; channel < 3; channel ++) {
-        u.sky[channel] = p->view.env_sky[channel] * p->view.env_intensity;
-        u.ground[channel] = p->view.env_ground[channel] * p->view.env_intensity;
+        u.sky[channel] = view->env_sky[channel] * view->env_intensity;
+        u.ground[channel] = view->env_ground[channel] * view->env_intensity;
     }
 
+    uint32_t base = slot * BOX_ENV_PASSES;
     uint32_t index;
     for (index = 0; index < BOX_ENV_PASSES; index ++) {
         uint32_t stage = index / BOX_ENV_FACES;
@@ -399,7 +438,7 @@ static void box_env_uniforms(
         }
 
         wgpuQueueWriteBuffer(r->gpu_queue, r->env_uniform,
-            (uint64_t)index * BOX_ENV_STRIDE, &u, sizeof(box_env_uniform_t));
+            (uint64_t)(base + index) * BOX_ENV_STRIDE, &u, sizeof(box_env_uniform_t));
     }
 }
 
@@ -410,7 +449,7 @@ static void box_env_uniforms(
  * @param pipeline The pipeline of the passes
  * @param group The bind group of the passes
  * @param mip Mip level to fill
- * @param stage Index of the stage in the uniform buffer
+ * @param first Index of the first pass in the uniform buffer
  */
 static void box_env_cube(
     WGPUCommandEncoder encoder,
@@ -418,12 +457,12 @@ static void box_env_cube(
     WGPURenderPipeline pipeline,
     WGPUBindGroup group,
     uint32_t mip,
-    uint32_t stage)
+    uint32_t first)
 {
     uint32_t face;
     for (face = 0; face < BOX_ENV_FACES; face ++) {
         WGPUTextureView target = box_env_face(texture, face, mip);
-        box_env_pass(encoder, pipeline, group, target, stage * BOX_ENV_FACES + face);
+        box_env_pass(encoder, pipeline, group, target, first + face);
         wgpuTextureViewRelease(target);
     }
 }
@@ -450,37 +489,82 @@ void box_environment_init(
     box_env_integrate_brdf(r);
 }
 
+/** Find the entry that holds a generation, or the one to prefilter it into.
+ *
+ * The entry a view bound most recently is kept, so the views of a frame keep
+ * their environment and the entry no view has used for the longest is reused.
+ *
+ * @param r The renderer
+ * @param generation The environment generation of the view
+ * @param found Set to true when the entry already holds the generation
+ * @return The entry index
+ */
+static uint32_t box_env_slot(
+    box_renderer_t *r,
+    uint32_t generation,
+    bool *found)
+{
+    uint32_t result = 0;
+    uint32_t oldest = 0xFFFFFFFF;
+    uint32_t i;
+    *found = false;
+    for (i = 0; i < BOX_ENV_SLOTS && !*found; i ++) {
+        if (r->envs[i].source && r->envs[i].generation == generation) {
+            result = i;
+            *found = true;
+        } else if (r->envs[i].used < oldest) {
+            oldest = r->envs[i].used;
+            result = i;
+        }
+    }
+
+    return result;
+}
+
 void box_environment_update(
     box_renderer_t *r,
-    const box_packet_t *p,
+    const box_view_t *view,
     WGPUCommandEncoder encoder)
 {
-    if (p->view.env_generation == r->env_generation) {
-        goto done;
+    bool found = false;
+    uint32_t slot = box_env_slot(r, view->env_generation, &found);
+    box_gpu_env_t *e = &r->envs[slot];
+    if (!found) {
+        if (!e->source) {
+            box_env_slot_init(r, e);
+        }
+
+        e->generation = view->env_generation;
+        box_env_uniforms(r, slot, view);
+        uint32_t base = slot * BOX_ENV_PASSES;
+        box_env_cube(encoder, e->source, r->env_gradient_pipeline, r->env_pass_group, 0, base);
+
+        uint32_t mip;
+        for (mip = 0; mip < BOX_ENV_MIPS; mip ++) {
+            box_env_cube(encoder, e->specular, r->env_specular_pipeline,
+                e->filter_group, mip, base + (mip + 1) * BOX_ENV_FACES);
+        }
+
+        box_env_cube(encoder, e->irradiance, r->env_irradiance_pipeline,
+            e->filter_group, 0, base + (BOX_ENV_MIPS + 1) * BOX_ENV_FACES);
     }
 
-    r->env_generation = p->view.env_generation;
-    box_env_uniforms(r, p);
-    box_env_cube(encoder, r->env_source, r->env_gradient_pipeline, r->env_pass_group, 0, 0);
-
-    uint32_t mip;
-    for (mip = 0; mip < BOX_ENV_MIPS; mip ++) {
-        box_env_cube(encoder, r->env_specular, r->env_specular_pipeline,
-            r->env_filter_group, mip, mip + 1);
+    e->used = ++ r->env_clock;
+    if (r->v->env_slot != slot || r->v->env_dirty || !r->v->env_group) {
+        r->v->env_slot = slot;
+        box_environment_group(r);
     }
-
-    box_env_cube(encoder, r->env_irradiance, r->env_irradiance_pipeline,
-        r->env_filter_group, 0, BOX_ENV_MIPS + 1);
-done:
-    return;
 }
 
 void box_environment_fini(
     box_renderer_t *r)
 {
-    if (r->env_group) wgpuBindGroupRelease(r->env_group);
+    uint32_t slot;
+    for (slot = 0; slot < BOX_ENV_SLOTS; slot ++) {
+        box_env_slot_fini(&r->envs[slot]);
+    }
+
     if (r->env_pass_group) wgpuBindGroupRelease(r->env_pass_group);
-    if (r->env_filter_group) wgpuBindGroupRelease(r->env_filter_group);
     if (r->env_layout) wgpuBindGroupLayoutRelease(r->env_layout);
     if (r->env_pass_layout) wgpuBindGroupLayoutRelease(r->env_pass_layout);
     if (r->env_filter_layout) wgpuBindGroupLayoutRelease(r->env_filter_layout);
@@ -490,17 +574,9 @@ void box_environment_fini(
     if (r->env_brdf_pipeline) wgpuRenderPipelineRelease(r->env_brdf_pipeline);
     if (r->env_sampler) wgpuSamplerRelease(r->env_sampler);
     if (r->env_uniform) wgpuBufferRelease(r->env_uniform);
-    if (r->env_source_view) wgpuTextureViewRelease(r->env_source_view);
-    if (r->env_specular_view) wgpuTextureViewRelease(r->env_specular_view);
-    if (r->env_irradiance_view) wgpuTextureViewRelease(r->env_irradiance_view);
     if (r->env_brdf_view) wgpuTextureViewRelease(r->env_brdf_view);
-    if (r->env_source) wgpuTextureRelease(r->env_source);
-    if (r->env_specular) wgpuTextureRelease(r->env_specular);
-    if (r->env_irradiance) wgpuTextureRelease(r->env_irradiance);
     if (r->env_brdf) wgpuTextureRelease(r->env_brdf);
-    r->env_group = NULL;
     r->env_pass_group = NULL;
-    r->env_filter_group = NULL;
     r->env_layout = NULL;
     r->env_pass_layout = NULL;
     r->env_filter_layout = NULL;
@@ -510,13 +586,6 @@ void box_environment_fini(
     r->env_brdf_pipeline = NULL;
     r->env_sampler = NULL;
     r->env_uniform = NULL;
-    r->env_source_view = NULL;
-    r->env_specular_view = NULL;
-    r->env_irradiance_view = NULL;
     r->env_brdf_view = NULL;
-    r->env_source = NULL;
-    r->env_specular = NULL;
-    r->env_irradiance = NULL;
     r->env_brdf = NULL;
-    r->env_generation = 0;
 }
