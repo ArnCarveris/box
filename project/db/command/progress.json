@@ -6,5 +6,6 @@
   "end_time": "2026-09-18T08:25:34.129+00:00",
   "dependencies": [
     "scene_core"
-  ]
+  ],
+  "priority": 40
 }

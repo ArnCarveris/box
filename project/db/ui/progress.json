@@ -10,5 +10,6 @@
     "picking",
     "input",
     "command"
-  ]
+  ],
+  "priority": 220
 }

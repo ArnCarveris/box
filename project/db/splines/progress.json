@@ -7,5 +7,6 @@
   "dependencies": [
     "meshes",
     "effects"
-  ]
+  ],
+  "priority": 170
 }

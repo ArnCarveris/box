@@ -6,5 +6,6 @@
   "end_time": null,
   "dependencies": [
     "command"
-  ]
+  ],
+  "priority": 240
 }

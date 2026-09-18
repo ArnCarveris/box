@@ -9,5 +9,6 @@
     "materials",
     "effects",
     "weather"
-  ]
+  ],
+  "priority": 270
 }

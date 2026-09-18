@@ -7,5 +7,6 @@
   "dependencies": [
     "views",
     "lighting"
-  ]
+  ],
+  "priority": 110
 }

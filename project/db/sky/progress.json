@@ -7,5 +7,6 @@
   "dependencies": [
     "effects",
     "lighting"
-  ]
+  ],
+  "priority": 120
 }

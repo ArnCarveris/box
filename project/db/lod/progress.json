@@ -9,5 +9,6 @@
     "responsiveness",
     "collision",
     "meshes"
-  ]
+  ],
+  "priority": 260
 }

@@ -7,5 +7,6 @@
   "dependencies": [
     "textures",
     "responsiveness"
-  ]
+  ],
+  "priority": 150
 }
