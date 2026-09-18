@@ -1,0 +1,54 @@
+{
+    "id": "view",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.view module and its render targets",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "View",
+                "testcases": [
+                    "defaults_of_a_new_view",
+                    "camera_fills_the_view",
+                    "views_render_in_priority_order",
+                    "synthesized_view_matches_an_explicit_one",
+                    "disabled_view_is_skipped",
+                    "view_without_camera_is_skipped",
+                    "view_with_a_dead_camera_is_skipped",
+                    "impl_holds_the_view_index",
+                    "environment_of_a_view_overrides_the_singleton",
+                    "environment_falls_back_to_the_singleton",
+                    "equal_environments_share_a_generation",
+                    "cluster_settings_of_a_view_override_the_singleton",
+                    "cluster_settings_fall_back_to_the_singleton",
+                    "material_layers_toggle_reaches_the_view",
+                    "clear_color_of_a_view_is_linear",
+                    "lights_are_culled_per_view",
+                    "sorted_draws_are_sorted_per_view",
+                    "depth_precision_at_100k"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Target",
+                "testcases": [
+                    "surface_view_has_no_target",
+                    "target_reaches_the_packet_as_a_create_command",
+                    "view_names_the_target_handle_and_size",
+                    "resize_resends_the_create_command",
+                    "unchanged_target_is_sent_once",
+                    "deleted_target_is_destroyed",
+                    "two_targets_get_two_handles"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}
