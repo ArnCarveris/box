@@ -232,7 +232,7 @@ int main(
 
     bench.statics = ecs_query(world, {
         .expr = "box.render.RenderMesh, box.transform.Position, "
-            "!box.transform.DynamicTransform(self|up)"
+            "!box.transform.DynamicTransform(self|up), !box.material.DynamicMaterial(self|up)"
     });
     box_bench_collect(world, &bench);
     bench.samples = ecs_os_malloc_n(double, bench.frames);
