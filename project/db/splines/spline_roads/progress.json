@@ -5,8 +5,8 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "geometry_extensions/spline_core",
-    "geometry_extensions/mesh3",
+    "splines/spline_core",
+    "meshes/mesh3",
     "effects/shader_component"
   ]
 }

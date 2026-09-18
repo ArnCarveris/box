@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "geometry_extensions/mesh3",
+    "meshes/mesh3",
     "textures/textures",
     "responsiveness/job_system"
   ]

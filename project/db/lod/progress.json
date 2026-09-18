@@ -8,7 +8,7 @@
     "culling",
     "responsiveness",
     "collision",
-    "geometry_extensions"
+    "meshes"
   ],
   "priority": 13
 }

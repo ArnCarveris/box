@@ -6,7 +6,7 @@
   "end_time": null,
   "dependencies": [
     "views",
-    "geometry_extensions",
+    "shapes_2d",
     "picking",
     "input",
     "command"
