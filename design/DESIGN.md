@@ -40,6 +40,7 @@ You shall build a small project management tool:
     - Deliverables can include screenshots, benchmark results, research
     - If the result is research, keep text brief so as not to waste context of other agents.
 - Each epic shall have a project/db/<epic_name>/deliverable folder
+    - This shall contain a wasm build of the engine under deliverable/wasm that the inspector page (see below) can load
     - This shall contain a JSON file with the all unit tests (see above)
     - This shall contain integration test results
     - This shall contain a small README.md file (no more than 200 lines) detailing how the epic was completed.
@@ -178,6 +179,18 @@ The framework shall expose a command interface that:
             - action.list
 - The HTTP API shall provide a /resource/[path] endpoint for requesting the content of resources (such as a rendered screenshot)
     - This API shall only return files in the /tmp/box/<pid>/session/resources folder
+
+## Inspector
+The framework shall ship a web page for inspecting a running instance:
+- It shall connect to a running instance over the HTTP command API (default http://localhost:27750)
+- It shall connect to a wasm image of the engine by loading the image in the page and calling an exported request function directly, the same trick the flecs explorer uses for the flecs REST API (`flecs_explorer_request` via `ccall`), so no HTTP server is needed in the browser
+- Both transports shall present the same interface to the page: the page code does not know which one it talks to
+- It shall have a command console that creates a terminal session on connect, sends command lines, shows the command log and keeps a history
+- It shall show an automatically updating render of the active camera at 1 Hz, captured through the command API and fetched as a resource
+- The refresh rate shall be configurable and refreshing shall be pausable
+- The page shall be a single static HTML file without a build step, usable from a file URL or served by any static file server
+- The project management page shall link every epic that delivers a wasm image to the inspector page connected to that image, so the state of the engine as of that epic can be inspected with one click
+- The project management page shall also link to the inspector connected to a locally running instance
 
 ## Validation
 The project shall be validated in the following way:
