@@ -16,5 +16,4 @@ resolves the waiters of its action immediately. The private `ActionWaiters` sing
 entry per pending await and its cancel callback drops it when a task is cancelled, which is what
 deleting the entity of the task does.
 
-63 tests pass in `test/input`, 7 of them in `Events`; `Events.resume_100_waiters`, one press that
-resumes a hundred awaiting tasks, costs 81 us.
+63 tests pass in `test/input`, 7 in `Events`; `Events.resume_100_waiters` costs 81 us.
