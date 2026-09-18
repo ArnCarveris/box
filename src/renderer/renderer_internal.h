@@ -1,0 +1,109 @@
+/**
+ * @file renderer/renderer_internal.h
+ * @brief Private renderer state shared between the renderer source files.
+ */
+
+#ifndef BOX_RENDERER_INTERNAL_H
+#define BOX_RENDERER_INTERNAL_H
+
+#include "renderer.h"
+#include "queue.h"
+#include "gpu.h"
+
+/** Everything the renderer needs to produce frames */
+struct box_renderer_t {
+    box_renderer_desc_t desc;        /**< Creation parameters */
+    box_queue_t queue;               /**< Packet handoff */
+    WGPUInstance instance;           /**< WebGPU instance */
+    WGPUSurface surface;             /**< Window surface, NULL when offscreen */
+    WGPUAdapter adapter;             /**< Selected adapter */
+    WGPUDevice device;               /**< Logical device */
+    WGPUQueue gpu_queue;             /**< Device queue */
+    WGPUTextureFormat format;        /**< Color target format */
+    WGPUTexture offscreen;           /**< Offscreen color target, NULL with a surface */
+    WGPUTextureView offscreen_view;  /**< View of the offscreen target */
+    WGPUTexture depth;               /**< Depth target */
+    WGPUTextureView depth_view;      /**< View of the depth target */
+    WGPURenderPipeline pipeline;     /**< Pipeline of the placeholder triangle */
+    uint32_t width;                  /**< Current target width */
+    uint32_t height;                 /**< Current target height */
+    volatile bool ready;             /**< Device and targets are usable */
+    volatile bool failed;            /**< Device creation failed */
+    volatile uint32_t frames;        /**< Frames presented */
+#ifndef BOX_PLATFORM_WEB
+    pthread_t thread;                /**< Renderer thread when threaded */
+    bool thread_started;             /**< Thread was created */
+#endif
+};
+
+/** Create instance, surface, adapter and device; blocks on native.
+ *
+ * @param r The renderer
+ * @return 0 on success, nonzero on failure
+ */
+int box_device_init(
+    box_renderer_t *r);
+
+/** Release device, adapter, surface and instance.
+ *
+ * @param r The renderer
+ */
+void box_device_fini(
+    box_renderer_t *r);
+
+/** Create or resize the color and depth targets for the packet size.
+ *
+ * @param r The renderer
+ * @param width Target width
+ * @param height Target height
+ */
+void box_device_resize(
+    box_renderer_t *r,
+    uint32_t width,
+    uint32_t height);
+
+/** Create the pipeline of the placeholder triangle.
+ *
+ * @param r The renderer
+ */
+void box_frame_init(
+    box_renderer_t *r);
+
+/** Render and present one packet.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_frame_render(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Read back a texture and write it as PNG.
+ *
+ * @param r The renderer
+ * @param texture Texture with CopySrc usage
+ * @param path Output file
+ * @return 0 on success, nonzero on failure
+ */
+int box_capture_texture(
+    box_renderer_t *r,
+    WGPUTexture texture,
+    const char *path);
+
+/** Write an RGBA8 image as PNG.
+ *
+ * @param path Output file
+ * @param width Image width
+ * @param height Image height
+ * @param stride Bytes per row
+ * @param pixels Pixel data
+ * @return 0 on success, nonzero on failure
+ */
+int box_image_write_png(
+    const char *path,
+    uint32_t width,
+    uint32_t height,
+    uint32_t stride,
+    const void *pixels);
+
+#endif

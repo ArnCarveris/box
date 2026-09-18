@@ -109,7 +109,7 @@ The framework will be optimized for agent-based development. This means:
     - Modifications made to an entity that is not defined by a script will not be checkpointable
 
 ## Command interface
-It shall expose a command interface that:
+The framework shall expose a command interface that:
 - is accessible as HTTP API
 - is accessible by pressing ` when in game
 - commands shall be implemented as flecs script functions
@@ -211,6 +211,9 @@ The project shall be validated in the following way:
 - This data is extracted by an Extract system in the main thread
 - The main thread does not have access to wgpu, the renderer thread does not have access to Flecs
 - This has the potential for being an expensive handoff, think about strategies to reduce allocation pressure and memory usage
+- Shaders shall be authored in wgsl files, and loaded by a Shader component that contains a path to the file
+    - This shall be the single abstraction for all shaders in the engine
+    - Shaders shall be able to include each other, and use macros
 
 ## Graphics
 - The framework shall be wgpu based, cross-platform, and use bake3 for building

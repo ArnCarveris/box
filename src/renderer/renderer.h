@@ -1,0 +1,82 @@
+/**
+ * @file renderer/renderer.h
+ * @brief Public interface of the renderer, usable without WebGPU headers.
+ *
+ * The renderer owns the GPU device and renders packets from its queue.
+ */
+
+#ifndef BOX_RENDERER_H
+#define BOX_RENDERER_H
+
+#include "packet.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Opaque renderer handle */
+typedef struct box_renderer_t box_renderer_t;
+
+/** Parameters for creating a renderer */
+typedef struct box_renderer_desc_t {
+    void *metal_layer;            /**< CAMetalLayer of the window, NULL for offscreen */
+    const char *canvas_selector;  /**< HTML canvas selector on web, NULL for offscreen */
+    uint32_t width;               /**< Initial target width in pixels */
+    uint32_t height;              /**< Initial target height in pixels */
+    bool vsync;                   /**< Present with vertical sync */
+    bool threaded;                /**< Run on a dedicated thread */
+} box_renderer_desc_t;
+
+/** Create a renderer and start its thread when requested.
+ *
+ * @param desc Creation parameters
+ * @return The renderer, or NULL when the device could not be created
+ */
+box_renderer_t* box_renderer_create(
+    const box_renderer_desc_t *desc);
+
+/** Stop the renderer thread and release GPU resources.
+ *
+ * @param r The renderer
+ */
+void box_renderer_destroy(
+    box_renderer_t *r);
+
+/** Take a free packet, blocking while too many frames are in flight.
+ *
+ * @param r The renderer
+ * @return A packet to fill, or NULL when the renderer stopped
+ */
+box_packet_t* box_renderer_acquire(
+    box_renderer_t *r);
+
+/** Hand a filled packet to the renderer; renders immediately when not threaded.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_renderer_submit(
+    box_renderer_t *r,
+    box_packet_t *p);
+
+/** Check whether the GPU device is ready to render.
+ *
+ * @param r The renderer
+ * @return true when frames can be rendered
+ */
+bool box_renderer_ready(
+    const box_renderer_t *r);
+
+/** Number of frames the renderer has presented.
+ *
+ * @param r The renderer
+ * @return Frame count
+ */
+uint32_t box_renderer_frames(
+    const box_renderer_t *r);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
