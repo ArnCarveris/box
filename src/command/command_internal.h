@@ -16,6 +16,45 @@
 /** Command lines listed when no count is given */
 #define BOX_COMMAND_LOG_DEFAULT (20)
 
+/** Slot of a ring buffer that holds the entry with an absolute index.
+ *
+ * Rings count every append, so entry i lives in slot i modulo the ring size.
+ *
+ * @param index Absolute index of the entry
+ * @param max Number of slots in the ring
+ * @return The slot that holds the entry
+ */
+static inline int32_t box_ring_slot(
+    int32_t index,
+    int32_t max)
+{
+    return index % max;
+}
+
+/** Absolute index of the first of the last count entries of a ring.
+ *
+ * @param total Entries appended to the ring so far
+ * @param count Number of entries to read
+ * @param max Number of slots in the ring
+ * @return The absolute index to start reading at
+ */
+static inline int32_t box_ring_begin(
+    int32_t total,
+    int32_t count,
+    int32_t max)
+{
+    if (count > max) {
+        count = max;
+    }
+
+    int32_t result = total - count;
+    if (result < 0) {
+        result = 0;
+    }
+
+    return result;
+}
+
 /** One executed command line and its result */
 typedef struct box_command_entry_t {
     char *line;    /**< The command line */
@@ -172,5 +211,127 @@ void box_capture_init(
  */
 void box_http_init(
     ecs_world_t *world);
+
+/** Apply a minimal unified diff to a text.
+ *
+ * The patch holds one or more `@@ -a,b +c,d @@` hunks with context, added and
+ * removed lines. The `---`, `+++` and `\` lines of a diff are ignored.
+ *
+ * @param source The text to patch
+ * @param patch The unified diff
+ * @param error Receives the message of the hunk that failed, NULL to ignore
+ * @return The patched text, NULL when a hunk did not apply, the caller frees it
+ */
+char* box_patch_apply(
+    const char *source,
+    const char *patch,
+    char **error);
+
+/** Prefix of a command result that reports a failure */
+#define BOX_COMMAND_ERROR "error: "
+
+/** Get the scope that the paths of a session resolve against.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @return The Terminal.cwd entity, 0 for the root
+ */
+ecs_entity_t box_path_cwd(
+    ecs_world_t *world,
+    ecs_entity_t session);
+
+/** Resolve an entity path against a scope.
+ *
+ * Paths separate their elements with `.`, are absolute when they start with a
+ * `.`, use `..` or an empty element for the parent and `/` or an empty path for
+ * the root.
+ *
+ * @param world The world
+ * @param cwd Scope that relative paths resolve against, 0 for the root
+ * @param path The path
+ * @param out Receives the entity the path resolves to, 0 for the root
+ * @return 0 on success, -1 when an element of the path does not exist
+ */
+int box_path_lookup(
+    ecs_world_t *world,
+    ecs_entity_t cwd,
+    const char *path,
+    ecs_entity_t *out);
+
+/** Resolve an entity path against a scope and create the missing elements.
+ *
+ * @param world The world
+ * @param cwd Scope that relative paths resolve against, 0 for the root
+ * @param path The path
+ * @return The entity the path resolves to, 0 for the root
+ */
+ecs_entity_t box_path_ensure(
+    ecs_world_t *world,
+    ecs_entity_t cwd,
+    const char *path);
+
+/** Split a path into the scope that holds its last element and its name.
+ *
+ * @param world The world
+ * @param cwd Scope that relative paths resolve against, 0 for the root
+ * @param path The path
+ * @param scope Receives the scope of the last element, 0 for the root
+ * @param name Receives the name of the last element, the caller frees it
+ * @return 0 on success, -1 when the path has no name or its scope is missing
+ */
+int box_path_split(
+    ecs_world_t *world,
+    ecs_entity_t cwd,
+    const char *path,
+    ecs_entity_t *scope,
+    char **name);
+
+/** Get the path of an entity the way commands print it.
+ *
+ * @param world The world
+ * @param e The entity, 0 for the root
+ * @return The path, `/` for the root, the caller frees it
+ */
+char* box_path_str(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Private state of the command server */
+typedef struct HttpEndpoint {
+    ecs_http_server_t *server;  /**< The server, NULL when no port is set */
+    ecs_world_t *world;         /**< World the request handler operates on */
+    bool started;               /**< The server thread accepts connections */
+    int32_t next;               /**< Counter of the generated session names */
+} HttpEndpoint;
+
+extern ECS_COMPONENT_DECLARE(HttpEndpoint);
+
+/** Get the state of the command server.
+ *
+ * @param world The world
+ * @return The endpoint state, NULL when the world has none
+ */
+HttpEndpoint* box_http_endpoint(
+    ecs_world_t *world);
+
+/** Get the running command server.
+ *
+ * @param world The world
+ * @return The server, NULL when no port is set
+ */
+ecs_http_server_t* box_http_server(
+    ecs_world_t *world);
+
+/** Serve one request of the command endpoints.
+ *
+ * @param req The request
+ * @param reply The reply
+ * @param ctx The world
+ * @return Always true, every endpoint sets its own status code
+ */
+bool box_http_endpoint_request(
+    const ecs_http_request_t *req,
+    ecs_http_reply_t *reply,
+    void *ctx);
 
 #endif
