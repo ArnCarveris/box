@@ -14,6 +14,11 @@
 #include "box/math.h"
 #include "box/core.h"
 #include "box/transform.h"
+#include "box/camera.h"
+#include "box/light.h"
+#include "box/material.h"
+#include "box/geometry.h"
+#include "box/render.h"
 #include "box/surface.h"
 
 #endif

@@ -1,0 +1,42 @@
+/**
+ * @file box/render.h
+ * @brief Render module: mesh handles and the Extract system that fills frame packets.
+ */
+
+#ifndef BOX_RENDER_H
+#define BOX_RENDER_H
+
+#include "types.h"
+
+#ifdef BOX_RENDER_IMPL
+#define ECS_META_IMPL IMPL
+#else
+#define ECS_META_IMPL EXTERN
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Mesh and local scale that render an entity, written by shape modules */
+ECS_STRUCT(RenderMesh, {
+    uint32_t handle;  /**< Renderer mesh handle */
+    vec3 scale;       /**< Scale applied before the world transform */
+    vec3 bounds_min;  /**< Local bounds minimum of the unscaled mesh */
+    vec3 bounds_max;  /**< Local bounds maximum of the unscaled mesh */
+});
+
+/** Register the box.render module.
+ *
+ * @param world The world
+ */
+void BoxRenderImport(
+    ecs_world_t *world);
+
+#ifdef __cplusplus
+}
+#endif
+
+#undef ECS_META_IMPL
+
+#endif

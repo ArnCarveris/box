@@ -6,17 +6,7 @@
 #define BOX_SURFACE_IMPL
 #include <box.h>
 #include <string.h>
-#include "../platform/platform.h"
-#include "../renderer/renderer.h"
-
-/** Runtime objects behind a Surface */
-typedef struct SurfaceImpl {
-    box_window_t *window;       /**< Window, NULL when headless */
-    box_renderer_t *renderer;   /**< Renderer producing frames */
-    int32_t width;              /**< Last applied requested width */
-    int32_t height;             /**< Last applied requested height */
-    char *title;                /**< Last applied title */
-} SurfaceImpl;
+#include "surface_internal.h"
 
 ECS_COMPONENT_DECLARE(SurfaceImpl);
 
@@ -207,11 +197,11 @@ done:
     return;
 }
 
-/** Fill a packet with the frame's parameters and submit it to the renderer.
+/** Acquire the packet of the frame and fill its surface parameters.
  *
  * @param it Iterator over surfaces
  */
-static void BoxSurfaceSubmit(
+static void BoxSurfaceAcquire(
     ecs_iter_t *it)
 {
     const App *app = ecs_singleton_get(it->world, App);
@@ -219,6 +209,7 @@ static void BoxSurfaceSubmit(
     SurfaceImpl *impl = ecs_field(it, SurfaceImpl, 1);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
+        impl[i].packet = NULL;
         if (!impl[i].renderer) {
             continue;
         }
@@ -237,7 +228,24 @@ static void BoxSurfaceSubmit(
         p->clear[2] = 0.03f;
         p->clear[3] = 1.0f;
         box_surface_capture_path(&s[i], app->frame, p->capture_path, sizeof(p->capture_path));
-        box_renderer_submit(impl[i].renderer, p);
+        impl[i].packet = p;
+    }
+}
+
+/** Submit the packet acquired at the start of the frame.
+ *
+ * @param it Iterator over surfaces
+ */
+static void BoxSurfaceSubmit(
+    ecs_iter_t *it)
+{
+    SurfaceImpl *impl = ecs_field(it, SurfaceImpl, 1);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (impl[i].packet) {
+            box_renderer_submit(impl[i].renderer, impl[i].packet);
+            impl[i].packet = NULL;
+        }
     }
 }
 
@@ -258,5 +266,6 @@ void BoxSurfaceImport(
     ecs_add_pair(world, ecs_id(SurfaceImpl), EcsOnInstantiate, EcsDontInherit);
 
     ECS_SYSTEM(world, BoxSurfacePoll, EcsOnLoad, Surface, SurfaceImpl);
+    ECS_SYSTEM(world, BoxSurfaceAcquire, EcsPreStore, Surface, SurfaceImpl);
     ECS_SYSTEM(world, BoxSurfaceSubmit, EcsOnStore, Surface, SurfaceImpl);
 }
