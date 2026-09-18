@@ -1,0 +1,8 @@
+{
+    "id": "box_app",
+    "type": "application",
+    "value": {
+        "description": "Runs the box engine with a scene",
+        "use": ["box"]
+    }
+}

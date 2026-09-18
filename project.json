@@ -1,0 +1,82 @@
+{
+    "id": "box",
+    "type": "package",
+    "value": {
+        "author": "Sander Mertens",
+        "description": "Data-driven 2D/3D game framework built on flecs and WebGPU",
+        "public": true
+    },
+    "lang.c": {
+        "c-standard": "c11",
+        "defines": ["FLECS_SCRIPT_MATH", "FLECS_SCRIPT_PLATFORM"],
+        "${os Darwin}": {
+            "defines": ["GLFW_EXPOSE_NATIVE_COCOA", "BOX_PLATFORM_GLFW"]
+        },
+        "${os Emscripten}": {
+            "defines": ["BOX_PLATFORM_WEB"],
+            "cflags": ["--use-port=emdawnwebgpu"]
+        }
+    },
+    "dependee": {
+        "lang.c": {
+            "defines": ["FLECS_SCRIPT_MATH", "FLECS_SCRIPT_PLATFORM"],
+            "${os Darwin}": {
+                "lib": ["m"],
+                "ldflags": [
+                    "-framework Cocoa",
+                    "-framework QuartzCore",
+                    "-framework Metal",
+                    "-framework IOKit",
+                    "-framework CoreVideo",
+                    "-framework CoreFoundation",
+                    "-framework CoreGraphics",
+                    "-framework Foundation",
+                    "-framework AppKit"
+                ]
+            },
+            "${os Emscripten}": {
+                "cflags": ["--use-port=emdawnwebgpu"],
+                "ldflags": [
+                    "--use-port=emdawnwebgpu",
+                    "-sALLOW_MEMORY_GROWTH=1",
+                    "-sSTACK_SIZE=8388608",
+                    "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+                ]
+            }
+        }
+    },
+    "bundle": {
+        "flecs": {
+            "repository": "/Users/sandermertens/GitHub/SanderMertens/flecs",
+            "library": "flecs_static",
+            "cmake-args": [
+                "-DCMAKE_C_FLAGS=-DFLECS_SCRIPT_MATH -DFLECS_SCRIPT_PLATFORM",
+                "-DFLECS_SHARED=OFF",
+                "-DFLECS_STATIC=ON",
+                "-DFLECS_TESTS=OFF"
+            ]
+        },
+        "stb": {
+            "repository": "https://github.com/nothings/stb.git",
+            "commit": "28d546d5eb77d4585506a20480f4de2e706dff4c",
+            "header-only": true
+        }
+    },
+    "${os Darwin}": {
+        "bundle": {
+            "glfw": {
+                "repository": "https://github.com/glfw/glfw.git",
+                "tag": "3.4",
+                "library": "glfw3",
+                "cmake-args": ["-DGLFW_BUILD_EXAMPLES=OFF", "-DGLFW_BUILD_TESTS=OFF", "-DGLFW_BUILD_DOCS=OFF"]
+            },
+            "wgpu_native": {
+                "repository": "https://github.com/gfx-rs/wgpu-native.git",
+                "tag": "v29.0.1.1",
+                "build-system": "cargo",
+                "library": "wgpu_native",
+                "include": ["ffi", "ffi/webgpu-headers"]
+            }
+        }
+    }
+}
