@@ -71,3 +71,11 @@ the previous epic:
 python3 tools/bench.py --env <name> --out project/db/<epic>/deliverable \
     --baseline project/db/<previous epic>/deliverable
 ```
+
+## Visual scenes
+
+`python3 tools/integration.py visual` compares every render byte for byte with
+`test/integration/visual/baseline/<scene>.png` and fails on a difference. Do not
+view screenshots of scenes you are not working on; a task only inspects its own
+scene and refreshes that baseline with `--update-baseline <scene>` when the change
+is intended. Every other scene must keep matching.

@@ -202,6 +202,8 @@ The project shall be validated in the following way:
     - There are three kinds of testst:
         - Visual screenshot-based tests
             - Deliverable: screenshots
+            - Each scene has a stored baseline image; the runner compares the render against it automatically and fails on a difference, so no agent needs to look at screenshots
+            - An agent only inspects the scene of the task it works on, and updates that scene's baseline (--update-baseline) when the change is intended; other scenes must keep matching their baselines
         - Command-based tests
             - Deliverable: command log
         - Benchmarks

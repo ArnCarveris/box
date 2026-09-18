@@ -3,7 +3,9 @@
 reports and command scenes to session command logs.
 
 Usage:
-  integration.py visual  [--out dir] [--env name] [--frames n] [scene.flecs ...]
+  integration.py visual  [--out dir] [--env name] [--frames n] [--update-baseline] [scene.flecs ...]
+  Visual scenes are compared byte for byte with test/integration/visual/baseline/<scene>.png;
+  a missing baseline is created, --update-baseline replaces it.
   integration.py bench   [--out dir] [--env name] [--frames n] [scene.flecs ...]
   integration.py command [--out dir] [--env name] [--frames n] [scene.flecs ...]
 
@@ -45,7 +47,23 @@ def env_flag(name):
     return f"--local-env={name}" if name else "--local-env"
 
 
-def run_visual(scenes, out, env, frames, width, height):
+BASELINE_DIR = os.path.join(VISUAL_DIR, "baseline")
+
+
+def compare_baseline(name, png, update):
+    """Return "match", "new", "updated" or "differs" for a rendered scene against its stored baseline."""
+    baseline = os.path.join(BASELINE_DIR, name + ".png")
+    os.makedirs(BASELINE_DIR, exist_ok=True)
+    if update or not os.path.isfile(baseline):
+        status = "updated" if os.path.isfile(baseline) else "new"
+        with open(png, "rb") as src, open(baseline, "wb") as dst:
+            dst.write(src.read())
+        return status
+    with open(png, "rb") as a, open(baseline, "rb") as b:
+        return "match" if a.read() == b.read() else "differs"
+
+
+def run_visual(scenes, out, env, frames, width, height, update=False):
     os.makedirs(out, exist_ok=True)
     results = []
     for scene in scenes:
@@ -58,11 +76,13 @@ def run_visual(scenes, out, env, frames, width, height):
         proc = bake(["run", "box_app", env_flag(env), "--cfg", "release", "--",
                      "--headless", "--frames", str(frames), harness_path, os.path.abspath(scene)])
         os.unlink(harness_path)
-        ok = proc.returncode == 0 and os.path.isfile(png)
+        rendered = proc.returncode == 0 and os.path.isfile(png)
+        baseline = compare_baseline(name, png, update) if rendered else "missing"
+        ok = rendered and baseline != "differs"
         results.append({"scene": os.path.relpath(scene, ROOT), "status": "pass" if ok else "fail",
-                        "image": os.path.relpath(png, ROOT) if ok else None})
-        print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)}")
-        if not ok:
+                        "baseline": baseline, "image": os.path.relpath(png, ROOT) if rendered else None})
+        print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)} ({baseline})")
+        if not rendered:
             print(proc.stdout[-2000:], proc.stderr[-2000:])
     return results
 
@@ -175,13 +195,14 @@ def main():
     parser.add_argument("--size", default="960x540")
     parser.add_argument("--churn", default="1-1000")
     parser.add_argument("--churn-color", action="store_true")
+    parser.add_argument("--update-baseline", action="store_true")
     args = parser.parse_args()
 
     if args.kind == "visual":
         scenes = args.scenes or sorted(glob.glob(os.path.join(VISUAL_DIR, "*.flecs")))
         width, height = (int(v) for v in args.size.split("x"))
         results = run_visual(scenes, args.out or os.path.join(ROOT, "test", "integration", "out"), args.env,
-                             args.frames or 3, width, height)
+                             args.frames or 3, width, height, update=args.update_baseline)
     elif args.kind == "command":
         scenes = args.scenes or sorted(s for s in glob.glob(os.path.join(COMMAND_DIR, "*.flecs"))
                                        if not s.endswith("_content.flecs"))
