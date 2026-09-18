@@ -156,7 +156,7 @@ static void BoxTransformOnReparent(
     ecs_world_t *world = it->world;
     bool unparented = it->event == EcsOnRemove;
     if (unparented) {
-        if (!it->other_table) {
+        if (!it->other_table || !ecs_table_get_type(it->other_table)->count) {
             goto done;
         }
 
