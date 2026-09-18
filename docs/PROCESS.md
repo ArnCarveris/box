@@ -73,28 +73,31 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
 built**, **Verification**, **Lessons** and **Not in this epic** in that order and
 under 200 lines, a merged `tests.json`, a `bench/` folder, an `integration/`
 folder or screenshots, `wasm/box_app.wasm`, and every task complete or discarded.
-`tools/epic.py` (task `project_tool/epic_tool`) will produce all of it in one
-run. Until it lands, from the repository root with `D=project/db/<epic>/deliverable`:
+`tools/epic.py` produces all of it in one run:
 
 ```sh
-bake3 --local-env=<name> && bake3 --local-env=<name> --cfg release
-for p in core transform geometry render view command job input controller script; do
-    bake3 run test/$p --local-env=<name> -- -j 8 --json $D/tests_$p.json
-done
-python3 tools/integration.py visual && python3 tools/integration.py bench
-python3 tools/integration.py command
-cp test/integration/out/* $D/integration/
-python3 tools/bench.py --env <name> --out $D/bench --baseline project/db/<previous>/deliverable/bench
-bake3 build box_app --target em --local-env=<name> --cfg release
-cp .bake/local_env/<name>/wasm32-Emscripten/release/bin/box_app.* $D/wasm/
+python3 tools/epic.py <epic> --env <name> [--baseline <previous epic>]
 ```
 
-Merge the per project reports into `tests.json` the way `pm deliver` does (one
-row per case with its `project`, a `projects` summary and the totals), write the
-README, then `python3 project/pm.py done <epic>`. The wasm image is what gives
-the epic its **Inspect** link on the status page: the page serves
+Its steps, each writing into `project/db/<epic>/deliverable`, are `build_debug`
+and `build_release`, which build `box_app` in debug and release and keep the
+bake3 `--build-json` reports as `build_debug.json` and `build_native.json`;
+`tests`, one `bake3 run test/<project> --json` per project under `test/` into
+`tests_<project>.json`, merged into `tests.json` the way `pm deliver` does;
+`visual`, `bench_scenes` and `command`, which run `tools/integration.py` into
+`integration/`; `bench`, which runs `tools/bench.py` into `bench/` against the
+`bench/` folder of the baseline epic, by default the last completed one; and
+`wasm`, which builds the web image with its `build_wasm.json` report and copies
+`box_app.html`, `box_app.js` and `box_app.wasm` into `wasm/`. `--steps a,b` and
+`--skip a,b` rerun part of a pipeline after a failure.
+
+The run prints one line per step and exits non zero when a build, a test or a
+scene fails, then lists what `pm done` still wants. Write the README yourself and
+close with `python3 project/pm.py done <epic>`. The wasm image is what gives the
+epic its **Inspect** link on the status page: the page serves
 `apps/box_inspector/index.html` at `/inspector` and opens it on that build, which
-is how an old epic stays explorable after the code has moved on.
+is how an old epic stays explorable after the code has moved on. The three build
+reports are what the **Build** tab of the status page charts over epics.
 
 ## Environments
 

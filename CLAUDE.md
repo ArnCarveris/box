@@ -68,13 +68,21 @@ bake3 run bench/transform --local-env=<name> --cfg release -- \
 that has no `deliverable/bench*.json`; the warning does not fail the check, so
 skip it when the task changed nothing that runs per frame.
 
-An epic attaches one report per bench project plus a baseline comparison against
-the previous epic:
+An epic is closed with `tools/epic.py`, which runs the whole deliverable pipeline:
 
 ```sh
-python3 tools/bench.py --env <name> --out project/db/<epic>/deliverable \
-    --baseline project/db/<previous epic>/deliverable
+python3 tools/epic.py <epic> --env <name> [--baseline <previous epic>]
 ```
+
+It builds `box_app` in debug, release and wasm and keeps the bake3 `--build-json`
+reports as `build_debug.json`, `build_native.json` and `build_wasm.json`, runs
+every project under `test/` into `tests_<project>.json` plus the merged
+`tests.json`, runs the visual, bench and command scenes into `integration/`, runs
+one benchmark report per project into `bench/` against the `bench/` folder of the
+previous epic and copies the web image into `wasm/`, all under
+`project/db/<epic>/deliverable`. It prints a line per step, exits non zero when a
+build, a test or a scene fails and ends with what `pm done <epic>` still wants;
+`--steps` and `--skip` rerun part of it. Write `deliverable/README.md` by hand.
 
 ## Visual scenes
 
