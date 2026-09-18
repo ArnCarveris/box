@@ -114,12 +114,14 @@ def walk_item(path, level, rel):
         "start_time": progress.get("start_time"),
         "end_time": progress.get("end_time"),
         "dependencies": progress.get("dependencies", []),
+        "created": progress.get("created"),
         "deliverables": list_deliverables(path),
         "children": [],
     }
     if level + 1 < len(LEVELS):
         for name, full in child_dirs(path):
             item["children"].append(walk_item(full, level + 1, rel + "/" + name))
+        item["children"].sort(key=lambda c: (c["created"] or "", c["name"]))
     return item
 
 
@@ -128,6 +130,7 @@ def collect_state():
     if os.path.isdir(DB):
         for name, full in child_dirs(DB):
             epics.append(walk_item(full, 0, name))
+        epics.sort(key=lambda c: (c["created"] or "", c["name"]))
     return {"generated": now(), "epics": epics}
 
 
@@ -210,6 +213,7 @@ def cmd_new(args):
     write_progress(directory, {
         "kind": args.type,
         "status": "pending",
+        "created": now(),
         "start_time": None,
         "end_time": None,
         "dependencies": deps,
