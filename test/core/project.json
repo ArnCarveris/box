@@ -39,7 +39,9 @@
                 "fifo_order",
                 "acquire_returns_null_after_stop",
                 "acquire_blocks_until_release",
-                "wait_blocks_until_submit"
+                "wait_blocks_until_submit",
+                "web_startup_keeps_packet_until_ready",
+                "web_startup_full_pool_recovers"
             ]
         }, {
             "id": "Surface",

@@ -157,6 +157,37 @@ bool box_renderer_ready(
     return r->ready;
 }
 
+void box_renderer_set_ready(
+    box_renderer_t *r,
+    bool ready)
+{
+    r->ready = ready;
+}
+
+bool box_renderer_has_mesh(
+    const box_renderer_t *r,
+    uint32_t mesh)
+{
+    bool result = false;
+    if (mesh < r->meshes.count) {
+        result = ((box_gpu_mesh_t*)box_vec_at(&r->meshes, mesh))->alive;
+    }
+
+    return result;
+}
+
+uint32_t box_renderer_static_count(
+    const box_renderer_t *r,
+    uint32_t mesh)
+{
+    uint32_t result = 0;
+    if (mesh < r->meshes.count) {
+        result = ((box_gpu_mesh_t*)box_vec_at(&r->meshes, mesh))->static_count;
+    }
+
+    return result;
+}
+
 uint32_t box_renderer_frames(
     const box_renderer_t *r)
 {

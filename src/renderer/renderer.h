@@ -67,6 +67,38 @@ void box_renderer_submit(
 bool box_renderer_ready(
     const box_renderer_t *r);
 
+/** Set whether the GPU device is ready to render.
+ *
+ * The web path calls this from the device callback, because the device request
+ * completes long after the first packets were produced.
+ *
+ * @param r The renderer
+ * @param ready Whether frames can be rendered
+ */
+void box_renderer_set_ready(
+    box_renderer_t *r,
+    bool ready);
+
+/** Check whether the renderer holds GPU buffers for a mesh handle.
+ *
+ * @param r The renderer
+ * @param mesh The mesh handle
+ * @return true when the mesh was uploaded
+ */
+bool box_renderer_has_mesh(
+    const box_renderer_t *r,
+    uint32_t mesh);
+
+/** Number of static instances the renderer draws for a mesh handle.
+ *
+ * @param r The renderer
+ * @param mesh The mesh handle
+ * @return The instance count, 0 when the mesh holds none
+ */
+uint32_t box_renderer_static_count(
+    const box_renderer_t *r,
+    uint32_t mesh);
+
 /** Number of frames the renderer has presented.
  *
  * @param r The renderer

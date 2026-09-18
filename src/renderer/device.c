@@ -189,7 +189,7 @@ static void box_on_device_web(
     if (r->device) {
         box_device_complete(r);
         box_frame_init(r);
-        r->ready = true;
+        box_renderer_set_ready(r, true);
     }
 }
 
