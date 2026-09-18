@@ -21,6 +21,24 @@ typedef struct box_command_job_t {
     char *line;            /**< The command line */
 } box_command_job_t;
 
+/** Nesting change of a character: 1 for an opening bracket, -1 for a closing one.
+ *
+ * @param c The character
+ * @return The change of nesting depth
+ */
+static int32_t box_dispatch_bracket(
+    char c)
+{
+    int32_t result = 0;
+    if (c == '(' || c == '{' || c == '[') {
+        result = 1;
+    } else if (c == ')' || c == '}' || c == ']') {
+        result = -1;
+    }
+
+    return result;
+}
+
 /** Split a line into a command name and its whitespace separated arguments.
  *
  * Double quotes group a single argument, the quotes are not part of it.
@@ -54,7 +72,9 @@ static int32_t box_dispatch_split(
                 p ++;
             }
         } else {
-            while (p[0] && p[0] != ' ' && p[0] != '\t') {
+            int32_t depth = 0;
+            while (p[0] && (depth || (p[0] != ' ' && p[0] != '\t'))) {
+                depth += box_dispatch_bracket(p[0]);
                 p ++;
             }
         }

@@ -99,6 +99,18 @@ void Dispatch_quoted_argument(void)
     ecs_os_free(out);
 }
 
+void Dispatch_bracketed_argument(void)
+{
+    // command/terminal
+    char *out = box_command_run(w, session, "probe {x: 1, y: 2} 7 2", NULL);
+    test_str(out, "{x: 1, y: 2}|7|2.00");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "probe (Likes, [a b]) 7 2", NULL);
+    test_str(out, "(Likes, [a b])|7|2.00");
+    ecs_os_free(out);
+}
+
 void Dispatch_unknown_command(void)
 {
     // command/terminal

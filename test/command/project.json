@@ -31,6 +31,7 @@
                 "testcases": [
                     "command_with_arguments",
                     "quoted_argument",
+                    "bracketed_argument",
                     "unknown_command",
                     "too_many_arguments",
                     "missing_argument",
