@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T11:22:56.826+00:00",
   "start_time": "2026-09-18T11:23:03.635+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T11:55:06.654+00:00",
   "dependencies": [
     "lighting/light_baking"
   ]
