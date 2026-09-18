@@ -51,6 +51,12 @@ Every completed epic ships a wasm build under `project/db/<epic>/deliverable/was
 serve that folder with any static file server and open `box_app.html` in a
 WebGPU-capable browser.
 
+## Coding style
+
+`design/coding_style.c` is the reference and `tools/lint.py` enforces it. Run
+`python3 tools/lint.py` before committing (`--fix` reformats signatures and blank
+lines). See `CLAUDE.md` for the full rule list.
+
 ## Project status page
 
 ```sh

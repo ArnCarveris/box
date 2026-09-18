@@ -1,3 +1,4 @@
 .bake/
 .DS_Store
 __pycache__/
+include/box/bake_config.h
