@@ -824,23 +824,45 @@ static void box_input_cmd_action_drag(
     *(char**)result->ptr = out;
 }
 
+/** One action of the action list, with the path it is sorted by */
+typedef struct box_input_cmd_action_t {
+    char *path;          /**< Path of the action */
+    ecs_entity_t action; /**< The action entity */
+} box_input_cmd_action_t;
+
+/** Compare two listed actions by path.
+ *
+ * @param a The first action
+ * @param b The second action
+ * @return Negative when a sorts first, positive when b does, 0 when equal
+ */
+static int box_input_cmd_compare(
+    const void *a,
+    const void *b)
+{
+    const box_input_cmd_action_t *a1 = a;
+    const box_input_cmd_action_t *a2 = b;
+
+    return strcmp(a1->path, a2->path);
+}
+
 /** Append one action with its key masks and its description to a buffer.
  *
  * @param world The world
  * @param action The action entity
+ * @param path Path of the action
  * @param buf The buffer
  */
 static void box_input_cmd_action_line(
     ecs_world_t *world,
     ecs_entity_t action,
+    const char *path,
     ecs_strbuf_t *buf)
 {
     uint64_t masks[BOX_INPUT_CMD_BINDINGS];
     int32_t i, count = box_input_bindings(
         world, action, masks, BOX_INPUT_CMD_BINDINGS);
-    char *path = ecs_get_path(world, action);
     ecs_strbuf_append(buf, "%s\t", path);
-    ecs_os_free(path);
 
     for (i = 0; i < count; i ++) {
         char *name = box_input_mask_name(masks[i]);
@@ -874,15 +896,33 @@ static void box_input_cmd_action_list(
         .terms = {{ .id = ecs_id(InputAction), .inout = EcsIn }}
     });
 
+    ecs_vec_t actions;
+    ecs_vec_init_t(NULL, &actions, box_input_cmd_action_t, 0);
     ecs_iter_t it = ecs_query_iter(world, q);
     while (ecs_query_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            box_input_cmd_action_line(world, it.entities[i], &buf);
+            box_input_cmd_action_t *entry = ecs_vec_append_t(
+                NULL, &actions, box_input_cmd_action_t);
+            entry->path = ecs_get_path(world, it.entities[i]);
+            entry->action = it.entities[i];
         }
     }
 
     ecs_query_fini(q);
+
+    int32_t i, count = ecs_vec_count(&actions);
+    qsort(ecs_vec_first(&actions), (size_t)count,
+        sizeof(box_input_cmd_action_t), box_input_cmd_compare);
+
+    for (i = 0; i < count; i ++) {
+        box_input_cmd_action_t *entry = ecs_vec_get_t(
+            &actions, box_input_cmd_action_t, i);
+        box_input_cmd_action_line(world, entry->action, entry->path, &buf);
+        ecs_os_free(entry->path);
+    }
+
+    ecs_vec_fini_t(NULL, &actions, box_input_cmd_action_t);
     *(char**)result->ptr = ecs_strbuf_get(&buf);
 }
 

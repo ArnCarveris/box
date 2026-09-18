@@ -23,8 +23,19 @@ Fire down
 $ action.up actions.Fire
 Fire up
 $ action.list
-actions.Forward	W	Move forward
+actions.Back	S	Move against the view direction
+actions.Crouch	Ctrl	Lower the eye while held
+actions.Down	Q	Move down
+actions.Fast	Shift	Move faster while held
 actions.Fire	MouseLeft	Fire at the cursor
+actions.Fly	F	Toggle free flight
+actions.Forward	W,Up	Move forward
+actions.Jump	Space	Jump from the ground
+actions.Left	A	Strafe left
+actions.Look	MouseRight	Turn with the cursor while held
+actions.Right	D	Strafe right
+actions.Run	Shift	Walk at the run speed while held
+actions.Up	E	Move up
 
 $ input.wait
 20 events pending
