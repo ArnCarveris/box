@@ -5,6 +5,7 @@
 
 #include "command_internal.h"
 #include <string.h>
+#include <stdlib.h>
 
 /** Test whether a path element is the parent token.
  *
@@ -35,6 +36,26 @@ static ecs_entity_t box_path_parent(
     return result;
 }
 
+/** Resolve a raw entity id written after a hash sign.
+ *
+ * @param world The world
+ * @param digits The decimal id
+ * @return The entity when it is alive, 0 otherwise
+ */
+static ecs_entity_t box_path_raw_id(
+    ecs_world_t *world,
+    const char *digits)
+{
+    char *end = NULL;
+    unsigned long long id = strtoull(digits, &end, 10);
+    ecs_entity_t result = 0;
+    if (end && !end[0] && id && ecs_is_alive(world, (ecs_entity_t)id)) {
+        result = (ecs_entity_t)id;
+    }
+
+    return result;
+}
+
 /** Walk a path element by element and return the entity it resolves to.
  *
  * @param world The world
@@ -57,6 +78,23 @@ static int box_path_walk(
     if (!path || !path[0] || !strcmp(path, "/")) {
         scope = 0;
         goto done;
+    }
+
+    if (path[0] == '#') {
+        scope = box_path_raw_id(world, path + 1);
+        result = scope ? 0 : -1;
+        goto done;
+    }
+
+    if (!create) {
+        bool absolute = path[0] == '.' && path[1] != '.';
+        scope = ecs_lookup_path_w_sep(
+            world, absolute ? 0 : cwd, absolute ? path + 1 : path, ".", NULL, false);
+        if (scope) {
+            goto done;
+        }
+
+        scope = cwd;
     }
 
     buffer = ecs_os_strdup(path);
@@ -263,4 +301,20 @@ ecs_id_t box_path_id(
 
 done:
     return id;
+}
+
+char* box_path_escape(
+    const char *name)
+{
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    const char *p;
+    for (p = name; p[0]; p ++) {
+        if (p[0] == '.') {
+            ecs_strbuf_appendch(&buf, '\\');
+        }
+
+        ecs_strbuf_appendch(&buf, p[0]);
+    }
+
+    return ecs_strbuf_get(&buf);
 }

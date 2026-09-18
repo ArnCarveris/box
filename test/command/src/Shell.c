@@ -572,3 +572,49 @@ void Shell_touch_under_parent_child(void)
     test_assert(leaf != 0);
     test_uint(ecs_get_parent(w, leaf), node);
 }
+
+void Shell_path_raw_id(void)
+{
+    // command/path_lookup
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_add_id(w, e, tag);
+    char *line = flecs_asprintf("has #%u Tag", (uint32_t)e);
+    char *out = box_command_run(w, session, line, NULL);
+    test_str(out, "true");
+    ecs_os_free(out);
+    ecs_os_free(line);
+}
+
+void Shell_path_escaped_dot(void)
+{
+    // command/path_lookup
+    ecs_entity_t e = ecs_entity_init(w, &(ecs_entity_desc_t){ .name = "scene.flecs", .sep = "" });
+    ecs_add_id(w, e, tag);
+    char *out = box_command_run(w, session, "has scene\\.flecs Tag", NULL);
+    test_str(out, "true");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "has \"scene\\.flecs\" Tag", NULL);
+    test_str(out, "true");
+    ecs_os_free(out);
+}
+
+void Shell_path_child_of_dotted_name(void)
+{
+    // command/path_lookup
+    ecs_entity_t parent = ecs_entity_init(w, &(ecs_entity_desc_t){ .name = "a.b", .sep = "" });
+    ecs_entity_t child = ecs_entity(w, { .name = "child", .parent = parent });
+    ecs_add_id(w, child, tag);
+    char *out = box_command_run(w, session, "has a\\.b.child Tag", NULL);
+    test_str(out, "true");
+    ecs_os_free(out);
+}
+
+void Shell_ls_escapes_dots(void)
+{
+    // command/path_lookup
+    ecs_entity_init(w, &(ecs_entity_desc_t){ .name = "scene.x.flecs", .sep = "" });
+    char *out = box_command_run(w, session, "ls", NULL);
+    test_assert(strstr(out, "scene\\.x\\.flecs") != NULL);
+    ecs_os_free(out);
+}

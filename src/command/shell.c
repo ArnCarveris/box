@@ -148,7 +148,7 @@ static void box_shell_add_child(
     const char *name = ecs_get_name(world, e);
     child->e = e;
     child->name = name ?
-        ecs_os_strdup(name) : flecs_asprintf("#%u", (uint32_t)e);
+        box_path_escape(name) : flecs_asprintf("#%u", (uint32_t)e);
 }
 
 /** Collect the named entities that have no parent.

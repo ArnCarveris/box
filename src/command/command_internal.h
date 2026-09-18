@@ -386,6 +386,14 @@ ecs_id_t box_path_id(
     ecs_world_t *world,
     const char *expr);
 
+/** Escape the dots of an entity name so it can be pasted back into a path.
+ *
+ * @param name The entity name
+ * @return The escaped name, the caller frees it
+ */
+char* box_path_escape(
+    const char *name);
+
 /** Get the path of an entity the way commands print it.
  *
  * @param world The world
