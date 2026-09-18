@@ -11,7 +11,9 @@
 #include <flecs.h>
 
 #include "box/types.h"
+#include "box/math.h"
 #include "box/core.h"
+#include "box/transform.h"
 #include "box/surface.h"
 
 #endif
