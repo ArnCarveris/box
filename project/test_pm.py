@@ -23,17 +23,28 @@ globalThis.esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":
 globalThis.element = { innerHTML: "", querySelector: () => null };
 globalThis.document = { getElementById: () => element, querySelector: () => element };
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+const task = (path, title, status, deps, subs) => ({
+  path, name: path.split("/")[1], level: "task", status, dependencies: deps,
+  readme: { title }, children: (subs || []).map((d, i) => ({
+    path: path + "/s" + i, name: "s" + i, level: "subtask", status: "pending",
+    dependencies: d, readme: { title: "Sub " + i }, children: [],
+  })),
+});
 globalThis.EPICS = [
-  { name: "root", title: "Root", status: "complete", locked: true, dependencies: [] },
-  { name: "core", title: "Core", status: "in progress", locked: true, dependencies: ["root"] },
-  { name: "one", title: "One", status: "pending", locked: false, dependencies: ["core"] },
-  { name: "two", title: "Two", status: "pending", locked: false, dependencies: ["one/task"] },
-  { name: "three", title: "Three", status: "pending", locked: false, dependencies: ["core"] },
-  { name: "four", title: "Four", status: "pending", locked: false, dependencies: ["two", "three"] },
+  { name: "core", priority: 10, created: "2026-01-01", status: "complete", readme: { title: "Core" }, children: [
+    task("core/boot", "Boot", "complete", []),
+    task("core/loop", "Main loop", "complete", ["core/boot"]),
+  ] },
+  { name: "render", priority: 20, created: "2026-01-02", status: "in progress", readme: { title: "Render" }, children: [
+    task("render/pipeline", "Pipeline", "in progress", ["core"]),
+    task("render/shadows", "Shadows", "pending", ["render/pipeline"]),
+    task("render/post", "Post effects", "complete", ["render/pipeline"]),
+  ] },
+  { name: "ui", priority: 5, created: "2026-01-03", status: "pending", readme: { title: "Interface" }, children: [
+    task("ui/panel", "Panels", "pending", []),
+    task("ui/theme", "Theming", "pending", ["ui/panel"], [["render/shadows", "ui/theme"]]),
+  ] },
 ];
-globalThis.ORDER = ["root", "core", "one", "two", "three", "four"];
-globalThis.BAD_ORDER = ["root", "core", "two", "one", "three", "four"];
-globalThis.LOCKED = ["root", "core"];
 globalThis.overlaps = list => {
   const hits = [];
   for (let i = 0; i < list.length; i++) {
@@ -579,73 +590,84 @@ class PmTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         return json.loads(run.stdout)
 
-    def test_plan_page_lays_out_epics_in_dependency_columns(self):
+    def test_plan_page_lays_out_tasks_in_dependency_columns(self):
         out = self.run_plan_js("""
-const depth = planDepths(EPICS);
-const layout = planLayout(EPICS, ORDER);
-element.innerHTML = planSvg(layout, EPICS, ORDER, { x: 0, y: 0, k: 1 });
+const layout = planLayout(EPICS, {});
+element.innerHTML = planSvg(layout, { x: 0, y: 0, k: 1 });
 const markup = element.innerHTML;
-const badOrder = BAD_ORDER;
-const badMarkup = planSvg(planLayout(EPICS, badOrder), EPICS, badOrder, { x: 0, y: 0, k: 1 });
 console.log(JSON.stringify({
-  depth,
+  depth: layout.depth,
   columns: layout.list.map(n => [n.name, n.col]),
   rows: layout.list.map(n => [n.name, n.row]),
+  xs: layout.list.map(n => [n.col, n.x]),
+  bands: layout.bands.map(b => [b.epic, b.y, b.height, b.tasks]),
   overlaps: overlaps(layout.list),
   size: [layout.width > 0, layout.height > 0],
   nodes: count(markup, "data-node="),
-  arrows: count(markup, "data-to="),
-  handles: count(markup, "data-handle="),
-  deps: count(markup, 'class="plan-dep"'),
-  locks: count(markup, 'class="plan-lock"'),
+  edges: count(markup, 'class="plan-dep'),
+  cross: count(markup, "plan-dep cross"),
+  bandLabels: count(markup, 'class="plan-band"'),
+  complete: count(markup, "plan-node complete"),
+  inProgress: count(markup, "plan-node in-progress"),
   svg: markup.startsWith("<svg") && markup.includes('id="plan-zoom"'),
-  violations: planViolations(EPICS, badOrder),
-  badArrows: count(badMarkup, "plan-arrow bad"),
-  badTip: badMarkup.includes("Two is planned before one"),
-  xs: ORDER.map(n => [n, layout.nodes[n].x]),
-  badXs: badOrder.map(n => [n, planLayout(EPICS, badOrder).nodes[n].x]),
+  epicTag: markup.includes("Render \u00b7 in progress"),
+  related: planRelated(layout, "render/pipeline"),
+  handles: count(markup, "data-handle="),
 }));
 """)
-        self.assertEqual(out["depth"], {"root": 0, "core": 1, "one": 2, "two": 3, "three": 2, "four": 4})
-        self.assertEqual(dict(out["columns"]),
-                         {"root": 0, "core": 1, "one": 2, "two": 3, "three": 3, "four": 4})
+        self.assertEqual(out["depth"], {"ui/panel": 0, "ui/theme": 4, "core/boot": 0, "core/loop": 1,
+                                        "render/pipeline": 2, "render/shadows": 3, "render/post": 3})
         for name, column in out["columns"]:
-            self.assertGreaterEqual(column, out["depth"][name])
-        for xs in (out["xs"], out["badXs"]):
-            for (prev, x0), (name, x1) in zip(xs, xs[1:]):
-                self.assertGreaterEqual(x1, x0, "%s is left of %s" % (name, prev))
+            self.assertEqual(column, out["depth"][name])
+        for (col_a, x_a), (col_b, x_b) in zip(sorted(out["xs"]), sorted(out["xs"])[1:]):
+            self.assertLessEqual(x_a, x_b)
+            self.assertEqual(col_a < col_b, x_a < x_b)
+        self.assertEqual([b[0] for b in out["bands"]], ["ui", "core", "render"])
+        self.assertEqual([b[3] for b in out["bands"]], [2, 2, 3])
+        for (_, y_a, h_a, _), (_, y_b, _, _) in zip(out["bands"], out["bands"][1:]):
+            self.assertGreater(y_b, y_a + h_a)
+        self.assertEqual(dict(out["rows"])["render/post"], 1)
+        self.assertEqual(dict(out["rows"])["render/shadows"], 0)
         self.assertEqual(out["overlaps"], [])
         self.assertEqual(out["size"], [True, True])
-        self.assertEqual(dict(out["rows"])["one"], 0)
-        self.assertEqual(dict(out["rows"])["three"], 1)
-        self.assertEqual((out["nodes"], out["arrows"], out["deps"]), (6, 5, 6))
-        self.assertEqual(out["handles"], 3)
-        self.assertEqual(out["locks"], 2)
+        self.assertEqual((out["nodes"], out["edges"], out["cross"]), (7, 6, 2))
+        self.assertEqual((out["bandLabels"], out["complete"], out["inProgress"]), (3, 3, 1))
+        self.assertEqual(out["handles"], 0)
         self.assertTrue(out["svg"])
-        self.assertEqual(out["violations"], {"two": ["one"]})
-        self.assertEqual(out["badArrows"], 1)
-        self.assertTrue(out["badTip"])
+        self.assertTrue(out["epicTag"])
+        self.assertEqual(sorted(out["related"]["nodes"]),
+                         ["core/loop", "render/pipeline", "render/post", "render/shadows"])
+        self.assertEqual(sorted(out["related"]["edges"]),
+                         ["core/loop > render/pipeline", "render/pipeline > render/post",
+                          "render/pipeline > render/shadows"])
 
-    def test_plan_page_reorders_the_chain_and_refuses_locked_epics(self):
+    def test_plan_page_filters_by_epic_and_unfinished_tasks(self):
         out = self.run_plan_js("""
-const move = (name, target, order) => planReorder(order || ORDER, name, target, LOCKED);
+const one = planLayout(EPICS, { epic: "render" });
+const open = planLayout(EPICS, { open: true });
 console.log(JSON.stringify({
-  after: move("four", "one").order,
-  end: move("one", "four").order,
-  onLast: move("two", "core").order,
-  onFirst: move("two", "root"),
-  itself: move("one", "one"),
-  unknown: move("one", "nope"),
-  repaired: move("four", "one").order.slice().sort(),
+  order: planEpics(EPICS).map(e => e.name),
+  one: one.list.map(n => n.name),
+  oneDepth: one.depth,
+  oneEdges: one.edges.length,
+  oneBands: one.bands.map(b => b.epic),
+  open: open.list.map(n => n.name),
+  openBands: open.bands.map(b => b.epic),
+  openCross: open.edges.filter(e => e.cross).length,
+  openDepth: open.depth,
+  none: planLayout(EPICS, { epic: "nope" }).list.length,
+  subDeps: (planLayout(EPICS, {}).into["ui/theme"] || []).slice().sort(),
 }));
 """)
-        self.assertEqual(out["after"], ["root", "core", "one", "four", "two", "three"])
-        self.assertEqual(out["end"], ["root", "core", "two", "three", "four", "one"])
-        self.assertEqual(out["onLast"], ["root", "core", "two", "one", "three", "four"])
-        self.assertEqual(out["onFirst"], {"error": "locked"})
-        self.assertEqual(out["itself"], {"error": "same epic"})
-        self.assertEqual(out["unknown"], {"error": "unknown epic nope"})
-        self.assertEqual(out["repaired"], sorted(["root", "core", "one", "two", "three", "four"]))
+        self.assertEqual(out["order"], ["ui", "core", "render"])
+        self.assertEqual(out["one"], ["render/pipeline", "render/shadows", "render/post"])
+        self.assertEqual(out["oneDepth"], {"render/pipeline": 0, "render/shadows": 1, "render/post": 1})
+        self.assertEqual((out["oneEdges"], out["oneBands"]), (2, ["render"]))
+        self.assertEqual(out["open"], ["ui/panel", "ui/theme", "render/pipeline", "render/shadows"])
+        self.assertEqual(out["openBands"], ["ui", "render"])
+        self.assertEqual((out["openCross"], out["openDepth"]["render/pipeline"]), (1, 0))
+        self.assertEqual(out["none"], 0)
+        self.assertEqual(out["subDeps"], ["render/shadows", "ui/panel"])
 
     def write_wasm(self, epic):
         directory = os.path.join(pm.DB, epic, "deliverable", "wasm")

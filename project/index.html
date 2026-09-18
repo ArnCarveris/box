@@ -23,14 +23,14 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-  --plan-order: var(--ink);
+  --band: #eae8e1;
 }
 :root:not([data-theme="light"]) { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
     --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
-    --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6); --band: #232322;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   }
@@ -38,7 +38,7 @@
 :root[data-theme="dark"] {
   --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --border: #2f2f2d;
   --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #85847c; --accent: #3987e5;
-  --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --pending: #56554f; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6); --band: #232322;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
 }
@@ -130,6 +130,21 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .tests b.ok { color: var(--good); } .tests b.bad { color: var(--bad); } .tests b.empty { color: var(--warn); }
 .deps { font-size: 12px; color: var(--ink-3); }
 .deps code { font-family: var(--mono); font-size: 11px; }
+.next-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: up; }
+.next-list li {
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.next-list li::before {
+  counter-increment: up; content: counter(up); color: var(--ink-3); font-size: 11px;
+  font-variant-numeric: tabular-nums; min-width: 14px;
+}
+.next-list li:hover { background: var(--surface-2); }
+.next-list li .n { flex: 1; }
+.prio { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); }
+.prio input {
+  font: inherit; width: 72px; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+}
 .empty-state { color: var(--ink-3); padding: 60px; text-align: center; }
 
 .panel {
@@ -227,36 +242,39 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 #plan-svg { display: block; width: 100%; height: 100%; background: var(--surface); cursor: grab; }
 #plan-svg.panning { cursor: grabbing; }
 #plan-svg text { user-select: none; }
-.plan-tools { position: absolute; right: 16px; top: 12px; z-index: 3; display: flex; gap: 6px; align-items: center; }
+.plan-tools {
+  position: absolute; right: 16px; top: 12px; z-index: 3; display: flex; gap: 6px; align-items: center;
+  flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 32px);
+}
 .plan-tools button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 9px; font-size: 12px; }
+.plan-tools select {
+  font: inherit; font-size: 12px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+}
+.plan-tools label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); }
 .plan-tools .hint { color: var(--ink-3); font-size: 11px; }
 .plan-note { font-size: 12px; font-weight: 600; color: var(--good); }
 .plan-note.bad { color: var(--bad); }
-.plan-node rect.box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.plan-band rect { fill: var(--band); }
+.plan-band text { fill: var(--ink-2); font-size: 12px; font-weight: 650; }
+.plan-band .count { fill: var(--ink-3); font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; }
+.plan-node rect.box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
 .plan-node .bar { fill: var(--pending); }
 .plan-node .title { fill: var(--ink); font-size: 12px; font-weight: 650; }
 .plan-node .sub { fill: var(--ink-3); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
-.plan-node .plan-lock { fill: var(--ink-3); }
-.plan-node.complete .bar, .plan-node.complete .plan-lock, .plan-node.complete .sub { fill: var(--good); }
+.plan-node.complete .bar, .plan-node.complete .sub { fill: var(--good); }
 .plan-node.complete rect.box { stroke: color-mix(in srgb, var(--good) 45%, var(--border)); }
-.plan-node.in-progress .bar, .plan-node.in-progress .plan-lock, .plan-node.in-progress .sub { fill: var(--accent); }
+.plan-node.in-progress .bar, .plan-node.in-progress .sub { fill: var(--accent); }
 .plan-node.in-progress rect.box { stroke: color-mix(in srgb, var(--accent) 55%, var(--border)); }
 .plan-node.discarded .bar { fill: transparent; }
-.plan-node.locked rect.box { fill: color-mix(in srgb, var(--surface-2) 92%, var(--ink)); }
-.plan-node.violation .sub { fill: var(--bad); }
+.plan-node.discarded .title { fill: var(--ink-3); text-decoration: line-through; }
 .plan-node:hover rect.box { stroke: var(--accent); }
-.plan-node.drop rect.box { stroke: var(--accent); stroke-width: 2.5; }
-.plan-node.drop-bad rect.box { stroke: var(--bad); stroke-width: 2.5; }
-.plan-dep { fill: none; stroke: var(--ink-3); stroke-width: 1.3; opacity: .38; }
-.plan-order { fill: none; stroke: var(--plan-order); stroke-width: 2.4; stroke-linecap: round; }
-.plan-arrow.bad .plan-order { stroke: var(--bad); }
-.plan-arrow.dragging .plan-order { opacity: .25; }
-.plan-hit { fill: none; stroke: transparent; stroke-width: 14; }
-.plan-arrow.locked .plan-hit { cursor: not-allowed; }
-.plan-handle { fill: var(--plan-order); stroke: var(--surface); stroke-width: 2; cursor: grab; }
-.plan-handle.bad { fill: var(--bad); }
-.plan-handle:hover { stroke: var(--accent); }
-.plan-ghost { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; pointer-events: none; }
+.plan-dep { fill: none; stroke: var(--ink-3); stroke-width: 1.3; opacity: .35; }
+.plan-dep.cross { stroke: var(--ink-2); stroke-width: 2.2; opacity: .75; }
+#plan-svg.hover .plan-node, #plan-svg.hover .plan-dep, #plan-svg.hover .plan-band { opacity: .18; }
+#plan-svg.hover .plan-node.lit, #plan-svg.hover .plan-dep.lit { opacity: 1; }
+#plan-svg.hover .plan-node.lit rect.box { stroke: var(--accent); }
+#plan-svg.hover .plan-dep.lit { stroke: var(--accent); opacity: .9; }
 .tooltip {
   position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 6px;
   font-size: 12px; z-index: 20; display: none; white-space: nowrap; box-shadow: var(--shadow);
@@ -306,8 +324,8 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 
 <script>
 const state = {
-  data: null, tests: null, bench: null, plan: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
-  suites: [], benchSuites: [], hidden: {}, planView: null,
+  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
+  suites: [], benchSuites: [], hidden: {}, planView: null, planFilter: { epic: "", open: false },
   scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0, plan: 0 },
 };
 const VIEWS = ["board", "timeline", "plan", "tests", "benchmarks"];
@@ -341,7 +359,7 @@ function saveUi() {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
       suites: state.suites, benchSuites: state.benchSuites, hidden: state.hidden, scene: state.scene,
-      planView: state.planView,
+      planView: state.planView, planFilter: state.planFilter,
     }));
   } catch (e) {}
 }
@@ -365,6 +383,9 @@ function loadUi() {
   if (saved.scene) state.scene = saved.scene;
   if (saved.zoom > 0) state.zoom = saved.zoom;
   if (saved.planView && saved.planView.k > 0) state.planView = saved.planView;
+  if (saved.planFilter && typeof saved.planFilter === "object") {
+    state.planFilter = { epic: String(saved.planFilter.epic || ""), open: !!saved.planFilter.open };
+  }
   if (saved.scroll) Object.assign(state.scroll, saved.scroll);
 }
 
@@ -474,6 +495,17 @@ function renderEpics() {
   restoreScroll(document.querySelector("aside"), state.scroll.aside);
 }
 
+function nextUpCard() {
+  const list = state.data.next_up || [];
+  if (!list.length) return "";
+  return `<div class="card" style="grid-column: 1 / -1">
+    <div class="card-title"><h3>Next up</h3>
+      <span>ready to start · dependencies first, then epic priority</span></div>
+    <ol class="next-list">${list.map(i => `<li data-item="${esc(i.path)}">
+      <span class="n">${esc(i.title)}</span><span class="kind">${esc(i.epic_title)}</span>
+      <span class="chip pending">${ICONS.pending}${esc(i.level)}</span></li>`).join("")}</ol></div>`;
+}
+
 function renderBoard() {
   const board = document.getElementById("board");
   const epic = state.data.epics.find(e => e.path === state.epic);
@@ -500,7 +532,7 @@ function renderBoard() {
       <div class="brief">${esc(epic.readme.brief || "")}</div>
       ${testSummary(epic)}
     </div>`;
-  board.innerHTML = epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
+  board.innerHTML = nextUpCard() + epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
   board.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
   restoreScroll(document.getElementById("content"), state.scroll.content);
 }
@@ -535,6 +567,9 @@ function openPanel(path) {
     <h1>${esc(item.readme.title || item.name)}</h1>
     <div class="meta">${chip(item.status)}<span class="kind">${esc(item.kind)}</span>
       <span style="color:var(--ink-3);font-size:12px">${item.start_time ? fmtDate(item.start_time) + " → " + (item.end_time ? fmtDate(item.end_time) : "now") + " (" + dur(item.start_time, item.end_time) + ")" : "not started"}</span>
+      ${item.level === "epic" ? `<label class="prio" title="Lower runs first, 100 by default">priority
+        <input type="number" id="epic-priority" step="10" value="${esc(item.priority)}"></label>
+        <span class="plan-note" id="prio-note"></span>` : ""}
       ${inspectLink(item)}</div>
     ${item.dependencies.length ? `<div class="deps">Depends on ${item.dependencies.map(d => `<code>${esc(d)}</code>`).join(", ")}</div>` : ""}
     <div class="md">${markdown(item.readme.markdown)}</div>
@@ -548,6 +583,8 @@ function openPanel(path) {
   saveSoon();
   document.getElementById("close").onclick = () => { state.item = null; state.scroll.panel = 0; closePanel(); saveUi(); };
   panel.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
+  const priority = document.getElementById("epic-priority");
+  if (priority) priority.onchange = () => savePriority(item.name, priority.value);
   const readme = item.deliverables.find(d => /readme\.md$/i.test(d.name));
   if (readme) fetch(readme.url).then(r => r.text()).then(t => {
     const div = document.createElement("div");
@@ -1047,66 +1084,125 @@ function renderBenchmarks() {
 }
 
 // --- plan logic (extracted by test_pm.py, keep free of DOM access) ---
-const PLAN_BOX = { w: 176, h: 48, colGap: 92, rowGap: 26, pad: 24 };
-const PLAN_LOCK = '<g class="plan-lock" transform="translate(152,11)">' +
-  '<rect x="0" y="6" width="11" height="8" rx="2"/>' +
-  '<path d="M1.9,6 V4.2 a3.6,3.6 0 0 1 7.2,0 V6 H7.5 V4.2 a2.1,2.1 0 0 0 -4.2,0 V6 Z"/></g>';
+const PLAN_BOX = { w: 174, h: 46, colGap: 58, rowGap: 12, bandGap: 26, pad: 20, label: 136 };
+const PLAN_PRIORITY = 100;
 
 function planDep(name) {
   return String(name).split("/")[0];
 }
 
-function planDepths(epics) {
-  const byName = {};
-  for (const e of epics) byName[e.name] = e;
-  const depth = {};
-  const visit = (name, seen) => {
-    if (depth[name] != null) return depth[name];
-    if (seen.has(name)) return 0;
-    seen.add(name);
-    let d = 0;
-    for (const dep of (byName[name] || {}).dependencies || []) {
-      const from = planDep(dep);
-      if (from !== name && byName[from]) d = Math.max(d, visit(from, seen) + 1);
+function planTitle(item) {
+  return (item.readme && item.readme.title) || item.name;
+}
+
+function planPriority(epic) {
+  return typeof epic.priority === "number" ? epic.priority : PLAN_PRIORITY;
+}
+
+function planEpics(epics) {
+  return (epics || []).slice().sort((a, b) => planPriority(a) - planPriority(b)
+    || String(a.created || "").localeCompare(String(b.created || ""))
+    || String(a.name).localeCompare(String(b.name)));
+}
+
+function planTasks(epics, filter) {
+  const f = filter || {};
+  const tasks = [];
+  for (const epic of planEpics(epics)) {
+    for (const task of epic.children || []) {
+      if (task.level === "subtask") continue;
+      const subs = task.children || [];
+      const done = task.status === "complete" || task.status === "discarded";
+      if ((f.epic && epic.name !== f.epic) || (f.open && done)) continue;
+      const deps = [];
+      for (const list of [task.dependencies || []].concat(subs.map(s => s.dependencies || []))) {
+        for (const dep of list) if (!deps.includes(String(dep))) deps.push(String(dep));
+      }
+      tasks.push({
+        path: task.path, name: task.name, title: planTitle(task), status: task.status, done,
+        epic: epic.name, epicTitle: planTitle(epic), subs: subs.length, deps,
+      });
     }
-    seen.delete(name);
-    depth[name] = d;
+  }
+  return tasks;
+}
+
+function planGraph(tasks) {
+  const byPath = {}, last = {}, into = {}, out = {}, edges = [];
+  for (const task of tasks) { byPath[task.path] = task; last[task.epic] = task.path; }
+  for (const task of tasks) {
+    for (const dep of task.deps) {
+      const parts = dep.split("/");
+      const path = parts.length > 1 ? parts[0] + "/" + parts[1] : null;
+      const from = path ? (byPath[path] ? path : null) : last[parts[0]] || null;
+      if (!from || from === task.path || (into[task.path] || []).includes(from)) continue;
+      (into[task.path] = into[task.path] || []).push(from);
+      (out[from] = out[from] || []).push(task.path);
+      edges.push({ from, to: task.path, cross: byPath[from].epic !== task.epic });
+    }
+  }
+  return { byPath, into, out, edges };
+}
+
+function planDepths(tasks, into) {
+  const depth = {};
+  const visit = (path, seen) => {
+    if (depth[path] != null) return depth[path];
+    if (seen.has(path)) return 0;
+    seen.add(path);
+    let d = 0;
+    for (const from of into[path] || []) d = Math.max(d, visit(from, seen) + 1);
+    seen.delete(path);
+    depth[path] = d;
     return d;
   };
-  for (const e of epics) visit(e.name, new Set());
+  for (const task of tasks) visit(task.path, new Set());
   return depth;
 }
 
-function planLayout(epics, order) {
-  const depth = planDepths(epics);
-  const rank = {};
-  order.forEach((name, i) => { rank[name] = i; });
-  const at = e => (rank[e.name] == null ? order.length : rank[e.name]);
-  const cols = [];
-  let last = 0;
-  for (const e of epics.slice().sort((a, b) => at(a) - at(b))) {
-    const c = Math.max(depth[e.name] || 0, last);
-    last = c;
-    (cols[c] = cols[c] || []).push(e);
+function planLayout(epics, filter) {
+  const tasks = planTasks(epics, filter);
+  const graph = planGraph(tasks);
+  const depth = planDepths(tasks, graph.into);
+  const groups = {}, order = [];
+  for (const task of tasks) {
+    if (!groups[task.epic]) { groups[task.epic] = []; order.push(task.epic); }
+    groups[task.epic].push(task);
   }
-  const rows = cols.reduce((a, col) => Math.max(a, col ? col.length : 0), 1);
-  const nodes = {}, list = [];
-  cols.forEach((col, c) => {
-    const offset = (rows - col.length) / 2;
-    col.forEach((epic, r) => {
+  const nodes = {}, list = [], bands = [];
+  let top = PLAN_BOX.pad, columns = 0;
+  for (const name of order) {
+    const group = groups[name];
+    const used = {};
+    let rows = 1;
+    for (const task of group) {
+      const col = depth[task.path] || 0;
+      const row = used[col] = used[col] == null ? 0 : used[col] + 1;
+      rows = Math.max(rows, row + 1);
+      columns = Math.max(columns, col + 1);
       const node = {
-        name: epic.name, epic, col: c, row: r, w: PLAN_BOX.w, h: PLAN_BOX.h,
-        x: PLAN_BOX.pad + c * (PLAN_BOX.w + PLAN_BOX.colGap),
-        y: PLAN_BOX.pad + (offset + r) * (PLAN_BOX.h + PLAN_BOX.rowGap),
+        name: task.path, task, col, row, w: PLAN_BOX.w, h: PLAN_BOX.h,
+        x: PLAN_BOX.pad + PLAN_BOX.label + col * (PLAN_BOX.w + PLAN_BOX.colGap),
+        y: top + row * (PLAN_BOX.h + PLAN_BOX.rowGap),
       };
-      nodes[epic.name] = node;
+      nodes[task.path] = node;
       list.push(node);
-    });
-  });
+    }
+    const height = rows * (PLAN_BOX.h + PLAN_BOX.rowGap) - PLAN_BOX.rowGap;
+    bands.push({ epic: name, title: group[0].epicTitle, tasks: group.length, y: top, height });
+    top += height + PLAN_BOX.bandGap;
+  }
   return {
-    nodes, list, depth, columns: cols.length,
-    width: 2 * PLAN_BOX.pad + Math.max(1, cols.length) * (PLAN_BOX.w + PLAN_BOX.colGap) - PLAN_BOX.colGap,
-    height: 2 * PLAN_BOX.pad + rows * (PLAN_BOX.h + PLAN_BOX.rowGap) - PLAN_BOX.rowGap,
+    nodes, list, bands, depth, columns, edges: graph.edges, into: graph.into, out: graph.out,
+    width: 2 * PLAN_BOX.pad + PLAN_BOX.label + Math.max(1, columns) * (PLAN_BOX.w + PLAN_BOX.colGap) - PLAN_BOX.colGap,
+    height: bands.length ? top - PLAN_BOX.bandGap + PLAN_BOX.pad : 2 * PLAN_BOX.pad,
+  };
+}
+
+function planRelated(layout, path) {
+  return {
+    nodes: [path].concat(layout.into[path] || [], layout.out[path] || []),
+    edges: layout.edges.filter(e => e.from === path || e.to === path).map(e => e.from + " > " + e.to),
   };
 }
 
@@ -1138,112 +1234,50 @@ function planPath(a) {
     `${planRound(a.c2x)},${planRound(a.c2y)} ${planRound(a.x2)},${planRound(a.y2)}`;
 }
 
-function planHead(a, back) {
-  const dx = a.x2 - a.c2x, dy = a.y2 - a.c2y;
-  const len = Math.hypot(dx, dy) || 1;
-  return { x: a.x2 - dx / len * back, y: a.y2 - dy / len * back };
-}
-
-function planViolations(epics, order) {
-  const at = {};
-  order.forEach((name, i) => { at[name] = i; });
-  const out = {};
-  for (const e of epics) {
-    for (const dep of e.dependencies || []) {
-      const from = planDep(dep);
-      if (at[from] == null || at[e.name] == null || at[from] < at[e.name]) continue;
-      (out[e.name] = out[e.name] || []).push(from);
-    }
-  }
-  return out;
-}
-
-function planReorder(order, name, target, locked) {
-  if (!order.includes(name)) return { error: `unknown epic ${name}` };
-  if (name === target) return { error: "same epic" };
-  const next = order.filter(n => n !== name);
-  const at = next.indexOf(target);
-  if (at < 0) return { error: `unknown epic ${target}` };
-  next.splice(at + 1, 0, name);
-  const front = order.filter(n => locked.includes(n));
-  if (next.slice(0, front.length).join("|") !== front.join("|")) return { error: "locked" };
-  return { order: next };
-}
-
-function planNodeSvg(node, violations) {
-  const e = node.epic;
-  const status = String(e.status).replace(" ", "-");
-  const bad = violations[e.name] || [];
-  const label = e.title.length > 21 ? e.title.slice(0, 20) + "…" : e.title;
-  const sub = bad.length ? "after " + bad.join(", ") : e.status;
-  const tip = bad.length ? `planned before ${bad.join(", ")}` : e.locked ? "locked" : "drop an arrow head here";
-  return `<g class="plan-node ${status}${e.locked ? " locked" : ""}${bad.length ? " violation" : ""}"
-      data-node="${esc(e.name)}" transform="translate(${node.x},${node.y})"
-      data-tip="${esc(e.title)}" data-sub="${esc(" · " + e.status + " · " + tip)}">
-    <rect class="box" width="${node.w}" height="${node.h}" rx="10"/>
+function planNodeSvg(node, layout) {
+  const task = node.task;
+  const status = String(task.status).replace(" ", "-");
+  const label = task.title.length > 23 ? task.title.slice(0, 22) + "…" : task.title;
+  const deps = layout.into[task.path] || [], dependents = layout.out[task.path] || [];
+  const sub = task.name + (task.subs ? " · " + task.subs + (task.subs > 1 ? " subtasks" : " subtask") : "");
+  const tip = " · " + task.epicTitle + " · " + task.status
+    + (deps.length ? " · after " + deps.join(", ") : "")
+    + (dependents.length ? " · blocks " + dependents.join(", ") : "");
+  return `<g class="plan-node ${status}" data-node="${esc(task.path)}" data-epic="${esc(task.epic)}"
+      transform="translate(${node.x},${node.y})" data-tip="${esc(task.title)}" data-sub="${esc(tip)}">
+    <rect class="box" width="${node.w}" height="${node.h}" rx="9"/>
     <rect class="bar" x="1" y="9" width="4" height="${node.h - 18}" rx="2"/>
-    <text class="title" x="16" y="21">${esc(label)}</text>
-    <text class="sub" x="16" y="36">${esc(sub)}</text>
-    ${e.locked ? PLAN_LOCK : ""}
+    <text class="title" x="15" y="20">${esc(label)}</text>
+    <text class="sub" x="15" y="35">${esc(sub)}</text>
   </g>`;
 }
 
-function planArrowSvg(from, to, locked, bad) {
-  const link = planLink(from, to);
-  const d = planPath(link);
-  const head = planHead(link, 17);
-  const tip = bad.length ? `${to.epic.title} is planned before ${bad.join(", ")}`
-    : locked ? "locked" : `then ${to.epic.title}`;
-  const sub = locked ? " · started epics keep their order" : " · drag the head onto an epic to move it";
-  return {
-    arrow: `<g class="plan-arrow${bad.length ? " bad" : ""}${locked ? " locked" : ""}"
-        data-from="${esc(from.name)}" data-to="${esc(to.name)}">
-      <path class="plan-order" d="${d}" marker-end="url(#plan-head${bad.length ? "-bad" : ""})"/>
-      <path class="plan-hit" d="${d}" data-tip="${esc(tip)}" data-sub="${esc(sub)}"/></g>`,
-    handle: locked ? "" : `<circle class="plan-handle${bad.length ? " bad" : ""}" cx="${planRound(head.x)}" cy="${planRound(head.y)}" r="7"
-      data-handle="${esc(to.name)}" data-from="${esc(from.name)}"
-      data-tip="${esc(to.epic.title)}" data-sub=" · drag onto an epic to plan it right after"/>`,
-  };
-}
-
-function planSvg(layout, epics, order, view) {
-  const violations = planViolations(epics, order);
+function planSvg(layout, view) {
   const marker = (id, color) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5"
     orient="auto-start-reverse"><path d="M0,1 L9.5,5 L0,9 z" fill="${color}"/></marker>`;
-  const deps = [];
-  for (const e of epics) {
-    const to = layout.nodes[e.name];
-    for (const dep of e.dependencies || []) {
-      const from = layout.nodes[planDep(dep)];
-      if (from && to && from !== to) {
-        deps.push(`<path class="plan-dep" d="${planPath(planLink(from, to))}" marker-end="url(#plan-dep-head)"/>`);
-      }
-    }
-  }
-  const arrows = [], handles = [];
-  for (let i = 0; i + 1 < order.length; i++) {
-    const from = layout.nodes[order[i]], to = layout.nodes[order[i + 1]];
-    if (!from || !to) continue;
-    const link = planArrowSvg(from, to, from.epic.locked || to.epic.locked, violations[to.name] || []);
-    arrows.push(link.arrow);
-    handles.push(link.handle);
-  }
-  return `<svg id="plan-svg" role="img" aria-label="epic plan">
-    <defs>${marker("plan-dep-head", "var(--ink-3)")}${marker("plan-head", "var(--plan-order)")}${marker("plan-head-bad", "var(--bad)")}</defs>
+  const bands = layout.bands.map(b => `<g class="plan-band" data-band="${esc(b.epic)}">
+    <rect x="${PLAN_BOX.pad / 2}" y="${planRound(b.y - 9)}" width="${layout.width - PLAN_BOX.pad}"
+      height="${planRound(b.height + 18)}" rx="10"/>
+    <text x="${PLAN_BOX.pad}" y="${planRound(b.y + 14)}">${esc(b.title)}</text>
+    <text class="count" x="${PLAN_BOX.pad}" y="${planRound(b.y + 30)}">${b.tasks} ${b.tasks > 1 ? "tasks" : "task"}</text>
+  </g>`).join("");
+  const edges = layout.edges.map(e => {
+    const from = layout.nodes[e.from], to = layout.nodes[e.to];
+    if (!from || !to) return "";
+    return `<path class="plan-dep${e.cross ? " cross" : ""}" d="${planPath(planLink(from, to))}"
+      marker-end="url(#plan-dep-head${e.cross ? "-cross" : ""})" data-from="${esc(e.from)}" data-to="${esc(e.to)}"/>`;
+  }).join("");
+  return `<svg id="plan-svg" role="img" aria-label="task plan">
+    <defs>${marker("plan-dep-head", "var(--ink-3)")}${marker("plan-dep-head-cross", "var(--ink-2)")}</defs>
     <g id="plan-zoom" transform="translate(${view.x},${view.y}) scale(${view.k})">
-      <g class="plan-deps">${deps.join("")}</g>
-      <g class="plan-arrows">${arrows.join("")}</g>
-      <g class="plan-nodes">${layout.list.map(n => planNodeSvg(n, violations)).join("")}</g>
-      <g class="plan-handles">${handles.join("")}</g>
+      <g class="plan-bands">${bands}</g>
+      <g class="plan-edges">${edges}</g>
+      <g class="plan-nodes">${layout.list.map(n => planNodeSvg(n, layout)).join("")}</g>
     </g></svg>`;
 }
 // --- end plan logic ---
 
-let planDrag = null, planSig = "", planLayoutCache = null, planNoteTimer = 0;
-
-function planLockedNames(d) {
-  return d.order.filter(name => (d.epics.find(e => e.name === name) || {}).locked);
-}
+let planSig = "", planLayoutCache = null;
 
 function applyPlanView() {
   const g = document.getElementById("plan-zoom");
@@ -1252,7 +1286,7 @@ function applyPlanView() {
 
 function planZoom(factor, px, py) {
   const v = state.planView;
-  const k = Math.max(0.25, Math.min(2.5, v.k * factor));
+  const k = Math.max(0.15, Math.min(2.5, v.k * factor));
   const cx = px == null ? 320 : px, cy = py == null ? 220 : py;
   v.x = cx - (cx - v.x) * (k / v.k);
   v.y = cy - (cy - v.y) * (k / v.k);
@@ -1265,27 +1299,22 @@ function planFit() {
   const svg = document.getElementById("plan-svg");
   if (!svg || !planLayoutCache) return;
   const box = svg.getBoundingClientRect();
-  const k = Math.max(0.25, Math.min(1.2, (box.width - 24) / planLayoutCache.width, (box.height - 24) / planLayoutCache.height));
-  state.planView = { x: 12, y: Math.max(12, (box.height - planLayoutCache.height * k) / 2), k };
+  const k = Math.max(0.15, Math.min(1.2, (box.width - 24) / planLayoutCache.width, (box.height - 68) / planLayoutCache.height));
+  state.planView = { x: 12, y: Math.max(48, (box.height - planLayoutCache.height * k) / 2), k };
   applyPlanView();
   saveUi();
 }
 
-function planNote(text, bad) {
-  const note = document.getElementById("plan-note");
-  if (!note) return;
-  note.textContent = text;
-  note.classList.toggle("bad", !!bad);
-  clearTimeout(planNoteTimer);
-  planNoteTimer = setTimeout(() => { note.textContent = ""; }, bad ? 6000 : 1600);
-}
-
-function planPoint(ev) {
-  const box = document.getElementById("plan-svg").getBoundingClientRect();
-  return {
-    x: (ev.clientX - box.left - state.planView.x) / state.planView.k,
-    y: (ev.clientY - box.top - state.planView.y) / state.planView.k,
-  };
+function planHover(svg, path) {
+  svg.querySelectorAll(".lit").forEach(el => el.classList.remove("lit"));
+  if (!path) { svg.classList.remove("hover"); return; }
+  const related = planRelated(planLayoutCache, path);
+  for (const name of related.nodes) svg.querySelector(`[data-node="${name}"]`)?.classList.add("lit");
+  for (const edge of related.edges) {
+    const [from, to] = edge.split(" > ");
+    svg.querySelector(`.plan-dep[data-from="${from}"][data-to="${to}"]`)?.classList.add("lit");
+  }
+  svg.classList.add("hover");
 }
 
 function planPan(ev, svg) {
@@ -1303,53 +1332,20 @@ function planPan(ev, svg) {
   window.addEventListener("mouseup", up);
 }
 
-function planDropTarget(ev) {
-  const el = document.elementFromPoint(ev.clientX, ev.clientY);
-  const node = el && el.closest ? el.closest("[data-node]") : null;
-  return node ? node.dataset.node : null;
-}
-
-function planStartDrag(ev, svg, handle) {
-  const d = state.plan;
-  const name = handle.dataset.handle;
-  const arrow = svg.querySelector(`.plan-arrow[data-to="${name}"]`);
-  const ghost = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  ghost.setAttribute("class", "plan-ghost");
-  document.getElementById("plan-zoom").appendChild(ghost);
-  arrow.classList.add("dragging");
-  planDrag = { name, locked: planLockedNames(d) };
-  const source = planLayoutCache.nodes[handle.dataset.from];
-  let hover = null;
-  const paint = at => {
-    const p = planPoint(at);
-    ghost.setAttribute("d", planPath(planLink(source, { x: p.x - 4, y: p.y - 4, w: 8, h: 8 })));
-    const target = planDropTarget(at);
-    if (hover && hover.dataset.node !== target) hover.classList.remove("drop", "drop-bad");
-    hover = target ? svg.querySelector(`[data-node="${target}"]`) : null;
-    if (!hover) return;
-    const move = planReorder(d.order, name, target, planDrag.locked);
-    hover.classList.toggle("drop", !move.error);
-    hover.classList.toggle("drop-bad", !!move.error);
-  };
-  const drop = at => {
-    window.removeEventListener("mousemove", paint);
-    window.removeEventListener("mouseup", drop);
-    ghost.remove();
-    arrow.classList.remove("dragging");
-    if (hover) hover.classList.remove("drop", "drop-bad");
-    const target = planDropTarget(at);
-    const move = target ? planReorder(d.order, name, target, planDrag.locked) : { error: "" };
-    planDrag = null;
-    if (move.error === "locked") planNote("locked", true);
-    else if (!move.error) planSavePlan(move.order);
-  };
-  window.addEventListener("mousemove", paint);
-  window.addEventListener("mouseup", drop);
-  paint(ev);
-}
-
 function bindPlan(el) {
   const svg = el.querySelector("#plan-svg");
+  el.querySelector("#plan-epic").onchange = ev => {
+    state.planFilter = { ...state.planFilter, epic: ev.target.value };
+    state.planView = null;
+    renderPlan(true);
+    saveUi();
+  };
+  el.querySelector("#plan-open").onchange = ev => {
+    state.planFilter = { ...state.planFilter, open: ev.target.checked };
+    state.planView = null;
+    renderPlan(true);
+    saveUi();
+  };
   if (!svg) return;
   el.querySelector("#plan-in").onclick = () => planZoom(1.25);
   el.querySelector("#plan-out").onclick = () => planZoom(1 / 1.25);
@@ -1362,50 +1358,62 @@ function bindPlan(el) {
   svg.onmousedown = ev => {
     if (ev.button) return;
     ev.preventDefault();
-    const handle = ev.target.closest("[data-handle]");
-    if (handle) planStartDrag(ev, svg, handle);
-    else planPan(ev, svg);
+    planPan(ev, svg);
   };
+  svg.querySelectorAll("[data-node]").forEach(node => {
+    node.addEventListener("mouseenter", () => planHover(svg, node.dataset.node));
+    node.addEventListener("mouseleave", () => planHover(svg, null));
+    node.onclick = () => openPanel(node.dataset.node);
+  });
 }
 
-async function planSavePlan(order) {
-  const previous = state.plan.order;
-  state.plan = { ...state.plan, order };
-  renderPlan(true);
+async function savePriority(name, value) {
+  const note = () => document.getElementById("prio-note");
+  const number = Math.round(Number(value));
+  if (!String(value).trim() || !Number.isFinite(number)) {
+    note().textContent = "priority must be a whole number";
+    note().classList.add("bad");
+    return;
+  }
   try {
-    const r = await fetch("/api/plan", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order }),
+    const r = await fetch("/api/priority", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ epic: name, priority: number }),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "the server refused the order");
-    state.plan = data;
-    renderPlan(true);
-    planNote("saved");
+    if (!r.ok) throw new Error(data.error || "the server refused the priority");
+    planSig = "";
+    await refresh();
+    if (note()) { note().textContent = "saved"; note().classList.remove("bad"); }
   } catch (err) {
-    state.plan = { ...state.plan, order: previous };
-    renderPlan(true);
-    planNote(String(err.message || err), true);
+    if (note()) { note().textContent = String(err.message || err); note().classList.add("bad"); }
   }
 }
 
 function renderPlan(force) {
   const el = document.getElementById("plan");
-  const d = state.plan;
-  if (!d) { el.innerHTML = `<div class="empty-state">Loading the plan…</div>`; return; }
-  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
-  if (!d.epics.length) { el.innerHTML = `<div class="empty-state">No epics yet</div>`; return; }
-  const sig = JSON.stringify([d.order, d.epics.map(e => [e.name, e.title, e.status, e.dependencies])]);
+  const epics = state.data ? state.data.epics : [];
+  if (!epics.length) { el.innerHTML = `<div class="empty-state">No epics yet</div>`; return; }
+  const filter = state.planFilter;
+  const sig = JSON.stringify([filter, epics.map(e => [e.name, e.priority, e.children.map(t =>
+    [t.path, t.status, t.dependencies, t.children.map(s => s.dependencies)])])]);
   if (!force && sig === planSig && el.querySelector("#plan-svg")) { applyPlanView(); return; }
   planSig = sig;
   const fit = !state.planView;
   if (fit) state.planView = { x: 12, y: 12, k: 1 };
-  planLayoutCache = planLayout(d.epics, d.order);
+  planLayoutCache = planLayout(epics, filter);
+  const options = planEpics(epics).map(e =>
+    `<option value="${esc(e.name)}"${filter.epic === e.name ? " selected" : ""}>${esc(planTitle(e))}</option>`).join("");
   el.innerHTML = `<div class="plan-tools">
-      <span class="hint">drag an arrow head onto an epic · drag the background to pan</span>
-      <span class="plan-note" id="plan-note"></span>
+      <span class="hint">drag to pan · scroll to zoom · hover a task for its links</span>
+      <select id="plan-epic" title="Show one epic"><option value="">all epics</option>${options}</select>
+      <label title="Hide complete and discarded tasks">
+        <input type="checkbox" id="plan-open"${filter.open ? " checked" : ""}>unfinished only</label>
       <button id="plan-out" title="Zoom out">−</button><button id="plan-in" title="Zoom in">+</button>
       <button id="plan-fit" title="Fit the diagram">fit</button>
-    </div>` + planSvg(planLayoutCache, d.epics, d.order, state.planView);
+    </div>` + (planLayoutCache.list.length
+      ? planSvg(planLayoutCache, state.planView)
+      : `<div class="empty-state">No tasks match the filter</div>`);
   bindPlan(el);
   bindTips(el);
   if (fit) planFit();
@@ -1438,11 +1446,9 @@ async function loadApi(path) {
 async function loadView() {
   if (state.view === "tests") state.tests = await loadApi("/api/tests");
   if (state.view === "benchmarks") state.bench = await loadApi("/api/benchmarks");
-  if (state.view === "plan") state.plan = await loadApi("/api/plan");
 }
 
 async function refresh() {
-  if (planDrag) return;
   try {
     const r = await fetch("/api/state");
     state.data = await r.json();
