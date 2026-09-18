@@ -1,0 +1,52 @@
+{
+  "project": "material",
+  "timestamp": "2026-09-18T06:48:30Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.084363,
+  "tests": [
+    {
+      "suite": "render.Material",
+      "case": "tint_resolves_to_children",
+      "status": "pass",
+      "elapsed": 0.011506
+    },
+    {
+      "suite": "render.Material",
+      "case": "child_with_own_tint_keeps_it",
+      "status": "pass",
+      "elapsed": 0.012589
+    },
+    {
+      "suite": "render.Material",
+      "case": "tint_removed_falls_back_to_parent",
+      "status": "pass",
+      "elapsed": 0.012445
+    },
+    {
+      "suite": "render.Material",
+      "case": "new_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.011133
+    },
+    {
+      "suite": "render.Material",
+      "case": "instance_color_uses_tint_and_opacity",
+      "status": "pass",
+      "elapsed": 0.012417
+    },
+    {
+      "suite": "render.Material",
+      "case": "emissive_scaled_by_strength",
+      "status": "pass",
+      "elapsed": 0.012209
+    },
+    {
+      "suite": "render.Material",
+      "case": "pbr_defaults",
+      "status": "pass",
+      "elapsed": 0.012064
+    }
+  ]
+}

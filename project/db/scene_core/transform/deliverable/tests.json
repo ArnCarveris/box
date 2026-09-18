@@ -1,56 +1,286 @@
 {
   "project": "transform",
-  "timestamp": "2026-09-18T06:10:11Z",
+  "timestamp": "2026-09-18T06:48:30Z",
   "pass": 46,
   "fail": 0,
   "empty": 0,
-  "elapsed": 0.049958,
+  "elapsed": 0.384165,
   "tests": [
-    {"suite": "Math", "case": "identity_is_neutral", "status": "pass", "elapsed": 0.003991},
-    {"suite": "Math", "case": "translation_matrix", "status": "pass", "elapsed": 0.004346},
-    {"suite": "Math", "case": "scale_matrix", "status": "pass", "elapsed": 0.003992},
-    {"suite": "Math", "case": "rotation_x_hand_computed", "status": "pass", "elapsed": 0.004220},
-    {"suite": "Math", "case": "rotation_xyz_hand_computed", "status": "pass", "elapsed": 0.004984},
-    {"suite": "Math", "case": "rotation_yxz_hand_computed", "status": "pass", "elapsed": 0.004308},
-    {"suite": "Math", "case": "trs_composition", "status": "pass", "elapsed": 0.004318},
-    {"suite": "Math", "case": "parent_child_multiplication", "status": "pass", "elapsed": 0.005010},
-    {"suite": "Math", "case": "facing_z_axis_matches_direction", "status": "pass", "elapsed": 0.003879},
-    {"suite": "Math", "case": "facing_euler_round_trip", "status": "pass", "elapsed": 0.003637},
-    {"suite": "Static", "case": "position_only", "status": "pass", "elapsed": 0.008908},
-    {"suite": "Static", "case": "scale_defaults_to_one", "status": "pass", "elapsed": 0.008802},
-    {"suite": "Static", "case": "rotation_composition", "status": "pass", "elapsed": 0.008875},
-    {"suite": "Static", "case": "rotation_and_scale_composition", "status": "pass", "elapsed": 0.008809},
-    {"suite": "Static", "case": "orientation_wins_over_rotation", "status": "pass", "elapsed": 0.007994},
-    {"suite": "Static", "case": "child_of_moved_parent", "status": "pass", "elapsed": 0.008355},
-    {"suite": "Static", "case": "grandchild_of_moved_parent", "status": "pass", "elapsed": 0.008547},
-    {"suite": "Static", "case": "scale_inherited_three_levels", "status": "pass", "elapsed": 0.007636},
-    {"suite": "Static", "case": "child_set_does_not_move_parent", "status": "pass", "elapsed": 0.008205},
-    {"suite": "Static", "case": "reparent_to_new_parent", "status": "pass", "elapsed": 0.008793},
-    {"suite": "Static", "case": "remove_parent_makes_root", "status": "pass", "elapsed": 0.008767},
-    {"suite": "Static", "case": "manual_transform_not_written", "status": "pass", "elapsed": 0.008934},
-    {"suite": "Static", "case": "manual_transform_parent_propagates", "status": "pass", "elapsed": 0.008577},
-    {"suite": "Static", "case": "one_on_set_per_entity", "status": "pass", "elapsed": 0.011189},
-    {"suite": "Static", "case": "one_on_set_for_new_child", "status": "pass", "elapsed": 0.008615},
-    {"suite": "Static", "case": "delete_parent_deletes_subtree", "status": "pass", "elapsed": 0.007855},
-    {"suite": "Static", "case": "deep_chain", "status": "pass", "elapsed": 0.011496},
-    {"suite": "Dynamic", "case": "dynamic_root_updates_each_frame", "status": "pass", "elapsed": 0.008853},
-    {"suite": "Dynamic", "case": "dynamic_parent_static_child", "status": "pass", "elapsed": 0.009092},
-    {"suite": "Dynamic", "case": "dynamic_grandparent_static_chain", "status": "pass", "elapsed": 0.008803},
-    {"suite": "Dynamic", "case": "dynamic_scale_inherited", "status": "pass", "elapsed": 0.008851},
-    {"suite": "Dynamic", "case": "orientation_in_dynamic", "status": "pass", "elapsed": 0.008901},
-    {"suite": "Dynamic", "case": "dynamic_emits_no_events", "status": "pass", "elapsed": 0.008795},
-    {"suite": "Dynamic", "case": "add_then_remove_dynamic", "status": "pass", "elapsed": 0.008550},
-    {"suite": "Dynamic", "case": "manual_transform_not_written", "status": "pass", "elapsed": 0.008912},
-    {"suite": "Dynamic", "case": "deep_chain_cascade_order", "status": "pass", "elapsed": 0.013101},
-    {"suite": "Dynamic", "case": "static_sibling_not_updated_by_system", "status": "pass", "elapsed": 0.008673},
-    {"suite": "LookAt", "case": "target_in_front", "status": "pass", "elapsed": 0.008415},
-    {"suite": "LookAt", "case": "target_behind", "status": "pass", "elapsed": 0.008620},
-    {"suite": "LookAt", "case": "target_below", "status": "pass", "elapsed": 0.008578},
-    {"suite": "LookAt", "case": "target_above", "status": "pass", "elapsed": 0.008401},
-    {"suite": "LookAt", "case": "target_to_the_side", "status": "pass", "elapsed": 0.008388},
-    {"suite": "LookAt", "case": "rotation_round_trips", "status": "pass", "elapsed": 0.007831},
-    {"suite": "LookAt", "case": "follows_moving_entity", "status": "pass", "elapsed": 0.007952},
-    {"suite": "LookAt", "case": "child_of_translated_parent", "status": "pass", "elapsed": 0.008998},
-    {"suite": "LookAt", "case": "dynamic_entity", "status": "pass", "elapsed": 0.008476}
+    {
+      "suite": "transform.Math",
+      "case": "identity_is_neutral",
+      "status": "pass",
+      "elapsed": 0.004551
+    },
+    {
+      "suite": "transform.Math",
+      "case": "translation_matrix",
+      "status": "pass",
+      "elapsed": 0.004542
+    },
+    {
+      "suite": "transform.Math",
+      "case": "scale_matrix",
+      "status": "pass",
+      "elapsed": 0.004657
+    },
+    {
+      "suite": "transform.Math",
+      "case": "rotation_x_hand_computed",
+      "status": "pass",
+      "elapsed": 0.005164
+    },
+    {
+      "suite": "transform.Math",
+      "case": "rotation_xyz_hand_computed",
+      "status": "pass",
+      "elapsed": 0.004668
+    },
+    {
+      "suite": "transform.Math",
+      "case": "rotation_yxz_hand_computed",
+      "status": "pass",
+      "elapsed": 0.005328
+    },
+    {
+      "suite": "transform.Math",
+      "case": "trs_composition",
+      "status": "pass",
+      "elapsed": 0.005129
+    },
+    {
+      "suite": "transform.Math",
+      "case": "parent_child_multiplication",
+      "status": "pass",
+      "elapsed": 0.005144
+    },
+    {
+      "suite": "transform.Math",
+      "case": "facing_z_axis_matches_direction",
+      "status": "pass",
+      "elapsed": 0.003441
+    },
+    {
+      "suite": "transform.Math",
+      "case": "facing_euler_round_trip",
+      "status": "pass",
+      "elapsed": 0.003597
+    },
+    {
+      "suite": "transform.Static",
+      "case": "position_only",
+      "status": "pass",
+      "elapsed": 0.011607
+    },
+    {
+      "suite": "transform.Static",
+      "case": "scale_defaults_to_one",
+      "status": "pass",
+      "elapsed": 0.01163
+    },
+    {
+      "suite": "transform.Static",
+      "case": "rotation_composition",
+      "status": "pass",
+      "elapsed": 0.011147
+    },
+    {
+      "suite": "transform.Static",
+      "case": "rotation_and_scale_composition",
+      "status": "pass",
+      "elapsed": 0.011099
+    },
+    {
+      "suite": "transform.Static",
+      "case": "orientation_wins_over_rotation",
+      "status": "pass",
+      "elapsed": 0.011108
+    },
+    {
+      "suite": "transform.Static",
+      "case": "child_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.010937
+    },
+    {
+      "suite": "transform.Static",
+      "case": "grandchild_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.011942
+    },
+    {
+      "suite": "transform.Static",
+      "case": "scale_inherited_three_levels",
+      "status": "pass",
+      "elapsed": 0.008365
+    },
+    {
+      "suite": "transform.Static",
+      "case": "child_set_does_not_move_parent",
+      "status": "pass",
+      "elapsed": 0.009116
+    },
+    {
+      "suite": "transform.Static",
+      "case": "reparent_to_new_parent",
+      "status": "pass",
+      "elapsed": 0.008971
+    },
+    {
+      "suite": "transform.Static",
+      "case": "remove_parent_makes_root",
+      "status": "pass",
+      "elapsed": 0.0091
+    },
+    {
+      "suite": "transform.Static",
+      "case": "manual_transform_not_written",
+      "status": "pass",
+      "elapsed": 0.009019
+    },
+    {
+      "suite": "transform.Static",
+      "case": "manual_transform_parent_propagates",
+      "status": "pass",
+      "elapsed": 0.008961
+    },
+    {
+      "suite": "transform.Static",
+      "case": "one_on_set_per_entity",
+      "status": "pass",
+      "elapsed": 0.011719
+    },
+    {
+      "suite": "transform.Static",
+      "case": "one_on_set_for_new_child",
+      "status": "pass",
+      "elapsed": 0.008645
+    },
+    {
+      "suite": "transform.Static",
+      "case": "delete_parent_deletes_subtree",
+      "status": "pass",
+      "elapsed": 0.007879
+    },
+    {
+      "suite": "transform.Static",
+      "case": "deep_chain",
+      "status": "pass",
+      "elapsed": 0.010945
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "dynamic_root_updates_each_frame",
+      "status": "pass",
+      "elapsed": 0.008718
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "dynamic_parent_static_child",
+      "status": "pass",
+      "elapsed": 0.008796
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "dynamic_grandparent_static_chain",
+      "status": "pass",
+      "elapsed": 0.008643
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "dynamic_scale_inherited",
+      "status": "pass",
+      "elapsed": 0.008872
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "orientation_in_dynamic",
+      "status": "pass",
+      "elapsed": 0.008872
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "dynamic_emits_no_events",
+      "status": "pass",
+      "elapsed": 0.008314
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "add_then_remove_dynamic",
+      "status": "pass",
+      "elapsed": 0.008371
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "manual_transform_not_written",
+      "status": "pass",
+      "elapsed": 0.00855
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "deep_chain_cascade_order",
+      "status": "pass",
+      "elapsed": 0.012144
+    },
+    {
+      "suite": "transform.Dynamic",
+      "case": "static_sibling_not_updated_by_system",
+      "status": "pass",
+      "elapsed": 0.008698
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "target_in_front",
+      "status": "pass",
+      "elapsed": 0.008517
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "target_behind",
+      "status": "pass",
+      "elapsed": 0.008517
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "target_below",
+      "status": "pass",
+      "elapsed": 0.008371
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "target_above",
+      "status": "pass",
+      "elapsed": 0.008567
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "target_to_the_side",
+      "status": "pass",
+      "elapsed": 0.007991
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "rotation_round_trips",
+      "status": "pass",
+      "elapsed": 0.008618
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "follows_moving_entity",
+      "status": "pass",
+      "elapsed": 0.008321
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "child_of_translated_parent",
+      "status": "pass",
+      "elapsed": 0.008531
+    },
+    {
+      "suite": "transform.LookAt",
+      "case": "dynamic_entity",
+      "status": "pass",
+      "elapsed": 0.008343
+    }
   ]
 }

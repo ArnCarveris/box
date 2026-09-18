@@ -1,0 +1,304 @@
+{
+  "project": "geometry",
+  "timestamp": "2026-09-18T06:48:30Z",
+  "pass": 49,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.362464,
+  "tests": [
+    {
+      "suite": "geometry.Flat",
+      "case": "quad",
+      "status": "pass",
+      "elapsed": 0.004452
+    },
+    {
+      "suite": "geometry.Flat",
+      "case": "triangle",
+      "status": "pass",
+      "elapsed": 0.004448
+    },
+    {
+      "suite": "geometry.Flat",
+      "case": "right_triangle",
+      "status": "pass",
+      "elapsed": 0.004443
+    },
+    {
+      "suite": "geometry.Flat",
+      "case": "ngon_matches_triangle_at_three_sides",
+      "status": "pass",
+      "elapsed": 0.004409
+    },
+    {
+      "suite": "geometry.Flat",
+      "case": "ngon_clamps_minimum",
+      "status": "pass",
+      "elapsed": 0.004405
+    },
+    {
+      "suite": "geometry.Flat",
+      "case": "ngon",
+      "status": "pass",
+      "elapsed": 0.004416
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "box",
+      "status": "pass",
+      "elapsed": 0.004412
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "rounded_box",
+      "status": "pass",
+      "elapsed": 0.004425
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "rounded_box_clamps_radius",
+      "status": "pass",
+      "elapsed": 0.003525
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "rounded_box_clamps_segments",
+      "status": "pass",
+      "elapsed": 0.003682
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "triangle_prism",
+      "status": "pass",
+      "elapsed": 0.004027
+    },
+    {
+      "suite": "geometry.Box",
+      "case": "right_triangle_prism",
+      "status": "pass",
+      "elapsed": 0.003414
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "sphere_smooth",
+      "status": "pass",
+      "elapsed": 0.003738
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "sphere_flat",
+      "status": "pass",
+      "elapsed": 0.003771
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "hemisphere_smooth",
+      "status": "pass",
+      "elapsed": 0.003656
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "hemisphere_flat",
+      "status": "pass",
+      "elapsed": 0.004123
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "icosphere_base_smooth",
+      "status": "pass",
+      "elapsed": 0.003702
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "icosphere_base_flat",
+      "status": "pass",
+      "elapsed": 0.00364
+    },
+    {
+      "suite": "geometry.Round",
+      "case": "icosphere_subdivided",
+      "status": "pass",
+      "elapsed": 0.004019
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "cone_smooth",
+      "status": "pass",
+      "elapsed": 0.003376
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "cone_flat",
+      "status": "pass",
+      "elapsed": 0.003094
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "cylinder_smooth",
+      "status": "pass",
+      "elapsed": 0.003504
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "cylinder_flat",
+      "status": "pass",
+      "elapsed": 0.003336
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "frustum_smooth",
+      "status": "pass",
+      "elapsed": 0.00329
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "frustum_flat",
+      "status": "pass",
+      "elapsed": 0.003402
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "capsule_smooth",
+      "status": "pass",
+      "elapsed": 0.003244
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "capsule_flat",
+      "status": "pass",
+      "elapsed": 0.003653
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "tube_smooth",
+      "status": "pass",
+      "elapsed": 0.003326
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "tube_flat",
+      "status": "pass",
+      "elapsed": 0.003163
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "tube_open_arc",
+      "status": "pass",
+      "elapsed": 0.003482
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "torus_smooth",
+      "status": "pass",
+      "elapsed": 0.003512
+    },
+    {
+      "suite": "geometry.Axis",
+      "case": "torus_flat",
+      "status": "pass",
+      "elapsed": 0.003124
+    },
+    {
+      "suite": "render.Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.016326
+    },
+    {
+      "suite": "render.Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.016193
+    },
+    {
+      "suite": "render.Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.016382
+    },
+    {
+      "suite": "render.Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.016212
+    },
+    {
+      "suite": "render.Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.016345
+    },
+    {
+      "suite": "render.Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.016226
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.01635
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.016397
+    },
+    {
+      "suite": "render.Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.012298
+    },
+    {
+      "suite": "render.Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.012809
+    },
+    {
+      "suite": "render.Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.012602
+    },
+    {
+      "suite": "render.Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.012176
+    },
+    {
+      "suite": "render.Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.01231
+    },
+    {
+      "suite": "render.Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.012477
+    },
+    {
+      "suite": "render.Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.012487
+    },
+    {
+      "suite": "render.Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.012095
+    },
+    {
+      "suite": "render.Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.012566
+    }
+  ]
+}
