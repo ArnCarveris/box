@@ -43,6 +43,7 @@ int main(
     ECS_IMPORT(world, BoxTexture);
     ECS_IMPORT(world, BoxMovement);
     ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, BoxScript);
 
     if (box_parse_args(world, argc, argv)) {
         goto error;

@@ -1,0 +1,45 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+template Cluster {
+  prop tint: f32 = 0
+
+  base {
+    Position: {0, 0.4, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {120 + tint, 140, 200 - tint}
+  }
+
+  top {
+    Position: {0, 1.2, 0}
+    Sphere: {segments: 8, smooth: true, radius: 0.4}
+    Rgb: {230, 180 - tint, 90 + tint}
+  }
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+camera {
+  Position: {0, 40, -120}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 60}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {1000, 0.2, 1000}
+  Rgb: {80, 90, 85}
+}
+
+for i in 0..100000 {
+  _ {
+    Position: {(i % 320) * 3 - 478, 0, (i / 320) * 3 - 468}
+    Cluster: {tint: (i * 17) % 80}
+  }
+}

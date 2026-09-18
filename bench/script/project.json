@@ -1,0 +1,18 @@
+{
+    "id": "bench_script",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for incremental template instantiation",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Incremental",
+            "benchcases": [
+                "instantiate_10k",
+                "order_100k"
+            ]
+        }]
+    }
+}

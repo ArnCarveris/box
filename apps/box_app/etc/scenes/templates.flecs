@@ -1,0 +1,51 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+template Pillar {
+  prop tint: f32 = 0
+
+  base {
+    Position: {0, 0.15, 0}
+    Box: {1.1, 0.3, 1.1}
+    Rgb: {110, 110, 120}
+  }
+
+  shaft {
+    Position: {0, 1.4, 0}
+    Cylinder: {segments: 12, smooth: true, length: 2.2, radius: 0.35}
+    Rgb: {180 + tint, 150, 200 - tint}
+  }
+
+  cap {
+    Position: {0, 2.8, 0}
+    Sphere: {segments: 10, smooth: true, radius: 0.45}
+    Rgb: {240, 200 - tint, 120 + tint}
+  }
+}
+
+camera {
+  Position: {0, 6, -22}
+  LookAt: {0, 2, 0}
+  Camera: {fov: 60}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {400, 0.2, 400}
+  Rgb: {90, 100, 90}
+}
+
+for i in 0..4096 {
+  _ {
+    Position: {(i % 64) * 6 - 189, 0, (i / 64) * 6 - 189}
+    Pillar: {tint: (i * 13) % 60}
+  }
+}
