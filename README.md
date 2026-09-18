@@ -261,8 +261,8 @@ missing and where lower runs first.
 The tool derives the execution order from that: a task is ready when every
 dependency is complete (an epic as a dependency counts as complete when that
 epic is), and among the ready tasks the one from the epic with the lowest
-priority goes first, then the oldest one. That order fills the **Next up** list
-on the board and sorts unstarted epics and tasks everywhere the page lists them.
+priority goes first, then the oldest one. That order sorts unstarted epics and
+tasks everywhere the page lists them and is served as `next_up` in `/api/state`.
 
 The **Plan** tab draws one node per task, colored by status and grouped into a
 horizontal band per epic in priority order, with the columns left to right by

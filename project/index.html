@@ -130,16 +130,6 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .tests b.ok { color: var(--good); } .tests b.bad { color: var(--bad); } .tests b.empty { color: var(--warn); }
 .deps { font-size: 12px; color: var(--ink-3); }
 .deps code { font-family: var(--mono); font-size: 11px; }
-.next-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: up; }
-.next-list li {
-  display: flex; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
-}
-.next-list li::before {
-  counter-increment: up; content: counter(up); color: var(--ink-3); font-size: 11px;
-  font-variant-numeric: tabular-nums; min-width: 14px;
-}
-.next-list li:hover { background: var(--surface-2); }
-.next-list li .n { flex: 1; }
 .prio { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); }
 .prio input {
   font: inherit; width: 72px; color: var(--ink); background: var(--surface-2);
@@ -495,17 +485,6 @@ function renderEpics() {
   restoreScroll(document.querySelector("aside"), state.scroll.aside);
 }
 
-function nextUpCard() {
-  const list = state.data.next_up || [];
-  if (!list.length) return "";
-  return `<div class="card" style="grid-column: 1 / -1">
-    <div class="card-title"><h3>Next up</h3>
-      <span>ready to start · dependencies first, then epic priority</span></div>
-    <ol class="next-list">${list.map(i => `<li data-item="${esc(i.path)}">
-      <span class="n">${esc(i.title)}</span><span class="kind">${esc(i.epic_title)}</span>
-      <span class="chip pending">${ICONS.pending}${esc(i.level)}</span></li>`).join("")}</ol></div>`;
-}
-
 function renderBoard() {
   const board = document.getElementById("board");
   const epic = state.data.epics.find(e => e.path === state.epic);
@@ -532,7 +511,7 @@ function renderBoard() {
       <div class="brief">${esc(epic.readme.brief || "")}</div>
       ${testSummary(epic)}
     </div>`;
-  board.innerHTML = nextUpCard() + epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
+  board.innerHTML = epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
   board.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
   restoreScroll(document.getElementById("content"), state.scroll.content);
 }
