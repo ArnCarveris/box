@@ -1,0 +1,130 @@
+// effects/height_fog
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+
+camera {
+  Position: {0, 2.2, -14}
+  LookAt: {0, 2.2, 0}
+  Camera: {fov: 60}
+}
+
+sun {
+  Rotation: {0.75, -0.5, 0}
+  DirectionalLight: {intensity: 1.4}
+}
+
+$ { EnvironmentLight: {sky_color: {150, 170, 200}, ground_color: {70, 68, 62}, intensity: 0.9} }
+
+floor {
+  Position: {0, -0.1, 60}
+  Box: {60, 0.2, 180}
+  Rgb: {150, 148, 145}
+  PbrMaterial: {roughness: 0.9}
+}
+
+pillar_a {
+  Position: {-5, 3, 2}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_b {
+  Position: {5, 3, 2}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_c {
+  Position: {-5, 3, 12}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_d {
+  Position: {5, 3, 12}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_e {
+  Position: {-5, 3, 26}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_f {
+  Position: {5, 3, 26}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_g {
+  Position: {-5, 3, 44}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_h {
+  Position: {5, 3, 44}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_i {
+  Position: {-5, 3, 68}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_j {
+  Position: {5, 3, 68}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_k {
+  Position: {-5, 3, 98}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+pillar_l {
+  Position: {5, 3, 98}
+  Box: {1.2, 6, 1.2}
+  Rgb: {200, 196, 188}
+  PbrMaterial: {roughness: 0.7}
+}
+
+arch {
+  Position: {0, 6.4, 26}
+  Box: {12, 0.8, 1.2}
+  Rgb: {200, 196, 188}
+}
+
+sphere {
+  Position: {0, 1.2, 6}
+  Sphere: {segments: 32, smooth: true, radius: 1.2}
+  Rgb: {210, 110, 80}
+  PbrMaterial: {roughness: 0.4}
+}
+
+box { effects { stack { fog {
+  Effect: {enabled: true}
+  Fog: {color: {0.62, 0.66, 0.74}, density: 0.055, falloff: 0.45, start: 2,
+        max_opacity: 0.97, height: 0.5}
+} } } }

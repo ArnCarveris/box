@@ -171,7 +171,13 @@
                     "bloom_levels_follow_the_radius",
                     "karis_weight_falls_with_the_luminance",
                     "builtin_bloom_is_off_by_default",
-                    "bloom_parameters_reach_the_pass"
+                    "bloom_parameters_reach_the_pass",
+                    "fog_integrates_a_level_ray",
+                    "fog_integral_matches_a_numeric_one",
+                    "fog_thins_as_the_ray_climbs",
+                    "fog_factor_is_capped",
+                    "builtin_fog_is_off_by_default",
+                    "fog_parameters_reach_the_pass"
                 ],
                 "setup": true,
                 "teardown": true

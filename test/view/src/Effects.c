@@ -10,6 +10,7 @@
 #include <string.h>
 #include "../../../src/render/render_internal.h"
 #include "../../../src/renderer/bloom.h"
+#include "../../../src/renderer/fog.h"
 #include "../../../src/renderer/exposure.h"
 
 static ecs_world_t *w;
@@ -558,4 +559,119 @@ void Effects_bloom_parameters_reach_the_pass(void)
     test_flt(pass->params[3], 12.0f);
     test_uint(box_bloom_chain(packet.view.width, packet.view.height), 5);
     test_uint(box_bloom_levels(packet.view.width, packet.view.height, pass->params[1]), 3);
+}
+
+void Effects_fog_integrates_a_level_ray(void)
+{
+    // effects/height_fog
+    test_flt(box_fog_depth(0.1f, 0.0f, 0.0f, 5.0f, 0.0f, 0.0f, 10.0f), 1.0f);
+    test_assert(fabsf(box_fog_depth(0.1f, 0.5f, 0.0f, 2.0f, 0.0f, 0.0f, 10.0f) -
+        0.367879f) < 0.0001f);
+    test_assert(fabsf(box_fog_depth(0.1f, 0.5f, 2.0f, 2.0f, 0.0f, 0.0f, 10.0f) - 1.0f) <
+        0.0001f);
+    test_flt(box_fog_depth(0.1f, 0.0f, 0.0f, 5.0f, 0.0f, 4.0f, 4.0f), 0.0f);
+    test_flt(box_fog_depth(0.1f, 0.0f, 0.0f, 5.0f, 0.0f, 8.0f, 4.0f), 0.0f);
+    test_flt(box_fog_depth(0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f), 0.0f);
+}
+
+void Effects_fog_integral_matches_a_numeric_one(void)
+{
+    // effects/height_fog
+    float density = 0.08f;
+    float falloff = 0.35f;
+    float height = 1.5f;
+    float y0 = 4.0f;
+    float t0 = 3.0f;
+    float t1 = 40.0f;
+    float dy;
+    for (dy = -0.9f; dy < 0.95f; dy += 0.3f) {
+        double numeric = 0.0;
+        int32_t steps = 20000;
+        int32_t i;
+        for (i = 0; i < steps; i ++) {
+            double t = t0 + ((double)i + 0.5) * (t1 - t0) / steps;
+            numeric += density * exp(-falloff * (y0 + dy * t - height)) * (t1 - t0) / steps;
+        }
+
+        float analytic = box_fog_depth(density, falloff, height, y0, dy, t0, t1);
+        test_assert(fabs(numeric - analytic) < 0.0005 * (numeric + 0.01));
+    }
+}
+
+void Effects_fog_thins_as_the_ray_climbs(void)
+{
+    // effects/height_fog
+    float level = box_fog_depth(0.2f, 0.4f, 0.0f, 2.0f, 0.0f, 0.0f, 30.0f);
+    float up = box_fog_depth(0.2f, 0.4f, 0.0f, 2.0f, 0.6f, 0.0f, 30.0f);
+    float down = box_fog_depth(0.2f, 0.4f, 0.0f, 2.0f, -0.06f, 0.0f, 30.0f);
+    test_assert(up < level);
+    test_assert(down > level);
+    test_assert(up > 0.0f);
+
+    float high = box_fog_depth(0.2f, 0.4f, 0.0f, 20.0f, 0.0f, 0.0f, 30.0f);
+    test_assert(high < level);
+}
+
+void Effects_fog_factor_is_capped(void)
+{
+    // effects/height_fog
+    float thin = box_fog_factor(0.02f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f, 1.0f);
+    test_assert(fabsf(thin - 0.181269f) < 0.0001f);
+
+    float thick = box_fog_factor(2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 1.0f);
+    test_assert(thick > 0.999f);
+
+    float capped = box_fog_factor(2.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.6f);
+    test_flt(capped, 0.6f);
+
+    float none = box_fog_factor(0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 20.0f, 10.0f, 1.0f);
+    test_flt(none, 0.0f);
+    test_assert(box_fog_factor(0.02f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f, 0.0f) > 0.18f);
+}
+
+void Effects_builtin_fog_is_off_by_default(void)
+{
+    // effects/height_fog
+    ecs_entity_t fog = ecs_lookup(w, "box.effects.stack.fog");
+    test_assert(fog != 0);
+    const Effect *fx = ecs_get(w, fog, Effect);
+    test_assert(fx != NULL);
+    test_bool(fx->enabled, false);
+    test_bool(fx->depth, true);
+    test_bool(fx->color, true);
+    test_int(fx->order, 700);
+    test_assert(fx->order < ecs_get(w, ecs_lookup(w, "box.effects.stack.bloom"), Effect)->order);
+    test_uint(fx->shader, ecs_lookup(w, "box.effects.shaders.fog"));
+
+    const Fog *params = ecs_get(w, fog, Fog);
+    test_assert(params != NULL);
+    test_flt(params->density, 0.02f);
+    test_flt(params->max_opacity, 1.0f);
+    test_flt(params->height, 0.0f);
+
+    box_render_extract(w, &packet);
+    test_int(packet.effects.count, 0);
+}
+
+void Effects_fog_parameters_reach_the_pass(void)
+{
+    // effects/height_fog
+    ecs_entity_t fog = ecs_lookup(w, "box.effects.stack.fog");
+    ecs_get_mut(w, fog, Effect)->enabled = true;
+    ecs_modified(w, fog, Effect);
+    ecs_set(w, fog, Fog, { .color = {0.25f, 0.5f, 0.75f}, .density = 0.04f, .falloff = 0.3f,
+        .start = 5.0f, .max_opacity = 0.8f, .height = 1.5f });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH);
+    test_flt(pass->params[0], 0.25f);
+    test_flt(pass->params[1], 0.5f);
+    test_flt(pass->params[2], 0.75f);
+    test_flt(pass->params[3], 0.04f);
+    test_flt(pass->params[4], 0.3f);
+    test_flt(pass->params[5], 5.0f);
+    test_flt(pass->params[6], 0.8f);
+    test_flt(pass->params[7], 1.5f);
 }
