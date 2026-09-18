@@ -222,6 +222,20 @@
                 "teardown": true
             },
             {
+                "id": "SvgJobs",
+                "testcases": [
+                    "queues_a_job_instead_of_rasterizing",
+                    "previous_image_stays_while_resizing",
+                    "completion_uploads_on_the_main_thread",
+                    "new_set_supersedes_the_queued_job",
+                    "deleting_the_entity_cancels_the_job",
+                    "bands_split_a_large_image",
+                    "nearest_texture_rasterizes_first"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Tiling",
                 "testcases": [
                     "component_defaults",

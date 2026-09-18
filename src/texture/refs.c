@@ -109,6 +109,84 @@ done:
     return;
 }
 
+/** Squared distance between two positions.
+ *
+ * @param a The first position
+ * @param b The second position
+ * @return The squared distance
+ */
+static double box_texture_dist2(
+    vec3 a,
+    vec3 b)
+{
+    vec3 d = vec3_sub(a, b);
+
+    return (double)d.x * d.x + (double)d.y * d.y + (double)d.z * d.z;
+}
+
+/** World position of an entity, from its transform or its local position.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out Receives the position
+ * @return true when the entity has a position
+ */
+static bool box_texture_position(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    vec3 *out)
+{
+    bool result = false;
+    const WorldTransform *wt = ecs_get(world, e, WorldTransform);
+    if (wt) {
+        *out = vec3_new(wt->m.v[12], wt->m.v[13], wt->m.v[14]);
+        result = true;
+        goto done;
+    }
+
+    const Position *p = ecs_get(world, e, Position);
+    if (p) {
+        *out = vec3_new(p->x, p->y, p->z);
+        result = true;
+    }
+
+done:
+    return result;
+}
+
+bool box_texture_refs_nearest(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    vec3 eye,
+    vec3 *out)
+{
+    bool result = false;
+    ecs_vec_t *list = box_texture_refs_list(world, texture, false);
+    if (!list) {
+        goto done;
+    }
+
+    int32_t count = box_texture_refs_compact(world, list, texture);
+    double best = 0;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        vec3 pos;
+        if (!box_texture_position(world, ecs_vec_get_t(list, ecs_entity_t, i)[0], &pos)) {
+            continue;
+        }
+
+        double d = box_texture_dist2(pos, eye);
+        if (!result || d < best) {
+            best = d;
+            *out = pos;
+            result = true;
+        }
+    }
+
+done:
+    return result;
+}
+
 void box_texture_refs_mark(
     ecs_world_t *world,
     ecs_entity_t texture)

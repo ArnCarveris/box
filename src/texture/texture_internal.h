@@ -25,6 +25,7 @@ typedef struct TextureImpl {
     int32_t source_height; /**< Height of the image file */
     ecs_entity_t source;   /**< Component that owns the texture, Texture or Svg */
     bool conflict;         /**< The rejected second source component was logged */
+    bool pending;          /**< A rasterization job has not published its image yet */
 } TextureImpl;
 
 /** Materials that bind a texture entity in one of their PbrTextures slots */
@@ -144,6 +145,20 @@ void box_svg_init(
  */
 void box_texture_refs_init(
     ecs_world_t *world);
+
+/** Position of the entity nearest the eye that binds a texture.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @param eye The position distances are measured from
+ * @param out Receives the position
+ * @return true when a material binds the texture
+ */
+bool box_texture_refs_nearest(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    vec3 eye,
+    vec3 *out);
 
 /** Queue every material that binds a texture for re-extraction.
  *

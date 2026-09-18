@@ -1,11 +1,10 @@
 /**
  * @file texture/svg.c
- * @brief Rasterizes an Svg component with resvg and uploads it as a texture.
+ * @brief Rasterizes an Svg component with resvg, one horizontal band at a time.
  */
 
-#include "texture_internal.h"
+#include "svg_internal.h"
 #include "../shader/shader_internal.h"
-#include <resvg.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -109,26 +108,24 @@ done:
     return;
 }
 
-/** Parse the file or the inline data of an Svg component.
+/** Parse the file or the inline data of an image.
  *
- * @param svg The component
+ * @param img The image
  * @return The parsed tree, or NULL when neither source parses
  */
 static resvg_render_tree* box_svg_parse(
-    const Svg *svg)
+    const box_svg_image_t *img)
 {
     resvg_render_tree *result = NULL;
     int32_t err = RESVG_OK;
-    if (svg->file && svg->file[0]) {
-        char path[BOX_SHADER_PATH_MAX];
-        box_shader_resolve(svg->file, path, sizeof(path));
-        err = resvg_parse_tree_from_file(path, box_svg_opts, &result);
+    if (img->file) {
+        err = resvg_parse_tree_from_file(img->file, box_svg_opts, &result);
         if (err != RESVG_OK) {
-            ecs_err("svg: cannot parse '%s' (%d)", svg->file, err);
+            ecs_err("svg: cannot parse '%s' (%d)", img->file, err);
         }
-    } else if (svg->data && svg->data[0]) {
-        uintptr_t len = (uintptr_t)ecs_os_strlen(svg->data);
-        err = resvg_parse_tree_from_data(svg->data, len, box_svg_opts, &result);
+    } else if (img->data) {
+        uintptr_t len = (uintptr_t)ecs_os_strlen(img->data);
+        err = resvg_parse_tree_from_data(img->data, len, box_svg_opts, &result);
         if (err != RESVG_OK) {
             ecs_err("svg: cannot parse the inline data (%d)", err);
         }
@@ -171,20 +168,20 @@ static int32_t box_svg_clamp(
  * fits the SVG in it, so the art is never distorted.
  *
  * @param source The size of the parsed SVG
- * @param svg The component
+ * @param request The requested width and height in pixels
  * @param size Receives the width and the height in pixels
  * @param scale Receives the uniform scale resvg rasterizes with
  */
 static void box_svg_target(
     resvg_size source,
-    const Svg *svg,
+    const int32_t *request,
     int32_t *size,
     float *scale)
 {
     float sw = source.width;
     float sh = source.height;
-    int32_t want_w = box_svg_clamp(svg->width > 0 ? svg->width : 1) * (svg->width > 0);
-    int32_t want_h = box_svg_clamp(svg->height > 0 ? svg->height : 1) * (svg->height > 0);
+    int32_t want_w = box_svg_clamp(request[0] > 0 ? request[0] : 1) * (request[0] > 0);
+    int32_t want_h = box_svg_clamp(request[1] > 0 ? request[1] : 1) * (request[1] > 0);
     float by_w = want_w ? (float)want_w / sw : 1.0f;
     float by_h = want_h ? (float)want_h / sh : 1.0f;
 
@@ -277,70 +274,86 @@ static void box_svg_bleed(
     ecs_os_free(src);
 }
 
-/** Render a parsed SVG into a straight alpha RGBA8 buffer.
- *
- * @param tree The parsed SVG, destroyed by the call
- * @param svg The component
- * @param size Receives the width and the height in pixels
- * @return The texels, owned by the caller
- */
-static uint8_t* box_svg_render(
-    resvg_render_tree *tree,
+void box_svg_bound(
     const Svg *svg,
     int32_t *size)
 {
-    resvg_size source = resvg_get_image_size(tree);
-    float scale;
-    box_svg_target(source, svg, size, &scale);
-
-    uint8_t *pixels = ecs_os_calloc((ecs_size_t)(size[0] * size[1] * 4));
-    resvg_transform xform = resvg_transform_identity();
-    xform.a = scale;
-    xform.d = scale;
-    xform.e = ((float)size[0] - source.width * scale) * 0.5f;
-    xform.f = ((float)size[1] - source.height * scale) * 0.5f;
-    resvg_render(tree, xform, (uint32_t)size[0], (uint32_t)size[1], (char*)pixels);
-    resvg_tree_destroy(tree);
-
-    box_svg_unpremultiply(pixels, size[0] * size[1]);
-    box_svg_bleed(pixels, size[0], size[1]);
-
-    return pixels;
+    size[0] = svg->width > 0 ? box_svg_clamp(svg->width) : BOX_SVG_MAX_SIZE;
+    size[1] = svg->height > 0 ? box_svg_clamp(svg->height) : BOX_SVG_MAX_SIZE;
 }
 
-/** Rasterize an SVG and hand the pixels to the texture upload path.
- *
- * @param world The world
- * @param e The texture entity
- * @param svg The component
- */
-static void box_svg_rasterize(
-    ecs_world_t *world,
-    ecs_entity_t e,
-    const Svg *svg)
+int32_t box_svg_band_count(
+    const int32_t *size)
 {
-    resvg_render_tree *tree = box_svg_parse(svg);
-    if (!tree) {
+    int32_t rows = BOX_SVG_BAND_PIXELS / (size[0] > 0 ? size[0] : 1);
+    int32_t result = 1;
+    if (rows < 1) {
+        rows = 1;
+    }
+
+    if (rows < size[1]) {
+        result = (size[1] + rows - 1) / rows;
+    }
+
+    return result;
+}
+
+void box_svg_image_measure(
+    box_svg_image_t *img)
+{
+    img->measured = true;
+    img->tree = box_svg_parse(img);
+    if (!img->tree) {
+        img->failed = true;
         goto done;
     }
 
-    int32_t size[2];
-    uint8_t *pixels = box_svg_render(tree, svg, size);
-
-    uint32_t cap;
-    bool keep;
-    box_texture_settings(world, &cap, &keep);
-
-    box_image_t img;
-    box_texture_image(pixels, size[0], size[1],
-        size[0] > size[1] ? size[0] : size[1], cap, &img);
-    ecs_os_free(pixels);
-    box_texture_publish(world, e, &img, keep);
+    resvg_size source = resvg_get_image_size(img->tree);
+    box_svg_target(source, img->request, img->size, &img->scale);
+    img->offset[0] = ((float)img->size[0] - source.width * img->scale) * 0.5f;
+    img->offset[1] = ((float)img->size[1] - source.height * img->scale) * 0.5f;
+    img->bands = box_svg_band_count(img->size);
+    img->rows = (img->size[1] + img->bands - 1) / img->bands;
+    img->left = img->bands;
+    img->pixels = ecs_os_calloc((ecs_size_t)(img->size[0] * img->size[1] * 4));
 done:
     return;
 }
 
-/** Svg was set: rasterize it and upload the pixels.
+void box_svg_image_band(
+    box_svg_image_t *img,
+    int32_t band)
+{
+    int32_t y0 = band * img->rows;
+    int32_t y1 = y0 + img->rows;
+    if (y1 > img->size[1]) {
+        y1 = img->size[1];
+    }
+
+    uint8_t *rows = img->pixels + (size_t)y0 * img->size[0] * 4;
+    resvg_transform xform = resvg_transform_identity();
+    xform.a = img->scale;
+    xform.d = img->scale;
+    xform.e = img->offset[0];
+    xform.f = img->offset[1] - (float)y0;
+    resvg_render(img->tree, xform, (uint32_t)img->size[0], (uint32_t)(y1 - y0), (char*)rows);
+    box_svg_unpremultiply(rows, img->size[0] * (y1 - y0));
+}
+
+void box_svg_image_finish(
+    box_svg_image_t *img)
+{
+    box_svg_bleed(img->pixels, img->size[0], img->size[1]);
+    resvg_tree_destroy(img->tree);
+    img->tree = NULL;
+    box_texture_image(img->pixels, img->size[0], img->size[1],
+        img->size[0] > img->size[1] ? img->size[0] : img->size[1], img->cap, &img->out);
+    ecs_os_free(img->pixels);
+    img->pixels = NULL;
+    img->ready = true;
+}
+
+/** Svg was set: queue the rasterization of the new image.
  *
  * @param it Iterator over the changed SVG textures
  */
@@ -360,11 +373,11 @@ static void box_svg_on_set(
             continue;
         }
 
-        box_svg_rasterize(it->world, it->entities[i], &svg[i]);
+        box_svg_submit(it->world, it->entities[i], &svg[i]);
     }
 }
 
-/** Svg was removed: unload the texture it produced.
+/** Svg was removed: cancel its rasterization and unload the texture.
  *
  * @param it Iterator over the entities that lost their SVG
  */
@@ -378,6 +391,7 @@ static void box_svg_on_remove(
     bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
+        box_svg_drop(it->world, it->entities[i]);
         box_texture_release(it->world, it->stage, it->entities[i], ecs_id(Svg), deleting);
     }
 done:
@@ -388,6 +402,7 @@ void box_svg_init(
     ecs_world_t *world)
 {
     box_svg_options();
+    box_svg_jobs_init(world);
 
     ecs_add_pair(world, ecs_id(Svg), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(Svg), EcsWith, ecs_id(TextureImpl));

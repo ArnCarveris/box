@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../../../src/texture/texture_internal.h"
+#include "../../../src/job/job_internal.h"
 
 static const char *svg_halves =
     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"
@@ -95,6 +96,7 @@ void Svg_inline_data_rasterizes(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 64, .height = 64 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -127,6 +129,7 @@ void Svg_file_rasterizes(void)
 
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .file = ecs_os_strdup(path), .width = 256, .height = 256 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -144,6 +147,7 @@ void Svg_zero_height_follows_the_width(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 1024 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -161,6 +165,7 @@ void Svg_resize_rerasterizes(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 64, .height = 64 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
     test_int(cmd->width, 256);
@@ -169,6 +174,7 @@ void Svg_resize_rerasterizes(void)
     box_packet_reset(&packet);
 
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 1024, .height = 1024 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     cmd = box_vec_at(&packet.texture_create, 0);
@@ -191,6 +197,7 @@ void Svg_removing_the_component_destroys_the_handle(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 64, .height = 64 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
     uint32_t handle = cmd->handle;
@@ -211,6 +218,7 @@ void Svg_handle_reaches_a_pbr_slot(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 256, .height = 256 });
+    box_job_flush(w);
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Quad, {1, 1});
@@ -230,6 +238,7 @@ void Svg_texture_and_svg_is_an_error(void)
     // textures/svg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_circle), .width = 64, .height = 64 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
     uint32_t handle = cmd->handle;
@@ -254,6 +263,7 @@ void Svg_row_zero_is_the_bottom_of_the_image(void)
     // textures/uv_orientation
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_halves), .width = 2, .height = 2 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -273,6 +283,7 @@ void Svg_text_rasterizes(void)
     // textures/svg_resvg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_text), .width = 256, .height = 256 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -301,6 +312,7 @@ void Svg_mask_hides_half(void)
     // textures/svg_resvg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_mask), .width = 256, .height = 256 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
@@ -319,6 +331,7 @@ void Svg_clip_path_keeps_the_clipped_half(void)
     // textures/svg_resvg
     ecs_entity_t t = ecs_new(w);
     ecs_set(w, t, Svg, { .data = ecs_os_strdup(svg_clip), .width = 256, .height = 256 });
+    box_job_flush(w);
     box_render_extract(w, &packet);
     test_int(packet.texture_create.count, 1);
     box_texture_cmd_t *cmd = box_vec_at(&packet.texture_create, 0);
