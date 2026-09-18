@@ -711,7 +711,8 @@ function renderBenchmarks() {
   const d = state.bench;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
   if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
-  if (!d.scenes.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
+  const micro = d.micro || [], microRuns = d.micro_runs || [];
+  if (!d.scenes.length && !micro.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
   const w = chartWidth(el);
   const color = {};
   d.scenes.forEach((s, i) => { color[s.scene] = SERIES[i % SERIES.length]; });
@@ -728,15 +729,15 @@ function renderBenchmarks() {
   }
   const legend = d.scenes.map(s => ({ name: s.scene, color: color[s.scene] }))
     .concat([{ name: "mean", color: "var(--ink-3)" }, { name: "p99", color: "var(--ink-3)", dash: "5 4" }]);
-  const chart = lineChart({
+  const chart = d.scenes.length ? lineChart({
     width: w, label: "frame time per scene over time", yLabel: "frame time (ms)",
     yFormat: v => v.toFixed(2), series, legend,
-  });
+  }) : "";
   const cell = (v, n) => `<td class="num">${v == null ? "—" : (+v).toFixed(n)}</td>`;
   const selected = d.scenes.find(s => s.scene === state.scene);
   const history = selected ? d.runs.filter(r => r.scene === selected.scene) : [];
   el.innerHTML = `
-    <div class="card">
+    ${!d.scenes.length ? "" : `<div class="card">
       <div class="card-title"><h3>Latest benchmark per scene</h3>
         <span>${d.scenes.length} scenes · ${d.runs.length} runs · click a row for its history</span></div>
       <table class="data"><thead><tr><th>Scene</th><th class="num">Entities</th><th class="num">Frames</th>
@@ -752,7 +753,18 @@ function renderBenchmarks() {
     <div class="card">
       <div class="card-title"><h3>Frame time over time</h3><span>one line per scene, solid mean and dashed p99</span></div>
       ${chart}
-    </div>
+    </div>`}
+    ${!micro.length ? "" : `<div class="card">
+      <div class="card-title"><h3>Microbenchmarks</h3>
+        <span>${micro.length} case(s) · ${microRuns.length} run(s) · bake3 bench reports</span></div>
+      <table class="data"><thead><tr><th>Project</th><th>Case</th><th class="num">Median (ns)</th>
+        <th class="num">ci95 low (ns)</th><th class="num">ci95 high (ns)</th><th class="num">Mean (ns)</th>
+        <th class="num">Samples</th><th>Report</th></tr></thead>
+        <tbody>${micro.map(m => `<tr><td>${esc(m.project || "")}</td><td class="mono">${esc(m.suite + "." + m.case)}</td>
+          ${cell(m.median_ns, 1)}${cell(m.ci_low_ns, 1)}${cell(m.ci_high_ns, 1)}${cell(m.mean_ns, 1)}
+          <td class="num">${m.samples == null ? "—" : m.samples}</td>
+          <td class="muted">${esc(m.item || "")} · ${esc(fmtDate(m.time))}</td></tr>`).join("")}</tbody></table>
+    </div>`}
     ${selected ? `<div class="card">
       <div class="card-title"><h3>${esc(selected.scene)}</h3><span>${history.length} run(s)${selected.source ? " · " + esc(selected.source) : ""}</span></div>
       <table class="data"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>

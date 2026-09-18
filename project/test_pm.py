@@ -22,11 +22,14 @@ class PmTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.old_db = pm.DB
+        self.old_bench = pm.BENCH_PROJECTS
         pm.DB = os.path.join(self.tmp, "db")
+        pm.BENCH_PROJECTS = os.path.join(self.tmp, "bench")
         os.makedirs(pm.DB)
 
     def tearDown(self):
         pm.DB = self.old_db
+        pm.BENCH_PROJECTS = self.old_bench
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def new(self, kind, path, title, **kw):
@@ -200,6 +203,66 @@ class PmTests(unittest.TestCase):
         self.assertEqual(scenes["material_100k"]["origin"], "integration")
         self.assertIsNone(scenes["material_100k"]["url"])
         self.assertEqual(scenes["material_100k"]["p99_ms"], 2.2)
+
+    def test_aggregate_benchmarks_reads_micro_reports(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/bench.json", {
+            "project": "bench_transform", "timestamp": "2026-01-01T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf_position", "median_ns": 200.0, "mean_ns": 201.0,
+                 "ci_low_ns": 198.0, "ci_high_ns": 204.0, "stddev_ns": 2.0, "iterations": 1000, "samples": 100},
+                {"suite": "Dynamic", "case": "propagate_subtree", "median_ns": 18000.0, "mean_ns": 18100.0,
+                 "ci_low_ns": 17900.0, "ci_high_ns": 18300.0, "stddev_ns": 50.0, "iterations": 50, "samples": 20},
+            ],
+        })
+        self.write_report("e1/deliverable/transform.json", {
+            "project": "bench_transform", "timestamp": "2026-01-02T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf_position", "median_ns": 180.0, "mean_ns": 181.0,
+                 "ci_low_ns": 178.0, "ci_high_ns": 184.0, "samples": 100},
+            ],
+        })
+        agg = pm.aggregate_benchmarks(extra_dirs=[])
+        self.assertEqual(agg["scenes"], [])
+        self.assertEqual([r["key"] for r in agg["micro"]],
+                         ["bench_transform/Dynamic.propagate_subtree", "bench_transform/Static.set_leaf_position"])
+        self.assertEqual(len(agg["micro_runs"]), 3)
+        latest = {r["key"]: r for r in agg["micro"]}
+        row = latest["bench_transform/Static.set_leaf_position"]
+        self.assertEqual((row["median_ns"], row["mean_ns"], row["ci_low_ns"], row["ci_high_ns"]),
+                         (180.0, 181.0, 178.0, 184.0))
+        self.assertEqual(row["time"], "2026-01-02T10:00:00Z")
+        self.assertEqual(row["item"], "e1")
+        self.assertEqual(row["url"], "/deliverable/e1/deliverable/transform.json")
+        self.assertEqual(latest["bench_transform/Dynamic.propagate_subtree"]["samples"], 20)
+        self.assertEqual(latest["bench_transform/Dynamic.propagate_subtree"]["suite"], "Dynamic")
+
+    def test_check_warns_for_completed_task_without_bench_report(self):
+        config = os.path.join(pm.BENCH_PROJECTS, "transform", "project.json")
+        os.makedirs(os.path.dirname(config))
+        with open(config, "w") as f:
+            f.write("{}")
+        os.utime(config, (1767261600, 1767261600))
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.new("task", "e1/t2", "Other task")
+        self.new("epic", "project_tool", "Tooling")
+        self.new("task", "project_tool/t1", "Tool task")
+        for path in ("e1/t1", "e1/t2", "project_tool/t1"):
+            pm.set_status(path, "complete")
+            self.write_report(path + "/deliverable/tests.json", {"project": "core", "tests": []})
+        self.write_report("e1/t2/deliverable/bench.json", {"project": "bench_transform", "benchmarks": []})
+        import io, contextlib
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = pm.cmd_check(None)
+        text = out.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertIn("e1/t1: warning: complete without deliverable/bench.json", text)
+        self.assertNotIn("e1/t2: warning", text)
+        self.assertNotIn("project_tool/t1: warning", text)
+        self.assertIn("1 warning(s)", text)
 
     def test_aggregate_handles_empty_db(self):
         self.assertEqual(pm.aggregate_tests()["reports"], [])

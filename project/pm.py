@@ -28,6 +28,10 @@ LEVELS = ("epic", "task", "subtask")
 TEST_STATUSES = ("pass", "fail", "empty")
 BENCH_METRICS = ("mean_ms", "p50_ms", "p99_ms", "max_ms", "fps")
 BENCH_FIELDS = ("entities", "static", "dynamic", "frames")
+MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns",
+                "iterations", "samples", "items_per_sec")
+BENCH_PROJECTS = os.path.join(REPO, "bench")
+BENCH_EXEMPT_EPIC = "project_tool"
 
 
 def now():
@@ -297,10 +301,55 @@ def bench_runs(full, data, origin, item, url):
     return [run]
 
 
+def micro_runs(full, data, item, url):
+    if not isinstance(data, dict) or not isinstance(data.get("benchmarks"), list):
+        return []
+    project = data.get("project") or os.path.splitext(os.path.basename(full))[0]
+    stamp, time_source = report_time(full, data)
+    runs = []
+    for case in data["benchmarks"]:
+        if not isinstance(case, dict):
+            continue
+        suite = case.get("suite") or "(none)"
+        name = case.get("case") or "(none)"
+        run = {
+            "key": f"{project}/{suite}.{name}",
+            "project": project,
+            "suite": suite,
+            "case": name,
+            "item": item,
+            "file": os.path.relpath(full, REPO).replace(os.sep, "/"),
+            "url": url,
+            "time": stamp,
+            "time_source": time_source,
+        }
+        for key in MICRO_FIELDS:
+            if key in case:
+                run[key] = number(case.get(key), None)
+        runs.append(run)
+    return runs
+
+
+def is_bench_report(name):
+    return name.startswith("bench") and name.endswith(".json")
+
+
+def bench_projects_time():
+    stamps = []
+    if os.path.isdir(BENCH_PROJECTS):
+        for name in sorted(os.listdir(BENCH_PROJECTS)):
+            config = os.path.join(BENCH_PROJECTS, name, "project.json")
+            if os.path.isfile(config):
+                stamps.append(os.path.getmtime(config))
+    return min(stamps) if stamps else None
+
+
 def aggregate_benchmarks(extra_dirs=None):
     runs = []
+    micro = []
     for entry in deliverable_reports():
         runs.extend(bench_runs(entry["full"], entry["data"], "db", entry["item"], entry["url"]))
+        micro.extend(micro_runs(entry["full"], entry["data"], entry["item"], entry["url"]))
     for directory in (INTEGRATION_OUT,) if extra_dirs is None else extra_dirs:
         if not os.path.isdir(directory):
             continue
@@ -309,15 +358,23 @@ def aggregate_benchmarks(extra_dirs=None):
                 continue
             full = os.path.join(directory, name)
             item = os.path.relpath(directory, REPO).replace(os.sep, "/")
-            runs.extend(bench_runs(full, read_json(full), "integration", item, None))
+            data = read_json(full)
+            runs.extend(bench_runs(full, data, "integration", item, None))
+            micro.extend(micro_runs(full, data, item, None))
     runs.sort(key=lambda r: (time_value(r["time"]), r["scene"], r["file"]))
+    micro.sort(key=lambda r: (time_value(r["time"]), r["key"], r["file"]))
     latest = {}
     for run in runs:
         latest[run["scene"]] = run
+    latest_micro = {}
+    for run in micro:
+        latest_micro[run["key"]] = run
     return {
         "generated": now(),
         "runs": runs,
         "scenes": [latest[name] for name in sorted(latest)],
+        "micro_runs": micro,
+        "micro": [latest_micro[key] for key in sorted(latest_micro)],
     }
 
 
@@ -458,7 +515,16 @@ def cmd_status(args):
 
 def cmd_check(args):
     problems = []
+    warnings = []
     known = set()
+    bench_since = bench_projects_time()
+
+    def wants_bench(item):
+        if bench_since is None or item["level"] != "task" or item["status"] != "complete":
+            return False
+        if item["path"].split("/")[0] == BENCH_EXEMPT_EPIC:
+            return False
+        return time_value(item["end_time"]) > bench_since
 
     def visit(item):
         known.add(item["path"])
@@ -479,6 +545,8 @@ def cmd_check(args):
             names = [d["name"] for d in item["deliverables"]]
             if "README.md" not in names:
                 problems.append(f"{item['path']}: complete epic without deliverable/README.md")
+        if wants_bench(item) and not any(is_bench_report(d["name"]) for d in item["deliverables"]):
+            warnings.append(f"{item['path']}: warning: complete without deliverable/bench.json")
         for child in item["children"]:
             visit(child)
 
@@ -497,7 +565,9 @@ def cmd_check(args):
         visit_deps(epic)
     for problem in problems:
         print(problem)
-    print(f"{len(problems)} problem(s)")
+    for warning in warnings:
+        print(warning)
+    print(f"{len(problems)} problem(s), {len(warnings)} warning(s)")
     return 1 if problems else 0
 
 
