@@ -1,0 +1,21 @@
+{
+    "id": "bench_input",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.input device layer",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Input",
+                "benchcases": [
+                    "update_1000_events"
+                ]
+            }
+        ]
+    }
+}
