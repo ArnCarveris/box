@@ -939,3 +939,275 @@ void Bake_trilinear_sample_mixes_the_corners(void)
     box_sh_eval(&out, up, value);
     test_assert(fabsf(value[0] - 3.0f) < 1e-3f);
 }
+
+void Bake_move_without_static_light_marks_only_itself(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    int32_t i;
+    ecs_entity_t moved = 0;
+    for (i = 0; i < 9; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {(float)i - 4.0f, 0, 5});
+        ecs_set(w, e, Box, {0.8f, 0.8f, 0.8f});
+        moved = i == 4 ? e : moved;
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(box_bake_state_take(&state, 64), 9);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, moved, Position, {0.2f, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+    test_int(state.dirty.count, 1);
+    box_bake_state_fini(&state);
+}
+
+void Bake_move_near_static_light_marks_neighbours(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    ecs_entity_t light = ecs_new(w);
+    ecs_set(w, light, Position, {0, 0, 5});
+    ecs_set(w, light, PointLight, {.intensity = 5, .range = 6});
+
+    int32_t i;
+    ecs_entity_t moved = 0;
+    for (i = 0; i < 9; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {(float)i - 4.0f, 0, 5});
+        ecs_set(w, e, Box, {0.8f, 0.8f, 0.8f});
+        moved = i == 4 ? e : moved;
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(box_bake_state_take(&state, 64), 9);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, moved, Position, {0.2f, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+    test_assert(state.dirty.count > 1);
+    box_bake_state_fini(&state);
+}
+
+void Bake_move_invalidates_the_old_and_the_new_position(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    ecs_entity_t here_light = ecs_new(w);
+    ecs_set(w, here_light, Position, {0, 0, 5});
+    ecs_set(w, here_light, PointLight, {.intensity = 5, .range = 4});
+    ecs_entity_t there_light = ecs_new(w);
+    ecs_set(w, there_light, Position, {50, 0, 5});
+    ecs_set(w, there_light, PointLight, {.intensity = 5, .range = 4});
+
+    ecs_entity_t here = ecs_new(w);
+    ecs_set(w, here, Position, {1, 0, 5});
+    ecs_set(w, here, Box, {0.8f, 0.8f, 0.8f});
+    ecs_entity_t there = ecs_new(w);
+    ecs_set(w, there, Position, {51, 0, 5});
+    ecs_set(w, there, Box, {0.8f, 0.8f, 0.8f});
+    ecs_entity_t moved = ecs_new(w);
+    ecs_set(w, moved, Position, {0, 0, 5});
+    ecs_set(w, moved, Box, {0.8f, 0.8f, 0.8f});
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(box_bake_state_take(&state, 64), 3);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, moved, Position, {50, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    const RenderInstance *old_inst = ecs_get(w, here, RenderInstance);
+    const RenderInstance *new_inst = ecs_get(w, there, RenderInstance);
+    bool old_marked = false;
+    bool new_marked = false;
+    uint32_t j;
+    for (j = 0; j < state.dirty.count; j ++) {
+        const box_bake_job_t *job = box_vec_at(&state.dirty, j);
+        old_marked = old_marked ||
+            (job->mesh == old_inst->mesh && job->slot == old_inst->slot);
+        new_marked = new_marked ||
+            (job->mesh == new_inst->mesh && job->slot == new_inst->slot);
+    }
+
+    test_assert(old_marked);
+    test_assert(new_marked);
+    box_bake_state_fini(&state);
+}
+
+void Bake_move_keeps_the_pool_layout(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    ecs_entity_t big = ecs_new(w);
+    ecs_set(w, big, Position, {0, 0, 5});
+    ecs_set(w, big, Box, {4, 0.5f, 4});
+    ecs_entity_t small = ecs_new(w);
+    ecs_set(w, small, Position, {12, 0, 5});
+    ecs_set(w, small, Box, {1, 1, 1});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(state.probe_count, 17);
+
+    const RenderInstance *inst = ecs_get(w, small, RenderInstance);
+    box_bake_mesh_t *mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(((box_probe_desc_t*)box_vec_at(&mesh->descs, inst->slot))->grid[0], 16);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, big, Position, {0.5f, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    inst = ecs_get(w, small, RenderInstance);
+    mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_bool(mesh->pool_dirty, false);
+    test_int(((box_probe_desc_t*)box_vec_at(&mesh->descs, inst->slot))->grid[0], 16);
+    test_int(state.probe_count, 17);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, big, Box, {8, 0.5f, 8});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    inst = ecs_get(w, small, RenderInstance);
+    mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(((box_probe_desc_t*)box_vec_at(&mesh->descs, inst->slot))->grid[0], 64);
+    test_int(state.probe_count, 65);
+    box_bake_state_fini(&state);
+}
+
+void Bake_unlit_move_defers_the_descriptor_upload(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    int32_t i;
+    ecs_entity_t moved = 0;
+    for (i = 0; i < 9; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {(float)i - 4.0f, 0, 5});
+        ecs_set(w, e, Box, {1, 1, 1});
+        moved = i == 4 ? e : moved;
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+
+    const RenderInstance *inst = ecs_get(w, moved, RenderInstance);
+    box_bake_mesh_t *mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(mesh->upload_lo, 0);
+    test_int(mesh->upload_hi, 9);
+    mesh->upload_lo = UINT32_MAX;
+    mesh->upload_hi = 0;
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, moved, Position, {0.2f, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(mesh->upload_hi, 0);
+    test_int(mesh->stale_lo, inst->slot);
+    test_int(mesh->stale_hi, inst->slot + 1);
+    box_bake_state_fini(&state);
+}
+
+void Bake_new_light_flushes_the_deferred_descriptors(void)
+{
+    // lighting/bake_churn
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    int32_t i;
+    ecs_entity_t moved = 0;
+    for (i = 0; i < 9; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {(float)i - 4.0f, 0, 5});
+        ecs_set(w, e, Box, {1, 1, 1});
+        moved = i == 4 ? e : moved;
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+
+    const RenderInstance *inst = ecs_get(w, moved, RenderInstance);
+    box_bake_mesh_t *mesh = box_bake_state_mesh(&state, inst->mesh);
+    mesh->upload_lo = UINT32_MAX;
+    mesh->upload_hi = 0;
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, moved, Position, {0.2f, 0, 5});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(mesh->stale_lo, inst->slot);
+    test_int(mesh->stale_hi, inst->slot + 1);
+
+    ecs_entity_t light = ecs_new(w);
+    ecs_set(w, light, Position, {0, 0, 5});
+    ecs_set(w, light, PointLight, {.intensity = 5, .range = 6});
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_bake_state_apply(&state, &packet);
+
+    mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(mesh->upload_lo, inst->slot);
+    test_int(mesh->upload_hi, inst->slot + 1);
+    test_int(mesh->stale_lo, UINT32_MAX);
+    test_int(mesh->stale_hi, 0);
+    test_assert(state.grid_dirty);
+    box_bake_state_fini(&state);
+}

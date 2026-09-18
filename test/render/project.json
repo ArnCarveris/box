@@ -112,7 +112,13 @@
                     "grid_probe_follows_the_instance_scale",
                     "trilinear_weights_at_the_corners",
                     "trilinear_weights_at_the_center",
-                    "trilinear_sample_mixes_the_corners"
+                    "trilinear_sample_mixes_the_corners",
+                    "move_without_static_light_marks_only_itself",
+                    "move_near_static_light_marks_neighbours",
+                    "move_invalidates_the_old_and_the_new_position",
+                    "move_keeps_the_pool_layout",
+                    "unlit_move_defers_the_descriptor_upload",
+                    "new_light_flushes_the_deferred_descriptors"
                 ],
                 "setup": true,
                 "teardown": true
