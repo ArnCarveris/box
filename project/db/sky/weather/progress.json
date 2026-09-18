@@ -1,0 +1,13 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:25.546+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "sky/sky_ibl",
+    "particles/appearance",
+    "textures_and_materials/material_layers",
+    "transitions/transition_params"
+  ]
+}
