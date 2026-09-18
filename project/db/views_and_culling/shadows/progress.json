@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:27:56.259+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "views_and_culling/view",
+    "views_and_culling/layers",
+    "views_and_culling/frustum_culling"
+  ]
+}
