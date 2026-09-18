@@ -633,6 +633,7 @@ function renderTests() {
   const el = document.getElementById("tests");
   const d = state.tests;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading test reports…</div>`; return; }
+  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
   if (!d.reports.length) { el.innerHTML = `<div class="empty-state">No test reports under project/db</div>`; return; }
   const w = chartWidth(el);
   const reports = d.reports.filter(r => r.time);
@@ -709,6 +710,7 @@ function renderBenchmarks() {
   const el = document.getElementById("benchmarks");
   const d = state.bench;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
+  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
   if (!d.scenes.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
   const w = chartWidth(el);
   const color = {};
@@ -784,9 +786,15 @@ function render() {
   saveUi();
 }
 
+async function loadApi(path) {
+  const r = await fetch(path);
+  if (r.status === 404) return { stale: true };
+  return r.json();
+}
+
 async function loadView() {
-  if (state.view === "tests") state.tests = await fetch("/api/tests").then(r => r.json());
-  if (state.view === "benchmarks") state.bench = await fetch("/api/benchmarks").then(r => r.json());
+  if (state.view === "tests") state.tests = await loadApi("/api/tests");
+  if (state.view === "benchmarks") state.bench = await loadApi("/api/benchmarks");
 }
 
 async function refresh() {
