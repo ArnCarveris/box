@@ -60,6 +60,26 @@ ECS_STRUCT(Emissive, {
     Rgb color;      /**< Emission color */
 });
 
+/** Equation the fragments of a material are combined with, default Opaque */
+ECS_ENUM(BlendMode, {
+    Opaque = 0,             /**< No blending, the fragment replaces the target */
+    AlphaBlend = 1,         /**< Source over, the fragment is weighted by its alpha */
+    PremultipliedAlpha = 2, /**< Source over with a color that already holds its alpha */
+    Additive = 3,           /**< The fragment is added to the target */
+    Multiply = 4,           /**< The fragment multiplies the target */
+    Screen = 5,             /**< Inverse multiply, the target is brightened */
+    Subtractive = 6,        /**< The fragment is subtracted from the target */
+    Min = 7,                /**< The darker of the fragment and the target */
+    Max = 8                 /**< The brighter of the fragment and the target */
+});
+
+/** What the faces pointing away from the camera show, default BackFaceCull */
+ECS_ENUM(BackFaceMode, {
+    BackFaceTextured = 0, /**< The artwork of the front with the normal flipped */
+    BackFacePlain = 1,    /**< The material constants without any texture */
+    BackFaceCull = 2      /**< Nothing, the faces are culled */
+});
+
 /** Projection a TextureTiling derives its UVs from */
 ECS_ENUM(TilingShape, {
     TilingBox = 0,      /**< Planar per face, picked by the dominant axis of the local normal */

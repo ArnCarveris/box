@@ -123,6 +123,8 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, Emissive);
     ECS_META_COMPONENT(world, PbrTextures);
+    ECS_META_COMPONENT(world, BlendMode);
+    ECS_META_COMPONENT(world, BackFaceMode);
     ECS_META_COMPONENT(world, TilingShape);
     ECS_META_COMPONENT(world, TextureWrap);
     ECS_META_COMPONENT(world, TextureTransform);
@@ -143,6 +145,8 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(PbrMaterial), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Emissive), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(BlendMode), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(BackFaceMode), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, DynamicMaterial, EcsOnInstantiate, EcsInherit);
 
     box_tint_init(world);
