@@ -1,0 +1,26 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T18:06:27Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.042161,
+  "tests": [
+    {"suite": "Shadows", "case": "splits_are_uniform_at_lambda_zero", "status": "pass", "elapsed": 0.017948},
+    {"suite": "Shadows", "case": "splits_are_logarithmic_at_lambda_one", "status": "pass", "elapsed": 0.018615},
+    {"suite": "Shadows", "case": "default_splits_blend_both", "status": "pass", "elapsed": 0.022536},
+    {"suite": "Shadows", "case": "cascades_cover_the_camera_range", "status": "pass", "elapsed": 0.018900},
+    {"suite": "Shadows", "case": "cascade_holds_the_slice_corners", "status": "pass", "elapsed": 0.018194},
+    {"suite": "Shadows", "case": "texel_snapping_keeps_the_matrix", "status": "pass", "elapsed": 0.018173},
+    {"suite": "Shadows", "case": "casters_exclude_no_shadow", "status": "pass", "elapsed": 0.018165},
+    {"suite": "Shadows", "case": "casters_exclude_transparent", "status": "pass", "elapsed": 0.018164},
+    {"suite": "Shadows", "case": "casters_respect_shadow_layers", "status": "pass", "elapsed": 0.014201},
+    {"suite": "Shadows", "case": "settings_fall_back_to_the_singleton", "status": "pass", "elapsed": 0.015750},
+    {"suite": "Shadows", "case": "settings_are_clamped", "status": "pass", "elapsed": 0.013909},
+    {"suite": "Shadows", "case": "view_without_shadows_has_no_cascades", "status": "pass", "elapsed": 0.013765},
+    {"suite": "Shadows", "case": "world_without_a_sun_has_no_cascades", "status": "pass", "elapsed": 0.013828},
+    {"suite": "Shadows", "case": "static_delta_inside_a_cascade_marks_it_dirty", "status": "pass", "elapsed": 0.013687},
+    {"suite": "Shadows", "case": "static_delta_outside_a_cascade_keeps_it", "status": "pass", "elapsed": 0.013747},
+    {"suite": "Shadows", "case": "camera_rotation_marks_every_cascade", "status": "pass", "elapsed": 0.019427}
+  ]
+}

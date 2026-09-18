@@ -1,0 +1,16 @@
+{
+  "scene": "/tmp/claude-501/shadowbench/material_100k_noshadow.flecs",
+  "entities": 110000,
+  "static": 100000,
+  "dynamic": 10000,
+  "churn": [1, 1000],
+  "frames": 300,
+  "mean_ms": 1.611,
+  "p50_ms": 1.610,
+  "p99_ms": 3.444,
+  "max_ms": 3.572,
+  "fps": 620.7,
+  "drawn": 93866,
+  "culled": 16134,
+  "shadow_static_rebuilds": 0
+}
