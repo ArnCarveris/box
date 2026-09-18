@@ -29,8 +29,10 @@ int main(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxJob);
     ECS_IMPORT(world, BoxCommand);
     ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, BoxInput);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxView);
@@ -40,6 +42,7 @@ int main(
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxTexture);
     ECS_IMPORT(world, BoxMovement);
+    ECS_IMPORT(world, BoxMonitor);
 
     if (box_parse_args(world, argc, argv)) {
         goto error;
