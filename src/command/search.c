@@ -517,9 +517,7 @@ static char* box_search_grep_run(
     char *result = NULL;
     ecs_id_t filter = 0;
     if (component) {
-        int prev = ecs_log_set_level(-4);
-        filter = ecs_id_from_str(world, component);
-        ecs_log_set_level(prev);
+        filter = box_path_id(world, component);
         if (!filter) {
             result = flecs_asprintf(
                 BOX_COMMAND_ERROR_PREFIX "unknown component '%s'", component);

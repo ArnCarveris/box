@@ -122,9 +122,7 @@ static char* box_shell_id(
 {
     out[0] = 0;
     if (box_shell_is_id(expr)) {
-        int prev = ecs_log_set_level(-4);
-        out[0] = ecs_id_from_str(world, expr);
-        ecs_log_set_level(prev);
+        out[0] = box_path_id(world, expr);
     }
 
     char *result = NULL;
@@ -759,9 +757,7 @@ static void box_shell_has(
 
     ecs_id_t id = 0;
     if (box_shell_is_id(expr)) {
-        int prev = ecs_log_set_level(-4);
-        id = ecs_id_from_str(world, expr);
-        ecs_log_set_level(prev);
+        id = box_path_id(world, expr);
     }
 
     bool has = false;

@@ -374,6 +374,17 @@ int box_path_split(
     ecs_entity_t *scope,
     char **name);
 
+/** Resolve a component or pair expression by path or by symbol, for example Position or
+ * (Layer, a).
+ *
+ * @param world The world
+ * @param expr The expression, Comp or (Rel,Tgt)
+ * @return The id, 0 when unknown
+ */
+ecs_id_t box_path_id(
+    ecs_world_t *world,
+    const char *expr);
+
 /** Get the path of an entity the way commands print it.
  *
  * @param world The world

@@ -202,3 +202,65 @@ char* box_path_str(
 
     return result;
 }
+
+/** Resolve one side of a component expression by path, then by symbol.
+ *
+ * @param world The world
+ * @param name The path or symbol
+ * @return The entity, 0 when unknown
+ */
+static ecs_entity_t box_path_symbol(
+    ecs_world_t *world,
+    const char *name)
+{
+    ecs_entity_t e = ecs_lookup(world, name);
+    if (!e) {
+        e = ecs_lookup_symbol(world, name, true, true);
+    }
+
+    return e;
+}
+
+ecs_id_t box_path_id(
+    ecs_world_t *world,
+    const char *expr)
+{
+    int prev = ecs_log_set_level(-4);
+    ecs_id_t id = ecs_id_from_str(world, expr);
+    ecs_log_set_level(prev);
+    if (id) {
+        goto done;
+    }
+
+    if (expr[0] != '(') {
+        id = box_path_symbol(world, expr);
+        goto done;
+    }
+
+    const char *comma = strchr(expr, ',');
+    const char *close = strrchr(expr, ')');
+    if (!comma || !close || close < comma) {
+        goto done;
+    }
+
+    char *first = ecs_os_strdup(expr + 1);
+    first[comma - expr - 1] = '\0';
+    const char *second_start = comma + 1;
+    while (second_start[0] == ' ') {
+        second_start ++;
+    }
+
+    char *second = ecs_os_strdup(second_start);
+    second[close - second_start] = '\0';
+    ecs_entity_t rel = box_path_symbol(world, first);
+    ecs_entity_t tgt = box_path_symbol(world, second);
+    if (rel && tgt) {
+        id = ecs_pair(rel, tgt);
+    }
+
+    ecs_os_free(first);
+    ecs_os_free(second);
+
+done:
+    return id;
+}

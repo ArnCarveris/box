@@ -463,3 +463,41 @@ void Shell_root_is_not_an_entity(void)
     test_str(out, "the root has no components");
     ecs_os_free(out);
 }
+
+void Shell_component_by_symbol(void)
+{
+    // command/shell
+    ecs_entity_t scoped = ecs_entity(w, { .name = "ns.inner.Marker", .symbol = "Marker" });
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    char *out = box_command_run(w, session, "add thing Marker", NULL);
+    test_str(out, "thing");
+    ecs_os_free(out);
+    test_assert(ecs_has_id(w, e, scoped));
+
+    out = box_command_run(w, session, "has thing Marker", NULL);
+    test_str(out, "true");
+    ecs_os_free(out);
+}
+
+void Shell_pair_by_symbol(void)
+{
+    // command/shell
+    ecs_entity_t rel = ecs_entity(w, { .name = "ns.Wants", .symbol = "Wants" });
+    ecs_entity_t tgt = ecs_entity(w, { .name = "ns.Cake", .symbol = "Cake" });
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    char *out = box_command_run(w, session, "add thing (Wants,Cake)", NULL);
+    test_str(out, "thing");
+    ecs_os_free(out);
+    test_assert(ecs_has_pair(w, e, rel, tgt));
+}
+
+void Shell_unknown_symbol_is_error(void)
+{
+    // command/shell
+    ecs_entity(w, { .name = "thing" });
+    bool error = false;
+    char *out = box_command_run(w, session, "add thing Nope", &error);
+    test_bool(error, true);
+    test_str(out, "unknown component 'Nope'");
+    ecs_os_free(out);
+}
