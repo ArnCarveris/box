@@ -41,7 +41,6 @@ MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", 
                 "p95_ns", "p99_ns", "outliers", "iterations", "samples", "items_per_sec")
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
-LOCKED_STATUSES = ("complete", "in progress")
 DONE_STATUSES = ("complete", "discarded")
 PRIORITY_DEFAULT = 100
 UNRANKED = 1 << 30
@@ -142,10 +141,6 @@ def priority_of(progress):
     if isinstance(value, bool) or not isinstance(value, int):
         return PRIORITY_DEFAULT
     return value
-
-
-def epic_names():
-    return [name for name, _ in child_dirs(DB)] if os.path.isdir(DB) else []
 
 
 def set_priority(name, value):
