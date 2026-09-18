@@ -286,6 +286,8 @@ The material system shall support:
 - Emissive
 - Opacity
     - Combine with roughness for "milk glass" effect, or blurred UI panels
+    - Milk glass is transmission, not an alpha overlay: the opaque scene is snapshotted into a filtered mip pyramid, sampled at the refracted screen position with a mip level driven by roughness, and the transmitted color enters the PBR shading (specular from lights and environment on top), see flecs-engine's render_transmission and pbr_transmission for the reference
+    - A roughness sweep at fixed opacity must show clearly distinct blur levels
 - Alphablending
 - PBR textures (albedo, emissive, roughness, normal)
     - Texture tiling/wrapping
@@ -301,6 +303,8 @@ The material system shall support:
         - wetness
 - Tint
     - Applied recursively to children on change
+    - Tint is {r, g, b, a} where a is the tint strength: the surface color is mixed toward the tint color by a; it is not transparency (that is Opacity)
+    - Tints compose down the hierarchy: a child's tint applies on top of its ancestors' result (blue at 50% on a parent plus black at 50% on a child darkens the grandchild's light blue), for ChildOf, Parent and mixed trees alike
 
 ## Content
 - Content shall be authored primarly with flecs script templates
