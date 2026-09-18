@@ -14,6 +14,6 @@
   8 by 8 Bayer dither of one output step. Targets between two passes are RGBA16F.
 - 22 `Effects`, 112 `view`, 24 `shader` and 223 `render` cases green. `Effects.extract_chain`
   is 0.81 us for eight passes against 0.74, nothing else in `bench.json` leaves the noise, and
-  at 1280x720 over 300 headless frames the tone map costs 0.23 ms mean CPU frame time against
-  0.19 off, the auto exposure 0.27 against 0.17. `tonemap.png` clips none of its 518400 pixels
+  at 1280x720 over 300 headless frames the tone map costs 0.22 ms mean CPU frame time against
+  0.18 off, the auto exposure 0.27 against 0.18 (median of five runs). `tonemap.png` clips none of its 518400 pixels
   where the curve off clips 230183; `auto_exposure.png` lifts a mean of 36 to 151 in 3 frames.

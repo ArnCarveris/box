@@ -6,6 +6,7 @@
   "end_time": null,
   "dependencies": [
     "responsiveness/job_system",
-    "textures/svg"
+    "textures/svg",
+    "textures/svg_resvg"
   ]
 }
