@@ -5,9 +5,11 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "../../../src/render/render_internal.h"
+#include "../../../src/renderer/exposure.h"
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -312,4 +314,167 @@ void Effects_two_views_keep_their_own_range(void)
     test_int(v1->effect_first, 2);
     test_int(v1->effect_count, 1);
     test_int(packet.effects.count, 3);
+}
+
+void Effects_histogram_bins_map_the_log_range(void)
+{
+    // effects/exposure_tonemap
+    test_uint(box_exposure_bin(0.0f), 0);
+    test_uint(box_exposure_bin(BOX_EXPOSURE_BLACK * 0.5f), 0);
+    test_uint(box_exposure_bin(exp2f(BOX_EXPOSURE_MIN_LOG)), 1);
+    test_uint(box_exposure_bin(exp2f(BOX_EXPOSURE_MIN_LOG - 4.0f)), 1);
+    test_uint(box_exposure_bin(exp2f(BOX_EXPOSURE_MIN_LOG + BOX_EXPOSURE_LOG_RANGE)),
+        BOX_EXPOSURE_BINS - 1);
+    test_uint(box_exposure_bin(exp2f(BOX_EXPOSURE_MIN_LOG + BOX_EXPOSURE_LOG_RANGE + 8.0f)),
+        BOX_EXPOSURE_BINS - 1);
+    test_uint(box_exposure_bin(1.0f), 160);
+    test_assert(fabsf(box_exposure_luma((float)box_exposure_bin(1.0f)) - 1.0f) < 0.02f);
+    test_assert(fabsf(box_exposure_luma((float)box_exposure_bin(0.25f)) - 0.25f) < 0.01f);
+}
+
+void Effects_histogram_average_skips_the_black_bin(void)
+{
+    // effects/exposure_tonemap
+    uint32_t bins[BOX_EXPOSURE_BINS] = {0};
+    test_flt(box_exposure_average(bins, BOX_EXPOSURE_BINS), 0.0f);
+
+    bins[0] = 5000;
+    test_flt(box_exposure_average(bins, BOX_EXPOSURE_BINS), 0.0f);
+
+    bins[box_exposure_bin(1.0f)] = 10;
+    test_assert(fabsf(box_exposure_average(bins, BOX_EXPOSURE_BINS) - 1.0f) < 0.02f);
+
+    bins[box_exposure_bin(1.0f)] = 0;
+    bins[box_exposure_bin(0.125f)] = 4;
+    bins[box_exposure_bin(2.0f)] = 4;
+    test_assert(fabsf(box_exposure_average(bins, BOX_EXPOSURE_BINS) - 0.5f) < 0.02f);
+}
+
+void Effects_exposure_adapts_at_the_speed_of_its_direction(void)
+{
+    // effects/exposure_tonemap
+    float up = box_exposure_step(0.0f, 0.09f, 0.18f, 4.0f, 1.0f, -8.0f, 8.0f, false, 0.1f);
+    test_flt(up, 0.4f);
+
+    float down = box_exposure_step(2.0f, 0.36f, 0.18f, 4.0f, 1.0f, -8.0f, 8.0f, false, 0.1f);
+    test_flt(down, 1.9f);
+
+    float reached = box_exposure_step(1.0f, 0.09f, 0.18f, 4.0f, 1.0f, -8.0f, 8.0f, false, 1.0f);
+    test_flt(reached, 1.0f);
+
+    float still = box_exposure_step(1.0f, 0.09f, 0.18f, 4.0f, 1.0f, -8.0f, 8.0f, false, 0.0f);
+    test_flt(still, 1.0f);
+}
+
+void Effects_exposure_stays_inside_its_range(void)
+{
+    // effects/exposure_tonemap
+    float high = box_exposure_step(0.0f, 0.001f, 0.18f, 100.0f, 100.0f, -2.0f, 2.0f, false,
+        1.0f);
+    test_flt(high, 2.0f);
+
+    float low = box_exposure_step(0.0f, 100.0f, 0.18f, 100.0f, 100.0f, -2.0f, 2.0f, false,
+        1.0f);
+    test_flt(low, -2.0f);
+
+    float outside = box_exposure_step(6.0f, 0.18f, 0.18f, 0.0f, 0.0f, -2.0f, 2.0f, false,
+        1.0f);
+    test_flt(outside, 2.0f);
+
+    float pulled = box_exposure_step(6.0f, 0.18f, 0.18f, 1.0f, 1.0f, -2.0f, 2.0f, false,
+        1.0f);
+    test_flt(pulled, 1.0f);
+    test_flt(box_exposure_scale(2.0f, 0.0f), 4.0f);
+    test_flt(box_exposure_scale(0.0f, -1.0f), 0.5f);
+}
+
+void Effects_pinned_exposure_keeps_its_value(void)
+{
+    // effects/exposure_tonemap
+    float pinned = box_exposure_step(1.5f, 0.001f, 0.18f, 100.0f, 100.0f, -8.0f, 8.0f, true,
+        1.0f);
+    test_flt(pinned, 1.5f);
+
+    float clamped = box_exposure_step(9.0f, 0.001f, 0.18f, 100.0f, 100.0f, -8.0f, 8.0f, true,
+        1.0f);
+    test_flt(clamped, 8.0f);
+}
+
+void Effects_builtin_exposure_and_tonemap_are_off(void)
+{
+    // effects/exposure_tonemap
+    ecs_entity_t exposure = ecs_lookup(w, "box.effects.stack.auto_exposure");
+    ecs_entity_t tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    test_assert(exposure != 0);
+    test_assert(tonemap != 0);
+
+    const Effect *fx = ecs_get(w, exposure, Effect);
+    test_assert(fx != NULL);
+    test_bool(fx->enabled, false);
+    test_bool(fx->exposure, true);
+    test_int(fx->order, 850);
+    test_uint(fx->shader, ecs_lookup(w, "box.effects.shaders.auto_exposure"));
+
+    const Effect *map = ecs_get(w, tonemap, Effect);
+    test_assert(map != NULL);
+    test_bool(map->enabled, false);
+    test_int(map->order, 900);
+    test_assert(map->order > fx->order);
+
+    const AutoExposure *params = ecs_get(w, exposure, AutoExposure);
+    test_assert(params != NULL);
+    test_flt(params->target, 0.18f);
+    test_bool(params->pinned, false);
+    const ToneMapping *curve = ecs_get(w, tonemap, ToneMapping);
+    test_assert(curve != NULL);
+    test_flt(curve->white, 1.0f);
+    test_bool(curve->dither, true);
+
+    box_render_extract(w, &packet);
+    test_int(packet.effects.count, 0);
+}
+
+void Effects_tonemap_parameters_reach_the_pass(void)
+{
+    // effects/exposure_tonemap
+    ecs_entity_t tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    ecs_get_mut(w, tonemap, Effect)->enabled = true;
+    ecs_modified(w, tonemap, Effect);
+    ecs_set(w, tonemap, ToneMapping, { .white = 2.5f, .dither = false });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_flt(pass->params[0], 2.5f);
+    test_flt(pass->params[1], 0.0f);
+    test_int(pass->inputs, BOX_EFFECT_COLOR);
+
+    box_packet_reset(&packet);
+    ecs_set(w, tonemap, ToneMapping, { .white = 1.0f, .dither = true });
+    box_render_extract(w, &packet);
+    test_flt(((box_effect_t*)box_vec_at(&packet.effects, 0))->params[1], 1.0f);
+}
+
+void Effects_exposure_pass_declares_its_input(void)
+{
+    // effects/exposure_tonemap
+    ecs_entity_t exposure = ecs_lookup(w, "box.effects.stack.auto_exposure");
+    ecs_get_mut(w, exposure, Effect)->enabled = true;
+    ecs_modified(w, exposure, Effect);
+    ecs_set(w, exposure, AutoExposure, { .speed_up = 2.0f, .speed_down = 3.0f,
+        .min_ev = -5.0f, .max_ev = 6.0f, .target = 0.4f, .compensation = 0.5f,
+        .pinned = true });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_EXPOSURE);
+    test_int(packet.view.effect_inputs, BOX_EFFECT_COLOR | BOX_EFFECT_EXPOSURE);
+    test_flt(pass->params[0], 2.0f);
+    test_flt(pass->params[1], 3.0f);
+    test_flt(pass->params[2], -5.0f);
+    test_flt(pass->params[3], 6.0f);
+    test_flt(pass->params[4], 0.4f);
+    test_flt(pass->params[5], 0.5f);
+    test_flt(pass->params[6], 1.0f);
 }

@@ -158,7 +158,15 @@
                     "parameters_come_from_the_parameter_component",
                     "two_passes_of_one_scale_share_a_target_size",
                     "half_scale_pass_asks_for_half_the_target",
-                    "two_views_keep_their_own_range"
+                    "two_views_keep_their_own_range",
+                    "histogram_bins_map_the_log_range",
+                    "histogram_average_skips_the_black_bin",
+                    "exposure_adapts_at_the_speed_of_its_direction",
+                    "exposure_stays_inside_its_range",
+                    "pinned_exposure_keeps_its_value",
+                    "builtin_exposure_and_tonemap_are_off",
+                    "tonemap_parameters_reach_the_pass",
+                    "exposure_pass_declares_its_input"
                 ],
                 "setup": true,
                 "teardown": true
