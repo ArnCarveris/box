@@ -41,6 +41,20 @@ typedef struct InputState {
 
 extern ECS_COMPONENT_DECLARE(InputState);
 
+/** One script task waiting for a phase of an action */
+typedef struct box_waiter_t {
+    ecs_entity_t action;           /**< Action the task waits for */
+    ActionPhase phase;             /**< Phase that resolves the wait */
+    ecs_script_future_t *future;   /**< Future of the awaiting task */
+} box_waiter_t;
+
+/** Private list of the script tasks that await an action */
+typedef struct ActionWaiters {
+    ecs_vec_t waiters; /**< box_waiter_t, one per pending await */
+} ActionWaiters;
+
+extern ECS_COMPONENT_DECLARE(ActionWaiters);
+
 /** Private per frame list of the action events, read by the script event layer */
 typedef struct ActionEvents {
     ecs_vec_t events; /**< ActionEvent of the frame, cleared by BoxInputActions */
@@ -120,6 +134,33 @@ void box_input_actions_init(
  */
 void box_input_queries_fini(
     InputState *state);
+
+/** Register the waiters and the on.pressed, on.down and on.up async functions.
+ *
+ * @param world The world
+ */
+void box_input_events_init(
+    ecs_world_t *world);
+
+/** Resolve the tasks that await a phase of an action.
+ *
+ * @param world The world
+ * @param action The action that fired
+ * @param phase The phase it reached
+ * @param source Binding or emitter the phase comes from
+ */
+void box_input_deliver(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    ActionPhase phase,
+    ecs_entity_t source);
+
+/** Raise the action events of the frame at the tasks that await them.
+ *
+ * @param it Iterator of the system, which has no terms
+ */
+void BoxInputRaise(
+    ecs_iter_t *it);
 
 /** Resolve the bindings of the maps into the state of the actions of the frame.
  *

@@ -511,6 +511,8 @@ void box_input_emit(
     ptr->value = 1.0f;
     box_input_event(events, action, ActionPressed, source, 0);
     box_input_event(events, action, ActionReleased, source, 0);
+    box_input_deliver(world, action, ActionPressed, source);
+    box_input_deliver(world, action, ActionReleased, source);
 }
 
 int32_t box_input_events(

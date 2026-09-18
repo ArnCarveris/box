@@ -131,6 +131,7 @@ void BoxInputImport(
 
     ActionEvents *events = ecs_singleton_ensure(world, ActionEvents);
     ecs_vec_init_t(NULL, &events->events, ActionEvent, 0);
+    box_input_events_init(world);
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;
@@ -139,4 +140,5 @@ void BoxInputImport(
     ECS_SYSTEM(world, BoxInputBind, EcsPreFrame, [in] Surface, [in] SurfaceImpl);
     ECS_SYSTEM(world, BoxInputUpdate, EcsOnLoad, 0);
     ECS_SYSTEM(world, BoxInputActions, EcsOnLoad, 0);
+    ECS_SYSTEM(world, BoxInputRaise, EcsOnLoad, 0);
 }
