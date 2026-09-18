@@ -1,0 +1,305 @@
+{
+  "kind": "visual",
+  "results": [
+    {
+      "scene": "test/integration/visual/back_faces.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/back_faces.png"
+    },
+    {
+      "scene": "test/integration/visual/baked_room.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/baked_room.png"
+    },
+    {
+      "scene": "test/integration/visual/blending.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/blending.png"
+    },
+    {
+      "scene": "test/integration/visual/culling.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/culling.png"
+    },
+    {
+      "scene": "test/integration/visual/dynamic_room.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/dynamic_room.png"
+    },
+    {
+      "scene": "test/integration/visual/glass_sweep.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/glass_sweep.png"
+    },
+    {
+      "scene": "test/integration/visual/layers.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/layers.png"
+    },
+    {
+      "scene": "test/integration/visual/layers_views.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/layers_views.png"
+    },
+    {
+      "scene": "test/integration/visual/lights_city.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/lights_city.png"
+    },
+    {
+      "scene": "test/integration/visual/milk_glass.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/milk_glass.png"
+    },
+    {
+      "scene": "test/integration/visual/normal_bump.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/normal_bump.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/occlusion.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/occlusion_off.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion_sweep.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/occlusion_sweep.png"
+    },
+    {
+      "scene": "test/integration/visual/parent_tree.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/parent_tree.png"
+    },
+    {
+      "scene": "test/integration/visual/pbr_spheres.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/pbr_spheres.png"
+    },
+    {
+      "scene": "test/integration/visual/primitives.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/primitives.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/shadows.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows_dynamic.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/shadows_dynamic.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows_low_sun.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/shadows_low_sun.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_icons.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/svg_icons.png"
+    },
+    {
+      "scene": "test/integration/visual/textured.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/textured.png"
+    },
+    {
+      "scene": "test/integration/visual/tiling.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/tiling.png"
+    },
+    {
+      "scene": "test/integration/visual/tint.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/tint.png"
+    },
+    {
+      "scene": "test/integration/visual/two_views.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "test/integration/out/two_views.png"
+    }
+  ]
+}
