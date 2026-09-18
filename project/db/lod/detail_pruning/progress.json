@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:26.091+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "lod/screen_space_error",
+    "interaction/aabb_roots"
+  ]
+}

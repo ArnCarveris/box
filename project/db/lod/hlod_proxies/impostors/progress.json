@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:26.224+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "lod/hlod_proxies/merged_meshes"
+  ]
+}

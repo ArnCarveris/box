@@ -1,0 +1,12 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:26.124+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "lod/primitive_reduction",
+    "lod/detail_pruning",
+    "responsiveness/job_system"
+  ]
+}
