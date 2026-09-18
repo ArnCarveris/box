@@ -90,7 +90,7 @@ static void bench_hierarchy_propagate_case(
     ECS_IMPORT(world, BoxTransform);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_HIERARCHY_COUNT);
     bench_hierarchy_build(world, tree, BENCH_HIERARCHY_COUNT, parent_component);
-    bench_counter(b, "tables", (double)ecs_get_world_info(world)->table_count);
+    double tables = (double)ecs_get_world_info(world)->table_count;
 
     float x = 0;
 
@@ -104,6 +104,7 @@ static void bench_hierarchy_propagate_case(
         bench_keep(wt);
     }
 
+    bench_counter(b, "tables", tables);
     ecs_os_free(tree);
     ecs_fini(world);
 }
@@ -147,7 +148,7 @@ void Hierarchy_dynamic_subtree_parent(bench_t *b)
 
     ecs_add(world, tree[0], DynamicTransform);
     ecs_progress(world, 0.016f);
-    bench_counter(b, "tables", (double)ecs_get_world_info(world)->table_count);
+    double tables = (double)ecs_get_world_info(world)->table_count;
 
     bench_set_items(b, BENCH_HIERARCHY_SUBTREE);
 
@@ -158,6 +159,7 @@ void Hierarchy_dynamic_subtree_parent(bench_t *b)
         bench_keep(wt);
     }
 
+    bench_counter(b, "tables", tables);
     ecs_os_free(tree);
     ecs_fini(world);
 }

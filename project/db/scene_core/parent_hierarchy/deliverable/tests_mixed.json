@@ -1,0 +1,26 @@
+{
+  "project": "transform",
+  "timestamp": "2026-09-18T18:42:27Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.021583,
+  "tests": [
+    {"suite": "Mixed", "case": "childof_child_under_parent_node", "status": "pass", "elapsed": 0.009384},
+    {"suite": "Mixed", "case": "parent_child_under_childof_node", "status": "pass", "elapsed": 0.009381},
+    {"suite": "Mixed", "case": "deep_chain_alternating", "status": "pass", "elapsed": 0.009489},
+    {"suite": "Mixed", "case": "scale_inherited_alternating", "status": "pass", "elapsed": 0.010480},
+    {"suite": "Mixed", "case": "reparent_childof_to_parent", "status": "pass", "elapsed": 0.012493},
+    {"suite": "Mixed", "case": "reparent_parent_to_childof", "status": "pass", "elapsed": 0.009743},
+    {"suite": "Mixed", "case": "reparent_back_and_forth", "status": "pass", "elapsed": 0.009473},
+    {"suite": "Mixed", "case": "reparent_subtree_keeps_descendants", "status": "pass", "elapsed": 0.009467},
+    {"suite": "Mixed", "case": "reparent_dynamic_node", "status": "pass", "elapsed": 0.009613},
+    {"suite": "Mixed", "case": "dynamic_parent_root_childof_child", "status": "pass", "elapsed": 0.009206},
+    {"suite": "Mixed", "case": "dynamic_childof_node_under_parent_root", "status": "pass", "elapsed": 0.009396},
+    {"suite": "Mixed", "case": "dynamic_cascade_order_alternating", "status": "pass", "elapsed": 0.009182},
+    {"suite": "Mixed", "case": "dynamic_node_between_static_levels", "status": "pass", "elapsed": 0.009176},
+    {"suite": "Mixed", "case": "delete_parent_node_with_children", "status": "pass", "elapsed": 0.010039},
+    {"suite": "Mixed", "case": "only_changed_subtree_written", "status": "pass", "elapsed": 0.009507},
+    {"suite": "Mixed", "case": "manual_transform_between_storages", "status": "pass", "elapsed": 0.008969}
+  ]
+}

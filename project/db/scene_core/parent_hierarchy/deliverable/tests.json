@@ -1,0 +1,31 @@
+{
+  "project": "transform",
+  "timestamp": "2026-09-18T18:42:27Z",
+  "pass": 21,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.030574,
+  "tests": [
+    {"suite": "Parent", "case": "child_of_moved_parent", "status": "pass", "elapsed": 0.012207},
+    {"suite": "Parent", "case": "set_component_parents_entity", "status": "pass", "elapsed": 0.012237},
+    {"suite": "Parent", "case": "grandchild_of_moved_parent", "status": "pass", "elapsed": 0.012232},
+    {"suite": "Parent", "case": "scale_inherited_three_levels", "status": "pass", "elapsed": 0.012246},
+    {"suite": "Parent", "case": "child_set_does_not_move_parent", "status": "pass", "elapsed": 0.012159},
+    {"suite": "Parent", "case": "reparent_to_new_parent", "status": "pass", "elapsed": 0.012160},
+    {"suite": "Parent", "case": "remove_parent_makes_root", "status": "pass", "elapsed": 0.012159},
+    {"suite": "Parent", "case": "manual_transform_parent_propagates", "status": "pass", "elapsed": 0.014030},
+    {"suite": "Parent", "case": "one_on_set_for_new_child", "status": "pass", "elapsed": 0.009896},
+    {"suite": "Parent", "case": "only_changed_subtree_written", "status": "pass", "elapsed": 0.008921},
+    {"suite": "Parent", "case": "delete_parent_deletes_subtree", "status": "pass", "elapsed": 0.009017},
+    {"suite": "Parent", "case": "deep_chain", "status": "pass", "elapsed": 0.009513},
+    {"suite": "Parent", "case": "dynamic_parent_static_child", "status": "pass", "elapsed": 0.009001},
+    {"suite": "Parent", "case": "static_parent_dynamic_child", "status": "pass", "elapsed": 0.009294},
+    {"suite": "Parent", "case": "dynamic_subtree_under_static_root", "status": "pass", "elapsed": 0.009239},
+    {"suite": "Parent", "case": "dynamic_node_between_static_levels", "status": "pass", "elapsed": 0.008947},
+    {"suite": "Parent", "case": "dynamic_emits_no_events", "status": "pass", "elapsed": 0.008910},
+    {"suite": "Parent", "case": "add_then_remove_dynamic", "status": "pass", "elapsed": 0.008808},
+    {"suite": "Parent", "case": "prefab_tree_instantiation", "status": "pass", "elapsed": 0.008870},
+    {"suite": "Parent", "case": "lookat_under_parent", "status": "pass", "elapsed": 0.008970},
+    {"suite": "Parent", "case": "name_lookup_through_parent", "status": "pass", "elapsed": 0.008824}
+  ]
+}
