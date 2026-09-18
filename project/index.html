@@ -170,7 +170,7 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .deliverables img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
 .readme-deliverable { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 
-.timeline { display: grid; grid-template-columns: 300px 1fr; height: 100%; min-height: 0; }
+.timeline { display: grid; grid-template-columns: 300px 1fr; height: 100%; min-height: 0; position: relative; }
 .tl-labels { overflow: hidden; border-right: 1px solid var(--border); background: var(--surface); }
 .tl-scroll { overflow: auto; position: relative; }
 .tl-row { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 13px; }
@@ -622,8 +622,8 @@ function renderTimeline() {
     <div class="tl-labels"><div style="height:40px;border-bottom:1px solid var(--border)"></div><div id="tl-label-rows">
       ${rows.map(r => `<div class="tl-row ${r.kind}"><span class="dot ${cls(r.item.status)}"></span><span class="lbl" data-item="${esc(r.item.path)}">${esc(r.item.readme.title || r.item.name)}</span></div>`).join("")}
     </div></div>
+    <div class="tl-tools"><button id="zoom-out">−</button><button id="zoom-in">+</button><button id="zoom-now">now</button></div>
     <div class="tl-scroll" id="tl-scroll">
-      <div class="tl-tools"><button id="zoom-out">−</button><button id="zoom-in">+</button><button id="zoom-now">now</button></div>
       <div class="tl-head" style="width:${width}px">${days.map(d => `<div class="day" style="left:${x(d)}px">${d.toLocaleDateString([], { weekday: "short" })}<small>${d.toLocaleDateString([], { month: "short", day: "numeric" })}</small></div>`).join("")}</div>
       <div class="tl-body" style="width:${width}px">
         ${days.map(d => `<div class="tl-vline" style="left:${x(d)}px"></div>`).join("")}
