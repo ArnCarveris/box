@@ -1,0 +1,26 @@
+module box.light
+
+@brief Directional light, direction taken from the entity's Rotation
+struct DirectionalLight(intensity: f32) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Sun/moon style light with top-of-atmosphere intensity and color
+struct CelestialLight(toa_intensity: f32, toa_color: Rgb) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Omnidirectional light, color taken from the entity's Rgb
+struct PointLight(intensity: f32, range: f32) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Cone light, angles are half-angles in degrees
+struct SpotLight(
+  intensity: f32,
+  range: f32,
+  inner_angle: f32,
+  outer_angle: f32
+) {
+  (OnInstantiate, Inherit)
+}

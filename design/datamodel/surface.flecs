@@ -1,0 +1,66 @@
+module box.surface
+
+@brief Maximum anisotropic filtering samples
+enum Anisotropy(
+  Default: 0,
+  Off: 1,
+  Low: 2,
+  Medium: 4,
+  High: 8,
+  Ultra: 16
+)
+
+@brief MSAA sample count
+enum Msaa(
+  Default: 0,
+  Off: 1,
+  2x: 2,
+  4x: 4,
+  8x: 8
+)
+
+@brief Maximum texture dimension in pixels
+enum TextureQuality(
+  Default: 0,
+  Low: 512,
+  Medium: 1024,
+  High: 2048,
+  VeryHigh: 4096
+)
+
+@brief GPU texture block compression
+enum TextureCompression(Default, Off, Bc7)
+
+@brief On-disk cache for processed textures
+enum TextureCacheMode(TextureCacheDefault, TextureCacheOff, TextureCacheOn)
+
+@brief Window, headless or file output surface; setting it brings up the engine. actual_* and point_* are written by the engine
+struct Surface(
+  width: i32,
+  height: i32,
+  resolution_scale: i32,
+  actual_width: i32,
+  actual_height: i32,
+  point_width: i32,
+  point_height: i32,
+  msaa: Msaa,
+  vsync: bool,
+  target_fps: f32,
+  frames_in_flight: i32,
+  load_submits_in_flight: i32,
+  gpu_timings: bool,
+  mem_attribution: bool,
+  keep_source_textures: bool,
+  linear_colors: bool,
+  cursor_captured: bool,
+  anisotropy: Anisotropy,
+  texture_quality: TextureQuality,
+  texture_compression: TextureCompression,
+  texture_cache: TextureCacheMode,
+  texture_cache_path: string,
+  title: string,
+  write_to_file: string,
+  write_nth: i32
+) {
+  (With, SurfaceImpl)
+}

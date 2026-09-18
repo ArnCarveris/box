@@ -1,0 +1,84 @@
+module box.material
+
+@brief Projection used by TextureTiling to derive world-space UVs
+enum TilingShape(TilingBox, TilingCylinder, TilingRadial, TilingMeters)
+
+enum TextureWrap(WrapRepeat, WrapClamp, WrapMirror)
+
+enum BlendMode(
+    Opaque,
+    AlphaBlend,
+    PremultipliedAlpha,
+    Additive,
+    Multiply,
+    Screen,
+    Subtractive,
+    Min,
+    Max
+)
+
+@brief What faces whose local normal points along -z show: artwork, plain material constants, or nothing
+enum BackFaceMode(BackFaceTextured, BackFacePlain, BackFaceCull)
+
+@brief Base color, display-encoded bytes
+struct Rgb(r: u8, g: u8, b: u8) {
+  (OnInstantiate, Inherit)
+}
+
+struct Opacity(value: f32)
+
+@brief Color multiplier, also applies to descendants that have no tint of their own
+struct Tint(r: u8, g: u8, b: u8, a: u8) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Resolved tint written by the engine from Tint on the entity, its prefab or an ancestor
+struct ActualTint(r: u8, g: u8, b: u8, a: u8)
+
+struct PbrMaterial(metallic: f32, roughness: f32) {
+  (OnInstantiate, Inherit)
+}
+
+struct Emissive(strength: f32, color: Rgb) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Texture entities (Texture or Svg) for each PBR layer, 0 for none
+struct PbrTextures(
+  albedo: entity,
+  emissive: entity,
+  roughness: entity,
+  normal: entity
+) {
+  (OnInstantiate, Inherit)
+}
+
+struct TextureTransform(
+  scale_x: f32,
+  scale_y: f32,
+  offset_x: f32,
+  offset_y: f32
+) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Tiles textures at a physical size in meters instead of stretching them over the mesh
+struct TextureTiling(
+  meters_x: f32,
+  meters_y: f32,
+  fit: bool,
+  allow_partial: bool,
+  min_tiles: i32,
+  shape: TilingShape
+) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Keeps the object out of the shadow pass, for scene geometry and immediate-mode draws
+NoShadow {
+  (OnInstantiate, Inherit)
+}
+
+DynamicMaterial {
+  (OnInstantiate, Inherit)
+}

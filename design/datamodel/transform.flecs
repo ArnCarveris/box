@@ -1,0 +1,45 @@
+module box.transform
+
+@brief Axis-aligned bounds in world space
+struct AABB(min: {f32, count: 3}, max: {f32, count: 3})
+
+@brief Local-to-world matrix, computed by the engine; stale for children of a RigidSubtree root
+struct WorldTransform(m: mat4) {
+  (With, AABB)
+}
+
+@brief Position relative to the parent
+struct Position(x: f32, y: f32, z: f32) {
+  (With, WorldTransform)
+}
+
+@brief Euler angles in radians, composed as Rx * Ry * Rz
+struct Rotation(x: f32, y: f32, z: f32) {
+  (With, WorldTransform)
+  (With, Position)
+}
+
+struct Scale(x: f32, y: f32, z: f32) {
+  (With, WorldTransform)
+  (With, Position)
+}
+
+@brief Target point; Rotation is written every frame so local +z faces it
+struct LookAt(x: f32, y: f32, z: f32) {
+  (With, Rotation)
+}
+
+@brief Gimbal-safe alternative to Rotation, composed as Ry * Rx * Rz with forward = local +z; wins over Rotation when both are present
+struct Orientation(pitch: f32, yaw: f32, roll: f32) {
+  (With, WorldTransform)
+  (With, Position)
+}
+
+@brief Transform is recomputed every frame instead of only when a local component is set; propagates to children
+DynamicTransform
+
+@brief Engine does not write WorldTransform, the application does
+ManualTransform
+
+@brief Subtree moves as one piece; child poses are stored relative to this root and composed on the GPU
+RigidSubtree

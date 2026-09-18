@@ -1,0 +1,22 @@
+module box.camera
+
+@brief Fly/orbit controller settings, optionally keeps clearance above a terrain
+struct CameraController(terrain: entity, clearance: f32)
+
+@brief Perspective or orthographic camera
+struct Camera(
+  fov: f32,
+  near_: f32,
+  far_: f32,
+  aspect_ratio: f32,
+  orthographic: bool,
+  ortho_height: f32
+) {
+  (With, CameraImpl)
+  (With, LookAt)
+}
+
+@brief Rotates the entity every frame so its local +z faces the active camera
+Billboard {
+  (With, Rotation)
+}

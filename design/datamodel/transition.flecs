@@ -1,0 +1,21 @@
+module box.transitions
+
+enum TimingFunction(Linear, Ease, EaseIn, EaseOut, EaseInOut)
+
+@brief Duration and delay in seconds
+struct TransitionParams(
+  duration: f32,
+  delay: f32,
+  timing_function: TimingFunction
+)
+
+@brief Map from component, or component.member, to its transition parameters, e.g. Transition: [Rgb: {duration: 0.2}]
+Transition {
+  map: {key_type: entity, type: TransitionParams}
+  (OnInstantiate, Inherit)
+}
+
+@brief Interpolated output, stored by the engine as the pair (TransitionValue, Component)
+struct TransitionValue(value: {f32, count: 4}) {
+  (OnInstantiate, Inherit)
+}

@@ -1,0 +1,12 @@
+module box.texture
+
+@brief Texture loaded from an image file, width/height 0 keeps the source size
+struct Texture(path: string, width: i32, height: i32)
+
+@brief Texture rasterized from an SVG file or inline SVG data at width x height pixels
+struct Svg(
+  file: string,
+  data: string,
+  width: i32,
+  height: i32
+)

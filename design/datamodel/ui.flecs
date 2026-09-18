@@ -1,0 +1,42 @@
+module box.ui
+
+enum Align(Left, Center, Right)
+
+enum VAlign(Top, Middle, Bottom)
+
+enum Direction(None, Row, Column)
+
+enum ImageFit(Stretch, Contain, Cover)
+
+@brief Text label, size is the line height in logical pixels
+struct Text(text: string, size: f32, align: Align)
+
+@brief Arranges children in a row or column, in child order
+struct Layout(
+  direction: Direction,
+  padding: f32,
+  spacing: f32,
+  width: f32,
+  height: f32,
+  h: Align,
+  v: VAlign
+) {
+  (With, OrderedChildren)
+}
+
+@brief Anchors the element to an edge or center of its parent, with a pixel offset
+struct Anchor(
+  h: Align,
+  v: VAlign,
+  x: f32,
+  y: f32
+)
+
+@brief Absolute screen rectangle of the element, written by the layout pass every frame, read-only
+struct Bounds(
+  x: f32,
+  y: f32,
+  width: f32,
+  height: f32
+)
+

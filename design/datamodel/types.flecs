@@ -1,0 +1,10 @@
+module box.types
+
+struct vec2(x: f32, y: f32)
+
+struct vec3(x: f32, y: f32, z: f32)
+
+struct vec4(x: f32, y: f32, z: f32, w: f32)
+
+@brief Column-major 4x4 matrix
+struct mat4(v: {f32, count: 16})

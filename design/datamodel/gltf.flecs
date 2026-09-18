@@ -1,0 +1,6 @@
+module box.gltf
+
+@brief Loads the glTF file at path `file` into the entity when set
+struct Gltf(file: string) {
+  (OnInstantiate, DontInherit)
+}

@@ -1,0 +1,52 @@
+module box.atmosphere
+
+struct AtmosphereRayleigh(scale_height_km: f32, scattering_scale: f32)
+
+struct AtmosphereMie(
+  scale_height_km: f32,
+  anisotropy: f32,
+  scattering_scale: f32,
+  tint: rgb
+)
+
+@brief Physically based sky, sun and moon are directional light entities, stars is an entity with Stars, CelestialLight and Rotation
+struct Atmosphere(
+  sun: entity,
+  moon: entity,
+  stars: entity,
+  sun_disk_intensity: f32,
+  sun_disk_angular_radius: f32,
+  aerial_perspective_distance_km: f32,
+  aerial_perspective_intensity: f32,
+  sea_level_y: f32,
+  world_units_per_km: f32,
+  ground_altitude_km: f32,
+  planet_radius_km: f32,
+  atmosphere_thickness_km: f32,
+  rayleigh: AtmosphereRayleigh,
+  mie: AtmosphereMie,
+  ozone_scale: f32,
+  stratospheric_aerosol_scale: f32,
+  haze_absorption: f32,
+  ground_albedo: rgb,
+  night_tint: rgb,
+  night_intensity: f32,
+  turbulence: f32,
+  turbulence_scale: f32,
+  turbulence_speed: f32
+)
+
+@brief Drives sun, moon, atmosphere and stars from a simulated clock, hour is local solar time 0..24, day_of_year 1..365, latitude and north_offset in degrees, time_scale in simulated hours per real second, moon_position_offset in hours
+struct TimeOfDay(
+  light: entity,
+  moon_light: entity,
+  atmosphere: entity,
+  stars: entity,
+  hour: f32,
+  day_of_year: f32,
+  latitude: f32,
+  north_offset: f32,
+  time_scale: f32,
+  moon_position_offset: f32,
+  daylight: f32
+)

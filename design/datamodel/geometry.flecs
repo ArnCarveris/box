@@ -1,0 +1,130 @@
+module box.geometry
+
+@brief CPU mesh data, uploaded to the GPU on set; colors are optional per-vertex colors (rgb multiplies albedo, alpha multiplies roughness)
+struct Mesh3(
+  vertices: vecVec3,
+  normals: vecVec3,
+  uvs: vecVec2,
+  indices: vecU32,
+  colors: vecRgb,
+) {
+  (OnInstantiate, Inherit)
+}
+
+@brief Box with size x, y, z
+struct Box(x: f32, y: f32, z: f32)
+
+@brief Rectangle with size x, y
+struct Quad(x: f32, y: f32)
+
+@brief Isosceles triangle with base x and height y
+struct Triangle(x: f32, y: f32)
+
+@brief Right triangle with legs x and y
+struct RightTriangle(x: f32, y: f32)
+
+@brief Triangle extruded to depth z
+struct TrianglePrism(x: f32, y: f32, z: f32)
+
+@brief Right triangle extruded to depth z
+struct RightTrianglePrism(x: f32, y: f32, z: f32)
+
+@brief Flat regular polygon with the given number of sides
+struct NGon(sides: i32)
+
+@brief UV sphere
+struct Sphere(segments: i32, smooth: bool, radius: f32)
+
+@brief Upper half of a UV sphere
+struct HemiSphere(segments: i32, smooth: bool, radius: f32)
+
+@brief Subdivided icosahedron, segments is the subdivision level
+struct IcoSphere(segments: i32, smooth: bool, radius: f32)
+
+struct Cone(segments: i32, smooth: bool, length: f32)
+
+struct Cylinder(segments: i32, smooth: bool, length: f32)
+
+@brief Ring with major radius `radius` and minor radius `tube`
+struct Torus(
+  segments: i32,
+  rings: i32,
+  smooth: bool,
+  radius: f32,
+  tube: f32
+)
+
+struct Capsule(
+  segments: i32,
+  smooth: bool,
+  length: f32,
+  radius: f32
+)
+
+@brief Hollow cylinder with wall thickness, arc limits the sweep angle
+struct Tube(
+  segments: i32,
+  smooth: bool,
+  length: f32,
+  radius: f32,
+  thickness: f32,
+  arc: f32
+)
+
+@brief Truncated cone with separate bottom and top radius
+struct Frustum(
+  segments: i32,
+  smooth: bool,
+  length: f32,
+  radius_bottom: f32,
+  radius_top: f32
+)
+
+@brief Box with rounded edges and corners
+struct RoundedBox(
+  x: f32,
+  y: f32,
+  z: f32,
+  radius: f32,
+  segments: i32
+)
+
+@brief Filled rectangle in logical pixels, color taken from the entity's Rgb
+struct Rect(width: f32, height: f32)
+
+@brief Rounded corners and inset border; zero corner/edge fields inherit the radius/width shorthand, zero-alpha color inherits the entity's Rgb
+struct Border(
+  radius: f32,
+  radius_top_left: f32,
+  radius_top_right: f32,
+  radius_bottom_left: f32,
+  radius_bottom_right: f32,
+  width: f32,
+  top_width: f32,
+  bottom_width: f32,
+  left_width: f32,
+  right_width: f32,
+  color: rgb
+) {
+  (With, Rect)
+}
+
+@brief Line segment in logical pixels relative to the element
+struct Line(
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+  thickness: f32
+)
+
+@brief Textured rectangle showing the u0,v0..u1,v1 region of a texture entity
+struct Image(
+  texture: entity,
+  fit: ImageFit,
+  u0: f32,
+  v0: f32,
+  u1: f32,
+  v1: f32,
+  rotation: f32
+)
