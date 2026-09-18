@@ -287,6 +287,43 @@ void Extract_aabb_written_for_static(void)
     test_assert(fabsf(aabb->max.z - 3) < 1e-4f);
 }
 
+void Extract_bounds_written_in_the_delta(void)
+{
+    // culling/frustum_culling
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {10, 0, 0});
+    ecs_set(w, e, Box, {2, 4, 6});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 1);
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.bounds[0], 10);
+    test_flt(u->data.bounds[1], 0);
+    test_flt(u->data.bounds[2], 0);
+    test_assert(fabsf(u->data.bounds[3] - sqrtf(1 + 4 + 9)) < 1e-4f);
+}
+
+void Extract_bounds_cover_a_rotated_instance(void)
+{
+    // culling/frustum_culling
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Rotation, {0, 0.7853981f, 0});
+    ecs_set(w, e, Box, {2, 2, 8});
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 1);
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    const AABB *aabb = ecs_get(w, e, AABB);
+    test_assert(aabb != NULL);
+    test_assert(u->data.bounds[3] >= aabb->max.x);
+    test_assert(u->data.bounds[3] >= aabb->max.z);
+}
+
 void Extract_camera_fills_view(void)
 {
     // scene_core/render

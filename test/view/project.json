@@ -71,6 +71,25 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Frustum",
+                "testcases": [
+                    "planes_of_a_known_projection",
+                    "infinite_far_keeps_a_distant_point",
+                    "sphere_at_the_boundary",
+                    "aabb_at_the_boundary",
+                    "static_instance_carries_its_bounds",
+                    "dynamic_instance_carries_its_bounds",
+                    "bounds_refresh_when_the_entity_changes",
+                    "settings_fall_back_to_the_singleton",
+                    "settings_of_a_view_override_the_singleton",
+                    "view_without_settings_culls_by_default",
+                    "sorted_draws_behind_the_camera_are_culled",
+                    "disabled_culling_keeps_every_sorted_draw"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
