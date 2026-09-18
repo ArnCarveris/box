@@ -268,6 +268,28 @@ done:
     return;
 }
 
+void box_render_instance_bounds(
+    const RenderMesh *mesh,
+    const mat4 *m,
+    float *out)
+{
+    vec3 center = vec3_scale(vec3_add(mesh->bounds_min, mesh->bounds_max), 0.5f);
+    vec3 extent = vec3_scale(vec3_sub(mesh->bounds_max, mesh->bounds_min), 0.5f);
+    vec3 world = mat4_transform_point(m, center);
+    float radius = 0;
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        float e = fabsf(m->v[axis]) * extent.x + fabsf(m->v[4 + axis]) * extent.y +
+            fabsf(m->v[8 + axis]) * extent.z;
+        radius += e * e;
+    }
+
+    out[0] = world.x;
+    out[1] = world.y;
+    out[2] = world.z;
+    out[3] = sqrtf(radius);
+}
+
 void box_render_fill_instance(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -315,6 +337,8 @@ void box_render_fill_instance(
     if (layers) {
         box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
     }
+
+    box_render_instance_bounds(mesh, &m, out->bounds);
 }
 
 void box_render_instance_init(

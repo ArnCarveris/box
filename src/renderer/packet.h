@@ -88,7 +88,12 @@
 /** Layers a size class can hold, the packed instance slot is sixteen bits wide */
 #define BOX_TEXTURE_LAYER_MAX (0x3FFF - 1)
 
-/** Per instance data as laid out in GPU instance buffers */
+/** Per instance data as laid out in GPU instance buffers.
+ *
+ * The culling passes read the trailing bounding sphere out of the same buffer,
+ * so the fields before it keep their offsets and BOX_INSTANCE_WORDS spells the
+ * stride out for the shaders.
+ */
 typedef struct box_instance_t {
     float transform[12];   /**< Rows of the 3x4 world matrix, each x y z w */
     float color[4];        /**< Linear albedo rgb and opacity */
@@ -97,7 +102,14 @@ typedef struct box_instance_t {
     uint32_t textures[BOX_TEXTURE_SLOTS / 2]; /**< Two packed texture slots per word */
     float uv_transform[4]; /**< Uv scale x, scale y, offset x and offset y */
     uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
+    float bounds[4];       /**< World space bounding sphere: center xyz and radius */
 } box_instance_t;
+
+/** 32 bit words one instance takes in a GPU instance buffer */
+#define BOX_INSTANCE_WORDS (35)
+
+/** Word the bounding sphere of an instance starts at */
+#define BOX_INSTANCE_BOUNDS (31)
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
 typedef struct box_light_t {
@@ -180,7 +192,9 @@ typedef struct box_view_t {
     uint32_t caster_mask;   /**< Layers that cast its shadows, BOX_VIEW_LAYER_ALL for all */
     uint32_t dynamic_first; /**< First dynamic batch of the view in the packet */
     uint32_t dynamic_count; /**< Dynamic batches of the view */
-    uint32_t cpu_pad[3];    /**< Padding to the 16 byte stride */
+    uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
+    uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
+    uint32_t cpu_pad[1];    /**< Padding to the 16 byte stride */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */

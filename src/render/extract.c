@@ -121,6 +121,7 @@ static void box_extract_static(
     update->slot = inst->slot;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
         state->textured, state->tiled, state->layered ? state : NULL, &update->data);
+    update->data.params[3] = (float)inst->slot;
     box_render_update_aabb(world, e, mesh, transform);
 done:
     return;
