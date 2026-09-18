@@ -4,9 +4,15 @@
 Usage:
   pm.py serve [--port 8090]
   pm.py new <kind> <path> "<title>" [--type feature|bug|refactor] [--deps a/b,c] [--priority 100]
-  pm.py start|done|discard|reset <path>
+  pm.py next [n]
+  pm.py brief <epic>/<task> [--files a,b] [--env name] [--model opus|sonnet] [--worktree]
+  pm.py deliver <path> --tests <project>[:<suite>][,...] [--bench <project>[,...]] [--env name]
+  pm.py start|discard|reset <path>
+  pm.py done <path> [--force]
   pm.py status
   pm.py check
+
+docs/PROCESS.md describes the loop these commands encode.
 """
 import argparse
 import datetime as dt
@@ -14,7 +20,10 @@ import http.server
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import urllib.parse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +58,12 @@ DONE_STATUSES = ("complete", "discarded")
 PRIORITY_DEFAULT = 100
 UNRANKED = 1 << 30
 NEXT_UP = 10
+TEST_JOBS = 8
+REPORT_WORDS = 150
+STRICT_TASK = "project_tool/process"
+EPIC_SECTIONS = ("What was built", "Verification", "Lessons", "Not in this epic")
+EPIC_README_LINES = 200
+EPIC_WASM = ("wasm", "box_app.wasm")
 
 
 def now():
@@ -184,7 +199,7 @@ def plan_items(epics):
     return items
 
 
-def derived_plan(epics):
+def derived_plan(epics, limit=NEXT_UP):
     """Order the unfinished tasks: dependencies first, then epic priority, then creation time."""
     priority = {e["name"]: e["priority"] for e in epics}
     items = plan_items(epics)
@@ -223,7 +238,7 @@ def derived_plan(epics):
         if not left[pick["epic"]]:
             epic_done.add(pick["epic"])
     first = first or set()
-    next_up = [item for item in order if item["path"] in first and not item["start_time"]][:NEXT_UP]
+    next_up = [item for item in order if item["path"] in first and not item["start_time"]][:limit]
     return {"order": order, "next_up": next_up, "blocked": sorted(item["path"] for item in pending)}
 
 
@@ -686,10 +701,7 @@ def aggregate_benchmarks(extra_dirs=None):
 
 
 def collect_state():
-    epics = []
-    if os.path.isdir(DB):
-        for name, full in child_dirs(DB):
-            epics.append(walk_item(full, 0, name))
+    epics = load_epics()
     plan = derived_plan(epics)
     sort_tree(epics, plan_rank(epics, plan))
     return {"generated": now(), "epics": epics, "next_up": plan["next_up"]}
@@ -786,13 +798,16 @@ def item_dir(path):
     return os.path.join(DB, *parts), parts
 
 
-def write_progress(directory, progress):
-    path = os.path.join(directory, "progress.json")
+def write_json(path, data):
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(progress, f, indent=2)
+        json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
+
+
+def write_progress(directory, progress):
+    write_json(os.path.join(directory, "progress.json"), progress)
 
 
 def cmd_new(args):
@@ -871,6 +886,7 @@ def cmd_check(args):
     warnings = []
     known = set()
     bench_since = bench_projects_time()
+    strict = strict_since()
 
     def wants_bench(item):
         if bench_since is None or item["level"] != "task" or item["status"] != "complete":
@@ -898,6 +914,11 @@ def cmd_check(args):
             names = [d["name"] for d in item["deliverables"]]
             if "README.md" not in names:
                 problems.append(f"{item['path']}: complete epic without deliverable/README.md")
+            if strict is not None and time_value(item["end_time"]) > strict:
+                problems.extend(f"{item['path']}: missing {gap}" for gap in deliverable_gaps(item))
+        if item["status"] == "complete" and item["level"] == "task":
+            warnings.extend(f"{item['path']}: warning: missing {gap}"
+                            for gap in deliverable_gaps(item, bench=False))
         if wants_bench(item) and not any(is_bench_report(d["name"]) for d in item["deliverables"]):
             warnings.append(f"{item['path']}: warning: complete without deliverable/bench.json")
         for child in item["children"]:
@@ -925,6 +946,384 @@ def cmd_check(args):
     return 1 if problems else 0
 
 
+BRIEF_HEADER = """You are implementing the task `{path}` of the Box project at `{repo}`.
+
+Read `README.md` for the build, test and benchmark commands, `docs/ARCHITECTURE.md` for the
+module layout and `design/DESIGN.md` for the brief. Everything you need is below: the task
+spec, the epic it belongs to, the reports of the work it builds on, and the rules that apply
+to every change. Do the task and nothing else; propose follow up work instead of doing it."""
+
+RULE_ENV = """Build and test in your own environment so a parallel agent cannot corrupt your
+objects:
+
+```sh
+bake3 --local-env={env}
+bake3 run test/core --local-env={env} -- -j 8
+```
+
+Never build in the shared environment and never pass a different `--local-env`."""
+
+RULE_FILES = """You own: {files}.
+
+Never create or edit a file outside that list; if the task needs one, stop and report it.
+A file you share with another agent is re-read right before you edit it, because it may
+have changed since you last looked at it. Do not touch `project/db` outside your own task
+folder."""
+
+RULE_STYLE = """`design/coding_style.c` is the reference and `python3 tools/lint.py` enforces it.
+It must report 0 problems before every commit; `python3 tools/lint.py --fix` reformats
+signatures and blank lines. The rules: a file header with `@file` and `@brief`, a doc
+comment with `@param` and `@return` on every static function and header prototype, one
+parameter per line and the opening brace on its own line, no comments inside function
+bodies (a test may start with one `// epic/task` line), a blank line before `return` and
+after every block, no `return` inside a nested block (use `goto done`), lines under 100
+characters, functions under 200 lines, files under 2000 lines, and a doc comment on every
+type and member."""
+
+RULE_FLECS = """- This flecs has no implicit defer mode. Inside an OnAdd or OnRemove observer the
+  entity is mid table-move: structural changes to it (add, set of a missing component,
+  remove) must go through `it->stage`, never `it->world`. Reads use `it->world`. OnSet
+  observers may set components directly.
+- `ecs_ensure` in a system on a stage returns a temporary copy; use `ecs_get_mut` for
+  existing components and keep registries in heap structs.
+- Components without a ctor are not zero initialized. Register `.ctor = flecs_default_ctor`
+  for every private component with flags.
+- During deletion the OnRemove destination table is the empty root table, not NULL; test
+  `ecs_table_get_type(it->other_table)->count == 0`.
+- Never mutate entities while iterating `ecs_children`; collect them first.
+- `ecs_os_malloc` needs `ecs_os_init()` (or a world) before use."""
+
+RULE_TESTS = """Add every new case to `test/<project>/project.json` and its implementation to the
+matching `<Suite>.c`. A test function starts with a single `// {path}` comment line and is
+standalone: no test helpers, only callbacks may be shared. Run the suite you are changing
+while you iterate and the whole project once at the end:
+
+```sh
+bake3 run test/<project> --local-env={env} -- <Suite> -j 8
+bake3 run test/<project> --local-env={env} -- -j 8
+```
+
+Never edit an existing test to make your change pass; if a test looks wrong, report it."""
+
+RULE_VISUAL = """`python3 tools/integration.py visual` renders every scene and compares it with
+`test/integration/visual/baseline/<scene>.png`; it fails when the largest channel delta is
+above 24 and more than 200 pixels differ by more than 16, so GPU speckle passes. Look only
+at the scene of this task, refresh its baseline with `--update-baseline <scene>` when the
+change is intended, and leave every other baseline matching. Do not open screenshots of
+scenes you are not working on."""
+
+RULE_COMMITS = """Commit each logical change on its own, with a single short subject line: no
+body, no bullet points, no `Co-Authored-By` trailer. Stage explicit paths with
+`git add <path>`, never `-A` or `.`, because other agents have their own changes in this
+tree; retry the command when `index.lock` is taken. Never run `git push`."""
+
+RULE_DELIVERABLE = """Produce the deliverable from the repository root:
+
+```sh
+python3 project/pm.py deliver {path} --tests <project>[:<Suite>] [--bench <project>] --env {env}
+```
+
+It writes `project/db/{path}/deliverable/tests.json` and `bench.json` and fails when a test
+fails. Add a `deliverable/README.md` of under 20 lines saying what was built, what was
+verified and what was left out, plus the screenshot of your own scene when there is one.
+Close with `python3 project/pm.py done {path}`, which refuses while something is missing."""
+
+RULE_ECONOMY = """Keep the run cheap: no browser checks, no screenshots other than the scene of
+this task, and no full test sweep until the end. Read the files the task needs and stop
+there, prefer a targeted suite over a project run, and keep the final report short."""
+
+RULE_WORKTREE = """Another agent is editing this tree. Verify in a private worktree:
+`git worktree add ../box-{env} HEAD`, symlink `.bake/bundles` into it and build there with
+`--local-env={env}`, so a half written file of another agent cannot break your run. Commit
+from the main tree with explicit paths."""
+
+RULE_REPORT = """Report back in under {words} words: what you built, how you verified it (test
+counts, lint, the scene) and anything the next task needs to know. No code, no file
+listings, no restating of this prompt."""
+
+BRIEF_RULES = (
+    ("Build environment", RULE_ENV),
+    ("File ownership", RULE_FILES),
+    ("Style and linter", RULE_STYLE),
+    ("Flecs pitfalls", RULE_FLECS),
+    ("Tests", RULE_TESTS),
+    ("Visual baselines", RULE_VISUAL),
+    ("Commits", RULE_COMMITS),
+    ("Deliverable", RULE_DELIVERABLE),
+    ("Economy", RULE_ECONOMY),
+)
+
+
+def load_epics():
+    epics = []
+    if os.path.isdir(DB):
+        for name, full in child_dirs(DB):
+            epics.append(walk_item(full, 0, name))
+    return epics
+
+
+def cmd_next(args):
+    epics = load_epics()
+    plan = derived_plan(epics, args.count)
+    priority = {epic["name"]: epic["priority"] for epic in epics}
+    if not plan["next_up"]:
+        print("no ready unstarted task")
+    for index, item in enumerate(plan["next_up"], 1):
+        rank = priority.get(item["epic"], PRIORITY_DEFAULT)
+        print(f"{index}. {item['path']}  [{item['epic']} priority {rank}]  {item['title']}")
+        print(f"   depends on: {', '.join(item['dependencies']) or 'nothing'}")
+    return 0
+
+
+def item_text(path, *parts):
+    return read_text(os.path.join(DB, *path.split("/"), *parts))
+
+
+def quote_document(text):
+    """Fold an embedded README one heading level down so the brief keeps one outline."""
+    lines = (text or "TODO").strip().splitlines()
+    return "\n".join("#" + line if line.startswith("#") else line for line in lines)
+
+
+def dependency_sections(deps):
+    blocks = []
+    for dep in deps:
+        dep = str(dep)
+        level = "epic" if "/" not in dep else "task"
+        text = item_text(dep, "deliverable", "README.md")
+        if text:
+            blocks.append(f"# Report of {level} `{dep}`\n\n{quote_document(text)}")
+            continue
+        spec = item_text(dep, "README.md")
+        if spec:
+            blocks.append(f"# Spec of {level} `{dep}` (no report yet)\n\n{quote_document(spec)}")
+    return blocks
+
+
+def brief_context(path, parts, args):
+    files = [name.strip() for name in (args.files or "").split(",") if name.strip()]
+    owned = ", ".join("`%s`" % name for name in files)
+    return {
+        "path": path,
+        "repo": REPO,
+        "epic": parts[0],
+        "env": args.env or parts[-1],
+        "files": owned or "the files this task names; the coordinator pinned no list",
+        "words": REPORT_WORDS,
+    }
+
+
+def cmd_brief(args):
+    directory, parts = item_dir(args.path)
+    if len(parts) < 2:
+        sys.exit(f"brief takes <epic>/<task>, not '{args.path}'")
+    if not os.path.isdir(directory):
+        sys.exit(f"{args.path} does not exist")
+    progress = read_json(os.path.join(directory, "progress.json")) or {}
+    context = brief_context(args.path, parts, args)
+    blocks = [BRIEF_HEADER.format(**context)]
+    blocks.append(f"# Task `{args.path}`\n\n{quote_document(item_text(args.path, 'README.md'))}")
+    blocks.append(f"# Epic `{parts[0]}`\n\n{quote_document(item_text(parts[0], 'README.md'))}")
+    blocks.extend(dependency_sections(progress.get("dependencies") or []))
+    blocks.append("# Rules")
+    for title, body in BRIEF_RULES:
+        blocks.append(f"## {title}\n\n{body.format(**context).strip()}")
+    if args.worktree:
+        blocks.append(f"## Worktree\n\n{RULE_WORKTREE.format(**context).strip()}")
+    blocks.append(RULE_REPORT.format(**context).strip())
+    print("\n\n".join(blocks))
+    print(f"launch {args.path} with model {args.model} in env {context['env']}", file=sys.stderr)
+    return 0
+
+
+def run_tool(cmd):
+    return subprocess.run(cmd, cwd=REPO).returncode
+
+
+def parse_test_specs(text):
+    specs = []
+    for part in (text or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        project, _, suite = part.partition(":")
+        if not re.fullmatch(r"[a-z0-9_]+", project):
+            sys.exit(f"'{project}' is not a test project name")
+        specs.append((project, suite.strip() or None))
+    if not specs:
+        sys.exit("--tests needs at least one <project>[:<suite>]")
+    return specs
+
+
+def report_names(specs):
+    seen = {}
+    for project, _ in specs:
+        seen[project] = seen.get(project, 0) + 1
+    names = []
+    for project, suite in specs:
+        if len(specs) == 1:
+            names.append("tests.json")
+        elif seen[project] > 1 and suite:
+            names.append("tests_%s_%s.json" % (project, re.sub(r"[^a-z0-9]+", "_", suite.lower())))
+        else:
+            names.append(f"tests_{project}.json")
+    return names
+
+
+def merge_test_reports(reports):
+    tests = []
+    projects = []
+    for data in reports:
+        name = data.get("project") or "unknown"
+        for case in data.get("tests") or []:
+            row = dict(case)
+            row["project"] = name
+            tests.append(row)
+        projects.append({"project": name, "pass": number(data.get("pass")), "fail": number(data.get("fail")),
+                         "empty": number(data.get("empty")), "elapsed": number(data.get("elapsed"))})
+    projects.sort(key=lambda row: row["project"])
+    merged = {"project": "all", "timestamp": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    for key in TEST_STATUSES:
+        merged[key] = sum(row[key] for row in projects)
+    merged["elapsed"] = round(sum(row["elapsed"] for row in projects), 6)
+    merged["tests"] = tests
+    merged["projects"] = projects
+    return merged
+
+
+def run_tests(specs, out, env, failed):
+    reports = []
+    for (project, suite), name in zip(specs, report_names(specs)):
+        report = os.path.join(out, name)
+        if os.path.isfile(report):
+            os.remove(report)
+        cmd = ["bake3", "run", "test/" + project, f"--local-env={env}", "--"]
+        if suite:
+            cmd.append(suite)
+        cmd += ["-j", str(TEST_JOBS), "--json", report]
+        code = run_tool(cmd)
+        data = read_json(report)
+        label = "test/" + project + (":" + suite if suite else "")
+        if not isinstance(data, dict) or not isinstance(data.get("tests"), list):
+            print(f"FAIL {label}: no usable report at {name}")
+            failed.append(label)
+            continue
+        reports.append(data)
+        if code != 0 and not number(data.get("fail")):
+            failed.append(label)
+        print(f"{label}: {number(data.get('pass'))} passed, {number(data.get('fail'))} failed -> {name}")
+    if len(reports) > 1:
+        merged = merge_test_reports(reports)
+        write_json(os.path.join(out, "tests.json"), merged)
+        print(f"tests.json: {merged['pass']} passed, {merged['fail']} failed over {len(reports)} project(s)")
+    return reports
+
+
+def run_bench(names, out, env, failed):
+    tmp = tempfile.mkdtemp()
+    try:
+        code = run_tool([sys.executable, os.path.join(REPO, "tools", "bench.py"), *names,
+                         "--env", env, "--out", tmp])
+        for name in names:
+            source = os.path.join(tmp, name + ".json")
+            target = "bench.json" if len(names) == 1 else f"bench_{name}.json"
+            if not os.path.isfile(source):
+                print(f"FAIL bench/{name}: no report")
+                failed.append("bench/" + name)
+                continue
+            shutil.copyfile(source, os.path.join(out, target))
+            print(f"bench/{name} -> {target}")
+        if code != 0 and not failed:
+            failed.append("tools/bench.py")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def cmd_deliver(args):
+    directory, parts = item_dir(args.path)
+    if not os.path.isdir(directory):
+        sys.exit(f"{args.path} does not exist")
+    out = os.path.join(directory, "deliverable")
+    os.makedirs(out, exist_ok=True)
+    env = args.env or parts[-1]
+    failed = []
+    reports = run_tests(parse_test_specs(args.tests), out, env, failed)
+    if args.bench:
+        run_bench([name.strip() for name in args.bench.split(",") if name.strip()], out, env, failed)
+    passed = sum(number(data.get("pass")) for data in reports)
+    broken = sum(number(data.get("fail")) for data in reports)
+    print(f"{args.path}: {passed} passed, {broken} failed, {len(failed)} run(s) did not produce a report")
+    return 1 if broken or failed else 0
+
+
+def epic_readme_gaps(text):
+    if text is None:
+        return ["deliverable/README.md"]
+    lines = text.splitlines()
+    gaps = []
+    if len(lines) > EPIC_README_LINES:
+        gaps.append(f"deliverable/README.md is {len(lines)} lines, the limit is {EPIC_README_LINES}")
+    found = [line[3:].strip() for line in lines if line.startswith("## ")]
+    if [name for name in found if name in EPIC_SECTIONS] != list(EPIC_SECTIONS):
+        gaps.append("deliverable/README.md sections " + ", ".join(EPIC_SECTIONS) + " in that order")
+    return gaps
+
+
+def top_level(item, predicate):
+    return any("/" not in d["name"] and predicate(d["name"]) for d in item["deliverables"])
+
+
+def deliverable_gaps(item, bench=True):
+    """List what an item still misses before it may be marked complete."""
+    if item["level"] == "subtask":
+        return []
+    out = os.path.join(DB, *item["path"].split("/"), "deliverable")
+    gaps = []
+    tests = read_json(os.path.join(out, "tests.json"))
+    if not isinstance(tests, dict) or not isinstance(tests.get("tests"), list):
+        gaps.append("deliverable/tests.json holding a 'tests' list")
+    if item["level"] == "task":
+        if bench and item["bench"] is not False and not top_level(item, is_bench_report):
+            gaps.append("deliverable/bench.json, or \"bench\": false in progress.json")
+        return gaps
+    gaps.extend(epic_readme_gaps(read_text(os.path.join(out, "README.md"))))
+    reports = os.path.join(out, "bench")
+    if not os.path.isdir(reports) or not any(n.endswith(".json") for n in os.listdir(reports)):
+        gaps.append("deliverable/bench/ with at least one report")
+    if not os.path.isdir(os.path.join(out, "integration")):
+        if not top_level(item, lambda name: name.endswith(".png")):
+            gaps.append("deliverable/integration/ or screenshots")
+    if not os.path.isfile(os.path.join(out, *EPIC_WASM)):
+        gaps.append("deliverable/" + "/".join(EPIC_WASM))
+    for task in item["children"]:
+        if task["status"] not in DONE_STATUSES:
+            gaps.append(f"task {task['path']} is still {task['status']}")
+    return gaps
+
+
+def strict_since():
+    progress = read_json(os.path.join(DB, *STRICT_TASK.split("/"), "progress.json"))
+    if not isinstance(progress, dict) or not progress.get("created"):
+        return None
+    return time_value(progress["created"])
+
+
+def cmd_done(args):
+    directory, parts = item_dir(args.path)
+    if not os.path.isdir(directory):
+        sys.exit(f"{args.path} does not exist")
+    gaps = deliverable_gaps(walk_item(directory, len(parts) - 1, args.path))
+    for gap in gaps:
+        print(f"{args.path}: missing {gap}")
+    if gaps and not args.force:
+        print(f"{args.path} stays open: {len(gaps)} item(s) missing, pass --force to override")
+        return 1
+    if gaps:
+        print(f"warning: {args.path} completed with --force while {len(gaps)} item(s) are missing")
+    set_status(args.path, "complete")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -943,10 +1342,34 @@ def main():
     new.add_argument("--priority", type=int, help="epic order, lower runs first (default %d)" % PRIORITY_DEFAULT)
     new.set_defaults(fn=cmd_new)
 
-    for name, status in (("start", "in progress"), ("done", "complete"), ("discard", "discarded"), ("reset", "pending")):
+    for name, status in (("start", "in progress"), ("discard", "discarded"), ("reset", "pending")):
         p = sub.add_parser(name)
         p.add_argument("path")
         p.set_defaults(fn=lambda a, s=status: set_status(a.path, s))
+
+    done = sub.add_parser("done")
+    done.add_argument("path")
+    done.add_argument("--force", action="store_true", help="complete the item although something is missing")
+    done.set_defaults(fn=cmd_done)
+
+    nxt = sub.add_parser("next")
+    nxt.add_argument("count", nargs="?", type=int, default=NEXT_UP)
+    nxt.set_defaults(fn=cmd_next)
+
+    brief = sub.add_parser("brief")
+    brief.add_argument("path")
+    brief.add_argument("--files", help="comma separated paths the agent owns")
+    brief.add_argument("--env", help="private build environment (default: the task name)")
+    brief.add_argument("--model", choices=("opus", "sonnet"), default="sonnet")
+    brief.add_argument("--worktree", action="store_true", help="another agent is editing the tree")
+    brief.set_defaults(fn=cmd_brief)
+
+    deliver = sub.add_parser("deliver")
+    deliver.add_argument("path")
+    deliver.add_argument("--tests", required=True, help="<project>[:<suite>][,<project>[:<suite>]]")
+    deliver.add_argument("--bench", help="<project>[,<project>] passed to tools/bench.py")
+    deliver.add_argument("--env", help="private build environment (default: the task name)")
+    deliver.set_defaults(fn=cmd_deliver)
 
     sub.add_parser("status").set_defaults(fn=cmd_status)
     sub.add_parser("check").set_defaults(fn=cmd_check)

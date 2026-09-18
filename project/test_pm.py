@@ -138,6 +138,7 @@ class PmTests(unittest.TestCase):
         self.old_db = pm.DB
         self.old_bench = pm.BENCH_PROJECTS
         self.old_inspector = pm.INSPECTOR
+        self.old_tool = pm.run_tool
         pm.DB = os.path.join(self.tmp, "db")
         pm.BENCH_PROJECTS = os.path.join(self.tmp, "bench")
         pm.INSPECTOR = os.path.join(self.tmp, "inspector", "index.html")
@@ -1053,6 +1054,377 @@ console.log(JSON.stringify({
         status, _, body = self.get("/inspector")
         self.assertEqual(status, 404)
         self.assertIn(b"box_inspector", body)
+
+    def capture(self, fn, *args):
+        import io, contextlib
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fn(*args)
+        return rc, out.getvalue(), err.getvalue()
+
+    def fake_tool(self, fail=(), missing=()):
+        self.commands = []
+
+        def run(cmd):
+            self.commands.append(cmd)
+            if "--json" in cmd:
+                report = cmd[cmd.index("--json") + 1]
+                name = cmd[cmd.index("run") + 1].split("/")[-1]
+                if name in missing:
+                    return 1
+                broken = 1 if name in fail else 0
+                with open(report, "w") as f:
+                    json.dump({"project": name, "timestamp": "2026-01-01T10:00:00Z", "pass": 2, "fail": broken,
+                               "empty": 0, "elapsed": 0.25,
+                               "tests": [{"suite": "S", "case": name, "status": "pass", "elapsed": 0.25}]}, f)
+                return broken
+            if "--out" in cmd:
+                out = cmd[cmd.index("--out") + 1]
+                for name in cmd[2:cmd.index("--env")]:
+                    if name in missing:
+                        continue
+                    with open(os.path.join(out, name + ".json"), "w") as f:
+                        json.dump({"project": "bench_" + name, "benchmarks": []}, f)
+                return 0
+            return 0
+
+        pm.run_tool = run
+        self.addCleanup(setattr, pm, "run_tool", self.old_tool)
+
+    def epic_deliverable(self, path, sections=pm.EPIC_SECTIONS, tasks_done=True):
+        out = os.path.join(pm.DB, *path.split("/"), "deliverable")
+        os.makedirs(os.path.join(out, "bench"), exist_ok=True)
+        os.makedirs(os.path.join(out, "integration"), exist_ok=True)
+        os.makedirs(os.path.join(out, "wasm"), exist_ok=True)
+        with open(os.path.join(out, "README.md"), "w") as f:
+            f.write("# Epic\n\nBrief.\n\n" + "".join("## %s\n\nText.\n\n" % s for s in sections))
+        with open(os.path.join(out, "tests.json"), "w") as f:
+            json.dump({"project": "all", "pass": 1, "fail": 0, "empty": 0, "tests": [{"suite": "S", "case": "c"}]}, f)
+        with open(os.path.join(out, "bench", "transform.json"), "w") as f:
+            json.dump({"project": "bench_transform", "benchmarks": []}, f)
+        with open(os.path.join(out, "wasm", "box_app.wasm"), "wb") as f:
+            f.write(b"wasm")
+        if tasks_done:
+            for name in os.listdir(os.path.join(pm.DB, *path.split("/"))):
+                if os.path.isdir(os.path.join(pm.DB, path, name)) and name != "deliverable":
+                    self.task_deliverable(path + "/" + name)
+                    pm.set_status(path + "/" + name, "complete")
+
+    def task_deliverable(self, path, bench=True):
+        out = os.path.join(pm.DB, *path.split("/"), "deliverable")
+        os.makedirs(out, exist_ok=True)
+        with open(os.path.join(out, "tests.json"), "w") as f:
+            json.dump({"project": "core", "pass": 1, "fail": 0, "empty": 0,
+                       "tests": [{"suite": "S", "case": "c", "status": "pass", "elapsed": 0.1}]}, f)
+        if bench:
+            with open(os.path.join(out, "bench.json"), "w") as f:
+                json.dump({"project": "bench_core", "benchmarks": []}, f)
+
+    def test_next_lists_ready_unstarted_tasks_in_order(self):
+        self.new("epic", "late", "Late", priority=50)
+        self.new("epic", "early", "Early", priority=10)
+        self.new("task", "late/one", "Late one")
+        self.new("task", "early/one", "Early one")
+        self.new("task", "early/two", "Early two", deps="early/one")
+        rc, out, _ = self.capture(pm.cmd_next, Args(count=10))
+        self.assertEqual(rc, 0)
+        self.assertLess(out.index("early/one"), out.index("late/one"))
+        self.assertNotIn("early/two", out)
+        self.assertIn("[early priority 10]", out)
+        self.assertIn("Early one", out)
+        self.assertIn("depends on: nothing", out)
+
+    def test_next_honours_the_count_and_skips_started_tasks(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "One")
+        self.new("task", "e1/t2", "Two")
+        self.new("task", "e1/t3", "Three")
+        _, out, _ = self.capture(pm.cmd_next, Args(count=2))
+        self.assertEqual(out.count("[e1 priority 100]"), 2)
+        pm.set_status("e1/t1", "in progress")
+        _, out, _ = self.capture(pm.cmd_next, Args(count=10))
+        self.assertNotIn("e1/t1 ", out)
+        self.assertIn("e1/t2", out)
+
+    def test_next_prints_dependencies(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "One")
+        self.new("task", "e1/t2", "Two", deps="e1/t1")
+        pm.set_status("e1/t1", "complete")
+        _, out, _ = self.capture(pm.cmd_next, Args(count=10))
+        self.assertIn("depends on: e1/t1", out)
+
+    def brief_args(self, path, **kw):
+        return Args(path=path, files=kw.get("files"), env=kw.get("env"), model=kw.get("model", "sonnet"),
+                    worktree=kw.get("worktree", False))
+
+    def test_brief_carries_the_task_epic_and_dependency_reports(self):
+        self.new("epic", "e1", "Epic one", brief="The epic brief.")
+        self.new("task", "e1/dep", "Dependency")
+        self.new("task", "e1/t1", "Task one", deps="e1/dep,e2")
+        self.new("epic", "e2", "Epic two")
+        os.makedirs(os.path.join(pm.DB, "e1", "dep", "deliverable"), exist_ok=True)
+        with open(os.path.join(pm.DB, "e1", "dep", "deliverable", "README.md"), "w") as f:
+            f.write("# Dep report\n\nWhat the dependency built.\n")
+        with open(os.path.join(pm.DB, "e2", "deliverable", "README.md"), "w") as f:
+            f.write("# Epic two report\n\nWhat the epic built.\n")
+        rc, out, err = self.capture(pm.cmd_brief, self.brief_args("e1/t1"))
+        self.assertEqual(rc, 0)
+        self.assertIn("# Task `e1/t1`", out)
+        self.assertIn("Task one", out)
+        self.assertIn("The epic brief.", out)
+        self.assertIn("# Report of task `e1/dep`", out)
+        self.assertIn("What the dependency built.", out)
+        self.assertIn("# Report of epic `e2`", out)
+        self.assertIn("What the epic built.", out)
+        self.assertNotIn("\n# Dep report", out)
+        self.assertIn("model sonnet", err)
+
+    def test_brief_falls_back_to_the_spec_of_a_dependency_without_a_report(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/dep", "Dependency", brief="Not done yet.")
+        self.new("task", "e1/t1", "Task", deps="e1/dep")
+        _, out, _ = self.capture(pm.cmd_brief, self.brief_args("e1/t1"))
+        self.assertIn("# Spec of task `e1/dep` (no report yet)", out)
+        self.assertIn("Not done yet.", out)
+
+    def test_brief_holds_every_rule_block(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        _, out, _ = self.capture(pm.cmd_brief, self.brief_args("e1/t1"))
+        for heading, _ in pm.BRIEF_RULES:
+            self.assertIn("## " + heading, out)
+        self.assertIn("tools/lint.py", out)
+        self.assertIn("0 problems", out)
+        self.assertIn("goto done", out)
+        self.assertIn("it->stage", out)
+        self.assertIn("flecs_default_ctor", out)
+        self.assertIn("// e1/t1", out)
+        self.assertIn("--update-baseline", out)
+        self.assertIn("Co-Authored-By", out)
+        self.assertIn("git push", out)
+        self.assertIn("pm.py deliver e1/t1", out)
+        self.assertIn("pm.py done e1/t1", out)
+        self.assertIn("no browser checks", out)
+        self.assertIn("Report back in under %d words" % pm.REPORT_WORDS, out)
+        self.assertNotIn("## Worktree", out)
+
+    def test_brief_names_the_environment_and_the_owned_files(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/layers", "Layers")
+        _, out, _ = self.capture(pm.cmd_brief, self.brief_args("e1/layers"))
+        self.assertIn("--local-env=layers", out)
+        self.assertIn("the coordinator pinned no list", out)
+        _, out, err = self.capture(pm.cmd_brief, self.brief_args(
+            "e1/layers", files="src/view/view.c, include/box/view.h", env="views", worktree=True))
+        self.assertIn("--local-env=views", out)
+        self.assertNotIn("--local-env=layers", out)
+        self.assertIn("`src/view/view.c`, `include/box/view.h`", out)
+        self.assertIn("Never create or edit a file outside that list", out)
+        self.assertIn("## Worktree", out)
+        self.assertIn("git worktree add", out)
+        self.assertIn("env views", err)
+
+    def test_brief_refuses_an_epic_and_a_missing_task(self):
+        self.new("epic", "e1", "Epic")
+        with self.assertRaises(SystemExit):
+            self.capture(pm.cmd_brief, self.brief_args("e1"))
+        with self.assertRaises(SystemExit):
+            self.capture(pm.cmd_brief, self.brief_args("e1/nope"))
+
+    def deliver_args(self, path, tests, **kw):
+        return Args(path=path, tests=tests, bench=kw.get("bench"), env=kw.get("env"))
+
+    def test_deliver_runs_bake3_and_writes_the_report(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.fake_tool()
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core:Layers"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.commands[0][:4], ["bake3", "run", "test/core", "--local-env=t1"])
+        self.assertEqual(self.commands[0][4:7], ["--", "Layers", "-j"])
+        self.assertEqual(self.commands[0][7], str(pm.TEST_JOBS))
+        report = pm.read_json(os.path.join(pm.DB, "e1", "t1", "deliverable", "tests.json"))
+        self.assertEqual(report["project"], "core")
+        self.assertIn("2 passed, 0 failed", out)
+
+    def test_deliver_merges_one_report_per_project(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.fake_tool()
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core,view:Layers", env="mine"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.commands[1][2:5], ["test/view", "--local-env=mine", "--"])
+        out_dir = os.path.join(pm.DB, "e1", "t1", "deliverable")
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "tests_core.json")))
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "tests_view.json")))
+        merged = pm.read_json(os.path.join(out_dir, "tests.json"))
+        self.assertEqual(merged["project"], "all")
+        self.assertEqual(merged["pass"], 4)
+        self.assertEqual([t["project"] for t in merged["tests"]], ["core", "view"])
+        self.assertEqual([p["project"] for p in merged["projects"]], ["core", "view"])
+
+    def test_deliver_fails_on_a_failing_or_missing_run(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.fake_tool(fail=("core",))
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core"))
+        self.assertEqual(rc, 1)
+        self.assertIn("2 passed, 1 failed", out)
+        self.fake_tool(missing=("core",))
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core"))
+        self.assertEqual(rc, 1)
+        self.assertIn("FAIL test/core", out)
+
+    def test_deliver_copies_the_bench_report(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.fake_tool()
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core", bench="transform"))
+        self.assertEqual(rc, 0)
+        bench = self.commands[1]
+        self.assertTrue(bench[1].endswith(os.path.join("tools", "bench.py")))
+        self.assertEqual(bench[2], "transform")
+        self.assertEqual(bench[3:5], ["--env", "t1"])
+        data = pm.read_json(os.path.join(pm.DB, "e1", "t1", "deliverable", "bench.json"))
+        self.assertEqual(data["project"], "bench_transform")
+        self.fake_tool()
+        self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core", bench="transform,render"))
+        out_dir = os.path.join(pm.DB, "e1", "t1", "deliverable")
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "bench_transform.json")))
+        self.assertTrue(os.path.isfile(os.path.join(out_dir, "bench_render.json")))
+
+    def test_deliver_reports_a_missing_bench_run(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.fake_tool(missing=("transform",))
+        rc, out, _ = self.capture(pm.cmd_deliver, self.deliver_args("e1/t1", "core", bench="transform"))
+        self.assertEqual(rc, 1)
+        self.assertIn("FAIL bench/transform", out)
+
+    def test_done_refuses_a_task_without_tests_and_bench(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=False))
+        self.assertEqual(rc, 1)
+        self.assertIn("deliverable/tests.json", out)
+        self.assertIn("deliverable/bench.json", out)
+        self.assertEqual(pm.read_json(os.path.join(pm.DB, "e1", "t1", "progress.json"))["status"], "pending")
+        self.write_report("e1/t1/deliverable/tests.json", {"project": "core", "notests": []})
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=False))
+        self.assertIn("deliverable/tests.json holding a 'tests' list", out)
+        self.task_deliverable("e1/t1")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=False))
+        self.assertEqual(rc, 0)
+        self.assertEqual(pm.read_json(os.path.join(pm.DB, "e1", "t1", "progress.json"))["status"], "complete")
+
+    def test_done_skips_the_bench_report_when_the_task_opts_out(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.task_deliverable("e1/t1", bench=False)
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=False))
+        self.assertEqual(rc, 1)
+        self.progress("e1/t1", bench=False)
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=False))
+        self.assertEqual(rc, 0)
+
+    def test_done_accepts_a_subtask_without_a_deliverable(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.new("subtask", "e1/t1/s1", "Sub")
+        rc, _, _ = self.capture(pm.cmd_done, Args(path="e1/t1/s1", force=False))
+        self.assertEqual(rc, 0)
+
+    def test_done_requires_the_whole_epic_deliverable(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        for missing in ("deliverable/README.md", "deliverable/tests.json", "deliverable/bench/",
+                        "deliverable/integration/", "deliverable/wasm/box_app.wasm", "task e1/t1 is still pending"):
+            self.assertIn(missing, out)
+        self.epic_deliverable("e1")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 0)
+
+    def test_done_checks_the_epic_report_sections_and_length(self):
+        self.new("epic", "e1", "Epic")
+        self.epic_deliverable("e1", sections=("What was built", "Lessons", "Verification", "Not in this epic"))
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        self.assertIn("in that order", out)
+        self.epic_deliverable("e1", sections=("What was built", "Verification", "Lessons"))
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        readme = os.path.join(pm.DB, "e1", "deliverable", "README.md")
+        with open(readme, "a") as f:
+            f.write("## Not in this epic\n\nText.\n" + "line\n" * pm.EPIC_README_LINES)
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        self.assertIn("the limit is %d" % pm.EPIC_README_LINES, out)
+
+    def test_done_accepts_screenshots_instead_of_an_integration_folder(self):
+        self.new("epic", "e1", "Epic")
+        self.epic_deliverable("e1")
+        shutil.rmtree(os.path.join(pm.DB, "e1", "deliverable", "integration"))
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        with open(os.path.join(pm.DB, "e1", "deliverable", "scene.png"), "wb") as f:
+            f.write(b"png")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 0)
+
+    def test_done_refuses_an_epic_with_an_open_task_and_accepts_a_discarded_one(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.new("task", "e1/t2", "Other")
+        self.epic_deliverable("e1", tasks_done=False)
+        pm.set_status("e1/t1", "in progress")
+        pm.set_status("e1/t2", "discarded")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1", force=False))
+        self.assertEqual(rc, 1)
+        self.assertIn("task e1/t1 is still in progress", out)
+        self.assertNotIn("e1/t2", out)
+
+    def test_done_force_completes_with_a_warning(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        rc, out, _ = self.capture(pm.cmd_done, Args(path="e1/t1", force=True))
+        self.assertEqual(rc, 0)
+        self.assertIn("completed with --force", out)
+        self.assertEqual(pm.read_json(os.path.join(pm.DB, "e1", "t1", "progress.json"))["status"], "complete")
+
+    def test_check_warns_for_a_complete_task_missing_its_report(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/report.json", {"project": "core", "pass": 1, "tests": [{"case": "c"}]})
+        pm.set_status("e1/t1", "complete")
+        rc, out, _ = self.capture(pm.cmd_check, None)
+        self.assertEqual(rc, 0)
+        self.assertIn("e1/t1: warning: missing deliverable/tests.json", out)
+
+    def test_check_applies_the_epic_rules_only_after_the_process_task(self):
+        self.new("epic", "project_tool", "Tool")
+        self.new("task", "project_tool/process", "Process")
+        self.progress("project_tool/process", created="2026-05-01T00:00:00+00:00")
+        self.new("epic", "old", "Old epic")
+        self.new("epic", "new", "New epic")
+        for name in ("old", "new"):
+            out = os.path.join(pm.DB, name, "deliverable")
+            os.makedirs(out, exist_ok=True)
+            with open(os.path.join(out, "README.md"), "w") as f:
+                f.write("# Epic\n\nBrief.\n")
+            with open(os.path.join(out, "tests.json"), "w") as f:
+                json.dump({"project": "all", "pass": 1, "tests": [{"case": "c"}]}, f)
+        pm.set_status("old", "complete")
+        pm.set_status("new", "complete")
+        self.progress("old", end_time="2026-01-01T00:00:00+00:00")
+        self.progress("new", end_time="2026-09-01T00:00:00+00:00")
+        rc, out, _ = self.capture(pm.cmd_check, None)
+        self.assertEqual(rc, 1)
+        self.assertIn("new: missing deliverable/wasm/box_app.wasm", out)
+        self.assertIn("new: missing deliverable/bench/", out)
+        self.assertNotIn("old: missing", out)
 
 
 class JsonResult(unittest.TextTestResult):
