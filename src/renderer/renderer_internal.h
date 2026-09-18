@@ -10,6 +10,17 @@
 #include "queue.h"
 #include "gpu.h"
 
+/** GPU resources of one mesh and its static instances */
+typedef struct box_gpu_mesh_t {
+    WGPUBuffer vertices;             /**< Interleaved vertex buffer */
+    WGPUBuffer indices;              /**< Index buffer */
+    uint32_t index_count;            /**< Indices to draw */
+    WGPUBuffer statics;              /**< Static instance buffer */
+    uint32_t static_capacity;        /**< Instances the static buffer can hold */
+    uint32_t static_count;           /**< Static instances to draw */
+    bool alive;                      /**< Handle is in use */
+} box_gpu_mesh_t;
+
 /** Everything the renderer needs to produce frames */
 struct box_renderer_t {
     box_renderer_desc_t desc;        /**< Creation parameters */
@@ -24,7 +35,13 @@ struct box_renderer_t {
     WGPUTextureView offscreen_view;  /**< View of the offscreen target */
     WGPUTexture depth;               /**< Depth target */
     WGPUTextureView depth_view;      /**< View of the depth target */
-    WGPURenderPipeline pipeline;     /**< Pipeline of the placeholder triangle */
+    WGPURenderPipeline pipeline;     /**< Lit instanced mesh pipeline */
+    WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
+    WGPUBindGroup view_group;        /**< Bind group with the view uniforms */
+    WGPUBuffer view_buffer;          /**< View uniform buffer */
+    box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
+    WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
+    uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -77,6 +94,36 @@ void box_frame_init(
 void box_frame_render(
     box_renderer_t *r,
     const box_packet_t *p);
+
+/** Apply the resource and instance changes of a packet to GPU buffers.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_scene_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Record draw calls for every mesh with instances.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param pass The render pass
+ */
+void box_scene_draw(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPURenderPassEncoder pass);
+
+/** Release all mesh and instance buffers.
+ *
+ * @param r The renderer
+ */
+void box_scene_fini(
+    box_renderer_t *r);
+
+/** WGSL source of the lit instanced mesh shader */
+extern const char *box_mesh_shader_wgsl;
 
 /** Read back a texture and write it as PNG.
  *

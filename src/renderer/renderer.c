@@ -128,7 +128,7 @@ box_packet_t* box_renderer_acquire(
 {
     box_packet_t *p = box_queue_acquire(&r->queue);
     if (p) {
-        memset(p, 0, sizeof(box_packet_t));
+        box_packet_reset(p);
     }
 
     return p;

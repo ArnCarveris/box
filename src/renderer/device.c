@@ -278,7 +278,11 @@ done:
 void box_device_fini(
     box_renderer_t *r)
 {
+    box_scene_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
+    if (r->view_group) wgpuBindGroupRelease(r->view_group);
+    if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);
+    if (r->view_buffer) wgpuBufferRelease(r->view_buffer);
     if (r->depth_view) wgpuTextureViewRelease(r->depth_view);
     if (r->depth) wgpuTextureRelease(r->depth);
     if (r->offscreen_view) wgpuTextureViewRelease(r->offscreen_view);

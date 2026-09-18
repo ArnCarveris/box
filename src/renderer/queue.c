@@ -21,6 +21,7 @@ void box_queue_init(
     memset(q, 0, sizeof(box_queue_t));
     int32_t i;
     for (i = 0; i < BOX_QUEUE_SIZE; i ++) {
+        box_packet_init(&q->packets[i]);
         q->free_list[i] = &q->packets[i];
     }
 
@@ -35,12 +36,14 @@ void box_queue_init(
 void box_queue_fini(
     box_queue_t *q)
 {
+    int32_t i;
+    for (i = 0; i < BOX_QUEUE_SIZE; i ++) {
+        box_packet_fini(&q->packets[i]);
+    }
 #ifndef BOX_PLATFORM_WEB
     pthread_mutex_destroy(&q->lock);
     pthread_cond_destroy(&q->free_cond);
     pthread_cond_destroy(&q->ready_cond);
-#else
-    (void)q;
 #endif
 }
 
