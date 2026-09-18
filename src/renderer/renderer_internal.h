@@ -39,6 +39,9 @@
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
 
+/** Bindings the environment takes at the start of the shared fragment bind group */
+#define BOX_ENV_BINDINGS (4)
+
 /** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
 #define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
 
@@ -87,6 +90,14 @@ typedef struct box_gpu_mesh_t {
     uint32_t job_capacity;           /**< Jobs the job buffer can hold */
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
+
+/** The 2D array texture of one texture size class */
+typedef struct box_gpu_texclass_t {
+    WGPUTexture texture;   /**< Array texture holding every layer of the class */
+    WGPUTextureView view;  /**< Array view the mesh shader samples */
+    WGPUSampler sampler;   /**< Sampler of the class, with the anisotropy setting */
+    uint32_t layers;       /**< Layers the array texture holds */
+} box_gpu_texclass_t;
 
 #ifdef BOX_PLATFORM_WEB
 /** Captures that can wait for their buffer map at the same time */
@@ -176,6 +187,10 @@ struct box_renderer_t {
     WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
     WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
     WGPUComputePipeline grid_pipeline; /**< Occupancy fill pass */
+    box_gpu_texclass_t texclass[BOX_TEXTURE_CLASSES]; /**< One array texture per size class */
+    WGPUTexture texture_dummy;       /**< Single texel array texture of an unused class */
+    WGPUTextureView texture_dummy_view; /**< View of the single texel array texture */
+    bool texture_dirty;              /**< A class texture changed, the bind group is stale */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -258,6 +273,49 @@ void box_scene_draw(
 void box_scene_fini(
     box_renderer_t *r);
 
+/** Create the texture samplers and the placeholder array texture.
+ *
+ * @param r The renderer
+ */
+void box_texture_init(
+    box_renderer_t *r);
+
+/** Describe the texture half of the shared fragment bind group layout.
+ *
+ * @param out Entries to fill, BOX_TEXTURE_CLASSES times two of them
+ * @param base First binding of the texture half
+ */
+void box_texture_bind_layout(
+    WGPUBindGroupLayoutEntry *out,
+    uint32_t base);
+
+/** Fill the texture half of the shared fragment bind group.
+ *
+ * @param r The renderer
+ * @param out Entries to fill, BOX_TEXTURE_CLASSES times two of them
+ * @param base First binding of the texture half
+ */
+void box_texture_bind_group(
+    box_renderer_t *r,
+    WGPUBindGroupEntry *out,
+    uint32_t base);
+
+/** Upload the textures of a packet, growing the array texture of their class.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_texture_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Release the array textures, samplers and bind groups.
+ *
+ * @param r The renderer
+ */
+void box_texture_fini(
+    box_renderer_t *r);
+
 /** Create the cluster pipeline, its bind group layouts and the light buffer.
  *
  * @param r The renderer
@@ -309,6 +367,13 @@ void box_environment_update(
     box_renderer_t *r,
     const box_packet_t *p,
     WGPUCommandEncoder encoder);
+
+/** Rebuild the shared fragment bind group of the environment and the texture classes.
+ *
+ * @param r The renderer
+ */
+void box_environment_rebuild(
+    box_renderer_t *r);
 
 /** Release the environment textures, pipelines and bind groups.
  *

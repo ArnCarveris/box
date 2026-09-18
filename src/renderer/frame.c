@@ -46,6 +46,7 @@ void box_frame_init(
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
     box_frame_init_view(r);
     box_lights_init(r);
+    box_texture_init(r);
     box_environment_init(r);
     box_bake_init(r);
 
@@ -61,13 +62,14 @@ void box_frame_init(
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
     };
-    WGPUVertexAttribute instance_attrs[6] = {
+    WGPUVertexAttribute instance_attrs[7] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 }
+        { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 },
+        { .format = WGPUVertexFormat_Uint32x4, .offset = 96, .shaderLocation = 9 }
     };
     WGPUVertexBufferLayout layouts[2] = {
         {
@@ -78,7 +80,7 @@ void box_frame_init(
         }, {
             .arrayStride = sizeof(box_instance_t),
             .stepMode = WGPUVertexStepMode_Instance,
-            .attributeCount = 6,
+            .attributeCount = 7,
             .attributes = instance_attrs
         }
     };
@@ -175,6 +177,7 @@ void box_frame_render(
     const box_packet_t *p)
 {
     box_device_resize(r, p->width, p->height);
+    box_texture_apply(r, p);
     box_scene_apply(r, p);
     if (p->has_view) {
         box_lights_update(r, p);

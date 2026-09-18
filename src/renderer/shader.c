@@ -109,6 +109,46 @@
     "  pad1: u32,\n" \
     "};\n"
 
+/** One array texture and sampler per size class, sampled through a packed handle */
+#define BOX_WGSL_TEXTURES \
+    "@group(2) @binding(4) var tex0: texture_2d_array<f32>;\n" \
+    "@group(2) @binding(5) var tex1: texture_2d_array<f32>;\n" \
+    "@group(2) @binding(6) var tex2: texture_2d_array<f32>;\n" \
+    "@group(2) @binding(7) var tex3: texture_2d_array<f32>;\n" \
+    "@group(2) @binding(8) var samp0: sampler;\n" \
+    "@group(2) @binding(9) var samp1: sampler;\n" \
+    "@group(2) @binding(10) var samp2: sampler;\n" \
+    "@group(2) @binding(11) var samp3: sampler;\n" \
+    "fn tex_sample(slot: u32, uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> {\n" \
+    "  let cls = slot >> 24u;\n" \
+    "  let layer = (slot & 0xFFFFFFu) - 1u;\n" \
+    "  var result = vec4<f32>(1.0);\n" \
+    "  if (cls == 0u) {\n" \
+    "    result = textureSampleGrad(tex0, samp0, uv, layer, ddx, ddy);\n" \
+    "  } else if (cls == 1u) {\n" \
+    "    result = textureSampleGrad(tex1, samp1, uv, layer, ddx, ddy);\n" \
+    "  } else if (cls == 2u) {\n" \
+    "    result = textureSampleGrad(tex2, samp2, uv, layer, ddx, ddy);\n" \
+    "  } else {\n" \
+    "    result = textureSampleGrad(tex3, samp3, uv, layer, ddx, ddy);\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {\n" \
+    "  let lo = c / 12.92;\n" \
+    "  let hi = pow((c + vec3(0.055)) / 1.055, vec3(2.4));\n" \
+    "  return select(lo, hi, c > vec3(0.04045));\n" \
+    "}\n" \
+    "fn perturb(n: vec3<f32>, dp1: vec3<f32>, dp2: vec3<f32>, duv1: vec2<f32>,\n" \
+    "    duv2: vec2<f32>, ts: vec3<f32>) -> vec3<f32> {\n" \
+    "  let perp1 = cross(dp2, n);\n" \
+    "  let perp2 = cross(n, dp1);\n" \
+    "  let t = perp1 * duv1.x + perp2 * duv2.x;\n" \
+    "  let b = perp1 * duv1.y + perp2 * duv2.y;\n" \
+    "  let inv = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));\n" \
+    "  return normalize(t * (inv * ts.x) + b * (inv * ts.y) + n * ts.z);\n" \
+    "}\n"
+
 /** Cluster a view space position falls in, the shader side of box_cluster_index */
 #define BOX_WGSL_CLUSTER_INDEX \
     "fn cluster_index(vp: vec3<f32>) -> u32 {\n" \
@@ -140,6 +180,7 @@ const char *box_mesh_shader_wgsl =
     "@group(2) @binding(3) var env_sampler: sampler;\n"
     "@group(3) @binding(0) var<storage, read> probes: array<Probe>;\n"
     "@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;\n"
+    BOX_WGSL_TEXTURES
     BOX_WGSL_CLUSTER_INDEX
     "fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {\n"
     "  var result = 0.0;\n"
@@ -168,6 +209,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(6) color: vec4<f32>,\n"
     "  @location(7) emissive: vec4<f32>,\n"
     "  @location(8) params: vec4<f32>,\n"
+    "  @location(9) textures: vec4<u32>,\n"
     "};\n"
     "struct VertexOut {\n"
     "  @builtin(position) clip: vec4<f32>,\n"
@@ -175,10 +217,11 @@ const char *box_mesh_shader_wgsl =
     "  @location(1) normal: vec3<f32>,\n"
     "  @location(2) uv: vec2<f32>,\n"
     "  @location(3) color: vec4<f32>,\n"
-    "  @location(4) emissive: vec3<f32>,\n"
+    "  @location(4) emissive: vec4<f32>,\n"
     "  @location(5) params: vec4<f32>,\n"
     "  @location(6) @interpolate(flat) slot: u32,\n"
     "  @location(7) local: vec3<f32>,\n"
+    "  @location(8) @interpolate(flat) textures: vec4<u32>,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -193,7 +236,8 @@ const char *box_mesh_shader_wgsl =
     "  out.normal = normalize((m * vec4(in.normal, 0.0)).xyz);\n"
     "  out.uv = in.uv;\n"
     "  out.color = in.color;\n"
-    "  out.emissive = in.emissive.rgb;\n"
+    "  out.emissive = in.emissive;\n"
+    "  out.textures = in.textures;\n"
     "  out.params = in.params;\n"
     "  out.slot = in.instance;\n"
     "  out.local = vec3<f32>(0.0);\n"
@@ -278,16 +322,36 @@ const char *box_mesh_shader_wgsl =
     "  return sum;\n"
     "}\n"
     "@fragment fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {\n"
-    "  let n = normalize(in.normal);\n"
+    "  let ddx = dpdx(in.uv);\n"
+    "  let ddy = dpdy(in.uv);\n"
+    "  let dp1 = dpdx(in.world_pos);\n"
+    "  let dp2 = dpdy(in.world_pos);\n"
+    "  var n = normalize(in.normal);\n"
+    "  var albedo = in.color.rgb;\n"
+    "  var emitted = in.emissive.rgb;\n"
+    "  var rough = in.params.y;\n"
+    "  if (in.textures.x != 0u) {\n"
+    "    albedo = albedo * srgb_to_linear(tex_sample(in.textures.x, in.uv, ddx, ddy).rgb);\n"
+    "  }\n"
+    "  if (in.textures.y != 0u) {\n"
+    "    let t = srgb_to_linear(tex_sample(in.textures.y, in.uv, ddx, ddy).rgb);\n"
+    "    emitted = emitted + t * in.emissive.w;\n"
+    "  }\n"
+    "  if (in.textures.z != 0u) {\n"
+    "    rough = rough * tex_sample(in.textures.z, in.uv, ddx, ddy).g;\n"
+    "  }\n"
+    "  if (in.textures.w != 0u) {\n"
+    "    let ts = tex_sample(in.textures.w, in.uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
+    "    n = perturb(n, dp1, dp2, ddx, ddy, ts);\n"
+    "  }\n"
     "  let l = normalize(-u.sun_dir);\n"
     "  let v = normalize(u.eye - in.world_pos);\n"
     "  let metallic = in.params.x;\n"
-    "  let roughness = clamp(in.params.y, 0.04, 1.0);\n"
-    "  let albedo = in.color.rgb;\n"
+    "  let roughness = clamp(rough, 0.04, 1.0);\n"
     "  let sun = u.sun_color * u.sun_intensity;\n"
     "  let env = environment(n, v, albedo, metallic, roughness);\n"
     "  let is_baked = in.params.z > 0.5;\n"
-    "  var color = shade(n, v, l, albedo, metallic, roughness) * sun + env + in.emissive;\n"
+    "  var color = shade(n, v, l, albedo, metallic, roughness) * sun + env + emitted;\n"
     "  color = color + punctual(in.world_pos, n, v, albedo, metallic, roughness, is_baked);\n"
     "  if (is_baked) {\n"
     "    color = color + baked(in.slot, in.local, n, albedo, metallic);\n"

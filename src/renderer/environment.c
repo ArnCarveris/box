@@ -194,7 +194,7 @@ static void box_env_layouts(
     WGPUBindGroupLayoutDescriptor filter_desc = { .entryCount = 3, .entries = filter_entries };
     r->env_filter_layout = wgpuDeviceCreateBindGroupLayout(r->device, &filter_desc);
 
-    WGPUBindGroupLayoutEntry mesh_entries[4] = {
+    WGPUBindGroupLayoutEntry mesh_entries[BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -222,7 +222,11 @@ static void box_env_layouts(
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }
     };
-    WGPUBindGroupLayoutDescriptor mesh_desc = { .entryCount = 4, .entries = mesh_entries };
+    box_texture_bind_layout(mesh_entries + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
+    WGPUBindGroupLayoutDescriptor mesh_desc = {
+        .entryCount = BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2,
+        .entries = mesh_entries
+    };
     r->env_layout = wgpuDeviceCreateBindGroupLayout(r->device, &mesh_desc);
 }
 
@@ -296,17 +300,28 @@ static void box_env_groups(
     };
     r->env_filter_group = wgpuDeviceCreateBindGroup(r->device, &filter_desc);
 
-    WGPUBindGroupEntry mesh_entries[4] = {
+    box_environment_rebuild(r);
+}
+
+void box_environment_rebuild(
+    box_renderer_t *r)
+{
+    WGPUBindGroupEntry mesh_entries[BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2] = {
         { .binding = 0, .textureView = r->env_irradiance_view },
         { .binding = 1, .textureView = r->env_specular_view },
         { .binding = 2, .textureView = r->env_brdf_view },
         { .binding = 3, .sampler = r->env_sampler }
     };
+    box_texture_bind_group(r, mesh_entries + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
     WGPUBindGroupDescriptor mesh_desc = {
         .layout = r->env_layout,
-        .entryCount = 4,
+        .entryCount = BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2,
         .entries = mesh_entries
     };
+    if (r->env_group) {
+        wgpuBindGroupRelease(r->env_group);
+    }
+
     r->env_group = wgpuDeviceCreateBindGroup(r->device, &mesh_desc);
 }
 

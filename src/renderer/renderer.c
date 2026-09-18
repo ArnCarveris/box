@@ -29,6 +29,12 @@ static void box_renderer_discard(
         cmd->indices = NULL;
     }
 
+    for (i = 0; i < p->texture_create.count; i ++) {
+        box_texture_cmd_t *cmd = box_vec_at(&p->texture_create, i);
+        free(cmd->pixels);
+        cmd->pixels = NULL;
+    }
+
     box_queue_release(&r->queue, p);
 }
 
