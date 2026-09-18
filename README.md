@@ -177,6 +177,11 @@ the median, confidence interval, p99 and samples per case, plus frame timing per
 bench scene). Both read the aggregated `/api/tests` and `/api/benchmarks`
 endpoints served by `pm.py serve`.
 
+The server also serves `apps/box_inspector/index.html` at `/inspector`. An epic
+with a `deliverable/wasm/` build gets an **Inspect** link on its card and in its
+detail panel that opens the inspector on that image; the header link **Inspect
+local instance** opens it on `http://localhost:27750`.
+
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
 python3 project/pm.py start <epic>/<task>

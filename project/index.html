@@ -53,7 +53,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 a { color: var(--accent); }
 
 header {
-  display: flex; align-items: center; gap: 16px; padding: 12px 20px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 20px;
   border-bottom: 1px solid var(--border); background: var(--surface);
 }
 header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
@@ -110,6 +110,9 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .chip.fail { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .chip.empty { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .kind { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.link { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.link:hover { text-decoration: underline; }
+.card-head .link { align-self: center; }
 .subtasks { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 0; padding: 0; list-style: none; }
 .subtasks li {
   display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
@@ -245,6 +248,8 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
     <button data-view="benchmarks">Benchmarks</button>
   </div>
   <div class="tiles" id="tiles"></div>
+  <a class="link" href="/inspector?http=http://localhost:27750" target="_blank" rel="noopener"
+     title="Open the inspector connected to a local instance">Inspect local instance</a>
   <button class="icon-btn" id="theme" title="Toggle theme">◐</button>
 </header>
 <main>
@@ -280,6 +285,9 @@ const ICONS = {
   discarded: '<svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
 const cls = s => s.replace(" ", "-");
+const inspectLink = item => item.inspect_url
+  ? `<a class="link" href="${esc(item.inspect_url)}" target="_blank" rel="noopener"
+       title="Open the inspector with the wasm image of this epic">Inspect</a>` : "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmtDate = iso => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 const dur = (a, b) => {
@@ -449,7 +457,7 @@ function renderBoard() {
     </div>`);
   const epicCard = `
     <div class="card" style="grid-column: 1 / -1">
-      <div class="card-head"><h3 data-item="${esc(epic.path)}">${esc(epic.readme.title || epic.name)}</h3>${chip(epic.status)}</div>
+      <div class="card-head"><h3 data-item="${esc(epic.path)}">${esc(epic.readme.title || epic.name)}</h3>${inspectLink(epic)}${chip(epic.status)}</div>
       <div class="brief">${esc(epic.readme.brief || "")}</div>
       ${testSummary(epic)}
     </div>`;
@@ -486,7 +494,8 @@ function openPanel(path) {
     <div class="path">${esc(item.level)} · ${esc(item.path)}</div>
     <h1>${esc(item.readme.title || item.name)}</h1>
     <div class="meta">${chip(item.status)}<span class="kind">${esc(item.kind)}</span>
-      <span style="color:var(--ink-3);font-size:12px">${item.start_time ? fmtDate(item.start_time) + " → " + (item.end_time ? fmtDate(item.end_time) : "now") + " (" + dur(item.start_time, item.end_time) + ")" : "not started"}</span></div>
+      <span style="color:var(--ink-3);font-size:12px">${item.start_time ? fmtDate(item.start_time) + " → " + (item.end_time ? fmtDate(item.end_time) : "now") + " (" + dur(item.start_time, item.end_time) + ")" : "not started"}</span>
+      ${inspectLink(item)}</div>
     ${item.dependencies.length ? `<div class="deps">Depends on ${item.dependencies.map(d => `<code>${esc(d)}</code>`).join(", ")}</div>` : ""}
     <div class="md">${markdown(item.readme.markdown)}</div>
     ${deliverables ? `<h2>Deliverables</h2><ul class="deliverables">${deliverables}</ul>` : ""}
