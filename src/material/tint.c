@@ -5,32 +5,43 @@
 
 #include "material_internal.h"
 
-/** Write a resolved tint to an entity and recurse into children without their own Tint.
+/** Queue a resolved tint for an entity and recurse into children without their own Tint.
  *
- * @param world The world
+ * @param world The world, used for reading
+ * @param stage The stage that queues the writes
  * @param e The entity
  * @param tint The resolved tint, NULL to remove it
  */
 static void box_tint_apply(
     ecs_world_t *world,
+    ecs_world_t *stage,
     ecs_entity_t e,
     const ActualTint *tint)
 {
     if (tint) {
-        ecs_set_ptr(world, e, ActualTint, tint);
+        ecs_set_ptr(stage, e, ActualTint, tint);
     } else {
-        ecs_remove(world, e, ActualTint);
+        ecs_remove(stage, e, ActualTint);
     }
 
+    ecs_vec_t children;
+    ecs_vec_init_t(NULL, &children, ecs_entity_t, 0);
     ecs_iter_t it = ecs_children(world, e);
     while (ecs_children_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             if (!ecs_has(world, it.entities[i], Tint)) {
-                box_tint_apply(world, it.entities[i], tint);
+                ecs_vec_append_t(NULL, &children, ecs_entity_t)[0] = it.entities[i];
             }
         }
     }
+
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&children); i ++) {
+        box_tint_apply(world, stage, ecs_vec_get_t(&children, ecs_entity_t, i)[0], tint);
+    }
+
+    ecs_vec_fini_t(NULL, &children, ecs_entity_t);
 }
 
 /** Tint was set: resolve it for the subtree.
@@ -44,8 +55,9 @@ static void box_tint_on_set(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         ActualTint actual = { t[i].r, t[i].g, t[i].b, t[i].a };
-        box_tint_apply(it->world, it->entities[i], &actual);
+        box_tint_apply(it->world, it->stage, it->entities[i], &actual);
     }
+
 }
 
 /** Tint was removed: fall back to the parent's resolved tint for the subtree.
@@ -55,12 +67,14 @@ static void box_tint_on_set(
 static void box_tint_on_remove(
     ecs_iter_t *it)
 {
+    bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
-    for (i = 0; i < it->count; i ++) {
+    for (i = 0; i < it->count && !deleting; i ++) {
         ecs_entity_t parent = ecs_get_target(it->world, it->entities[i], EcsChildOf, 0);
         const ActualTint *inherited = parent ? ecs_get(it->world, parent, ActualTint) : NULL;
-        box_tint_apply(it->world, it->entities[i], inherited);
+        box_tint_apply(it->world, it->stage, it->entities[i], inherited);
     }
+
 }
 
 /** Entity was parented under a tinted ancestor: inherit its resolved tint.
@@ -73,8 +87,9 @@ static void box_tint_on_parent(
     ActualTint *parent_tint = ecs_field(it, ActualTint, 1);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_tint_apply(it->world, it->entities[i], parent_tint);
+        box_tint_apply(it->world, it->stage, it->entities[i], parent_tint);
     }
+
 }
 
 void box_tint_init(
