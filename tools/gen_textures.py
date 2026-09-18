@@ -62,7 +62,7 @@ def bumps(size):
             nx, ny, nz = 0.0, 0.0, 1.0
             if d < radius and d > 1e-3:
                 s = math.sin(math.pi * 0.5 * d / radius)
-                nx, ny = dx / d * s, dy / d * s
+                nx, ny = dx / d * s, -dy / d * s
                 nz = math.sqrt(max(1.0 - nx * nx - ny * ny, 0.0))
             i = (y * size + x) * 4
             out[i:i + 4] = bytes(int((v * 0.5 + 0.5) * 255) for v in (nx, ny, nz)) + b"\xff"

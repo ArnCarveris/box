@@ -211,6 +211,19 @@
                 "teardown": true
             },
             {
+                "id": "NormalMap",
+                "testcases": [
+                    "frame_of_a_camera_facing_surface",
+                    "frame_is_the_same_with_screen_y_up",
+                    "frame_is_the_same_for_a_flipped_normal",
+                    "frame_follows_swapped_uv_axes",
+                    "flat_sample_keeps_the_normal",
+                    "sample_leans_along_the_u_tangent",
+                    "sample_leans_along_the_v_tangent",
+                    "degenerate_derivatives_keep_the_normal"
+                ]
+            },
+            {
                 "id": "Movement",
                 "testcases": [
                     "velocity_integrates_position",

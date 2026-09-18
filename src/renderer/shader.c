@@ -109,7 +109,8 @@
     "  pad1: u32,\n" \
     "};\n"
 
-/** One array texture and sampler per size class, sampled through a packed handle */
+/** One array texture and sampler per size class, sampled through a packed handle.
+ * `perturb` is the shader side of normal.h and bends a normal with a map sample. */
 #define BOX_WGSL_TEXTURES \
     "@group(2) @binding(4) var tex0: texture_2d_array<f32>;\n" \
     "@group(2) @binding(5) var tex1: texture_2d_array<f32>;\n" \
@@ -145,7 +146,9 @@
     "  let perp2 = cross(n, dp1);\n" \
     "  let t = perp1 * duv1.x + perp2 * duv2.x;\n" \
     "  let b = perp1 * duv1.y + perp2 * duv2.y;\n" \
-    "  let inv = inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));\n" \
+    "  let area = dot(n, cross(dp1, dp2));\n" \
+    "  let side = select(-1.0, 1.0, area >= 0.0);\n" \
+    "  let inv = side * inverseSqrt(max(max(dot(t, t), dot(b, b)), 1e-12));\n" \
     "  return normalize(t * (inv * ts.x) + b * (inv * ts.y) + n * ts.z);\n" \
     "}\n"
 
