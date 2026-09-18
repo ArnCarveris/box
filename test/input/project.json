@@ -1,0 +1,82 @@
+{
+    "id": "input",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.input device layer",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Input",
+                "testcases": [
+                    "defaults_of_the_singleton",
+                    "press_is_set_for_one_frame",
+                    "held_key_keeps_its_state",
+                    "release_clears_the_state",
+                    "press_and_release_in_one_frame_keeps_the_press",
+                    "mouse_buttons_use_their_own_slots",
+                    "text_buffer_holds_the_characters_of_the_frame",
+                    "text_buffer_encodes_utf8",
+                    "text_buffer_stops_at_its_size",
+                    "scroll_accumulates_over_frames",
+                    "mouse_window_position_follows_the_events",
+                    "mouse_delta_is_the_movement_of_the_frame",
+                    "mouse_view_and_normalized_come_from_the_surface",
+                    "mouse_center_is_the_origin_of_the_view"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Focus",
+                "testcases": [
+                    "a_new_world_is_focused",
+                    "focus_loss_clears_the_key_state",
+                    "refocus_presses_nothing",
+                    "refocus_does_not_jump_the_cursor",
+                    "platform_keys_are_ignored_while_unfocused",
+                    "platform_keys_are_ignored_while_minimized",
+                    "injected_keys_are_applied_while_unfocused",
+                    "minimize_event_sets_and_clears_the_flag"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Inject",
+                "testcases": [
+                    "a_press_of_one_frame_releases_the_next_frame",
+                    "a_press_with_a_duration_holds_the_key",
+                    "a_down_without_a_duration_stays_down",
+                    "delay_postpones_the_event",
+                    "platform_events_are_applied_before_injected",
+                    "events_of_one_frame_keep_their_order",
+                    "a_sweep_walks_the_cursor_over_frames",
+                    "pending_counts_the_queued_events",
+                    "reset_empties_the_queue_and_clears_the_state"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Codes",
+                "testcases": [
+                    "printable_keys_are_ascii",
+                    "mouse_buttons_are_128_and_129",
+                    "spare_codes_are_unique_and_fit_the_table",
+                    "keys_are_exported_as_script_constants",
+                    "family_modifiers_are_reserved_above_the_slots",
+                    "glfw_printable_keys_map_to_themselves",
+                    "glfw_named_keys_map_to_spare_codes",
+                    "glfw_unknown_keys_map_to_none"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}
