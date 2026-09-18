@@ -1,0 +1,53 @@
+{
+    "id": "core",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for box.core, box.surface and the renderer queue",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Args",
+            "testcases": [
+                "no_args_defaults",
+                "headless_requires_stop_condition",
+                "headless_with_frames",
+                "timeout_seconds",
+                "timeout_infinite",
+                "cpu_budget",
+                "fps",
+                "unknown_option_fails",
+                "scene_file_loads",
+                "missing_scene_fails"
+            ]
+        }, {
+            "id": "App",
+            "testcases": [
+                "stops_after_frames",
+                "stops_after_timeout",
+                "stops_on_quit",
+                "process_dir_created_and_removed",
+                "cpu_budget_slows_loop"
+            ]
+        }, {
+            "id": "Queue",
+            "testcases": [
+                "init_all_free",
+                "acquire_submit_wait_release",
+                "poll_returns_null_when_empty",
+                "fifo_order",
+                "acquire_returns_null_after_stop",
+                "acquire_blocks_until_release",
+                "wait_blocks_until_submit"
+            ]
+        }, {
+            "id": "Surface",
+            "testcases": [
+                "headless_surface_reports_size",
+                "headless_surface_writes_png",
+                "write_nth_adds_frame_suffix"
+            ]
+        }]
+    }
+}
