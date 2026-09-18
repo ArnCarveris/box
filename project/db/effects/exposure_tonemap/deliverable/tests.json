@@ -1,0 +1,32 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T22:47:43Z",
+  "pass": 22,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.058695,
+  "tests": [
+    {"suite": "Effects", "case": "builtin_grade_is_off_by_default", "status": "pass", "elapsed": 0.019893},
+    {"suite": "Effects", "case": "chain_runs_in_order", "status": "pass", "elapsed": 0.019703},
+    {"suite": "Effects", "case": "disabled_effect_is_skipped", "status": "pass", "elapsed": 0.019509},
+    {"suite": "Effects", "case": "enabling_an_effect_rebuilds_the_chain", "status": "pass", "elapsed": 0.019463},
+    {"suite": "Effects", "case": "effect_without_a_shader_is_skipped", "status": "pass", "elapsed": 0.019948},
+    {"suite": "Effects", "case": "view_list_overrides_the_stack", "status": "pass", "elapsed": 0.019700},
+    {"suite": "Effects", "case": "view_without_a_list_runs_the_stack", "status": "pass", "elapsed": 0.019757},
+    {"suite": "Effects", "case": "view_toggle_skips_the_chain", "status": "pass", "elapsed": 0.019857},
+    {"suite": "Effects", "case": "inputs_are_the_union_of_the_passes", "status": "pass", "elapsed": 0.019892},
+    {"suite": "Effects", "case": "disabled_pass_does_not_ask_for_its_inputs", "status": "pass", "elapsed": 0.020082},
+    {"suite": "Effects", "case": "parameters_come_from_the_parameter_component", "status": "pass", "elapsed": 0.019588},
+    {"suite": "Effects", "case": "two_passes_of_one_scale_share_a_target_size", "status": "pass", "elapsed": 0.019726},
+    {"suite": "Effects", "case": "half_scale_pass_asks_for_half_the_target", "status": "pass", "elapsed": 0.019741},
+    {"suite": "Effects", "case": "two_views_keep_their_own_range", "status": "pass", "elapsed": 0.019559},
+    {"suite": "Effects", "case": "histogram_bins_map_the_log_range", "status": "pass", "elapsed": 0.019332},
+    {"suite": "Effects", "case": "histogram_average_skips_the_black_bin", "status": "pass", "elapsed": 0.019800},
+    {"suite": "Effects", "case": "exposure_adapts_at_the_speed_of_its_direction", "status": "pass", "elapsed": 0.019022},
+    {"suite": "Effects", "case": "exposure_stays_inside_its_range", "status": "pass", "elapsed": 0.018852},
+    {"suite": "Effects", "case": "pinned_exposure_keeps_its_value", "status": "pass", "elapsed": 0.018928},
+    {"suite": "Effects", "case": "builtin_exposure_and_tonemap_are_off", "status": "pass", "elapsed": 0.019149},
+    {"suite": "Effects", "case": "tonemap_parameters_reach_the_pass", "status": "pass", "elapsed": 0.018697},
+    {"suite": "Effects", "case": "exposure_pass_declares_its_input", "status": "pass", "elapsed": 0.018533}
+  ]
+}
