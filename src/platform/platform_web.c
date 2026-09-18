@@ -124,6 +124,18 @@ static int32_t box_web_key_side(
     return result;
 }
 
+/** Tell whether the page keyboard focus sits in a text field, which then keeps its keys.
+ *
+ * @return true when an input, text area, select or editable element is focused
+ */
+static bool box_web_text_focused(void)
+{
+    const char *script = "(function(){var e=document.activeElement;return e&&(e.tagName==='INPUT'"
+        "||e.tagName==='TEXTAREA'||e.tagName==='SELECT'||e.isContentEditable)?1:0;})()";
+
+    return emscripten_run_script_int(script) != 0;
+}
+
 /** Key callback: report the key and the character it typed.
  *
  * @param type The browser event type
@@ -136,6 +148,11 @@ static bool box_web_key(
     const EmscriptenKeyboardEvent *event,
     void *ctx)
 {
+    bool handled = false;
+    if (box_web_text_focused()) {
+        goto done;
+    }
+
     box_window_t *w = ctx;
     int32_t code = box_web_key_side(
         box_platform_key_from_native((int32_t)event->keyCode), event->location);
@@ -149,7 +166,10 @@ static bool box_web_key(
         box_web_emit(w, BoxInputChar, point, 0, 0);
     }
 
-    return code && !event->ctrlKey && !event->metaKey;
+    handled = code && !event->ctrlKey && !event->metaKey;
+
+done:
+    return handled;
 }
 
 /** Move callback: report the cursor, following the pointer lock when it is held.
