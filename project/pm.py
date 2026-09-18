@@ -111,6 +111,11 @@ def child_dirs(path):
         yield name, full
 
 
+def start_order(item):
+    started = item["start_time"] or ""
+    return (0 if started else 1, started or item["created"] or "", item["name"])
+
+
 def walk_item(path, level, rel):
     progress = read_json(os.path.join(path, "progress.json")) or {}
     item = {
@@ -130,7 +135,7 @@ def walk_item(path, level, rel):
     if level + 1 < len(LEVELS):
         for name, full in child_dirs(path):
             item["children"].append(walk_item(full, level + 1, rel + "/" + name))
-        item["children"].sort(key=lambda c: (c["created"] or "", c["name"]))
+        item["children"].sort(key=start_order)
     return item
 
 
@@ -461,7 +466,7 @@ def collect_state():
     if os.path.isdir(DB):
         for name, full in child_dirs(DB):
             epics.append(walk_item(full, 0, name))
-        epics.sort(key=lambda c: (c["created"] or "", c["name"]))
+        epics.sort(key=start_order)
     return {"generated": now(), "epics": epics}
 
 
