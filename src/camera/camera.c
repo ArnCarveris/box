@@ -15,6 +15,7 @@ void BoxCameraImport(
     ECS_IMPORT(world, BoxTransform);
 
     ECS_META_COMPONENT(world, Camera);
+    ECS_META_COMPONENT(world, Capture);
     ECS_TAG_DEFINE(world, Billboard);
 
     ecs_add_pair(world, ecs_id(Camera), EcsWith, ecs_id(Position));

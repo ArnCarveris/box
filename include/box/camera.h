@@ -30,6 +30,11 @@ ECS_STRUCT(Camera, {
     float ortho_height;  /**< Visible height in world units when orthographic, default 10 */
 });
 
+/** Renders the camera to a PNG once, the engine removes the component */
+ECS_STRUCT(Capture, {
+    char *path;  /**< File the frame is written to */
+});
+
 /** Rotates the entity every frame so its local +Z faces the active camera */
 extern ECS_TAG_DECLARE(Billboard);
 

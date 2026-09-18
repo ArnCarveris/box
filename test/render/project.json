@@ -35,6 +35,21 @@
                 "teardown": true
             },
             {
+                "id": "Capture",
+                "testcases": [
+                    "component_consumed_by_extract",
+                    "camera_becomes_the_view",
+                    "two_cameras_over_two_frames",
+                    "overrides_write_to_file",
+                    "write_to_file_kept_without_component",
+                    "active_camera_is_the_first_camera",
+                    "active_camera_without_camera_entity",
+                    "removed_after_a_deferred_extract"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Material",
                 "testcases": [
                     "tint_resolves_to_children",

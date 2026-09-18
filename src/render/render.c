@@ -41,6 +41,7 @@ static void box_render_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
         if (state[i].dynamic) ecs_query_fini(state[i].dynamic);
         if (state[i].cameras) ecs_query_fini(state[i].cameras);
+        if (state[i].captures) ecs_query_fini(state[i].captures);
         if (state[i].suns) ecs_query_fini(state[i].suns);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);

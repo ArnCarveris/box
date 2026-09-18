@@ -186,7 +186,39 @@ static void box_extract_dynamic(
     }
 }
 
-/** Fill the packet view from the first camera, or a default one.
+/** Take the capture request of the first camera that has one.
+ *
+ * The path of the request replaces the one the surface wrote and the component
+ * is removed, so a next frame honors the request of another camera.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ * @return The camera that requested the capture, 0 when no camera did
+ */
+static ecs_entity_t box_extract_capture(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_query_iter(world, state->captures);
+    if (ecs_query_next(&it)) {
+        const Capture *capture = ecs_field(&it, Capture, 0);
+        result = it.entities[0];
+        ecs_os_snprintf(p->capture_path, BOX_CAPTURE_PATH_MAX, "%s",
+            capture->path ? capture->path : "");
+        ecs_iter_fini(&it);
+    }
+
+    if (result) {
+        ecs_remove(world, result, Capture);
+    }
+
+    return result;
+}
+
+/** Fill the packet view from the capture or active camera, or a default one.
  *
  * @param world The world
  * @param state The registry
@@ -202,10 +234,14 @@ static void box_extract_camera(
     mat4 proj = mat4_perspective(60.0f * 3.14159265f / 180.0f, aspect, 0.1f);
     vec3 eye = vec3_new(0, 3, -8);
 
-    ecs_iter_t it = ecs_query_iter(world, state->cameras);
-    if (ecs_query_next(&it)) {
-        Camera *camera = ecs_field(&it, Camera, 0);
-        WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
+    ecs_entity_t e = box_extract_capture(world, state, p);
+    if (!e) {
+        e = box_render_active_camera(world);
+    }
+
+    const Camera *camera = e ? ecs_get(world, e, Camera) : NULL;
+    const WorldTransform *transform = e ? ecs_get(world, e, WorldTransform) : NULL;
+    if (camera && transform) {
         view = mat4_inverse(&transform->m);
         eye = mat4_get_translation(&transform->m);
         float fov = camera->fov > 0 ? camera->fov : 60.0f;
@@ -218,8 +254,6 @@ static void box_extract_camera(
         } else {
             proj = mat4_perspective(fov * 3.14159265f / 180.0f, ratio, near);
         }
-
-        ecs_iter_fini(&it);
     }
 
     memcpy(p->view.view, view.v, sizeof(view.v));
@@ -268,6 +302,30 @@ static void box_extract_sun(
     p->view.sun_color[1] = color.y;
     p->view.sun_color[2] = color.z;
     p->view.ambient = 0.25f;
+}
+
+ecs_entity_t box_render_active_camera(
+    ecs_world_t *world)
+{
+    ecs_entity_t result = 0;
+    ecs_entity_t singleton = ecs_lookup(world, "box.render.RenderState");
+    if (!singleton) {
+        goto done;
+    }
+
+    const RenderState *state = ecs_get_id(world, singleton, singleton);
+    if (!state || !state->cameras) {
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_query_iter(world, state->cameras);
+    if (ecs_query_next(&it)) {
+        result = it.entities[0];
+        ecs_iter_fini(&it);
+    }
+
+done:
+    return result;
 }
 
 void box_render_extract(
@@ -371,6 +429,12 @@ void box_render_extract_init(
         .terms = {
             { .id = ecs_id(Camera), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn }
+        }
+    });
+    state->captures = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(Capture), .inout = EcsIn },
+            { .id = ecs_id(Camera), .inout = EcsInOutNone }
         }
     });
     state->suns = ecs_query(world, {

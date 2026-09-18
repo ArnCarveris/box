@@ -31,6 +31,7 @@ typedef struct RenderState {
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
+    ecs_query_t *captures;    /**< Camera entities that request a capture */
     ecs_query_t *suns;        /**< Directional light entities */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
@@ -101,6 +102,16 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     box_instance_t *out);
+
+/** Get the camera that extract renders when no camera requests a capture.
+ *
+ * The active camera is the first entity with a Camera and a WorldTransform.
+ *
+ * @param world The world
+ * @return The active camera, 0 when the world has none
+ */
+ecs_entity_t box_render_active_camera(
+    ecs_world_t *world);
 
 /** Fill a packet with this frame's meshes, instances, camera and light.
  *
