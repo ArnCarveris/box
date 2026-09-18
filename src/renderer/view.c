@@ -73,6 +73,9 @@ void box_view_prepare(
     if (!r->v->view_buffer) {
         box_view_uniform(r);
         box_lights_view_init(r);
+        box_vec_init(&r->v->draws, sizeof(box_cull_draw_t));
+        box_vec_init(&r->v->staging, sizeof(box_instance_t));
+        box_vec_init(&r->v->culls, sizeof(box_gpu_cull_t));
     }
 
     if (r->v->width != view->width || r->v->height != view->height) {
@@ -88,6 +91,7 @@ void box_view_release(
 {
     box_transparent_view_fini(v);
     box_lights_view_fini(v);
+    box_cull_view_fini(v);
     if (v->env_group) wgpuBindGroupRelease(v->env_group);
     if (v->view_group) wgpuBindGroupRelease(v->view_group);
     if (v->view_buffer) wgpuBufferRelease(v->view_buffer);

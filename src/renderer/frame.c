@@ -128,6 +128,7 @@ void box_frame_init(
     box_transparent_init(r);
     box_environment_init(r);
     box_bake_init(r);
+    box_cull_init(r);
 
     r->mesh_shader = box_layers_shader(r);
 
@@ -283,8 +284,10 @@ static void box_frame_view(
     box_transparent_needed(r, view, p);
     box_lights_update(r, view, p);
     box_frame_write_view(r, view);
+    box_cull_view(r, view, p);
     box_environment_update(r, view, encoder);
     box_lights_dispatch(r, view, encoder);
+    box_cull_dispatch(r, encoder);
     if (!index) {
         box_bake_update(r, p, encoder);
     }
@@ -315,7 +318,12 @@ static void box_frame_view(
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
-    box_scene_draw(r, view, p, pass);
+    if (r->v->culled) {
+        box_cull_draw(r, pass);
+    } else {
+        box_scene_draw(r, view, p, pass);
+    }
+
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 
@@ -361,6 +369,7 @@ void box_frame_render(
     box_texture_apply(r, p);
     box_target_apply(r, p);
     box_scene_apply(r, p);
+    box_cull_frame(r, p);
     box_transparent_upload(r, p);
 
     WGPUTexture surface = box_frame_target(r);
@@ -374,10 +383,12 @@ void box_frame_render(
         box_frame_view(r, p, i, encoder, surface);
     }
 
+    box_cull_record(r, encoder);
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
     wgpuCommandBufferRelease(cmd);
     wgpuCommandEncoderRelease(encoder);
+    box_cull_publish(r);
 
     if (p->capture_path[0]) {
         box_capture_texture(r, box_frame_capture_target(r, p, surface), p->capture_path);

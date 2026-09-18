@@ -293,6 +293,7 @@ void box_device_fini(
     box_environment_fini(r);
     box_texture_fini(r);
     box_bake_fini(r);
+    box_cull_fini(r);
     box_layers_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);

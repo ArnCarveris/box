@@ -17,6 +17,16 @@ extern "C" {
 /** Opaque renderer handle */
 typedef struct box_renderer_t box_renderer_t;
 
+/** Instance counts of the last frame the renderer drew.
+ *
+ * The counts of the compute culled batches come from a read back of the draw
+ * arguments, so they trail the frame they belong to by one or two frames.
+ */
+typedef struct box_renderer_stats_t {
+    uint32_t drawn;   /**< Instances the frame drew */
+    uint32_t culled;  /**< Instances the frame skipped because no view could see them */
+} box_renderer_stats_t;
+
 /** Parameters for creating a renderer */
 typedef struct box_renderer_desc_t {
     void *metal_layer;            /**< CAMetalLayer of the window, NULL for offscreen */
@@ -99,6 +109,15 @@ bool box_renderer_has_mesh(
 uint32_t box_renderer_static_count(
     const box_renderer_t *r,
     uint32_t mesh);
+
+/** Instance counts of the last frame the renderer drew.
+ *
+ * @param r The renderer
+ * @param out The counts to fill
+ */
+void box_renderer_stats(
+    const box_renderer_t *r,
+    box_renderer_stats_t *out);
 
 /** Number of frames the renderer has presented.
  *

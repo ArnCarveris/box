@@ -37,6 +37,8 @@ static box_gpu_mesh_t* box_scene_mesh(
         box_gpu_mesh_t *m = box_vec_push(&r->meshes);
         memset(m, 0, sizeof(box_gpu_mesh_t));
         box_vec_init(&m->groups, sizeof(box_static_group_t));
+        box_vec_init(&m->mirror, sizeof(box_instance_t));
+        m->mirror_valid = true;
     }
 
     return box_vec_at(&r->meshes, handle);
@@ -54,8 +56,11 @@ static void box_scene_mesh_release(
     if (m->indices) wgpuBufferRelease(m->indices);
     if (m->statics) wgpuBufferRelease(m->statics);
     box_vec_fini(&m->groups);
+    box_vec_fini(&m->mirror);
     memset(m, 0, sizeof(box_gpu_mesh_t));
     box_vec_init(&m->groups, sizeof(box_static_group_t));
+    box_vec_init(&m->mirror, sizeof(box_instance_t));
+    m->mirror_valid = true;
 }
 
 /** Upload a mesh from a create command and free the command's arrays.
@@ -103,7 +108,7 @@ static void box_scene_grow_statics(
     }
 
     WGPUBufferUsage usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst |
-        WGPUBufferUsage_CopySrc;
+        WGPUBufferUsage_CopySrc | WGPUBufferUsage_Storage;
     WGPUBuffer buffer = box_scene_buffer(r, usage, (uint64_t)grown * sizeof(box_instance_t));
     if (m->statics) {
         WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
@@ -118,6 +123,39 @@ static void box_scene_grow_statics(
 
     m->statics = buffer;
     m->static_capacity = grown;
+}
+
+/** Keep the CPU mirror of a static buffer in step with an instance update.
+ *
+ * The mirror feeds the CPU culling of small batches. A batch that grows past
+ * the mirror limit drops it and is culled by the compute pass from then on.
+ *
+ * @param m The mesh entry
+ * @param slot The instance slot
+ * @param data The new instance data
+ */
+static void box_scene_mirror(
+    box_gpu_mesh_t *m,
+    uint32_t slot,
+    const box_instance_t *data)
+{
+    if (!m->mirror_valid) {
+        goto done;
+    }
+
+    if (slot >= BOX_CULL_MIRROR_MAX) {
+        box_vec_clear(&m->mirror);
+        m->mirror_valid = false;
+        goto done;
+    }
+
+    while (m->mirror.count <= slot) {
+        memset(box_vec_push(&m->mirror), 0, sizeof(box_instance_t));
+    }
+
+    *(box_instance_t*)box_vec_at(&m->mirror, slot) = *data;
+done:
+    return;
 }
 
 /** Upload the dynamic instances of a packet into the shared buffer.
@@ -174,6 +212,10 @@ void box_scene_apply(
         }
 
         m->static_count = c->count;
+        if (c->count > BOX_CULL_MIRROR_MAX && m->mirror_valid) {
+            box_vec_clear(&m->mirror);
+            m->mirror_valid = false;
+        }
     }
 
     uint32_t grouped = 0xFFFFFFFFu;
@@ -199,9 +241,12 @@ void box_scene_apply(
 
         wgpuQueueWriteBuffer(r->gpu_queue, m->statics,
             (uint64_t)u->slot * sizeof(box_instance_t), &u->data, sizeof(box_instance_t));
+        box_scene_mirror(m, u->slot, &u->data);
     }
 
-    box_scene_upload_dynamics(r, p);
+    if (!box_cull_packet(p)) {
+        box_scene_upload_dynamics(r, p);
+    }
 }
 
 /** Record the static draws of one mesh, one per run of slots the view shows.

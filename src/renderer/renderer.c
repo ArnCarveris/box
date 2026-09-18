@@ -263,6 +263,13 @@ uint32_t box_renderer_static_count(
     return result;
 }
 
+void box_renderer_stats(
+    const box_renderer_t *r,
+    box_renderer_stats_t *out)
+{
+    *out = r->stats;
+}
+
 uint32_t box_renderer_frames(
     const box_renderer_t *r)
 {

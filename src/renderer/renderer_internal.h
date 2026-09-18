@@ -8,6 +8,7 @@
 
 #include "renderer.h"
 #include "cluster.h"
+#include "frustum.h"
 #include "bake.h"
 #include "queue.h"
 #include "gpu.h"
@@ -63,6 +64,21 @@
 /** Bytes of the uniform block holding the parameters of every material layer */
 #define BOX_LAYER_UNIFORM_SIZE (BOX_LAYER_MAX * sizeof(box_layer_params_t))
 
+/** Static instances a batch may hold before the renderer stops mirroring it on the CPU */
+#define BOX_CULL_MIRROR_MAX (4096)
+
+/** Byte stride between two culling uniforms, the alignment a dynamic offset needs */
+#define BOX_CULL_UNIFORM_STRIDE (256)
+
+/** Words of one indexed indirect draw argument */
+#define BOX_CULL_ARG_WORDS (5)
+
+/** Instances one workgroup of the culling pass tests */
+#define BOX_CULL_GROUP (64)
+
+/** Argument offset of a draw the CPU culled, which needs no indirect arguments */
+#define BOX_CULL_NO_ARGS (0xFFFFFFFFu)
+
 /** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
 #define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
 
@@ -90,6 +106,48 @@ typedef struct box_bake_info_t {
     uint32_t job_count;   /**< Probes the bake pass writes this frame */
     uint32_t pad[2];      /**< Padding to the 16 byte GPU stride */
 } box_bake_info_t;
+
+/** Frustum and range of one dispatch of the culling pass */
+typedef struct box_cull_uniform_t {
+    float planes[BOX_FRUSTUM_PLANES][4]; /**< Planes of the frustum of the view */
+    uint32_t first;  /**< First instance of the source buffer the dispatch tests */
+    uint32_t count;  /**< Instances the dispatch tests */
+    uint32_t base;   /**< First instance of the visible buffer the dispatch writes */
+    uint32_t arg;    /**< Index of the draw arguments the dispatch counts into */
+} box_cull_uniform_t;
+
+/** One dispatch of the culling pass, recorded for the view being drawn */
+typedef struct box_cull_job_t {
+    uint32_t mesh;   /**< Mesh whose static instance buffer the dispatch reads */
+    uint32_t first;  /**< First slot of the mesh the dispatch tests */
+    uint32_t count;  /**< Instances the dispatch tests */
+    uint32_t slot;   /**< Index of its uniform in the uniform buffer */
+    uint32_t draw;   /**< Index of its draw in the draw list of the view */
+} box_cull_job_t;
+
+/** One draw of a view after culling */
+typedef struct box_cull_draw_t {
+    uint32_t mesh;   /**< Mesh handle */
+    uint32_t first;  /**< First instance of the visible buffer of the view */
+    uint32_t count;  /**< Instances a CPU culled draw holds */
+    uint32_t limit;  /**< Instances the slice of the visible buffer holds at most */
+    uint32_t args;   /**< Byte offset of its arguments, BOX_CULL_NO_ARGS on the CPU path */
+    uint32_t baked;  /**< The draw reads the probes of its mesh */
+} box_cull_draw_t;
+
+/** Contiguous range of static slots a view shows */
+typedef struct box_cull_range_t {
+    uint32_t first;  /**< First slot of the range */
+    uint32_t count;  /**< Slots in the range */
+} box_cull_range_t;
+
+/** Bind group of the culling dispatches of one mesh in one view */
+typedef struct box_gpu_cull_t {
+    WGPUBindGroup group; /**< Bind group of its dispatches */
+    WGPUBuffer src;      /**< Static instance buffer the group binds */
+    WGPUBuffer dst;      /**< Visible instance buffer the group binds */
+    WGPUBuffer args;     /**< Argument buffer the group binds */
+} box_gpu_cull_t;
 
 /** Offscreen color texture a view renders into, created from a packet command */
 typedef struct box_gpu_target_t {
@@ -137,6 +195,12 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
+    WGPUBuffer visible;              /**< Instances the culling of the view compacted */
+    uint32_t visible_capacity;       /**< Instances the visible buffer can hold */
+    box_vec_t draws;                 /**< box_cull_draw_t of the frame, in draw order */
+    box_vec_t staging;               /**< box_instance_t the CPU culling compacted this frame */
+    box_vec_t culls;                 /**< box_gpu_cull_t indexed by mesh handle */
+    bool culled;                     /**< The draw list of the view holds this frame */
 } box_gpu_view_t;
 
 /** GPU resources of one mesh and its static instances */
@@ -155,6 +219,8 @@ typedef struct box_gpu_mesh_t {
     WGPUBindGroup probe_group;       /**< Probes and descriptors the mesh shader reads */
     WGPUBindGroup bake_group;        /**< Probe buffers of the bake pass */
     WGPUBindGroup grid_group;        /**< Probe descriptors of the occupancy pass */
+    box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
+    bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
     uint32_t desc_capacity;          /**< Descriptors the descriptor buffer can hold */
     uint32_t probe_capacity;         /**< Probes the probe buffer can hold */
     uint32_t job_capacity;           /**< Jobs the job buffer can hold */
@@ -259,6 +325,25 @@ struct box_renderer_t {
     WGPUTexture texture_dummy;       /**< Single texel array texture of an unused class */
     WGPUTextureView texture_dummy_view; /**< View of the single texel array texture */
     bool texture_dirty;              /**< A class texture changed, the bind group is stale */
+    WGPUComputePipeline cull_pipeline; /**< Frustum culling pass */
+    WGPUBindGroupLayout cull_layout; /**< Uniform, source, visible and argument layout */
+    WGPUBuffer cull_uniform;         /**< Frustum and range of every dispatch of the frame */
+    uint32_t cull_uniform_capacity;  /**< Dispatches the uniform buffer can hold */
+    WGPUBuffer cull_args;            /**< Indirect arguments of every compute culled draw */
+    uint32_t cull_args_capacity;     /**< Draws the argument buffer can hold */
+    box_vec_t cull_jobs;             /**< box_cull_job_t of the view being recorded */
+    box_vec_t cull_ranges;           /**< box_cull_range_t scratch of one mesh */
+    uint32_t cull_slots;             /**< Uniforms the frame handed out */
+    uint32_t cull_arg_count;         /**< Draw arguments the frame handed out */
+    uint32_t cull_drawn;             /**< Instances the CPU culling of the frame kept */
+    uint32_t cull_culled;            /**< Instances the CPU culling of the frame skipped */
+    uint32_t cull_tested;            /**< Instances the compute culling of the frame tested */
+    uint32_t cull_visible;           /**< Instances the last read back compute culling kept */
+    box_renderer_stats_t stats;      /**< Instance counts of the last frame */
+    WGPUBuffer cull_readback;        /**< Mappable copy of the arguments of a recorded frame */
+    uint32_t cull_readback_capacity; /**< Draws the readback buffer can hold */
+    uint32_t cull_readback_count;    /**< Draws the pending readback holds */
+    bool cull_readback_busy;         /**< The readback buffer is waiting for its map */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -417,6 +502,92 @@ void box_scene_draw(
  * @param r The renderer
  */
 void box_scene_fini(
+    box_renderer_t *r);
+
+/** Create the culling pipeline, its layout and the shared uniform and argument buffers.
+ *
+ * @param r The renderer
+ */
+void box_cull_init(
+    box_renderer_t *r);
+
+/** Check whether every view of a packet culls, so the shared dynamic upload is skipped.
+ *
+ * @param p The packet
+ * @return True when no view draws the whole dynamic instance array
+ */
+bool box_cull_packet(
+    const box_packet_t *p);
+
+/** Grow the shared culling buffers for the dispatches a packet can produce.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_cull_frame(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Build the visible instances and the draw list of the current view.
+ *
+ * Small static batches and the dynamic batches are culled and compacted on the
+ * CPU, large static batches get a dispatch of the culling pass.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ * @param p The packet
+ */
+void box_cull_view(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p);
+
+/** Record the culling dispatches of the current view.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+void box_cull_dispatch(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder);
+
+/** Record the draws of the draw list of the current view.
+ *
+ * @param r The renderer
+ * @param pass The render pass
+ */
+void box_cull_draw(
+    box_renderer_t *r,
+    WGPURenderPassEncoder pass);
+
+/** Copy the draw arguments of the frame into the readback buffer.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+void box_cull_record(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder);
+
+/** Publish the instance counts of the frame and map the pending readback.
+ *
+ * @param r The renderer
+ */
+void box_cull_publish(
+    box_renderer_t *r);
+
+/** Release the culling resources of one view.
+ *
+ * @param v The view resources
+ */
+void box_cull_view_fini(
+    box_gpu_view_t *v);
+
+/** Release the culling pipeline and its buffers.
+ *
+ * @param r The renderer
+ */
+void box_cull_fini(
     box_renderer_t *r);
 
 /** Create the uniform buffer the material layer parameters live in.
@@ -733,6 +904,9 @@ extern const char *box_mesh_shader_head;
 
 /** WGSL source of the fragment stage, which the composed layers precede */
 extern const char *box_mesh_shader_tail;
+
+/** WGSL source of the frustum culling compute shader */
+extern const char *box_cull_shader_wgsl;
 
 /** WGSL source of the cluster assignment compute shader */
 extern const char *box_cluster_shader_wgsl;

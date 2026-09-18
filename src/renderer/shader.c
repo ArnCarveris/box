@@ -544,6 +544,54 @@ const char *box_mesh_shader_tail =
     "  return resolve(color, s.alpha, in.clip.xy, roughness, blend);\n"
     "}\n";
 
+/** Frustum culling pass: tests instance bounds and compacts what the view keeps.
+ *
+ * Instances are copied word by word, so the layout of box_instance_t only has to
+ * agree on its stride and on where its bounding sphere sits.
+ */
+const char *box_cull_shader_wgsl =
+    "struct Cull {\n"
+    "  planes: array<vec4<f32>, " BOX_WGSL_STR(BOX_FRUSTUM_PLANES) ">,\n"
+    "  first: u32,\n"
+    "  count: u32,\n"
+    "  base: u32,\n"
+    "  arg: u32,\n"
+    "};\n"
+    "@group(0) @binding(0) var<uniform> c: Cull;\n"
+    "@group(0) @binding(1) var<storage, read> src: array<u32>;\n"
+    "@group(0) @binding(2) var<storage, read_write> dst: array<u32>;\n"
+    "@group(0) @binding(3) var<storage, read_write> args: array<atomic<u32>>;\n"
+    "const WORDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_WORDS) ");\n"
+    "const BOUNDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_BOUNDS) ");\n"
+    "const ARGS: u32 = u32(" BOX_WGSL_STR(BOX_CULL_ARG_WORDS) ");\n"
+    "fn visible(center: vec3<f32>, radius: f32) -> bool {\n"
+    "  var result = true;\n"
+    "  for (var i = 0u; i < u32(" BOX_WGSL_STR(BOX_FRUSTUM_PLANES) "); i = i + 1u) {\n"
+    "    let p = c.planes[i];\n"
+    "    if (dot(p.xyz, center) + p.w < -radius) {\n"
+    "      result = false;\n"
+    "    }\n"
+    "  }\n"
+    "  return result;\n"
+    "}\n"
+    "@compute @workgroup_size(" BOX_WGSL_STR(BOX_CULL_GROUP) ")\n"
+    "fn cs_main(@builtin(global_invocation_id) id: vec3<u32>) {\n"
+    "  if (id.x >= c.count) {\n"
+    "    return;\n"
+    "  }\n"
+    "  let base = (c.first + id.x) * WORDS;\n"
+    "  let center = vec3<f32>(bitcast<f32>(src[base + BOUNDS]),\n"
+    "    bitcast<f32>(src[base + BOUNDS + 1u]), bitcast<f32>(src[base + BOUNDS + 2u]));\n"
+    "  if (!visible(center, bitcast<f32>(src[base + BOUNDS + 3u]))) {\n"
+    "    return;\n"
+    "  }\n"
+    "  let slot = atomicAdd(&args[c.arg * ARGS + 1u], 1u);\n"
+    "  let out = (c.base + slot) * WORDS;\n"
+    "  for (var i = 0u; i < WORDS; i = i + 1u) {\n"
+    "    dst[out + i] = src[base + i];\n"
+    "  }\n"
+    "}\n";
+
 const char *box_cluster_shader_wgsl =
     BOX_WGSL_VIEW
     BOX_WGSL_LIGHT
