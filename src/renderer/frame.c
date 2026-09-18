@@ -13,7 +13,7 @@
 static void box_frame_init_view(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry layout_entries[2] = {
+    WGPUBindGroupLayoutEntry layout_entries[4] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -28,9 +28,20 @@ static void box_frame_init_view(
                 .type = WGPUBufferBindingType_Uniform,
                 .minBindingSize = BOX_LAYER_UNIFORM_SIZE
             }
+        }, {
+            .binding = 2,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        }, {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Comparison }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 2, .entries = layout_entries };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = layout_entries };
     r->view_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 }
 
@@ -122,6 +133,7 @@ void box_frame_init(
     box_vec_init(&r->views, sizeof(box_gpu_view_t));
     box_vec_init(&r->targets, sizeof(box_gpu_target_t));
     box_layers_init(r);
+    box_shadow_init(r);
     box_frame_init_view(r);
     box_lights_init(r);
     box_texture_init(r);
@@ -285,9 +297,12 @@ static void box_frame_view(
     box_lights_update(r, view, p);
     box_frame_write_view(r, view);
     box_cull_view(r, view, p);
+    box_shadow_prepare(r, view, p);
     box_environment_update(r, view, encoder);
     box_lights_dispatch(r, view, encoder);
     box_cull_dispatch(r, encoder);
+    box_shadow_dispatch(r, encoder);
+    box_shadow_record(r, view, encoder);
     if (!index) {
         box_bake_update(r, p, encoder);
     }
@@ -370,6 +385,7 @@ void box_frame_render(
     box_target_apply(r, p);
     box_scene_apply(r, p);
     box_cull_frame(r, p);
+    box_shadow_frame(r, p);
     box_transparent_upload(r, p);
 
     WGPUTexture surface = box_frame_target(r);

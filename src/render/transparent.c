@@ -282,6 +282,10 @@ void box_render_extract_transparent(
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
         box_render_fill_instance(world, e, mesh, transform, false, state, &entry->data);
+        const RenderInstance *inst = ecs_get(world, e, RenderInstance);
+        if (inst && !box_view_casts(v, inst->layer_mask)) {
+            box_instance_set_caster(&entry->data, false);
+        }
 
         entry->blend = box_render_blend_mode(world, e);
         entry->back = box_render_back_mode(world, e);

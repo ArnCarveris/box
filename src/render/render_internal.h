@@ -537,6 +537,7 @@ void box_render_extract(
  * @param state The registry
  * @param p The packet
  * @param view_mask Layers the view shows, BOX_VIEW_LAYER_ALL for every layer
+ * @param caster_mask Layers that cast its shadows, BOX_VIEW_LAYER_ALL for all
  * @param strict The view draws the members of its layers only
  */
 void box_render_extract_dynamic(
@@ -544,6 +545,7 @@ void box_render_extract_dynamic(
     RenderState *state,
     box_packet_t *p,
     uint32_t view_mask,
+    uint32_t caster_mask,
     bool strict);
 
 /** Fill the light array of one view with the lights inside its frustum.

@@ -508,7 +508,8 @@ static void box_view_fill(
     v->dynamic_first = 0;
     if (state->layer_used) {
         v->dynamic_first = p->dynamic_batches.count;
-        box_render_extract_dynamic(world, state, p, v->layer_mask, v->strict_layers != 0);
+        box_render_extract_dynamic(world, state, p, v->layer_mask, v->caster_mask,
+            v->strict_layers != 0);
     }
 
     v->dynamic_count = p->dynamic_batches.count - v->dynamic_first;

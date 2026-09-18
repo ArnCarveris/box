@@ -733,6 +733,7 @@ void box_cull_publish(
     uint32_t visible = r->cull_visible < r->cull_tested ? r->cull_visible : r->cull_tested;
     r->stats.drawn = r->cull_drawn + visible;
     r->stats.culled = r->cull_culled + r->cull_tested - visible;
+    r->stats.shadow_rebuilds = r->shadow_rebuilds;
 
 #ifndef BOX_PLATFORM_WEB
     if (r->cull_readback_busy || !r->cull_readback_count || !r->cull_readback) {

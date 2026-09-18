@@ -25,6 +25,7 @@ typedef struct box_renderer_t box_renderer_t;
 typedef struct box_renderer_stats_t {
     uint32_t drawn;   /**< Instances the frame drew */
     uint32_t culled;  /**< Instances the frame skipped because no view could see them */
+    uint32_t shadow_rebuilds; /**< Cached static cascade layers the frame rendered again */
 } box_renderer_stats_t;
 
 /** Parameters for creating a renderer */

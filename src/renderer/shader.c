@@ -36,6 +36,18 @@
     "  pad0: u32,\n" \
     "  pad1: u32,\n" \
     "  pad2: u32,\n" \
+    "  shadow_matrix: array<mat4x4<f32>, " BOX_WGSL_STR(BOX_SHADOW_CASCADE_MAX) ">,\n" \
+    "  shadow_split: vec4<f32>,\n" \
+    "  shadow_offset: vec4<f32>,\n" \
+    "  shadow_bias: vec4<f32>,\n" \
+    "  shadow_fade: f32,\n" \
+    "  shadow_distance: f32,\n" \
+    "  shadow_texel: f32,\n" \
+    "  shadow_pad: f32,\n" \
+    "  shadow_cascades: u32,\n" \
+    "  shadow_filter: u32,\n" \
+    "  shadow_pad2: u32,\n" \
+    "  shadow_pad3: u32,\n" \
     "};\n"
 
 /** Light storage element, laid out as box_light_t */
@@ -112,6 +124,63 @@
     "  pad0: u32,\n" \
     "  pad1: u32,\n" \
     "};\n"
+
+/** Cascaded shadow map lookup: a PCF filtered comparison against the cascade of a fragment.
+ *
+ * The cascade is picked by view depth, the lookup is offset along the geometric
+ * normal and biased in depth, the boundary between two cascades is blended and
+ * the shadows fade out at the distance the last cascade ends at.
+ */
+#define BOX_WGSL_SHADOW \
+    "@group(0) @binding(2) var shadow_map: texture_depth_2d_array;\n" \
+    "@group(0) @binding(3) var shadow_samp: sampler_comparison;\n" \
+    "fn shadow_lookup(index: u32, world: vec3<f32>, gn: vec3<f32>) -> f32 {\n" \
+    "  let p = u.shadow_matrix[index] * vec4(world + gn * u.shadow_offset[index], 1.0);\n" \
+    "  let uv = p.xy * vec2(0.5, -0.5) + vec2(0.5);\n" \
+    "  let depth = p.z + u.shadow_bias[index];\n" \
+    "  var sum = 0.0;\n" \
+    "  var taps = 0.0;\n" \
+    "  let half_size = i32(u.shadow_filter) / 2;\n" \
+    "  for (var y = -half_size; y <= half_size; y = y + 1) {\n" \
+    "    for (var x = -half_size; x <= half_size; x = x + 1) {\n" \
+    "      let o = vec2<f32>(f32(x), f32(y)) * u.shadow_texel;\n" \
+    "      sum = sum + textureSampleCompareLevel(shadow_map, shadow_samp, uv + o,\n" \
+    "        index, depth);\n" \
+    "      taps = taps + 1.0;\n" \
+    "    }\n" \
+    "  }\n" \
+    "  var result = sum / max(taps, 1.0);\n" \
+    "  let outside = any(uv < vec2(0.0)) || any(uv > vec2(1.0)) || p.z < 0.0 || p.z > 1.0;\n" \
+    "  if (outside) {\n" \
+    "    result = 1.0;\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn shadow_factor(world: vec3<f32>, gn: vec3<f32>) -> f32 {\n" \
+    "  var result = 1.0;\n" \
+    "  if (u.shadow_cascades != 0u) {\n" \
+    "    let depth = (u.view * vec4(world, 1.0)).z;\n" \
+    "    var index = u.shadow_cascades - 1u;\n" \
+    "    for (var i = 0u; i < u.shadow_cascades; i = i + 1u) {\n" \
+    "      if (depth < u.shadow_split[i]) {\n" \
+    "        index = i;\n" \
+    "        break;\n" \
+    "      }\n" \
+    "    }\n" \
+    "    result = shadow_lookup(index, world, gn);\n" \
+    "    let end = u.shadow_split[index];\n" \
+    "    let start = select(0.0, u.shadow_split[max(index, 1u) - 1u], index > 0u);\n" \
+    "    let band = (end - start) * 0.1;\n" \
+    "    if (index + 1u < u.shadow_cascades && depth > end - band) {\n" \
+    "      let t = clamp((depth - (end - band)) / max(band, 1e-4), 0.0, 1.0);\n" \
+    "      result = mix(result, shadow_lookup(index + 1u, world, gn), t);\n" \
+    "    }\n" \
+    "    let stop = u.shadow_distance * (1.0 - u.shadow_fade);\n" \
+    "    let fade = clamp((depth - stop) / max(u.shadow_distance - stop, 1e-4), 0.0, 1.0);\n" \
+    "    result = mix(result, 1.0, fade);\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n"
 
 /** One array texture and sampler per size class, sampled through a packed handle.
  * `perturb` is the shader side of normal.h and bends a normal with a map sample. */
@@ -292,6 +361,7 @@ const char *box_mesh_shader_head =
     "@group(2) @binding(3) var env_sampler: sampler;\n"
     "@group(3) @binding(0) var<storage, read> probes: array<Probe>;\n"
     "@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;\n"
+    BOX_WGSL_SHADOW
     BOX_WGSL_TEXTURES
     BOX_WGSL_TILING
     BOX_WGSL_RESOLVE
@@ -533,7 +603,9 @@ const char *box_mesh_shader_tail =
     "  let sun = u.sun_color * u.sun_intensity;\n"
     "  let env = environment(sn, v, s.albedo, metallic, roughness);\n"
     "  let is_baked = in.params.z > 0.5;\n"
-    "  var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun + env + s.emissive;\n"
+    "  let shadow = shadow_factor(in.world_pos, gn);\n"
+    "  var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow +\n"
+    "    env + s.emissive;\n"
     "  color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);\n"
     "  if (is_baked) {\n"
     "    color = color + baked(in.slot, in.local, sn, s.albedo, metallic);\n"
@@ -556,6 +628,10 @@ const char *box_cull_shader_wgsl =
     "  count: u32,\n"
     "  base: u32,\n"
     "  arg: u32,\n"
+    "  caster: u32,\n"
+    "  pad0: u32,\n"
+    "  pad1: u32,\n"
+    "  pad2: u32,\n"
     "};\n"
     "@group(0) @binding(0) var<uniform> c: Cull;\n"
     "@group(0) @binding(1) var<storage, read> src: array<u32>;\n"
@@ -563,6 +639,8 @@ const char *box_cull_shader_wgsl =
     "@group(0) @binding(3) var<storage, read_write> args: array<atomic<u32>>;\n"
     "const WORDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_WORDS) ");\n"
     "const BOUNDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_BOUNDS) ");\n"
+    "const MODE: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_MODE) ");\n"
+    "const NOCAST: u32 = 1u << u32(" BOX_WGSL_STR(BOX_MODE_NOCAST_SHIFT) ");\n"
     "const ARGS: u32 = u32(" BOX_WGSL_STR(BOX_CULL_ARG_WORDS) ");\n"
     "fn visible(center: vec3<f32>, radius: f32) -> bool {\n"
     "  var result = true;\n"
@@ -580,6 +658,9 @@ const char *box_cull_shader_wgsl =
     "    return;\n"
     "  }\n"
     "  let base = (c.first + id.x) * WORDS;\n"
+    "  if (c.caster != 0u && (src[base + MODE] & NOCAST) != 0u) {\n"
+    "    return;\n"
+    "  }\n"
     "  let center = vec3<f32>(bitcast<f32>(src[base + BOUNDS]),\n"
     "    bitcast<f32>(src[base + BOUNDS + 1u]), bitcast<f32>(src[base + BOUNDS + 2u]));\n"
     "  if (!visible(center, bitcast<f32>(src[base + BOUNDS + 3u]))) {\n"
@@ -938,4 +1019,30 @@ const char *box_downsample_wgsl =
     "}\n"
     "@fragment fn fs_main(in: Out) -> @location(0) vec4<f32> {\n"
     "  return textureSampleLevel(src, samp, in.uv, 0.0);\n"
+    "}\n";
+
+/** Shadow pass: writes the depth of a caster into the cascade it is drawn for.
+ *
+ * The stage reads the position of the mesh and the three transform rows of the
+ * instance only, so the pass shares the instance buffers with the mesh pipeline
+ * without reading anything it does not need.
+ */
+const char *box_shadow_shader_wgsl =
+    "struct Cascade {\n"
+    "  matrix: mat4x4<f32>,\n"
+    "};\n"
+    "@group(0) @binding(0) var<uniform> c: Cascade;\n"
+    "struct VertexIn {\n"
+    "  @location(0) pos: vec3<f32>,\n"
+    "  @location(3) row0: vec4<f32>,\n"
+    "  @location(4) row1: vec4<f32>,\n"
+    "  @location(5) row2: vec4<f32>,\n"
+    "};\n"
+    "@vertex fn vs_main(in: VertexIn) -> @builtin(position) vec4<f32> {\n"
+    "  let m = mat4x4<f32>(\n"
+    "    vec4(in.row0.x, in.row1.x, in.row2.x, 0.0),\n"
+    "    vec4(in.row0.y, in.row1.y, in.row2.y, 0.0),\n"
+    "    vec4(in.row0.z, in.row1.z, in.row2.z, 0.0),\n"
+    "    vec4(in.row0.w, in.row1.w, in.row2.w, 1.0));\n"
+    "  return c.matrix * (m * vec4(in.pos, 1.0));\n"
     "}\n";

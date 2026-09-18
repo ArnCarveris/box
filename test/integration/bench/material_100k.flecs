@@ -2,7 +2,13 @@ using box.transform
 using box.geometry
 using box.material
 using box.camera
+using box.light
 using box.movement
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
 
 camera {
   Position: {0, 60, -160}

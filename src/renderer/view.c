@@ -8,6 +8,23 @@
 
 #include "renderer_internal.h"
 
+void box_view_group(
+    box_renderer_t *r)
+{
+    WGPUBindGroupEntry group_entries[4] = {
+        { .binding = 0, .buffer = r->v->view_buffer, .size = BOX_VIEW_UNIFORM_SIZE },
+        { .binding = 1, .buffer = r->layer_buffer, .size = BOX_LAYER_UNIFORM_SIZE }
+    };
+    box_shadow_bind_group(r, group_entries + 2, 2);
+    WGPUBindGroupDescriptor group_desc = {
+        .layout = r->view_layout,
+        .entryCount = 4,
+        .entries = group_entries
+    };
+    if (r->v->view_group) wgpuBindGroupRelease(r->v->view_group);
+    r->v->view_group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
+}
+
 /** Create the view uniform buffer and its bind group for the current view.
  *
  * @param r The renderer
@@ -20,17 +37,7 @@ static void box_view_uniform(
         .size = BOX_VIEW_UNIFORM_SIZE
     };
     r->v->view_buffer = wgpuDeviceCreateBuffer(r->device, &buffer_desc);
-
-    WGPUBindGroupEntry group_entries[2] = {
-        { .binding = 0, .buffer = r->v->view_buffer, .size = BOX_VIEW_UNIFORM_SIZE },
-        { .binding = 1, .buffer = r->layer_buffer, .size = BOX_LAYER_UNIFORM_SIZE }
-    };
-    WGPUBindGroupDescriptor group_desc = {
-        .layout = r->view_layout,
-        .entryCount = 2,
-        .entries = group_entries
-    };
-    r->v->view_group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
+    box_view_group(r);
 }
 
 /** Create the depth target of the current view for its size.
@@ -76,6 +83,9 @@ void box_view_prepare(
         box_vec_init(&r->v->draws, sizeof(box_cull_draw_t));
         box_vec_init(&r->v->staging, sizeof(box_instance_t));
         box_vec_init(&r->v->culls, sizeof(box_gpu_cull_t));
+        box_vec_init(&r->v->shadow_draws, sizeof(box_shadow_draw_t));
+        box_vec_init(&r->v->shadow_staging, sizeof(box_instance_t));
+        box_vec_init(&r->v->shadow_culls, sizeof(box_gpu_cull_t));
     }
 
     if (r->v->width != view->width || r->v->height != view->height) {
@@ -92,6 +102,10 @@ void box_view_release(
     box_transparent_view_fini(v);
     box_lights_view_fini(v);
     box_cull_view_fini(v);
+    box_shadow_view_fini(v);
+    box_vec_fini(&v->shadow_draws);
+    box_vec_fini(&v->shadow_staging);
+    box_vec_fini(&v->shadow_culls);
     if (v->env_group) wgpuBindGroupRelease(v->env_group);
     if (v->view_group) wgpuBindGroupRelease(v->view_group);
     if (v->view_buffer) wgpuBufferRelease(v->view_buffer);

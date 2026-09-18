@@ -1,0 +1,96 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+camera {
+  Position: {-26, 9, -16}
+  LookAt: {12, 2, 4}
+  Camera: {fov: 55, near_: 0.5, far_: 400}
+}
+
+sun {
+  Rotation: {0.7124, -0.5, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+$ { EnvironmentLight: {sky_color: {90, 110, 150}, ground_color: {40, 38, 36}, intensity: 1} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {400, 0.5, 400}
+  Rgb: {150, 150, 155}
+  PbrMaterial: {roughness: 0.9}
+}
+
+pole {
+  Position: {0, 7, 0}
+  Box: {0.7, 14, 0.7}
+  Rgb: {210, 90, 70}
+  PbrMaterial: {roughness: 0.6}
+}
+
+overhang {
+  Position: {8, 5.2, -4}
+  Box: {10, 0.5, 4}
+  Rgb: {230, 190, 90}
+  PbrMaterial: {roughness: 0.7}
+
+  leg_a {
+    Position: {-4.5, -2.6, 0}
+    Box: {0.5, 5, 0.5}
+    Rgb: {180, 150, 80}
+  }
+
+  leg_b {
+    Position: {4.5, -2.6, 0}
+    Box: {0.5, 5, 0.5}
+    Rgb: {180, 150, 80}
+  }
+}
+
+tower {
+  Position: {-8, 0, 6}
+
+  base {
+    Position: {0, 0.6, 0}
+    Box: {3, 1.2, 3}
+    Rgb: {120, 180, 140}
+    PbrMaterial: {roughness: 0.5}
+  }
+
+  shaft {
+    Position: {0, 3, 0}
+    Cylinder: {segments: 24, smooth: true, length: 3.6, radius: 0.8}
+    Rgb: {90, 160, 220}
+    PbrMaterial: {roughness: 0.4}
+  }
+
+  cap {
+    Position: {0, 5.4, 0}
+    Sphere: {segments: 24, smooth: true, radius: 1.1}
+    Rgb: {240, 220, 120}
+    PbrMaterial: {roughness: 0.3, metallic: 0.4}
+  }
+}
+
+row {
+  for i in 0..12 {
+    _ {
+      Position: {i * 14 + 14, 1.2, 8}
+      Box: {2.4, 2.4, 2.4}
+      Rgb: {200, 120, 220}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+  for i in 0..12 {
+    _ {
+      Position: {i * 14 + 20, 1.4, -10}
+      Sphere: {segments: 20, smooth: true, radius: 1.4}
+      Rgb: {110, 210, 170}
+      PbrMaterial: {roughness: 0.4}
+    }
+  }
+}

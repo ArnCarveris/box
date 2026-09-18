@@ -10,6 +10,7 @@
 #include "cluster.h"
 #include "frustum.h"
 #include "bake.h"
+#include "shadow.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -114,7 +115,21 @@ typedef struct box_cull_uniform_t {
     uint32_t count;  /**< Instances the dispatch tests */
     uint32_t base;   /**< First instance of the visible buffer the dispatch writes */
     uint32_t arg;    /**< Index of the draw arguments the dispatch counts into */
+    uint32_t caster; /**< The dispatch keeps the shadow casters of the range only */
+    uint32_t pad[3]; /**< Padding to the 16 byte GPU stride */
 } box_cull_uniform_t;
+
+/** One draw of the shadow pass of a view, in the order the draws are recorded */
+typedef struct box_shadow_draw_t {
+    uint32_t mesh;    /**< Mesh handle */
+    uint32_t first;   /**< First instance of the caster buffer of the view */
+    uint32_t count;   /**< Instances a CPU culled draw holds */
+    uint32_t limit;   /**< Instances the slice of the caster buffer holds at most */
+    uint32_t args;    /**< Byte offset of its arguments, BOX_CULL_NO_ARGS on the CPU path */
+    uint32_t stage;   /**< First instance of the staging array a compacted draw wrote */
+    uint32_t cascade; /**< Cascade the draw belongs to */
+    uint32_t statics; /**< The draw fills the cached static layer of its cascade */
+} box_shadow_draw_t;
 
 /** One dispatch of the culling pass, recorded for the view being drawn */
 typedef struct box_cull_job_t {
@@ -203,6 +218,22 @@ typedef struct box_gpu_view_t {
     box_vec_t staging;               /**< box_instance_t the CPU culling compacted this frame */
     box_vec_t culls;                 /**< box_gpu_cull_t indexed by mesh handle */
     bool culled;                     /**< The draw list of the view holds this frame */
+    WGPUTexture shadow_depth;        /**< Depth array the shadow lookup of the view samples */
+    WGPUTextureView shadow_sample;   /**< Array view of the working depth */
+    WGPUTexture shadow_static;       /**< Cached depth of the static casters of every cascade */
+    WGPUTextureView shadow_attach[BOX_SHADOW_CASCADE_MAX];  /**< Attachment of a working layer */
+    WGPUTextureView shadow_cached[BOX_SHADOW_CASCADE_MAX];  /**< Attachment of a static layer */
+    uint32_t shadow_size;            /**< Edge the shadow textures were created for */
+    uint32_t shadow_count;           /**< Cascades the shadow textures hold */
+    box_shadow_cache_t shadow_cache; /**< State of the cached static layers */
+    uint32_t shadow_rebuild;         /**< Cascades whose static layer this frame renders */
+    WGPUBuffer shadow_uniform;       /**< Cascade matrix of every shadow pass of the view */
+    WGPUBindGroup shadow_group;      /**< Uniform bind group of the shadow pass */
+    WGPUBuffer shadow_instances;     /**< Caster instances the shadow culling compacted */
+    uint32_t shadow_capacity;        /**< Instances the caster buffer can hold */
+    box_vec_t shadow_draws;          /**< box_shadow_draw_t of the frame, in draw order */
+    box_vec_t shadow_staging;        /**< box_instance_t the CPU shadow culling compacted */
+    box_vec_t shadow_culls;          /**< box_gpu_cull_t of the shadow culling, per mesh */
 } box_gpu_view_t;
 
 /** GPU resources of one mesh and its static instances */
@@ -346,6 +377,20 @@ struct box_renderer_t {
     uint32_t cull_readback_capacity; /**< Draws the readback buffer can hold */
     uint32_t cull_readback_count;    /**< Draws the pending readback holds */
     bool cull_readback_busy;         /**< The readback buffer is waiting for its map */
+    WGPURenderPipeline shadow_pipeline; /**< Depth only pipeline of the shadow pass */
+    WGPUShaderModule shadow_shader;  /**< Module the shadow pipeline is built from */
+    WGPUBindGroupLayout shadow_layout; /**< Cascade uniform layout of the shadow pass */
+    WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
+    WGPUSampler shadow_sampler;      /**< Comparison sampler of the shadow lookup */
+    WGPUTexture shadow_dummy;        /**< Depth array a view without shadows binds */
+    WGPUTextureView shadow_dummy_view; /**< Array view of the placeholder depth */
+    WGPUBuffer shadow_cull_uniform;  /**< Frustum and range of every shadow dispatch */
+    uint32_t shadow_uniform_capacity; /**< Dispatches the shadow uniform buffer can hold */
+    WGPUBuffer shadow_args;          /**< Indirect arguments of every compute culled caster draw */
+    box_vec_t shadow_jobs;           /**< box_cull_job_t of the shadow pass being recorded */
+    uint32_t shadow_slots;           /**< Shadow uniforms the frame handed out */
+    uint32_t shadow_arg_count;       /**< Shadow draw arguments the frame handed out */
+    uint32_t shadow_rebuilds;        /**< Static cascade layers the frame rendered */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -400,6 +445,13 @@ void box_frame_init(
 void box_view_select(
     box_renderer_t *r,
     uint32_t index);
+
+/** Build the bind group of the view and layer uniforms of the current view.
+ *
+ * @param r The renderer
+ */
+void box_view_group(
+    box_renderer_t *r);
 
 /** Create or resize the targets and buffers of the current view.
  *
@@ -590,6 +642,78 @@ void box_cull_view_fini(
  * @param r The renderer
  */
 void box_cull_fini(
+    box_renderer_t *r);
+
+/** Create the shadow pipeline, its sampler and the placeholder depth array.
+ *
+ * @param r The renderer
+ */
+void box_shadow_init(
+    box_renderer_t *r);
+
+/** Reset the per frame shadow counters and grow the shared shadow buffers.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_shadow_frame(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Build the cascade textures, the dirty set and the caster draws of the current view.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ * @param p The packet
+ */
+void box_shadow_prepare(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p);
+
+/** Record the culling dispatches of the shadow pass of the current view.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+void box_shadow_dispatch(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder);
+
+/** Record the static and the dynamic caster passes of the current view.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ * @param encoder The command encoder
+ */
+void box_shadow_record(
+    box_renderer_t *r,
+    const box_view_t *view,
+    WGPUCommandEncoder encoder);
+
+/** Fill the shadow map half of the view bind group of the current view.
+ *
+ * @param r The renderer
+ * @param out Entries to fill, two of them
+ * @param base First binding of the shadow map half
+ */
+void box_shadow_bind_group(
+    box_renderer_t *r,
+    WGPUBindGroupEntry *out,
+    uint32_t base);
+
+/** Release the shadow resources of one view.
+ *
+ * @param v The view resources
+ */
+void box_shadow_view_fini(
+    box_gpu_view_t *v);
+
+/** Release the shadow pipeline, its sampler and the shared shadow buffers.
+ *
+ * @param r The renderer
+ */
+void box_shadow_fini(
     box_renderer_t *r);
 
 /** Create the uniform buffer the material layer parameters live in.
@@ -909,6 +1033,9 @@ extern const char *box_mesh_shader_tail;
 
 /** WGSL source of the frustum culling compute shader */
 extern const char *box_cull_shader_wgsl;
+
+/** WGSL source of the depth only vertex stage of the shadow pass */
+extern const char *box_shadow_shader_wgsl;
 
 /** WGSL source of the cluster assignment compute shader */
 extern const char *box_cluster_shader_wgsl;

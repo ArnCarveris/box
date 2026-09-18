@@ -26,6 +26,7 @@ typedef struct box_bench_t {
     ecs_vec_t entities;    /**< ecs_entity_t snapshot of static entities */
     double drawn;          /**< Instances the measured frames drew */
     double culled;         /**< Instances the measured frames skipped */
+    double rebuilds;       /**< Cached static cascade layers the measured frames rendered */
     int32_t stat_count;    /**< Frames the instance counts were read on */
 } box_bench_t;
 
@@ -51,6 +52,7 @@ static void box_bench_stats(
             box_renderer_stats(impl[i].renderer, &stats);
             bench->drawn += stats.drawn;
             bench->culled += stats.culled;
+            bench->rebuilds += stats.shadow_rebuilds;
             bench->stat_count ++;
         }
     }
@@ -204,17 +206,18 @@ static void box_bench_report(
     fprintf(f, "{\n  \"scene\": \"%s\",\n  \"entities\": %d,\n  \"static\": %d,\n"
         "  \"dynamic\": %d,\n  \"churn\": [%d, %d],\n  \"frames\": %d,\n"
         "  \"mean_ms\": %.3f,\n  \"p50_ms\": %.3f,\n  \"p99_ms\": %.3f,\n  \"max_ms\": %.3f,\n"
-        "  \"fps\": %.1f,\n  \"drawn\": %.0f,\n  \"culled\": %.0f\n}\n",
+        "  \"fps\": %.1f,\n  \"drawn\": %.0f,\n  \"culled\": %.0f,\n"
+        "  \"shadow_static_rebuilds\": %.0f\n}\n",
         bench->scene, entity_count, static_count, entity_count - static_count,
         bench->churn_min, bench->churn_max, bench->sample_count,
         mean * 1000, p50 * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0,
-        bench->drawn * scale, bench->culled * scale);
+        bench->drawn * scale, bench->culled * scale, bench->rebuilds);
     if (f != stdout) {
         fclose(f);
         printf("entities %d, mean %.3f ms, p99 %.3f ms, max %.3f ms, %.1f fps, "
-            "drawn %.0f, culled %.0f\n",
+            "drawn %.0f, culled %.0f, shadow rebuilds %.0f\n",
             entity_count, mean * 1000, p99 * 1000, worst * 1000, mean > 0 ? 1.0 / mean : 0,
-            bench->drawn * scale, bench->culled * scale);
+            bench->drawn * scale, bench->culled * scale, bench->rebuilds);
     }
 }
 

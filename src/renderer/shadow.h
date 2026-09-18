@@ -117,27 +117,37 @@ static inline void box_shadow_cache_all(
     }
 }
 
-/** The cascade whose static layer is rendered this frame, nearest first.
+/** The cascades whose static layer is rendered this frame, nearest first.
  *
  * A cascade that never held a rendering is rendered as soon as it is dirty, so
- * the first frame of a scene fills every layer; after that one dirty cascade is
- * rendered per frame and the others keep drawing with their cached layer.
+ * the first frame of a scene fills every layer; after that at most one cascade
+ * with a cached layer is rendered per frame and the others keep drawing with
+ * the layer they hold, however many of them the frame made dirty.
  *
  * @param c The cache
  * @param v The view of this frame
- * @param budget Cascades already rendered this frame
- * @return The cascade index, -1 when none is rendered
+ * @return One bit per cascade the frame renders
  */
-static inline int32_t box_shadow_cache_next(
+static inline uint32_t box_shadow_cache_pick(
     const box_shadow_cache_t *c,
-    const box_view_t *v,
-    int32_t budget)
+    const box_view_t *v)
 {
-    int32_t result = -1;
+    uint32_t result = 0;
+    bool spent = false;
     uint32_t i;
-    for (i = 0; i < v->shadow_cascades && result < 0; i ++) {
-        if (c->dirty[i] && (!c->valid[i] || !budget)) {
-            result = (int32_t)i;
+    for (i = 0; i < v->shadow_cascades; i ++) {
+        if (!c->dirty[i]) {
+            continue;
+        }
+
+        if (!c->valid[i]) {
+            result |= 1u << i;
+            continue;
+        }
+
+        if (!spent) {
+            result |= 1u << i;
+            spent = true;
         }
     }
 
@@ -153,7 +163,7 @@ static inline int32_t box_shadow_cache_next(
 static inline void box_shadow_cache_done(
     box_shadow_cache_t *c,
     const box_view_t *v,
-    int32_t cascade)
+    uint32_t cascade)
 {
     memcpy(c->matrix[cascade], v->shadow_matrix + cascade * 16, 16 * sizeof(float));
     c->dirty[cascade] = false;

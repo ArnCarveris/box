@@ -153,6 +153,7 @@ void box_render_extract_dynamic(
     RenderState *state,
     box_packet_t *p,
     uint32_t view_mask,
+    uint32_t caster_mask,
     bool strict)
 {
     ecs_iter_t it = ecs_query_iter(world, state->dynamic);
@@ -189,6 +190,10 @@ void box_render_extract_dynamic(
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
             box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false,
                 state, data);
+            if (!box_layer_shown(inst[i].layer_mask, caster_mask, strict)) {
+                box_instance_set_caster(data, false);
+            }
+
             batch->count ++;
         }
     }
@@ -239,7 +244,8 @@ void box_render_extract(
 
     ecs_vec_clear(&state->dirty);
     if (!state->layer_used) {
-        box_render_extract_dynamic(world, state, p, BOX_VIEW_LAYER_ALL, false);
+        box_render_extract_dynamic(world, state, p, BOX_VIEW_LAYER_ALL,
+            BOX_VIEW_LAYER_ALL, false);
     }
 
     box_extract_counts(state, p);

@@ -90,6 +90,28 @@ static inline void box_frustum_mul(
     }
 }
 
+/** Build the six planes of a frustum from a world to clip matrix.
+ *
+ * @param m The world to clip matrix, sixteen floats
+ * @param out The frustum to fill
+ */
+static inline void box_frustum_of_clip(
+    const float *m,
+    box_frustum_t *out)
+{
+    box_frustum_plane(out->planes[BOX_FRUSTUM_LEFT],
+        m[3] + m[0], m[7] + m[4], m[11] + m[8], m[15] + m[12]);
+    box_frustum_plane(out->planes[BOX_FRUSTUM_RIGHT],
+        m[3] - m[0], m[7] - m[4], m[11] - m[8], m[15] - m[12]);
+    box_frustum_plane(out->planes[BOX_FRUSTUM_BOTTOM],
+        m[3] + m[1], m[7] + m[5], m[11] + m[9], m[15] + m[13]);
+    box_frustum_plane(out->planes[BOX_FRUSTUM_TOP],
+        m[3] - m[1], m[7] - m[5], m[11] - m[9], m[15] - m[13]);
+    box_frustum_plane(out->planes[BOX_FRUSTUM_NEAR],
+        m[3] - m[2], m[7] - m[6], m[11] - m[10], m[15] - m[14]);
+    box_frustum_plane(out->planes[BOX_FRUSTUM_FAR], m[2], m[6], m[10], m[14]);
+}
+
 /** Build the six planes of a frustum from a view and a projection matrix.
  *
  * @param view The world to view matrix, sixteen floats
@@ -103,17 +125,7 @@ static inline void box_frustum_build(
 {
     float m[16];
     box_frustum_mul(proj, view, m);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_LEFT],
-        m[3] + m[0], m[7] + m[4], m[11] + m[8], m[15] + m[12]);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_RIGHT],
-        m[3] - m[0], m[7] - m[4], m[11] - m[8], m[15] - m[12]);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_BOTTOM],
-        m[3] + m[1], m[7] + m[5], m[11] + m[9], m[15] + m[13]);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_TOP],
-        m[3] - m[1], m[7] - m[5], m[11] - m[9], m[15] - m[13]);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_NEAR],
-        m[3] - m[2], m[7] - m[6], m[11] - m[10], m[15] - m[14]);
-    box_frustum_plane(out->planes[BOX_FRUSTUM_FAR], m[2], m[6], m[10], m[14]);
+    box_frustum_of_clip(m, out);
 }
 
 /** Build the planes of the frustum of a view.
