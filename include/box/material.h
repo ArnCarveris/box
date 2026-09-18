@@ -129,7 +129,7 @@ ECS_STRUCT(PbrTextures, {
  *
  * The source is the body of `fn layer(s: ptr<function, Surface>, p: LayerParams)`,
  * so it writes `(*s).albedo`, `(*s).roughness`, `(*s).metallic`, `(*s).normal`,
- * `(*s).emissive`, `(*s).occlusion` and `(*s).alpha`, and reads `(*s).world_pos`,
+ * `(*s).emissive` and `(*s).alpha`, and reads `(*s).world_pos`,
  * `(*s).local` (the position in the mesh bounds, 0 to 1 on each axis) and
  * `(*s).geo_normal` (the world normal before normal mapping). The parameters
  * come from the LayerParams of the same entity and `box_noise(p: vec3<f32>)`

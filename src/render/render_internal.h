@@ -29,6 +29,12 @@ typedef struct RenderInstance {
     bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
 } RenderInstance;
 
+/** One registered material layer, kept in the order the layers are applied in */
+typedef struct box_layer_t {
+    ecs_entity_t entity; /**< The layer entity */
+    int32_t order;       /**< Application order the list was sorted by */
+} box_layer_t;
+
 /** Depth and index of one entry of the sorted draw list */
 typedef struct box_sort_key_t {
     uint32_t key;   /**< Depth as an unsigned value that sorts back to front */
@@ -48,6 +54,10 @@ typedef struct RenderState {
     bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
     bool blended;             /**< A blend or back face mode exists, so instances read them */
     bool translucent;         /**< An opacity or tint exists, so instances resolve their alpha */
+    bool layered;             /**< A material enables a layer, so instances resolve their mask */
+    bool layers_dirty;        /**< The registration list changed and must be sent again */
+    bool layers_reported;     /**< The layer limit was already logged */
+    ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
@@ -58,6 +68,7 @@ typedef struct RenderState {
     ecs_query_t *suns;        /**< Directional light entities */
     ecs_query_t *lights;      /**< Point and spot light entities */
     ecs_query_t *emitters;    /**< Static entities with an Emissive material */
+    ecs_query_t *layer_query; /**< Entities holding a MaterialLayer registration */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
     uint32_t mesh_count;      /**< Handles allocated so far */
@@ -142,6 +153,15 @@ void box_render_mark_dirty(
     ecs_world_t *world,
     ecs_entity_t e);
 
+/** Queue an entity and every descendant with a mesh for extraction.
+ *
+ * @param world The world
+ * @param e The entity
+ */
+void box_render_mark_subtree(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Register the observers that track instance changes.
  *
  * @param world The world
@@ -198,6 +218,7 @@ void box_render_release_slot(
  * @param baked The instance reads a baked probe instead of the static lights
  * @param textured The world holds textures, so the PBR slots are resolved
  * @param tiled The world holds tiling components, so the uv transform is derived
+ * @param layered The world enables material layers, so the layer mask is resolved
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -208,6 +229,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
+    bool layered,
     box_instance_t *out);
 
 /** Fill the uv transform and mode of an instance from its material components.
@@ -385,6 +407,41 @@ void box_render_extract_emitters(
  */
 void box_render_validate(
     ecs_world_t *world);
+
+/** Register the observers that track material layer registrations and use.
+ *
+ * @param world The world
+ */
+void box_render_layers_init(
+    ecs_world_t *world);
+
+/** Resolve the material layers an entity enables into a mask of layer bits.
+ *
+ * The pair is inherited, so the prefabs the entity instantiates are walked too.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The entity
+ * @return One bit per enabled layer, the bit being its index in the registry
+ */
+uint32_t box_render_layer_mask(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e);
+
+/** Send the layer registrations and their parameters with the packet.
+ *
+ * The ordered registration list only travels when it changed; the parameters
+ * are scene global and travel every frame while a material enables a layer.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_layers(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
 
 /** Register the Extract system.
  *

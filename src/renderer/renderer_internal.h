@@ -57,6 +57,9 @@
 /** Cull modes a sorted pipeline is built for: back faces culled or kept */
 #define BOX_CULL_MODES (2)
 
+/** Bytes of the uniform block holding the parameters of every material layer */
+#define BOX_LAYER_UNIFORM_SIZE (BOX_LAYER_MAX * sizeof(box_layer_params_t))
+
 /** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
 #define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
 
@@ -159,6 +162,11 @@ struct box_renderer_t {
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full mip range */
     WGPUBindGroupLayout downsample_layout; /**< Source texture and sampler of a downsample */
     WGPURenderPipeline downsample_pipeline; /**< Halves one mip of the copy into the next */
+    WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
+    char *layer_wgsl[BOX_LAYER_MAX]; /**< Body of every layer the shader was composed from */
+    uint32_t layer_count;            /**< Layers the composed shader holds */
+    bool layer_failed;               /**< A recomposition failed and was already reported */
+    volatile bool device_error;      /**< The device reported an error since it was cleared */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     WGPUBindGroup view_group;        /**< Bind group with the view uniforms */
     WGPUBuffer view_buffer;          /**< View uniform buffer */
@@ -318,6 +326,47 @@ void box_scene_draw(
  * @param r The renderer
  */
 void box_scene_fini(
+    box_renderer_t *r);
+
+/** Create the uniform buffer the material layer parameters live in.
+ *
+ * @param r The renderer
+ */
+void box_layers_init(
+    box_renderer_t *r);
+
+/** Compose the mesh shader out of the layers the renderer holds.
+ *
+ * @param r The renderer
+ * @return The shader module, NULL when the source did not compile
+ */
+WGPUShaderModule box_layers_shader(
+    box_renderer_t *r);
+
+/** Take the layer registrations of a packet and upload its layer parameters.
+ *
+ * A new registration list recomposes the mesh shader and rebuilds every mesh
+ * pipeline; the previous pipelines stay in use when the new source fails.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_layers_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Release the layer uniform buffer and the sources of the registered layers.
+ *
+ * @param r The renderer
+ */
+void box_layers_fini(
+    box_renderer_t *r);
+
+/** Release the lazily built pipelines of the sorted pass.
+ *
+ * @param r The renderer
+ */
+void box_transparent_reset(
     box_renderer_t *r);
 
 /** Create the sampler, the downsample pipeline and the views of the scene copy.
@@ -545,8 +594,11 @@ void box_bake_mesh_release(
 void box_bake_fini(
     box_renderer_t *r);
 
-/** WGSL source of the lit instanced mesh shader */
-extern const char *box_mesh_shader_wgsl;
+/** WGSL source of the lit instanced mesh shader up to the material layers */
+extern const char *box_mesh_shader_head;
+
+/** WGSL source of the fragment stage, which the composed layers precede */
+extern const char *box_mesh_shader_tail;
 
 /** WGSL source of the cluster assignment compute shader */
 extern const char *box_cluster_shader_wgsl;

@@ -24,12 +24,7 @@ done:
     return;
 }
 
-/** Queue an entity and every descendant with a mesh for extraction.
- *
- * @param world The world
- * @param e The entity
- */
-static void box_render_mark_subtree(
+void box_render_mark_subtree(
     ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -288,6 +283,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
+    bool layered,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -323,6 +319,10 @@ void box_render_fill_instance(
     }
 
     box_render_fill_uv(world, e, mesh, &m, tiled, out);
+    if (layered) {
+        RenderState *state = box_render_state(world);
+        box_instance_set_layers(out, box_render_layer_mask(world, state, e));
+    }
 }
 
 void box_render_instance_init(

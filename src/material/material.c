@@ -178,5 +178,5 @@ void BoxMaterialImport(
     ecs_add_pair(world, MaterialLayerOn, EcsOnInstantiate, EcsInherit);
 
     box_tint_init(world);
-    box_layers_init(world);
+    box_material_layers_init(world);
 }

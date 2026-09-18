@@ -19,23 +19,34 @@ static void box_frame_init_view(
     };
     r->view_buffer = wgpuDeviceCreateBuffer(r->device, &buffer_desc);
 
-    WGPUBindGroupLayoutEntry layout_entry = {
-        .binding = 0,
-        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-        .buffer = { .type = WGPUBufferBindingType_Uniform, .minBindingSize = sizeof(box_view_t) }
+    WGPUBindGroupLayoutEntry layout_entries[2] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = sizeof(box_view_t)
+            }
+        }, {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_LAYER_UNIFORM_SIZE
+            }
+        }
     };
-    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 1, .entries = &layout_entry };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 2, .entries = layout_entries };
     r->view_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUBindGroupEntry group_entry = {
-        .binding = 0,
-        .buffer = r->view_buffer,
-        .size = sizeof(box_view_t)
+    WGPUBindGroupEntry group_entries[2] = {
+        { .binding = 0, .buffer = r->view_buffer, .size = sizeof(box_view_t) },
+        { .binding = 1, .buffer = r->layer_buffer, .size = BOX_LAYER_UNIFORM_SIZE }
     };
     WGPUBindGroupDescriptor group_desc = {
         .layout = r->view_layout,
-        .entryCount = 1,
-        .entries = &group_entry
+        .entryCount = 2,
+        .entries = group_entries
     };
     r->view_group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
 }
@@ -48,10 +59,12 @@ WGPURenderPipeline box_frame_pipeline(
     bool depth_write,
     const WGPUBlendState *blend)
 {
-    WGPUVertexAttribute vertex_attrs[3] = {
+    WGPUVertexAttribute vertex_attrs[4] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
-        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
+        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
+            .shaderLocation = 12 }
     };
     WGPUVertexAttribute instance_attrs[9] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 0, .shaderLocation = 3 },
@@ -68,7 +81,7 @@ WGPURenderPipeline box_frame_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 3,
+            .attributeCount = 4,
             .attributes = vertex_attrs
         }, {
             .arrayStride = stride,
@@ -123,6 +136,7 @@ void box_frame_init(
     box_renderer_t *r)
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
+    box_layers_init(r);
     box_frame_init_view(r);
     box_lights_init(r);
     box_texture_init(r);
@@ -130,12 +144,7 @@ void box_frame_init(
     box_environment_init(r);
     box_bake_init(r);
 
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_mesh_shader_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor shader_desc = { .nextInChain = (WGPUChainedStruct*)&wgsl };
-    r->mesh_shader = wgpuDeviceCreateShaderModule(r->device, &shader_desc);
+    r->mesh_shader = box_layers_shader(r);
 
     WGPUBindGroupLayout group_layouts[4] = {
         r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
@@ -241,6 +250,7 @@ void box_frame_render(
     const box_packet_t *p)
 {
     box_device_resize(r, p->width, p->height);
+    box_layers_apply(r, p);
     box_texture_apply(r, p);
     box_scene_apply(r, p);
     box_transparent_upload(r, p);

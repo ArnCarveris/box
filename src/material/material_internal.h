@@ -19,7 +19,7 @@ void box_tint_init(
  *
  * @param world The world
  */
-void box_layers_init(
+void box_material_layers_init(
     ecs_world_t *world);
 
 #endif

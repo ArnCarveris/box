@@ -32,6 +32,10 @@
     "  cluster_far: f32,\n" \
     "  light_count: u32,\n" \
     "  env_generation: u32,\n" \
+    "  layers_enabled: u32,\n" \
+    "  pad0: u32,\n" \
+    "  pad1: u32,\n" \
+    "  pad2: u32,\n" \
     "};\n"
 
 /** Light storage element, laid out as box_light_t */
@@ -231,7 +235,49 @@
     "  return x + y * u.cluster_x + z * u.cluster_x * u.cluster_y;\n" \
     "}\n"
 
-const char *box_mesh_shader_wgsl =
+/** Surface the fragment stage shades, which the material layers change.
+ * The parameters of every registered layer share one uniform block and
+ * `box_noise` is the hash based value noise the layer bodies sample. */
+#define BOX_WGSL_SURFACE \
+    "struct Surface {\n" \
+    "  albedo: vec3<f32>,\n" \
+    "  alpha: f32,\n" \
+    "  emissive: vec3<f32>,\n" \
+    "  roughness: f32,\n" \
+    "  metallic: f32,\n" \
+    "  normal: vec3<f32>,\n" \
+    "  geo_normal: vec3<f32>,\n" \
+    "  world_pos: vec3<f32>,\n" \
+    "  local: vec3<f32>,\n" \
+    "};\n" \
+    "struct LayerParams {\n" \
+    "  a: vec4<f32>,\n" \
+    "  b: vec4<f32>,\n" \
+    "};\n" \
+    "struct LayerBlock {\n" \
+    "  p: array<LayerParams, " BOX_WGSL_STR(BOX_LAYER_MAX) ">,\n" \
+    "};\n" \
+    "@group(0) @binding(1) var<uniform> layer_params: LayerBlock;\n" \
+    "fn box_hash(p: vec3<f32>) -> f32 {\n" \
+    "  let q = fract(p * vec3(0.1031, 0.1030, 0.0973));\n" \
+    "  let r = q + vec3(dot(q, q.yzx + vec3(33.33)));\n" \
+    "  return fract((r.x + r.y) * r.z);\n" \
+    "}\n" \
+    "fn box_noise(p: vec3<f32>) -> f32 {\n" \
+    "  let i = floor(p);\n" \
+    "  let f = fract(p);\n" \
+    "  let u = f * f * (vec3(3.0) - 2.0 * f);\n" \
+    "  let x00 = mix(box_hash(i), box_hash(i + vec3(1.0, 0.0, 0.0)), u.x);\n" \
+    "  let x10 = mix(box_hash(i + vec3(0.0, 1.0, 0.0)),\n" \
+    "    box_hash(i + vec3(1.0, 1.0, 0.0)), u.x);\n" \
+    "  let x01 = mix(box_hash(i + vec3(0.0, 0.0, 1.0)),\n" \
+    "    box_hash(i + vec3(1.0, 0.0, 1.0)), u.x);\n" \
+    "  let x11 = mix(box_hash(i + vec3(0.0, 1.0, 1.0)),\n" \
+    "    box_hash(i + vec3(1.0, 1.0, 1.0)), u.x);\n" \
+    "  return mix(mix(x00, x10, u.y), mix(x01, x11, u.y), u.z);\n" \
+    "}\n"
+
+const char *box_mesh_shader_head =
     BOX_WGSL_VIEW
     BOX_WGSL_LIGHT
     BOX_WGSL_PROBE
@@ -250,6 +296,7 @@ const char *box_mesh_shader_wgsl =
     BOX_WGSL_TILING
     BOX_WGSL_RESOLVE
     BOX_WGSL_CLUSTER_INDEX
+    BOX_WGSL_SURFACE
     "fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {\n"
     "  var result = 0.0;\n"
     "  let len = dot(span, span);\n"
@@ -280,6 +327,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(9) textures: vec2<u32>,\n"
     "  @location(10) uv_xform: vec4<f32>,\n"
     "  @location(11) uv_mode: u32,\n"
+    "  @location(12) bounds_pos: vec4<f32>,\n"
     "};\n"
     "struct VertexOut {\n"
     "  @builtin(position) clip: vec4<f32>,\n"
@@ -296,6 +344,7 @@ const char *box_mesh_shader_wgsl =
     "  @location(10) local_normal: vec3<f32>,\n"
     "  @location(11) @interpolate(flat) uv_xform: vec4<f32>,\n"
     "  @location(12) @interpolate(flat) uv_mode: u32,\n"
+    "  @location(13) bounds_pos: vec3<f32>,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -321,6 +370,7 @@ const char *box_mesh_shader_wgsl =
     "  out.local_normal = in.normal;\n"
     "  out.uv_xform = in.uv_xform;\n"
     "  out.uv_mode = in.uv_mode;\n"
+    "  out.bounds_pos = in.bounds_pos.xyz;\n"
     "  out.local = vec3<f32>(0.0);\n"
     "  if (in.params.z > 0.5) {\n"
     "    out.local = probe_coord(in.instance, world.xyz);\n"
@@ -401,7 +451,9 @@ const char *box_mesh_shader_wgsl =
     "    sum = sum + shade(n, v, l, albedo, metallic, roughness) * radiance;\n"
     "  }\n"
     "  return sum;\n"
-    "}\n"
+    "}\n";
+
+const char *box_mesh_shader_tail =
     "@fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)\n"
     "    -> @location(0) vec4<f32> {\n"
     "  let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);\n"
@@ -418,10 +470,11 @@ const char *box_mesh_shader_wgsl =
     "  }\n"
     "  let blend = (in.uv_mode >> 8u) & 0xFu;\n"
     "  let plain = !front && ((in.uv_mode >> 12u) & 0x3u) == 1u;\n"
-    "  var n = normalize(in.normal);\n"
+    "  var gn = normalize(in.normal);\n"
     "  if (!front) {\n"
-    "    n = -n;\n"
+    "    gn = -gn;\n"
     "  }\n"
+    "  var n = gn;\n"
     "  var albedo = in.color.rgb;\n"
     "  var alpha = in.color.a;\n"
     "  var emitted = in.emissive.rgb;\n"
@@ -458,22 +511,38 @@ const char *box_mesh_shader_wgsl =
     "    let ts = tex_sample(slot_normal, uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
     "    n = perturb(n, dp1, dp2, ddx, ddy, ts);\n"
     "  }\n"
+    "  var s: Surface;\n"
+    "  s.albedo = albedo;\n"
+    "  s.alpha = alpha;\n"
+    "  s.emissive = emitted;\n"
+    "  s.roughness = rough;\n"
+    "  s.metallic = in.params.x;\n"
+    "  s.normal = n;\n"
+    "  s.geo_normal = gn;\n"
+    "  s.world_pos = in.world_pos;\n"
+    "  s.local = in.bounds_pos;\n"
+    "  var mask = in.uv_mode >> u32(" BOX_WGSL_STR(BOX_MODE_LAYER_SHIFT) ");\n"
+    "  if (u.layers_enabled == 0u) {\n"
+    "    mask = 0u;\n"
+    "  }\n"
+    "  apply_layers(&s, mask);\n"
     "  let l = normalize(-u.sun_dir);\n"
     "  let v = normalize(u.eye - in.world_pos);\n"
-    "  let metallic = in.params.x;\n"
-    "  let roughness = clamp(rough, 0.04, 1.0);\n"
+    "  let sn = s.normal;\n"
+    "  let metallic = s.metallic;\n"
+    "  let roughness = clamp(s.roughness, 0.04, 1.0);\n"
     "  let sun = u.sun_color * u.sun_intensity;\n"
-    "  let env = environment(n, v, albedo, metallic, roughness);\n"
+    "  let env = environment(sn, v, s.albedo, metallic, roughness);\n"
     "  let is_baked = in.params.z > 0.5;\n"
-    "  var color = shade(n, v, l, albedo, metallic, roughness) * sun + env + emitted;\n"
-    "  color = color + punctual(in.world_pos, n, v, albedo, metallic, roughness, is_baked);\n"
+    "  var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun + env + s.emissive;\n"
+    "  color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);\n"
     "  if (is_baked) {\n"
-    "    color = color + baked(in.slot, in.local, n, albedo, metallic);\n"
+    "    color = color + baked(in.slot, in.local, sn, s.albedo, metallic);\n"
     "  }\n"
     "  if (u.gamma_encode > 0.5) {\n"
     "    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));\n"
     "  }\n"
-    "  return resolve(color, alpha, in.clip.xy, roughness, blend);\n"
+    "  return resolve(color, s.alpha, in.clip.xy, roughness, blend);\n"
     "}\n";
 
 const char *box_cluster_shader_wgsl =

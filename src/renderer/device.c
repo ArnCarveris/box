@@ -79,7 +79,7 @@ static void box_on_device(
  * @param device The device
  * @param type Error category
  * @param message Error text
- * @param userdata1 Unused
+ * @param userdata1 The renderer
  * @param userdata2 Unused
  */
 static void box_on_device_error(
@@ -89,7 +89,12 @@ static void box_on_device_error(
     void *userdata1,
     void *userdata2)
 {
-    (void)device; (void)type; (void)userdata1; (void)userdata2;
+    (void)device; (void)type; (void)userdata2;
+    box_renderer_t *r = userdata1;
+    if (r) {
+        r->device_error = true;
+    }
+
     box_device_report("device error", message);
 }
 
@@ -213,6 +218,7 @@ static void box_on_adapter_web(
     if (r->adapter) {
         WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
         desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
+        desc.uncapturedErrorCallbackInfo.userdata1 = r;
         WGPURequestDeviceCallbackInfo info = {
             .mode = WGPUCallbackMode_AllowSpontaneous,
             .callback = box_on_device_web,
@@ -258,6 +264,7 @@ int box_device_init(
 
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
+    desc.uncapturedErrorCallbackInfo.userdata1 = r;
     WGPURequestDeviceCallbackInfo device_info = {
         .mode = WGPUCallbackMode_AllowSpontaneous,
         .callback = box_on_device,
@@ -284,6 +291,7 @@ void box_device_fini(
     box_environment_fini(r);
     box_texture_fini(r);
     box_bake_fini(r);
+    box_layers_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
     if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);

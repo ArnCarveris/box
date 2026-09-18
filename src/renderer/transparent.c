@@ -385,7 +385,7 @@ void box_transparent_draw(
     }
 }
 
-void box_transparent_fini(
+void box_transparent_reset(
     box_renderer_t *r)
 {
     uint32_t blend;
@@ -398,6 +398,12 @@ void box_transparent_fini(
             }
         }
     }
+}
+
+void box_transparent_fini(
+    box_renderer_t *r)
+{
+    box_transparent_reset(r);
 
     box_transparent_release_scene(r);
     if (r->sorted) wgpuBufferRelease(r->sorted);

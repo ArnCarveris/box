@@ -48,6 +48,7 @@ static void box_render_state_dtor(
             ecs_vec_fini_t(NULL, &state[i].free_layers[j], uint32_t);
         }
 
+        ecs_vec_fini_t(NULL, &state[i].layers, box_layer_t);
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].transparent, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].sort, box_sort_key_t);
@@ -58,9 +59,35 @@ static void box_render_state_dtor(
         if (state[i].suns) ecs_query_fini(state[i].suns);
         if (state[i].lights) ecs_query_fini(state[i].lights);
         if (state[i].emitters) ecs_query_fini(state[i].emitters);
+        if (state[i].layer_query) ecs_query_fini(state[i].layer_query);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);
     }
+}
+
+/** Pack the position of a vertex inside the mesh bounds into four bytes.
+ *
+ * @param p The vertex position
+ * @param min Minimum corner of the mesh bounds
+ * @param extent Size of the mesh bounds, zero on an axis the mesh is flat in
+ * @return The position in the bounds, one byte per axis and a zero fourth byte
+ */
+static uint32_t box_render_pack_local(
+    const float *p,
+    vec3 min,
+    vec3 extent)
+{
+    float origin[3] = { min.x, min.y, min.z };
+    float size[3] = { extent.x, extent.y, extent.z };
+    uint32_t result = 0;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float t = size[i] > 0 ? (p[i] - origin[i]) / size[i] : 0.5f;
+        t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+        result |= (uint32_t)(t * 255.0f + 0.5f) << (i * 8);
+    }
+
+    return result;
 }
 
 RenderState* box_render_state(
@@ -97,12 +124,16 @@ uint32_t box_render_mesh_create(
     cmd->bounds_max[1] = data->bounds_max.y;
     cmd->bounds_max[2] = data->bounds_max.z;
 
+    vec3 extent = vec3_sub(data->bounds_max, data->bounds_min);
     uint32_t v;
     for (v = 0; v < data->vertex_count; v ++) {
+        const float *pos = data->positions + (size_t)v * 3;
         float *dst = cmd->vertices + (size_t)v * BOX_VERTEX_FLOATS;
-        memcpy(dst, data->positions + (size_t)v * 3, 3 * sizeof(float));
+        memcpy(dst, pos, 3 * sizeof(float));
         memcpy(dst + 3, data->normals + (size_t)v * 3, 3 * sizeof(float));
         memcpy(dst + 6, data->uvs + (size_t)v * 2, 2 * sizeof(float));
+        uint32_t local = box_render_pack_local(pos, data->bounds_min, extent);
+        memcpy(dst + 8, &local, sizeof(local));
     }
 
     return handle;
@@ -146,12 +177,14 @@ void BoxRenderImport(
         ecs_vec_init_t(NULL, &state->free_layers[cls], uint32_t, 0);
     }
 
+    ecs_vec_init_t(NULL, &state->layers, box_layer_t, 0);
     ecs_vec_init_t(NULL, &state->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->transparent, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->sort, box_sort_key_t, 0);
     ecs_vec_init_t(NULL, &state->sort_tmp, box_sort_key_t, 0);
 
     box_render_texture_init(world);
+    box_render_layers_init(world);
     box_render_instance_init(world);
     box_render_extract_init(world);
 }

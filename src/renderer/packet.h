@@ -15,8 +15,14 @@
 /** Longest capture path stored in a packet */
 #define BOX_CAPTURE_PATH_MAX (512)
 
-/** Floats per vertex: position, normal and uv */
-#define BOX_VERTEX_FLOATS (8)
+/** Floats per vertex: position, normal, uv and the packed bounds local position */
+#define BOX_VERTEX_FLOATS (9)
+
+/** Bytes from a vertex to its packed local position, a Unorm10_10_10_2 value */
+#define BOX_VERTEX_LOCAL_OFFSET (32)
+
+/** Material layers a scene can register, one bit each in the instance layer mask */
+#define BOX_LAYER_MAX (16)
 
 /** Point and spot lights a packet can carry */
 #define BOX_LIGHT_MAX (4096)
@@ -66,6 +72,9 @@
 /** Bit the back face mode of an instance starts at in its mode word */
 #define BOX_MODE_BACK_SHIFT (12)
 
+/** Bit the material layer mask of an instance starts at in its mode word */
+#define BOX_MODE_LAYER_SHIFT (16)
+
 /** Layers a size class can hold, the packed instance slot is sixteen bits wide */
 #define BOX_TEXTURE_LAYER_MAX (0x3FFF - 1)
 
@@ -77,7 +86,7 @@ typedef struct box_instance_t {
     float params[4];       /**< Metallic, roughness, baked, unused */
     uint32_t textures[BOX_TEXTURE_SLOTS / 2]; /**< Two packed texture slots per word */
     float uv_transform[4]; /**< Uv scale x, scale y, offset x and offset y */
-    uint32_t uv_mode;      /**< Tiling, wrap, blend and back face mode of the instance */
+    uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
 } box_instance_t;
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
@@ -139,6 +148,8 @@ typedef struct box_view_t {
     box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
     uint32_t light_count;   /**< Lights in the packet light array */
     uint32_t env_generation; /**< Changes when the extracted environment changes */
+    uint32_t layers_enabled; /**< The view applies the registered material layers */
+    uint32_t pad[3];        /**< Padding to the 16 byte GPU stride */
 } box_view_t;
 
 /** Mesh to upload, the renderer takes ownership of the arrays */
@@ -151,6 +162,19 @@ typedef struct box_mesh_cmd_t {
     float bounds_min[3];    /**< Local bounds minimum of the unscaled mesh */
     float bounds_max[3];    /**< Local bounds maximum of the unscaled mesh */
 } box_mesh_cmd_t;
+
+/** Registration of one material layer, the renderer takes ownership of the source */
+typedef struct box_layer_cmd_t {
+    uint32_t index; /**< Bit the layer takes in the instance layer mask */
+    int32_t order;  /**< Application order the registrations were sorted by */
+    char *wgsl;     /**< Body of the layer function, freed by the renderer */
+} box_layer_cmd_t;
+
+/** Scene global parameters of one material layer, as the layer uniform expects them */
+typedef struct box_layer_params_t {
+    float a[4]; /**< First parameter vector */
+    float b[4]; /**< Second parameter vector */
+} box_layer_params_t;
 
 /** Texture to upload, the renderer takes ownership of the pixel array */
 typedef struct box_texture_cmd_t {
@@ -301,8 +325,31 @@ static inline void box_instance_set_shading(
     uint32_t blend,
     uint32_t back)
 {
-    inst->uv_mode &= 0xFFu;
+    inst->uv_mode &= ~0xFF00u;
     inst->uv_mode |= (blend << BOX_MODE_BLEND_SHIFT) | (back << BOX_MODE_BACK_SHIFT);
+}
+
+/** Write the enabled material layers of an instance into its mode word.
+ *
+ * @param inst The instance
+ * @param mask One bit per registered layer, the bit being its index
+ */
+static inline void box_instance_set_layers(
+    box_instance_t *inst,
+    uint32_t mask)
+{
+    inst->uv_mode = (inst->uv_mode & 0xFFFFu) | (mask << BOX_MODE_LAYER_SHIFT);
+}
+
+/** Material layer mask the mode word of an instance holds.
+ *
+ * @param inst The instance
+ * @return One bit per enabled layer, the bit being its index
+ */
+static inline uint32_t box_instance_layers(
+    const box_instance_t *inst)
+{
+    return inst->uv_mode >> BOX_MODE_LAYER_SHIFT;
 }
 
 /** Blend mode the mode word of an instance holds.
@@ -370,6 +417,10 @@ typedef struct box_packet_t {
     box_vec_t mesh_destroy;                  /**< uint32_t handles */
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
     box_vec_t texture_destroy;               /**< uint32_t handles */
+    box_vec_t layer_create;                  /**< box_layer_cmd_t, the whole list when it changed */
+    bool layers_changed;                     /**< layer_create holds a new registration list */
+    uint32_t layer_count;                    /**< Layers the scene has registered */
+    box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     box_vec_t static_updates;                /**< box_static_update_t */
     box_vec_t static_counts;                 /**< box_static_count_t */
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
@@ -393,6 +444,7 @@ static inline void box_packet_init(
     box_vec_init(&p->mesh_destroy, sizeof(uint32_t));
     box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
     box_vec_init(&p->texture_destroy, sizeof(uint32_t));
+    box_vec_init(&p->layer_create, sizeof(box_layer_cmd_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
@@ -420,6 +472,8 @@ static inline void box_packet_reset(
     box_vec_clear(&p->mesh_destroy);
     box_vec_clear(&p->texture_create);
     box_vec_clear(&p->texture_destroy);
+    box_vec_clear(&p->layer_create);
+    p->layers_changed = false;
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->dynamic_batches);
@@ -441,6 +495,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->mesh_destroy);
     box_vec_fini(&p->texture_create);
     box_vec_fini(&p->texture_destroy);
+    box_vec_fini(&p->layer_create);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->dynamic_batches);

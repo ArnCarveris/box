@@ -35,6 +35,12 @@ static void box_renderer_discard(
         cmd->pixels = NULL;
     }
 
+    for (i = 0; i < p->layer_create.count; i ++) {
+        box_layer_cmd_t *cmd = box_vec_at(&p->layer_create, i);
+        free(cmd->wgsl);
+        cmd->wgsl = NULL;
+    }
+
     box_queue_release(&r->queue, p);
 }
 

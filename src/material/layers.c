@@ -92,7 +92,7 @@ static ecs_entity_t box_layer_add(
     return e;
 }
 
-void box_layers_init(
+void box_material_layers_init(
     ecs_world_t *world)
 {
     ecs_entity_t parent = ecs_entity(world, { .name = "layers" });
