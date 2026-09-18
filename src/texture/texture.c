@@ -164,11 +164,18 @@ static void box_texture_on_set(
 
 /** Texture was removed: unbind the materials that still reference it.
  *
+ * Nothing is unbound once the world is quitting or being deleted, so tearing a
+ * world down does not warn about every material that outlives its textures.
+ *
  * @param it Iterator over the entities that lost their texture
  */
 static void box_texture_on_remove(
     ecs_iter_t *it)
 {
+    if (ecs_is_fini(it->world) || ecs_should_quit(it->world)) {
+        goto done;
+    }
+
     bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
@@ -179,6 +186,8 @@ static void box_texture_on_remove(
             ecs_remove(it->stage, e, TextureImpl);
         }
     }
+done:
+    return;
 }
 
 void BoxTextureImport(

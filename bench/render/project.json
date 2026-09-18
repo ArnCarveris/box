@@ -4,35 +4,48 @@
     "value": {
         "description": "Benchmarks for the box.render extract step",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "bench": {
-        "benchsuites": [{
-            "id": "Extract",
-            "benchcases": [
-                "static_1_changed",
-                "static_100_changed",
-                "static_1000_changed",
-                "dynamic_10k"
-            ]
-        }, {
-            "id": "Environment",
-            "benchcases": [
-                "extract"
-            ]
-        }, {
-            "id": "Bake",
-            "benchcases": [
-                "invalidate_one_of_100k",
-                "probe_count_100k",
-                "churn_1000_of_100k"
-            ]
-        }, {
-            "id": "Lights",
-            "benchcases": [
-                "extract_1000_moving",
-                "extract_1000_culled"
-            ]
-        }]
+        "benchsuites": [
+            {
+                "id": "Extract",
+                "benchcases": [
+                    "static_1_changed",
+                    "static_100_changed",
+                    "static_1000_changed",
+                    "dynamic_10k"
+                ]
+            },
+            {
+                "id": "Environment",
+                "benchcases": [
+                    "extract"
+                ]
+            },
+            {
+                "id": "Bake",
+                "benchcases": [
+                    "invalidate_one_of_100k",
+                    "probe_count_100k",
+                    "churn_1000_of_100k"
+                ]
+            },
+            {
+                "id": "Lights",
+                "benchcases": [
+                    "extract_1000_moving",
+                    "extract_1000_culled"
+                ]
+            },
+            {
+                "id": "Textures",
+                "benchcases": [
+                    "extract_1000_materials"
+                ]
+            }
+        ]
     }
 }
