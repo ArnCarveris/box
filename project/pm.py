@@ -23,6 +23,7 @@ REPO = os.path.dirname(ROOT)
 INTEGRATION_OUT = os.path.join(REPO, "test", "integration", "out")
 INSPECTOR = os.path.join(REPO, "apps", "box_inspector", "index.html")
 WASM_IMAGE = "deliverable/wasm/box_app.js"
+DEFAULT_SCENE = "etc/scenes/default.flecs"
 CONTENT_TYPES = {
     ".wasm": "application/wasm",
     ".js": "application/javascript",
@@ -107,7 +108,7 @@ def inspect_urls(path, rel):
     if not os.path.isfile(image):
         return None, None
     wasm_url = "/deliverable/" + rel + "/" + WASM_IMAGE
-    return wasm_url, "/inspector?wasm=" + wasm_url
+    return wasm_url, "/inspector?wasm=" + wasm_url + "&scene=" + DEFAULT_SCENE
 
 
 def summarize_tests(path):
