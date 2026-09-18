@@ -1,0 +1,17 @@
+{
+  "project": "input",
+  "timestamp": "2026-09-18T21:37:26Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.015012,
+  "tests": [
+    {"suite": "Events", "case": "a_script_resumes_on_the_pressed_frame", "status": "pass", "elapsed": 0.013089},
+    {"suite": "Events", "case": "on_down_resumes_while_the_action_is_held", "status": "pass", "elapsed": 0.013960},
+    {"suite": "Events", "case": "on_up_resumes_when_the_action_is_released", "status": "pass", "elapsed": 0.013410},
+    {"suite": "Events", "case": "several_waiters_resume_on_one_action", "status": "pass", "elapsed": 0.014621},
+    {"suite": "Events", "case": "an_emitted_action_resumes_a_waiter", "status": "pass", "elapsed": 0.014922},
+    {"suite": "Events", "case": "the_wait_carries_the_source", "status": "pass", "elapsed": 0.014039},
+    {"suite": "Events", "case": "deleting_the_entity_of_a_task_cancels_the_wait", "status": "pass", "elapsed": 0.013662}
+  ]
+}

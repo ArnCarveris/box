@@ -141,6 +141,8 @@ exported as script constants under `keys` (`keys.W`, `keys.MouseLeft`).
 under the `actions` scope with an `InputAction`, an entity with `InputMap` binds them with
 `(keys.W, actions.Forward)` pairs or with `Binding` children that carry a full key mask
 like `keys.Ctrl|keys.S`, and a UI button or a command fires the same action without a key.
+A script task awaits an action with `await on.pressed(actions.Forward)` inside an `async`
+block, next to `on.down` and `on.up`; the await returns the source that fired the action.
 
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
@@ -164,7 +166,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, command, job, input, script
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, job, input, script
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
@@ -192,6 +194,40 @@ process removes its folder when it exits.
 Integration harnesses disable incremental template loading (`ScriptSettings: {enabled: false}`)
 so captures and command logs are deterministic; `templates_per_frame` with `budget_ms: 0` gives a
 deterministic incremental run when that is what a test needs.
+
+## Shaders
+
+Every shader of the engine is a WGSL file under `apps/box_app/etc/shaders/`, loaded
+by a `Shader` component that holds a path and a comma separated `NAME=value` macro
+list. Setting it preprocesses the file and hands the source to the renderer, which
+compiles a module and rebuilds the pipelines that use it; a file that does not
+preprocess leaves the previous shader drawing and reports the file and line through
+`ShaderStatus`. The builtin shaders are entities under `box.shader.builtin`, so
+reloading the mesh shader is a component write:
+
+```
+box { shader { builtin { mesh {
+  Shader: {path: "etc/shaders/mesh.wgsl", macros: "DEBUG_NORMALS=1"}
+} } } }
+```
+
+A path is resolved against the shader search path: the working directory, then
+`apps/box_app` under the working directory or the nearest ancestor of it that has
+one, then the directory of the executable. That makes a checkout work from the
+repository root and from a test project, an installed game work from any working
+directory, and the wasm build work from the embedded `etc`.
+
+The preprocessor understands `#include "file"` relative to the including file with
+cycle detection, `#define NAME value` with identifier substitution, `#if NAME`,
+`#ifdef`, `#ifndef`, `#else`, `#endif` and `#pragma once`; an undefined macro is 0
+in a condition and a `#define` never replaces a macro the component or the engine
+set. The constants the renderer and the shaders share, such as `SHADOW_CASCADE_MAX`
+and `ENV_MIPS`, are predefined. `#include "generated/layers.wgsl"` is answered by
+the material layer registry instead of from a file, which is how the mesh shader is
+recomposed when a scene registers or removes a layer.
+
+`test/integration/visual/shader_macro.flecs` is the macro check: the same scene with
+`DEBUG_NORMALS=1` on the builtin mesh shader, which outputs world normals as color.
 
 ## Benchmarks
 
