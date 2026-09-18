@@ -38,6 +38,11 @@ ECS_STRUCT(TerminalOutput, {
     bool error;    /**< The command failed */
 });
 
+/** HTTP server that serves the terminal and resource endpoints */
+ECS_STRUCT(HttpServer, {
+    int32_t port;  /**< Port to listen on, 0 stops the server */
+});
+
 /** Register the box.command module.
  *
  * @param world The world
