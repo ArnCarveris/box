@@ -1,0 +1,102 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+camera {
+  Position: {0, 4, -12}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {20, 0.2, 20}
+  Rgb: {180, 180, 190}
+  PbrMaterial: {roughness: 0.9}
+}
+
+sphere {
+  Position: {-3, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 160, 240}
+  PbrMaterial: {metallic: 0.2, roughness: 0.3}
+}
+
+cylinder {
+  Position: {0, 0.75, 0}
+  Cylinder: {segments: 24, smooth: true, length: 1.5, radius: 0.6}
+  Rgb: {90, 200, 110}
+}
+
+cone {
+  Position: {3, 0.75, 0}
+  Cone: {segments: 24, smooth: true, length: 1.5, radius: 0.7}
+  Rgb: {250, 200, 60}
+}
+
+glow {
+  Position: {6, 1, 0}
+  Sphere: {segments: 16, smooth: true, radius: 0.5}
+  Rgb: {40, 40, 40}
+  Emissive: {strength: 4, color: {255, 120, 40}}
+}
+
+alpha_back {
+  Position: {-4, 2, -4.2}
+  Quad: {2.4, 2.4}
+  Rgb: {60, 120, 255}
+  Opacity: {0.55}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {AlphaBlend}
+}
+
+alpha_front {
+  Position: {-2.6, 1.2, -5.4}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 70, 50}
+  Opacity: {0.55}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {AlphaBlend}
+}
+
+additive {
+  Position: {-0.6, 2, -4.2}
+  Quad: {2.4, 2.4}
+  Rgb: {40, 220, 160}
+  Opacity: {0.6}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {Additive}
+}
+
+multiply {
+  Position: {0.6, 1.2, -5.4}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 200, 90}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {Multiply}
+}
+
+screen {
+  Position: {3.4, 2, -4.2}
+  Quad: {2.4, 2.4}
+  Rgb: {120, 60, 200}
+  Opacity: {0.6}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {Screen}
+}
+
+subtractive {
+  Position: {4.6, 1.2, -5.4}
+  Quad: {2.4, 2.4}
+  Rgb: {180, 180, 180}
+  Opacity: {0.5}
+  PbrMaterial: {roughness: 0.05}
+  BlendMode: {Subtractive}
+}

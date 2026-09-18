@@ -1,0 +1,124 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {110, 140, 190}, ground_color: {70, 62, 55}, intensity: 0.6}
+}
+
+textures {
+  checker {
+    Texture: {path: "etc/textures/checker.png"}
+  }
+}
+
+camera {
+  Position: {0, 1.6, -7.5}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.85, -0.5, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+floor {
+  Position: {0, -0.02, 0}
+  Box: {20, 0.04, 20}
+  Rgb: {150, 150, 160}
+  PbrMaterial: {roughness: 0.9}
+}
+
+textured_back {
+  Position: {-3.4, 1, 1}
+  Rotation: {0, 3.14159, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceTextured}
+}
+
+textured_left {
+  Position: {-4.4, 1, 0}
+  Rotation: {0, 1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceTextured}
+}
+
+textured_right {
+  Position: {-2.4, 1, 0}
+  Rotation: {0, -1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceTextured}
+}
+
+plain_back {
+  Position: {0, 1, 1}
+  Rotation: {0, 3.14159, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFacePlain}
+}
+
+plain_left {
+  Position: {-1, 1, 0}
+  Rotation: {0, 1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFacePlain}
+}
+
+plain_right {
+  Position: {1, 1, 0}
+  Rotation: {0, -1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFacePlain}
+}
+
+culled_back {
+  Position: {3.4, 1, 1}
+  Rotation: {0, 3.14159, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceCull}
+}
+
+culled_left {
+  Position: {2.4, 1, 0}
+  Rotation: {0, 1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceCull}
+}
+
+culled_right {
+  Position: {4.4, 1, 0}
+  Rotation: {0, -1.5708, 0}
+  Quad: {2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.5}
+  PbrTextures: {albedo: textures.checker}
+  BackFaceMode: {BackFaceCull}
+}

@@ -51,6 +51,9 @@
 /** Mip levels the copy of the opaque target can hold, enough for 8192 pixels */
 #define BOX_SCENE_MIPS_MAX (14)
 
+/** Mip levels a rough surface blurs over, past which the copy is one flat color */
+#define BOX_SCENE_BLUR_MIPS (5)
+
 /** Cull modes a sorted pipeline is built for: back faces culled or kept */
 #define BOX_CULL_MODES (2)
 

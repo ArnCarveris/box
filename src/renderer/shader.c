@@ -201,7 +201,8 @@
     "  if (blend == 1u || blend == 2u) {\n" \
     "    let dims = vec2<f32>(textureDimensions(scene_tex, 0));\n" \
     "    let levels = f32(textureNumLevels(scene_tex)) - 1.0;\n" \
-    "    let lod = clamp(roughness, 0.0, 1.0) * levels;\n" \
+    "    let lod = clamp(roughness, 0.0, 1.0) *\n" \
+    "      min(levels, f32(" BOX_WGSL_STR(BOX_SCENE_BLUR_MIPS) "));\n" \
     "    let bg = textureSampleLevel(scene_tex, scene_samp, frag / dims, lod).rgb;\n" \
     "    let t = roughness * roughness;\n" \
     "    var pre = rgb * a;\n" \
