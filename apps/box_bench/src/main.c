@@ -203,6 +203,7 @@ int main(
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxRender);
+    ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxMovement);
 

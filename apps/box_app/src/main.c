@@ -21,6 +21,7 @@ int main(
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxCamera);
+    ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxMaterial);
     ECS_IMPORT(world, BoxRender);
