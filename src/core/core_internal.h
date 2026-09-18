@@ -14,6 +14,13 @@ typedef struct box_cpu_t {
     double wall_time;   /**< Wall clock seconds at the last sample */
 } box_cpu_t;
 
+/** Remove a directory and everything in it.
+ *
+ * @param path The directory
+ */
+void box_rmtree(
+    const char *path);
+
 /** Create the per-process folder and register its cleanup.
  *
  * @param world The world

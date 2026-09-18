@@ -10,11 +10,7 @@
 #include <string.h>
 #include <errno.h>
 
-/** Remove a directory tree.
- *
- * @param path The directory
- */
-static void box_rmtree(
+void box_rmtree(
     const char *path)
 {
     DIR *dir = opendir(path);
