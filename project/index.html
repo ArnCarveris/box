@@ -97,7 +97,7 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 }
 .chip svg { width: 10px; height: 10px; }
 .chip.complete { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
-.chip.in-progress { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.chip.in-progress { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); text-decoration: none; }
 .chip.pending { color: var(--ink-3); border-color: var(--border); }
 .chip.discarded { color: var(--ink-3); border-color: var(--border); text-decoration: line-through; }
 .kind { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
@@ -344,6 +344,9 @@ function openPanel(path) {
   const deliverables = item.deliverables.map(d => {
     const img = /\.(png|jpe?g|gif|webp|svg)$/i.test(d.name);
     const t = d.tests;
+    if (/\.html$/i.test(d.name)) {
+      return `<li><span class="n">${esc(d.name)}</span><a class="chip in-progress" href="${esc(d.url)}" target="_blank">${ICONS["in progress"]}open build</a></li>`;
+    }
     return `<li><span class="n"><a href="${esc(d.url)}" target="_blank">${esc(d.name)}</a></span>
       ${t ? `<span class="tests"><b class="ok">${t.pass}</b>${t.fail ? `<b class="bad">${t.fail}</b>` : ""}${t.empty ? `<b class="empty">${t.empty}</b>` : ""}</span>` : `<span style="color:var(--ink-3);font-size:11px">${(d.size / 1024).toFixed(1)} KB</span>`}
       </li>${img ? `<li style="display:block;border:0;padding:0"><img src="${esc(d.url)}" alt="${esc(d.name)}"></li>` : ""}`;
