@@ -1,0 +1,26 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T07:57:18Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.031453,
+  "tests": [
+    {"suite": "Search", "case": "query_creates_query", "status": "pass", "elapsed": 0.018993},
+    {"suite": "Search", "case": "query_replaces_query", "status": "pass", "elapsed": 0.019063},
+    {"suite": "Search", "case": "query_invalid_expression", "status": "pass", "elapsed": 0.018528},
+    {"suite": "Search", "case": "iter_and_next_in_chunks", "status": "pass", "elapsed": 0.018977},
+    {"suite": "Search", "case": "next_past_the_end", "status": "pass", "elapsed": 0.018935},
+    {"suite": "Search", "case": "next_without_iter", "status": "pass", "elapsed": 0.017524},
+    {"suite": "Search", "case": "done_finishes_iterator", "status": "pass", "elapsed": 0.018786},
+    {"suite": "Search", "case": "other_command_exits_iteration", "status": "pass", "elapsed": 0.018915},
+    {"suite": "Search", "case": "grep_matches_names", "status": "pass", "elapsed": 0.012700},
+    {"suite": "Search", "case": "grep_matches_component_names", "status": "pass", "elapsed": 0.010006},
+    {"suite": "Search", "case": "grep_matches_values", "status": "pass", "elapsed": 0.012101},
+    {"suite": "Search", "case": "grep_with_component_filter", "status": "pass", "elapsed": 0.010824},
+    {"suite": "Search", "case": "grep_unknown_component", "status": "pass", "elapsed": 0.010922},
+    {"suite": "Search", "case": "grep_recur_nested_children", "status": "pass", "elapsed": 0.010729},
+    {"suite": "Search", "case": "output_capped_at_limit", "status": "pass", "elapsed": 0.012199},
+    {"suite": "Search", "case": "delete_session_while_iterating", "status": "pass", "elapsed": 0.011984}
+  ]
+}
