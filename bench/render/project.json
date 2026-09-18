@@ -16,7 +16,7 @@
                     "static_1_changed",
                     "static_100_changed",
                     "static_1000_changed",
-                "static_1000_changed_parent",
+                    "static_1000_changed_parent",
                     "dynamic_10k"
                 ]
             },
@@ -82,6 +82,12 @@
                 "id": "Frustum",
                 "benchcases": [
                     "cull_100k_cpu"
+                ]
+            },
+            {
+                "id": "HiZ",
+                "benchcases": [
+                    "project_100k"
                 ]
             },
             {
