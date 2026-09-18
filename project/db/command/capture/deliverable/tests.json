@@ -1,0 +1,20 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T07:59:58Z",
+  "pass": 10,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.059899,
+  "tests": [
+    {"suite": "Capture", "case": "prints_path_of_the_active_camera", "status": "pass", "elapsed": 0.018418},
+    {"suite": "Capture", "case": "path_uses_the_frame_number", "status": "pass", "elapsed": 0.019628},
+    {"suite": "Capture", "case": "named_camera", "status": "pass", "elapsed": 0.018546},
+    {"suite": "Capture", "case": "multiple_cameras", "status": "pass", "elapsed": 0.017645},
+    {"suite": "Capture", "case": "camera_relative_to_cwd", "status": "pass", "elapsed": 0.018504},
+    {"suite": "Capture", "case": "unknown_camera", "status": "pass", "elapsed": 0.018262},
+    {"suite": "Capture", "case": "entity_without_camera", "status": "pass", "elapsed": 0.018256},
+    {"suite": "Capture", "case": "without_active_camera", "status": "pass", "elapsed": 0.017611},
+    {"suite": "Capture", "case": "second_request_replaces_the_first", "status": "pass", "elapsed": 0.014558},
+    {"suite": "Capture", "case": "headless_run_writes_the_png", "status": "pass", "elapsed": 0.042089}
+  ]
+}

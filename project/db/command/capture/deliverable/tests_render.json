@@ -1,0 +1,18 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T07:59:58Z",
+  "pass": 8,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.019287,
+  "tests": [
+    {"suite": "Capture", "case": "component_consumed_by_extract", "status": "pass", "elapsed": 0.017433},
+    {"suite": "Capture", "case": "camera_becomes_the_view", "status": "pass", "elapsed": 0.017127},
+    {"suite": "Capture", "case": "two_cameras_over_two_frames", "status": "pass", "elapsed": 0.019134},
+    {"suite": "Capture", "case": "overrides_write_to_file", "status": "pass", "elapsed": 0.018298},
+    {"suite": "Capture", "case": "write_to_file_kept_without_component", "status": "pass", "elapsed": 0.016175},
+    {"suite": "Capture", "case": "active_camera_is_the_first_camera", "status": "pass", "elapsed": 0.017574},
+    {"suite": "Capture", "case": "active_camera_without_camera_entity", "status": "pass", "elapsed": 0.017476},
+    {"suite": "Capture", "case": "removed_after_a_deferred_extract", "status": "pass", "elapsed": 0.017800}
+  ]
+}
