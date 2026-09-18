@@ -43,7 +43,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow-x: hidden; }
 body {
   background: var(--bg); color: var(--ink);
   font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
@@ -86,8 +86,8 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .bar .done { background: var(--good); }
 .bar .active { background: var(--accent); }
 
-.content { overflow: auto; min-height: 0; position: relative; }
-.board { padding: 20px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-content: start; }
+.content { overflow: auto; overflow-x: hidden; min-height: 0; position: relative; }
+.board { padding: 20px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); align-content: start; }
 .card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
@@ -131,7 +131,7 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 .panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 90%); background: var(--surface);
   border-left: 1px solid var(--border); box-shadow: var(--shadow); overflow: auto; padding: 20px 24px;
-  transform: translateX(100%); transition: transform .18s ease; z-index: 5;
+  transform: translateX(101%); transition: transform .18s ease; z-index: 5;
 }
 .panel.open { transform: none; }
 .panel .close { position: absolute; top: 12px; right: 12px; }
@@ -214,6 +214,8 @@ td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color:
 }
 .tooltip b { display: block; }
 @media (max-width: 800px) {
+  header { flex-wrap: wrap; row-gap: 8px; }
+  header .meta { display: none; }
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   aside { border-right: 0; border-bottom: 1px solid var(--border); max-height: 200px; }
   .tiles { display: none; }
@@ -244,7 +246,7 @@ td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color:
     <div id="timeline" class="timeline" hidden></div>
     <div id="tests" class="page" hidden></div>
     <div id="benchmarks" class="page" hidden></div>
-    <div class="panel" id="panel"></div>
+    <div class="panel" id="panel" hidden></div>
   </div>
 </main>
 <div class="tooltip" id="tooltip"></div>
@@ -258,7 +260,7 @@ const VIEWS = ["board", "timeline", "tests", "benchmarks"];
 const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench" };
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
-let saveTimer = 0, restoring = false;
+let saveTimer = 0, panelTimer = 0, restoring = false;
 const ICONS = {
   complete: '<svg viewBox="0 0 10 10"><path d="M1.5 5.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   "in progress": '<svg viewBox="0 0 10 10"><path d="M2 1.5v7l6-3.5z" fill="currentColor"/></svg>',
@@ -441,12 +443,19 @@ function renderBoard() {
   restoreScroll(document.getElementById("content"), state.scroll.content);
 }
 
+function closePanel() {
+  const panel = document.getElementById("panel");
+  panel.classList.remove("open");
+  clearTimeout(panelTimer);
+  panelTimer = setTimeout(() => { if (!panel.classList.contains("open")) panel.hidden = true; }, 220);
+}
+
 function openPanel(path) {
   if (path !== state.item) state.scroll.panel = 0;
   state.item = path;
   const item = findItem(path);
   const panel = document.getElementById("panel");
-  if (!item) { panel.classList.remove("open"); return; }
+  if (!item) { closePanel(); return; }
   const deliverables = item.deliverables.map(d => {
     const img = /\.(png|jpe?g|gif|webp|svg)$/i.test(d.name);
     const t = d.tests;
@@ -468,10 +477,12 @@ function openPanel(path) {
     ${deliverables ? `<h2>Deliverables</h2><ul class="deliverables">${deliverables}</ul>` : ""}
     ${item.children.length ? `<h2>${item.children[0].level}s</h2><ul class="subtasks">${item.children.map(s => `
       <li class="${cls(s.status)}" data-item="${esc(s.path)}"><span class="dot ${cls(s.status)}"></span><span class="t">${esc(s.readme.title || s.name)}</span><time>${s.start_time ? dur(s.start_time, s.end_time) : ""}</time></li>`).join("")}</ul>` : ""}`;
+  clearTimeout(panelTimer);
+  if (panel.hidden) { panel.hidden = false; void panel.offsetWidth; }
   panel.classList.add("open");
   restoreScroll(panel, state.scroll.panel);
   saveSoon();
-  document.getElementById("close").onclick = () => { state.item = null; state.scroll.panel = 0; panel.classList.remove("open"); saveUi(); };
+  document.getElementById("close").onclick = () => { state.item = null; state.scroll.panel = 0; closePanel(); saveUi(); };
   panel.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
   const readme = item.deliverables.find(d => /readme\.md$/i.test(d.name));
   if (readme) fetch(readme.url).then(r => r.text()).then(t => {
@@ -794,7 +805,7 @@ function render() {
   else if (state.view === "tests") renderTests();
   else renderBenchmarks();
   if (state.item && (state.view === "board" || state.view === "timeline")) openPanel(state.item);
-  else document.getElementById("panel").classList.remove("open");
+  else closePanel();
   saveUi();
 }
 
