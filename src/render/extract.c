@@ -520,11 +520,7 @@ void box_render_extract_init(
             { .id = ecs_id(PointLight), .inout = EcsIn, .oper = EcsOr },
             { .id = ecs_id(SpotLight), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
-            { .id = DynamicTransform, .src.id = EcsSelf | EcsUp,
-                .oper = EcsOptional, .inout = EcsInOutNone },
-            { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp,
-                .oper = EcsOptional, .inout = EcsInOutNone }
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -541,11 +537,7 @@ void box_render_extract_init(
         .terms = {
             { .id = ecs_id(Emissive), .inout = EcsIn },
             { .id = ecs_id(RenderMesh), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = DynamicTransform, .src.id = EcsSelf | EcsUp,
-                .oper = EcsOptional, .inout = EcsInOutNone },
-            { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp,
-                .oper = EcsOptional, .inout = EcsInOutNone }
+            { .id = ecs_id(WorldTransform), .inout = EcsIn }
         },
         .cache_kind = EcsQueryCacheAuto
     });

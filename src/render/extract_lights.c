@@ -245,7 +245,7 @@ void box_render_extract_lights(
             has_planes = true;
         }
 
-        bool is_static = !ecs_field_is_set(&it, 3) && !ecs_field_is_set(&it, 4);
+        bool is_static = !box_render_is_dynamic(world, it.entities[0]);
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
             box_light_extract(&it, i, planes, is_static, p);

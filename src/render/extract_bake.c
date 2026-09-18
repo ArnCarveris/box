@@ -127,7 +127,7 @@ void box_render_extract_emitters(
 
     ecs_iter_t it = ecs_query_iter(world, state->emitters);
     while (ecs_query_next(&it)) {
-        if (ecs_field_is_set(&it, 3) || ecs_field_is_set(&it, 4)) {
+        if (box_render_is_dynamic(world, it.entities[0])) {
             continue;
         }
 
