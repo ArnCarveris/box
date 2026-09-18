@@ -36,11 +36,15 @@ KINDS = ("bug", "feature", "refactor")
 LEVELS = ("epic", "task", "subtask")
 TEST_STATUSES = ("pass", "fail", "empty")
 BENCH_METRICS = ("mean_ms", "p50_ms", "p99_ms", "max_ms", "fps")
-BENCH_FIELDS = ("entities", "static", "dynamic", "frames")
+BENCH_FIELDS = ("entities", "static", "dynamic", "frames", "drawn", "culled")
 MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", "min_ns", "max_ns",
                 "p95_ns", "p99_ns", "outliers", "iterations", "samples", "items_per_sec")
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
+TREND_POINTS = 12
+TEST_TREND = ("pass", "fail", "empty", "cases", "elapsed")
+MICRO_TREND = ("median_ns", "mean_ns", "cases")
+MICRO_REPORT_TREND = MICRO_TREND + ("project",)
 DONE_STATUSES = ("complete", "discarded")
 PRIORITY_DEFAULT = 100
 UNRANKED = 1 << 30
@@ -317,6 +321,25 @@ def deliverable_reports():
     return result
 
 
+def trend_tail(points, fields):
+    """Keep the last TREND_POINTS of a history as compact {time, field...} rows."""
+    tail = []
+    for point in points[-TREND_POINTS:]:
+        row = {"time": point.get("time")}
+        row.update({field: point.get(field) for field in fields})
+        tail.append(row)
+    return tail
+
+
+def test_status(row):
+    """Sum up a test level: a failure wins, then a pass, otherwise the level is empty."""
+    if number(row.get("fail")):
+        return "fail"
+    if number(row.get("pass")):
+        return "pass"
+    return "empty"
+
+
 def suite_rows(data):
     suites = {}
     for case in data.get("tests") or []:
@@ -402,7 +425,15 @@ def aggregate_tests():
                 })
             latest[key] = row
     suites = [latest[key] for key in sorted(latest)]
+    for suite in suites:
+        points = suite_history.get(suite["key"], [])
+        suite["reports"] = len(points)
+        suite["status"] = test_status(suite)
+        suite["trend"] = trend_tail(points, TEST_TREND)
 
+    by_project = {}
+    for report in reports:
+        by_project.setdefault(report["project"], []).append(report)
     projects = {}
     for suite in suites:
         row = projects.setdefault(suite["project"], {
@@ -413,13 +444,36 @@ def aggregate_tests():
         row["time"] = round(row["time"] + suite["time"], 6)
         for key in TEST_STATUSES:
             row[key] += suite[key]
+    for name, row in projects.items():
+        history = by_project.get(name, [])
+        last = history[-1] if history else {}
+        row["reports"] = len(history)
+        row["latest"] = last.get("time")
+        row["item"] = last.get("item")
+        row["url"] = last.get("url")
+        row["status"] = test_status(row)
+        row["trend"] = trend_tail(history, TEST_TREND)
+    project_rows = [projects[name] for name in sorted(projects)]
+    overall = {
+        "projects": len(project_rows),
+        "suites": len(suites),
+        "reports": len(reports),
+        "cases": sum(row["cases"] for row in project_rows),
+        "time": round(sum(row["time"] for row in project_rows), 6),
+        "latest": reports[-1]["time"] if reports else None,
+        "trend": trend_tail(reports, TEST_TREND),
+    }
+    for key in TEST_STATUSES:
+        overall[key] = sum(row[key] for row in project_rows)
+    overall["status"] = test_status(overall)
     return {
         "generated": now(),
+        "overall": overall,
         "reports": reports,
         "suites": suites,
         "suite_history": suite_history,
         "case_history": case_history,
-        "projects": [projects[name] for name in sorted(projects)],
+        "projects": project_rows,
     }
 
 
@@ -487,6 +541,29 @@ def micro_case_row(run):
     return row
 
 
+def micro_report_points(micro):
+    """Fold the case runs of every benchmark report into one point per project, oldest first."""
+    points = {}
+    for run in micro:
+        point = points.setdefault((run["project"], run["file"]), {
+            "time": run["time"], "time_source": run["time_source"], "item": run["item"], "url": run["url"],
+            "project": run["project"], "file": run["file"], "cases": 0, "suites": 0,
+            "median_ns": 0.0, "mean_ns": 0.0, "_suites": [],
+        })
+        point["cases"] += 1
+        point["median_ns"] = round(point["median_ns"] + number(run.get("median_ns")), 3)
+        point["mean_ns"] = round(point["mean_ns"] + number(run.get("mean_ns")), 3)
+        if run["suite"] not in point["_suites"]:
+            point["_suites"].append(run["suite"])
+    history = {}
+    for point in points.values():
+        point["suites"] = len(point.pop("_suites"))
+        history.setdefault(point["project"], []).append(point)
+    for rows in history.values():
+        rows.sort(key=lambda p: time_value(p["time"]))
+    return history
+
+
 def micro_aggregates(micro):
     reports = {}
     case_history = {}
@@ -515,20 +592,44 @@ def micro_aggregates(micro):
                            cases_detail=[micro_case_row(row) for row in rows])
     for points in list(suite_history.values()) + list(case_history.values()):
         points.sort(key=lambda p: time_value(p["time"]))
+    for key, row in latest.items():
+        points = suite_history.get(key, [])
+        row["reports"] = len(points)
+        row["trend"] = trend_tail(points, MICRO_TREND)
+    project_history = micro_report_points(micro)
     projects = {}
     for key in sorted(latest):
         row = latest[key]
         project = projects.setdefault(row["project"], {
-            "project": row["project"], "suites": 0, "cases": 0, "median_ns": 0.0,
+            "project": row["project"], "suites": 0, "cases": 0, "median_ns": 0.0, "mean_ns": 0.0,
             "time": row["time"], "item": row["item"], "url": row["url"],
         })
         project["suites"] += 1
         project["cases"] += row["cases"]
         project["median_ns"] = round(project["median_ns"] + row["median_ns"], 3)
+        project["mean_ns"] = round(project["mean_ns"] + row["mean_ns"], 3)
         if time_value(row["time"]) >= time_value(project["time"]):
             project.update({"time": row["time"], "item": row["item"], "url": row["url"]})
+    for name, project in projects.items():
+        points = project_history.get(name, [])
+        project["reports"] = len(points)
+        project["latest"] = project["time"]
+        project["trend"] = trend_tail(points, MICRO_REPORT_TREND)
+    project_rows = [projects[name] for name in sorted(projects)]
+    runs = sorted((point for points in project_history.values() for point in points),
+                  key=lambda p: time_value(p["time"]))
     return {
-        "micro_projects": [projects[name] for name in sorted(projects)],
+        "micro_overall": {
+            "projects": len(project_rows),
+            "suites": len(latest),
+            "cases": sum(row["cases"] for row in project_rows),
+            "reports": len(runs),
+            "median_ns": round(sum(row["median_ns"] for row in project_rows), 3),
+            "mean_ns": round(sum(row["mean_ns"] for row in project_rows), 3),
+            "latest": runs[-1]["time"] if runs else None,
+            "trend": trend_tail(runs, MICRO_REPORT_TREND),
+        },
+        "micro_projects": project_rows,
         "micro_suites": [latest[key] for key in sorted(latest)],
         "micro_suite_history": suite_history,
         "micro_case_history": case_history,
