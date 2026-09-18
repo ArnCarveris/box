@@ -157,6 +157,43 @@ static void box_render_color(
     }
 }
 
+/** Resolve a texture slot entity to the handle of its uploaded texture.
+ *
+ * @param world The world
+ * @param slot The texture entity, 0 for none
+ * @return The texture handle, 0 when the slot binds no texture
+ */
+static uint32_t box_render_texture_of(
+    ecs_world_t *world,
+    ecs_entity_t slot)
+{
+    uint32_t result = 0;
+    if (slot && ecs_is_alive(world, slot)) {
+        const RenderTexture *rt = ecs_get(world, slot, RenderTexture);
+        result = rt ? rt->handle : 0;
+    }
+
+    return result;
+}
+
+/** Write the texture handles of the PBR slots into instance data.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out The instance to fill
+ */
+static void box_render_fill_textures(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_instance_t *out)
+{
+    const PbrTextures *tex = ecs_get(world, e, PbrTextures);
+    out->textures[0] = tex ? box_render_texture_of(world, tex->albedo) : 0;
+    out->textures[1] = tex ? box_render_texture_of(world, tex->emissive) : 0;
+    out->textures[2] = tex ? box_render_texture_of(world, tex->roughness) : 0;
+    out->textures[3] = tex ? box_render_texture_of(world, tex->normal) : 0;
+}
+
 void box_render_fill_instance(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -184,13 +221,15 @@ void box_render_fill_instance(
     out->emissive[0] = emissive ? box_srgb_to_linear(emissive->color.r) * strength : 0.0f;
     out->emissive[1] = emissive ? box_srgb_to_linear(emissive->color.g) * strength : 0.0f;
     out->emissive[2] = emissive ? box_srgb_to_linear(emissive->color.b) * strength : 0.0f;
-    out->emissive[3] = 0.0f;
+    out->emissive[3] = strength;
 
     const PbrMaterial *pbr = ecs_get(world, e, PbrMaterial);
     out->params[0] = pbr ? pbr->metallic : 0.0f;
     out->params[1] = pbr ? pbr->roughness : 0.5f;
     out->params[2] = baked ? 1.0f : 0.0f;
     out->params[3] = 0.0f;
+
+    box_render_fill_textures(world, e, out);
 }
 
 void box_render_instance_init(
@@ -203,6 +242,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(ActualTint));
     box_render_watch(world, ecs_id(PbrMaterial));
     box_render_watch(world, ecs_id(Emissive));
+    box_render_watch(world, ecs_id(PbrTextures));
 
     ecs_observer(world, {
         .query.terms = {{ .id = DynamicTransform }},

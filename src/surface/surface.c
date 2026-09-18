@@ -30,6 +30,7 @@ static void box_surface_open(
         .width = (uint32_t)s->width,
         .height = (uint32_t)s->height,
         .vsync = s->vsync,
+        .anisotropy = s->anisotropy ? (uint32_t)s->anisotropy : BOX_ANISOTROPY_DEFAULT,
 #ifndef BOX_PLATFORM_WEB
         .threaded = true
 #endif
@@ -255,6 +256,10 @@ void BoxSurfaceImport(
     ECS_MODULE(world, BoxSurface);
     ECS_IMPORT(world, BoxCore);
 
+    ECS_META_COMPONENT(world, Anisotropy);
+    ECS_META_COMPONENT(world, TextureQuality);
+    ECS_META_COMPONENT(world, TextureCompression);
+    ECS_META_COMPONENT(world, TextureCacheMode);
     ECS_META_COMPONENT(world, Surface);
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
 

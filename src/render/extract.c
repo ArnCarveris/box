@@ -400,6 +400,7 @@ void box_render_extract(
     RenderState *state = box_render_state(world);
     box_render_extract_bake(world, state, p);
     box_extract_meshes(state, p);
+    box_render_extract_textures(state, p);
 
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->dirty); i ++) {

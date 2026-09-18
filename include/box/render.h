@@ -26,6 +26,13 @@ ECS_STRUCT(RenderMesh, {
     vec3 bounds_max;  /**< Local bounds maximum of the unscaled mesh */
 });
 
+/** Texture handle an image entity resolved to, written by texture modules */
+ECS_STRUCT(RenderTexture, {
+    uint32_t handle;  /**< Renderer texture handle, its size class in the high byte */
+    int32_t width;    /**< Width in pixels of the uploaded texture */
+    int32_t height;   /**< Height in pixels of the uploaded texture */
+});
+
 /** Register the box.render module.
  *
  * @param world The world

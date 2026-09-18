@@ -23,6 +23,7 @@ typedef struct box_renderer_desc_t {
     const char *canvas_selector;  /**< HTML canvas selector on web, NULL for offscreen */
     uint32_t width;               /**< Initial target width in pixels */
     uint32_t height;              /**< Initial target height in pixels */
+    uint32_t anisotropy;          /**< Anisotropic samples of the texture samplers */
     bool vsync;                   /**< Present with vertical sync */
     bool threaded;                /**< Run on a dedicated thread */
 } box_renderer_desc_t;

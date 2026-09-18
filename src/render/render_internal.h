@@ -30,6 +30,10 @@ typedef struct RenderInstance {
 typedef struct RenderState {
     ecs_vec_t batches;        /**< box_batch_t indexed by mesh handle */
     ecs_vec_t pending_meshes; /**< box_mesh_cmd_t waiting for the next packet */
+    ecs_vec_t pending_textures; /**< box_texture_cmd_t waiting for the next packet */
+    ecs_vec_t dead_textures;  /**< uint32_t texture handles waiting for the next packet */
+    ecs_vec_t free_layers[BOX_TEXTURE_CLASSES]; /**< uint32_t free layers per size class */
+    uint32_t layer_count[BOX_TEXTURE_CLASSES];  /**< Layers handed out per size class */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
@@ -65,6 +69,52 @@ RenderState* box_render_state(
 uint32_t box_render_mesh_create(
     ecs_world_t *world,
     const box_mesh_data_t *data);
+
+/** Upload a texture with the next packet and return its handle.
+ *
+ * The pixel array holds the whole RGBA8 mip chain of a square texture and is
+ * handed to the renderer, which frees it after the upload. Passing a handle of
+ * a matching size class replaces the contents of that handle instead of
+ * allocating a new one.
+ *
+ * @param world The world
+ * @param handle Handle to replace, 0 to allocate a new one
+ * @param size Edge length in pixels, the size of a texture class
+ * @param pixels The mip chain, ownership moves to the renderer
+ * @param srgb Pixels are display encoded
+ * @return The texture handle
+ */
+uint32_t box_render_texture_create(
+    ecs_world_t *world,
+    uint32_t handle,
+    uint32_t size,
+    uint8_t *pixels,
+    bool srgb);
+
+/** Release a texture handle and queue its destroy command.
+ *
+ * @param world The world
+ * @param handle The texture handle
+ */
+void box_render_texture_destroy(
+    ecs_world_t *world,
+    uint32_t handle);
+
+/** Register the observer that frees the handle of a removed RenderTexture.
+ *
+ * @param world The world
+ */
+void box_render_texture_init(
+    ecs_world_t *world);
+
+/** Move the pending texture commands of the registry into a packet.
+ *
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_textures(
+    RenderState *state,
+    box_packet_t *p);
 
 /** Queue an entity for static extraction.
  *

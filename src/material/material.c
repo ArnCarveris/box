@@ -76,15 +76,18 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, ActualTint);
     ECS_META_COMPONENT(world, PbrMaterial);
     ECS_META_COMPONENT(world, Emissive);
+    ECS_META_COMPONENT(world, PbrTextures);
     ECS_TAG_DEFINE(world, DynamicMaterial);
 
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_ctor });
+    ecs_set_hooks(world, PbrTextures, { .ctor = flecs_default_ctor });
 
     ecs_add_pair(world, ecs_id(Rgb), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Tint), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrMaterial), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Emissive), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, DynamicMaterial, EcsOnInstantiate, EcsInherit);
 
     box_tint_init(world);

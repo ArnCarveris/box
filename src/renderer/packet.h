@@ -27,12 +27,25 @@
 /** Light type of a cone light */
 #define BOX_LIGHT_SPOT (1)
 
+/** Texture size classes, each a 2D array texture of one edge length */
+#define BOX_TEXTURE_CLASSES (4)
+
+/** Edge length of the smallest texture size class */
+#define BOX_TEXTURE_MIN_SIZE (256)
+
+/** Edge length of the largest texture size class */
+#define BOX_TEXTURE_MAX_SIZE (BOX_TEXTURE_MIN_SIZE << (BOX_TEXTURE_CLASSES - 1))
+
+/** Texture slots a material binds: albedo, emissive, roughness and normal */
+#define BOX_TEXTURE_SLOTS (4)
+
 /** Per instance data as laid out in GPU instance buffers */
 typedef struct box_instance_t {
     float transform[12];   /**< Rows of the 3x4 world matrix, each x y z w */
     float color[4];        /**< Linear albedo rgb and opacity */
-    float emissive[4];     /**< Linear emissive rgb, w unused */
-    float params[4];       /**< Metallic, roughness, unused, unused */
+    float emissive[4];     /**< Linear emissive rgb, w is the emission strength */
+    float params[4];       /**< Metallic, roughness, baked, unused */
+    uint32_t textures[BOX_TEXTURE_SLOTS]; /**< Texture handle per slot, 0 for none */
 } box_instance_t;
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
@@ -107,6 +120,101 @@ typedef struct box_mesh_cmd_t {
     float bounds_max[3];    /**< Local bounds maximum of the unscaled mesh */
 } box_mesh_cmd_t;
 
+/** Texture to upload, the renderer takes ownership of the pixel array */
+typedef struct box_texture_cmd_t {
+    uint32_t handle;   /**< Texture handle, size class in the high byte */
+    uint32_t width;    /**< Width in pixels, the edge length of its size class */
+    uint32_t height;   /**< Height in pixels, the edge length of its size class */
+    uint32_t mips;     /**< Mip levels in the pixel array, level 0 first */
+    uint32_t srgb;     /**< Pixels are display encoded */
+    uint8_t *pixels;   /**< RGBA8 mip chain of the texture */
+} box_texture_cmd_t;
+
+/** Edge length of a texture size class.
+ *
+ * @param cls The size class
+ * @return Edge length in pixels
+ */
+static inline uint32_t box_texture_class_size(
+    uint32_t cls)
+{
+    return (uint32_t)BOX_TEXTURE_MIN_SIZE << cls;
+}
+
+/** Build a texture handle out of a size class and a layer.
+ *
+ * @param cls The size class
+ * @param layer The array layer inside the class
+ * @return The handle, never 0
+ */
+static inline uint32_t box_texture_handle(
+    uint32_t cls,
+    uint32_t layer)
+{
+    return (cls << 24) | (layer + 1);
+}
+
+/** Size class of a texture handle.
+ *
+ * @param handle The handle
+ * @return The size class
+ */
+static inline uint32_t box_texture_class(
+    uint32_t handle)
+{
+    return handle >> 24;
+}
+
+/** Array layer of a texture handle.
+ *
+ * @param handle The handle
+ * @return The layer inside its size class
+ */
+static inline uint32_t box_texture_layer(
+    uint32_t handle)
+{
+    return (handle & 0xFFFFFF) - 1;
+}
+
+/** Mip levels of a square texture, down to a single texel.
+ *
+ * @param size Edge length in pixels
+ * @return The number of mip levels
+ */
+static inline uint32_t box_texture_mips(
+    uint32_t size)
+{
+    uint32_t result = 1;
+    while (size > 1) {
+        size >>= 1;
+        result ++;
+    }
+
+    return result;
+}
+
+/** Bytes an RGBA8 mip chain of a square texture occupies.
+ *
+ * @param size Edge length in pixels
+ * @return The byte count
+ */
+static inline size_t box_texture_bytes(
+    uint32_t size)
+{
+    size_t result = 0;
+    uint32_t level = size;
+    while (level >= 1) {
+        result += (size_t)level * level * 4;
+        if (level == 1) {
+            break;
+        }
+
+        level >>= 1;
+    }
+
+    return result;
+}
+
 /** Instance data written to a slot of a mesh's static buffer */
 typedef struct box_static_update_t {
     uint32_t mesh;          /**< Mesh handle */
@@ -139,6 +247,8 @@ typedef struct box_packet_t {
     bool has_view;                           /**< A camera was extracted */
     box_vec_t mesh_create;                   /**< box_mesh_cmd_t */
     box_vec_t mesh_destroy;                  /**< uint32_t handles */
+    box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
+    box_vec_t texture_destroy;               /**< uint32_t handles */
     box_vec_t static_updates;                /**< box_static_update_t */
     box_vec_t static_counts;                 /**< box_static_count_t */
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
@@ -159,6 +269,8 @@ static inline void box_packet_init(
     memset(p, 0, sizeof(box_packet_t));
     box_vec_init(&p->mesh_create, sizeof(box_mesh_cmd_t));
     box_vec_init(&p->mesh_destroy, sizeof(uint32_t));
+    box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
+    box_vec_init(&p->texture_destroy, sizeof(uint32_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
@@ -183,6 +295,8 @@ static inline void box_packet_reset(
     p->has_view = false;
     box_vec_clear(&p->mesh_create);
     box_vec_clear(&p->mesh_destroy);
+    box_vec_clear(&p->texture_create);
+    box_vec_clear(&p->texture_destroy);
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->dynamic_batches);
@@ -201,6 +315,8 @@ static inline void box_packet_fini(
 {
     box_vec_fini(&p->mesh_create);
     box_vec_fini(&p->mesh_destroy);
+    box_vec_fini(&p->texture_create);
+    box_vec_fini(&p->texture_destroy);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->dynamic_batches);

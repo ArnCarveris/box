@@ -60,6 +60,14 @@ ECS_STRUCT(Emissive, {
     Rgb color;      /**< Emission color */
 });
 
+/** Texture entities for each PBR layer, 0 for none, inherited by instances */
+ECS_STRUCT(PbrTextures, {
+    ecs_entity_t albedo;    /**< Multiplied with the base color, display encoded */
+    ecs_entity_t emissive;  /**< Added, scaled by the emission strength */
+    ecs_entity_t roughness; /**< Multiplied with the roughness, green channel */
+    ecs_entity_t normal;    /**< Tangent space normal perturbation */
+});
+
 /** Material properties may change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
 

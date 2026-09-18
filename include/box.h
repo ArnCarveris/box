@@ -19,6 +19,7 @@
 #include "box/material.h"
 #include "box/geometry.h"
 #include "box/render.h"
+#include "box/texture.h"
 #include "box/movement.h"
 #include "box/surface.h"
 #include "box/command.h"
