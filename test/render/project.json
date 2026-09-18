@@ -230,6 +230,29 @@
                     "angular_velocity_integrates_rotation",
                     "velocity_marks_dynamic"
                 ]
+            },
+            {
+                "id": "Blending",
+                "testcases": [
+                    "opaque_entity_stays_in_its_batch",
+                    "blend_mode_moves_to_the_sorted_list",
+                    "opacity_moves_to_the_sorted_list",
+                    "full_opacity_stays_in_its_batch",
+                    "tint_alpha_moves_to_the_sorted_list",
+                    "translucent_opaque_mode_blends_as_alpha",
+                    "back_face_mode_moves_to_the_sorted_list",
+                    "back_face_modes_reach_the_packet",
+                    "every_blend_mode_reaches_the_packet",
+                    "sorted_back_to_front",
+                    "static_entity_leaves_and_regains_its_slot",
+                    "sorted_entity_extracted_every_frame",
+                    "dynamic_transparent_leaves_the_dynamic_batches",
+                    "deleted_entity_leaves_the_sorted_list",
+                    "prefab_blend_mode_is_inherited",
+                    "opaque_scene_packet_is_unchanged"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
