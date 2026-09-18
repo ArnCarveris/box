@@ -37,6 +37,19 @@ ECS_STRUCT(SpotLight, {
     float outer_angle; /**< Zero intensity cone half angle */
 });
 
+/** Environment light that lights the scene from every direction, a singleton
+ *
+ * The source is reserved for the cubemap texture or sky entity that later
+ * epics render the environment from; it must be 0 while the environment is the
+ * sky and ground gradient of the two colors.
+ */
+ECS_STRUCT(EnvironmentLight, {
+    rgb sky_color;       /**< Color of the upper hemisphere */
+    rgb ground_color;    /**< Color of the lower hemisphere */
+    float intensity;     /**< Radiance scale of both colors, zero takes 1 */
+    ecs_entity_t source; /**< Reserved for a cubemap or sky entity, 0 for now */
+});
+
 /** Froxel grid the renderer assigns point and spot lights to, a singleton */
 ECS_STRUCT(ClusterSettings, {
     int32_t x;          /**< Clusters across the view, default 16 */
@@ -56,6 +69,15 @@ ECS_STRUCT(ClusterSettings, {
 
 /** Default lights stored per cluster */
 #define BOX_CLUSTER_MAX_LIGHTS (64)
+
+/** Sky color channel of the environment light a world without one gets */
+#define BOX_ENV_SKY (255)
+
+/** Ground color channel of the environment light a world without one gets */
+#define BOX_ENV_GROUND (128)
+
+/** Intensity of the environment light a world without one gets */
+#define BOX_ENV_INTENSITY (0.25f)
 
 /** Register the box.light module.
  *
