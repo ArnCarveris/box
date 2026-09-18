@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T23:05:07.430+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "project_tool/epic_tool"
+  ]
+}
