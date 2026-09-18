@@ -1,0 +1,23 @@
+{
+  "kind": "command",
+  "results": [
+    {
+      "scene": "test/integration/command/script.flecs",
+      "status": "pass",
+      "log": "test/integration/out/script.log",
+      "expected": "test/integration/command/script.expected"
+    },
+    {
+      "scene": "test/integration/command/search.flecs",
+      "status": "pass",
+      "log": "test/integration/out/search.log",
+      "expected": "test/integration/command/search.expected"
+    },
+    {
+      "scene": "test/integration/command/shell.flecs",
+      "status": "pass",
+      "log": "test/integration/out/shell.log",
+      "expected": "test/integration/command/shell.expected"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "visual",
+  "results": [
+    {
+      "scene": "test/integration/visual/primitives.flecs",
+      "status": "pass",
+      "image": "test/integration/out/primitives.png"
+    }
+  ]
+}
