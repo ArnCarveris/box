@@ -475,6 +475,8 @@ static void box_view_cull(
     v->cull_enabled = !s || s->enabled ? 1u : 0u;
     v->cull_threshold = s && s->gpu_threshold > 0 ?
         (uint32_t)s->gpu_threshold : BOX_CULL_GPU_THRESHOLD;
+    v->occlusion = v->cull_enabled && (!s || s->occlusion) ? 1u : 0u;
+    v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
 /** Fill one view of the packet from its view entity and its camera.

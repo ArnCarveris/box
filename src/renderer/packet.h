@@ -218,6 +218,8 @@ typedef struct box_view_t {
     uint32_t dynamic_count; /**< Dynamic batches of the view */
     uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
     uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
+    uint32_t occlusion;     /**< Compute culled static batches are tested against a depth pyramid */
+    uint32_t hiz_levels;    /**< Levels of that pyramid, 0 for the whole chain */
     uint32_t strict_layers; /**< A view that lists layers draws its members only */
     uint32_t shadow_resolution; /**< Edge of one cascade of its shadow map in texels */
     float shadow_bounds[BOX_SHADOW_CASCADE_MAX * 4]; /**< Sphere of a cascade, center and radius */

@@ -141,6 +141,7 @@ void box_frame_init(
     box_environment_init(r);
     box_bake_init(r);
     box_cull_init(r);
+    box_hiz_init(r);
 
     r->mesh_shader = box_layers_shader(r);
 
@@ -245,6 +246,78 @@ static void box_frame_sorted(
     wgpuRenderPassEncoderRelease(pass);
 }
 
+/** Record and submit the occlusion pass that keeps what the previous frame saw.
+ *
+ * The dispatch goes into a command buffer of its own because it samples the
+ * depth pyramid that the passes of this frame render into later on, and a
+ * texture read that a command buffer records before the render pass that fills
+ * it reads nothing.
+ *
+ * @param r The renderer
+ */
+static void box_frame_first_pass(
+    box_renderer_t *r)
+{
+    if (!r->v->hiz_active) {
+        goto done;
+    }
+
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
+    box_hiz_dispatch(r, encoder, BOX_HIZ_PASS_VISIBLE);
+    WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
+    wgpuCommandBufferRelease(cmd);
+    wgpuCommandEncoderRelease(encoder);
+done:
+    return;
+}
+
+/** Build the depth pyramid of the current view and draw what it uncovers.
+ *
+ * The first pass of the view drew the instances the previous frame drew, so its
+ * depth target is what the pyramid is built from; the occlusion pass then tests
+ * the instances that pass left out and this pass draws the ones it accepted
+ * over the same color and depth targets.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param attachment The render target view the view draws into
+ */
+static void box_frame_uncovered(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView attachment)
+{
+    box_hiz_build(r, encoder);
+    box_hiz_dispatch(r, encoder, BOX_HIZ_PASS_NEW);
+
+    WGPURenderPassColorAttachment color = {
+        .view = attachment,
+        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+        .loadOp = WGPULoadOp_Load,
+        .storeOp = WGPUStoreOp_Store
+    };
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = r->v->depth_view,
+        .depthLoadOp = WGPULoadOp_Load,
+        .depthStoreOp = WGPUStoreOp_Store
+    };
+    WGPURenderPassDescriptor desc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = &color,
+        .depthStencilAttachment = &depth
+    };
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
+    box_cull_draw(r, pass, BOX_HIZ_PASS_NEW);
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+}
+
 /** Check whether an earlier view of the frame already drew into a target.
  *
  * @param p The packet
@@ -301,6 +374,7 @@ static void box_frame_view(
     box_environment_update(r, view, encoder);
     box_lights_dispatch(r, view, encoder);
     box_cull_dispatch(r, encoder);
+    box_frame_first_pass(r);
     box_shadow_dispatch(r, encoder);
     box_shadow_record(r, view, encoder);
     if (!index) {
@@ -334,13 +408,17 @@ static void box_frame_view(
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
     if (r->v->culled) {
-        box_cull_draw(r, pass);
+        box_cull_draw(r, pass, BOX_HIZ_PASS_VISIBLE);
     } else {
         box_scene_draw(r, view, p, pass);
     }
 
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
+
+    if (r->v->hiz_active) {
+        box_frame_uncovered(r, encoder, attachment);
+    }
 
     if (view->transparent_count) {
         box_frame_sorted(r, view, p, encoder, target, attachment);

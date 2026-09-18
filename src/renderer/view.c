@@ -47,10 +47,11 @@ static void box_view_uniform(
 static void box_view_depth(
     box_renderer_t *r)
 {
+    if (r->v->depth_sample) wgpuTextureViewRelease(r->v->depth_sample);
     if (r->v->depth_view) wgpuTextureViewRelease(r->v->depth_view);
     if (r->v->depth) wgpuTextureRelease(r->v->depth);
     WGPUTextureDescriptor depth_desc = {
-        .usage = WGPUTextureUsage_RenderAttachment,
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
         .dimension = WGPUTextureDimension_2D,
         .size = { r->v->width, r->v->height, 1 },
         .format = WGPUTextureFormat_Depth32Float,
@@ -59,6 +60,8 @@ static void box_view_depth(
     };
     r->v->depth = wgpuDeviceCreateTexture(r->device, &depth_desc);
     r->v->depth_view = wgpuTextureCreateView(r->v->depth, NULL);
+    r->v->depth_sample = wgpuTextureCreateView(r->v->depth, NULL);
+    box_hiz_resize(r->v);
 }
 
 void box_view_select(
@@ -86,6 +89,7 @@ void box_view_prepare(
         box_vec_init(&r->v->shadow_draws, sizeof(box_shadow_draw_t));
         box_vec_init(&r->v->shadow_staging, sizeof(box_instance_t));
         box_vec_init(&r->v->shadow_culls, sizeof(box_gpu_cull_t));
+        box_vec_init(&r->v->hiz_meshes, sizeof(box_hiz_mesh_t));
     }
 
     if (r->v->width != view->width || r->v->height != view->height) {
@@ -102,6 +106,7 @@ void box_view_release(
     box_transparent_view_fini(v);
     box_lights_view_fini(v);
     box_cull_view_fini(v);
+    box_hiz_view_fini(v);
     box_shadow_view_fini(v);
     box_vec_fini(&v->shadow_draws);
     box_vec_fini(&v->shadow_staging);
@@ -109,6 +114,7 @@ void box_view_release(
     if (v->env_group) wgpuBindGroupRelease(v->env_group);
     if (v->view_group) wgpuBindGroupRelease(v->view_group);
     if (v->view_buffer) wgpuBufferRelease(v->view_buffer);
+    if (v->depth_sample) wgpuTextureViewRelease(v->depth_sample);
     if (v->depth_view) wgpuTextureViewRelease(v->depth_view);
     if (v->depth) wgpuTextureRelease(v->depth);
     memset(v, 0, sizeof(box_gpu_view_t));

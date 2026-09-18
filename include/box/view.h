@@ -119,14 +119,19 @@ ECS_STRUCT(ShadowSettings, {
 /** Fraction of the last cascade the shadows fade out over */
 #define BOX_SHADOW_FADE (0.2f)
 
-/** Frustum culling of a view, with the singleton as its default */
+/** Frustum and occlusion culling of a view, with the singleton as its default */
 ECS_STRUCT(CullSettings, {
     bool enabled;          /**< Instances outside the view frustum are skipped, default true */
     int32_t gpu_threshold; /**< Static instances a batch needs before a compute pass culls it */
+    bool occlusion;        /**< Compute culled batches are occlusion culled, default true */
+    int32_t hiz_levels;    /**< Levels of the depth pyramid, 0 for the whole chain */
 });
 
 /** Static instances a batch needs before the renderer culls it in a compute pass */
 #define BOX_CULL_GPU_THRESHOLD (2048)
+
+/** Levels of the depth pyramid of a view, zero being the whole chain down to one texel */
+#define BOX_CULL_HIZ_LEVELS (0)
 
 /** Red channel of the clear color a view starts out with */
 #define BOX_VIEW_CLEAR_R (39)

@@ -42,7 +42,7 @@ static void box_view_ctor(
     }
 }
 
-/** CullSettings constructor: culling is on and the compute pass takes large batches.
+/** CullSettings constructor: culling and occlusion are on, large batches go to the GPU.
  *
  * @param ptr The components
  * @param count Number of components
@@ -59,6 +59,8 @@ static void box_cull_ctor(
     for (i = 0; i < count; i ++) {
         s[i].enabled = true;
         s[i].gpu_threshold = BOX_CULL_GPU_THRESHOLD;
+        s[i].occlusion = true;
+        s[i].hiz_levels = BOX_CULL_HIZ_LEVELS;
     }
 }
 

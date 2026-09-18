@@ -7,6 +7,11 @@
  * CPU, out of the instance mirror and the packet; a static batch above the
  * threshold of the view is culled by a compute pass that appends the instances
  * it keeps and counts them into indexed indirect draw arguments.
+ *
+ * A view that also occlusion culls sends its compute culled batches through the
+ * two pass scheme of hiz.c instead: the frustum test then runs in the occlusion
+ * pass, which adds the depth pyramid test and splits the batch into the draw of
+ * what the previous frame saw and the draw of what the pyramid uncovered.
  */
 
 #include "renderer_internal.h"
@@ -120,6 +125,7 @@ void box_cull_frame(
     r->cull_drawn = 0;
     r->cull_culled = 0;
     r->cull_tested = 0;
+    box_hiz_frame(r, p);
 
     uint32_t jobs = (p->views.count + 1) * (r->meshes.count + 1);
     if (jobs <= r->cull_uniform_capacity) {
@@ -286,6 +292,7 @@ static void box_cull_static_cpu(
     draw->args = BOX_CULL_NO_ARGS;
     draw->baked = 1;
     draw->stage = r->v->staging.count;
+    draw->pass = BOX_HIZ_PASS_VISIBLE;
     draw->src = NULL;
 
     const box_instance_t *mirror = box_vec_at(&m->mirror, 0);
@@ -313,16 +320,19 @@ done:
     r->cull_drawn += draw->count;
 }
 
-/** Add the compute culled draw of one static mesh and the dispatches it needs.
+/** Add one compute culled draw of a mesh to the draw list of the view.
  *
  * @param r The renderer
  * @param mesh The mesh handle
+ * @param pass One of the BOX_HIZ_PASS constants
+ * @return Index of the draw in the draw list
  */
-static void box_cull_static_gpu(
+static uint32_t box_cull_indirect(
     box_renderer_t *r,
-    uint32_t mesh)
+    uint32_t mesh,
+    uint32_t pass)
 {
-    uint32_t index = r->v->draws.count;
+    uint32_t result = r->v->draws.count;
     box_cull_draw_t *draw = box_vec_push(&r->v->draws);
     draw->mesh = mesh;
     draw->first = 0;
@@ -330,21 +340,51 @@ static void box_cull_static_gpu(
     draw->limit = 0;
     draw->args = r->cull_arg_count * BOX_CULL_ARG_WORDS * (uint32_t)sizeof(uint32_t);
     draw->baked = 1;
+    draw->stage = 0;
+    draw->pass = pass;
+    draw->src = NULL;
+    r->cull_arg_count ++;
+
+    return result;
+}
+
+/** Add the compute culled draws of one static mesh and the dispatches they need.
+ *
+ * A view that occlusion culls gets a second draw for the instances its pyramid
+ * uncovers, whose dispatch runs after the first draw filled the depth target.
+ *
+ * @param r The renderer
+ * @param mesh The mesh handle
+ * @param occlusion The view tests the mesh against its depth pyramid
+ */
+static void box_cull_static_gpu(
+    box_renderer_t *r,
+    uint32_t mesh,
+    bool occlusion)
+{
+    uint32_t index = box_cull_indirect(r, mesh, BOX_HIZ_PASS_VISIBLE);
+    uint32_t second = occlusion ? box_cull_indirect(r, mesh, BOX_HIZ_PASS_NEW) : index;
 
     uint32_t i;
     for (i = 0; i < r->cull_ranges.count; i ++) {
         box_cull_range_t *range = box_vec_at(&r->cull_ranges, i);
-        box_cull_job_t *job = box_vec_push(&r->cull_jobs);
-        job->mesh = mesh;
-        job->first = range->first;
-        job->count = range->count;
-        job->slot = r->cull_slots ++;
-        job->draw = index;
-        draw = box_vec_at(&r->v->draws, index);
-        draw->limit += range->count;
+        if (occlusion) {
+            box_hiz_job(r, mesh, range->first, range->count, index, BOX_HIZ_PASS_VISIBLE);
+            box_hiz_job(r, mesh, range->first, range->count, second, BOX_HIZ_PASS_NEW);
+            ((box_cull_draw_t*)box_vec_at(&r->v->draws, second))->limit += range->count;
+        } else {
+            box_cull_job_t *job = box_vec_push(&r->cull_jobs);
+            job->mesh = mesh;
+            job->first = range->first;
+            job->count = range->count;
+            job->slot = r->cull_slots ++;
+            job->draw = index;
+            job->pass = BOX_HIZ_PASS_VISIBLE;
+        }
+
+        ((box_cull_draw_t*)box_vec_at(&r->v->draws, index))->limit += range->count;
     }
 
-    r->cull_arg_count ++;
     r->cull_tested += ((box_cull_draw_t*)box_vec_at(&r->v->draws, index))->limit;
 }
 
@@ -376,6 +416,7 @@ static void box_cull_dynamic(
         draw->args = BOX_CULL_NO_ARGS;
         draw->baked = 0;
         draw->stage = r->v->staging.count;
+        draw->pass = BOX_HIZ_PASS_VISIBLE;
         draw->src = NULL;
         draw->count = box_cull_test(f, src, b->count);
         if (draw->count == b->count) {
@@ -524,7 +565,9 @@ void box_cull_view(
     box_vec_clear(&r->v->draws);
     box_vec_clear(&r->v->staging);
     box_vec_clear(&r->cull_jobs);
+    box_vec_clear(&r->hiz_jobs);
     r->v->culled = false;
+    r->v->hiz_active = false;
     if (!view->cull_enabled) {
         box_cull_count(r, view, p);
         goto done;
@@ -532,6 +575,10 @@ void box_cull_view(
 
     box_frustum_t frustum;
     box_frustum_of_view(view, &frustum);
+    bool occlusion = view->occlusion != 0;
+    if (occlusion) {
+        box_hiz_prepare(r, view);
+    }
 
     uint32_t i;
     for (i = 0; i < r->meshes.count; i ++) {
@@ -550,7 +597,7 @@ void box_cull_view(
         if (cpu) {
             box_cull_static_cpu(r, i, m, &frustum);
         } else {
-            box_cull_static_gpu(r, i);
+            box_cull_static_gpu(r, i, occlusion);
         }
     }
 
@@ -559,6 +606,7 @@ void box_cull_view(
     box_cull_grow(r, total ? total : 1);
     box_cull_write(r);
     box_cull_upload(r, &frustum);
+    box_hiz_upload(r, view, &frustum);
     r->v->culled = true;
 done:
     return;
@@ -634,14 +682,15 @@ done:
 
 void box_cull_draw(
     box_renderer_t *r,
-    WGPURenderPassEncoder pass)
+    WGPURenderPassEncoder pass,
+    uint32_t group)
 {
     uint64_t stride = sizeof(box_instance_t);
     uint32_t i;
     for (i = 0; i < r->v->draws.count; i ++) {
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, draw->mesh);
-        if (!m->alive || !draw->limit) {
+        if (!m->alive || !draw->limit || draw->pass != group) {
             continue;
         }
 
@@ -677,19 +726,25 @@ static void box_cull_mapped(
     (void)message;
     (void)userdata2;
     box_renderer_t *r = userdata1;
-    size_t size = (size_t)r->cull_readback_count * BOX_CULL_ARG_WORDS * sizeof(uint32_t);
+    uint32_t words = r->cull_readback_count * BOX_CULL_ARG_WORDS + BOX_HIZ_STAT_WORDS;
     if (status != WGPUMapAsyncStatus_Success) {
         goto done;
     }
 
-    const uint32_t *args = wgpuBufferGetConstMappedRange(r->cull_readback, 0, size);
+    const uint32_t *args = wgpuBufferGetConstMappedRange(r->cull_readback, 0,
+        (size_t)words * sizeof(uint32_t));
     uint32_t total = 0;
     uint32_t i;
     for (i = 0; args && i < r->cull_readback_count; i ++) {
         total += args[i * BOX_CULL_ARG_WORDS + 1];
     }
 
-    r->cull_visible = total;
+    if (args) {
+        r->cull_visible = total;
+        r->hiz_tested = args[words - BOX_HIZ_STAT_WORDS];
+        r->hiz_occluded = args[words - BOX_HIZ_STAT_WORDS + 1];
+    }
+
     wgpuBufferUnmap(r->cull_readback);
 done:
     r->cull_readback_busy = false;
@@ -706,14 +761,17 @@ void box_cull_record(
     }
 
     uint64_t size = (uint64_t)r->cull_arg_count * BOX_CULL_ARG_WORDS * sizeof(uint32_t);
+    uint64_t stats = BOX_HIZ_STAT_WORDS * sizeof(uint32_t);
     if (r->cull_arg_count > r->cull_readback_capacity) {
         if (r->cull_readback) wgpuBufferRelease(r->cull_readback);
         r->cull_readback = box_cull_buffer(r, WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
-            size);
+            size + stats);
         r->cull_readback_capacity = r->cull_arg_count;
     }
 
     wgpuCommandEncoderCopyBufferToBuffer(encoder, r->cull_args, 0, r->cull_readback, 0, size);
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, r->hiz_stats, 0, r->cull_readback, size,
+        stats);
     r->cull_readback_count = r->cull_arg_count;
 done:
     return;
@@ -731,8 +789,14 @@ void box_cull_publish(
     wgpuInstanceProcessEvents(r->instance);
 #endif
     uint32_t visible = r->cull_visible < r->cull_tested ? r->cull_visible : r->cull_tested;
+    uint32_t kept = r->hiz_used ? r->hiz_tested : visible;
+    if (kept > r->cull_tested) {
+        kept = r->cull_tested;
+    }
+
     r->stats.drawn = r->cull_drawn + visible;
-    r->stats.culled = r->cull_culled + r->cull_tested - visible;
+    r->stats.occluded = r->hiz_used ? r->hiz_occluded : 0;
+    r->stats.culled = r->cull_culled + r->cull_tested - kept;
     r->stats.shadow_rebuilds = r->shadow_rebuilds;
 
 #ifndef BOX_PLATFORM_WEB
@@ -740,7 +804,8 @@ void box_cull_publish(
         goto done;
     }
 
-    size_t size = (size_t)r->cull_readback_count * BOX_CULL_ARG_WORDS * sizeof(uint32_t);
+    size_t size = ((size_t)r->cull_readback_count * BOX_CULL_ARG_WORDS + BOX_HIZ_STAT_WORDS) *
+        sizeof(uint32_t);
     WGPUBufferMapCallbackInfo info = {
         .mode = WGPUCallbackMode_AllowProcessEvents,
         .callback = box_cull_mapped,

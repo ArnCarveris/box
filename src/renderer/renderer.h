@@ -23,8 +23,9 @@ typedef struct box_renderer_t box_renderer_t;
  * arguments, so they trail the frame they belong to by one or two frames.
  */
 typedef struct box_renderer_stats_t {
-    uint32_t drawn;   /**< Instances the frame drew */
+    uint32_t drawn;   /**< Instances the frame drew, which the first pass overshoots */
     uint32_t culled;  /**< Instances the frame skipped because no view could see them */
+    uint32_t occluded; /**< Instances the depth pyramid of a view found hidden behind others */
     uint32_t shadow_rebuilds; /**< Cached static cascade layers the frame rendered again */
 } box_renderer_stats_t;
 

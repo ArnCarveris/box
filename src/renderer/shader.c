@@ -698,10 +698,234 @@ const char *box_cull_shader_wgsl =
     "  if (!visible(center, bitcast<f32>(src[base + BOUNDS + 3u]))) {\n"
     "    return;\n"
     "  }\n"
-    "  let slot = atomicAdd(&args[c.arg * ARGS + 1u], 1u);\n"
-    "  let out = (c.base + slot) * WORDS;\n"
+    "  let index = atomicAdd(&args[c.arg * ARGS + 1u], 1u);\n"
+    "  let out = (c.base + index) * WORDS;\n"
     "  for (var i = 0u; i < WORDS; i = i + 1u) {\n"
     "    dst[out + i] = src[base + i];\n"
+    "  }\n"
+    "}\n";
+
+/** Full screen triangle every pass of the depth pyramid draws */
+#define BOX_WGSL_HIZ_VERTEX \
+    "@vertex fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {\n" \
+    "  let corner = vec2<f32>(f32((index << 1u) & 2u), f32(index & 2u));\n" \
+    "  return vec4(corner * 2.0 - vec2(1.0), 0.0, 1.0);\n" \
+    "}\n"
+
+/** Halving of the depth target of a view into the first level of its pyramid.
+ *
+ * A texel keeps the minimum of the block it covers, which under reverse Z is
+ * its farthest surface, so the first level already holds the rule every level
+ * above it repeats; the block grows by a line when that axis of the depth
+ * target is odd, which halving would otherwise drop.
+ */
+const char *box_hiz_copy_wgsl =
+    "@group(0) @binding(0) var src: texture_depth_2d;\n"
+    BOX_WGSL_HIZ_VERTEX
+    "@fragment fn fs_main(@builtin(position) pos: vec4<f32>) -> @location(0) f32 {\n"
+    "  let size = vec2<i32>(textureDimensions(src, 0));\n"
+    "  let base = vec2<i32>(pos.xy) * 2;\n"
+    "  let span = vec2<i32>(2, 2) + vec2(size.x & 1, size.y & 1);\n"
+    "  var result = 1.0;\n"
+    "  for (var y = 0; y < span.y; y = y + 1) {\n"
+    "    for (var x = 0; x < span.x; x = x + 1) {\n"
+    "      let c = clamp(base + vec2(x, y), vec2(0, 0), size - vec2(1, 1));\n"
+    "      result = min(result, textureLoad(src, c, 0));\n"
+    "    }\n"
+    "  }\n"
+    "  return result;\n"
+    "}\n";
+
+/** Reduction of one level of the depth pyramid into the next.
+ *
+ * A texel takes the minimum of the two by two block under it, which under
+ * reverse Z is the farthest surface of that block, plus the row or the column
+ * behind it when that axis of the source is odd; halving an odd level would
+ * otherwise drop its last line and report a surface nearer than the block holds.
+ */
+const char *box_hiz_reduce_wgsl =
+    "@group(0) @binding(0) var src: texture_2d<f32>;\n"
+    BOX_WGSL_HIZ_VERTEX
+    "@fragment fn fs_main(@builtin(position) pos: vec4<f32>) -> @location(0) f32 {\n"
+    "  let size = vec2<i32>(textureDimensions(src, 0));\n"
+    "  let base = vec2<i32>(pos.xy) * 2;\n"
+    "  let span = vec2<i32>(2, 2) + vec2(size.x & 1, size.y & 1);\n"
+    "  var result = 1.0;\n"
+    "  for (var y = 0; y < span.y; y = y + 1) {\n"
+    "    for (var x = 0; x < span.x; x = x + 1) {\n"
+    "      let c = clamp(base + vec2(x, y), vec2(0, 0), size - vec2(1, 1));\n"
+    "      result = min(result, textureLoad(src, c, 0).r);\n"
+    "    }\n"
+    "  }\n"
+    "  return result;\n"
+    "}\n";
+
+/** Bindings, frustum test and pyramid lookups both occlusion passes share.
+ *
+ * An instance is projected to a screen rectangle and read against the level of
+ * a pyramid whose texels are as wide as that rectangle, so the rectangle covers
+ * at most two by two texels and its four corners reach every texel it touches.
+ * A pyramid that was never filled holds zero, which is the farthest depth under
+ * reverse Z and accepts every instance, so the first frame of a view needs no
+ * special case.
+ */
+#define BOX_WGSL_HIZ \
+    "struct Hiz {\n" \
+    "  clip: mat4x4<f32>,\n" \
+    "  prev: mat4x4<f32>,\n" \
+    "  planes: array<vec4<f32>, " BOX_WGSL_STR(BOX_FRUSTUM_PLANES) ">,\n" \
+    "  range: vec4<u32>,\n" \
+    "  screen: vec4<u32>,\n" \
+    "};\n" \
+    "@group(0) @binding(0) var<uniform> c: Hiz;\n" \
+    "@group(0) @binding(1) var<storage, read> src: array<u32>;\n" \
+    "@group(0) @binding(2) var<storage, read_write> dst: array<u32>;\n" \
+    "@group(0) @binding(3) var<storage, read_write> args: array<atomic<u32>>;\n" \
+    "@group(0) @binding(4) var<storage, read_write> counters: array<atomic<u32>>;\n" \
+    "@group(0) @binding(5) var pyramid: texture_2d<f32>;\n" \
+    "@group(0) @binding(6) var history: texture_2d<f32>;\n" \
+    "const WORDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_WORDS) ");\n" \
+    "const BOUNDS: u32 = u32(" BOX_WGSL_STR(BOX_INSTANCE_BOUNDS) ");\n" \
+    "const ARGS: u32 = u32(" BOX_WGSL_STR(BOX_CULL_ARG_WORDS) ");\n" \
+    "struct Rect {\n" \
+    "  lo: vec2<f32>,\n" \
+    "  hi: vec2<f32>,\n" \
+    "  depth: f32,\n" \
+    "  clamped: bool,\n" \
+    "};\n" \
+    "fn in_frustum(center: vec3<f32>, radius: f32) -> bool {\n" \
+    "  var result = true;\n" \
+    "  for (var i = 0u; i < u32(" BOX_WGSL_STR(BOX_FRUSTUM_PLANES) "); i = i + 1u) {\n" \
+    "    let p = c.planes[i];\n" \
+    "    if (dot(p.xyz, center) + p.w < -radius) {\n" \
+    "      result = false;\n" \
+    "    }\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn project(m: mat4x4<f32>, center: vec3<f32>, radius: f32) -> Rect {\n" \
+    "  var lo = vec2(1.0, 1.0);\n" \
+    "  var hi = vec2(0.0, 0.0);\n" \
+    "  var depth = 0.0;\n" \
+    "  var crossed = false;\n" \
+    "  for (var i = 0u; i < 8u; i = i + 1u) {\n" \
+    "    let corner = vec3(f32(i & 1u), f32((i >> 1u) & 1u), f32((i >> 2u) & 1u));\n" \
+    "    let clip = m * vec4(center + (corner * 2.0 - 1.0) * radius, 1.0);\n" \
+    "    if (clip.w <= 1e-6) {\n" \
+    "      crossed = true;\n" \
+    "    } else {\n" \
+    "      let ndc = clip.xyz / clip.w;\n" \
+    "      let uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);\n" \
+    "      lo = min(lo, uv);\n" \
+    "      hi = max(hi, uv);\n" \
+    "      depth = max(depth, ndc.z);\n" \
+    "    }\n" \
+    "  }\n" \
+    "  if (crossed) {\n" \
+    "    lo = vec2(0.0, 0.0);\n" \
+    "    hi = vec2(1.0, 1.0);\n" \
+    "    depth = 1.0;\n" \
+    "  }\n" \
+    "  return Rect(clamp(lo, vec2(0.0), vec2(1.0)), clamp(hi, vec2(0.0), vec2(1.0)),\n" \
+    "    min(depth, 1.0), crossed);\n" \
+    "}\n" \
+    "fn level_of(r: Rect) -> u32 {\n" \
+    "  let span = (r.hi - r.lo) * vec2(f32(c.screen.x), f32(c.screen.y));\n" \
+    "  var extent = max(span.x, span.y);\n" \
+    "  var result = 0u;\n" \
+    "  loop {\n" \
+    "    if (extent <= 1.0 || result + 1u >= c.screen.z) {\n" \
+    "      break;\n" \
+    "    }\n" \
+    "    extent = extent * 0.5;\n" \
+    "    result = result + 1u;\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn texels(r: Rect, level: u32) -> vec4<u32> {\n" \
+    "  let size = max(c.screen.xy >> vec2(level, level), vec2(1u, 1u));\n" \
+    "  let limit = size - vec2(1u, 1u);\n" \
+    "  let a = min(vec2<u32>(r.lo * vec2<f32>(size)), limit);\n" \
+    "  let b = min(vec2<u32>(r.hi * vec2<f32>(size)), limit);\n" \
+    "  return vec4(a.x, a.y, b.x, b.y);\n" \
+    "}\n" \
+    "fn shown_now(center: vec3<f32>, radius: f32) -> bool {\n" \
+    "  let r = project(c.clip, center, radius);\n" \
+    "  var result = true;\n" \
+    "  if (!r.clamped) {\n" \
+    "    let level = level_of(r);\n" \
+    "    let t = texels(r, level);\n" \
+    "    var far = textureLoad(pyramid, vec2(t.x, t.y), level).r;\n" \
+    "    far = min(far, textureLoad(pyramid, vec2(t.z, t.y), level).r);\n" \
+    "    far = min(far, textureLoad(pyramid, vec2(t.x, t.w), level).r);\n" \
+    "    far = min(far, textureLoad(pyramid, vec2(t.z, t.w), level).r);\n" \
+    "    result = r.depth >= far;\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn shown_before(center: vec3<f32>, radius: f32) -> bool {\n" \
+    "  let r = project(c.prev, center, radius);\n" \
+    "  var result = true;\n" \
+    "  if (!r.clamped) {\n" \
+    "    let level = level_of(r);\n" \
+    "    let t = texels(r, level);\n" \
+    "    var far = textureLoad(history, vec2(t.x, t.y), level).r;\n" \
+    "    far = min(far, textureLoad(history, vec2(t.z, t.y), level).r);\n" \
+    "    far = min(far, textureLoad(history, vec2(t.x, t.w), level).r);\n" \
+    "    far = min(far, textureLoad(history, vec2(t.z, t.w), level).r);\n" \
+    "    result = r.depth >= far;\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n" \
+    "fn append(base: u32) {\n" \
+    "  let index = atomicAdd(&args[c.range.w * ARGS + 1u], 1u);\n" \
+    "  let out = (c.range.z + index) * WORDS;\n" \
+    "  for (var i = 0u; i < WORDS; i = i + 1u) {\n" \
+    "    dst[out + i] = src[base + i];\n" \
+    "  }\n" \
+    "}\n"
+
+/** Bounds of the instance a dispatch invocation covers, shared by both passes */
+#define BOX_WGSL_HIZ_BOUNDS \
+    "  if (id.x >= c.range.y) {\n" \
+    "    return;\n" \
+    "  }\n" \
+    "  let base = (c.range.x + id.x) * WORDS;\n" \
+    "  let center = vec3<f32>(bitcast<f32>(src[base + BOUNDS]),\n" \
+    "    bitcast<f32>(src[base + BOUNDS + 1u]), bitcast<f32>(src[base + BOUNDS + 2u]));\n" \
+    "  let radius = bitcast<f32>(src[base + BOUNDS + 3u]);\n" \
+    "  if (!in_frustum(center, radius)) {\n" \
+    "    return;\n" \
+    "  }\n"
+
+/** The two occlusion passes of a view, one module so both pyramids stay bound.
+ *
+ * The first pass keeps what the pyramid of the previous frame accepted, tested
+ * with the matrix of that frame, so it answers what that frame saw; the second
+ * keeps what the pyramid of this frame accepts and the first pass did not
+ * already draw, which is why it repeats the test of the first pass. A camera
+ * that moved only means the first pass draws a little more or a little less,
+ * which the second pass corrects either way.
+ */
+const char *box_hiz_shader_wgsl =
+    BOX_WGSL_HIZ
+    "@compute @workgroup_size(" BOX_WGSL_STR(BOX_HIZ_GROUP) ")\n"
+    "fn cs_first(@builtin(global_invocation_id) id: vec3<u32>) {\n"
+    BOX_WGSL_HIZ_BOUNDS
+    "  if (shown_before(center, radius)) {\n"
+    "    append(base);\n"
+    "  }\n"
+    "}\n"
+    "@compute @workgroup_size(" BOX_WGSL_STR(BOX_HIZ_GROUP) ")\n"
+    "fn cs_second(@builtin(global_invocation_id) id: vec3<u32>) {\n"
+    BOX_WGSL_HIZ_BOUNDS
+    "  atomicAdd(&counters[0], 1u);\n"
+    "  if (!shown_now(center, radius)) {\n"
+    "    atomicAdd(&counters[1], 1u);\n"
+    "    return;\n"
+    "  }\n"
+    "  if (!shown_before(center, radius)) {\n"
+    "    append(base);\n"
     "  }\n"
     "}\n";
 

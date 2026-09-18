@@ -12,6 +12,7 @@
 #include "bake.h"
 #include "shadow.h"
 #include "blur.h"
+#include "hiz.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -78,6 +79,21 @@
 /** Argument offset of a draw the CPU culled, which needs no indirect arguments */
 #define BOX_CULL_NO_ARGS (0xFFFFFFFFu)
 
+/** Byte stride between two occlusion uniforms, the alignment a dynamic offset needs */
+#define BOX_HIZ_UNIFORM_STRIDE (256)
+
+/** Counters the occlusion pass keeps: instances tested and instances found hidden */
+#define BOX_HIZ_STAT_WORDS (2)
+
+/** Instances one workgroup of the occlusion pass tests */
+#define BOX_HIZ_GROUP (64)
+
+/** Draw of a view that holds the instances the previous frame already saw */
+#define BOX_HIZ_PASS_VISIBLE (0)
+
+/** Draw of a view that holds the instances the pyramid uncovered this frame */
+#define BOX_HIZ_PASS_NEW (1)
+
 /** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
 #define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
 
@@ -117,6 +133,25 @@ typedef struct box_cull_uniform_t {
     uint32_t pad[3]; /**< Padding to the 16 byte GPU stride */
 } box_cull_uniform_t;
 
+/** Frustum, matrices and pyramid extent of one dispatch of the occlusion pass */
+typedef struct box_hiz_uniform_t {
+    float clip[16];                      /**< World to clip matrix of the view */
+    float prev[16];                      /**< World to clip matrix of the previous frame */
+    float planes[BOX_FRUSTUM_PLANES][4]; /**< Planes of the frustum of the view */
+    uint32_t range[4];  /**< First slot, instances, first visible slot and argument index */
+    uint32_t screen[4]; /**< Pyramid width, height, levels and the mode of the dispatch */
+} box_hiz_uniform_t;
+
+/** Bind group of the occlusion dispatches of one mesh in one view */
+typedef struct box_hiz_mesh_t {
+    WGPUBindGroup group;      /**< Bind group of its occlusion dispatches */
+    WGPUBuffer src;           /**< Static instance buffer the group binds */
+    WGPUBuffer dst;           /**< Visible instance buffer the group binds */
+    WGPUBuffer args;          /**< Argument buffer the group binds */
+    WGPUTextureView pyramid;  /**< Pyramid of this frame the group binds */
+    WGPUTextureView history;  /**< Pyramid of the previous frame the group binds */
+} box_hiz_mesh_t;
+
 /** One draw of the shadow pass of a view, in the order the draws are recorded */
 typedef struct box_shadow_draw_t {
     uint32_t mesh;    /**< Mesh handle */
@@ -136,6 +171,7 @@ typedef struct box_cull_job_t {
     uint32_t count;  /**< Instances the dispatch tests */
     uint32_t slot;   /**< Index of its uniform in the uniform buffer */
     uint32_t draw;   /**< Index of its draw in the draw list of the view */
+    uint32_t pass;   /**< Pass of the view the dispatch feeds, a BOX_HIZ_PASS constant */
 } box_cull_job_t;
 
 /** One draw of a view after culling */
@@ -147,6 +183,7 @@ typedef struct box_cull_draw_t {
     uint32_t args;   /**< Byte offset of its arguments, BOX_CULL_NO_ARGS on the CPU path */
     uint32_t baked;  /**< The draw reads the probes of its mesh */
     uint32_t stage;  /**< First instance of the staging array a compacted draw wrote */
+    uint32_t pass;   /**< Pass the draw belongs to, one of the BOX_HIZ_PASS constants */
     const box_instance_t *src; /**< Source of a draw the frustum kept whole, NULL otherwise */
 } box_cull_draw_t;
 
@@ -192,6 +229,17 @@ typedef struct box_gpu_view_t {
     uint32_t height;                 /**< Height the targets of the view were created for */
     WGPUTexture depth;               /**< Depth target of the view */
     WGPUTextureView depth_view;      /**< Attachment view of the depth target */
+    WGPUTextureView depth_sample;    /**< Sampled view of the depth target, read by the pyramid */
+    WGPUTexture hiz[2];              /**< Depth pyramids of the view, r32float mip chains */
+    WGPUTextureView hiz_view[2];     /**< View of a whole pyramid the occlusion test reads */
+    WGPUTextureView hiz_mips[2][BOX_HIZ_LEVELS_MAX]; /**< Attachment view of one of its levels */
+    WGPUBindGroup hiz_source[2][BOX_HIZ_LEVELS_MAX]; /**< Source of the pass that fills a level */
+    uint32_t hiz_levels;             /**< Levels its pyramids hold, 0 when it has none */
+    uint32_t hiz_slot;               /**< Pyramid this frame builds, the other one is its history */
+    bool hiz_history;                /**< The other pyramid holds the depth of the previous frame */
+    float hiz_clip[16];              /**< World to clip matrix the history pyramid was built with */
+    box_vec_t hiz_meshes;            /**< box_hiz_mesh_t indexed by mesh handle */
+    bool hiz_active;                 /**< The frame recorded occlusion dispatches for the view */
     WGPUBuffer view_buffer;          /**< Uniform buffer holding the view */
     WGPUBindGroup view_group;        /**< Bind group with the view and layer uniforms */
     WGPUBuffer lights;               /**< Light storage buffer of the view */
@@ -372,6 +420,22 @@ struct box_renderer_t {
     uint32_t cull_culled;            /**< Instances the CPU culling of the frame skipped */
     uint32_t cull_tested;            /**< Instances the compute culling of the frame tested */
     uint32_t cull_visible;           /**< Instances the last read back compute culling kept */
+    WGPURenderPipeline hiz_copy;     /**< Depth target into the first level of a pyramid */
+    WGPURenderPipeline hiz_reduce;   /**< One level of a pyramid into the next */
+    WGPUBindGroupLayout hiz_depth_layout; /**< Depth target layout of the copy pass */
+    WGPUBindGroupLayout hiz_level_layout; /**< Level layout of the reduce pass */
+    WGPUComputePipeline hiz_first;   /**< Occlusion pass that keeps what the last frame saw */
+    WGPUComputePipeline hiz_second;  /**< Occlusion pass that keeps what the pyramid uncovered */
+    WGPUBindGroupLayout hiz_layout;  /**< Uniform, source, visible, arguments, bits and pyramid */
+    WGPUBuffer hiz_uniform;          /**< Frustum, range and pyramid of every occlusion dispatch */
+    uint32_t hiz_uniform_capacity;   /**< Dispatches the uniform buffer can hold */
+    WGPUBuffer hiz_stats;            /**< Instances the occlusion pass tested and hid */
+    WGPUBuffer hiz_dummy;            /**< Visibility bits a dispatch without occlusion binds */
+    box_vec_t hiz_jobs;              /**< box_cull_job_t of the occlusion pass being recorded */
+    uint32_t hiz_slots;              /**< Occlusion uniforms the frame handed out */
+    bool hiz_used;                   /**< The frame recorded occlusion dispatches */
+    uint32_t hiz_tested;             /**< Instances the last read back occlusion pass tested */
+    uint32_t hiz_occluded;           /**< Instances the last read back occlusion pass hid */
     box_renderer_stats_t stats;      /**< Instance counts of the last frame */
     WGPUBuffer cull_readback;        /**< Mappable copy of the arguments of a recorded frame */
     uint32_t cull_readback_capacity; /**< Draws the readback buffer can hold */
@@ -605,14 +669,110 @@ void box_cull_dispatch(
     box_renderer_t *r,
     WGPUCommandEncoder encoder);
 
-/** Record the draws of the draw list of the current view.
+/** Record the draws of one pass of the draw list of the current view.
  *
  * @param r The renderer
  * @param pass The render pass
+ * @param group One of the BOX_HIZ_PASS constants
  */
 void box_cull_draw(
     box_renderer_t *r,
-    WGPURenderPassEncoder pass);
+    WGPURenderPassEncoder pass,
+    uint32_t group);
+
+/** Create the pyramid pipelines, the occlusion pass and their shared buffers.
+ *
+ * @param r The renderer
+ */
+void box_hiz_init(
+    box_renderer_t *r);
+
+/** Reset the per frame occlusion counters and grow the shared uniform buffer.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_hiz_frame(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Create or resize the depth pyramid of the current view.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ */
+void box_hiz_prepare(
+    box_renderer_t *r,
+    const box_view_t *view);
+
+/** Add the occlusion dispatch of one range of a mesh to one pass of the view.
+ *
+ * @param r The renderer
+ * @param mesh The mesh handle
+ * @param first First slot of the range
+ * @param count Slots in the range
+ * @param draw Index of its draw in the draw list of the view
+ * @param pass One of the BOX_HIZ_PASS constants
+ */
+void box_hiz_job(
+    box_renderer_t *r,
+    uint32_t mesh,
+    uint32_t first,
+    uint32_t count,
+    uint32_t draw,
+    uint32_t pass);
+
+/** Write the uniform of every occlusion dispatch of the current view.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ * @param f The frustum of the view
+ */
+void box_hiz_upload(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_frustum_t *f);
+
+/** Record the passes that fill the depth pyramid of the current view.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+void box_hiz_build(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder);
+
+/** Record the occlusion dispatches of one pass of the current view.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param pass One of the BOX_HIZ_PASS constants
+ */
+void box_hiz_dispatch(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    uint32_t pass);
+
+/** Release the pyramid textures and the level bind groups of one view.
+ *
+ * @param v The view resources
+ */
+void box_hiz_resize(
+    box_gpu_view_t *v);
+
+/** Release the pyramid and the visibility bits of one view.
+ *
+ * @param v The view resources
+ */
+void box_hiz_view_fini(
+    box_gpu_view_t *v);
+
+/** Release the pyramid pipelines, the occlusion pass and their buffers.
+ *
+ * @param r The renderer
+ */
+void box_hiz_fini(
+    box_renderer_t *r);
 
 /** Copy the draw arguments of the frame into the readback buffer.
  *
@@ -1031,6 +1191,15 @@ extern const char *box_mesh_shader_tail;
 
 /** WGSL source of the frustum culling compute shader */
 extern const char *box_cull_shader_wgsl;
+
+/** WGSL source of the pass that copies a depth target into the first pyramid level */
+extern const char *box_hiz_copy_wgsl;
+
+/** WGSL source of the pass that reduces one pyramid level into the next */
+extern const char *box_hiz_reduce_wgsl;
+
+/** WGSL source of the two occlusion culling passes of a view */
+extern const char *box_hiz_shader_wgsl;
 
 /** WGSL source of the depth only vertex stage of the shadow pass */
 extern const char *box_shadow_shader_wgsl;
