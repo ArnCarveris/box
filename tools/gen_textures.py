@@ -4,6 +4,12 @@
 The engine has no way to author images from a scene, so the textures the visual
 scene uses are generated here and committed next to it. Usage: gen_textures.py
 [outdir]; without an argument it writes apps/box_app/etc/textures.
+
+Normal maps follow the OpenGL convention: red is the +u tangent and green is the
++v tangent, so the half of a bump that faces +v is the bright green half. The
+loader flips the rows of an image so uv v = 0 is the bottom row of the file,
+which puts +v up the artwork as it is displayed; a row of this file with a
+larger y is therefore a smaller v and gets the darker green.
 """
 import math
 import os
@@ -63,6 +69,25 @@ def bumps(size):
     return out
 
 
+def bump_single(size):
+    """Tangent space normal map of one large hemispherical bump in the middle."""
+    out = bytearray(size * size * 4)
+    radius = size * 0.42
+    for y in range(size):
+        for x in range(size):
+            dx = x - size / 2 + 0.5
+            dy = y - size / 2 + 0.5
+            d = math.hypot(dx, dy)
+            nx, ny, nz = 0.0, 0.0, 1.0
+            if d < radius and d > 1e-3:
+                s = d / radius
+                nx, ny = dx / d * s, -dy / d * s
+                nz = math.sqrt(max(1.0 - nx * nx - ny * ny, 0.0))
+            i = (y * size + x) * 4
+            out[i:i + 4] = bytes(int((v * 0.5 + 0.5) * 255) for v in (nx, ny, nz)) + b"\xff"
+    return out
+
+
 def roughness(size):
     """Horizontal roughness ramp with vertical stripes of scratched material."""
     out = bytearray(size * size * 4)
@@ -81,7 +106,8 @@ def main():
     out_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
         ROOT, "apps", "box_app", "etc", "textures")
     os.makedirs(out_dir, exist_ok=True)
-    for name, fn in (("checker", checker), ("bumps_normal", bumps), ("roughness", roughness)):
+    for name, fn in (("checker", checker), ("bumps_normal", bumps),
+                     ("bump_single", bump_single), ("roughness", roughness)):
         path = os.path.join(out_dir, name + ".png")
         write_png(path, SIZE, fn(SIZE))
         print("%s %d bytes" % (path, os.path.getsize(path)))

@@ -1,0 +1,43 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {24, 26, 32}, ground_color: {18, 16, 14}, intensity: 0.35}
+}
+
+textures {
+  bump {
+    Texture: {path: "etc/textures/bump_single.png"}
+  }
+}
+
+camera {
+  Position: {0, 0, -7}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 45}
+}
+
+sun {
+  Rotation: {1.032, 0.709, 0}
+  DirectionalLight: {intensity: 1.4}
+}
+
+dome {
+  Position: {-1.4, 0, 0}
+  Rotation: {-1.5708, 0, 0}
+  HemiSphere: {segments: 64, smooth: true, radius: 1}
+  Rgb: {220, 220, 225}
+  PbrMaterial: {metallic: 0, roughness: 0.55}
+}
+
+bumped {
+  Position: {1.4, 0, 0.1}
+  Box: {2.4, 2.4, 0.2}
+  Rgb: {220, 220, 225}
+  PbrMaterial: {metallic: 0, roughness: 0.55}
+  PbrTextures: {normal: textures.bump}
+}
