@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Box Project</title>
+<link rel="icon" href="data:,">
 <style>
 :root {
   --bg: #f4f4f1;
@@ -204,9 +205,6 @@ table.data td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
 table.data tr:last-child td { border-bottom: 0; }
 table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.data td.mono { font-family: var(--mono); font-size: 12px; }
-table.data tbody tr.pick { cursor: pointer; }
-table.data tbody tr.pick:hover { background: var(--surface-2); }
-table.data tbody tr.sel { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--accent); }
 td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color: var(--warn); }
 .muted { color: var(--ink-3); }
 .chart { display: flex; flex-direction: column; gap: 6px; }
@@ -216,18 +214,83 @@ td .ok { color: var(--good); } td .bad { color: var(--bad); } td .empty { color:
 .chart .grid { stroke: var(--border); stroke-width: 1; }
 .chart .hit { fill: transparent; cursor: default; }
 .spark { display: block; }
-.spark-cell { width: 92px; }
 .tw { display: inline-block; width: 14px; color: var(--ink-2); font-size: 11px; }
 td .dot { display: inline-block; vertical-align: middle; margin-right: 4px; }
-tr.exp > td { background: var(--surface-2); padding: 8px 12px 12px; box-shadow: inset 2px 0 0 var(--accent); }
 table.data.sub { margin: 2px 0 8px; }
 table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
-.sub-note { color: var(--ink-3); font-size: 11px; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
 .legend span, .legend button { display: inline-flex; align-items: center; gap: 6px; }
 .legend button { padding: 1px 5px; border-radius: 5px; color: var(--ink-2); }
 .legend button:hover { background: var(--surface-2); color: var(--ink); }
 .legend button.off { opacity: .45; text-decoration: line-through; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(122px, 1fr)); gap: 8px; }
+.stat {
+  display: flex; flex-direction: column; gap: 1px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+}
+.stat span { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.stat b { font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat b small { font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.stat .spark { margin-top: 2px; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tools input {
+  font: inherit; flex: 1 1 180px; min-width: 110px; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px;
+}
+.tools button { border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; font-size: 12px; color: var(--ink-2); }
+.tools button:hover { background: var(--surface-2); color: var(--ink); }
+.tools .muted { font-size: 12px; }
+.more { font-size: 12px; color: var(--ink-2); align-self: start; padding: 2px 0; }
+.more:hover { color: var(--ink); }
+.tree { display: flex; flex-direction: column; min-width: 0; }
+.trow { display: grid; grid-template-columns: var(--cols); gap: 0 8px; align-items: center; border-bottom: 1px solid var(--border); }
+.trow .cell { padding: 5px 4px; font-size: 13px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trow.thead .cell {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3);
+  font-weight: 600; text-align: left; border-radius: 6px;
+}
+.trow.thead .cell.num { text-align: right; }
+.trow.thead .cell:hover { color: var(--ink); background: var(--surface-2); }
+.trow.thead .cell.sorted { color: var(--ink); }
+.cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cell.name { display: flex; align-items: center; gap: 6px; padding-left: calc(4px + var(--depth) * 15px); }
+.cell.name .nm { overflow: hidden; text-overflow: ellipsis; }
+.cell.name .nt { font-size: 11px; flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cell.status { display: flex; gap: 4px; align-items: center; }
+.cell.trend { display: flex; justify-content: flex-end; }
+.trow.lvl-project { background: var(--surface-2); }
+.trow.lvl-project .nm { font-weight: 650; }
+.trow.lvl-suite .nm, .trow.lvl-scene .nm { font-weight: 600; }
+.trow.lvl-case .nm { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.trow[data-toggle] { cursor: pointer; }
+.trow[data-toggle]:hover { background: var(--band); }
+.trow.open { box-shadow: inset 2px 0 0 var(--accent); }
+.cell.meta {
+  display: none; grid-column: 1 / -1; padding: 0 4px 6px calc(19px + var(--depth) * 15px);
+  color: var(--ink-3); font-size: 11px; white-space: normal;
+}
+.tree-detail {
+  padding: 10px 6px 14px calc(19px + var(--depth) * 15px); border-bottom: 1px solid var(--border);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.tree-detail .card-title { margin-bottom: 6px; }
+.tree-note { color: var(--ink-3); font-size: 11px; padding: 6px 4px; }
+.tree.t-tests { --cols: minmax(130px, 1fr) 54px 150px 78px 92px 156px; }
+.tree.t-bench { --cols: minmax(130px, 1fr) 56px 80px 80px 64px 76px 62px 70px 74px 92px; }
+.tree.t-scenes { --cols: minmax(130px, 1fr) 72px 72px 72px 78px 78px 64px 92px; }
+@media (max-width: 1240px) {
+  .tree.t-tests { --cols: minmax(130px, 1fr) 54px 150px 78px 92px; }
+  .tree.t-bench { --cols: minmax(130px, 1fr) 56px 86px 86px 92px; }
+  .tree.t-scenes { --cols: minmax(130px, 1fr) 72px 78px 78px 64px 92px; }
+  .cell.c-wide { display: none; }
+  .cell.meta { display: block; }
+}
+@media (max-width: 760px) {
+  .tree.t-tests { --cols: minmax(110px, 1fr) 128px 74px; }
+  .tree.t-bench { --cols: minmax(110px, 1fr) 86px; }
+  .tree.t-scenes { --cols: minmax(110px, 1fr) 74px 74px; }
+  .cell.c-mid { display: none; }
+}
 .plan { position: relative; height: 100%; min-height: 0; overflow: hidden; }
 #plan-svg { display: block; width: 100%; height: 100%; background: var(--surface); cursor: grab; }
 #plan-svg.panning { cursor: grabbing; }
@@ -314,15 +377,17 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 
 <script>
 const state = {
-  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
-  suites: [], benchSuites: [], hidden: {}, planView: null, planFilter: { epic: "", open: false },
+  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null,
+  suites: [], benchSuites: [], scenes: [], hidden: {}, planView: null, planFilter: { epic: "", open: false },
+  testsUi: { sort: { key: "name", dir: 1 }, search: "", charts: false },
+  benchUi: { sort: { key: "name", dir: 1 }, search: "", charts: false },
   scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0, plan: 0 },
 };
 const VIEWS = ["board", "timeline", "plan", "tests", "benchmarks"];
 const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench", plan: "plan" };
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
-let saveTimer = 0, panelTimer = 0, restoring = false;
+let saveTimer = 0, panelTimer = 0, searchTimer = 0, restoring = false;
 const ICONS = {
   complete: '<svg viewBox="0 0 10 10"><path d="M1.5 5.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   "in progress": '<svg viewBox="0 0 10 10"><path d="M2 1.5v7l6-3.5z" fill="currentColor"/></svg>',
@@ -348,8 +413,8 @@ function saveUi() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
-      suites: state.suites, benchSuites: state.benchSuites, hidden: state.hidden, scene: state.scene,
-      planView: state.planView, planFilter: state.planFilter,
+      suites: state.suites, benchSuites: state.benchSuites, scenes: state.scenes, hidden: state.hidden,
+      testsUi: state.testsUi, benchUi: state.benchUi, planView: state.planView, planFilter: state.planFilter,
     }));
   } catch (e) {}
 }
@@ -370,7 +435,15 @@ function loadUi() {
   else if (saved.suite) state.suites = [saved.suite];
   if (Array.isArray(saved.benchSuites)) state.benchSuites = saved.benchSuites;
   if (saved.hidden && typeof saved.hidden === "object") state.hidden = saved.hidden;
-  if (saved.scene) state.scene = saved.scene;
+  if (Array.isArray(saved.scenes)) state.scenes = saved.scenes;
+  else if (saved.scene) state.scenes = ["scene:" + saved.scene];
+  for (const key of ["testsUi", "benchUi"]) {
+    const ui = saved[key];
+    if (!ui || typeof ui !== "object") continue;
+    if (typeof ui.search === "string") state[key].search = ui.search;
+    state[key].charts = !!ui.charts;
+    if (ui.sort && typeof ui.sort.key === "string") state[key].sort = { key: ui.sort.key, dir: ui.sort.dir < 0 ? -1 : 1 };
+  }
   if (saved.zoom > 0) state.zoom = saved.zoom;
   if (saved.planView && saved.planView.k > 0) state.planView = saved.planView;
   if (saved.planFilter && typeof saved.planFilter === "object") {
@@ -769,73 +842,460 @@ function bindTips(host) {
   });
 }
 
-function bindRows(host, attr, expanded, rerender) {
-  host.querySelectorAll("[" + attr + "]").forEach(row => row.onclick = () => {
-    const key = row.getAttribute(attr);
-    const i = expanded.indexOf(key);
-    if (i < 0) expanded.push(key); else expanded.splice(i, 1);
+// --- tree logic (extracted by test_pm.py, keep free of DOM access) ---
+const TREE_MAX_ROWS = 1200;
+const TREE_SERIES = 12;
+const TREE_RANK = { fail: 3, empty: 2, pass: 1 };
+const TREE_COLS = {
+  tests: [
+    { key: "name", label: "Name", cls: "name" },
+    { key: "cases", label: "Cases", cls: "num c-mid" },
+    { key: "status", label: "Status", cls: "status" },
+    { key: "time", label: "Time (s)", cls: "num" },
+    { key: "trend", label: "Trend", cls: "trend c-mid" },
+    { key: "latest", label: "Latest report", cls: "muted c-wide" },
+  ],
+  bench: [
+    { key: "name", label: "Name", cls: "name" },
+    { key: "cases", label: "Cases", cls: "num c-mid" },
+    { key: "median", label: "Median", cls: "num" },
+    { key: "mean", label: "Mean", cls: "num c-mid" },
+    { key: "ci", label: "ci95", cls: "num muted c-wide" },
+    { key: "p99", label: "p99", cls: "num c-wide" },
+    { key: "iterations", label: "Iters", cls: "num c-wide" },
+    { key: "samples", label: "Samples", cls: "num c-wide" },
+    { key: "outliers", label: "Outliers", cls: "num c-wide" },
+    { key: "trend", label: "Trend", cls: "trend c-mid" },
+  ],
+  scenes: [
+    { key: "name", label: "Scene", cls: "name" },
+    { key: "entities", label: "Entities", cls: "num c-mid" },
+    { key: "drawn", label: "Drawn", cls: "num c-wide" },
+    { key: "culled", label: "Culled", cls: "num c-wide" },
+    { key: "mean_ms", label: "Mean (ms)", cls: "num" },
+    { key: "p99", label: "p99 (ms)", cls: "num" },
+    { key: "fps", label: "FPS", cls: "num c-mid" },
+    { key: "trend", label: "Trend", cls: "trend c-mid" },
+  ],
+};
+
+function trendPoints(rows, field) {
+  return (rows || []).filter(r => r && r[field] != null).map(r => ({ t: +new Date(r.time), v: +r[field] }));
+}
+
+function countText(value) {
+  const n = +value;
+  if (!isFinite(n)) return "";
+  if (n >= 1e6) return +(n / 1e6).toFixed(1) + "M";
+  if (n >= 1e4) return Math.round(n / 1e3) + "k";
+  return String(n);
+}
+
+function testTreeNodes(d) {
+  const hist = d.suite_history || {}, cases = d.case_history || {};
+  const bySuite = {};
+  for (const s of d.suites || []) (bySuite[s.project] = bySuite[s.project] || []).push(s);
+  return (d.projects || []).map((p, i) => ({
+    key: "p:" + p.project, name: p.project, level: "project", color: SERIES[i % SERIES.length],
+    note: p.suites + (p.suites === 1 ? " suite" : " suites"),
+    cases: p.cases, pass: p.pass, fail: p.fail, empty: p.empty, time: p.time, status: p.status,
+    latest: p.latest, item: p.item, url: p.url, reports: p.reports,
+    trend: trendPoints(p.trend, "elapsed"), detail: true,
+    children: (bySuite[p.project] || []).map((s, j) => ({
+      key: s.key, name: s.suite, level: "suite", color: SERIES[j % SERIES.length],
+      cases: s.cases, pass: s.pass, fail: s.fail, empty: s.empty, time: s.time, status: s.status,
+      latest: s.report_time, item: s.item, url: s.url, file: s.file, reports: s.reports,
+      trend: trendPoints(s.trend && s.trend.length ? s.trend : hist[s.key], "elapsed"), detail: true,
+      children: (s.cases_detail || []).map(c => ({
+        key: s.key + "|" + c.case, name: c.case, level: "case", status: c.status, time: c.time,
+        color: c.status === "fail" ? "var(--bad)" : c.status === "empty" ? "var(--warn)" : "var(--good)",
+        trend: trendPoints(cases[s.key + "|" + c.case], "elapsed"), children: [],
+      })),
+    })),
+  }));
+}
+
+function benchTreeNodes(d) {
+  const hist = d.micro_suite_history || {}, cases = d.micro_case_history || {};
+  const bySuite = {};
+  for (const s of d.micro_suites || []) (bySuite[s.project] = bySuite[s.project] || []).push(s);
+  return (d.micro_projects || []).map((p, i) => ({
+    key: "p:" + p.project, name: p.project, level: "project", color: SERIES[i % SERIES.length],
+    note: p.suites + (p.suites === 1 ? " suite" : " suites"),
+    cases: p.cases, median_ns: p.median_ns, mean_ns: p.mean_ns, reports: p.reports,
+    latest: p.latest || p.time, item: p.item, url: p.url,
+    trend: trendPoints(p.trend, "median_ns"), detail: true,
+    children: (bySuite[p.project] || []).map((s, j) => ({
+      key: s.key, name: s.suite, level: "suite", color: SERIES[j % SERIES.length],
+      cases: s.cases, median_ns: s.median_ns, mean_ns: s.mean_ns, reports: s.reports,
+      latest: s.time, item: s.item, url: s.url, file: s.file,
+      trend: trendPoints(s.trend && s.trend.length ? s.trend : hist[s.key], "median_ns"), detail: true,
+      children: (s.cases_detail || []).map(c => ({
+        key: s.key + "|" + c.case, name: c.case, level: "case", color: SERIES[j % SERIES.length],
+        median_ns: c.median_ns, mean_ns: c.mean_ns, stddev_ns: c.stddev_ns, p95_ns: c.p95_ns, p99_ns: c.p99_ns,
+        ci_low_ns: c.ci_low_ns, ci_high_ns: c.ci_high_ns, iterations: c.iterations, samples: c.samples,
+        outliers: c.outliers, trend: trendPoints(cases[s.key + "|" + c.case], "median_ns"), children: [],
+      })),
+    })),
+  }));
+}
+
+function sceneTreeNodes(d) {
+  const runs = d.runs || [];
+  return (d.scenes || []).map((s, i) => {
+    const own = runs.filter(r => r.scene === s.scene);
+    return {
+      key: "scene:" + s.scene, name: s.scene, level: "scene", color: SERIES[i % SERIES.length],
+      entities: s.entities, drawn: s.drawn, culled: s.culled, frames: s.frames, fps: s.fps,
+      mean_ms: s.mean_ms, p50_ms: s.p50_ms, p99_ms: s.p99_ms, max_ms: s.max_ms,
+      latest: s.time, item: s.item, url: s.url, file: s.file, source: s.source, runs: own,
+      note: own.length + (own.length === 1 ? " run" : " runs"),
+      trend: trendPoints(own, "mean_ms"), detail: true, children: [],
+    };
+  });
+}
+
+function treeValue(node, key) {
+  const trend = node.trend || [];
+  switch (key) {
+    case "name": return String(node.name || "").toLowerCase();
+    case "status": return node.status ? TREE_RANK[node.status] || 0 : node.fail ? 3 : node.pass ? 1 : null;
+    case "trend": return trend.length ? trend[trend.length - 1].v : null;
+    case "latest": return node.latest ? +new Date(node.latest) : null;
+    case "median": return node.median_ns;
+    case "mean": return node.mean_ns;
+    case "ci": return node.ci_low_ns == null ? null : node.ci_high_ns - node.ci_low_ns;
+    case "p99": return node.p99_ns == null ? node.p99_ms : node.p99_ns;
+    default: return node[key];
+  }
+}
+
+function treeCompare(a, b, key, dir) {
+  const av = treeValue(a, key), bv = treeValue(b, key);
+  const an = av == null || av !== av, bn = bv == null || bv !== bv;
+  if (an || bn) return an && bn ? 0 : an ? 1 : -1;
+  if (av < bv) return -dir;
+  if (av > bv) return dir;
+  return String(a.name).localeCompare(String(b.name));
+}
+
+function treeSort(nodes, sort) {
+  const key = (sort && sort.key) || "name";
+  const dir = sort && sort.dir < 0 ? -1 : 1;
+  return (nodes || []).slice().sort((a, b) => treeCompare(a, b, key, dir))
+    .map(node => ({ ...node, children: treeSort(node.children, sort) }));
+}
+
+function treeFilter(nodes, query) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return nodes || [];
+  const keep = list => (list || []).map(node => {
+    if (String(node.name || "").toLowerCase().includes(q)) return node;
+    const children = keep(node.children);
+    return children.length ? { ...node, children } : null;
+  }).filter(Boolean);
+  return keep(nodes);
+}
+
+function treeCount(nodes) {
+  return (nodes || []).reduce((total, node) => total + 1 + treeCount(node.children), 0);
+}
+
+function treeKeys(nodes, out = []) {
+  for (const node of nodes || []) {
+    if ((node.children || []).length || node.detail) out.push(node.key);
+    treeKeys(node.children, out);
+  }
+  return out;
+}
+
+function treeRows(nodes, open, force) {
+  const rows = [];
+  const walk = (list, depth) => {
+    for (const node of list || []) {
+      const children = node.children || [];
+      const holds = children.length || node.detail;
+      const isOpen = !!holds && (force || (open || []).includes(node.key));
+      rows.push({ node, depth, open: isOpen, leaf: !holds });
+      if (isOpen) walk(children, depth + 1);
+    }
+  };
+  walk(nodes, 0);
+  return rows;
+}
+
+function treeName(row) {
+  const node = row.node;
+  const dot = node.color ? `<span class="dot" style="background:${node.color}"></span>` : "";
+  const note = node.note ? `<span class="muted nt">${esc(node.note)}</span>` : "";
+  return `<span class="tw">${row.leaf ? "" : row.open ? "▾" : "▸"}</span>${dot}<span class="nm">${esc(node.name)}</span>${note}`;
+}
+
+function treeSpark(node, format) {
+  const points = node.trend || [];
+  if (!points.length) return `<span class="muted">—</span>`;
+  return sparkline(points, node.color || "var(--accent)",
+    node.name + " · " + points.length + " report(s)", points.slice(-6).map(format).join(" → "));
+}
+
+function ciText(node) {
+  if (node.ci_low_ns == null || node.ci_high_ns == null) return "";
+  const half = (node.ci_high_ns - node.ci_low_ns) / 2;
+  const span = esc(nsText(node.ci_low_ns) + " – " + nsText(node.ci_high_ns));
+  return `<span title="${span}">±${node.median_ns ? (100 * half / node.median_ns).toFixed(2) + "%" : esc(nsText(half))}</span>`;
+}
+
+function testChips(node) {
+  return `<span class="chip pass">${node.pass} pass</span>`
+    + (node.fail ? `<span class="chip fail">${node.fail} fail</span>` : "")
+    + (node.empty ? `<span class="chip empty">${node.empty} empty</span>` : "");
+}
+
+function testCell(row, col) {
+  const n = row.node;
+  switch (col.key) {
+    case "name": return treeName(row);
+    case "cases": return n.cases == null ? "" : String(n.cases);
+    case "status": return n.level === "case" ? caseChip(n.status) : testChips(n);
+    case "time": return n.time == null ? "" : (+n.time).toFixed(n.level === "case" ? 4 : 3);
+    case "trend": return treeSpark(n, p => (+p.v).toFixed(3) + "s");
+    case "latest": return n.latest ? esc((n.item || "db") + " · " + fmtDate(n.latest)) : "";
+  }
+  return "";
+}
+
+function benchCell(row, col) {
+  const n = row.node;
+  switch (col.key) {
+    case "name": return treeName(row);
+    case "cases": return n.cases == null ? "" : String(n.cases);
+    case "median": return n.median_ns == null ? "" : esc(nsText(n.median_ns));
+    case "mean": return n.mean_ns == null ? "" : esc(nsText(n.mean_ns));
+    case "ci": return ciText(n);
+    case "p99": return n.p99_ns == null ? "" : esc(nsText(n.p99_ns));
+    case "iterations": return n.iterations == null ? "" : esc(countText(n.iterations));
+    case "samples": return n.samples == null ? "" : String(n.samples);
+    case "outliers": return n.outliers == null ? "" : `<span class="${n.outliers ? "empty" : ""}">${n.outliers}</span>`;
+    case "trend": return treeSpark(n, p => nsText(p.v));
+  }
+  return "";
+}
+
+function sceneCell(row, col) {
+  const n = row.node;
+  const num = (v, digits) => v == null ? "—" : (+v).toFixed(digits);
+  switch (col.key) {
+    case "name": return treeName(row);
+    case "entities": return n.entities == null ? "—" : esc(countText(n.entities));
+    case "drawn": return n.drawn == null ? "—" : esc(countText(n.drawn));
+    case "culled": return n.culled == null ? "—" : esc(countText(n.culled));
+    case "mean_ms": return num(n.mean_ms, 3);
+    case "p99": return num(n.p99_ms, 3);
+    case "fps": return num(n.fps, 0);
+    case "trend": return treeSpark(n, p => (+p.v).toFixed(2) + "ms");
+  }
+  return "";
+}
+
+const TREE_CELLS = { tests: testCell, bench: benchCell, scenes: sceneCell };
+
+function treeMeta(row) {
+  const n = row.node;
+  const bits = [];
+  if (n.ci_low_ns != null) bits.push("ci95 " + nsText(n.ci_low_ns) + " – " + nsText(n.ci_high_ns));
+  if (n.stddev_ns != null) bits.push("stddev " + nsText(n.stddev_ns));
+  if (n.p99_ns != null) bits.push("p99 " + nsText(n.p99_ns));
+  if (n.iterations != null) bits.push(countText(n.iterations) + " iterations");
+  if (n.samples != null) bits.push(n.samples + " samples");
+  if (n.outliers != null) bits.push(n.outliers + " outliers");
+  if (n.entities != null) bits.push(countText(n.entities) + " entities");
+  if (n.drawn != null) bits.push(countText(n.drawn) + " drawn · " + countText(n.culled) + " culled");
+  if (n.fps != null) bits.push((+n.fps).toFixed(0) + " fps");
+  if (n.latest) bits.push((n.item || "db") + " · " + fmtDate(n.latest));
+  return bits.length ? esc(bits.join(" · ")) : "";
+}
+
+function treeRowHtml(row, cols, cell) {
+  const n = row.node;
+  const cells = cols.map(col => `<div class="cell ${col.cls}">${cell(row, col)}</div>`).join("");
+  const meta = treeMeta(row);
+  return `<div class="trow lvl-${esc(n.level)}${row.open ? " open" : ""}" style="--depth:${row.depth}"
+    data-row="${esc(n.key)}"${row.leaf ? "" : ` data-toggle="1"`}>${cells}${meta ? `<div class="cell meta">${meta}</div>` : ""}</div>`;
+}
+
+function treeHead(cols, sort) {
+  const key = (sort && sort.key) || "name";
+  const dir = sort && sort.dir < 0 ? " ↓" : " ↑";
+  return `<div class="trow thead">${cols.map(col =>
+    `<button type="button" class="cell ${col.cls}${key === col.key ? " sorted" : ""}" data-sort="${esc(col.key)}"
+      title="Sort by ${esc(col.label)}">${esc(col.label)}${key === col.key ? dir : ""}</button>`).join("")}</div>`;
+}
+
+function treeHtml(id, rows, sort, detail) {
+  const cols = TREE_COLS[id], cell = TREE_CELLS[id];
+  const shown = rows.slice(0, TREE_MAX_ROWS);
+  const body = shown.map(row => treeRowHtml(row, cols, cell)
+    + (row.open && detail ? treeDetailHtml(row, detail) : "")).join("");
+  const more = rows.length > shown.length
+    ? `<div class="tree-note">showing the first ${shown.length} of ${rows.length} rows · narrow the filter</div>` : "";
+  return `<div class="tree t-${esc(id)}">${treeHead(cols, sort)}${body
+    || `<div class="tree-note">nothing matches the filter</div>`}${more}</div>`;
+}
+
+function treeDetailHtml(row, detail) {
+  const html = detail(row);
+  return html ? `<div class="tree-detail" style="--depth:${row.depth}">${html}</div>` : "";
+}
+
+function treeToolbar(id, ui, rows, total) {
+  return `<div class="tools">
+    <input type="search" data-search="${esc(id)}" value="${esc(ui.search)}"
+      placeholder="Filter by project, suite or case" aria-label="Filter rows by name">
+    <button type="button" data-expand="${esc(id)}">Expand all</button>
+    <button type="button" data-collapse="${esc(id)}">Collapse all</button>
+    <span class="muted">${rows} of ${total} rows</span>
+  </div>`;
+}
+
+function statTiles(tiles) {
+  return `<div class="stats">${tiles.map(t => `<div class="stat"><span>${esc(t.label)}</span>
+    <b>${esc(t.value)}${t.note ? `<small> ${esc(t.note)}</small>` : ""}</b>
+    ${(t.points || []).length ? sparkline(t.points, t.color || "var(--accent)", t.label, t.tip || "") : ""}</div>`).join("")}</div>`;
+}
+// --- end tree logic ---
+
+function treeSearchCaret(id) {
+  const active = document.activeElement;
+  return active && active.getAttribute && active.getAttribute("data-search") === id ? active.selectionStart : null;
+}
+
+function bindTree(el, id, open, nodes, ui, rerender, caret) {
+  el.querySelectorAll(".trow[data-toggle]").forEach(row => row.onclick = ev => {
+    if (ev.target.closest("a")) return;
+    const key = row.getAttribute("data-row");
+    const i = open.indexOf(key);
+    if (i < 0) open.push(key); else open.splice(i, 1);
     rerender();
     saveUi();
   });
-  host.querySelectorAll("[data-series]").forEach(btn => btn.onclick = ev => {
+  el.querySelectorAll("[data-sort]").forEach(btn => btn.onclick = ev => {
+    ev.stopPropagation();
+    const key = btn.dataset.sort;
+    ui.sort = { key, dir: ui.sort.key === key ? -ui.sort.dir : key === "name" ? 1 : -1 };
+    rerender();
+    saveUi();
+  });
+  el.querySelectorAll("[data-series]").forEach(btn => btn.onclick = ev => {
     ev.stopPropagation();
     const key = btn.dataset.series;
     if (state.hidden[key]) delete state.hidden[key]; else state.hidden[key] = true;
     rerender();
     saveUi();
   });
+  const charts = el.querySelector(`[data-charts="${id}"]`);
+  if (charts) charts.onclick = () => { ui.charts = !ui.charts; rerender(); saveUi(); };
+  const expand = el.querySelector(`[data-expand="${id}"]`);
+  if (expand) expand.onclick = () => { open.splice(0, open.length, ...treeKeys(nodes)); rerender(); saveUi(); };
+  const collapse = el.querySelector(`[data-collapse="${id}"]`);
+  if (collapse) collapse.onclick = () => { open.splice(0, open.length); rerender(); saveUi(); };
+  const search = el.querySelector(`[data-search="${id}"]`);
+  if (!search) return;
+  search.oninput = () => {
+    ui.search = search.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { rerender(); saveUi(); }, 160);
+  };
+  if (caret == null) return;
+  search.focus();
+  search.setSelectionRange(caret, caret);
 }
 
-function testSuiteRows(suites, hist, caseHist) {
-  return suites.map((s, i) => {
-    const color = SERIES[i % SERIES.length];
-    const open = state.suites.includes(s.key);
-    const history = hist[s.key] || [];
-    const points = history.map(h => ({ t: +new Date(h.time), v: h.elapsed }));
-    const row = `<tr class="pick${open ? " sel" : ""}" data-suite="${esc(s.key)}">
-      <td><span class="tw">${open ? "▾" : "▸"}</span><span class="dot" style="background:${color}"></span> <b>${esc(s.suite)}</b></td>
-      <td class="num">${s.cases}</td><td class="num ok">${s.pass}</td>
-      <td class="num${s.fail ? " bad" : ""}">${s.fail}</td><td class="num${s.empty ? " empty" : ""}">${s.empty}</td>
-      <td class="num">${(+s.time).toFixed(3)}</td>
-      <td class="spark-cell">${sparkline(points, color, s.suite + " · " + history.length + " report(s)",
-        points.map(p => (+p.v).toFixed(3) + "s").slice(-6).join(" → "))}</td>
-      <td class="muted">${esc(s.item || "db")} · ${esc(fmtDate(s.report_time))}</td></tr>`;
-    if (!open) return row;
-    const cases = (s.cases_detail || []).map(c => {
-      const ch = caseHist[s.key + "|" + c.case] || [];
-      const color2 = c.status === "fail" ? "var(--bad)" : c.status === "empty" ? "var(--warn)" : "var(--good)";
-      return `<tr><td class="mono">${esc(c.case)}</td><td>${caseChip(c.status)}</td>
-        <td class="num">${(+c.time).toFixed(4)}</td>
-        <td class="spark-cell">${sparkline(ch.map(h => ({ t: +new Date(h.time), v: h.elapsed })), color2,
-          c.case + " · " + ch.length + " report(s)", ch.map(h => (+h.elapsed).toFixed(4) + "s").slice(-6).join(" → "))}</td></tr>`;
-    }).join("");
-    return row + `<tr class="exp"><td colspan="8">
-      <table class="data sub"><thead><tr><th>Case</th><th>Status</th><th class="num">Time (s)</th><th>History</th></tr></thead>
-        <tbody>${cases}</tbody></table>
-      <div class="sub-note">latest report <a href="${esc(s.url)}" target="_blank">${esc(s.file)}</a></div></td></tr>`;
-  }).join("");
+function benchTrendChip(trend) {
+  const list = trend || [];
+  if (!list.length) return "";
+  const last = list[list.length - 1];
+  const prev = list.slice(0, -1).reverse().find(p => p.project === last.project);
+  const name = esc(last.project || "latest report");
+  if (!prev || !prev.median_ns) return `<span class="chip pending">${name}</span>`;
+  const pct = 100 * (last.median_ns - prev.median_ns) / prev.median_ns;
+  if (Math.abs(pct) < 0.5) return `<span class="chip pending">${name} steady</span>`;
+  return `<span class="chip ${pct < 0 ? "pass" : "fail"}">${name} ${pct < 0 ? "" : "+"}${pct.toFixed(1)}%</span>`;
 }
 
-function testProjectCard(project, suites, hist, caseHist, width) {
-  const series = suites.map((s, i) => ({
-    key: "tests:" + s.key, name: s.suite, color: SERIES[i % SERIES.length], dash: seriesDash(i),
-    hidden: !!state.hidden["tests:" + s.key],
-    points: (hist[s.key] || []).map(h => ({
-      t: +new Date(h.time), v: h.elapsed,
-      tip: `${s.suite} · ${(+h.elapsed).toFixed(3)}s`,
-      sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.cases} cases · ${h.pass} pass${h.fail ? ` · ${h.fail} fail` : ""}`,
-    })),
-  }));
+function testsSummary(d, ui, width) {
+  const o = d.overall || {};
+  const points = field => (o.trend || []).map(p => ({ t: +new Date(p.time), v: p[field] }));
+  const tiles = [
+    { label: "Projects", value: o.projects },
+    { label: "Suites", value: o.suites },
+    { label: "Cases", value: o.cases, points: points("cases"), color: "var(--accent)", tip: "cases per report" },
+    { label: "Pass", value: o.pass, points: points("pass"), color: "var(--good)", tip: "passing cases per report" },
+    { label: "Fail", value: o.fail, points: points("fail"), color: "var(--bad)", tip: "failing cases per report" },
+    { label: "Time", value: (+o.time || 0).toFixed(2) + "s", points: points("elapsed"), color: "var(--s3)",
+      tip: "run time per report" },
+    { label: "Reports", value: o.reports },
+  ];
+  if (o.empty) tiles.splice(5, 0, { label: "Empty", value: o.empty, points: points("empty"), color: "var(--warn)" });
+  const reports = (d.reports || []).filter(r => r.time);
+  const point = (r, v) => ({
+    t: +new Date(r.time), v,
+    tip: `${r.project} · ${r.item || "db"}`,
+    sub: `${fmtDate(r.time)}${r.time_source === "mtime" ? " (file time)" : ""} · ${r.pass} pass · ${r.fail} fail · ${r.cases} cases · ${(+r.elapsed).toFixed(2)}s`,
+  });
+  const charts = !ui.charts ? "" : `
+    <div class="card-title"><h3>Pass and fail over time</h3><span>one point per report</span></div>
+    ${lineChart({ width, label: "test cases per report over time", yLabel: "cases", yFormat: v => String(Math.round(v)),
+      series: [
+        { name: "pass", color: "var(--good)", points: reports.map(r => point(r, r.pass)) },
+        { name: "fail", color: "var(--bad)", points: reports.map(r => point(r, r.fail)) },
+        ...(reports.some(r => r.empty > 0) ? [{ name: "empty", color: "var(--warn)", points: reports.map(r => point(r, r.empty)) }] : []),
+      ] })}
+    <div class="card-title"><h3>Run time over time</h3><span>report total, seconds</span></div>
+    ${lineChart({ width, label: "total run time per report over time", yLabel: "seconds",
+      yFormat: v => v.toFixed(2), series: [{ name: "run time", color: "var(--accent)", points: reports.map(r => point(r, r.elapsed)) }] })}`;
   return `<div class="card">
-    <div class="card-title"><h3>${esc(project.project)}</h3>
-      <span>${project.suites} suites · ${project.cases} cases · <b class="ok">${project.pass} pass</b>${project.fail ? ` · <b class="bad">${project.fail} fail</b>` : ""}${project.empty ? ` · <b class="empty">${project.empty} empty</b>` : ""} · ${(+project.time).toFixed(3)}s · click a suite for its cases</span></div>
-    <table class="data"><thead><tr><th>Suite</th><th class="num">Cases</th><th class="num">Pass</th><th class="num">Fail</th>
-      <th class="num">Empty</th><th class="num">Time (s)</th><th>History</th><th>Report</th></tr></thead>
-      <tbody>${testSuiteRows(suites, hist, caseHist)}</tbody></table>
-    <div class="card-title"><h3>Time per suite</h3><span>seconds per report · click a legend entry to hide a line</span></div>
-    ${lineChart({ width, label: project.project + " suite time over time", yLabel: "seconds",
-      yFormat: v => v.toFixed(2), series })}
-  </div>`;
+    <div class="card-title"><h3>All tests</h3>
+      <span>${caseChip(o.status || "empty")} · latest report ${esc(fmtDate(o.latest))}</span></div>
+    ${statTiles(tiles)}
+    <button class="more" type="button" data-charts="tests">${ui.charts ? "▾" : "▸"} trend charts</button>
+    ${charts}</div>`;
+}
+
+function testDetail(row, d, width) {
+  const n = row.node;
+  const w = Math.max(320, width - 40 - row.depth * 16);
+  const hist = d.suite_history || {};
+  const report = n.url ? `<div class="tree-note">latest report
+    <a href="${esc(n.url)}" target="_blank">${esc(n.file || n.item || n.url)}</a></div>` : "";
+  if (n.level === "project") {
+    const all = (n.children || []).slice().sort((a, b) => (b.time || 0) - (a.time || 0));
+    const top = all.slice(0, TREE_SERIES);
+    const series = top.map((s, i) => ({
+      key: "tests:" + s.key, name: s.name, color: s.color, dash: seriesDash(i),
+      hidden: !!state.hidden["tests:" + s.key],
+      points: (hist[s.key] || []).map(h => ({
+        t: +new Date(h.time), v: h.elapsed,
+        tip: `${s.name} · ${(+h.elapsed).toFixed(3)}s`,
+        sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.cases} cases · ${h.pass} pass${h.fail ? ` · ${h.fail} fail` : ""}`,
+      })),
+    }));
+    return `<div class="card-title"><h3>Time per suite</h3>
+      <span>seconds per report · ${top.length < all.length ? `slowest ${top.length} of ${all.length} suites · ` : ""}click a legend entry to hide a line</span></div>
+      ${lineChart({ width: w, height: 200, label: n.name + " suite time over time", yLabel: "seconds",
+        yFormat: v => v.toFixed(2), series })}${report}`;
+  }
+  if (n.level === "suite") {
+    const points = (hist[n.key] || []).map(h => ({
+      t: +new Date(h.time), v: h.elapsed,
+      tip: `${n.name} · ${(+h.elapsed).toFixed(3)}s`,
+      sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.cases} cases · ${h.pass} pass${h.fail ? ` · ${h.fail} fail` : ""}`,
+    }));
+    return `<div class="card-title"><h3>Time over time</h3>
+      <span>${n.cases} case(s) · ${n.reports || points.length} report(s)</span></div>
+      ${lineChart({ width: w, height: 180, label: n.name + " time over time", yLabel: "seconds",
+        yFormat: v => v.toFixed(2), series: [{ name: n.name, color: n.color, points }] })}${report}`;
+  }
+  return "";
 }
 
 function renderTests() {
@@ -845,66 +1305,31 @@ function renderTests() {
   if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
   if (!d.reports.length) { el.innerHTML = `<div class="empty-state">No test reports under project/db</div>`; return; }
   const w = chartWidth(el);
-  const hist = d.suite_history || {}, caseHist = d.case_history || {};
-  const reports = d.reports.filter(r => r.time);
-  const byProject = {};
-  for (const s of d.suites) (byProject[s.project] = byProject[s.project] || []).push(s);
-  const totals = d.projects.reduce((a, p) => ({
-    cases: a.cases + p.cases, pass: a.pass + p.pass, fail: a.fail + p.fail, empty: a.empty + p.empty, time: a.time + p.time,
-  }), { cases: 0, pass: 0, fail: 0, empty: 0, time: 0 });
-  const point = (r, v) => ({
-    t: +new Date(r.time), v,
-    tip: `${r.project} · ${r.item || "db"}`,
-    sub: `${fmtDate(r.time)}${r.time_source === "mtime" ? " (file time)" : ""} · ${r.pass} pass · ${r.fail} fail · ${r.cases} cases · ${(+r.elapsed).toFixed(2)}s`,
-  });
-  const anyEmpty = reports.some(r => r.empty > 0);
-  const counts = lineChart({
-    width: w, label: "test cases per report over time", yLabel: "cases", yFormat: v => String(Math.round(v)),
-    series: [
-      { name: "pass", color: "var(--good)", points: reports.map(r => point(r, r.pass)) },
-      { name: "fail", color: "var(--bad)", points: reports.map(r => point(r, r.fail)) },
-      ...(anyEmpty ? [{ name: "empty", color: "var(--warn)", points: reports.map(r => point(r, r.empty)) }] : []),
-    ],
-  });
-  const timing = lineChart({
-    width: w, label: "total run time per report over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
-    series: [{ name: "run time", color: "var(--accent)", points: reports.map(r => point(r, r.elapsed)) }],
-  });
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-title"><h3>Latest test run</h3>
-        <span>${d.reports.length} reports · ${d.suites.length} suites · ${totals.cases} cases ·
-        <b class="ok">${totals.pass} pass</b>${totals.fail ? ` · <b class="bad">${totals.fail} fail</b>` : ""}${totals.empty ? ` · <b class="empty">${totals.empty} empty</b>` : ""} ·
-        ${totals.time.toFixed(2)}s</span></div>
-      <table class="data"><thead><tr><th>Project</th><th class="num">Suites</th><th class="num">Cases</th>
-        <th class="num">Passed</th><th class="num">Failed</th><th class="num">Empty</th><th class="num">Time (s)</th></tr></thead>
-        <tbody>${d.projects.map(p => `<tr><td><b>${esc(p.project)}</b></td><td class="num">${p.suites}</td><td class="num">${p.cases}</td>
-          <td class="num ok">${p.pass}</td><td class="num${p.fail ? " bad" : ""}">${p.fail}</td>
-          <td class="num${p.empty ? " empty" : ""}">${p.empty}</td><td class="num">${(+p.time).toFixed(3)}</td></tr>`).join("")}</tbody></table>
-    </div>
-    ${d.projects.map(p => testProjectCard(p, byProject[p.project] || [], hist, caseHist, w)).join("")}
-    <div class="card">
-      <div class="card-title"><h3>Pass and fail over time</h3>
-        <span>one point per report · ${esc(fmtDate(reports.length ? reports[reports.length - 1].time : null))} latest</span></div>
-      ${counts}
-      <div class="card-title"><h3>Run time over time</h3><span>report total, seconds</span></div>
-      ${timing}
-    </div>`;
-  bindRows(el, "data-suite", state.suites, renderTests);
+  const ui = state.testsUi;
+  const caret = treeSearchCaret("tests");
+  const nodes = testTreeNodes(d);
+  const rows = treeRows(treeSort(treeFilter(nodes, ui.search), ui.sort), state.suites, !!ui.search.trim());
+  el.innerHTML = testsSummary(d, ui, w) + `<div class="card">
+    <div class="card-title"><h3>Projects, suites and cases</h3>
+      <span>click a row to open it, a column header to sort</span></div>
+    ${treeToolbar("tests", ui, rows.length, treeCount(nodes))}
+    ${treeHtml("tests", rows, ui.sort, row => testDetail(row, d, w))}</div>`;
+  bindTree(el, "tests", state.suites, nodes, ui, renderTests, caret);
   bindTips(el);
   restoreScroll(document.getElementById("content"), state.scroll.tests);
 }
 
-function microCaseSeries(suite, caseHist, offset) {
-  return (suite.cases_detail || []).map((c, j) => {
-    const key = "bench:" + suite.key + "|" + c.case;
-    const history = caseHist[suite.key + "|" + c.case] || [];
+function microCaseSeries(suite, d, offset) {
+  const hist = d.micro_case_history || {};
+  return (suite.children || []).map((c, j) => {
+    const key = "bench:" + c.key;
+    const history = hist[c.key] || [];
     return {
-      key, name: suite.suite + "." + c.case, color: SERIES[(offset + j) % SERIES.length], dash: seriesDash(j),
+      key, name: suite.name + "." + c.name, color: SERIES[(offset + j) % SERIES.length], dash: seriesDash(j),
       hidden: !!state.hidden[key],
       points: history.map(h => ({
         t: +new Date(h.time), v: h.median_ns,
-        tip: `${c.case} · ${nsText(h.median_ns)}`,
+        tip: `${c.name} · ${nsText(h.median_ns)}`,
         sub: `${fmtDate(h.time)} · ${h.item || ""}${h.ci_low_ns == null ? "" : ` · ci95 ${nsText(h.ci_low_ns)} – ${nsText(h.ci_high_ns)}`}`,
       })),
       band: history.filter(h => h.ci_low_ns != null && h.ci_high_ns != null)
@@ -913,76 +1338,84 @@ function microCaseSeries(suite, caseHist, offset) {
   });
 }
 
-function microSuiteRows(suites, hist, caseHist, width) {
-  return suites.map((s, i) => {
-    const color = SERIES[i % SERIES.length];
-    const open = state.benchSuites.includes(s.key);
-    const history = hist[s.key] || [];
-    const points = history.map(h => ({ t: +new Date(h.time), v: h.median_ns }));
-    const row = `<tr class="pick${open ? " sel" : ""}" data-bench-suite="${esc(s.key)}">
-      <td><span class="tw">${open ? "▾" : "▸"}</span><span class="dot" style="background:${color}"></span> <b>${esc(s.suite)}</b></td>
-      <td class="num">${s.cases}</td><td class="num">${esc(nsText(s.median_ns))}</td><td class="num">${esc(nsText(s.mean_ns))}</td>
-      <td class="spark-cell">${sparkline(points, color, s.suite + " · " + history.length + " report(s)",
-        points.map(p => nsText(p.v)).slice(-6).join(" → "))}</td>
-      <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>`;
-    if (!open) return row;
-    const rows = (s.cases_detail || []).map((c, j) => {
-      const ch = caseHist[s.key + "|" + c.case] || [];
-      return `<tr><td class="mono">${esc(c.case)}</td>
-        <td class="num">${esc(nsText(c.median_ns))}</td>
-        <td class="num muted">${c.ci_low_ns == null ? "—" : esc(nsText(c.ci_low_ns) + " – " + nsText(c.ci_high_ns))}</td>
-        <td class="num">${esc(nsText(c.mean_ns))}</td><td class="num">${esc(nsText(c.stddev_ns))}</td>
-        <td class="num">${esc(nsText(c.p99_ns))}</td>
-        <td class="num">${c.iterations == null ? "—" : (+c.iterations).toLocaleString()}</td>
-        <td class="num">${c.samples == null ? "—" : c.samples}</td>
-        <td class="num${c.outliers ? " empty" : ""}">${c.outliers == null ? "—" : c.outliers}</td>
-        <td class="spark-cell">${sparkline(ch.map(h => ({ t: +new Date(h.time), v: h.median_ns })), SERIES[j % SERIES.length],
-          c.case + " · " + ch.length + " report(s)", ch.map(h => nsText(h.median_ns)).slice(-6).join(" → "))}</td></tr>`;
-    }).join("");
-    const series = microCaseSeries(s, caseHist, i);
-    const unit = nsUnit(Math.max(...series.flatMap(x => x.points.map(p => p.v)), 0));
-    return row + `<tr class="exp"><td colspan="6">
-      <table class="data sub"><thead><tr><th>Case</th><th class="num">Median</th><th class="num">ci95</th>
-        <th class="num">Mean</th><th class="num">Stddev</th><th class="num">p99</th><th class="num">Iterations</th>
-        <th class="num">Samples</th><th class="num">Outliers</th><th>History</th></tr></thead>
-        <tbody>${rows}</tbody></table>
-      ${lineChart({ width: Math.max(320, width - 60), height: 190, label: s.suite + " median over time",
-        yLabel: "median (" + unit.unit + ")", yFormat: v => String(+(v / unit.div).toPrecision(3)), series })}
-      <div class="sub-note">median with its 95% confidence interval as a band · latest report
-        <a href="${esc(s.url)}" target="_blank">${esc(s.file)}</a></div></td></tr>`;
-  }).join("");
+function benchDetail(row, d, width) {
+  const n = row.node;
+  const w = Math.max(320, width - 40 - row.depth * 16);
+  const report = n.url ? `<div class="tree-note">latest report
+    <a href="${esc(n.url)}" target="_blank">${esc(n.file || n.item || n.url)}</a></div>` : "";
+  let series = [];
+  if (n.level === "project") {
+    const all = (n.children || []).slice().sort((a, b) => (b.median_ns || 0) - (a.median_ns || 0));
+    all.slice(0, TREE_SERIES).forEach((s, i) => {
+      if (state.benchSuites.includes(s.key)) {
+        series.push(...microCaseSeries(s, d, i).map(x => ({
+          ...x, key: "bench:sum:" + x.key, hidden: !!state.hidden["bench:sum:" + x.key], band: null,
+        })));
+        return;
+      }
+      const key = "bench:sum:" + s.key;
+      series.push({
+        key, name: s.name, color: s.color, dash: seriesDash(i), hidden: !!state.hidden[key],
+        points: ((d.micro_suite_history || {})[s.key] || []).map(h => ({
+          t: +new Date(h.time), v: h.median_ns,
+          tip: `${s.name} · ${nsText(h.median_ns)}`,
+          sub: `${fmtDate(h.time)} · ${h.item || ""} · ${h.cases} case(s)`,
+        })),
+      });
+    });
+  } else if (n.level === "suite") {
+    series = microCaseSeries(n, d, 0);
+  } else {
+    return "";
+  }
+  const unit = nsUnit(Math.max(...series.flatMap(x => x.points.map(p => p.v)), 0));
+  const title = n.level === "project" ? "Time per suite" : "Median per case";
+  const note = n.level === "project"
+    ? "sum of case medians, per case for an expanded suite · click a legend entry to hide a line"
+    : "median with its 95% confidence interval as a band";
+  return `<div class="card-title"><h3>${esc(title)}</h3><span>${esc(note)}</span></div>
+    ${lineChart({ width: w, height: n.level === "project" ? 200 : 180, label: n.name + " median over time",
+      yLabel: "median (" + unit.unit + ")", yFormat: v => String(+(v / unit.div).toPrecision(3)), series })}${report}`;
 }
 
-function microProjectCard(project, suites, hist, caseHist, width) {
-  const series = [];
-  suites.forEach((s, i) => {
-    if (state.benchSuites.includes(s.key)) {
-      series.push(...microCaseSeries(s, caseHist, i).map(x => ({ ...x, key: "bench:sum:" + x.key, hidden: !!state.hidden["bench:sum:" + x.key], band: null })));
-      return;
-    }
-    const key = "bench:sum:" + s.key;
-    series.push({
-      key, name: s.suite, color: SERIES[i % SERIES.length], dash: seriesDash(i), hidden: !!state.hidden[key],
-      points: (hist[s.key] || []).map(h => ({
-        t: +new Date(h.time), v: h.median_ns,
-        tip: `${s.suite} · ${nsText(h.median_ns)}`,
-        sub: `${fmtDate(h.time)} · ${h.item || ""} · ${h.cases} case(s)`,
-      })),
-    });
-  });
-  const unit = nsUnit(Math.max(...series.flatMap(x => x.points.map(p => p.v)), 0));
+function sceneDetail(row) {
+  const n = row.node;
+  const cell = (v, digits) => `<td class="num">${v == null ? "—" : (+v).toFixed(digits)}</td>`;
+  const rows = (n.runs || []).slice().reverse().map(r => `<tr>
+    <td>${esc(fmtDate(r.time))}${r.time_source === "mtime" ? ' <span class="muted">(file time)</span>' : ""}</td>
+    ${cell(r.mean_ms, 3)}${cell(r.p99_ms, 3)}${cell(r.max_ms, 3)}${cell(r.fps, 0)}
+    <td class="mono">${r.url ? `<a href="${esc(r.url)}" target="_blank">${esc(r.file)}</a>` : esc(r.file)}</td></tr>`).join("");
+  return `<table class="data sub"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>
+    <th class="num">Max (ms)</th><th class="num">FPS</th><th>File</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tree-note">${(n.runs || []).length} run(s)${n.source ? " · " + esc(n.source) : ""}</div>`;
+}
+
+function benchSummary(d, ui, width) {
+  const o = d.micro_overall || {};
+  const points = field => (o.trend || []).map(p => ({ t: +new Date(p.time), v: p[field] }));
+  const tiles = [
+    { label: "Projects", value: o.projects },
+    { label: "Suites", value: o.suites },
+    { label: "Cases", value: o.cases, points: points("cases"), color: "var(--accent)", tip: "cases per report" },
+    { label: "Median total", value: nsText(o.median_ns), points: points("median_ns"), color: "var(--s3)",
+      tip: "sum of case medians per report" },
+    { label: "Mean total", value: nsText(o.mean_ns), points: points("mean_ns"), color: "var(--s4)" },
+    { label: "Reports", value: o.reports },
+    { label: "Scenes", value: (d.scenes || []).length, note: (d.runs || []).length + " runs" },
+  ];
+  const charts = !ui.charts ? "" : `
+    <div class="card-title"><h3>Median total over time</h3><span>one point per benchmark report</span></div>
+    ${lineChart({ width, label: "benchmark median total over time", yLabel: "median (" + nsUnit(o.median_ns || 0).unit + ")",
+      yFormat: v => String(+(v / nsUnit(o.median_ns || 0).div).toPrecision(3)),
+      series: [{ name: "median total", color: "var(--accent)", points: (o.trend || []).map(p => ({
+        t: +new Date(p.time), v: p.median_ns, tip: nsText(p.median_ns), sub: `${fmtDate(p.time)} · ${p.cases} case(s)`,
+      })) }] })}`;
   return `<div class="card">
-    <div class="card-title"><h3>${esc(project.project)}</h3>
-      <span>${project.suites} suites · ${project.cases} cases · ${esc(nsText(project.median_ns))} total ·
-      ${esc(fmtDate(project.time))} · click a suite for its cases</span></div>
-    <table class="data"><thead><tr><th>Suite</th><th class="num">Cases</th><th class="num">Median total</th>
-      <th class="num">Mean total</th><th>History</th><th>Report</th></tr></thead>
-      <tbody>${microSuiteRows(suites, hist, caseHist, width)}</tbody></table>
-    <div class="card-title"><h3>Time per suite</h3>
-      <span>sum of case medians, per case for an expanded suite · click a legend entry to hide a line</span></div>
-    ${lineChart({ width, label: project.project + " suite time over time", yLabel: "median (" + unit.unit + ")",
-      yFormat: v => String(+(v / unit.div).toPrecision(3)), series })}
-  </div>`;
+    <div class="card-title"><h3>All benchmarks</h3>
+      <span>${benchTrendChip(o.trend)} · latest report ${esc(fmtDate(o.latest))}</span></div>
+    ${statTiles(tiles)}
+    <button class="more" type="button" data-charts="bench">${ui.charts ? "▾" : "▸"} trend charts</button>
+    ${charts}</div>`;
 }
 
 function renderBenchmarks() {
@@ -990,12 +1423,16 @@ function renderBenchmarks() {
   const d = state.bench;
   if (!d) { el.innerHTML = `<div class="empty-state">Loading benchmark reports…</div>`; return; }
   if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
-  const microProjects = d.micro_projects || [], microSuites = d.micro_suites || [];
-  if (!d.scenes.length && !microSuites.length) { el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`; return; }
+  if (!d.scenes.length && !(d.micro_suites || []).length) {
+    el.innerHTML = `<div class="empty-state">No benchmark reports under project/db or test/integration/out</div>`;
+    return;
+  }
   const w = chartWidth(el);
-  const mHist = d.micro_suite_history || {}, mCases = d.micro_case_history || {};
-  const byProject = {};
-  for (const s of microSuites) (byProject[s.project] = byProject[s.project] || []).push(s);
+  const ui = state.benchUi;
+  const caret = treeSearchCaret("bench");
+  const nodes = benchTreeNodes(d);
+  const rows = treeRows(treeSort(treeFilter(nodes, ui.search), ui.sort), state.benchSuites, !!ui.search.trim());
+  const scenes = treeRows(treeSort(sceneTreeNodes(d), ui.sort), state.scenes, false);
   const color = {};
   d.scenes.forEach((s, i) => { color[s.scene] = SERIES[i % SERIES.length]; });
   const metric = (run, key) => (run[key] == null ? null : {
@@ -1011,53 +1448,27 @@ function renderBenchmarks() {
   }
   const legend = d.scenes.map(s => ({ name: s.scene, color: color[s.scene] }))
     .concat([{ name: "mean", color: "var(--ink-3)" }, { name: "p99", color: "var(--ink-3)", dash: "5 4" }]);
-  const chart = d.scenes.length ? lineChart({
-    width: w, label: "frame time per scene over time", yLabel: "frame time (ms)",
-    yFormat: v => v.toFixed(2), series, legend,
-  }) : "";
-  const cell = (v, n) => `<td class="num">${v == null ? "—" : (+v).toFixed(n)}</td>`;
-  const selected = d.scenes.find(s => s.scene === state.scene);
-  const history = selected ? d.runs.filter(r => r.scene === selected.scene) : [];
-  el.innerHTML = `
-    ${!microSuites.length ? "" : `<div class="card">
-      <div class="card-title"><h3>Microbenchmarks</h3>
-        <span>${microProjects.length} bench projects · ${microSuites.length} suites ·
-        ${microSuites.reduce((a, s) => a + s.cases, 0)} cases · ${(d.micro_runs || []).length} case runs · bake3 reports</span></div>
-      <table class="data"><thead><tr><th>Project</th><th class="num">Suites</th><th class="num">Cases</th>
-        <th class="num">Median total</th><th>Report</th></tr></thead>
-        <tbody>${microProjects.map(p => `<tr><td><b>${esc(p.project)}</b></td><td class="num">${p.suites}</td>
-          <td class="num">${p.cases}</td><td class="num">${esc(nsText(p.median_ns))}</td>
-          <td class="muted">${esc(p.item || "")} · ${esc(fmtDate(p.time))}</td></tr>`).join("")}</tbody></table>
-    </div>`}
-    ${microProjects.map(p => microProjectCard(p, byProject[p.project] || [], mHist, mCases, w)).join("")}
+  el.innerHTML = benchSummary(d, ui, w) + `
+    ${!nodes.length ? "" : `<div class="card">
+      <div class="card-title"><h3>Projects, suites and cases</h3>
+        <span>click a row to open it, a column header to sort</span></div>
+      ${treeToolbar("bench", ui, rows.length, treeCount(nodes))}
+      ${treeHtml("bench", rows, ui.sort, row => benchDetail(row, d, w))}</div>`}
     ${!d.scenes.length ? "" : `<div class="card">
       <div class="card-title"><h3>Scene benchmarks</h3>
         <span>${d.scenes.length} scenes · ${d.runs.length} runs · latest per scene · click a row for its history</span></div>
-      <table class="data"><thead><tr><th>Scene</th><th class="num">Entities</th><th class="num">Frames</th>
-        <th class="num">Mean (ms)</th><th class="num">p50 (ms)</th><th class="num">p99 (ms)</th><th class="num">Max (ms)</th>
-        <th class="num">FPS</th><th>Report</th></tr></thead>
-        <tbody>${d.scenes.map(s => `<tr class="pick ${s.scene === state.scene ? "sel" : ""}" data-scene="${esc(s.scene)}">
-          <td><span class="tw">${s.scene === state.scene ? "▾" : "▸"}</span><span class="dot" style="background:${color[s.scene]}"></span> <b>${esc(s.scene)}</b></td>
-          <td class="num">${s.entities == null ? "—" : (+s.entities).toLocaleString()}</td>
-          <td class="num">${s.frames == null ? "—" : s.frames}</td>
-          ${cell(s.mean_ms, 3)}${cell(s.p50_ms, 3)}${cell(s.p99_ms, 3)}${cell(s.max_ms, 3)}${cell(s.fps, 0)}
-          <td class="muted">${esc(s.item || "")} · ${esc(fmtDate(s.time))}</td></tr>
-          ${s.scene !== state.scene ? "" : `<tr class="exp"><td colspan="9">
-            <table class="data sub"><thead><tr><th>When</th><th class="num">Mean (ms)</th><th class="num">p99 (ms)</th>
-              <th class="num">Max (ms)</th><th class="num">FPS</th><th>File</th></tr></thead>
-              <tbody>${history.slice().reverse().map(r => `<tr><td>${esc(fmtDate(r.time))}${r.time_source === "mtime" ? ' <span class="muted">(file time)</span>' : ""}</td>
-                ${cell(r.mean_ms, 3)}${cell(r.p99_ms, 3)}${cell(r.max_ms, 3)}${cell(r.fps, 0)}
-                <td class="mono">${r.url ? `<a href="${esc(r.url)}" target="_blank">${esc(r.file)}</a>` : esc(r.file)}</td></tr>`).join("")}</tbody></table>
-            <div class="sub-note">${history.length} run(s)${selected && selected.source ? " · " + esc(selected.source) : ""}</div></td></tr>`}`).join("")}</tbody></table>
+      ${treeHtml("scenes", scenes, ui.sort, sceneDetail)}
       <div class="card-title"><h3>Frame time over time</h3><span>one line per scene, solid mean and dashed p99</span></div>
-      ${chart}
-    </div>`}`;
-  el.querySelectorAll("[data-scene]").forEach(row => row.onclick = () => {
-    state.scene = state.scene === row.dataset.scene ? null : row.dataset.scene;
+      ${lineChart({ width: w, label: "frame time per scene over time", yLabel: "frame time (ms)",
+        yFormat: v => v.toFixed(2), series, legend })}</div>`}`;
+  bindTree(el, "bench", state.benchSuites, nodes, ui, renderBenchmarks, caret);
+  el.querySelectorAll(".tree.t-scenes .trow[data-toggle]").forEach(row => row.onclick = () => {
+    const key = row.getAttribute("data-row");
+    const i = state.scenes.indexOf(key);
+    if (i < 0) state.scenes.push(key); else state.scenes.splice(i, 1);
     renderBenchmarks();
     saveUi();
   });
-  bindRows(el, "data-bench-suite", state.benchSuites, renderBenchmarks);
   bindTips(el);
   restoreScroll(document.getElementById("content"), state.scroll.bench);
 }
