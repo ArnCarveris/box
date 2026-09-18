@@ -20,6 +20,12 @@
                 ]
             },
             {
+                "id": "View",
+                "benchcases": [
+                    "extract_two_views"
+                ]
+            },
+            {
                 "id": "Environment",
                 "benchcases": [
                     "extract"

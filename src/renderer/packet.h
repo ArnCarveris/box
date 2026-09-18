@@ -13,6 +13,9 @@
 #include <stdbool.h>
 #include "vec.h"
 
+/** View index that names no view, the capture then reads the surface */
+#define BOX_VIEW_NONE (0xFFFFFFFFu)
+
 /** Longest capture path stored in a packet */
 #define BOX_CAPTURE_PATH_MAX (512)
 
@@ -442,7 +445,7 @@ typedef struct box_packet_t {
     box_view_t view;                         /**< Copy of the first view, for readers of one view */
     bool has_view;                           /**< The packet holds at least one view */
     box_vec_t views;                         /**< box_view_t sorted by priority */
-    uint32_t capture_view;                   /**< View the capture path reads its target from */
+    uint32_t capture_view;                   /**< View the capture reads, or BOX_VIEW_NONE */
     box_vec_t target_create;                 /**< box_target_cmd_t, also resizes a handle */
     box_vec_t target_destroy;                /**< uint32_t handles */
     box_vec_t mesh_create;                   /**< box_mesh_cmd_t */
@@ -503,7 +506,7 @@ static inline void box_packet_reset(
     p->height = 0;
     p->capture_path[0] = '\0';
     p->has_view = false;
-    p->capture_view = 0;
+    p->capture_view = BOX_VIEW_NONE;
     memset(&p->view, 0, sizeof(box_view_t));
     box_vec_clear(&p->views);
     box_vec_clear(&p->target_create);

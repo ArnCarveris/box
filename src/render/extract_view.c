@@ -495,7 +495,7 @@ void box_render_extract_views(
     ecs_entity_t capture)
 {
     box_vec_clear(&p->views);
-    p->capture_view = 0;
+    p->capture_view = BOX_VIEW_NONE;
     int32_t count = ecs_vec_count(&state->view_list);
     if (!count) {
         box_view_src_t src = {0};

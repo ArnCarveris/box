@@ -1,0 +1,78 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+main_camera {
+  Position: {0, 4, -12}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+side_camera {
+  Position: {11, 9, 7}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 40}
+  Capture: {path: "/tmp/box/two_views_side.png"}
+}
+
+main_view {
+  View: {camera: main_camera, priority: 0}
+}
+
+side_target {
+  RenderTarget: {640, 360}
+}
+
+side_view {
+  View: {camera: side_camera, target: side_target, priority: -1, clear: {20, 34, 60}}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {20, 0.2, 20}
+  Rgb: {180, 180, 190}
+  PbrMaterial: {roughness: 0.9}
+}
+
+box {
+  Position: {-4, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1.5, 1, 1.5}
+  Rgb: {220, 80, 60}
+}
+
+sphere {
+  Position: {-1, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 160, 240}
+  PbrMaterial: {metallic: 0.2, roughness: 0.3}
+}
+
+cylinder {
+  Position: {2, 0.75, 0}
+  Cylinder: {segments: 24, smooth: true, length: 1.5, radius: 0.6}
+  Rgb: {90, 200, 110}
+}
+
+torus {
+  Position: {5, 0.6, 0}
+  Rotation: {1.2, 0, 0}
+  Torus: {segments: 32, rings: 16, smooth: true, radius: 0.8, tube: 0.25}
+  Rgb: {200, 100, 220}
+  PbrMaterial: {metallic: 0.8, roughness: 0.25}
+}
+
+glow {
+  Position: {0, 1.2, -4}
+  Sphere: {segments: 16, smooth: true, radius: 0.5}
+  Rgb: {40, 40, 40}
+  Emissive: {strength: 4, color: {255, 160, 60}}
+}
