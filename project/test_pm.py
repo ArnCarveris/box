@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Unit tests for pm.py. Run with: python3 project/test_pm.py [--json report.json]"""
 import datetime as dt
+import http.server
 import json
 import os
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import unittest
+import urllib.error
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pm
@@ -23,14 +27,32 @@ class PmTests(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.old_db = pm.DB
         self.old_bench = pm.BENCH_PROJECTS
+        self.old_inspector = pm.INSPECTOR
         pm.DB = os.path.join(self.tmp, "db")
         pm.BENCH_PROJECTS = os.path.join(self.tmp, "bench")
+        pm.INSPECTOR = os.path.join(self.tmp, "inspector", "index.html")
         os.makedirs(pm.DB)
 
     def tearDown(self):
         pm.DB = self.old_db
         pm.BENCH_PROJECTS = self.old_bench
+        pm.INSPECTOR = self.old_inspector
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def get(self, route):
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), pm.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        url = "http://127.0.0.1:%d%s" % (server.server_address[1], route)
+        try:
+            with urllib.request.urlopen(url) as response:
+                return response.status, response.headers.get("Content-Type"), response.read()
+        except urllib.error.HTTPError as err:
+            return err.code, err.headers.get("Content-Type"), err.read()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
 
     def new(self, kind, path, title, **kw):
         args = Args(kind=kind, path=path, title=title, brief=kw.get("brief", "Brief."), type=kw.get("type", "feature"), deps=kw.get("deps"))
@@ -359,6 +381,65 @@ class PmTests(unittest.TestCase):
         ordered = sorted([late, early, started], key=pm.start_order)
 
         self.assertEqual([i["name"] for i in ordered], ["c", "a", "b"])
+
+    def write_wasm(self, epic):
+        directory = os.path.join(pm.DB, epic, "deliverable", "wasm")
+        os.makedirs(directory, exist_ok=True)
+        files = (("box_app.js", b"var Module;"), ("box_app.wasm", b"\0asm\1\0\0\0"),
+                 ("box_app.html", b"<html></html>"))
+        for name, body in files:
+            with open(os.path.join(directory, name), "wb") as f:
+                f.write(body)
+
+    def test_state_links_epics_with_a_wasm_deliverable(self):
+        self.new("epic", "e1", "Epic one")
+        self.new("task", "e1/t1", "Task")
+        self.new("epic", "e2", "Epic two")
+        self.write_wasm("e1")
+        epics = {e["name"]: e for e in pm.collect_state()["epics"]}
+        self.assertEqual(epics["e1"]["wasm_url"], "/deliverable/e1/deliverable/wasm/box_app.js")
+        self.assertEqual(epics["e1"]["inspect_url"],
+                         "/inspector?wasm=/deliverable/e1/deliverable/wasm/box_app.js")
+        self.assertIsNone(epics["e2"]["wasm_url"])
+        self.assertIsNone(epics["e2"]["inspect_url"])
+        self.assertNotIn("inspect_url", epics["e1"]["children"][0])
+
+    def test_content_type_per_extension(self):
+        self.assertEqual(pm.content_type("/a/box_app.wasm"), "application/wasm")
+        self.assertEqual(pm.content_type("/a/box_app.js"), "application/javascript")
+        self.assertEqual(pm.content_type("/a/box_app.HTML"), "text/html")
+        self.assertEqual(pm.content_type("/a/shot.png"), "image/png")
+        self.assertEqual(pm.content_type("/a/tests.json"), "application/json")
+        self.assertEqual(pm.content_type("/a/session.log"), "text/plain")
+        self.assertEqual(pm.content_type("/a/README.md"), "text/plain")
+        self.assertEqual(pm.content_type("/a/noext"), "text/plain")
+
+    def test_deliverable_route_serves_wasm_with_its_content_type(self):
+        self.new("epic", "e1", "Epic")
+        self.write_wasm("e1")
+        status, ctype, body = self.get("/deliverable/e1/deliverable/wasm/box_app.wasm")
+        self.assertEqual((status, ctype), (200, "application/wasm"))
+        self.assertEqual(body, b"\0asm\1\0\0\0")
+        status, ctype, _ = self.get("/deliverable/e1/deliverable/wasm/box_app.js")
+        self.assertEqual((status, ctype), (200, "application/javascript"))
+        self.assertEqual(self.get("/deliverable/e1/deliverable/wasm/missing.js")[0], 404)
+
+    def test_inspector_route_reads_the_page_from_disk(self):
+        os.makedirs(os.path.dirname(pm.INSPECTOR))
+        with open(pm.INSPECTOR, "w") as f:
+            f.write("<html>one</html>")
+        status, ctype, body = self.get("/inspector")
+        self.assertEqual((status, ctype), (200, "text/html; charset=utf-8"))
+        self.assertEqual(body, b"<html>one</html>")
+        with open(pm.INSPECTOR, "w") as f:
+            f.write("<html>two</html>")
+        self.assertEqual(self.get("/inspector?wasm=/deliverable/e1/deliverable/wasm/box_app.js")[2],
+                         b"<html>two</html>")
+
+    def test_inspector_route_404_when_the_page_is_missing(self):
+        status, _, body = self.get("/inspector")
+        self.assertEqual(status, 404)
+        self.assertIn(b"box_inspector", body)
 
 
 class JsonResult(unittest.TextTestResult):

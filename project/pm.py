@@ -12,7 +12,6 @@ import argparse
 import datetime as dt
 import http.server
 import json
-import mimetypes
 import os
 import re
 import sys
@@ -22,6 +21,15 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(ROOT, "db")
 REPO = os.path.dirname(ROOT)
 INTEGRATION_OUT = os.path.join(REPO, "test", "integration", "out")
+INSPECTOR = os.path.join(REPO, "apps", "box_inspector", "index.html")
+WASM_IMAGE = "deliverable/wasm/box_app.js"
+CONTENT_TYPES = {
+    ".wasm": "application/wasm",
+    ".js": "application/javascript",
+    ".html": "text/html",
+    ".png": "image/png",
+    ".json": "application/json",
+}
 STATUSES = ("pending", "in progress", "complete", "discarded")
 KINDS = ("bug", "feature", "refactor")
 LEVELS = ("epic", "task", "subtask")
@@ -88,6 +96,18 @@ def list_deliverables(path):
     return result
 
 
+def content_type(path):
+    return CONTENT_TYPES.get(os.path.splitext(path)[1].lower(), "text/plain")
+
+
+def inspect_urls(path, rel):
+    image = os.path.join(path, *WASM_IMAGE.split("/"))
+    if not os.path.isfile(image):
+        return None, None
+    wasm_url = "/deliverable/" + rel + "/" + WASM_IMAGE
+    return wasm_url, "/inspector?wasm=" + wasm_url
+
+
 def summarize_tests(path):
     data = read_json(path)
     if not isinstance(data, dict) or "tests" not in data:
@@ -138,6 +158,8 @@ def walk_item(path, level, rel):
         "deliverables": list_deliverables(path),
         "children": [],
     }
+    if item["level"] == "epic":
+        item["wasm_url"], item["inspect_url"] = inspect_urls(path, rel)
     if level + 1 < len(LEVELS):
         for name, full in child_dirs(path):
             item["children"].append(walk_item(full, level + 1, rel + "/" + name))
@@ -491,13 +513,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(aggregate_tests())
         if route == "/api/benchmarks":
             return self.send_json(aggregate_benchmarks())
+        if route == "/inspector":
+            if not os.path.isfile(INSPECTOR):
+                return self.send_error(404, "apps/box_inspector/index.html is not there yet")
+            return self.send_file(INSPECTOR, "text/html; charset=utf-8")
         if route.startswith("/deliverable/"):
             rel = os.path.normpath(route[len("/deliverable/"):])
             full = os.path.join(DB, rel)
             if rel.startswith("..") or "/deliverable/" not in full + "/" or not os.path.isfile(full):
                 return self.send_error(404)
-            ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
-            return self.send_file(full, ctype)
+            return self.send_file(full, content_type(full))
         return self.send_error(404)
 
     def send_json(self, payload):
