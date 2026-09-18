@@ -13,6 +13,7 @@
 #include "box/types.h"
 #include "box/math.h"
 #include "box/core.h"
+#include "box/job.h"
 #include "box/transform.h"
 #include "box/camera.h"
 #include "box/view.h"
@@ -23,6 +24,8 @@
 #include "box/texture.h"
 #include "box/movement.h"
 #include "box/surface.h"
+#include "box/input.h"
 #include "box/command.h"
+#include "box/monitor.h"
 
 #endif

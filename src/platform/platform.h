@@ -90,6 +90,60 @@ void box_window_set_size(
     int32_t width,
     int32_t height);
 
+/** What an OS input event does, mirrors InputEventKind of box/input.h */
+typedef enum box_input_kind_t {
+    BoxInputKeyDown = 0,     /**< Key went down, code is an engine key code */
+    BoxInputKeyUp = 1,       /**< Key came up, code is an engine key code */
+    BoxInputChar = 2,        /**< Character typed, code is a unicode code point */
+    BoxInputMouseMove = 3,   /**< Cursor moved to x, y in window points */
+    BoxInputButtonDown = 4,  /**< Mouse button went down, code is a button code */
+    BoxInputButtonUp = 5,    /**< Mouse button came up, code is a button code */
+    BoxInputScroll = 6,      /**< Wheel moved by x, y */
+    BoxInputFocus = 7,       /**< Window focus changed, code is 1 when focused */
+    BoxInputMinimize = 8     /**< Window minimize changed, code is 1 when minimized */
+} box_input_kind_t;
+
+/** One input event as the OS reported it */
+typedef struct box_input_event_t {
+    box_input_kind_t kind; /**< What the event does */
+    int32_t code;          /**< Key code, button code, code point or boolean flag */
+    float x;               /**< Cursor x in window points, or scroll x */
+    float y;               /**< Cursor y in window points, or scroll y */
+} box_input_event_t;
+
+/** Sink the window reports its input events to */
+typedef void (*box_input_fn)(
+    void *ctx,
+    const box_input_event_t *event);
+
+/** Report the input events of a window to a sink until it is set again.
+ *
+ * @param w The window
+ * @param fn The sink, NULL to stop reporting
+ * @param ctx Context passed to the sink
+ */
+void box_window_set_input(
+    box_window_t *w,
+    box_input_fn fn,
+    void *ctx);
+
+/** Lock the cursor to the window and hide it, or release it again.
+ *
+ * @param w The window
+ * @param captured true to lock the cursor
+ */
+void box_window_set_cursor_captured(
+    box_window_t *w,
+    bool captured);
+
+/** Translate a native key code to an engine key code.
+ *
+ * @param native The GLFW key code natively, the DOM key code on web
+ * @return The engine key code, BoxKeyNone when the key has none
+ */
+int32_t box_platform_key_from_native(
+    int32_t native);
+
 /** Get the CAMetalLayer backing the window on macOS.
  *
  * @param w The window
