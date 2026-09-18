@@ -68,13 +68,15 @@ static float box_effect_scalar(
  * @param ptr The value
  * @param out The parameter block
  * @param at Index of the next float, raised by what the value wrote
+ * @param plain Cleared when a member is not a float, which a copy would miss
  */
 static void box_effect_floats(
     ecs_world_t *world,
     ecs_entity_t type,
     const void *ptr,
     float *out,
-    int32_t *at)
+    int32_t *at,
+    bool *plain)
 {
     const EcsPrimitive *primitive = ecs_get(world, type, EcsPrimitive);
     if (primitive) {
@@ -82,6 +84,7 @@ static void box_effect_floats(
             out[*at] = box_effect_scalar(primitive->kind, ptr);
         }
 
+        plain[0] = plain[0] && primitive->kind == EcsF32;
         (*at) ++;
         goto done;
     }
@@ -103,7 +106,7 @@ static void box_effect_floats(
         int32_t element;
         for (element = 0; element < count; element ++) {
             const char *value = (const char*)ptr + member->offset + element * ti->size;
-            box_effect_floats(world, member->type, value, out, at);
+            box_effect_floats(world, member->type, value, out, at, plain);
         }
     }
 
@@ -111,17 +114,63 @@ done:
     return;
 }
 
+/** Whether a parameter component was already flattened once.
+ *
+ * @param state The registry
+ * @param id The parameter component
+ * @return Its entry in the table, -1 when the component was not seen yet
+ */
+static int32_t box_effect_known(
+    EffectState *state,
+    ecs_id_t id)
+{
+    int32_t result = -1;
+    int32_t i;
+    for (i = 0; i < state->layout_count && result < 0; i ++) {
+        if (state->layout_id[i] == id) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+/** Remember how a parameter component reaches the block.
+ *
+ * @param state The registry
+ * @param id The parameter component
+ * @param raw A copy of the component is the block
+ * @param size Bytes the component holds
+ */
+static void box_effect_remember(
+    EffectState *state,
+    ecs_id_t id,
+    bool raw,
+    int32_t size)
+{
+    if (state->layout_count < BOX_EFFECT_LAYOUT_MAX) {
+        state->layout_id[state->layout_count] = id;
+        state->layout_raw[state->layout_count] = raw;
+        state->layout_size[state->layout_count] = size;
+        state->layout_count ++;
+    }
+}
+
 /** Copy the parameters of an effect out of its parameter component.
  *
  * The parameters are the first reflected struct on the entity that is not the
- * Effect itself, flattened into the floats the shader reads.
+ * Effect itself, flattened into the floats the shader reads. A component whose
+ * members are floats end to end is the block already, which the registry
+ * remembers after it has flattened it once.
  *
  * @param world The world
+ * @param state The registry
  * @param e The effect entity
  * @param out The parameter block to fill
  */
 static void box_effect_params(
     ecs_world_t *world,
+    EffectState *state,
     ecs_entity_t e,
     float *out)
 {
@@ -147,8 +196,23 @@ static void box_effect_params(
             continue;
         }
 
+        int32_t known = box_effect_known(state, id);
+        if (known >= 0 && state->layout_raw[known]) {
+            memcpy(out, ptr, (size_t)state->layout_size[known]);
+            goto done;
+        }
+
         int32_t at = 0;
-        box_effect_floats(world, id, ptr, out, &at);
+        bool plain = true;
+        box_effect_floats(world, id, ptr, out, &at, &plain);
+        if (known < 0) {
+            const ecs_type_info_t *ti = ecs_get_type_info(world, id);
+            int32_t size = ti ? ti->size : 0;
+            int32_t limit = BOX_EFFECT_PARAM_MAX * (int32_t)sizeof(float);
+            bool raw = plain && size == at * (int32_t)sizeof(float) && size <= limit;
+            box_effect_remember(state, id, raw, size);
+        }
+
         goto done;
     }
 
@@ -159,12 +223,14 @@ done:
 /** Append one effect entity to the chain of a view.
  *
  * @param world The world
+ * @param state The registry
  * @param e The effect entity
  * @param p The packet
  * @param v The view
  */
 static void box_effect_append(
     ecs_world_t *world,
+    EffectState *state,
     ecs_entity_t e,
     box_packet_t *p,
     box_view_t *v)
@@ -192,7 +258,7 @@ static void box_effect_append(
     pass->inputs |= fx->motion ? BOX_EFFECT_MOTION : 0u;
     pass->inputs |= fx->pyramid ? BOX_EFFECT_PYRAMID : 0u;
     pass->inputs |= fx->exposure ? BOX_EFFECT_EXPOSURE : 0u;
-    box_effect_params(world, e, pass->params);
+    box_effect_params(world, state, e, pass->params);
     v->effect_inputs |= pass->inputs;
     v->effect_count ++;
 done:
@@ -269,7 +335,7 @@ void box_effects_extract(
     box_effect_collect(world, state, e);
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->stack); i ++) {
-        box_effect_append(world,
+        box_effect_append(world, state,
             ecs_vec_get_t(&state->stack, box_effect_src_t, i)->entity, p, v);
     }
 

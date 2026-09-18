@@ -15,11 +15,18 @@ typedef struct box_effect_src_t {
     int32_t order;       /**< Order the chain was sorted by */
 } box_effect_src_t;
 
+/** Parameter components the registry remembers the layout of */
+#define BOX_EFFECT_LAYOUT_MAX (8)
+
 /** Module wide registry of the effects, stored as a singleton */
 typedef struct EffectState {
     ecs_query_t *effects; /**< Entities holding an Effect component */
     ecs_vec_t stack;      /**< box_effect_src_t of the chain being built */
     int32_t enabled;      /**< Effects with a shader that are on, 0 skips every chain */
+    ecs_id_t layout_id[BOX_EFFECT_LAYOUT_MAX]; /**< Parameter components already seen */
+    bool layout_raw[BOX_EFFECT_LAYOUT_MAX];    /**< The component is floats end to end */
+    int32_t layout_size[BOX_EFFECT_LAYOUT_MAX]; /**< Bytes such a component copies */
+    int32_t layout_count; /**< Entries of that table in use */
 } EffectState;
 
 extern ECS_COMPONENT_DECLARE(EffectState);
