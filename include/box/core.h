@@ -20,6 +20,9 @@
 extern "C" {
 #endif
 
+/** Port the command endpoints listen on when --port is not given */
+#define BOX_PORT_DEFAULT (27750)
+
 /** Process wide settings, set once from the command line before the loop starts */
 ECS_STRUCT(App, {
     bool headless;        /**< Run without a window */
@@ -27,6 +30,7 @@ ECS_STRUCT(App, {
     double timeout;       /**< Stop after this many seconds, 0 for no limit */
     double cpu_budget;    /**< Fraction of one core this process may use, 1 for all */
     double target_fps;    /**< Frame rate the loop paces to, 0 for uncapped */
+    int32_t port;         /**< Port of the command endpoints, 0 disables the server */
     int32_t frame;        /**< Frames completed so far, written by the engine */
     char *process_dir;    /**< Folder with temporary files, written by the engine */
 });

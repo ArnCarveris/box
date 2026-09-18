@@ -20,7 +20,8 @@ static void box_print_usage(
         "  --frames <n>          stop after n frames\n"
         "  --timeout <s|infinite> stop after s seconds\n"
         "  --cpu-budget <0..1>   fraction of one core to use\n"
-        "  --fps <n>             target frame rate, 0 for uncapped\n",
+        "  --fps <n>             target frame rate, 0 for uncapped\n"
+        "  --port <n>            port of the command endpoints, 0 disables them\n",
         exe);
 }
 
@@ -47,6 +48,9 @@ int box_parse_args(
             i ++;
         } else if (!strcmp(arg, "--fps") && value) {
             app->target_fps = atof(value);
+            i ++;
+        } else if (!strcmp(arg, "--port") && value) {
+            app->port = atoi(value);
             i ++;
         } else if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
             box_print_usage(argv[0]);

@@ -13,6 +13,9 @@ void BoxCoreImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, App);
-    ecs_singleton_set(world, App, { .cpu_budget = 1.0 });
+    ecs_singleton_set(world, App, {
+        .cpu_budget = 1.0,
+        .port = BOX_PORT_DEFAULT
+    });
     box_process_init(world);
 }
