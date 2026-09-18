@@ -184,6 +184,21 @@
             "setup": true,
             "teardown": true
         }, {
+            "id": "CaptureEndpoint",
+            "testcases": [
+                "unknown_session_gives_404",
+                "unknown_camera_gives_400",
+                "without_camera_gives_400",
+                "first_request_sets_capture",
+                "second_request_keeps_the_capture",
+                "named_camera",
+                "reply_allows_any_origin",
+                "preflight_lists_methods",
+                "headless_run_returns_the_png"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
             "id": "WasmRequest",
             "testcases": [
                 "help_round_trip",

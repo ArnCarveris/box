@@ -19,6 +19,9 @@
 /** Path prefix of the resource endpoint */
 #define BOX_HTTP_RESOURCE "resource/"
 
+/** File of the session resources that the capture endpoint renders to */
+#define BOX_HTTP_CAPTURE_FILE "live.png"
+
 /** Fill a reply with a status code and a text body.
  *
  * @param reply The reply
@@ -32,7 +35,9 @@ static void box_http_reply(
 {
     reply->code = code;
     reply->content_type = "text/plain";
-    if (code == 400) {
+    if (code == 202) {
+        reply->status = "Accepted";
+    } else if (code == 400) {
         reply->status = "Bad Request";
     } else if (code == 403) {
         reply->status = "Forbidden";
@@ -258,6 +263,89 @@ done:
     return;
 }
 
+/** Capture the active or named camera and reply with the last completed PNG.
+ *
+ * A capture completes a few frames after it is requested, so the reply carries
+ * the image of an earlier request and queues the next one. A request that is
+ * still pending is not queued again.
+ *
+ * @param world The world
+ * @param req The request
+ * @param reply The reply
+ */
+static void box_http_capture(
+    ecs_world_t *world,
+    const ecs_http_request_t *req,
+    ecs_http_reply_t *reply)
+{
+    ecs_entity_t session = box_http_session(world, req);
+    if (!session) {
+        box_http_reply(reply, 404, "unknown session");
+        goto done;
+    }
+
+    ecs_entity_t camera = 0;
+    char *error = box_capture_camera(
+        world, session, ecs_http_get_param(req, "camera"), &camera);
+    if (error) {
+        box_http_reply(reply, 400, error);
+        ecs_os_free(error);
+        goto done;
+    }
+
+    char *path = box_capture_path(world, session, BOX_HTTP_CAPTURE_FILE);
+    if (!ecs_has(world, camera, Capture)) {
+        box_capture_request(world, camera, ecs_os_strdup(path));
+    }
+
+    struct stat st;
+    if (stat(path, &st) || !S_ISREG(st.st_mode) || !st.st_size) {
+        box_http_reply(reply, 202, NULL);
+    } else if (box_http_file(path, reply)) {
+        box_http_reply(reply, 202, NULL);
+    } else {
+        reply->code = 200;
+        reply->content_type = "image/png";
+    }
+
+    ecs_os_free(path);
+done:
+    return;
+}
+
+/** Reply to a preflight request with the methods and headers a page may use.
+ *
+ * @param reply The reply
+ */
+static void box_http_preflight(
+    ecs_http_reply_t *reply)
+{
+    box_http_reply(reply, 200, NULL);
+    ecs_strbuf_appendlit(&reply->headers,
+        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
+    ecs_strbuf_appendlit(&reply->headers,
+        "Access-Control-Allow-Headers: Content-Type\r\n");
+    ecs_strbuf_appendlit(&reply->headers, "Access-Control-Max-Age: 600\r\n");
+}
+
+/** Allow a page of another origin to read the reply.
+ *
+ * The flecs server writes the header on every reply it sends over a socket, so
+ * the handler only writes it for the requests it is called for directly, which
+ * is how the wasm transport runs.
+ *
+ * @param req The request
+ * @param reply The reply
+ */
+static void box_http_cors(
+    const ecs_http_request_t *req,
+    ecs_http_reply_t *reply)
+{
+    if (!req->conn) {
+        ecs_strbuf_appendlit(&reply->headers, "Access-Control-Allow-Origin: *\r\n");
+    }
+}
+
 bool box_http_endpoint_request(
     const ecs_http_request_t *req,
     ecs_http_reply_t *reply,
@@ -265,17 +353,23 @@ bool box_http_endpoint_request(
 {
     ecs_world_t *world = ctx;
     const char *path = req->path;
-    if (!strcmp(path, "terminal/new")) {
+    if (req->method == EcsHttpOptions) {
+        box_http_preflight(reply);
+    } else if (!strcmp(path, "terminal/new")) {
         box_http_new(world, reply);
     } else if (!strcmp(path, "terminal/close")) {
         box_http_close(world, req, reply);
     } else if (!strcmp(path, "terminal/exec")) {
         box_http_exec(world, req, reply);
+    } else if (!strcmp(path, "capture")) {
+        box_http_capture(world, req, reply);
     } else if (!strncmp(path, BOX_HTTP_RESOURCE, ecs_os_strlen(BOX_HTTP_RESOURCE))) {
         box_http_resource(world, req, reply);
     } else {
         box_http_reply(reply, 404, "unknown endpoint");
     }
+
+    box_http_cors(req, reply);
 
     return true;
 }
