@@ -15,6 +15,12 @@
                 "static_1000_changed",
                 "dynamic_10k"
             ]
+        }, {
+            "id": "Lights",
+            "benchcases": [
+                "extract_1000_moving",
+                "extract_1000_culled"
+            ]
         }]
     }
 }
