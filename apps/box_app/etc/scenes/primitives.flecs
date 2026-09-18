@@ -1,0 +1,106 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+camera {
+  Position: {0, 4, -12}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 3}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {20, 0.2, 20}
+  Rgb: {180, 180, 190}
+  PbrMaterial: {roughness: 0.9}
+}
+
+box {
+  Position: {-6, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1.5, 1, 1.5}
+  Rgb: {220, 80, 60}
+}
+
+sphere {
+  Position: {-3, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 160, 240}
+  PbrMaterial: {metallic: 0.2, roughness: 0.3}
+}
+
+cylinder {
+  Position: {0, 0.75, 0}
+  Cylinder: {segments: 24, smooth: true, length: 1.5, radius: 0.6}
+  Rgb: {90, 200, 110}
+}
+
+cone {
+  Position: {3, 0.75, 0}
+  Cone: {segments: 24, smooth: true, length: 1.5, radius: 0.7}
+  Rgb: {250, 200, 60}
+}
+
+torus {
+  Position: {6, 0.6, 0}
+  Rotation: {1.2, 0, 0}
+  Torus: {segments: 32, rings: 16, smooth: true, radius: 0.8, tube: 0.25}
+  Rgb: {200, 100, 220}
+  PbrMaterial: {metallic: 0.8, roughness: 0.25}
+}
+
+capsule {
+  Position: {-4.5, 1, 3}
+  Capsule: {segments: 16, smooth: true, length: 1, radius: 0.5}
+  Rgb: {240, 240, 240}
+}
+
+ico {
+  Position: {-1.5, 0.8, 3}
+  IcoSphere: {segments: 2, smooth: false, radius: 0.8}
+  Rgb: {60, 200, 200}
+}
+
+tube {
+  Position: {1.5, 0.75, 3}
+  Tube: {segments: 32, smooth: true, length: 1.5, radius: 0.7, thickness: 0.15}
+  Rgb: {230, 140, 80}
+}
+
+frustum {
+  Position: {4.5, 0.75, 3}
+  Frustum: {segments: 24, smooth: true, length: 1.5, radius_bottom: 0.8, radius_top: 0.3}
+  Rgb: {140, 140, 240}
+}
+
+rounded {
+  Position: {-3, 0.6, -3}
+  RoundedBox: {1.6, 1.2, 1.2, radius: 0.3, segments: 4}
+  Rgb: {250, 120, 160}
+}
+
+prism {
+  Position: {0, 0.75, -3}
+  TrianglePrism: {1.5, 1.5, 1}
+  Rgb: {120, 220, 160}
+}
+
+hemi {
+  Position: {3, 0, -3}
+  HemiSphere: {segments: 24, smooth: true, radius: 1}
+  Rgb: {240, 200, 140}
+}
+
+glow {
+  Position: {6, 1, -3}
+  Sphere: {segments: 16, smooth: true, radius: 0.5}
+  Rgb: {40, 40, 40}
+  Emissive: {strength: 4, color: {255, 120, 40}}
+}

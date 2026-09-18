@@ -18,6 +18,12 @@ int main(
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxCamera);
+    ECS_IMPORT(world, BoxLight);
+    ECS_IMPORT(world, BoxMaterial);
+    ECS_IMPORT(world, BoxRender);
+    ECS_IMPORT(world, BoxGeometry);
 
     if (box_parse_args(world, argc, argv)) {
         goto error;
