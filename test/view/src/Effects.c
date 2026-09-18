@@ -675,3 +675,49 @@ void Effects_fog_parameters_reach_the_pass(void)
     test_flt(pass->params[6], 0.8f);
     test_flt(pass->params[7], 1.5f);
 }
+
+void Effects_chain_gives_the_view_a_float_target(void)
+{
+    // effects/hdr_target
+    box_render_extract(w, &packet);
+    test_int(packet.view.effect_count, 0);
+    test_bool(box_view_hdr(&packet.view), false);
+
+    box_packet_reset(&packet);
+    ecs_entity_t tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    ecs_get_mut(w, tonemap, Effect)->enabled = true;
+    ecs_modified(w, tonemap, Effect);
+    box_render_extract(w, &packet);
+
+    test_int(packet.view.effect_count, 1);
+    test_bool(box_view_hdr(&packet.view), true);
+}
+
+void Effects_float_target_moves_the_gamma_encode(void)
+{
+    // effects/hdr_target
+    test_flt(box_view_gamma(false, false), 1.0f);
+    test_flt(box_view_gamma(true, false), 0.0f);
+    test_flt(box_view_gamma(false, true), 0.0f);
+    test_flt(box_view_gamma(true, true), 0.0f);
+
+    test_flt(box_effect_decode_flag(false, false), 1.0f);
+    test_flt(box_effect_decode_flag(true, false), 0.0f);
+    test_flt(box_effect_decode_flag(true, true), 0.0f);
+}
+
+void Effects_chain_encodes_once_at_the_end(void)
+{
+    // effects/hdr_target
+    float encodes = 0.0f;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        encodes += box_effect_encode_flag(true, false, i == 3);
+    }
+
+    test_flt(encodes, 1.0f);
+    test_flt(box_effect_encode_flag(true, false, true), 1.0f);
+    test_flt(box_effect_encode_flag(true, false, false), 0.0f);
+    test_flt(box_effect_encode_flag(true, true, true), 0.0f);
+    test_flt(box_effect_encode_flag(false, false, false), 1.0f);
+}

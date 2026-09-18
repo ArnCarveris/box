@@ -31,7 +31,7 @@ fn tap(uv: vec2<f32>) -> vec3<f32> {
 // component allows and every group of the filter is weighted by the Karis
 // average, so it cannot flicker its way through the pyramid.
 fn tap_first(uv: vec2<f32>) -> vec3<f32> {
-  let c = fx_decode(tap(uv), fx.eye.w);
+  let c = fx_decode(tap(uv), fx.frame.z);
   let clamp_luma = fx.params[0].w;
   let luma = fx_luma(c);
   if (clamp_luma > 0.0 && luma > clamp_luma) {

@@ -2,7 +2,9 @@
 
 // Uniform block of a post process pass and the values every pass of a chain
 // shares: the parameters of its component, the size of its target, the camera
-// and the clip to world matrix of the view.
+// and the clip to world matrix of the view. eye.w is the display encoding of
+// the frame, frame.z the encoding of the image the pass reads and frame.w the
+// encoding of the image it writes.
 struct Effect {
   params: array<vec4<f32>, EFFECT_PARAM_VECS>,
   size: vec4<f32>,
@@ -19,9 +21,10 @@ struct Exposure {
   pad: f32,
 };
 
-// The chain carries display encoded values: a pass that works in linear light
-// decodes what it reads and encodes what it writes, which keeps a pass that
-// does neither bit identical to the image it was handed.
+// A chain over a float scene target carries linear light and only its last pass
+// encodes; a chain over an 8 bit one carries display encoded values and every
+// pass decodes what it reads and encodes what it writes. Either way a pass that
+// does neither is bit identical to the image it was handed.
 fn fx_decode(c: vec3<f32>, encode: f32) -> vec3<f32> {
   let positive = max(c, vec3(0.0));
   if (encode > 0.5) {

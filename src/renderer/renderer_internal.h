@@ -254,6 +254,7 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup scene_down[BOX_BLUR_LEVELS_MAX]; /**< Downsample source, the finer level */
     WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
     uint32_t scene_mips_count;       /**< Levels its blur chain holds */
+    WGPUTextureFormat scene_format;  /**< Format of that copy, which follows the scene target */
     WGPUBuffer exposure_state;       /**< Adapted exposure of the view, kept between frames */
     WGPUBuffer exposure_hist;        /**< Log luminance histogram its compute pass fills */
     WGPUTexture bloom;               /**< Pyramid of the image a bloom pass of the view reads */
@@ -360,7 +361,7 @@ typedef struct box_effect_uniform_t {
     float params[BOX_EFFECT_PARAM_MAX]; /**< Parameters of its parameter component */
     float size[4];                      /**< Target width, height and their reciprocals */
     float eye[4];                       /**< Camera position, w is the display encode flag */
-    float frame[4];                     /**< Seconds the frame advanced and seconds since start */
+    float frame[4];                     /**< Delta, time, and the decode and encode flags */
     float inv_clip[16];                 /**< Clip to world of the view */
 } box_effect_uniform_t;
 
@@ -390,16 +391,17 @@ struct box_renderer_t {
     WGPUTextureFormat format;        /**< Color target format */
     WGPUTexture offscreen;           /**< Offscreen color target, NULL with a surface */
     WGPUTextureView offscreen_view;  /**< View of the offscreen target */
-    WGPURenderPipeline pipeline;     /**< Lit instanced mesh pipeline */
+    WGPURenderPipeline pipeline[BOX_EFFECT_FORMATS]; /**< Lit mesh pipeline per target format */
     WGPUShaderModule mesh_shader;    /**< Module every mesh pipeline is built from */
     WGPUPipelineLayout mesh_layout;  /**< Pipeline layout shared by the mesh pipelines */
-    WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]; /**< Sorted pass */
+    WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES][BOX_EFFECT_FORMATS];
+        /**< Sorted pass, per blend mode, cull mode and target format */
     WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full level range */
     WGPUBindGroupLayout blur_layout; /**< Source texture and sampler of a blur pass */
-    WGPURenderPipeline blur_down;    /**< Thirteen tap downsample of a level into the next */
-    WGPURenderPipeline blur_up;      /**< Eight tap tent upsample, mixed into the level above */
+    WGPURenderPipeline blur_down[BOX_EFFECT_FORMATS]; /**< Thirteen tap downsample of a level */
+    WGPURenderPipeline blur_up[BOX_EFFECT_FORMATS]; /**< Eight tap tent upsample, mixed up */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
     box_vec_t shaders;               /**< char* of the preprocessed WGSL, indexed by handle */
     box_gpu_pool_t pool[BOX_EFFECT_POOL_MAX]; /**< Intermediate targets the passes share */
@@ -410,7 +412,7 @@ struct box_renderer_t {
     uint32_t effect_run_count;       /**< Passes in that list */
     bool shader_failed;              /**< A shader did not compile and was already reported */
     bool initialized;                /**< The pipelines were built from the builtin sources */
-    WGPURenderPipeline normal_pipeline; /**< Mesh pipeline that also writes world normals */
+    WGPURenderPipeline normal_pipeline[BOX_EFFECT_FORMATS]; /**< Mesh pipeline writing normals */
     box_vec_t effect_pipelines;      /**< box_gpu_effect_t indexed by shader handle */
     WGPUBindGroupLayout effect_layout;  /**< Uniforms, inputs and sampler of an effect pass */
     WGPUPipelineLayout effect_pipeline_layout; /**< Pipeline layout of every effect pass */
@@ -568,6 +570,18 @@ void box_device_resize(
     uint32_t width,
     uint32_t height);
 
+/** Whether the target of a view is a format the hardware encodes for the pass.
+ *
+ * @param r The renderer
+ * @return True when the color format of the frame is an sRGB one
+ */
+static inline bool box_renderer_srgb(
+    const box_renderer_t *r)
+{
+    return r->format == WGPUTextureFormat_BGRA8UnormSrgb ||
+        r->format == WGPUTextureFormat_RGBA8UnormSrgb;
+}
+
 /** Create the pipeline of the placeholder triangle.
  *
  * @param r The renderer
@@ -648,6 +662,7 @@ void box_target_fini(
  * @param cull Faces the rasterizer drops
  * @param depth_write The draw writes the depth buffer
  * @param blend Blend state of the color target, NULL for no blending
+ * @param hdr The draw writes the float scene target of a view with a chain
  * @return The pipeline
  */
 WGPURenderPipeline box_frame_pipeline(
@@ -656,7 +671,8 @@ WGPURenderPipeline box_frame_pipeline(
     uint64_t offset,
     WGPUCullMode cull,
     bool depth_write,
-    const WGPUBlendState *blend);
+    const WGPUBlendState *blend,
+    bool hdr);
 
 /** Render and present one packet.
  *
@@ -1200,9 +1216,11 @@ void box_transparent_init(
 /** Recreate the copy of the opaque image of the current view and its blur chain.
  *
  * @param r The renderer
+ * @param format Format of the copy, which follows the target the scene passes write
  */
 void box_transparent_resize(
-    box_renderer_t *r);
+    box_renderer_t *r,
+    WGPUTextureFormat format);
 
 /** Release the copy of the opaque image of one view and its bind groups.
  *

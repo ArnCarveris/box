@@ -14,7 +14,7 @@ camera {
 
 sun {
   Rotation: {0.9, -0.6, 0}
-  DirectionalLight: {intensity: 6}
+  DirectionalLight: {intensity: 9}
 }
 
 $ { EnvironmentLight: {sky_color: {120, 145, 190}, ground_color: {60, 55, 50}, intensity: 1.5} }

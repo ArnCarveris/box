@@ -446,6 +446,74 @@ static inline void box_effect_size(
     *out_height = h ? h : 1;
 }
 
+/** Whether the scene passes of a view render into the float scene target.
+ *
+ * A view with a chain draws the mesh, transparent and glass passes into a
+ * pooled RGBA16F target so what they push past white reaches the tone map at
+ * the end of the chain; a view without one keeps the direct 8 bit path.
+ *
+ * @param v The view
+ * @return True when the scene passes write a float target
+ */
+static inline bool box_view_hdr(
+    const box_view_t *v)
+{
+    return v->effect_count != 0;
+}
+
+/** Gamma encode flag of the view uniform, which the mesh pass encodes with.
+ *
+ * The float scene target holds linear light, so the encode moves to the pass
+ * that writes the image of the view and the mesh pass only encodes when it
+ * writes an 8 bit target the hardware does not encode for it.
+ *
+ * @param hdr The scene passes write the float target
+ * @param srgb The target of the view is an sRGB format
+ * @return 1 when the mesh pass encodes, 0 when it writes linear light
+ */
+static inline float box_view_gamma(
+    bool hdr,
+    bool srgb)
+{
+    return (hdr || srgb) ? 0.0f : 1.0f;
+}
+
+/** Decode flag a pass of a chain reads its image with.
+ *
+ * @param hdr The scene passes write the float target
+ * @param srgb The target of the view is an sRGB format
+ * @return 1 when the image the pass reads is display encoded
+ */
+static inline float box_effect_decode_flag(
+    bool hdr,
+    bool srgb)
+{
+    return (hdr || srgb) ? 0.0f : 1.0f;
+}
+
+/** Encode flag a pass of a chain writes its image with.
+ *
+ * On the float path every pass hands linear light to the next one and only the
+ * last pass encodes, so the sum of the flags over a chain is one encode.
+ *
+ * @param hdr The scene passes write the float target
+ * @param srgb The target of the view is an sRGB format
+ * @param last The pass writes the image of the view
+ * @return 1 when the pass encodes what it writes
+ */
+static inline float box_effect_encode_flag(
+    bool hdr,
+    bool srgb,
+    bool last)
+{
+    float result = srgb ? 0.0f : 1.0f;
+    if (hdr && !last) {
+        result = 0.0f;
+    }
+
+    return result;
+}
+
 /** WGSL module to compile, the renderer takes ownership of the source */
 typedef struct box_shader_cmd_t {
     uint32_t handle; /**< Shader handle, a BOX_SHADER constant for a builtin one */

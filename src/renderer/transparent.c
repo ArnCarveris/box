@@ -102,24 +102,26 @@ static WGPUBindGroup box_transparent_level_group(
 }
 
 void box_transparent_resize(
-    box_renderer_t *r)
+    box_renderer_t *r,
+    WGPUTextureFormat format)
 {
     box_transparent_view_fini(r->v);
     r->v->scene_mips_count = box_blur_levels(r->v->width, r->v->height);
+    r->v->scene_format = format;
 
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
             WGPUTextureUsage_CopyDst,
         .dimension = WGPUTextureDimension_2D,
         .size = { r->v->width, r->v->height, 1 },
-        .format = r->format,
+        .format = format,
         .mipLevelCount = r->v->scene_mips_count,
         .sampleCount = 1
     };
     r->v->scene = wgpuDeviceCreateTexture(r->device, &desc);
 
     WGPUTextureViewDescriptor view_desc = {
-        .format = r->format,
+        .format = format,
         .dimension = WGPUTextureViewDimension_2D,
         .mipLevelCount = r->v->scene_mips_count,
         .arrayLayerCount = 1,
@@ -130,7 +132,7 @@ void box_transparent_resize(
     uint32_t mip;
     for (mip = 0; mip < r->v->scene_mips_count; mip ++) {
         WGPUTextureViewDescriptor mip_desc = {
-            .format = r->format,
+            .format = format,
             .dimension = WGPUTextureViewDimension_2D,
             .baseMipLevel = mip,
             .mipLevelCount = 1,
@@ -157,6 +159,7 @@ void box_transparent_resize(
  * @param layout The pipeline layout
  * @param entry Name of the fragment entry point
  * @param blend Blend state of the pass, NULL when the pass replaces its target
+ * @param hdr The chain of the view holds linear light in a float copy
  * @return The pipeline
  */
 static WGPURenderPipeline box_transparent_blur_pipeline(
@@ -164,10 +167,11 @@ static WGPURenderPipeline box_transparent_blur_pipeline(
     WGPUShaderModule module,
     WGPUPipelineLayout layout,
     const char *entry,
-    const WGPUBlendState *blend)
+    const WGPUBlendState *blend,
+    bool hdr)
 {
     WGPUColorTargetState target = {
-        .format = r->format,
+        .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
         .blend = blend,
         .writeMask = WGPUColorWriteMask_All
     };
@@ -236,9 +240,14 @@ void box_transparent_init(
     WGPUPipelineLayout pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
-    r->blur_down = box_transparent_blur_pipeline(r, module, pipeline_layout, "fs_down", NULL);
-    r->blur_up = box_transparent_blur_pipeline(r, module, pipeline_layout, "fs_up",
-        &box_blur_mix);
+    uint32_t slot;
+    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+        r->blur_down[slot] = box_transparent_blur_pipeline(r, module, pipeline_layout,
+            "fs_down", NULL, slot != 0);
+        r->blur_up[slot] = box_transparent_blur_pipeline(r, module, pipeline_layout,
+            "fs_up", &box_blur_mix, slot != 0);
+    }
+
     wgpuPipelineLayoutRelease(pipeline_layout);
     wgpuShaderModuleRelease(module);
 }
@@ -356,15 +365,16 @@ void box_transparent_prepare(
     WGPUExtent3D extent = { r->v->width, r->v->height, 1 };
     wgpuCommandEncoderCopyTextureToTexture(encoder, &src, &dst, &extent);
 
+    uint32_t slot = r->v->scene_format == BOX_EFFECT_HDR_FORMAT ? 1 : 0;
     uint32_t level;
     for (level = 1; level < r->v->scene_mips_count; level ++) {
-        box_transparent_blur_pass(r, encoder, r->blur_down, r->v->scene_down[level], level,
-            false);
+        box_transparent_blur_pass(r, encoder, r->blur_down[slot], r->v->scene_down[level],
+            level, false);
     }
 
     for (level = r->v->scene_mips_count - 1; level > 1; level --) {
-        box_transparent_blur_pass(r, encoder, r->blur_up, r->v->scene_up[level - 1], level - 1,
-            true);
+        box_transparent_blur_pass(r, encoder, r->blur_up[slot], r->v->scene_up[level - 1],
+            level - 1, true);
     }
 }
 
@@ -373,22 +383,26 @@ void box_transparent_prepare(
  * @param r The renderer
  * @param blend One of the BOX_BLEND constants
  * @param back One of the BOX_BACK constants
+ * @param hdr The pass writes the float scene target of a view with a chain
  * @return The pipeline
  */
 static WGPURenderPipeline box_transparent_pipeline(
     box_renderer_t *r,
     uint32_t blend,
-    uint32_t back)
+    uint32_t back,
+    bool hdr)
 {
     uint32_t cull = back == BOX_BACK_CULL;
-    if (!r->sorted_pipelines[blend][cull]) {
+    uint32_t slot = hdr ? 1 : 0;
+    if (!r->sorted_pipelines[blend][cull][slot]) {
         const WGPUBlendState *state = blend ? &box_blend_states[blend] : NULL;
-        r->sorted_pipelines[blend][cull] = box_frame_pipeline(r, sizeof(box_transparent_t),
-            offsetof(box_transparent_t, data),
-            cull ? WGPUCullMode_Back : WGPUCullMode_None, blend == BOX_BLEND_OPAQUE, state);
+        r->sorted_pipelines[blend][cull][slot] = box_frame_pipeline(r,
+            sizeof(box_transparent_t), offsetof(box_transparent_t, data),
+            cull ? WGPUCullMode_Back : WGPUCullMode_None, blend == BOX_BLEND_OPAQUE, state,
+            hdr);
     }
 
-    return r->sorted_pipelines[blend][cull];
+    return r->sorted_pipelines[blend][cull][slot];
 }
 
 void box_transparent_draw(
@@ -397,6 +411,7 @@ void box_transparent_draw(
     const box_packet_t *p,
     WGPURenderPassEncoder pass)
 {
+    bool hdr = r->effect_scene != NULL;
     uint32_t end = view->transparent_first + view->transparent_count;
     uint32_t first = view->transparent_first;
     while (first < end) {
@@ -416,7 +431,7 @@ void box_transparent_draw(
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, entry->mesh);
         if (m->alive) {
             wgpuRenderPassEncoderSetPipeline(pass,
-                box_transparent_pipeline(r, entry->blend, entry->back));
+                box_transparent_pipeline(r, entry->blend, entry->back, hdr));
             wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
             wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->sorted,
                 (uint64_t)first * sizeof(box_transparent_t),
@@ -437,9 +452,12 @@ void box_transparent_reset(
     for (blend = 0; blend < BOX_BLEND_COUNT; blend ++) {
         uint32_t cull;
         for (cull = 0; cull < BOX_CULL_MODES; cull ++) {
-            if (r->sorted_pipelines[blend][cull]) {
-                wgpuRenderPipelineRelease(r->sorted_pipelines[blend][cull]);
-                r->sorted_pipelines[blend][cull] = NULL;
+            uint32_t slot;
+            for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+                if (r->sorted_pipelines[blend][cull][slot]) {
+                    wgpuRenderPipelineRelease(r->sorted_pipelines[blend][cull][slot]);
+                    r->sorted_pipelines[blend][cull][slot] = NULL;
+                }
             }
         }
     }
@@ -453,12 +471,16 @@ void box_transparent_fini(
     if (r->sorted) wgpuBufferRelease(r->sorted);
     if (r->scene_sampler) wgpuSamplerRelease(r->scene_sampler);
     if (r->blur_layout) wgpuBindGroupLayoutRelease(r->blur_layout);
-    if (r->blur_down) wgpuRenderPipelineRelease(r->blur_down);
-    if (r->blur_up) wgpuRenderPipelineRelease(r->blur_up);
+    uint32_t slot;
+    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+        if (r->blur_down[slot]) wgpuRenderPipelineRelease(r->blur_down[slot]);
+        if (r->blur_up[slot]) wgpuRenderPipelineRelease(r->blur_up[slot]);
+        r->blur_down[slot] = NULL;
+        r->blur_up[slot] = NULL;
+    }
+
     r->sorted = NULL;
     r->sorted_capacity = 0;
     r->scene_sampler = NULL;
     r->blur_layout = NULL;
-    r->blur_down = NULL;
-    r->blur_up = NULL;
 }

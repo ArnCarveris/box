@@ -18,7 +18,7 @@ fn cs_histogram(@builtin(global_invocation_id) gid: vec3<u32>,
   let size = textureDimensions(src, 0);
   if (gid.x < size.x && gid.y < size.y) {
     let texel = textureLoad(src, vec2<i32>(gid.xy), 0).rgb;
-    let luma = fx_luma(fx_decode(texel, fx.eye.w));
+    let luma = fx_luma(fx_decode(texel, fx.frame.z));
     atomicAdd(&bins[fx_exposure_bin(luma)], 1u);
   }
 

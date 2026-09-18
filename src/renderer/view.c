@@ -96,7 +96,12 @@ void box_view_prepare(
         r->v->width = view->width;
         r->v->height = view->height;
         box_view_depth(r);
-        box_transparent_resize(r);
+        r->v->scene_format = 0;
+    }
+
+    WGPUTextureFormat format = r->effect_scene ? BOX_EFFECT_HDR_FORMAT : r->format;
+    if (r->v->scene_format != format) {
+        box_transparent_resize(r, format);
     }
 }
 

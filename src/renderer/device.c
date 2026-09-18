@@ -298,8 +298,12 @@ void box_device_fini(
     box_layers_fini(r);
     box_effect_fini(r);
     box_shader_fini(r);
-    if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
-    if (r->normal_pipeline) wgpuRenderPipelineRelease(r->normal_pipeline);
+    uint32_t slot;
+    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+        if (r->pipeline[slot]) wgpuRenderPipelineRelease(r->pipeline[slot]);
+        if (r->normal_pipeline[slot]) wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
+    }
+
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
     if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);

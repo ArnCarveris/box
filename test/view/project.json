@@ -177,7 +177,10 @@
                     "fog_thins_as_the_ray_climbs",
                     "fog_factor_is_capped",
                     "builtin_fog_is_off_by_default",
-                    "fog_parameters_reach_the_pass"
+                    "fog_parameters_reach_the_pass",
+                    "chain_gives_the_view_a_float_target",
+                    "float_target_moves_the_gamma_encode",
+                    "chain_encodes_once_at_the_end"
                 ],
                 "setup": true,
                 "teardown": true

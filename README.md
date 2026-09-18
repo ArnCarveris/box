@@ -264,9 +264,10 @@ Enabling or disabling an effect, changing its order or changing the list of a vi
 reconfigures the chain on the next frame, because the chain is rebuilt during extract.
 
 The renderer runs the chain after the transparent pass and before the capture. A view
-with a chain draws into a pooled target instead of its own, the passes ping pong
-between pooled targets of the size their scale asks for and the last pass writes the
-image of the view; targets are handed back after the chain, so the passes of one view
+with a chain draws its mesh, transparent and glass passes into a pooled RGBA16F target
+instead of its own 8 bit one, so highlights past white reach the chain; the gamma encode
+moves to the last pass, which writes the image of the view. The passes ping pong
+between pooled targets of the size their scale asks for; targets are handed back after the chain, so the passes of one view
 and the views of a frame share the same textures. The declared inputs decide what the
 frame produces: the depth target is bound as it is, the world normals come from a
 second color attachment the mesh pass writes through its `fs_normal` stage, and the

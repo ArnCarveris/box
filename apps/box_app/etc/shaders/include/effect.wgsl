@@ -58,12 +58,24 @@ fn fx_exposure_scale() -> f32 {
   return fx_exposure.scale;
 }
 
+// Linear light of what the pass reads, and the encoding the target it writes
+// asks for; on the float path both are the identity until the last pass.
 fn fx_to_linear(c: vec3<f32>) -> vec3<f32> {
-  return fx_decode(c, fx.eye.w);
+  return fx_decode(c, fx.frame.z);
 }
 
 fn fx_to_display(c: vec3<f32>) -> vec3<f32> {
+  return fx_encode(c, fx.frame.w);
+}
+
+// The value a linear color has in the space the frame is shown in, for a pass
+// that works on the image the way the display shows it.
+fn fx_to_encoded(c: vec3<f32>) -> vec3<f32> {
   return fx_encode(c, fx.eye.w);
+}
+
+fn fx_from_encoded(c: vec3<f32>) -> vec3<f32> {
+  return fx_decode(c, fx.eye.w);
 }
 
 // World position the depth of a pixel stands for, reconstructed with the clip

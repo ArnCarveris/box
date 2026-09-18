@@ -4,6 +4,7 @@
  */
 
 #include "renderer_internal.h"
+#include <math.h>
 #include <stdio.h>
 
 /** Create the bind group layout the view and layer uniforms are bound through.
@@ -51,7 +52,8 @@ WGPURenderPipeline box_frame_pipeline(
     uint64_t offset,
     WGPUCullMode cull,
     bool depth_write,
-    const WGPUBlendState *blend)
+    const WGPUBlendState *blend,
+    bool hdr)
 {
     WGPUVertexAttribute vertex_attrs[4] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
@@ -86,7 +88,7 @@ WGPURenderPipeline box_frame_pipeline(
     };
 
     WGPUColorTargetState target = {
-        .format = r->format,
+        .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
         .blend = blend,
         .writeMask = WGPUColorWriteMask_All
     };
@@ -157,8 +159,8 @@ void box_frame_init(
         .bindGroupLayouts = group_layouts
     };
     r->mesh_layout = wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
-    r->pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
-        true, NULL);
+    r->pipeline[0] = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
+        true, NULL, false);
     box_effect_init(r);
 }
 
@@ -168,12 +170,15 @@ void box_frame_init(
  * mesh shader changes, because a scene without such an effect never needs it.
  *
  * @param r The renderer
+ * @param hdr The pass writes the float scene target of a view with a chain
  * @return The pipeline, NULL when the mesh shader has no normal stage
  */
 static WGPURenderPipeline box_frame_normal_pipeline(
-    box_renderer_t *r)
+    box_renderer_t *r,
+    bool hdr)
 {
-    if (r->normal_pipeline) {
+    uint32_t slot = hdr ? 1 : 0;
+    if (r->normal_pipeline[slot]) {
         goto done;
     }
 
@@ -209,7 +214,8 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         }
     };
     WGPUColorTargetState targets[2] = {
-        { .format = r->format, .writeMask = WGPUColorWriteMask_All },
+        { .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
+            .writeMask = WGPUColorWriteMask_All },
         { .format = r->format, .writeMask = WGPUColorWriteMask_All }
     };
     WGPUFragmentState fragment = {
@@ -244,9 +250,28 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         },
         .multisample = { .count = 1, .mask = 0xFFFFFFFF }
     };
-    r->normal_pipeline = wgpuDeviceCreateRenderPipeline(r->device, &desc);
+    r->normal_pipeline[slot] = wgpuDeviceCreateRenderPipeline(r->device, &desc);
 done:
-    return r->normal_pipeline;
+    return r->normal_pipeline[slot];
+}
+
+/** Mesh pipeline of the pass that draws the opaque instances of a view.
+ *
+ * @param r The renderer
+ * @param hdr The pass writes the float scene target of a view with a chain
+ * @return The pipeline, NULL when the float variant did not compile
+ */
+static WGPURenderPipeline box_frame_mesh_pipeline(
+    box_renderer_t *r,
+    bool hdr)
+{
+    uint32_t slot = hdr ? 1 : 0;
+    if (!r->pipeline[slot]) {
+        r->pipeline[slot] = box_frame_pipeline(r, sizeof(box_instance_t), 0,
+            WGPUCullMode_Back, true, NULL, hdr);
+    }
+
+    return r->pipeline[slot];
 }
 
 bool box_frame_rebuild(
@@ -262,18 +287,26 @@ bool box_frame_rebuild(
     r->mesh_shader = module;
     r->device_error = false;
     WGPURenderPipeline pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0,
-        WGPUCullMode_Back, true, NULL);
+        WGPUCullMode_Back, true, NULL, false);
     result = pipeline != NULL && !r->device_error;
     if (result) {
         box_transparent_reset(r);
-        wgpuRenderPipelineRelease(r->pipeline);
         wgpuShaderModuleRelease(previous);
-        if (r->normal_pipeline) {
-            wgpuRenderPipelineRelease(r->normal_pipeline);
-            r->normal_pipeline = NULL;
+        uint32_t slot;
+        for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+            if (r->pipeline[slot]) {
+                wgpuRenderPipelineRelease(r->pipeline[slot]);
+            }
+
+            if (r->normal_pipeline[slot]) {
+                wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
+            }
+
+            r->pipeline[slot] = NULL;
+            r->normal_pipeline[slot] = NULL;
         }
 
-        r->pipeline = pipeline;
+        r->pipeline[0] = pipeline;
     } else {
         r->mesh_shader = previous;
         wgpuShaderModuleRelease(module);
@@ -320,9 +353,7 @@ static void box_frame_write_view(
     const box_view_t *view)
 {
     box_view_t uniform = *view;
-    bool srgb = r->format == WGPUTextureFormat_BGRA8UnormSrgb ||
-        r->format == WGPUTextureFormat_RGBA8UnormSrgb;
-    uniform.gamma_encode = srgb ? 0.0f : 1.0f;
+    uniform.gamma_encode = box_view_gamma(r->effect_scene != NULL, box_renderer_srgb(r));
     wgpuQueueWriteBuffer(r->gpu_queue, r->v->view_buffer, 0, &uniform, BOX_VIEW_UNIFORM_SIZE);
 }
 
@@ -448,9 +479,10 @@ static void box_frame_uncovered(
         .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
+    bool hdr = r->effect_scene != NULL;
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    wgpuRenderPassEncoderSetPipeline(pass,
-        attachments == 2 ? box_frame_normal_pipeline(r) : r->pipeline);
+    wgpuRenderPassEncoderSetPipeline(pass, attachments == 2 ?
+        box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr));
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
@@ -480,6 +512,34 @@ static bool box_frame_first_use(
     return result;
 }
 
+/** Clear color the scene passes of a view start from.
+ *
+ * The clear color of a view is given in the space its target is shown in, which
+ * is what the 8 bit path writes it into. The float scene target holds linear
+ * light and the chain encodes once at the end, so the clear is decoded here and
+ * the background of a view with a chain stays what it was without one.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param hdr The scene passes write the float target
+ * @param out Receives the clear color of the attachment
+ */
+static void box_frame_clear(
+    box_renderer_t *r,
+    const box_view_t *view,
+    bool hdr,
+    float *out)
+{
+    bool decode = hdr && !box_renderer_srgb(r);
+    uint32_t i;
+    for (i = 0; i < 3; i ++) {
+        float c = view->clear[i] > 0.0f ? view->clear[i] : 0.0f;
+        out[i] = decode ? powf(c, 2.2f) : c;
+    }
+
+    out[3] = view->clear[3];
+}
+
 /** Record every pass of one view into its target.
  *
  * @param r The renderer
@@ -507,8 +567,8 @@ static void box_frame_view(
     }
 
     box_view_select(r, index);
-    box_view_prepare(r, view);
     uint32_t passes = box_effect_prepare(r, view, p);
+    box_view_prepare(r, view);
     if (passes && r->effect_scene) {
         target = r->effect_scene->texture;
     }
@@ -529,14 +589,17 @@ static void box_frame_view(
     }
 
     WGPUTextureView attachment = wgpuTextureCreateView(target, NULL);
+    bool hdr = r->effect_scene != NULL;
     bool clear = passes ? true : box_frame_first_use(p, index);
+    float background[4];
+    box_frame_clear(r, view, hdr, background);
     WGPURenderPassColorAttachment color[2] = {
         {
             .view = attachment,
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
             .loadOp = clear ? WGPULoadOp_Clear : WGPULoadOp_Load,
             .storeOp = WGPUStoreOp_Store,
-            .clearValue = { view->clear[0], view->clear[1], view->clear[2], view->clear[3] }
+            .clearValue = { background[0], background[1], background[2], background[3] }
         }
     };
     uint32_t attachments = 1;
@@ -561,8 +624,8 @@ static void box_frame_view(
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
-    wgpuRenderPassEncoderSetPipeline(pass,
-        attachments == 2 ? box_frame_normal_pipeline(r) : r->pipeline);
+    wgpuRenderPassEncoderSetPipeline(pass, attachments == 2 ?
+        box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr));
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);

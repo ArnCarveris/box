@@ -426,7 +426,8 @@ uint32_t box_effect_prepare(
         goto done;
     }
 
-    r->effect_scene = box_effect_acquire(r, view->width, view->height, r->format);
+    r->effect_scene = box_effect_acquire(r, view->width, view->height,
+        BOX_EFFECT_HDR_FORMAT);
     if (!r->effect_scene) {
         r->effect_run_count = 0;
         goto done;
@@ -568,6 +569,7 @@ done:
  * @param slot Index of the pass in the packet, which is its uniform slot
  * @param width Width of the target it writes
  * @param height Height of that target
+ * @param last The pass writes the image of the view
  */
 static void box_effect_uniform_write(
     box_renderer_t *r,
@@ -576,10 +578,11 @@ static void box_effect_uniform_write(
     const box_effect_t *fx,
     uint32_t slot,
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    bool last)
 {
-    bool srgb = r->format == WGPUTextureFormat_BGRA8UnormSrgb ||
-        r->format == WGPUTextureFormat_RGBA8UnormSrgb;
+    bool srgb = box_renderer_srgb(r);
+    bool hdr = r->effect_scene != NULL;
     box_effect_uniform_t u;
     memcpy(u.params, fx->params, sizeof(u.params));
     u.size[0] = (float)width;
@@ -592,8 +595,8 @@ static void box_effect_uniform_write(
     u.eye[3] = srgb ? 0.0f : 1.0f;
     u.frame[0] = p->delta;
     u.frame[1] = (float)p->time;
-    u.frame[2] = 0.0f;
-    u.frame[3] = 0.0f;
+    u.frame[2] = box_effect_decode_flag(hdr, srgb);
+    u.frame[3] = box_effect_encode_flag(hdr, srgb, last);
     memcpy(u.inv_clip, view->inv_clip, sizeof(u.inv_clip));
     wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
         (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE, &u, sizeof(u));
@@ -626,7 +629,7 @@ void box_effect_run(
             out = target->view;
         }
 
-        box_effect_uniform_write(r, view, p, fx, slot, width, height);
+        box_effect_uniform_write(r, view, p, fx, slot, width, height, last);
         WGPUTextureView pyramid = NULL;
         if (fx->inputs & BOX_EFFECT_EXPOSURE) {
             box_exposure_dispatch(r, slot, src, encoder);

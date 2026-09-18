@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T23:01:56.767+00:00",
   "start_time": "2026-09-18T23:01:56.807+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T23:19:46.155+00:00",
   "dependencies": [
     "effects/exposure_tonemap"
   ]
