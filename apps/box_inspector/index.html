@@ -120,6 +120,7 @@ main {
 .log .out { color: var(--ink); }
 .log .err { color: var(--bad); }
 .log .info { color: var(--ink-3); }
+.log .gap { height: .8em; padding: 0; }
 .log .t-prompt { color: var(--accent); }
 .log .t-cmd { color: var(--accent); font-weight: 700; }
 .log .t-path { color: var(--syn-path); }
@@ -821,6 +822,17 @@ function appendHtml(kind, html) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function endResult() {
+  var last = logEl.lastElementChild;
+  if (!last || last.classList.contains("gap")) {
+    return;
+  }
+  var gap = document.createElement("div");
+  gap.className = "line gap";
+  logEl.appendChild(gap);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
 function showReply(reply, command) {
   if (reply.status >= 400) {
     append("err", reply.body);
@@ -1014,6 +1026,7 @@ function connect() {
   }).then(function (reply) {
     showReply(reply, "help");
     append("info", "clear (page only) - empty this log pane");
+    endResult();
     startTimer();
   }).catch(function (err) {
     state.transport = null;
@@ -1021,6 +1034,7 @@ function connect() {
     connectEl.disabled = false;
     setStatus("bad", "error");
     append("err", "connect failed: " + (err && err.message ? err.message : err));
+    endResult();
   });
 }
 
@@ -1055,8 +1069,10 @@ function send(line) {
   appendHtml("cmd", I.colorize("$ " + line, line));
   state.session.exec(line).then(function (reply) {
     showReply(reply, line);
+    endResult();
   }).catch(function (err) {
     append("err", String(err && err.message ? err.message : err));
+    endResult();
   });
 }
 

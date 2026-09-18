@@ -17,7 +17,8 @@ command name in bold accent; entity paths get one colour and component or type n
 another, with the namespace before the last dot kept quiet; `<name:type>` in `help`, member
 names, numbers and strings inside `{...}` each get their own token; tab separated output
 (`next`, `grep`, `logs`) becomes an aligned grid; `logs` levels are coloured by severity.
-An error (status 400) stays plain text in the error colour. The colours are `--syn-path`,
+An error (status 400) stays plain text in the error colour, and every result is followed by
+one blank line so consecutive commands are easy to tell apart. The colours are `--syn-path`,
 `--syn-type`, `--syn-num` and `--syn-str` on `:root`, with a dark mode variant of each.
 
 ## Query parameters
@@ -59,6 +60,8 @@ second; run `capture` and open the thumbnail, which links to a `/resource/<file>
 PNG; run `render sphere` and open the thumbnail it prints once that frame rendered; run
 `clear` to empty the log without a request; press **Disconnect**. Run `grep Position` and
 `logs` and check the columns line up, and toggle the theme to read the log in both.
+`project/db/inspector/page/deliverable/console_colors.png` is a headless Chrome shot of the
+log after `help`, `ls`, `cat camera` and an unknown command.
 
 ## Known limitations
 
