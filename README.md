@@ -169,12 +169,13 @@ Work is tracked as epics, tasks and subtasks under `project/db`. Each item has
 a `README.md` with its goal and a `progress.json` with its status and timing;
 tasks and epics keep test reports, screenshots and notes in `deliverable/`.
 
-Besides the board and timeline, the page has a **Tests** tab (pass/fail/time per
-test project and suite from every `tests.json`, with charts of cases and run time
-over time and per-suite case lists) and a **Benchmarks** tab (latest frame timing
-per bench scene with mean and p99 over time, plus a **Microbenchmarks** table
-with the median and confidence interval of every bake3 benchcase). Both read the
-aggregated `/api/tests` and `/api/benchmarks` endpoints served by `pm.py serve`.
+Besides the board and timeline, the page has a **Tests** tab (per test project a
+table of suites with the time of the latest report and a chart of time per suite
+over every report, expanding into cases with their own history) and a
+**Benchmarks** tab (the same breakdown for bake3 benchmark suites, expanding into
+the median, confidence interval, p99 and samples per case, plus frame timing per
+bench scene). Both read the aggregated `/api/tests` and `/api/benchmarks`
+endpoints served by `pm.py serve`.
 
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
