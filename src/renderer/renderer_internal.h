@@ -21,6 +21,22 @@ typedef struct box_gpu_mesh_t {
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
 
+#ifdef BOX_PLATFORM_WEB
+/** Captures that can wait for their buffer map at the same time */
+#define BOX_CAPTURE_PENDING_MAX (2)
+
+/** A capture whose buffer is being mapped by the browser */
+typedef struct box_capture_t {
+    WGPUBuffer buffer;               /**< Mappable copy of the frame target */
+    uint32_t width;                  /**< Image width in pixels */
+    uint32_t height;                 /**< Image height in pixels */
+    uint32_t stride;                 /**< Bytes per row in the buffer */
+    bool bgra;                       /**< Rows need a BGRA to RGBA swap */
+    bool busy;                       /**< Slot holds a capture in flight */
+    char path[BOX_CAPTURE_PATH_MAX]; /**< PNG the callback writes */
+} box_capture_t;
+#endif
+
 /** Everything the renderer needs to produce frames */
 struct box_renderer_t {
     box_renderer_desc_t desc;        /**< Creation parameters */
@@ -47,7 +63,9 @@ struct box_renderer_t {
     volatile bool ready;             /**< Device and targets are usable */
     volatile bool failed;            /**< Device creation failed */
     volatile uint32_t frames;        /**< Frames presented */
-#ifndef BOX_PLATFORM_WEB
+#ifdef BOX_PLATFORM_WEB
+    box_capture_t captures[BOX_CAPTURE_PENDING_MAX]; /**< Captures waiting for their map */
+#else
     pthread_t thread;                /**< Renderer thread when threaded */
     bool thread_started;             /**< Thread was created */
 #endif
