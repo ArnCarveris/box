@@ -1,0 +1,74 @@
+{
+    "id": "transform",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.transform module",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Math",
+            "testcases": [
+                "identity_is_neutral",
+                "translation_matrix",
+                "scale_matrix",
+                "rotation_x_hand_computed",
+                "rotation_xyz_hand_computed",
+                "rotation_yxz_hand_computed",
+                "trs_composition",
+                "parent_child_multiplication",
+                "facing_z_axis_matches_direction",
+                "facing_euler_round_trip"
+            ]
+        }, {
+            "id": "Static",
+            "testcases": [
+                "position_only",
+                "scale_defaults_to_one",
+                "rotation_composition",
+                "rotation_and_scale_composition",
+                "orientation_wins_over_rotation",
+                "child_of_moved_parent",
+                "grandchild_of_moved_parent",
+                "scale_inherited_three_levels",
+                "child_set_does_not_move_parent",
+                "reparent_to_new_parent",
+                "remove_parent_makes_root",
+                "manual_transform_not_written",
+                "manual_transform_parent_propagates",
+                "one_on_set_per_entity",
+                "one_on_set_for_new_child",
+                "delete_parent_deletes_subtree",
+                "deep_chain"
+            ]
+        }, {
+            "id": "Dynamic",
+            "testcases": [
+                "dynamic_root_updates_each_frame",
+                "dynamic_parent_static_child",
+                "dynamic_grandparent_static_chain",
+                "dynamic_scale_inherited",
+                "orientation_in_dynamic",
+                "dynamic_emits_no_events",
+                "add_then_remove_dynamic",
+                "manual_transform_not_written",
+                "deep_chain_cascade_order",
+                "static_sibling_not_updated_by_system"
+            ]
+        }, {
+            "id": "LookAt",
+            "testcases": [
+                "target_in_front",
+                "target_behind",
+                "target_below",
+                "target_above",
+                "target_to_the_side",
+                "rotation_round_trips",
+                "follows_moving_entity",
+                "child_of_translated_parent",
+                "dynamic_entity"
+            ]
+        }]
+    }
+}
