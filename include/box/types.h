@@ -57,7 +57,7 @@ ECS_STRUCT(rgb, {
  *
  * @param world The world
  */
-void box_typesImport(
+void BoxTypesImport(
     ecs_world_t *world);
 
 #ifdef __cplusplus

@@ -16,10 +16,20 @@ int main(
     char *argv[])
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, box_core);
+    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxSurface);
 
     if (box_parse_args(world, argc, argv)) {
         goto error;
+    }
+
+    if (!ecs_singleton_get(world, Surface)) {
+        Surface *s = ecs_singleton_ensure(world, Surface);
+        s->width = 1280;
+        s->height = 720;
+        s->vsync = true;
+        s->title = ecs_os_strdup("box");
+        ecs_singleton_modified(world, Surface);
     }
 
     if (box_run(world)) {

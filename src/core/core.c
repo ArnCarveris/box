@@ -4,14 +4,15 @@
  */
 
 #define BOX_CORE_IMPL
-#include <box.h>
+#include "core_internal.h"
 
-void box_coreImport(
+void BoxCoreImport(
     ecs_world_t *world)
 {
-    ECS_MODULE(world, box_core);
-    ECS_IMPORT(world, box_types);
+    ECS_MODULE(world, BoxCore);
+    ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, App);
-    ecs_singleton_set(world, App, { .cpu_budget = 1.0, .target_fps = 60.0 });
+    ecs_singleton_set(world, App, { .cpu_budget = 1.0 });
+    box_process_init(world);
 }

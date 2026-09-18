@@ -42,7 +42,7 @@ Two hard rules keep the concerns apart:
 | later | `box.ui`, `box.particles`, `box.transition`, `box.spline`, `box.lod`, `box.job`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
-`box_<module>Import` function, and `src/<module>/` with one file per concern
+`Box<Module>Import` function, and `src/<module>/` with one file per concern
 (`<module>.c` registers the module, other files hold systems and hooks).
 
 ## Frame

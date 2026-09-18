@@ -1,0 +1,5 @@
+using box.surface
+
+$ {
+  Surface: {width: 640, height: 360, write_to_file: "/tmp/box_capture.png"}
+}

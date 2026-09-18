@@ -6,10 +6,10 @@
 #define BOX_TYPES_IMPL
 #include <box.h>
 
-void box_typesImport(
+void BoxTypesImport(
     ecs_world_t *world)
 {
-    ECS_MODULE(world, box_types);
+    ECS_MODULE(world, BoxTypes);
 
     ECS_META_COMPONENT(world, vec2);
     ECS_META_COMPONENT(world, vec3);

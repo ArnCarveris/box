@@ -35,7 +35,7 @@ ECS_STRUCT(App, {
  *
  * @param world The world
  */
-void box_coreImport(
+void BoxCoreImport(
     ecs_world_t *world);
 
 /** Parse command line arguments into the App singleton.
