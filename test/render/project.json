@@ -62,6 +62,21 @@
                 "teardown": true
             },
             {
+                "id": "Environment",
+                "testcases": [
+                    "defaults_without_component",
+                    "colors_are_linear",
+                    "intensity_copied_into_view",
+                    "zero_intensity_is_one",
+                    "generation_stable_without_change",
+                    "generation_changes_on_change",
+                    "removed_component_restores_defaults",
+                    "source_is_reserved"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "component_consumed_by_extract",
