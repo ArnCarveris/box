@@ -322,7 +322,9 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
-    const RenderState *state,
+    bool textured,
+    bool tiled,
+    const RenderState *layers,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -353,25 +355,15 @@ void box_render_fill_instance(
     out->params[3] = 0.0f;
 
     memset(out->textures, 0, sizeof(out->textures));
-    if (state->textured) {
+    if (textured) {
         box_render_fill_textures(world, e, out);
     }
 
-    box_render_fill_uv(world, e, mesh, &m, state->tiled, out);
-    if (state->layered) {
-        box_instance_set_layers(out, box_render_layer_mask(world, state, e));
+    box_render_fill_uv(world, e, mesh, &m, tiled, out);
+    if (layers) {
+        box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
     }
 
-    bool caster = !state->shadowless || box_render_casts_shadow(world, e);
-    if (caster && state->blended) {
-        caster = box_render_blend_mode(world, e) == BOX_BLEND_OPAQUE;
-    }
-
-    if (caster && state->translucent) {
-        caster = out->color[3] >= 1.0f;
-    }
-
-    box_instance_set_caster(out, caster);
     box_render_instance_bounds(mesh, &m, out->bounds);
 }
 

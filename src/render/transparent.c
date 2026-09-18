@@ -263,6 +263,7 @@ void box_render_extract_transparent(
     box_render_sort_keys(world, state, v);
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
     ecs_entity_t *entities = ecs_vec_first_t(&state->transparent, ecs_entity_t);
+    bool masked = v->caster_mask != BOX_VIEW_LAYER_ALL || v->strict_layers;
 
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->sort); i ++) {
@@ -281,9 +282,16 @@ void box_render_extract_transparent(
         box_transparent_t *entry = box_vec_push(&p->transparent);
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
-        box_render_fill_instance(world, e, mesh, transform, false, state, &entry->data);
-        const RenderInstance *inst = ecs_get(world, e, RenderInstance);
-        if (inst && !box_view_casts(v, inst->layer_mask)) {
+        box_render_fill_instance(world, e, mesh, transform, false, state->textured,
+            state->tiled, state->layered ? state : NULL, &entry->data);
+        if (masked) {
+            const RenderInstance *record = ecs_get(world, e, RenderInstance);
+            if (record && !box_view_casts(v, record->layer_mask)) {
+                box_instance_set_caster(&entry->data, false);
+            }
+        }
+
+        if (state->shadowless && !box_render_casts_shadow(world, e)) {
             box_instance_set_caster(&entry->data, false);
         }
 
@@ -291,6 +299,10 @@ void box_render_extract_transparent(
         entry->back = box_render_back_mode(world, e);
         if (entry->blend == BOX_BLEND_OPAQUE && entry->data.color[3] < 1.0f) {
             entry->blend = BOX_BLEND_ALPHA;
+        }
+
+        if (entry->blend != BOX_BLEND_OPAQUE) {
+            box_instance_set_caster(&entry->data, false);
         }
 
         box_instance_set_shading(&entry->data, entry->blend, entry->back);

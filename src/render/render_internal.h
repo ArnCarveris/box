@@ -370,8 +370,13 @@ void box_render_instance_bounds(
  * @param e The entity
  * @param mesh Its render mesh
  * @param transform Its world transform
+ * The instance comes out as a shadow caster; a world that holds a NoShadow tag
+ * or a blend mode clears the flag again through box_instance_set_caster.
+ *
  * @param baked The instance reads a baked probe instead of the static lights
- * @param state The registry, whose flags say which components the world holds
+ * @param textured The world holds textures, so the PBR slots are resolved
+ * @param tiled The world holds tiling components, so the uv transform is derived
+ * @param layers The registry when a material enables a layer, NULL when none does
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -380,7 +385,9 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
-    const RenderState *state,
+    bool textured,
+    bool tiled,
+    const RenderState *layers,
     box_instance_t *out);
 
 /** Check whether an entity and its ancestors let it cast a shadow.

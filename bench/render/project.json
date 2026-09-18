@@ -82,6 +82,13 @@
                 "benchcases": [
                     "cull_100k_cpu"
                 ]
+            },
+            {
+                "id": "Shadows",
+                "benchcases": [
+                    "fit_cascades",
+                    "casters_100k"
+                ]
             }
         ]
     }
