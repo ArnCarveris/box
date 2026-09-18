@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T17:27:34.805+00:00",
   "start_time": "2026-09-18T18:55:51.630+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T19:32:55.644+00:00",
   "dependencies": [
     "materials/blending"
   ]

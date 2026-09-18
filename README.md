@@ -77,8 +77,10 @@ tiles the same material at three sizes.
 additive, multiply, screen and subtractive panels overlapping each other and the
 primitives behind them, drawn back to front. `milk_glass.flecs` holds a frosted
 panel with opacity 0.5 and roughness 0.8 next to a clear one over the same
-textured geometry, and `back_faces.flecs` shows three open boxes of quads, one
-per `BackFaceMode`, with the camera looking into them.
+textured geometry, `glass_sweep.flecs` rows six panels of opacity 0.5 at
+roughness 0 to 1 over checker boxes and spheres, and `back_faces.flecs` shows
+three open boxes of quads, one per `BackFaceMode`, with the camera looking into
+them.
 
 `test/integration/visual/layers.flecs` is the material layer check: the same
 textured crate and sphere six times, without layers and with dust, edge wear,
@@ -122,6 +124,20 @@ Entities are static unless they or an ancestor have `DynamicTransform` or
 
 `test/integration/visual/tint.flecs` checks tint on single objects and on ChildOf, Parent and mixed hierarchies with tints set at different levels.
 
+The `Input` singleton of `box.input` holds the key, mouse and text state of the frame,
+filled in OnLoad from the OS events the platform layer queues and from injected events,
+which are indistinguishable from real input; key codes are ASCII where possible and are
+exported as script constants under `keys` (`keys.W`, `keys.MouseLeft`).
+
+`JobSettings` sizes the worker pool that runs large tasks off the main thread and
+caps the milliseconds their completions may take in PreUpdate, which is how SVG
+rasterization and light baking stay off the frame; `JobStats` reports the queue.
+
+`CpuMonitor`, `EcsStats` and `SystemMonitor` from `box.monitor` publish process
+and machine CPU usage, the flecs statistics addon and the per system frame
+breakdown as components; a source is only sampled while its singleton exists,
+and the CPU budget of a headless run shares the CpuMonitor sampling.
+
 ## Tests
 
 ```sh
@@ -129,7 +145,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, command
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, command, job, input
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
