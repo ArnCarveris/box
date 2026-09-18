@@ -120,6 +120,8 @@
     "@group(2) @binding(9) var samp1: sampler;\n" \
     "@group(2) @binding(10) var samp2: sampler;\n" \
     "@group(2) @binding(11) var samp3: sampler;\n" \
+    "@group(2) @binding(12) var scene_tex: texture_2d<f32>;\n" \
+    "@group(2) @binding(13) var scene_samp: sampler;\n" \
     "fn tex_sample(slot: u32, uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec4<f32> {\n" \
     "  let cls = slot >> 14u;\n" \
     "  let layer = (slot & 0x3FFFu) - 1u;\n" \
@@ -188,6 +190,30 @@
     "  return result;\n" \
     "}\n"
 
+/** Combines the shaded color with the blurred copy of the opaque target.
+ * The alpha blended modes premultiply and take part of their background from
+ * the mip chain of the copy, the roughness picking the mip and the weight. */
+#define BOX_WGSL_RESOLVE \
+    "fn resolve(color: vec3<f32>, alpha: f32, frag: vec2<f32>, roughness: f32,\n" \
+    "    blend: u32) -> vec4<f32> {\n" \
+    "  var rgb = color;\n" \
+    "  var a = alpha;\n" \
+    "  if (blend == 1u || blend == 2u) {\n" \
+    "    let dims = vec2<f32>(textureDimensions(scene_tex, 0));\n" \
+    "    let levels = f32(textureNumLevels(scene_tex)) - 1.0;\n" \
+    "    let lod = clamp(roughness, 0.0, 1.0) * levels;\n" \
+    "    let bg = textureSampleLevel(scene_tex, scene_samp, frag / dims, lod).rgb;\n" \
+    "    let t = roughness * roughness;\n" \
+    "    var pre = rgb * a;\n" \
+    "    if (blend == 2u) {\n" \
+    "      pre = rgb;\n" \
+    "    }\n" \
+    "    rgb = pre + (1.0 - a) * t * bg;\n" \
+    "    a = 1.0 - (1.0 - a) * (1.0 - t);\n" \
+    "  }\n" \
+    "  return vec4(rgb, a);\n" \
+    "}\n"
+
 /** Cluster a view space position falls in, the shader side of box_cluster_index */
 #define BOX_WGSL_CLUSTER_INDEX \
     "fn cluster_index(vp: vec3<f32>) -> u32 {\n" \
@@ -221,6 +247,7 @@ const char *box_mesh_shader_wgsl =
     "@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;\n"
     BOX_WGSL_TEXTURES
     BOX_WGSL_TILING
+    BOX_WGSL_RESOLVE
     BOX_WGSL_CLUSTER_INDEX
     "fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {\n"
     "  var result = 0.0;\n"
@@ -374,7 +401,8 @@ const char *box_mesh_shader_wgsl =
     "  }\n"
     "  return sum;\n"
     "}\n"
-    "@fragment fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {\n"
+    "@fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)\n"
+    "    -> @location(0) vec4<f32> {\n"
     "  let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);\n"
     "  let uv = wrap_uv(in.uv_mode, projected);\n"
     "  let dp1 = dpdx(in.world_pos);\n"
@@ -387,16 +415,36 @@ const char *box_mesh_shader_wgsl =
     "    ddx = clamp(ddx, vec2(-lim), vec2(lim));\n"
     "    ddy = clamp(ddy, vec2(-lim), vec2(lim));\n"
     "  }\n"
+    "  let blend = (in.uv_mode >> 8u) & 0xFu;\n"
+    "  let plain = !front && ((in.uv_mode >> 12u) & 0x3u) == 1u;\n"
     "  var n = normalize(in.normal);\n"
+    "  if (!front) {\n"
+    "    n = -n;\n"
+    "  }\n"
     "  var albedo = in.color.rgb;\n"
+    "  var alpha = in.color.a;\n"
     "  var emitted = in.emissive.rgb;\n"
     "  var rough = in.params.y;\n"
-    "  let slot_albedo = in.textures.x & 0xFFFFu;\n"
-    "  let slot_emissive = in.textures.x >> 16u;\n"
-    "  let slot_rough = in.textures.y & 0xFFFFu;\n"
-    "  let slot_normal = in.textures.y >> 16u;\n"
+    "  var slot_albedo = in.textures.x & 0xFFFFu;\n"
+    "  var slot_emissive = in.textures.x >> 16u;\n"
+    "  var slot_rough = in.textures.y & 0xFFFFu;\n"
+    "  var slot_normal = in.textures.y >> 16u;\n"
+    "  if (plain) {\n"
+    "    slot_albedo = 0u;\n"
+    "    slot_emissive = 0u;\n"
+    "    slot_rough = 0u;\n"
+    "    slot_normal = 0u;\n"
+    "  }\n"
     "  if (slot_albedo != 0u) {\n"
-    "    albedo = albedo * srgb_to_linear(tex_sample(slot_albedo, uv, ddx, ddy).rgb);\n"
+    "    let texel = tex_sample(slot_albedo, uv, ddx, ddy);\n"
+    "    albedo = albedo * srgb_to_linear(texel.rgb);\n"
+    "    if (blend == 0u) {\n"
+    "      if (texel.a < 0.5) {\n"
+    "        discard;\n"
+    "      }\n"
+    "    } else {\n"
+    "      alpha = alpha * texel.a;\n"
+    "    }\n"
     "  }\n"
     "  if (slot_emissive != 0u) {\n"
     "    let t = srgb_to_linear(tex_sample(slot_emissive, uv, ddx, ddy).rgb);\n"
@@ -424,7 +472,7 @@ const char *box_mesh_shader_wgsl =
     "  if (u.gamma_encode > 0.5) {\n"
     "    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));\n"
     "  }\n"
-    "  return vec4(color, in.color.a);\n"
+    "  return resolve(color, alpha, in.clip.xy, roughness, blend);\n"
     "}\n";
 
 const char *box_cluster_shader_wgsl =
@@ -755,4 +803,22 @@ const char *box_bake_shader_wgsl =
     "    sb = sb + value.b * basis;\n"
     "  }\n"
     "  probes[d.grid.x + job.index] = Probe(sr, sg, sb);\n"
+    "}\n";
+
+const char *box_downsample_wgsl =
+    "@group(0) @binding(0) var src: texture_2d<f32>;\n"
+    "@group(0) @binding(1) var samp: sampler;\n"
+    "struct Out {\n"
+    "  @builtin(position) pos: vec4<f32>,\n"
+    "  @location(0) uv: vec2<f32>,\n"
+    "};\n"
+    "@vertex fn vs_main(@builtin(vertex_index) index: u32) -> Out {\n"
+    "  let corner = vec2<f32>(f32((index << 1u) & 2u), f32(index & 2u));\n"
+    "  var out: Out;\n"
+    "  out.pos = vec4(corner * 2.0 - vec2(1.0), 0.0, 1.0);\n"
+    "  out.uv = vec2(corner.x, 1.0 - corner.y);\n"
+    "  return out;\n"
+    "}\n"
+    "@fragment fn fs_main(in: Out) -> @location(0) vec4<f32> {\n"
+    "  return textureSampleLevel(src, samp, in.uv, 0.0);\n"
     "}\n";

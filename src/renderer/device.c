@@ -280,10 +280,13 @@ void box_device_fini(
 {
     box_scene_fini(r);
     box_lights_fini(r);
+    box_transparent_fini(r);
     box_environment_fini(r);
     box_texture_fini(r);
     box_bake_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
+    if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
+    if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);
     if (r->view_group) wgpuBindGroupRelease(r->view_group);
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);
     if (r->view_buffer) wgpuBufferRelease(r->view_buffer);
@@ -327,6 +330,7 @@ void box_device_resize(
 
     if (r->surface) {
         box_device_configure_surface(r);
+        box_transparent_resize(r);
         goto done;
     }
 
@@ -342,6 +346,7 @@ void box_device_resize(
     };
     r->offscreen = wgpuDeviceCreateTexture(r->device, &color_desc);
     r->offscreen_view = wgpuTextureCreateView(r->offscreen, NULL);
+    box_transparent_resize(r);
 done:
     return;
 }

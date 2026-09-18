@@ -194,7 +194,7 @@ static void box_env_layouts(
     WGPUBindGroupLayoutDescriptor filter_desc = { .entryCount = 3, .entries = filter_entries };
     r->env_filter_layout = wgpuDeviceCreateBindGroupLayout(r->device, &filter_desc);
 
-    WGPUBindGroupLayoutEntry mesh_entries[BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2] = {
+    WGPUBindGroupLayoutEntry mesh_entries[BOX_MESH_BINDINGS] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -223,8 +223,9 @@ static void box_env_layouts(
         }
     };
     box_texture_bind_layout(mesh_entries + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
+    box_transparent_bind_layout(mesh_entries + BOX_SCENE_BINDING, BOX_SCENE_BINDING);
     WGPUBindGroupLayoutDescriptor mesh_desc = {
-        .entryCount = BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2,
+        .entryCount = BOX_MESH_BINDINGS,
         .entries = mesh_entries
     };
     r->env_layout = wgpuDeviceCreateBindGroupLayout(r->device, &mesh_desc);
@@ -306,16 +307,17 @@ static void box_env_groups(
 void box_environment_rebuild(
     box_renderer_t *r)
 {
-    WGPUBindGroupEntry mesh_entries[BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2] = {
+    WGPUBindGroupEntry mesh_entries[BOX_MESH_BINDINGS] = {
         { .binding = 0, .textureView = r->env_irradiance_view },
         { .binding = 1, .textureView = r->env_specular_view },
         { .binding = 2, .textureView = r->env_brdf_view },
         { .binding = 3, .sampler = r->env_sampler }
     };
     box_texture_bind_group(r, mesh_entries + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
+    box_transparent_bind_group(r, mesh_entries + BOX_SCENE_BINDING, BOX_SCENE_BINDING);
     WGPUBindGroupDescriptor mesh_desc = {
         .layout = r->env_layout,
-        .entryCount = BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2,
+        .entryCount = BOX_MESH_BINDINGS,
         .entries = mesh_entries
     };
     if (r->env_group) {

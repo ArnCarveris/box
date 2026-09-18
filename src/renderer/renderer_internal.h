@@ -42,6 +42,18 @@
 /** Bindings the environment takes at the start of the shared fragment bind group */
 #define BOX_ENV_BINDINGS (4)
 
+/** First binding of the scene copy in the shared fragment bind group */
+#define BOX_SCENE_BINDING (BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2)
+
+/** Entries of the shared fragment bind group */
+#define BOX_MESH_BINDINGS (BOX_SCENE_BINDING + 2)
+
+/** Mip levels the copy of the opaque target can hold, enough for 8192 pixels */
+#define BOX_SCENE_MIPS_MAX (14)
+
+/** Cull modes a sorted pipeline is built for: back faces culled or kept */
+#define BOX_CULL_MODES (2)
+
 /** Passes of a prefilter: one per face of the source, every specular mip and the irradiance */
 #define BOX_ENV_PASSES (BOX_ENV_FACES * (BOX_ENV_MIPS + 2))
 
@@ -130,6 +142,20 @@ struct box_renderer_t {
     WGPUTexture depth;               /**< Depth target */
     WGPUTextureView depth_view;      /**< View of the depth target */
     WGPURenderPipeline pipeline;     /**< Lit instanced mesh pipeline */
+    WGPUShaderModule mesh_shader;    /**< Module every mesh pipeline is built from */
+    WGPUPipelineLayout mesh_layout;  /**< Pipeline layout shared by the mesh pipelines */
+    WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]; /**< Sorted pass */
+    WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
+    uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
+    bool scene_needed;               /**< A sorted draw of this packet samples the copy */
+    WGPUTexture scene;               /**< Copy of the opaque target with a mip chain */
+    WGPUTextureView scene_view;      /**< View of the whole mip chain */
+    WGPUTextureView scene_mips[BOX_SCENE_MIPS_MAX]; /**< Render target view of one mip */
+    WGPUBindGroup scene_groups[BOX_SCENE_MIPS_MAX]; /**< Source group of one downsample pass */
+    uint32_t scene_mips_count;       /**< Mip levels the copy holds */
+    WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full mip range */
+    WGPUBindGroupLayout downsample_layout; /**< Source texture and sampler of a downsample */
+    WGPURenderPipeline downsample_pipeline; /**< Halves one mip of the copy into the next */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     WGPUBindGroup view_group;        /**< Bind group with the view uniforms */
     WGPUBuffer view_buffer;          /**< View uniform buffer */
@@ -237,6 +263,24 @@ void box_device_resize(
 void box_frame_init(
     box_renderer_t *r);
 
+/** Create a variant of the mesh pipeline.
+ *
+ * @param r The renderer
+ * @param stride Bytes between two instances in the instance buffer
+ * @param offset Bytes from an instance buffer element to its instance data
+ * @param cull Faces the rasterizer drops
+ * @param depth_write The draw writes the depth buffer
+ * @param blend Blend state of the color target, NULL for no blending
+ * @return The pipeline
+ */
+WGPURenderPipeline box_frame_pipeline(
+    box_renderer_t *r,
+    uint64_t stride,
+    uint64_t offset,
+    WGPUCullMode cull,
+    bool depth_write,
+    const WGPUBlendState *blend);
+
 /** Render and present one packet.
  *
  * @param r The renderer
@@ -271,6 +315,78 @@ void box_scene_draw(
  * @param r The renderer
  */
 void box_scene_fini(
+    box_renderer_t *r);
+
+/** Create the sampler, the downsample pipeline and the views of the scene copy.
+ *
+ * @param r The renderer
+ */
+void box_transparent_init(
+    box_renderer_t *r);
+
+/** Recreate the copy of the opaque target and its mip chain for the target size.
+ *
+ * @param r The renderer
+ */
+void box_transparent_resize(
+    box_renderer_t *r);
+
+/** Describe the scene copy half of the shared fragment bind group layout.
+ *
+ * @param out Entries to fill, two of them
+ * @param base First binding of the scene copy half
+ */
+void box_transparent_bind_layout(
+    WGPUBindGroupLayoutEntry *out,
+    uint32_t base);
+
+/** Fill the scene copy half of the shared fragment bind group.
+ *
+ * @param r The renderer
+ * @param out Entries to fill, two of them
+ * @param base First binding of the scene copy half
+ */
+void box_transparent_bind_group(
+    box_renderer_t *r,
+    WGPUBindGroupEntry *out,
+    uint32_t base);
+
+/** Upload the sorted draws of a packet into the instance buffer.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_transparent_upload(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Copy the opaque target into the scene copy and fill its mip chain.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param target The texture the opaque pass rendered into
+ */
+void box_transparent_prepare(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUTexture target);
+
+/** Record the sorted draws of a packet, back to front, one pipeline per mode.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param pass The render pass
+ */
+void box_transparent_draw(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPURenderPassEncoder pass);
+
+/** Release the scene copy, its pipelines and the sorted instance buffer.
+ *
+ * @param r The renderer
+ */
+void box_transparent_fini(
     box_renderer_t *r);
 
 /** Create the texture samplers and the placeholder array texture.
@@ -443,6 +559,9 @@ extern const char *box_bake_grid_wgsl;
 
 /** WGSL source of the probe bake shader */
 extern const char *box_bake_shader_wgsl;
+
+/** WGSL source of the pass that halves one mip of the scene copy into the next */
+extern const char *box_downsample_wgsl;
 
 /** Read back a texture and write it as PNG.
  *
