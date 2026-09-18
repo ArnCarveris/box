@@ -29,6 +29,7 @@ static void box_input_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].scheduled, InputEvent);
         ecs_vec_fini_t(NULL, &state[i].bound, box_binding_t);
         ecs_vec_fini_t(NULL, &state[i].active, box_active_t);
+        ecs_vec_fini_t(NULL, &state[i].holds, box_hold_t);
         box_input_queries_fini(&state[i]);
     }
 }
@@ -126,6 +127,7 @@ void BoxInputImport(
     ecs_vec_init_t(NULL, &state->platform, InputEvent, 0);
     ecs_vec_init_t(NULL, &state->injected, InputEvent, 0);
     ecs_vec_init_t(NULL, &state->scheduled, InputEvent, 0);
+    ecs_vec_init_t(NULL, &state->holds, box_hold_t, 0);
     box_input_actions_init(world, state);
     box_input_map_init(world);
 

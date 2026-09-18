@@ -202,7 +202,8 @@ static void box_input_apply_platform(
     for (i = 0; i < count; i ++) {
         const InputEvent *ev = ecs_vec_get_t(&state->platform, InputEvent, i);
         bool away = !in->focused || in->minimized;
-        if (!away || ev->kind == InputFocus || ev->kind == InputMinimize) {
+        bool pinned = state->cursor_pinned && ev->kind == InputMouseMove;
+        if ((!away || ev->kind == InputFocus || ev->kind == InputMinimize) && !pinned) {
             box_input_apply(in, state, ev);
         }
     }

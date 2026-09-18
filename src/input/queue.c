@@ -46,6 +46,13 @@ void box_input_inject(
     ecs_vec_append_t(NULL, queue, InputEvent)[0] = *event;
 }
 
+void box_input_cursor_pin(
+    ecs_world_t *world,
+    bool pinned)
+{
+    box_input_state(world)->cursor_pinned = pinned;
+}
+
 void box_input_reset(
     ecs_world_t *world)
 {

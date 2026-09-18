@@ -7,6 +7,8 @@
  */
 
 #include "input_internal.h"
+#include <string.h>
+#include <ctype.h>
 
 /** One key code with the name it takes under the keys scope */
 typedef struct box_key_name_t {
@@ -150,6 +152,80 @@ static void box_input_key_var(
     var->type_info = ti;
     *(uint64_t*)var->value.ptr = box_input_key_mask(code);
     ecs_modified(world, constant, EcsScriptConstVar);
+}
+
+int32_t box_input_key_from_name(
+    const char *name)
+{
+    int32_t result = -1;
+    int32_t i, count = (int32_t)(sizeof(box_key_names) / sizeof(box_key_names[0]));
+    for (i = 0; i < count && result < 0; i ++) {
+        const char *a = box_key_names[i].name, *b = name;
+        while (a[0] && tolower(a[0]) == tolower(b[0])) {
+            a ++;
+            b ++;
+        }
+
+        if (!a[0] && !b[0]) {
+            result = box_key_names[i].code;
+        }
+    }
+
+    return result;
+}
+
+/** Name of a key code, as the keys constants spell it.
+ *
+ * @param code The key code
+ * @return The name, or NULL when no key has that code
+ */
+static const char* box_input_code_name(
+    int32_t code)
+{
+    const char *result = NULL;
+    int32_t i, count = (int32_t)(sizeof(box_key_names) / sizeof(box_key_names[0]));
+    for (i = 0; i < count && !result; i ++) {
+        if (box_key_names[i].code == code) {
+            result = box_key_names[i].name;
+        }
+    }
+
+    return result;
+}
+
+char* box_input_mask_name(
+    uint64_t mask)
+{
+    static const int32_t families[4] = {
+        BoxKeyShift, BoxKeyCtrl, BoxKeyAlt, BoxKeySuper
+    };
+
+    const char *parts[5];
+    uint64_t mods = mask & BOX_KEY_MOD_MASK;
+    int32_t i, count = 0;
+    for (i = 0; i < 4; i ++) {
+        uint64_t family = box_input_key_mask(families[i]);
+        uint64_t bits = mods & family;
+        if (bits) {
+            int32_t code = bits == family
+                ? families[i]
+                : box_input_mod_key(bits);
+            parts[count ++] = box_input_code_name(code);
+        }
+    }
+
+    int32_t key = (int32_t)(mask & BOX_KEY_MASK);
+    if (key || !count) {
+        parts[count ++] = box_input_code_name(key);
+    }
+
+    ecs_strbuf_t buf = ECS_STRBUF_INIT;
+    for (i = 0; i < count; i ++) {
+        ecs_strbuf_append(&buf, "%s%s", i ? "+" : "",
+            parts[i] ? parts[i] : "None");
+    }
+
+    return ecs_strbuf_get(&buf);
 }
 
 ecs_entity_t box_input_keys_init(

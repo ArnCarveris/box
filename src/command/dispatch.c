@@ -164,16 +164,14 @@ static char* box_dispatch_call(
     char *result = NULL;
     error[0] = true;
 
-    ecs_entity_t cmd = ecs_lookup_child(world, box_command_scope(world), tokens[0]);
-    if (!cmd) {
+    ecs_entity_t cmd = ecs_lookup_path_w_sep(
+        world, box_command_scope(world), tokens[0], ".", NULL, false);
+    const EcsScriptFunction *f = cmd ? ecs_get(world, cmd, EcsScriptFunction) : NULL;
+    const CommandInfo *info = cmd ? ecs_get(world, cmd, CommandInfo) : NULL;
+    if (!f || !info) {
         result = flecs_asprintf("unknown command '%s'", tokens[0]);
         goto done;
     }
-
-    const EcsScriptFunction *f = ecs_get(world, cmd, EcsScriptFunction);
-    const CommandInfo *info = ecs_get(world, cmd, CommandInfo);
-    ecs_assert(f != NULL, ECS_INVALID_OPERATION, "command is not a function");
-    ecs_assert(info != NULL, ECS_INVALID_OPERATION, "command without parameter info");
 
     int32_t argc = ecs_vec_count(&f->params);
     int32_t provided = count - 1;

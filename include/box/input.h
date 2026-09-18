@@ -152,6 +152,75 @@ int32_t box_input_events(
     ecs_world_t *world,
     const ActionEvent **events);
 
+/** Hold an action from code, without a key.
+ *
+ * A hold makes the action active the next time the bindings resolve, which is
+ * what an action command does; frames counts the frames it stays active and 0
+ * holds it until box_input_release.
+ *
+ * @param world The world
+ * @param action The action entity, which must have an InputAction
+ * @param source The entity that holds the action, 0 when there is none
+ * @param frames Frames the action stays active, 0 to hold it until released
+ */
+void box_input_hold(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    ecs_entity_t source,
+    int32_t frames);
+
+/** Release an action that code holds.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @return Whether the action was held
+ */
+bool box_input_release(
+    ecs_world_t *world,
+    ecs_entity_t action);
+
+/** Collect the key masks that are bound to an action.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @param out Receives the masks
+ * @param max Size of the array
+ * @return Number of masks written
+ */
+int32_t box_input_bindings(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    uint64_t *out,
+    int32_t max);
+
+/** Look up the key code of a key name, as the keys constants spell it.
+ *
+ * @param name The key name, case insensitive
+ * @return The key code, or -1 when no key has that name
+ */
+int32_t box_input_key_from_name(
+    const char *name);
+
+/** Write a key mask as the names of its modifiers and its key.
+ *
+ * @param mask The key mask
+ * @return The name, for example Ctrl+S, the caller frees it
+ */
+char* box_input_mask_name(
+    uint64_t mask);
+
+/** Ignore or accept the cursor positions the platform layer reports.
+ *
+ * A pinned cursor keeps the position that injection gives it, which is what the
+ * mouse commands need while they drive the pointer.
+ *
+ * @param world The world
+ * @param pinned Whether platform cursor movement is ignored
+ */
+void box_input_cursor_pin(
+    ecs_world_t *world,
+    bool pinned);
+
 /** Queue an event, which the next BoxInputUpdate applies.
  *
  * A key or button down event with a duration schedules its up event that many

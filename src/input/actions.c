@@ -47,6 +47,20 @@ static uint64_t box_input_mod_bit(
     return result;
 }
 
+int32_t box_input_mod_key(
+    uint64_t bit)
+{
+    int32_t result = BoxKeyNone;
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        if (box_input_mod_bit(box_input_mod_keys[i]) == bit) {
+            result = box_input_mod_keys[i];
+        }
+    }
+
+    return result;
+}
+
 uint64_t box_input_key_mask(
     int32_t code)
 {
@@ -376,6 +390,28 @@ static void box_input_resolve_mods(
     }
 }
 
+/** Add the actions that code holds to the active list and age their frames.
+ *
+ * @param state The module state
+ */
+static void box_input_resolve_holds(
+    InputState *state)
+{
+    int32_t i = 0;
+    while (i < ecs_vec_count(&state->holds)) {
+        box_hold_t *hold = ecs_vec_get_t(&state->holds, box_hold_t, i);
+        box_active_t *out = ecs_vec_append_t(NULL, &state->active, box_active_t);
+        out->action = hold->action;
+        out->source = hold->source;
+        out->mask = 0;
+        if (hold->frames > 0 && !--hold->frames) {
+            ecs_vec_remove_ordered_t(&state->holds, box_hold_t, i);
+        } else {
+            i ++;
+        }
+    }
+}
+
 /** Find the first binding of the frame that fires an action.
  *
  * @param state The module state
@@ -496,6 +532,60 @@ void box_input_queries_fini(
     }
 }
 
+int32_t box_input_bindings(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    uint64_t *out,
+    int32_t max)
+{
+    InputState *state = box_input_state(world);
+    box_input_collect(world, state);
+
+    int32_t i, count = 0, bound = ecs_vec_count(&state->bound);
+    for (i = 0; i < bound && count < max; i ++) {
+        const box_binding_t *binding = ecs_vec_get_t(
+            &state->bound, box_binding_t, i);
+        if (binding->action == action) {
+            out[count ++] = binding->mask;
+        }
+    }
+
+    return count;
+}
+
+void box_input_hold(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    ecs_entity_t source,
+    int32_t frames)
+{
+    ecs_assert(ecs_get(world, action, InputAction) != NULL,
+        ECS_INVALID_PARAMETER, "entity is not an action");
+    InputState *state = box_input_state(world);
+    box_input_release(world, action);
+    box_hold_t *hold = ecs_vec_append_t(NULL, &state->holds, box_hold_t);
+    hold->action = action;
+    hold->source = source;
+    hold->frames = frames;
+}
+
+bool box_input_release(
+    ecs_world_t *world,
+    ecs_entity_t action)
+{
+    InputState *state = box_input_state(world);
+    bool result = false;
+    int32_t i, count = ecs_vec_count(&state->holds);
+    for (i = 0; i < count && !result; i ++) {
+        if (ecs_vec_get_t(&state->holds, box_hold_t, i)->action == action) {
+            ecs_vec_remove_ordered_t(&state->holds, box_hold_t, i);
+            result = true;
+        }
+    }
+
+    return result;
+}
+
 void box_input_emit(
     ecs_world_t *world,
     ecs_entity_t action,
@@ -541,5 +631,6 @@ void BoxInputActions(
     uint64_t held = box_input_held_mods(in);
     uint64_t claimed = box_input_resolve_keys(state, in, held);
     box_input_resolve_mods(state, held, claimed);
+    box_input_resolve_holds(state);
     box_input_write_actions(world, state, events);
 }

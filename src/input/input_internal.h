@@ -23,6 +23,13 @@ typedef struct box_active_t {
     uint64_t mask;       /**< Key mask that fired */
 } box_active_t;
 
+/** One action that code holds without a key */
+typedef struct box_hold_t {
+    ecs_entity_t action; /**< Action that is held */
+    ecs_entity_t source; /**< Entity that holds it */
+    int32_t frames;      /**< Frames it stays active, 0 until it is released */
+} box_hold_t;
+
 /** Queues the update system applies, and the state it keeps between frames */
 typedef struct InputState {
     ecs_vec_t platform;    /**< InputEvent the platform layer queued this frame */
@@ -30,12 +37,14 @@ typedef struct InputState {
     ecs_vec_t scheduled;   /**< InputEvent scratch holding the up events of a duration */
     ecs_vec_t bound;       /**< box_binding_t collected from the maps this frame */
     ecs_vec_t active;      /**< box_active_t of the bindings that fired this frame */
+    ecs_vec_t holds;       /**< box_hold_t of the actions that code holds */
     ecs_query_t *bindings; /**< Entities that hold a Binding */
     ecs_query_t *maps;     /**< Entities that hold an InputMap */
     ecs_query_t *actions;  /**< Entities that hold an InputAction */
     ecs_entity_t keys;     /**< The keys enum type the key constants live under */
     box_window_t *window;  /**< Window the sink is installed on, NULL while headless */
     bool captured;         /**< Cursor capture last applied to the window */
+    bool cursor_pinned;    /**< Platform cursor movement is ignored */
     bool cursor_valid;     /**< A cursor position arrived since the last focus gain */
 } InputState;
 
@@ -118,6 +127,14 @@ void BoxInputUpdate(
  */
 uint64_t box_input_key_mask(
     int32_t code);
+
+/** Key code of a single modifier bit.
+ *
+ * @param bit The modifier bit
+ * @return The key code of the modifier, or BoxKeyNone
+ */
+int32_t box_input_mod_key(
+    uint64_t bit);
 
 /** Create the queries the action layer resolves its bindings with.
  *
