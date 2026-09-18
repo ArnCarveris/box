@@ -6,6 +6,7 @@ Usage:
            [--time sec] [--samples n] [--fail-on-regression] [project ...]
 """
 import argparse
+import glob
 import json
 import os
 import subprocess
@@ -37,11 +38,24 @@ def env_flag(name):
     return f"--local-env={name}" if name else "--local-env"
 
 
+def baseline_report(baseline, name):
+    for candidate in sorted(glob.glob(os.path.join(baseline, "bench*.json"))):
+        try:
+            with open(candidate) as f:
+                if json.load(f).get("project") == "bench_" + name:
+                    return candidate
+        except (OSError, ValueError):
+            pass
+    return os.path.join(baseline, name + ".json")
+
+
 def run_project(name, out, env, cfg, baseline, extra):
     report = os.path.abspath(os.path.join(out, name + ".json"))
     args = ["--json", report, *extra]
     if baseline:
         previous = os.path.join(baseline, name + ".json")
+        if not os.path.isfile(previous):
+            previous = baseline_report(baseline, name)
         if os.path.isfile(previous):
             args += ["--baseline", os.path.abspath(previous)]
         else:
