@@ -1,0 +1,29 @@
+using box.input
+
+// Actions are entities under the actions scope. The engine writes pressed, held,
+// released and value on them every frame.
+actions {
+  Forward { InputAction: {description: "Move forward"} }
+  Back { InputAction: {description: "Move back"} }
+  Left { InputAction: {description: "Strafe left"} }
+  Right { InputAction: {description: "Strafe right"} }
+  Run { InputAction: {description: "Move faster while held"} }
+  Fire { InputAction: {description: "Fire, a UI button emits the same action"} }
+  Save { InputAction: {description: "Save the scene"} }
+}
+
+// An entity with InputMap is a map. A pair of a key constant and an action binds
+// the key, a Binding child carries the full key mask a modifier needs: the key in
+// the low 32 bits and the modifier bits above it.
+input_map {
+  InputMap
+  (keys.W, actions.Forward)
+  (keys.S, actions.Back)
+  (keys.A, actions.Left)
+  (keys.D, actions.Right)
+  (keys.Up, actions.Forward)
+  (keys.MouseLeft, actions.Fire)
+
+  run { Binding: {mask: keys.ShiftLeft, action: actions.Run} }
+  save { Binding: {mask: keys.Ctrl|keys.S, action: actions.Save} }
+}

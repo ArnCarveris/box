@@ -1,9 +1,10 @@
 /**
  * @file box/input.h
- * @brief Device input layer: the Input singleton with key, mouse and text state.
+ * @brief Device and action input layer: the Input singleton, actions and their bindings.
  *
  * One OnLoad system fills Input from the events the platform layer queues and from
- * injected events, so injected input is indistinguishable from real input.
+ * injected events, so injected input is indistinguishable from real input. A second
+ * one resolves the Binding entities of the input maps into the InputAction state.
  */
 
 #ifndef BOX_INPUT_H
@@ -80,6 +81,76 @@ ECS_STRUCT(Input, {
     bool focused;       /**< The window has keyboard focus */
     bool minimized;     /**< The window is minimized */
 });
+
+/** A named action, an entity under the actions scope.
+ *
+ * The description is authored, the other members are written every frame by the
+ * BoxInputActions system from the bindings that resolve to the action.
+ */
+ECS_STRUCT(InputAction, {
+    char *description; /**< What the action does, shown by the action list */
+    bool pressed;      /**< The action became active this frame */
+    bool held;         /**< The action is active */
+    bool released;     /**< The action stopped being active this frame */
+    float value;       /**< Analog value or repeat count, 1 while a binding holds it */
+});
+
+/** Marks an entity as an input map: the bindings under it resolve while enabled */
+ECS_STRUCT(InputMap, {
+    bool enabled; /**< Bindings of this map resolve, true unless the script clears it */
+});
+
+/** One key mask bound to one action, on a child of a map entity.
+ *
+ * Several bindings may carry the same mask, and an action may be bound by several
+ * masks; every binding that resolves this frame makes its action active.
+ */
+ECS_STRUCT(Binding, {
+    uint64_t mask;       /**< Key mask: key code in the low 32 bits, modifier bits above */
+    ecs_entity_t action; /**< Action the mask fires */
+});
+
+/** What an action event of the frame reports */
+ECS_ENUM(ActionPhase, {
+    ActionPressed = 0,  /**< The action became active this frame */
+    ActionHeld = 1,     /**< The action is active this frame */
+    ActionReleased = 2  /**< The action stopped being active this frame */
+});
+
+/** One action event of the frame, kept in the private per frame list */
+ECS_STRUCT(ActionEvent, {
+    ecs_entity_t action; /**< The action the event is about */
+    ActionPhase phase;   /**< What the action did */
+    ecs_entity_t source; /**< Binding that fired it, or the entity that emitted it */
+    uint64_t mask;       /**< Key mask that fired it, 0 when it was emitted */
+});
+
+/** Fire an action for one frame without a key.
+ *
+ * The action is pressed and released in the same frame and its event carries the
+ * source, which is how a UI widget or a command fires the action of a key binding.
+ *
+ * @param world The world
+ * @param action The action entity, which must have an InputAction
+ * @param source The entity that fires the action, 0 when there is none
+ */
+void box_input_emit(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    ecs_entity_t source);
+
+/** Get the action events of the frame.
+ *
+ * The list is cleared by BoxInputActions in OnLoad and holds one entry per phase
+ * per action, in the order the actions resolved, followed by the emitted ones.
+ *
+ * @param world The world
+ * @param events Receives the array, which stays valid until the next frame
+ * @return Number of events in the array
+ */
+int32_t box_input_events(
+    ecs_world_t *world,
+    const ActionEvent **events);
 
 /** Queue an event, which the next BoxInputUpdate applies.
  *

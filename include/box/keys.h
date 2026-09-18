@@ -55,6 +55,9 @@ extern "C" {
 /** Key mask family matching either super */
 #define BOX_KEY_MOD_SUPER (BOX_KEY_MOD_SUPER_LEFT | BOX_KEY_MOD_SUPER_RIGHT)
 
+/** Mask of every modifier bit of a key mask */
+#define BOX_KEY_MOD_MASK (0xffull << 32)
+
 /** Engine key codes, exported as script constants under the keys scope.
  *
  * Printable keys use their uppercase ASCII code, so keys.W is 87 and keys.Space is

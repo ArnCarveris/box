@@ -1,6 +1,9 @@
 /**
  * @file input/keys.c
  * @brief Exports the key codes as script constants under the keys scope.
+ *
+ * Every constant is also a script variable holding the key mask of the key, so a
+ * binding writes keys.W and combines a modifier with keys.Ctrl | keys.S.
  */
 
 #include "input_internal.h"
@@ -129,6 +132,26 @@ static const box_key_name_t box_key_names[] = {
     {"Super", BoxKeySuper}
 };
 
+/** Give a key constant the key mask of its code as a script variable.
+ *
+ * @param world The world
+ * @param constant The key constant
+ * @param code The key code of the constant
+ */
+static void box_input_key_var(
+    ecs_world_t *world,
+    ecs_entity_t constant,
+    int32_t code)
+{
+    const ecs_type_info_t *ti = ecs_get_type_info(world, ecs_id(ecs_u64_t));
+    EcsScriptConstVar *var = ecs_ensure(world, constant, EcsScriptConstVar);
+    var->value.type = ecs_id(ecs_u64_t);
+    var->value.ptr = ecs_os_malloc(ti->size);
+    var->type_info = ti;
+    *(uint64_t*)var->value.ptr = box_input_key_mask(code);
+    ecs_modified(world, constant, EcsScriptConstVar);
+}
+
 ecs_entity_t box_input_keys_init(
     ecs_world_t *world)
 {
@@ -137,6 +160,8 @@ ecs_entity_t box_input_keys_init(
         .constants = {{ .name = box_key_names[0].name }}
     });
 
+    box_input_key_var(world, ecs_lookup_child(world, type, "None"), BoxKeyNone);
+
     ecs_entity_t scope = ecs_set_scope(world, type);
     int32_t i, count = (int32_t)(sizeof(box_key_names) / sizeof(box_key_names[0]));
     for (i = 1; i < count; i ++) {
@@ -144,6 +169,8 @@ ecs_entity_t box_input_keys_init(
         ecs_set_pair_second(world, constant, EcsConstant, ecs_i32_t, {
             box_key_names[i].code
         });
+
+        box_input_key_var(world, constant, box_key_names[i].code);
     }
 
     ecs_set_scope(world, scope);
