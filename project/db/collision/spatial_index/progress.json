@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "interaction/aabb_roots",
-    "interaction/colliders"
+    "collision/aabb_roots",
+    "collision/colliders"
   ]
 }

@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "interaction/spatial_index",
+    "collision/spatial_index",
     "input/device_layer",
     "views/view"
   ]

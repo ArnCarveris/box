@@ -7,7 +7,7 @@
   "dependencies": [
     "ui/ui_view",
     "ui/layout",
-    "interaction/picking",
+    "picking/picking",
     "input/action_layer"
   ]
 }

@@ -7,7 +7,7 @@
   "dependencies": [
     "views",
     "geometry_extensions",
-    "interaction",
+    "picking",
     "input",
     "command"
   ],

@@ -6,6 +6,6 @@
   "end_time": null,
   "dependencies": [
     "lod/screen_space_error",
-    "interaction/aabb_roots"
+    "collision/aabb_roots"
   ]
 }

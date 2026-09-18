@@ -1,11 +1,10 @@
 {
   "kind": "feature",
   "status": "pending",
-  "created": "2026-09-18T08:28:20.464+00:00",
+  "created": "2026-09-18T08:28:20.060+00:00",
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "controllers/first_person",
-    "interaction/spatial_index"
+    "picking/picking"
   ]
 }

@@ -7,7 +7,7 @@
   "dependencies": [
     "culling",
     "responsiveness",
-    "interaction",
+    "collision",
     "geometry_extensions"
   ],
   "priority": 13
