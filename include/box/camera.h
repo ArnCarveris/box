@@ -32,7 +32,7 @@ ECS_STRUCT(Camera, {
 
 /** Renders the camera to a PNG once, the engine removes the component */
 ECS_STRUCT(Capture, {
-    char *path;  /**< File the frame is written to */
+    char *path;  /**< File the frame is written to, owned by the component */
 });
 
 /** Rotates the entity every frame so its local +Z faces the active camera */

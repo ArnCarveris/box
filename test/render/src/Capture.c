@@ -31,7 +31,7 @@ void Capture_component_consumed_by_extract(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_set(w, cam, Capture, {.path = "/tmp/box_test_capture.png"});
+    ecs_set(w, cam, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture.png")});
     box_render_extract(w, &packet);
     test_str(packet.capture_path, "/tmp/box_test_capture.png");
     test_assert(!ecs_has(w, cam, Capture));
@@ -46,7 +46,7 @@ void Capture_camera_becomes_the_view(void)
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {0, 0, 9});
     ecs_set(w, b, Camera, {.fov = 60});
-    ecs_set(w, b, Capture, {.path = "/tmp/box_test_capture_b.png"});
+    ecs_set(w, b, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_b.png")});
     box_render_extract(w, &packet);
     test_bool(packet.has_view, true);
     test_flt(packet.view.eye[2], 9);
@@ -59,11 +59,11 @@ void Capture_two_cameras_over_two_frames(void)
     ecs_entity_t a = ecs_new(w);
     ecs_set(w, a, Position, {-3, 0, 0});
     ecs_set(w, a, Camera, {.fov = 60});
-    ecs_set(w, a, Capture, {.path = "/tmp/box_test_capture_a.png"});
+    ecs_set(w, a, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_a.png")});
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {7, 0, 0});
     ecs_set(w, b, Camera, {.fov = 60});
-    ecs_set(w, b, Capture, {.path = "/tmp/box_test_capture_b.png"});
+    ecs_set(w, b, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_b.png")});
     box_render_extract(w, &packet);
     test_str(packet.capture_path, "/tmp/box_test_capture_a.png");
     test_flt(packet.view.eye[0], -3);
@@ -85,7 +85,7 @@ void Capture_overrides_write_to_file(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_set(w, cam, Capture, {.path = "/tmp/box_test_capture_cam.png"});
+    ecs_set(w, cam, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_cam.png")});
     ecs_os_snprintf(packet.capture_path, BOX_CAPTURE_PATH_MAX, "%s",
         "/tmp/box_test_capture_surface.png");
     box_render_extract(w, &packet);
@@ -133,7 +133,7 @@ void Capture_removed_after_a_deferred_extract(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_set(w, cam, Capture, {.path = "/tmp/box_test_capture_deferred.png"});
+    ecs_set(w, cam, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_deferred.png")});
     ecs_readonly_begin(w, false);
     box_render_extract(ecs_get_stage(w, 0), &packet);
     test_assert(ecs_has(w, cam, Capture));

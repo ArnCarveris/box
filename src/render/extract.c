@@ -189,7 +189,8 @@ static void box_extract_dynamic(
 /** Take the capture request of the first camera that has one.
  *
  * The path of the request replaces the one the surface wrote and the component
- * is removed, so a next frame honors the request of another camera.
+ * is removed, so a next frame honors the request of another camera. The
+ * component owns its path, which is released with the request.
  *
  * @param world The world
  * @param state The registry
@@ -204,10 +205,12 @@ static ecs_entity_t box_extract_capture(
     ecs_entity_t result = 0;
     ecs_iter_t it = ecs_query_iter(world, state->captures);
     if (ecs_query_next(&it)) {
-        const Capture *capture = ecs_field(&it, Capture, 0);
+        Capture *capture = ecs_field(&it, Capture, 0);
         result = it.entities[0];
         ecs_os_snprintf(p->capture_path, BOX_CAPTURE_PATH_MAX, "%s",
             capture->path ? capture->path : "");
+        ecs_os_free(capture->path);
+        capture->path = NULL;
         ecs_iter_fini(&it);
     }
 
@@ -389,12 +392,15 @@ void box_render_validate(
 
 /** Extract system body: fill the packet of the frame's surface.
  *
+ * The stage is used as the world, so that the removal of a consumed Capture is
+ * queued instead of applied to the readonly world of a system.
+ *
  * @param it System iterator
  */
 static void BoxRenderExtract(
     ecs_iter_t *it)
 {
-    ecs_world_t *world = it->world;
+    ecs_world_t *world = it->stage;
     RenderState *state = box_render_state(world);
     box_packet_t *p = NULL;
 
@@ -433,7 +439,7 @@ void box_render_extract_init(
     });
     state->captures = ecs_query(world, {
         .terms = {
-            { .id = ecs_id(Capture), .inout = EcsIn },
+            { .id = ecs_id(Capture), .inout = EcsInOut },
             { .id = ecs_id(Camera), .inout = EcsInOutNone }
         }
     });

@@ -167,6 +167,22 @@
             ],
             "setup": true,
             "teardown": true
+        }, {
+            "id": "Capture",
+            "testcases": [
+                "prints_path_of_the_active_camera",
+                "path_uses_the_frame_number",
+                "named_camera",
+                "multiple_cameras",
+                "camera_relative_to_cwd",
+                "unknown_camera",
+                "entity_without_camera",
+                "without_active_camera",
+                "second_request_replaces_the_first",
+                "headless_run_writes_the_png"
+            ],
+            "setup": true,
+            "teardown": true
         }]
     }
 }
