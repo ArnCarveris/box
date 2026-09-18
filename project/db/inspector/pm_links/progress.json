@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:36:31.200+00:00",
   "start_time": "2026-09-18T08:49:40.286+00:00",
-  "end_time": null,
+  "end_time": "2026-09-18T09:00:48.490+00:00",
   "dependencies": [
     "inspector/page"
   ]
