@@ -98,11 +98,11 @@ void box_material_layers_init(
     ecs_entity_t parent = ecs_entity(world, { .name = "layers" });
 
     box_layer_add(world, parent, "edge_wear", box_layer_edge_wear_wgsl, 0,
-        (vec4){ 0.82f, 0.80f, 0.76f, 1.0f }, (vec4){ 0.14f, 0.2f, 6.0f, 0.0f });
+        (vec4){ 0.78f, 0.76f, 0.72f, 1.0f }, (vec4){ 0.08f, 0.25f, 6.0f, 0.0f });
     box_layer_add(world, parent, "dust", box_layer_dust_wgsl, 10,
         (vec4){ 0.72f, 0.68f, 0.58f, 0.85f }, (vec4){ 6.0f, 0.95f, 1.5f, 0.0f });
     box_layer_add(world, parent, "grime", box_layer_grime_wgsl, 20,
-        (vec4){ 0.18f, 0.16f, 0.12f, 0.9f }, (vec4){ 4.0f, 0.85f, 0.0f, 0.0f });
+        (vec4){ 0.12f, 0.11f, 0.09f, 1.0f }, (vec4){ 4.0f, 0.9f, 0.0f, 0.0f });
     box_layer_add(world, parent, "wetness", box_layer_wetness_wgsl, 30,
         (vec4){ 0.05f, 0.0f, 0.0f, 0.9f }, (vec4){ 3.0f, 0.0f, 0.35f, 0.0f });
 }

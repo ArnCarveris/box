@@ -80,6 +80,19 @@ panel with opacity 0.5 and roughness 0.8 next to a clear one over the same
 textured geometry, and `back_faces.flecs` shows three open boxes of quads, one
 per `BackFaceMode`, with the camera looking into them.
 
+`test/integration/visual/layers.flecs` is the material layer check: the same
+textured crate and sphere six times, without layers and with dust, edge wear,
+grime, wetness and all four at once. A layer is an entity under
+`box.material.layers` with a `MaterialLayer` WGSL body and a `LayerParams`
+holding its two scene global vectors; a material enables one with the pair
+`(MaterialLayerOn, box.material.layers.dust)`. Dust takes its color and amount
+from `a`, and noise frequency, roughness and up facing sharpness from `b`. Edge
+wear takes the metal color and amount from `a` and the band width, roughness and
+noise frequency from `b`. Grime takes its albedo multiplier and amount from `a`
+and noise frequency and roughness from `b`. Wetness takes the wet roughness in
+`a.x` and the amount in `a.w`, and noise frequency, pooling and noise weight from
+`b`. `MaterialLayerSettings` turns every layer off at once.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights

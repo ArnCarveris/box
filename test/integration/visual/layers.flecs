@@ -1,0 +1,109 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {120, 145, 190}, ground_color: {75, 66, 58}, intensity: 0.7}
+}
+
+textures {
+  checker {
+    Texture: {path: "etc/textures/checker.png"}
+  }
+}
+
+camera {
+  Position: {0, 8, -13.2}
+  LookAt: {0, 1.0, 1.6}
+  Camera: {fov: 58}
+}
+
+sun {
+  Rotation: {0.75, -0.35, 0}
+  DirectionalLight: {intensity: 2.2}
+}
+
+floor {
+  Position: {0, -0.5, 1.5}
+  Box: {32, 0.2, 16}
+  Rgb: {110, 110, 118}
+  PbrMaterial: {roughness: 0.85}
+}
+
+prefabs {
+  Crate : Prefab {
+    Box: {2.4, 2.4, 2.4}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0.15, roughness: 0.7}
+    PbrTextures: {albedo: textures.checker}
+  }
+
+  Ball : Prefab {
+    Sphere: {segments: 40, smooth: true, radius: 1.1}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {metallic: 0.15, roughness: 0.7}
+    PbrTextures: {albedo: textures.checker}
+  }
+}
+
+plain_crate : prefabs.Crate { Position: {-11.0, 1.2, 0} }
+plain_ball : prefabs.Ball { Position: {-11.0, 1.1, 3.6} }
+
+dust_crate : prefabs.Crate {
+  Position: {-6.6, 1.2, 0}
+  (MaterialLayerOn, box.material.layers.dust)
+}
+
+dust_ball : prefabs.Ball {
+  Position: {-6.6, 1.1, 3.6}
+  (MaterialLayerOn, box.material.layers.dust)
+}
+
+wear_crate : prefabs.Crate {
+  Position: {-2.2, 1.2, 0}
+  (MaterialLayerOn, box.material.layers.edge_wear)
+}
+
+wear_ball : prefabs.Ball {
+  Position: {-2.2, 1.1, 3.6}
+  (MaterialLayerOn, box.material.layers.edge_wear)
+}
+
+grime_crate : prefabs.Crate {
+  Position: {2.2, 1.2, 0}
+  (MaterialLayerOn, box.material.layers.grime)
+}
+
+grime_ball : prefabs.Ball {
+  Position: {2.2, 1.1, 3.6}
+  (MaterialLayerOn, box.material.layers.grime)
+}
+
+wet_crate : prefabs.Crate {
+  Position: {6.6, 1.2, 0}
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+wet_ball : prefabs.Ball {
+  Position: {6.6, 1.1, 3.6}
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+all_crate : prefabs.Crate {
+  Position: {11.0, 1.2, 0}
+  (MaterialLayerOn, box.material.layers.edge_wear)
+  (MaterialLayerOn, box.material.layers.dust)
+  (MaterialLayerOn, box.material.layers.grime)
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+all_ball : prefabs.Ball {
+  Position: {11.0, 1.1, 3.6}
+  (MaterialLayerOn, box.material.layers.edge_wear)
+  (MaterialLayerOn, box.material.layers.dust)
+  (MaterialLayerOn, box.material.layers.grime)
+  (MaterialLayerOn, box.material.layers.wetness)
+}
