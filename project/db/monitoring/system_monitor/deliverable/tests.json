@@ -1,0 +1,17 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-18T19:43:24Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.051212,
+  "tests": [
+    {"suite": "Systems", "case": "off_by_default", "status": "pass", "elapsed": 0.009041},
+    {"suite": "Systems", "case": "disabled_monitor_collects_nothing", "status": "pass", "elapsed": 0.029133},
+    {"suite": "Systems", "case": "slow_system_is_attributed_to_itself", "status": "pass", "elapsed": 0.038941},
+    {"suite": "Systems", "case": "frame_total_covers_the_systems", "status": "pass", "elapsed": 0.051121},
+    {"suite": "Systems", "case": "phase_totals_are_kept_per_phase", "status": "pass", "elapsed": 0.050941},
+    {"suite": "Systems", "case": "disabling_stops_collection", "status": "pass", "elapsed": 0.048923},
+    {"suite": "Systems", "case": "removing_the_monitor_stops_measurement", "status": "pass", "elapsed": 0.048917}
+  ]
+}
