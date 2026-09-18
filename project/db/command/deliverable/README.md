@@ -11,7 +11,7 @@
 - 267 unit tests across test/core (25), test/transform (46), test/geometry (32), test/render (37) and test/command (127), see `tests.json` and `tests_<project>.json`.
 - Integration: three command scenes (`integration/shell.log`, `search.log`, `script.log`, all matching their expected logs), the visual scene `integration/primitives.png`, and the two stress benchmarks at mean 1.2 to 1.3 ms and p99 2.5 to 2.8 ms for 110k entities (`integration/*_100k.json`).
 - Microbenchmarks: `bench/<project>.json` for the four bench projects, compared against the baseline from `project_tool/bench` (see "Baseline" below).
-- Wasm build under `wasm`, open `box_app.html#etc/scenes/primitives.flecs`. The command server is native only; the wasm build compiles the module without listening.
+- Wasm build under `wasm`, open `box_app.html#etc/scenes/primitives.flecs`. The original image aborted at startup because the HTTP server tried to start a thread on the web; the folder holds an image rebuilt from the inspector epic, which fixed that and the dropped startup uploads.
 
 ## Baseline
 `tools/bench.py --baseline project/db/project_tool/bench/deliverable` reports `Extract.static_1000_changed` 6 to 11% slower and `Dispatch.help` 6% slower. The `help` change is real and expected: the baseline listed 17 commands, this epic registers 25. The extract change is machine load: rebuilding the baseline render sources while the other agents were running reproduced the same 7.5%, so the two numbers must be compared again on a quiet machine before the next epic; the only render change since the baseline is the shared slot ownership check, now inlined.

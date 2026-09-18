@@ -1,0 +1,13 @@
+{
+  "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/static_100k.flecs",
+  "entities": 110000,
+  "static": 100000,
+  "dynamic": 10000,
+  "churn": [1, 1000],
+  "frames": 300,
+  "mean_ms": 1.248,
+  "p50_ms": 1.238,
+  "p99_ms": 2.650,
+  "max_ms": 2.787,
+  "fps": 801.2
+}
