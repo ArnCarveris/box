@@ -173,6 +173,20 @@
                 "teardown": true
             },
             {
+                "id": "Svg",
+                "testcases": [
+                    "inline_data_rasterizes",
+                    "file_rasterizes",
+                    "zero_height_follows_the_width",
+                    "resize_rerasterizes",
+                    "removing_the_component_destroys_the_handle",
+                    "handle_reaches_a_pbr_slot",
+                    "texture_and_svg_is_an_error"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Movement",
                 "testcases": [
                     "velocity_integrates_position",
