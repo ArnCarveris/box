@@ -23,6 +23,7 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --plan-order: var(--ink);
 }
 :root:not([data-theme="light"]) { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
@@ -222,6 +223,40 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 .legend button { padding: 1px 5px; border-radius: 5px; color: var(--ink-2); }
 .legend button:hover { background: var(--surface-2); color: var(--ink); }
 .legend button.off { opacity: .45; text-decoration: line-through; }
+.plan { position: relative; height: 100%; min-height: 0; overflow: hidden; }
+#plan-svg { display: block; width: 100%; height: 100%; background: var(--surface); cursor: grab; }
+#plan-svg.panning { cursor: grabbing; }
+#plan-svg text { user-select: none; }
+.plan-tools { position: absolute; right: 16px; top: 12px; z-index: 3; display: flex; gap: 6px; align-items: center; }
+.plan-tools button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 9px; font-size: 12px; }
+.plan-tools .hint { color: var(--ink-3); font-size: 11px; }
+.plan-note { font-size: 12px; font-weight: 600; color: var(--good); }
+.plan-note.bad { color: var(--bad); }
+.plan-node rect.box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.plan-node .bar { fill: var(--pending); }
+.plan-node .title { fill: var(--ink); font-size: 12px; font-weight: 650; }
+.plan-node .sub { fill: var(--ink-3); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.plan-node .plan-lock { fill: var(--ink-3); }
+.plan-node.complete .bar, .plan-node.complete .plan-lock, .plan-node.complete .sub { fill: var(--good); }
+.plan-node.complete rect.box { stroke: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.plan-node.in-progress .bar, .plan-node.in-progress .plan-lock, .plan-node.in-progress .sub { fill: var(--accent); }
+.plan-node.in-progress rect.box { stroke: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.plan-node.discarded .bar { fill: transparent; }
+.plan-node.locked rect.box { fill: color-mix(in srgb, var(--surface-2) 92%, var(--ink)); }
+.plan-node.violation .sub { fill: var(--bad); }
+.plan-node:hover rect.box { stroke: var(--accent); }
+.plan-node.drop rect.box { stroke: var(--accent); stroke-width: 2.5; }
+.plan-node.drop-bad rect.box { stroke: var(--bad); stroke-width: 2.5; }
+.plan-dep { fill: none; stroke: var(--ink-3); stroke-width: 1.3; opacity: .38; }
+.plan-order { fill: none; stroke: var(--plan-order); stroke-width: 2.4; stroke-linecap: round; }
+.plan-arrow.bad .plan-order { stroke: var(--bad); }
+.plan-arrow.dragging .plan-order { opacity: .25; }
+.plan-hit { fill: none; stroke: transparent; stroke-width: 14; }
+.plan-arrow.locked .plan-hit { cursor: not-allowed; }
+.plan-handle { fill: var(--plan-order); stroke: var(--surface); stroke-width: 2; cursor: grab; }
+.plan-handle.bad { fill: var(--bad); }
+.plan-handle:hover { stroke: var(--accent); }
+.plan-ghost { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; pointer-events: none; }
 .tooltip {
   position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 6px;
   font-size: 12px; z-index: 20; display: none; white-space: nowrap; box-shadow: var(--shadow);
@@ -244,6 +279,7 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
   <div class="tabs">
     <button data-view="board" class="active">Board</button>
     <button data-view="timeline">Timeline</button>
+    <button data-view="plan">Plan</button>
     <button data-view="tests">Tests</button>
     <button data-view="benchmarks">Benchmarks</button>
   </div>
@@ -260,6 +296,7 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
   <div class="content" id="content">
     <div id="board" class="board"></div>
     <div id="timeline" class="timeline" hidden></div>
+    <div id="plan" class="plan" hidden></div>
     <div id="tests" class="page" hidden></div>
     <div id="benchmarks" class="page" hidden></div>
     <div class="panel" id="panel" hidden></div>
@@ -269,12 +306,12 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 
 <script>
 const state = {
-  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
-  suites: [], benchSuites: [], hidden: {},
-  scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0 },
+  data: null, tests: null, bench: null, plan: null, epic: null, view: "board", zoom: 6, item: null, scene: null,
+  suites: [], benchSuites: [], hidden: {}, planView: null,
+  scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0, plan: 0 },
 };
-const VIEWS = ["board", "timeline", "tests", "benchmarks"];
-const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench" };
+const VIEWS = ["board", "timeline", "plan", "tests", "benchmarks"];
+const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench", plan: "plan" };
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
 let saveTimer = 0, panelTimer = 0, restoring = false;
@@ -304,6 +341,7 @@ function saveUi() {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
       suites: state.suites, benchSuites: state.benchSuites, hidden: state.hidden, scene: state.scene,
+      planView: state.planView,
     }));
   } catch (e) {}
 }
@@ -326,6 +364,7 @@ function loadUi() {
   if (saved.hidden && typeof saved.hidden === "object") state.hidden = saved.hidden;
   if (saved.scene) state.scene = saved.scene;
   if (saved.zoom > 0) state.zoom = saved.zoom;
+  if (saved.planView && saved.planView.k > 0) state.planView = saved.planView;
   if (saved.scroll) Object.assign(state.scroll, saved.scroll);
 }
 
@@ -1006,6 +1045,369 @@ function renderBenchmarks() {
   restoreScroll(document.getElementById("content"), state.scroll.bench);
 }
 
+// --- plan logic (extracted by test_pm.py, keep free of DOM access) ---
+const PLAN_BOX = { w: 176, h: 48, colGap: 92, rowGap: 26, pad: 24 };
+const PLAN_LOCK = '<g class="plan-lock" transform="translate(152,11)">' +
+  '<rect x="0" y="6" width="11" height="8" rx="2"/>' +
+  '<path d="M1.9,6 V4.2 a3.6,3.6 0 0 1 7.2,0 V6 H7.5 V4.2 a2.1,2.1 0 0 0 -4.2,0 V6 Z"/></g>';
+
+function planDep(name) {
+  return String(name).split("/")[0];
+}
+
+function planDepths(epics) {
+  const byName = {};
+  for (const e of epics) byName[e.name] = e;
+  const depth = {};
+  const visit = (name, seen) => {
+    if (depth[name] != null) return depth[name];
+    if (seen.has(name)) return 0;
+    seen.add(name);
+    let d = 0;
+    for (const dep of (byName[name] || {}).dependencies || []) {
+      const from = planDep(dep);
+      if (from !== name && byName[from]) d = Math.max(d, visit(from, seen) + 1);
+    }
+    seen.delete(name);
+    depth[name] = d;
+    return d;
+  };
+  for (const e of epics) visit(e.name, new Set());
+  return depth;
+}
+
+function planLayout(epics, order) {
+  const depth = planDepths(epics);
+  const rank = {};
+  order.forEach((name, i) => { rank[name] = i; });
+  const at = e => (rank[e.name] == null ? order.length : rank[e.name]);
+  const cols = [];
+  for (const e of epics.slice().sort((a, b) => at(a) - at(b))) {
+    const c = depth[e.name] || 0;
+    (cols[c] = cols[c] || []).push(e);
+  }
+  const rows = cols.reduce((a, col) => Math.max(a, col ? col.length : 0), 1);
+  const nodes = {}, list = [];
+  cols.forEach((col, c) => {
+    const offset = (rows - col.length) / 2;
+    col.forEach((epic, r) => {
+      const node = {
+        name: epic.name, epic, col: c, row: r, w: PLAN_BOX.w, h: PLAN_BOX.h,
+        x: PLAN_BOX.pad + c * (PLAN_BOX.w + PLAN_BOX.colGap),
+        y: PLAN_BOX.pad + (offset + r) * (PLAN_BOX.h + PLAN_BOX.rowGap),
+      };
+      nodes[epic.name] = node;
+      list.push(node);
+    });
+  });
+  return {
+    nodes, list, depth, columns: cols.length,
+    width: 2 * PLAN_BOX.pad + Math.max(1, cols.length) * (PLAN_BOX.w + PLAN_BOX.colGap) - PLAN_BOX.colGap,
+    height: 2 * PLAN_BOX.pad + rows * (PLAN_BOX.h + PLAN_BOX.rowGap) - PLAN_BOX.rowGap,
+  };
+}
+
+function planLink(from, to) {
+  const fx = from.x + from.w / 2, fy = from.y + from.h / 2;
+  const tx = to.x + to.w / 2, ty = to.y + to.h / 2;
+  const gap = (from.w + to.w) / 2;
+  let a;
+  if (tx - fx > gap - 1) a = { x1: from.x + from.w, y1: fy, x2: to.x - 7, y2: ty, side: 1 };
+  else if (fx - tx > gap - 1) a = { x1: from.x, y1: fy, x2: to.x + to.w + 7, y2: ty, side: -1 };
+  else if (ty > fy) a = { x1: fx, y1: from.y + from.h, x2: tx, y2: to.y - 7, side: 0 };
+  else a = { x1: fx, y1: from.y, x2: tx, y2: to.y + to.h + 7, side: 0 };
+  const dx = Math.max(36, Math.abs(a.x2 - a.x1) * 0.5);
+  const dy = Math.max(28, Math.abs(a.y2 - a.y1) * 0.45) * (a.y2 > a.y1 ? 1 : -1);
+  if (a.side) {
+    a.c1x = a.x1 + a.side * dx; a.c1y = a.y1; a.c2x = a.x2 - a.side * dx; a.c2y = a.y2;
+  } else {
+    a.c1x = a.x1; a.c1y = a.y1 + dy; a.c2x = a.x2; a.c2y = a.y2 - dy;
+  }
+  return a;
+}
+
+function planRound(v) {
+  return Math.round(v * 10) / 10;
+}
+
+function planPath(a) {
+  return `M${planRound(a.x1)},${planRound(a.y1)} C${planRound(a.c1x)},${planRound(a.c1y)} ` +
+    `${planRound(a.c2x)},${planRound(a.c2y)} ${planRound(a.x2)},${planRound(a.y2)}`;
+}
+
+function planHead(a, back) {
+  const dx = a.x2 - a.c2x, dy = a.y2 - a.c2y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: a.x2 - dx / len * back, y: a.y2 - dy / len * back };
+}
+
+function planViolations(epics, order) {
+  const at = {};
+  order.forEach((name, i) => { at[name] = i; });
+  const out = {};
+  for (const e of epics) {
+    for (const dep of e.dependencies || []) {
+      const from = planDep(dep);
+      if (at[from] == null || at[e.name] == null || at[from] < at[e.name]) continue;
+      (out[e.name] = out[e.name] || []).push(from);
+    }
+  }
+  return out;
+}
+
+function planReorder(order, name, target, locked) {
+  if (!order.includes(name)) return { error: `unknown epic ${name}` };
+  if (name === target) return { error: "same epic" };
+  const next = order.filter(n => n !== name);
+  const at = next.indexOf(target);
+  if (at < 0) return { error: `unknown epic ${target}` };
+  next.splice(at + 1, 0, name);
+  const front = order.filter(n => locked.includes(n));
+  if (next.slice(0, front.length).join("|") !== front.join("|")) return { error: "locked" };
+  return { order: next };
+}
+
+function planNodeSvg(node, violations) {
+  const e = node.epic;
+  const status = String(e.status).replace(" ", "-");
+  const bad = violations[e.name] || [];
+  const label = e.title.length > 21 ? e.title.slice(0, 20) + "…" : e.title;
+  const sub = bad.length ? "after " + bad.join(", ") : e.status;
+  const tip = bad.length ? `planned before ${bad.join(", ")}` : e.locked ? "locked" : "drop an arrow head here";
+  return `<g class="plan-node ${status}${e.locked ? " locked" : ""}${bad.length ? " violation" : ""}"
+      data-node="${esc(e.name)}" transform="translate(${node.x},${node.y})"
+      data-tip="${esc(e.title)}" data-sub="${esc(" · " + e.status + " · " + tip)}">
+    <rect class="box" width="${node.w}" height="${node.h}" rx="10"/>
+    <rect class="bar" x="1" y="9" width="4" height="${node.h - 18}" rx="2"/>
+    <text class="title" x="16" y="21">${esc(label)}</text>
+    <text class="sub" x="16" y="36">${esc(sub)}</text>
+    ${e.locked ? PLAN_LOCK : ""}
+  </g>`;
+}
+
+function planArrowSvg(from, to, locked, bad) {
+  const link = planLink(from, to);
+  const d = planPath(link);
+  const head = planHead(link, 17);
+  const tip = bad.length ? `${to.epic.title} is planned before ${bad.join(", ")}`
+    : locked ? "locked" : `then ${to.epic.title}`;
+  const sub = locked ? " · started epics keep their order" : " · drag the head onto an epic to move it";
+  return {
+    arrow: `<g class="plan-arrow${bad.length ? " bad" : ""}${locked ? " locked" : ""}"
+        data-from="${esc(from.name)}" data-to="${esc(to.name)}">
+      <path class="plan-order" d="${d}" marker-end="url(#plan-head${bad.length ? "-bad" : ""})"/>
+      <path class="plan-hit" d="${d}" data-tip="${esc(tip)}" data-sub="${esc(sub)}"/></g>`,
+    handle: locked ? "" : `<circle class="plan-handle${bad.length ? " bad" : ""}" cx="${planRound(head.x)}" cy="${planRound(head.y)}" r="7"
+      data-handle="${esc(to.name)}" data-from="${esc(from.name)}"
+      data-tip="${esc(to.epic.title)}" data-sub=" · drag onto an epic to plan it right after"/>`,
+  };
+}
+
+function planSvg(layout, epics, order, view) {
+  const violations = planViolations(epics, order);
+  const marker = (id, color) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5"
+    orient="auto-start-reverse"><path d="M0,1 L9.5,5 L0,9 z" fill="${color}"/></marker>`;
+  const deps = [];
+  for (const e of epics) {
+    const to = layout.nodes[e.name];
+    for (const dep of e.dependencies || []) {
+      const from = layout.nodes[planDep(dep)];
+      if (from && to && from !== to) {
+        deps.push(`<path class="plan-dep" d="${planPath(planLink(from, to))}" marker-end="url(#plan-dep-head)"/>`);
+      }
+    }
+  }
+  const arrows = [], handles = [];
+  for (let i = 0; i + 1 < order.length; i++) {
+    const from = layout.nodes[order[i]], to = layout.nodes[order[i + 1]];
+    if (!from || !to) continue;
+    const link = planArrowSvg(from, to, from.epic.locked || to.epic.locked, violations[to.name] || []);
+    arrows.push(link.arrow);
+    handles.push(link.handle);
+  }
+  return `<svg id="plan-svg" role="img" aria-label="epic plan">
+    <defs>${marker("plan-dep-head", "var(--ink-3)")}${marker("plan-head", "var(--plan-order)")}${marker("plan-head-bad", "var(--bad)")}</defs>
+    <g id="plan-zoom" transform="translate(${view.x},${view.y}) scale(${view.k})">
+      <g class="plan-deps">${deps.join("")}</g>
+      <g class="plan-arrows">${arrows.join("")}</g>
+      <g class="plan-nodes">${layout.list.map(n => planNodeSvg(n, violations)).join("")}</g>
+      <g class="plan-handles">${handles.join("")}</g>
+    </g></svg>`;
+}
+// --- end plan logic ---
+
+let planDrag = null, planSig = "", planLayoutCache = null, planNoteTimer = 0;
+
+function planLockedNames(d) {
+  return d.order.filter(name => (d.epics.find(e => e.name === name) || {}).locked);
+}
+
+function applyPlanView() {
+  const g = document.getElementById("plan-zoom");
+  if (g) g.setAttribute("transform", `translate(${state.planView.x},${state.planView.y}) scale(${state.planView.k})`);
+}
+
+function planZoom(factor, px, py) {
+  const v = state.planView;
+  const k = Math.max(0.25, Math.min(2.5, v.k * factor));
+  const cx = px == null ? 320 : px, cy = py == null ? 220 : py;
+  v.x = cx - (cx - v.x) * (k / v.k);
+  v.y = cy - (cy - v.y) * (k / v.k);
+  v.k = k;
+  applyPlanView();
+  saveSoon();
+}
+
+function planFit() {
+  const svg = document.getElementById("plan-svg");
+  if (!svg || !planLayoutCache) return;
+  const box = svg.getBoundingClientRect();
+  const k = Math.max(0.25, Math.min(1.2, (box.width - 24) / planLayoutCache.width, (box.height - 24) / planLayoutCache.height));
+  state.planView = { x: 12, y: Math.max(12, (box.height - planLayoutCache.height * k) / 2), k };
+  applyPlanView();
+  saveUi();
+}
+
+function planNote(text, bad) {
+  const note = document.getElementById("plan-note");
+  if (!note) return;
+  note.textContent = text;
+  note.classList.toggle("bad", !!bad);
+  clearTimeout(planNoteTimer);
+  planNoteTimer = setTimeout(() => { note.textContent = ""; }, bad ? 6000 : 1600);
+}
+
+function planPoint(ev) {
+  const box = document.getElementById("plan-svg").getBoundingClientRect();
+  return {
+    x: (ev.clientX - box.left - state.planView.x) / state.planView.k,
+    y: (ev.clientY - box.top - state.planView.y) / state.planView.k,
+  };
+}
+
+function planPan(ev, svg) {
+  const v = state.planView;
+  const ox = ev.clientX - v.x, oy = ev.clientY - v.y;
+  svg.classList.add("panning");
+  const move = e => { v.x = e.clientX - ox; v.y = e.clientY - oy; applyPlanView(); };
+  const up = () => {
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", up);
+    svg.classList.remove("panning");
+    saveUi();
+  };
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", up);
+}
+
+function planDropTarget(ev) {
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  const node = el && el.closest ? el.closest("[data-node]") : null;
+  return node ? node.dataset.node : null;
+}
+
+function planStartDrag(ev, svg, handle) {
+  const d = state.plan;
+  const name = handle.dataset.handle;
+  const arrow = svg.querySelector(`.plan-arrow[data-to="${name}"]`);
+  const ghost = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  ghost.setAttribute("class", "plan-ghost");
+  document.getElementById("plan-zoom").appendChild(ghost);
+  arrow.classList.add("dragging");
+  planDrag = { name, locked: planLockedNames(d) };
+  const source = planLayoutCache.nodes[handle.dataset.from];
+  let hover = null;
+  const paint = at => {
+    const p = planPoint(at);
+    ghost.setAttribute("d", planPath(planLink(source, { x: p.x - 4, y: p.y - 4, w: 8, h: 8 })));
+    const target = planDropTarget(at);
+    if (hover && hover.dataset.node !== target) hover.classList.remove("drop", "drop-bad");
+    hover = target ? svg.querySelector(`[data-node="${target}"]`) : null;
+    if (!hover) return;
+    const move = planReorder(d.order, name, target, planDrag.locked);
+    hover.classList.toggle("drop", !move.error);
+    hover.classList.toggle("drop-bad", !!move.error);
+  };
+  const drop = at => {
+    window.removeEventListener("mousemove", paint);
+    window.removeEventListener("mouseup", drop);
+    ghost.remove();
+    arrow.classList.remove("dragging");
+    if (hover) hover.classList.remove("drop", "drop-bad");
+    const target = planDropTarget(at);
+    const move = target ? planReorder(d.order, name, target, planDrag.locked) : { error: "" };
+    planDrag = null;
+    if (move.error === "locked") planNote("locked", true);
+    else if (!move.error) planSavePlan(move.order);
+  };
+  window.addEventListener("mousemove", paint);
+  window.addEventListener("mouseup", drop);
+  paint(ev);
+}
+
+function bindPlan(el) {
+  const svg = el.querySelector("#plan-svg");
+  if (!svg) return;
+  el.querySelector("#plan-in").onclick = () => planZoom(1.25);
+  el.querySelector("#plan-out").onclick = () => planZoom(1 / 1.25);
+  el.querySelector("#plan-fit").onclick = planFit;
+  svg.onwheel = ev => {
+    ev.preventDefault();
+    const box = svg.getBoundingClientRect();
+    planZoom(Math.exp(-ev.deltaY * 0.0022), ev.clientX - box.left, ev.clientY - box.top);
+  };
+  svg.onmousedown = ev => {
+    if (ev.button) return;
+    ev.preventDefault();
+    const handle = ev.target.closest("[data-handle]");
+    if (handle) planStartDrag(ev, svg, handle);
+    else planPan(ev, svg);
+  };
+}
+
+async function planSavePlan(order) {
+  const previous = state.plan.order;
+  state.plan = { ...state.plan, order };
+  renderPlan(true);
+  try {
+    const r = await fetch("/api/plan", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "the server refused the order");
+    state.plan = data;
+    renderPlan(true);
+    planNote("saved");
+  } catch (err) {
+    state.plan = { ...state.plan, order: previous };
+    renderPlan(true);
+    planNote(String(err.message || err), true);
+  }
+}
+
+function renderPlan(force) {
+  const el = document.getElementById("plan");
+  const d = state.plan;
+  if (!d) { el.innerHTML = `<div class="empty-state">Loading the plan…</div>`; return; }
+  if (d.stale) { el.innerHTML = `<div class="empty-state">This server predates this page. Restart it: <code>python3 project/pm.py serve</code></div>`; return; }
+  if (!d.epics.length) { el.innerHTML = `<div class="empty-state">No epics yet</div>`; return; }
+  const sig = JSON.stringify([d.order, d.epics.map(e => [e.name, e.title, e.status, e.dependencies])]);
+  if (!force && sig === planSig && el.querySelector("#plan-svg")) { applyPlanView(); return; }
+  planSig = sig;
+  const fit = !state.planView;
+  if (fit) state.planView = { x: 12, y: 12, k: 1 };
+  planLayoutCache = planLayout(d.epics, d.order);
+  el.innerHTML = `<div class="plan-tools">
+      <span class="hint">drag an arrow head onto an epic · drag the background to pan</span>
+      <span class="plan-note" id="plan-note"></span>
+      <button id="plan-out" title="Zoom out">−</button><button id="plan-in" title="Zoom in">+</button>
+      <button id="plan-fit" title="Fit the diagram">fit</button>
+    </div>` + planSvg(planLayoutCache, d.epics, d.order, state.planView);
+  bindPlan(el);
+  bindTips(el);
+  if (fit) planFit();
+}
+
 function render() {
   if (!state.data) return;
   if (!state.epic && state.data.epics.length) {
@@ -1016,6 +1418,7 @@ function render() {
   applyView();
   if (state.view === "board") renderBoard();
   else if (state.view === "timeline") renderTimeline();
+  else if (state.view === "plan") renderPlan();
   else if (state.view === "tests") renderTests();
   else renderBenchmarks();
   if (state.item && (state.view === "board" || state.view === "timeline")) openPanel(state.item);
@@ -1032,9 +1435,11 @@ async function loadApi(path) {
 async function loadView() {
   if (state.view === "tests") state.tests = await loadApi("/api/tests");
   if (state.view === "benchmarks") state.bench = await loadApi("/api/benchmarks");
+  if (state.view === "plan") state.plan = await loadApi("/api/plan");
 }
 
 async function refresh() {
+  if (planDrag) return;
   try {
     const r = await fetch("/api/state");
     state.data = await r.json();

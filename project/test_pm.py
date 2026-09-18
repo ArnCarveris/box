@@ -5,6 +5,7 @@ import http.server
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -15,6 +16,35 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pm
+
+
+PLAN_STUBS = """
+globalThis.esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+globalThis.element = { innerHTML: "", querySelector: () => null };
+globalThis.document = { getElementById: () => element, querySelector: () => element };
+globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+globalThis.EPICS = [
+  { name: "root", title: "Root", status: "complete", locked: true, dependencies: [] },
+  { name: "core", title: "Core", status: "in progress", locked: true, dependencies: ["root"] },
+  { name: "one", title: "One", status: "pending", locked: false, dependencies: ["core"] },
+  { name: "two", title: "Two", status: "pending", locked: false, dependencies: ["one/task"] },
+  { name: "three", title: "Three", status: "pending", locked: false, dependencies: ["core"] },
+  { name: "four", title: "Four", status: "pending", locked: false, dependencies: ["two", "three"] },
+];
+globalThis.ORDER = ["root", "core", "one", "two", "three", "four"];
+globalThis.LOCKED = ["root", "core"];
+globalThis.overlaps = list => {
+  const hits = [];
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j];
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) hits.push([a.name, b.name]);
+    }
+  }
+  return hits;
+};
+globalThis.count = (text, needle) => text.split(needle).length - 1;
+"""
 
 
 class Args:
@@ -505,6 +535,83 @@ class PmTests(unittest.TestCase):
         self.new("epic", "b", "Epic b")
         self.new("task", "b/t1", "Task")
         self.assertEqual(pm.read_plan(), ["a", "b"])
+
+    def plan_logic(self):
+        with open(os.path.join(pm.ROOT, "index.html")) as f:
+            text = f.read()
+        start = text.index("// --- plan logic")
+        end = text.index("// --- end plan logic")
+        return text[start:end]
+
+    def run_plan_js(self, script):
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        path = os.path.join(self.tmp, "plan_check.js")
+        with open(path, "w") as f:
+            f.write(PLAN_STUBS + self.plan_logic() + script)
+        run = subprocess.run([shutil.which("node"), path], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return json.loads(run.stdout)
+
+    def test_plan_page_lays_out_epics_in_dependency_columns(self):
+        out = self.run_plan_js("""
+const depth = planDepths(EPICS);
+const layout = planLayout(EPICS, ORDER);
+element.innerHTML = planSvg(layout, EPICS, ORDER, { x: 0, y: 0, k: 1 });
+const markup = element.innerHTML;
+const badOrder = ["root", "core", "two", "one", "three", "four"];
+const badMarkup = planSvg(planLayout(EPICS, badOrder), EPICS, badOrder, { x: 0, y: 0, k: 1 });
+console.log(JSON.stringify({
+  depth,
+  columns: layout.list.map(n => [n.name, n.col]),
+  rows: layout.list.map(n => [n.name, n.row]),
+  overlaps: overlaps(layout.list),
+  size: [layout.width > 0, layout.height > 0],
+  nodes: count(markup, "data-node="),
+  arrows: count(markup, "data-to="),
+  handles: count(markup, "data-handle="),
+  deps: count(markup, 'class="plan-dep"'),
+  locks: count(markup, 'class="plan-lock"'),
+  svg: markup.startsWith("<svg") && markup.includes('id="plan-zoom"'),
+  violations: planViolations(EPICS, badOrder),
+  badArrows: count(badMarkup, "plan-arrow bad"),
+  badTip: badMarkup.includes("Two is planned before one"),
+}));
+""")
+        self.assertEqual(out["depth"], {"root": 0, "core": 1, "one": 2, "two": 3, "three": 2, "four": 4})
+        self.assertEqual(dict(out["columns"]), out["depth"])
+        self.assertEqual(out["overlaps"], [])
+        self.assertEqual(out["size"], [True, True])
+        self.assertEqual(dict(out["rows"])["one"], 0)
+        self.assertEqual(dict(out["rows"])["three"], 1)
+        self.assertEqual((out["nodes"], out["arrows"], out["deps"]), (6, 5, 6))
+        self.assertEqual(out["handles"], 3)
+        self.assertEqual(out["locks"], 2)
+        self.assertTrue(out["svg"])
+        self.assertEqual(out["violations"], {"two": ["one"]})
+        self.assertEqual(out["badArrows"], 1)
+        self.assertTrue(out["badTip"])
+
+    def test_plan_page_reorders_the_chain_and_refuses_locked_epics(self):
+        out = self.run_plan_js("""
+const move = (name, target, order) => planReorder(order || ORDER, name, target, LOCKED);
+console.log(JSON.stringify({
+  after: move("four", "one").order,
+  end: move("one", "four").order,
+  onLast: move("two", "core").order,
+  onFirst: move("two", "root"),
+  itself: move("one", "one"),
+  unknown: move("one", "nope"),
+  repaired: move("four", "one").order.slice().sort(),
+}));
+""")
+        self.assertEqual(out["after"], ["root", "core", "one", "four", "two", "three"])
+        self.assertEqual(out["end"], ["root", "core", "two", "three", "four", "one"])
+        self.assertEqual(out["onLast"], ["root", "core", "two", "one", "three", "four"])
+        self.assertEqual(out["onFirst"], {"error": "locked"})
+        self.assertEqual(out["itself"], {"error": "same epic"})
+        self.assertEqual(out["unknown"], {"error": "unknown epic nope"})
+        self.assertEqual(out["repaired"], sorted(["root", "core", "one", "two", "three", "four"]))
 
     def write_wasm(self, epic):
         directory = os.path.join(pm.DB, epic, "deliverable", "wasm")
