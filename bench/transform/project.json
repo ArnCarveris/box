@@ -15,6 +15,15 @@
                 "reparent"
             ]
         }, {
+            "id": "Hierarchy",
+            "benchcases": [
+                "build_100k_childof",
+                "build_100k_parent",
+                "propagate_root_childof",
+                "propagate_root_parent",
+                "dynamic_subtree_parent"
+            ]
+        }, {
             "id": "Dynamic",
             "benchcases": [
                 "propagate_subtree"

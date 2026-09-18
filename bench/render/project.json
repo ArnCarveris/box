@@ -16,6 +16,7 @@
                     "static_1_changed",
                     "static_100_changed",
                     "static_1000_changed",
+                "static_1000_changed_parent",
                     "dynamic_10k"
                 ]
             },
