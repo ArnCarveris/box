@@ -1,0 +1,15 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T23:54:28.914+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "effects/gtao",
+    "effects/ssr",
+    "effects/bloom",
+    "effects/height_fog",
+    "effects/exposure_tonemap",
+    "effects/hdr_target"
+  ]
+}
