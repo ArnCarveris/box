@@ -232,6 +232,8 @@ static void box_extract_camera(
     mat4 view = mat4_look_at(vec3_new(0, 3, -8), vec3_new(0, 0, 0), vec3_new(0, 1, 0));
     mat4 proj = mat4_perspective(60.0f * 3.14159265f / 180.0f, aspect, 0.1f);
     vec3 eye = vec3_new(0, 3, -8);
+    float near = 0.1f;
+    float far = 1000.0f;
 
     ecs_entity_t e = box_extract_capture(world, state, p);
     if (!e) {
@@ -244,8 +246,8 @@ static void box_extract_camera(
         view = mat4_inverse(&transform->m);
         eye = mat4_get_translation(&transform->m);
         float fov = camera->fov > 0 ? camera->fov : 60.0f;
-        float near = camera->near_ > 0 ? camera->near_ : 0.1f;
-        float far = camera->far_ > 0 ? camera->far_ : 1000.0f;
+        near = camera->near_ > 0 ? camera->near_ : near;
+        far = camera->far_ > 0 ? camera->far_ : far;
         float ratio = camera->aspect_ratio > 0 ? camera->aspect_ratio : aspect;
         if (camera->orthographic) {
             float height = camera->ortho_height > 0 ? camera->ortho_height : 10.0f;
@@ -260,6 +262,8 @@ static void box_extract_camera(
     p->view.eye[0] = eye.x;
     p->view.eye[1] = eye.y;
     p->view.eye[2] = eye.z;
+    p->view.cluster.near_ = near;
+    p->view.cluster.far_ = far;
     p->has_view = true;
 }
 
@@ -347,6 +351,7 @@ void box_render_extract(
     box_extract_counts(state, p);
     box_extract_camera(world, state, p);
     box_extract_sun(world, state, p);
+    box_render_extract_lights(world, state, p);
     box_render_validate(world);
 }
 
@@ -444,6 +449,15 @@ void box_render_extract_init(
             { .id = ecs_id(DirectionalLight), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn }
         }
+    });
+    state->lights = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(PointLight), .inout = EcsIn, .oper = EcsOr },
+            { .id = ecs_id(SpotLight), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional }
+        },
+        .cache_kind = EcsQueryCacheAuto
     });
     state->surfaces = ecs_query(world, {
         .terms = {{ .id = ecs_id(SurfaceImpl) }}

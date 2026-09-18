@@ -37,6 +37,31 @@
                 "teardown": true
             },
             {
+                "id": "Lights",
+                "testcases": [
+                    "point_light_extracted",
+                    "point_light_color_is_linear",
+                    "spot_light_direction_and_cone",
+                    "point_light_is_not_a_spot_cone",
+                    "light_behind_camera_culled",
+                    "light_far_to_the_side_culled",
+                    "light_beyond_far_plane_culled",
+                    "light_inside_frustum_kept",
+                    "range_reaches_into_the_frustum",
+                    "directional_light_stays_the_sun",
+                    "settings_copied_into_view",
+                    "settings_override_copied_into_view",
+                    "camera_range_is_the_cluster_depth",
+                    "cluster_index_of_view_center",
+                    "cluster_index_follows_screen_position",
+                    "cluster_slices_grow_with_depth",
+                    "lights_land_in_expected_clusters",
+                    "moved_light_is_reextracted"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Capture",
                 "testcases": [
                     "component_consumed_by_extract",

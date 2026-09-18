@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include "../renderer/packet.h"
+#include "../renderer/cluster.h"
 #include "../geometry/mesh_gen.h"
 
 /** Static instance slots of one mesh */
@@ -33,6 +34,7 @@ typedef struct RenderState {
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *captures;    /**< Camera entities that request a capture */
     ecs_query_t *suns;        /**< Directional light entities */
+    ecs_query_t *lights;      /**< Point and spot light entities */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
     uint32_t mesh_count;      /**< Handles allocated so far */
@@ -147,6 +149,17 @@ ecs_entity_t box_render_active_camera(
  */
 void box_render_extract(
     ecs_world_t *world,
+    box_packet_t *p);
+
+/** Fill the packet light array with the point and spot lights inside the frustum.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_lights(
+    ecs_world_t *world,
+    RenderState *state,
     box_packet_t *p);
 
 /** Assert that every instance record matches the batch slot tables, debug builds only.

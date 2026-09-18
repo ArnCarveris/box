@@ -37,6 +37,26 @@ ECS_STRUCT(SpotLight, {
     float outer_angle; /**< Zero intensity cone half angle */
 });
 
+/** Froxel grid the renderer assigns point and spot lights to, a singleton */
+ECS_STRUCT(ClusterSettings, {
+    int32_t x;          /**< Clusters across the view, default 16 */
+    int32_t y;          /**< Clusters down the view, default 9 */
+    int32_t z;          /**< Depth slices, default 24 */
+    int32_t max_lights; /**< Lights stored per cluster, default 64 */
+});
+
+/** Default clusters across the view */
+#define BOX_CLUSTER_X (16)
+
+/** Default clusters down the view */
+#define BOX_CLUSTER_Y (9)
+
+/** Default depth slices of the cluster grid */
+#define BOX_CLUSTER_Z (24)
+
+/** Default lights stored per cluster */
+#define BOX_CLUSTER_MAX_LIGHTS (64)
+
 /** Register the box.light module.
  *
  * @param world The world

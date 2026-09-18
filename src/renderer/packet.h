@@ -18,6 +18,15 @@
 /** Floats per vertex: position, normal and uv */
 #define BOX_VERTEX_FLOATS (8)
 
+/** Point and spot lights a packet can carry */
+#define BOX_LIGHT_MAX (4096)
+
+/** Light type of an omnidirectional light */
+#define BOX_LIGHT_POINT (0)
+
+/** Light type of a cone light */
+#define BOX_LIGHT_SPOT (1)
+
 /** Per instance data as laid out in GPU instance buffers */
 typedef struct box_instance_t {
     float transform[12];   /**< Rows of the 3x4 world matrix, each x y z w */
@@ -25,6 +34,29 @@ typedef struct box_instance_t {
     float emissive[4];     /**< Linear emissive rgb, w unused */
     float params[4];       /**< Metallic, roughness, unused, unused */
 } box_instance_t;
+
+/** One point or spot light, laid out as the GPU light storage buffer expects it */
+typedef struct box_light_t {
+    float position[3];   /**< World space position */
+    float range;         /**< Distance at which the light reaches zero */
+    float color[3];      /**< Linear color */
+    float intensity;     /**< Radiance scale */
+    float direction[3];  /**< Direction a spot light points in */
+    float cos_inner;     /**< Cosine of the full intensity cone half angle */
+    float cos_outer;     /**< Cosine of the zero intensity cone half angle */
+    uint32_t type;       /**< BOX_LIGHT_POINT or BOX_LIGHT_SPOT */
+    float pad[2];        /**< Padding to the 16 byte GPU stride */
+} box_light_t;
+
+/** Froxel grid of a view, copied from the ClusterSettings singleton */
+typedef struct box_cluster_t {
+    uint32_t x;           /**< Clusters across the view */
+    uint32_t y;           /**< Clusters down the view */
+    uint32_t z;           /**< Depth slices */
+    uint32_t max_lights;  /**< Lights stored per cluster */
+    float near_;          /**< View depth of the first slice boundary */
+    float far_;           /**< View depth of the last slice boundary */
+} box_cluster_t;
 
 /** Camera and lighting of one view */
 typedef struct box_view_t {
@@ -36,6 +68,9 @@ typedef struct box_view_t {
     float sun_intensity;    /**< Sun intensity */
     float sun_color[3];     /**< Sun color */
     float gamma_encode;     /**< 1 when the target is not an sRGB format */
+    box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
+    uint32_t light_count;   /**< Lights in the packet light array */
+    float pad;              /**< Padding to the 16 byte GPU stride */
 } box_view_t;
 
 /** Mesh to upload, the renderer takes ownership of the arrays */
@@ -83,6 +118,7 @@ typedef struct box_packet_t {
     box_vec_t static_counts;                 /**< box_static_count_t */
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
+    box_vec_t lights;                        /**< box_light_t inside the view frustum */
 } box_packet_t;
 
 /** Initialize the vectors of a packet.
@@ -99,6 +135,7 @@ static inline void box_packet_init(
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
+    box_vec_init(&p->lights, sizeof(box_light_t));
 }
 
 /** Reset per frame fields while keeping vector storage.
@@ -120,6 +157,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
+    box_vec_clear(&p->lights);
 }
 
 /** Release the vectors of a packet.
@@ -135,6 +173,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
+    box_vec_fini(&p->lights);
 }
 
 #endif
