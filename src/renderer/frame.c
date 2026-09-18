@@ -197,7 +197,7 @@ static void box_frame_write_view(
 
 /** Record the pass that draws the sorted instances of a view over its image.
  *
- * The opaque target is copied and its mip chain filled first, so the blended
+ * The opaque target is copied and its blur chain filled first, so the blended
  * draws can read what is behind them at the blur their roughness asks for.
  *
  * @param r The renderer
@@ -293,7 +293,7 @@ static void box_frame_view(
 
     box_view_select(r, index);
     box_view_prepare(r, view);
-    box_transparent_needed(r, view, p);
+    box_transparent_needed(r, view);
     box_lights_update(r, view, p);
     box_frame_write_view(r, view);
     box_cull_view(r, view, p);

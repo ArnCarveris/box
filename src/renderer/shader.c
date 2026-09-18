@@ -263,27 +263,53 @@
     "  return result;\n" \
     "}\n"
 
-/** Combines the shaded color with the blurred copy of the opaque target.
- * The alpha blended modes premultiply and take part of their background from
- * the mip chain of the copy, the roughness picking the mip and the weight. */
+/** Glass: the reflection a translucent surface keeps and the light it transmits.
+ * `glass_specular` is the sun highlight plus the environment reflection of the
+ * split sum approximation. `resolve` reads the blur chain of the background copy
+ * at a refracted screen position and the level box_blur_level of blur.h picks,
+ * tints it with the hue of the material, fades the diffuse response of the
+ * surface with its opacity and puts the specular on top of both. */
 #define BOX_WGSL_RESOLVE \
-    "fn resolve(color: vec3<f32>, alpha: f32, frag: vec2<f32>, roughness: f32,\n" \
+    "fn glass_specular(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, albedo: vec3<f32>,\n" \
+    "    metallic: f32, roughness: f32, sun: vec3<f32>, shadow: f32) -> vec3<f32> {\n" \
+    "  let f0 = mix(vec3(0.04), albedo, metallic);\n" \
+    "  let h = normalize(l + v);\n" \
+    "  let ndl = max(dot(n, l), 0.0);\n" \
+    "  let ndv = max(dot(n, v), 1e-4);\n" \
+    "  let shininess = (1.0 - roughness) * (1.0 - roughness) * 512.0 + 2.0;\n" \
+    "  let lobe = pow(max(dot(n, h), 0.0), shininess) * (1.0 - roughness);\n" \
+    "  let mip = roughness * (f32(" BOX_WGSL_STR(BOX_ENV_MIPS) ") - 1.0);\n" \
+    "  let mirror = textureSampleLevel(env_specular, env_sampler, reflect(-v, n), mip).rgb;\n" \
+    "  let ab = textureSampleLevel(env_brdf, env_sampler, vec2(ndv, roughness), 0.0).xy;\n" \
+    "  return f0 * lobe * ndl * sun * shadow + mirror * (f0 * ab.x + vec3(ab.y));\n" \
+    "}\n" \
+    "fn glass_tint(albedo: vec3<f32>) -> vec3<f32> {\n" \
+    "  let peak = max(max(albedo.r, albedo.g), max(albedo.b, 1e-4));\n" \
+    "  return albedo / peak;\n" \
+    "}\n" \
+    "fn resolve(color: vec3<f32>, spec: vec3<f32>, albedo: vec3<f32>, alpha: f32,\n" \
+    "    frag: vec2<f32>, roughness: f32, n: vec3<f32>, v: vec3<f32>,\n" \
     "    blend: u32) -> vec4<f32> {\n" \
     "  var rgb = color;\n" \
     "  var a = alpha;\n" \
     "  if (blend == 1u || blend == 2u) {\n" \
     "    let dims = vec2<f32>(textureDimensions(scene_tex, 0));\n" \
     "    let levels = f32(textureNumLevels(scene_tex)) - 1.0;\n" \
-    "    let lod = clamp(roughness, 0.0, 1.0) *\n" \
-    "      min(levels, f32(" BOX_WGSL_STR(BOX_SCENE_BLUR_MIPS) "));\n" \
-    "    let bg = textureSampleLevel(scene_tex, scene_samp, frag / dims, lod).rgb;\n" \
-    "    let t = roughness * roughness;\n" \
-    "    var pre = rgb * a;\n" \
+    "    let perceptual = sqrt(clamp(roughness, 0.0, 1.0));\n" \
+    "    let bend = (u.view * vec4(n, 0.0)).xy * vec2(1.0, -1.0);\n" \
+    "    let uv = (frag + bend * dims.y * " BOX_WGSL_STR(BOX_GLASS_REFRACT) ") / dims;\n" \
+    "    let bg = textureSampleLevel(scene_tex, scene_samp, uv, perceptual * levels).rgb;\n" \
+    "    let ndv = max(dot(n, v), 1e-4);\n" \
+    "    let fx = 1.0 - ndv;\n" \
+    "    let fresnel = 0.04 + 0.96 * fx * fx * fx * fx * fx;\n" \
+    "    let through = 1.0 - a;\n" \
+    "    var own = rgb * a;\n" \
     "    if (blend == 2u) {\n" \
-    "      pre = rgb;\n" \
+    "      own = rgb;\n" \
     "    }\n" \
-    "    rgb = pre + (1.0 - a) * t * bg;\n" \
-    "    a = 1.0 - (1.0 - a) * (1.0 - t);\n" \
+    "    rgb = own + spec * through +\n" \
+    "      through * perceptual * (1.0 - fresnel) * bg * glass_tint(albedo);\n" \
+    "    a = 1.0 - through * (1.0 - perceptual);\n" \
     "  }\n" \
     "  return vec4(rgb, a);\n" \
     "}\n"
@@ -604,6 +630,10 @@ const char *box_mesh_shader_tail =
     "  let env = environment(sn, v, s.albedo, metallic, roughness);\n"
     "  let is_baked = in.params.z > 0.5;\n"
     "  let shadow = shadow_factor(in.world_pos, gn);\n"
+    "  var spec = vec3<f32>(0.0);\n"
+    "  if (blend == 1u || blend == 2u) {\n"
+    "    spec = glass_specular(sn, v, l, s.albedo, metallic, roughness, sun, shadow);\n"
+    "  }\n"
     "  var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow +\n"
     "    env + s.emissive;\n"
     "  color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);\n"
@@ -612,8 +642,10 @@ const char *box_mesh_shader_tail =
     "  }\n"
     "  if (u.gamma_encode > 0.5) {\n"
     "    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));\n"
+    "    spec = pow(max(spec, vec3(0.0)), vec3(1.0 / 2.2));\n"
     "  }\n"
-    "  return resolve(color, s.alpha, in.clip.xy, roughness, blend);\n"
+    "  return resolve(color, spec, s.albedo, s.alpha, in.clip.xy, roughness, sn, v,\n"
+    "    blend);\n"
     "}\n";
 
 /** Frustum culling pass: tests instance bounds and compacts what the view keeps.
@@ -1003,7 +1035,9 @@ const char *box_bake_shader_wgsl =
     "  probes[d.grid.x + job.index] = Probe(sr, sg, sb);\n"
     "}\n";
 
-const char *box_downsample_wgsl =
+/** Blur of the background copy: the thirteen tap downsample of one level into the
+ * next and the eight tap tent that mixes a level back into the one above. */
+const char *box_blur_wgsl =
     "@group(0) @binding(0) var src: texture_2d<f32>;\n"
     "@group(0) @binding(1) var samp: sampler;\n"
     "struct Out {\n"
@@ -1017,8 +1051,42 @@ const char *box_downsample_wgsl =
     "  out.uv = vec2(corner.x, 1.0 - corner.y);\n"
     "  return out;\n"
     "}\n"
-    "@fragment fn fs_main(in: Out) -> @location(0) vec4<f32> {\n"
-    "  return textureSampleLevel(src, samp, in.uv, 0.0);\n"
+    "fn tap(uv: vec2<f32>) -> vec4<f32> {\n"
+    "  return textureSampleLevel(src, samp, uv, 0.0);\n"
+    "}\n"
+    "@fragment fn fs_down(in: Out) -> @location(0) vec4<f32> {\n"
+    "  let ps = 1.0 / vec2<f32>(textureDimensions(src, 0));\n"
+    "  let pl = 2.0 * ps;\n"
+    "  let uv = in.uv;\n"
+    "  let a = tap(uv + vec2(-pl.x, pl.y));\n"
+    "  let b = tap(uv + vec2(0.0, pl.y));\n"
+    "  let c = tap(uv + pl);\n"
+    "  let d = tap(uv + vec2(-pl.x, 0.0));\n"
+    "  let e = tap(uv);\n"
+    "  let f = tap(uv + vec2(pl.x, 0.0));\n"
+    "  let g = tap(uv - pl);\n"
+    "  let h = tap(uv + vec2(0.0, -pl.y));\n"
+    "  let i = tap(uv + vec2(pl.x, -pl.y));\n"
+    "  let j = tap(uv + vec2(-ps.x, ps.y));\n"
+    "  let k = tap(uv + ps);\n"
+    "  let l = tap(uv - ps);\n"
+    "  let m = tap(uv + vec2(ps.x, -ps.y));\n"
+    "  var sum = (a + c + g + i) * 0.03125;\n"
+    "  sum = sum + (b + d + f + h) * 0.0625;\n"
+    "  sum = sum + (e + j + k + l + m) * 0.125;\n"
+    "  return sum;\n"
+    "}\n"
+    "@fragment fn fs_up(in: Out) -> @location(0) vec4<f32> {\n"
+    "  let o = 0.5 / vec2<f32>(textureDimensions(src, 0));\n"
+    "  var sum = tap(in.uv + vec2(-o.x * 2.0, 0.0));\n"
+    "  sum = sum + tap(in.uv + vec2(-o.x, o.y)) * 2.0;\n"
+    "  sum = sum + tap(in.uv + vec2(0.0, o.y * 2.0));\n"
+    "  sum = sum + tap(in.uv + vec2(o.x, o.y)) * 2.0;\n"
+    "  sum = sum + tap(in.uv + vec2(o.x * 2.0, 0.0));\n"
+    "  sum = sum + tap(in.uv + vec2(o.x, -o.y)) * 2.0;\n"
+    "  sum = sum + tap(in.uv + vec2(0.0, -o.y * 2.0));\n"
+    "  sum = sum + tap(in.uv + vec2(-o.x, -o.y)) * 2.0;\n"
+    "  return sum / 12.0;\n"
     "}\n";
 
 /** Shadow pass: writes the depth of a caster into the cascade it is drawn for.

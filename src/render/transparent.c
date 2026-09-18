@@ -256,6 +256,7 @@ void box_render_extract_transparent(
 {
     v->transparent_first = p->transparent.count;
     v->transparent_count = 0;
+    v->translucent_count = 0;
     if (!ecs_vec_count(&state->transparent)) {
         goto done;
     }
@@ -303,6 +304,10 @@ void box_render_extract_transparent(
 
         if (entry->blend != BOX_BLEND_OPAQUE) {
             box_instance_set_caster(&entry->data, false);
+        }
+
+        if (entry->blend == BOX_BLEND_ALPHA || entry->blend == BOX_BLEND_PREMULTIPLIED) {
+            v->translucent_count ++;
         }
 
         box_instance_set_shading(&entry->data, entry->blend, entry->back);

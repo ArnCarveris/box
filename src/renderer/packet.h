@@ -208,6 +208,7 @@ typedef struct box_view_t {
     uint32_t light_first;   /**< First light of the view in the packet light array */
     uint32_t transparent_first; /**< First sorted draw of the view in the packet */
     uint32_t transparent_count; /**< Sorted draws of the view */
+    uint32_t translucent_count; /**< Sorted draws of the view that read the background copy */
     uint32_t shadows;       /**< The view casts and receives shadows */
     uint32_t effects;       /**< The view runs its post process effects */
     int32_t priority;       /**< Order in the frame, lower renders first */

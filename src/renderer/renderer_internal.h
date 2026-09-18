@@ -11,6 +11,7 @@
 #include "frustum.h"
 #include "bake.h"
 #include "shadow.h"
+#include "blur.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -50,11 +51,8 @@
 /** Entries of the shared fragment bind group */
 #define BOX_MESH_BINDINGS (BOX_SCENE_BINDING + 2)
 
-/** Mip levels the copy of the opaque target can hold, enough for 8192 pixels */
-#define BOX_SCENE_MIPS_MAX (14)
-
-/** Mip levels a rough surface blurs over, past which the copy is one flat color */
-#define BOX_SCENE_BLUR_MIPS (5)
+/** Screen heights a translucent surface bends the background sample it reads by */
+#define BOX_GLASS_REFRACT (0.03)
 
 /** Prefiltered environments the renderer keeps, shared by the views that match one */
 #define BOX_ENV_SLOTS (4)
@@ -205,10 +203,11 @@ typedef struct box_gpu_view_t {
     box_cluster_t grid;              /**< Grid its cluster buffers were built for */
     bool scene_needed;               /**< A sorted draw of the view samples the copy */
     WGPUTexture scene;               /**< Copy of the opaque image of the view */
-    WGPUTextureView scene_view;      /**< View of its whole mip chain */
-    WGPUTextureView scene_mips[BOX_SCENE_MIPS_MAX]; /**< Attachment view of one of its mips */
-    WGPUBindGroup scene_groups[BOX_SCENE_MIPS_MAX]; /**< Source group of one of its downsamples */
-    uint32_t scene_mips_count;       /**< Mip levels its copy holds */
+    WGPUTextureView scene_view;      /**< View of its whole blur chain */
+    WGPUTextureView scene_mips[BOX_BLUR_LEVELS_MAX]; /**< Attachment view of one of its levels */
+    WGPUBindGroup scene_down[BOX_BLUR_LEVELS_MAX]; /**< Downsample source, the finer level */
+    WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
+    uint32_t scene_mips_count;       /**< Levels its blur chain holds */
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
@@ -302,9 +301,10 @@ struct box_renderer_t {
     WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]; /**< Sorted pass */
     WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
-    WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full mip range */
-    WGPUBindGroupLayout downsample_layout; /**< Source texture and sampler of a downsample */
-    WGPURenderPipeline downsample_pipeline; /**< Halves one mip of the copy into the next */
+    WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full level range */
+    WGPUBindGroupLayout blur_layout; /**< Source texture and sampler of a blur pass */
+    WGPURenderPipeline blur_down;    /**< Thirteen tap downsample of a level into the next */
+    WGPURenderPipeline blur_up;      /**< Eight tap tent upsample, mixed into the level above */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
     char *layer_wgsl[BOX_LAYER_MAX]; /**< Body of every layer the shader was composed from */
     uint32_t layer_count;            /**< Layers the composed shader holds */
@@ -757,14 +757,14 @@ void box_layers_fini(
 void box_transparent_reset(
     box_renderer_t *r);
 
-/** Create the sampler, the downsample pipeline and the views of the scene copy.
+/** Create the sampler, the blur pipelines and the views of the scene copy.
  *
  * @param r The renderer
  */
 void box_transparent_init(
     box_renderer_t *r);
 
-/** Recreate the copy of the opaque image of the current view and its mip chain.
+/** Recreate the copy of the opaque image of the current view and its blur chain.
  *
  * @param r The renderer
  */
@@ -782,12 +782,10 @@ void box_transparent_view_fini(
  *
  * @param r The renderer
  * @param view The view
- * @param p The packet
  */
 void box_transparent_needed(
     box_renderer_t *r,
-    const box_view_t *view,
-    const box_packet_t *p);
+    const box_view_t *view);
 
 /** Describe the scene copy half of the shared fragment bind group layout.
  *
@@ -818,7 +816,7 @@ void box_transparent_upload(
     box_renderer_t *r,
     const box_packet_t *p);
 
-/** Copy the opaque target into the scene copy and fill its mip chain.
+/** Copy the opaque target into the scene copy and run its dual filter blur.
  *
  * @param r The renderer
  * @param encoder The command encoder
@@ -1053,7 +1051,7 @@ extern const char *box_bake_grid_wgsl;
 extern const char *box_bake_shader_wgsl;
 
 /** WGSL source of the pass that halves one mip of the scene copy into the next */
-extern const char *box_downsample_wgsl;
+extern const char *box_blur_wgsl;
 
 /** Read back a texture and write it as PNG.
  *
