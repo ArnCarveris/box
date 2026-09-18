@@ -113,6 +113,39 @@ static void box_render_on_remove(
     }
 }
 
+/** A component that derives instance uvs exists, so extract reads them.
+ *
+ * @param it Iterator over the entities that gained the component
+ */
+static void box_render_on_tiling(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->tiled = true;
+    }
+}
+
+/** Register an OnAdd observer that flags the world as holding tiling components.
+ *
+ * Prefabs are matched too, because a tiling component often lives on a prefab
+ * and is only inherited by the instances that carry the mesh.
+ *
+ * @param world The world
+ * @param component The component to watch
+ */
+static void box_render_watch_tiling(
+    ecs_world_t *world,
+    ecs_entity_t component)
+{
+    ecs_observer(world, {
+        .query.terms = {{ .id = component }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnAdd },
+        .callback = box_render_on_tiling
+    });
+}
+
 /** Register an OnSet observer for a component on entities with a mesh.
  *
  * @param world The world
@@ -207,6 +240,7 @@ void box_render_fill_instance(
     const WorldTransform *transform,
     bool baked,
     bool textured,
+    bool tiled,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -240,6 +274,8 @@ void box_render_fill_instance(
     if (textured) {
         box_render_fill_textures(world, e, out);
     }
+
+    box_render_fill_uv(world, e, mesh, &m, tiled, out);
 }
 
 void box_render_instance_init(
@@ -253,6 +289,12 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(PbrMaterial));
     box_render_watch(world, ecs_id(Emissive));
     box_render_watch(world, ecs_id(PbrTextures));
+    box_render_watch(world, ecs_id(TextureTransform));
+    box_render_watch(world, ecs_id(TextureTiling));
+    box_render_watch(world, ecs_id(TextureWrap));
+    box_render_watch_tiling(world, ecs_id(TextureTransform));
+    box_render_watch_tiling(world, ecs_id(TextureTiling));
+    box_render_watch_tiling(world, ecs_id(TextureWrap));
 
     ecs_observer(world, {
         .query.terms = {{ .id = DynamicTransform }},

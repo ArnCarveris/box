@@ -149,6 +149,42 @@
     "  return normalize(t * (inv * ts.x) + b * (inv * ts.y) + n * ts.z);\n" \
     "}\n"
 
+/** Texture tiling and wrapping, the shader side of tiling.h */
+#define BOX_WGSL_TILING \
+    "fn tile_uv(mode: u32, xform: vec4<f32>, mesh_uv: vec2<f32>, p: vec3<f32>,\n" \
+    "    n: vec3<f32>) -> vec2<f32> {\n" \
+    "  let proj = mode & 0xFu;\n" \
+    "  let a = abs(n);\n" \
+    "  let r = length(p.xz);\n" \
+    "  let angle = atan2(p.z, p.x);\n" \
+    "  var base = mesh_uv;\n" \
+    "  if (proj == 1u) {\n" \
+    "    if (a.x >= a.y && a.x >= a.z) {\n" \
+    "      base = vec2(select(p.z, -p.z, n.x < 0.0), p.y);\n" \
+    "    } else if (a.y >= a.z) {\n" \
+    "      base = vec2(p.x, select(p.z, -p.z, n.y < 0.0));\n" \
+    "    } else {\n" \
+    "      base = vec2(select(-p.x, p.x, n.z < 0.0), p.y);\n" \
+    "    }\n" \
+    "  } else if (proj == 2u) {\n" \
+    "    base = vec2(angle * r, p.y);\n" \
+    "  } else if (proj == 3u) {\n" \
+    "    base = vec2(r, angle * r);\n" \
+    "  }\n" \
+    "  return base * xform.xy + xform.zw;\n" \
+    "}\n" \
+    "fn wrap_uv(mode: u32, uv: vec2<f32>) -> vec2<f32> {\n" \
+    "  let w = (mode >> 4u) & 0xFu;\n" \
+    "  var result = uv;\n" \
+    "  if (w == 1u) {\n" \
+    "    result = clamp(uv, vec2(0.0), vec2(1.0));\n" \
+    "  } else if (w == 2u) {\n" \
+    "    let t = uv - 2.0 * floor(uv * 0.5);\n" \
+    "    result = vec2(1.0) - abs(t - vec2(1.0));\n" \
+    "  }\n" \
+    "  return result;\n" \
+    "}\n"
+
 /** Cluster a view space position falls in, the shader side of box_cluster_index */
 #define BOX_WGSL_CLUSTER_INDEX \
     "fn cluster_index(vp: vec3<f32>) -> u32 {\n" \
@@ -181,6 +217,7 @@ const char *box_mesh_shader_wgsl =
     "@group(3) @binding(0) var<storage, read> probes: array<Probe>;\n"
     "@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;\n"
     BOX_WGSL_TEXTURES
+    BOX_WGSL_TILING
     BOX_WGSL_CLUSTER_INDEX
     "fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {\n"
     "  var result = 0.0;\n"
@@ -210,6 +247,8 @@ const char *box_mesh_shader_wgsl =
     "  @location(7) emissive: vec4<f32>,\n"
     "  @location(8) params: vec4<f32>,\n"
     "  @location(9) textures: vec2<u32>,\n"
+    "  @location(10) uv_xform: vec4<f32>,\n"
+    "  @location(11) uv_mode: u32,\n"
     "};\n"
     "struct VertexOut {\n"
     "  @builtin(position) clip: vec4<f32>,\n"
@@ -222,6 +261,10 @@ const char *box_mesh_shader_wgsl =
     "  @location(6) @interpolate(flat) slot: u32,\n"
     "  @location(7) local: vec3<f32>,\n"
     "  @location(8) @interpolate(flat) textures: vec2<u32>,\n"
+    "  @location(9) local_pos: vec3<f32>,\n"
+    "  @location(10) local_normal: vec3<f32>,\n"
+    "  @location(11) @interpolate(flat) uv_xform: vec4<f32>,\n"
+    "  @location(12) @interpolate(flat) uv_mode: u32,\n"
     "};\n"
     "@vertex fn vs_main(in: VertexIn) -> VertexOut {\n"
     "  let m = mat4x4<f32>(\n"
@@ -240,6 +283,13 @@ const char *box_mesh_shader_wgsl =
     "  out.textures = in.textures;\n"
     "  out.params = in.params;\n"
     "  out.slot = in.instance;\n"
+    "  out.local_pos = in.pos * vec3(\n"
+    "    length(vec3(in.row0.x, in.row1.x, in.row2.x)),\n"
+    "    length(vec3(in.row0.y, in.row1.y, in.row2.y)),\n"
+    "    length(vec3(in.row0.z, in.row1.z, in.row2.z)));\n"
+    "  out.local_normal = in.normal;\n"
+    "  out.uv_xform = in.uv_xform;\n"
+    "  out.uv_mode = in.uv_mode;\n"
     "  out.local = vec3<f32>(0.0);\n"
     "  if (in.params.z > 0.5) {\n"
     "    out.local = probe_coord(in.instance, world.xyz);\n"
@@ -322,10 +372,18 @@ const char *box_mesh_shader_wgsl =
     "  return sum;\n"
     "}\n"
     "@fragment fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {\n"
-    "  let ddx = dpdx(in.uv);\n"
-    "  let ddy = dpdy(in.uv);\n"
+    "  let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);\n"
+    "  let uv = wrap_uv(in.uv_mode, projected);\n"
     "  let dp1 = dpdx(in.world_pos);\n"
     "  let dp2 = dpdy(in.world_pos);\n"
+    "  var ddx = dpdx(projected);\n"
+    "  var ddy = dpdy(projected);\n"
+    "  if ((in.uv_mode & 0xFu) >= 2u) {\n"
+    "    let step = max(length(dp1), length(dp2));\n"
+    "    let lim = step * max(abs(in.uv_xform.x), abs(in.uv_xform.y)) * 4.0 + 1e-8;\n"
+    "    ddx = clamp(ddx, vec2(-lim), vec2(lim));\n"
+    "    ddy = clamp(ddy, vec2(-lim), vec2(lim));\n"
+    "  }\n"
     "  var n = normalize(in.normal);\n"
     "  var albedo = in.color.rgb;\n"
     "  var emitted = in.emissive.rgb;\n"
@@ -335,17 +393,17 @@ const char *box_mesh_shader_wgsl =
     "  let slot_rough = in.textures.y & 0xFFFFu;\n"
     "  let slot_normal = in.textures.y >> 16u;\n"
     "  if (slot_albedo != 0u) {\n"
-    "    albedo = albedo * srgb_to_linear(tex_sample(slot_albedo, in.uv, ddx, ddy).rgb);\n"
+    "    albedo = albedo * srgb_to_linear(tex_sample(slot_albedo, uv, ddx, ddy).rgb);\n"
     "  }\n"
     "  if (slot_emissive != 0u) {\n"
-    "    let t = srgb_to_linear(tex_sample(slot_emissive, in.uv, ddx, ddy).rgb);\n"
+    "    let t = srgb_to_linear(tex_sample(slot_emissive, uv, ddx, ddy).rgb);\n"
     "    emitted = emitted + t * in.emissive.w;\n"
     "  }\n"
     "  if (slot_rough != 0u) {\n"
-    "    rough = rough * tex_sample(slot_rough, in.uv, ddx, ddy).g;\n"
+    "    rough = rough * tex_sample(slot_rough, uv, ddx, ddy).g;\n"
     "  }\n"
     "  if (slot_normal != 0u) {\n"
-    "    let ts = tex_sample(slot_normal, in.uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
+    "    let ts = tex_sample(slot_normal, uv, ddx, ddy).xyz * 2.0 - vec3(1.0);\n"
     "    n = perturb(n, dp1, dp2, ddx, ddy, ts);\n"
     "  }\n"
     "  let l = normalize(-u.sun_dir);\n"

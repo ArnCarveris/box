@@ -62,14 +62,16 @@ void box_frame_init(
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
     };
-    WGPUVertexAttribute instance_attrs[7] = {
+    WGPUVertexAttribute instance_attrs[9] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 },
-        { .format = WGPUVertexFormat_Uint32x2, .offset = 96, .shaderLocation = 9 }
+        { .format = WGPUVertexFormat_Uint32x2, .offset = 96, .shaderLocation = 9 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 104, .shaderLocation = 10 },
+        { .format = WGPUVertexFormat_Uint32, .offset = 120, .shaderLocation = 11 }
     };
     WGPUVertexBufferLayout layouts[2] = {
         {
@@ -80,7 +82,7 @@ void box_frame_init(
         }, {
             .arrayStride = sizeof(box_instance_t),
             .stepMode = WGPUVertexStepMode_Instance,
-            .attributeCount = 7,
+            .attributeCount = 9,
             .attributes = instance_attrs
         }
     };

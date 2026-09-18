@@ -9,6 +9,7 @@
 #include <box.h>
 #include "../renderer/packet.h"
 #include "../renderer/cluster.h"
+#include "../renderer/tiling.h"
 #include "../renderer/bake.h"
 #include "../geometry/mesh_gen.h"
 
@@ -35,6 +36,7 @@ typedef struct RenderState {
     ecs_vec_t free_layers[BOX_TEXTURE_CLASSES]; /**< uint32_t free layers per size class */
     uint32_t layer_count[BOX_TEXTURE_CLASSES];  /**< Layers handed out per size class */
     bool textured;            /**< A texture handle was allocated, slots need resolving */
+    bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
@@ -181,6 +183,7 @@ void box_render_release_slot(
  * @param transform Its world transform
  * @param baked The instance reads a baked probe instead of the static lights
  * @param textured The world holds textures, so the PBR slots are resolved
+ * @param tiled The world holds tiling components, so the uv transform is derived
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -190,6 +193,28 @@ void box_render_fill_instance(
     const WorldTransform *transform,
     bool baked,
     bool textured,
+    bool tiled,
+    box_instance_t *out);
+
+/** Fill the uv transform and mode of an instance from its material components.
+ *
+ * TextureTransform is the base scale and offset, TextureTiling replaces the
+ * scale with the tile count its projection derives from the world size of the
+ * instance and TextureWrap selects the fold the fragment stage applies.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param mesh Its render mesh
+ * @param m Its instance matrix, the world transform times the shape scale
+ * @param tiled The world holds tiling components, so the components are read
+ * @param out The instance to fill
+ */
+void box_render_fill_uv(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const RenderMesh *mesh,
+    const mat4 *m,
+    bool tiled,
     box_instance_t *out);
 
 /** Check whether an entity or an ancestor carries a dynamic tag.

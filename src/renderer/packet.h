@@ -49,6 +49,8 @@ typedef struct box_instance_t {
     float emissive[4];     /**< Linear emissive rgb, w is the emission strength */
     float params[4];       /**< Metallic, roughness, baked, unused */
     uint32_t textures[BOX_TEXTURE_SLOTS / 2]; /**< Two packed texture slots per word */
+    float uv_transform[4]; /**< Uv scale x, scale y, offset x and offset y */
+    uint32_t uv_mode;      /**< Tiling projection and wrap mode, see tiling.h */
 } box_instance_t;
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
