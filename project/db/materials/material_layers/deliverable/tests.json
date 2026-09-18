@@ -1,0 +1,27 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-18T15:11:45Z",
+  "pass": 17,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.037696,
+  "tests": [
+    {"suite": "Layers", "case": "built_in_layers_are_registered", "status": "pass", "elapsed": 0.013965},
+    {"suite": "Layers", "case": "registration_produces_the_ordered_command", "status": "pass", "elapsed": 0.014045},
+    {"suite": "Layers", "case": "command_is_sent_once", "status": "pass", "elapsed": 0.014501},
+    {"suite": "Layers", "case": "order_sorts_the_command", "status": "pass", "elapsed": 0.013312},
+    {"suite": "Layers", "case": "unregistration_renumbers_and_resends", "status": "pass", "elapsed": 0.014327},
+    {"suite": "Layers", "case": "material_pair_sets_the_layer_bit", "status": "pass", "elapsed": 0.013721},
+    {"suite": "Layers", "case": "two_layers_set_two_bits", "status": "pass", "elapsed": 0.013819},
+    {"suite": "Layers", "case": "removing_the_pair_clears_the_bit", "status": "pass", "elapsed": 0.013885},
+    {"suite": "Layers", "case": "inherited_from_a_prefab", "status": "pass", "elapsed": 0.013429},
+    {"suite": "Layers", "case": "dynamic_instance_gets_the_bit", "status": "pass", "elapsed": 0.012073},
+    {"suite": "Layers", "case": "transparent_instance_keeps_the_bit", "status": "pass", "elapsed": 0.012991},
+    {"suite": "Layers", "case": "params_reach_the_packet", "status": "pass", "elapsed": 0.012925},
+    {"suite": "Layers", "case": "params_update_on_change", "status": "pass", "elapsed": 0.013133},
+    {"suite": "Layers", "case": "settings_flag_reaches_the_view", "status": "pass", "elapsed": 0.011833},
+    {"suite": "Layers", "case": "project_layer_gets_a_bit", "status": "pass", "elapsed": 0.012903},
+    {"suite": "Layers", "case": "limit_is_an_error_logged_once", "status": "pass", "elapsed": 0.012816},
+    {"suite": "Layers", "case": "scene_without_layers_keeps_the_flag_off", "status": "pass", "elapsed": 0.011779}
+  ]
+}
