@@ -58,6 +58,74 @@ globalThis.overlaps = list => {
 globalThis.count = (text, needle) => text.split(needle).length - 1;
 """
 
+TREE_STUBS = """
+globalThis.esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+globalThis.SERIES = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"];
+globalThis.sparkline = (points, color, tip) => `<svg class="spark" data-tip="${esc(tip)}"></svg>`;
+globalThis.nsText = v => v == null ? "\\u2014" : String(+(+v).toPrecision(4)) + " ns";
+globalThis.fmtDate = iso => iso ? "when" : "";
+globalThis.caseChip = status => `<span class="chip ${status}">${status}</span>`;
+globalThis.count = (text, needle) => text.split(needle).length - 1;
+const trend = (times, field, values) => times.map((time, i) => ({ time, [field]: values[i], cases: 2 }));
+globalThis.TESTS = {
+  overall: { projects: 2, suites: 3, cases: 5, pass: 4, fail: 1, empty: 0, time: 1.5, reports: 3,
+    latest: "2026-01-03T10:00:00Z", status: "fail",
+    trend: trend(["2026-01-01T10:00:00Z", "2026-01-03T10:00:00Z"], "elapsed", [0.3, 1.5]) },
+  projects: [
+    { project: "core", suites: 2, cases: 3, pass: 3, fail: 0, empty: 0, time: 0.6, status: "pass",
+      reports: 2, latest: "2026-01-02T10:00:00Z", item: "e1", url: "/u/core",
+      trend: trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "elapsed", [0.2, 0.6]) },
+    { project: "render", suites: 1, cases: 2, pass: 1, fail: 1, empty: 0, time: 0.9, status: "fail",
+      reports: 1, latest: "2026-01-03T10:00:00Z", item: "e2", url: "/u/render",
+      trend: trend(["2026-01-03T10:00:00Z"], "elapsed", [0.9]) },
+  ],
+  suites: [
+    { key: "core|Alpha", project: "core", suite: "Alpha", cases: 2, pass: 2, fail: 0, empty: 0, time: 0.4,
+      status: "pass", reports: 2, report_time: "2026-01-02T10:00:00Z", item: "e1", file: "f1", url: "/u/1",
+      trend: trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "elapsed", [0.2, 0.4]),
+      cases_detail: [{ case: "one", status: "pass", time: 0.1 }, { case: "two", status: "pass", time: 0.3 }] },
+    { key: "core|Beta", project: "core", suite: "Beta", cases: 1, pass: 1, fail: 0, empty: 0, time: 0.2,
+      status: "pass", reports: 1, report_time: "2026-01-02T10:00:00Z", item: "e1", file: "f1", url: "/u/1",
+      trend: trend(["2026-01-02T10:00:00Z"], "elapsed", [0.2]),
+      cases_detail: [{ case: "three", status: "pass", time: 0.2 }] },
+    { key: "render|Gamma", project: "render", suite: "Gamma", cases: 2, pass: 1, fail: 1, empty: 0, time: 0.9,
+      status: "fail", reports: 1, report_time: "2026-01-03T10:00:00Z", item: "e2", file: "f2", url: "/u/2",
+      trend: trend(["2026-01-03T10:00:00Z"], "elapsed", [0.9]),
+      cases_detail: [{ case: "draws", status: "pass", time: 0.6 }, { case: "culls", status: "fail", time: 0.3 }] },
+  ],
+  suite_history: { "core|Alpha": trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "elapsed", [0.2, 0.4]) },
+  case_history: { "core|Alpha|one": trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "elapsed", [0.05, 0.1]) },
+};
+globalThis.BENCH = {
+  micro_overall: { projects: 1, suites: 2, cases: 3, reports: 2, median_ns: 9270, mean_ns: 9302,
+    latest: "2026-01-02T10:00:00Z", trend: trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "median_ns", [9300, 9270]) },
+  micro_projects: [{ project: "bench_transform", suites: 2, cases: 3, median_ns: 9270, mean_ns: 9302, reports: 2,
+    latest: "2026-01-02T10:00:00Z", item: "e1", url: "/u/b",
+    trend: trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "median_ns", [9300, 9270]) }],
+  micro_suites: [
+    { key: "bench_transform|Dynamic", project: "bench_transform", suite: "Dynamic", cases: 1, median_ns: 9000,
+      mean_ns: 9100, reports: 1, time: "2026-01-01T10:00:00Z", item: "e1", file: "b1", url: "/u/b",
+      trend: trend(["2026-01-01T10:00:00Z"], "median_ns", [9000]),
+      cases_detail: [{ case: "propagate", median_ns: 9000, mean_ns: 9100, samples: 20 }] },
+    { key: "bench_transform|Static", project: "bench_transform", suite: "Static", cases: 2, median_ns: 270,
+      mean_ns: 202, reports: 2, time: "2026-01-02T10:00:00Z", item: "e1", file: "b2", url: "/u/b",
+      trend: trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "median_ns", [300, 270]),
+      cases_detail: [
+        { case: "read_leaf", median_ns: 90, mean_ns: 91, samples: 100, iterations: 43776, outliers: 0 },
+        { case: "set_leaf", median_ns: 180, mean_ns: 181, ci_low_ns: 178, ci_high_ns: 184, stddev_ns: 2,
+          p99_ns: 240, iterations: 12000, samples: 100, outliers: 3 }] },
+  ],
+  micro_suite_history: { "bench_transform|Static": trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "median_ns", [300, 270]) },
+  micro_case_history: { "bench_transform|Static|set_leaf": trend(["2026-01-01T10:00:00Z", "2026-01-02T10:00:00Z"], "median_ns", [200, 180]) },
+  scenes: [{ scene: "static_100k", entities: 110000, drawn: 93866, culled: 16134, frames: 300, mean_ms: 1.25,
+    p50_ms: 1.2, p99_ms: 2.6, max_ms: 2.7, fps: 800, time: "2026-01-02T10:00:00Z", item: "e1", file: "s1", url: "/u/s" }],
+  runs: [
+    { scene: "static_100k", mean_ms: 1.4, p99_ms: 2.9, fps: 700, time: "2026-01-01T10:00:00Z", file: "s0" },
+    { scene: "static_100k", mean_ms: 1.25, p99_ms: 2.6, fps: 800, time: "2026-01-02T10:00:00Z", file: "s1" },
+  ],
+};
+"""
+
 
 class Args:
     def __init__(self, **kw):
@@ -311,6 +379,121 @@ class PmTests(unittest.TestCase):
         self.assertEqual([(p["median_ns"], p["ci_low_ns"], p["ci_high_ns"]) for p in cases],
                          [(200.0, 198.0, 204.0), (180.0, 178.0, 184.0)])
         self.assertEqual(cases[1]["url"], "/deliverable/e1/deliverable/bench.json")
+
+    def test_aggregate_tests_summarizes_every_level(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/tests.json", {
+            "project": "core", "timestamp": "2026-01-01T10:00:00Z", "elapsed": 0.5,
+            "tests": [
+                {"suite": "A", "case": "one", "status": "pass", "elapsed": 0.1},
+                {"suite": "A", "case": "two", "status": "fail", "elapsed": 0.2},
+                {"suite": "B", "case": "three", "status": "pass", "elapsed": 0.4},
+            ],
+        })
+        self.write_report("e1/deliverable/tests.json", {
+            "project": "core", "timestamp": "2026-01-02T10:00:00Z", "elapsed": 0.7,
+            "tests": [
+                {"suite": "A", "case": "one", "status": "pass", "elapsed": 0.3},
+                {"suite": "A", "case": "two", "status": "pass", "elapsed": 0.3},
+                {"suite": "B", "case": "three", "status": "empty", "elapsed": 0.0},
+            ],
+        })
+        agg = pm.aggregate_tests()
+        overall = agg["overall"]
+        self.assertEqual((overall["projects"], overall["suites"], overall["cases"], overall["reports"]), (1, 2, 3, 2))
+        self.assertEqual((overall["pass"], overall["fail"], overall["empty"]), (2, 0, 1))
+        self.assertAlmostEqual(overall["time"], 0.6)
+        self.assertEqual((overall["latest"], overall["status"]), ("2026-01-02T10:00:00Z", "pass"))
+        self.assertEqual([(p["time"], p["elapsed"], p["pass"]) for p in overall["trend"]],
+                         [("2026-01-01T10:00:00Z", 0.5, 2), ("2026-01-02T10:00:00Z", 0.7, 2)])
+
+        project = agg["projects"][0]
+        self.assertEqual((project["suites"], project["cases"], project["reports"]), (2, 3, 2))
+        self.assertEqual((project["latest"], project["item"], project["status"]),
+                         ("2026-01-02T10:00:00Z", "e1", "pass"))
+        self.assertEqual(project["url"], "/deliverable/e1/deliverable/tests.json")
+        self.assertEqual([p["cases"] for p in project["trend"]], [3, 3])
+
+        suites = {s["suite"]: s for s in agg["suites"]}
+        self.assertEqual((suites["A"]["status"], suites["A"]["reports"]), ("pass", 2))
+        self.assertEqual([(p["time"], p["elapsed"]) for p in suites["A"]["trend"]],
+                         [("2026-01-01T10:00:00Z", 0.3), ("2026-01-02T10:00:00Z", 0.6)])
+        self.assertEqual(suites["B"]["status"], "empty")
+        self.assertEqual(suites["A"]["cases_detail"][0], {"case": "one", "status": "pass", "time": 0.3})
+        self.assertEqual([p["status"] for p in agg["case_history"]["core|A|two"]], ["fail", "pass"])
+
+    def test_aggregate_tests_trend_keeps_the_last_reports_only(self):
+        self.new("epic", "e1", "Epic")
+        for i in range(pm.TREND_POINTS + 3):
+            self.new("task", "e1/t%d" % i, "Task %d" % i)
+            self.write_report("e1/t%d/deliverable/tests.json" % i, {
+                "project": "core", "timestamp": "2026-01-%02dT10:00:00Z" % (i + 1), "elapsed": 0.1 * i,
+                "tests": [{"suite": "A", "case": "one", "status": "pass", "elapsed": 0.1}],
+            })
+        agg = pm.aggregate_tests()
+        self.assertEqual(len(agg["reports"]), pm.TREND_POINTS + 3)
+        self.assertEqual(len(agg["overall"]["trend"]), pm.TREND_POINTS)
+        self.assertEqual(len(agg["projects"][0]["trend"]), pm.TREND_POINTS)
+        self.assertEqual(len(agg["suites"][0]["trend"]), pm.TREND_POINTS)
+        self.assertEqual(agg["overall"]["trend"][-1]["time"], "2026-01-15T10:00:00Z")
+
+    def test_aggregate_benchmarks_summarizes_every_level(self):
+        self.new("epic", "e1", "Epic")
+        self.new("task", "e1/t1", "Task")
+        self.write_report("e1/t1/deliverable/bench.json", {
+            "project": "bench_transform", "timestamp": "2026-01-01T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf", "median_ns": 200.0, "mean_ns": 201.0},
+                {"suite": "Static", "case": "read_leaf", "median_ns": 100.0, "mean_ns": 101.0},
+                {"suite": "Dynamic", "case": "propagate", "median_ns": 9000.0, "mean_ns": 9100.0},
+            ],
+        })
+        self.write_report("e1/deliverable/bench.json", {
+            "project": "bench_transform", "timestamp": "2026-01-02T10:00:00Z",
+            "benchmarks": [
+                {"suite": "Static", "case": "set_leaf", "median_ns": 180.0, "mean_ns": 181.0, "stddev_ns": 2.0,
+                 "ci_low_ns": 178.0, "ci_high_ns": 184.0, "p95_ns": 220.0, "p99_ns": 240.0,
+                 "iterations": 12000, "samples": 100, "outliers": 3},
+                {"suite": "Static", "case": "read_leaf", "median_ns": 90.0, "mean_ns": 91.0},
+            ],
+        })
+        agg = pm.aggregate_benchmarks(extra_dirs=[])
+        overall = agg["micro_overall"]
+        self.assertEqual((overall["projects"], overall["suites"], overall["cases"], overall["reports"]), (1, 2, 3, 2))
+        self.assertEqual((overall["median_ns"], overall["mean_ns"]), (9270.0, 9372.0))
+        self.assertEqual(overall["latest"], "2026-01-02T10:00:00Z")
+        self.assertEqual([(p["time"], p["median_ns"], p["cases"]) for p in overall["trend"]],
+                         [("2026-01-01T10:00:00Z", 9300.0, 3), ("2026-01-02T10:00:00Z", 270.0, 2)])
+
+        project = agg["micro_projects"][0]
+        self.assertEqual((project["suites"], project["cases"], project["reports"]), (2, 3, 2))
+        self.assertEqual((project["median_ns"], project["mean_ns"]), (9270.0, 9372.0))
+        self.assertEqual(project["latest"], "2026-01-02T10:00:00Z")
+        self.assertEqual([p["median_ns"] for p in project["trend"]], [9300.0, 270.0])
+
+        static = [s for s in agg["micro_suites"] if s["suite"] == "Static"][0]
+        self.assertEqual((static["cases"], static["median_ns"], static["mean_ns"], static["reports"]),
+                         (2, 270.0, 272.0, 2))
+        self.assertEqual([(p["time"], p["median_ns"]) for p in static["trend"]],
+                         [("2026-01-01T10:00:00Z", 300.0), ("2026-01-02T10:00:00Z", 270.0)])
+        case = [c for c in static["cases_detail"] if c["case"] == "set_leaf"][0]
+        self.assertEqual((case["median_ns"], case["mean_ns"], case["stddev_ns"]), (180.0, 181.0, 2.0))
+        self.assertEqual((case["ci_low_ns"], case["ci_high_ns"], case["p95_ns"], case["p99_ns"]),
+                         (178.0, 184.0, 220.0, 240.0))
+        self.assertEqual((case["iterations"], case["samples"], case["outliers"]), (12000, 100, 3))
+        self.assertEqual(len(agg["micro_case_history"]["bench_transform|Static|set_leaf"]), 2)
+
+    def test_aggregate_benchmarks_keeps_scene_counters(self):
+        self.new("epic", "e1", "Epic")
+        self.write_report("e1/deliverable/culling.json", {
+            "scene": "test/integration/visual/culling.flecs", "timestamp": "2026-01-02T10:00:00Z",
+            "entities": 37, "frames": 120, "mean_ms": 0.122, "p99_ms": 0.205, "fps": 8227.7,
+            "drawn": 14, "culled": 23,
+        })
+        scene = pm.aggregate_benchmarks(extra_dirs=[])["scenes"][0]
+        self.assertEqual((scene["scene"], scene["drawn"], scene["culled"]), ("culling", 14, 23))
+        self.assertEqual((scene["entities"], scene["frames"], scene["p99_ms"]), (37, 120, 0.205))
 
     def test_aggregate_tests_falls_back_to_mtime(self):
         self.new("epic", "e1", "Epic")
@@ -668,6 +851,149 @@ console.log(JSON.stringify({
         self.assertEqual((out["openCross"], out["openDepth"]["render/pipeline"]), (1, 0))
         self.assertEqual(out["none"], 0)
         self.assertEqual(out["subDeps"], ["render/shadows", "ui/panel"])
+
+    def tree_logic(self):
+        with open(os.path.join(pm.ROOT, "index.html")) as f:
+            text = f.read()
+        start = text.index("// --- tree logic")
+        end = text.index("// --- end tree logic")
+        return text[start:end]
+
+    def run_tree_js(self, script):
+        if not shutil.which("node"):
+            self.skipTest("node is not installed")
+        path = os.path.join(self.tmp, "tree_check.js")
+        helper = """
+globalThis.rowOf = (rows, key) => rows.find(r => r.node.key === key);
+globalThis.cellText = (row, id) =>
+  TREE_COLS[id].map(c => TREE_CELLS[id](row, c).replace(/<[^>]*>/g, "").trim());
+"""
+        with open(path, "w") as f:
+            f.write(TREE_STUBS + self.tree_logic() + helper + script)
+        run = subprocess.run([shutil.which("node"), path], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return json.loads(run.stdout)
+
+    def test_report_tree_renders_projects_suites_and_cases(self):
+        out = self.run_tree_js("""
+const nodes = testTreeNodes(TESTS);
+const collapsed = treeRows(nodes, [], false);
+const open = treeRows(nodes, ["p:core", "core|Alpha"], false);
+const markup = treeHtml("tests", open, { key: "time", dir: -1 },
+  row => row.node.level === "project" ? "<em>chart</em>" : "");
+const bench = benchTreeNodes(BENCH);
+const benchRows = treeRows(bench, ["p:bench_transform", "bench_transform|Static"], false);
+const scenes = treeRows(sceneTreeNodes(BENCH), ["scene:static_100k"], false);
+const sceneMarkup = treeHtml("scenes", scenes, { key: "name", dir: 1 }, () => "<em>history</em>");
+console.log(JSON.stringify({
+  count: treeCount(nodes),
+  keys: treeKeys(nodes),
+  collapsed: collapsed.map(r => [r.node.key, r.depth, r.open, r.leaf]),
+  open: open.map(r => r.node.level + ":" + r.node.name + ":" + r.depth),
+  columns: TREE_COLS.tests.map(c => c.key),
+  benchColumns: TREE_COLS.bench.map(c => c.key),
+  sceneColumns: TREE_COLS.scenes.map(c => c.key),
+  rows: count(markup, "data-row="),
+  toggles: count(markup, "data-toggle="),
+  projectRows: count(markup, "lvl-project"),
+  suiteRows: count(markup, "lvl-suite"),
+  caseRows: count(markup, "lvl-case"),
+  details: count(markup, "tree-detail"),
+  sparks: count(markup, 'class="spark"'),
+  heads: count(markup, "data-sort="),
+  sorted: markup.includes('data-sort="time"') && markup.includes('sorted" data-sort="time"'),
+  arrow: markup.includes("Time (s) ↓"),
+  suiteCells: cellText(rowOf(open, "core|Alpha"), "tests"),
+  caseCells: cellText(rowOf(open, "core|Alpha|one"), "tests"),
+  projectCells: cellText(rowOf(open, "p:core"), "tests"),
+  failCells: cellText(rowOf(treeRows(nodes, ["p:render", "render|Gamma"], false), "render|Gamma|culls"), "tests"),
+  benchCase: cellText(rowOf(benchRows, "bench_transform|Static|set_leaf"), "bench"),
+  benchSuite: cellText(rowOf(benchRows, "bench_transform|Static"), "bench"),
+  benchMeta: treeMeta(rowOf(benchRows, "bench_transform|Static|set_leaf")),
+  sceneCells: cellText(scenes[0], "scenes"),
+  sceneDetails: count(sceneMarkup, "tree-detail"),
+  tiles: count(statTiles([{ label: "Cases", value: 5, points: [{ t: 1, v: 2 }] },
+    { label: "Fail", value: 0 }]), 'class="stat"'),
+  toolbar: treeToolbar("tests", { search: "core" }, 4, 10),
+}));
+""")
+        self.assertEqual(out["count"], 10)
+        self.assertEqual(out["keys"], ["p:core", "core|Alpha", "core|Beta", "p:render", "render|Gamma"])
+        self.assertEqual(out["collapsed"], [["p:core", 0, False, False], ["p:render", 0, False, False]])
+        self.assertEqual(out["open"], ["project:core:0", "suite:Alpha:1", "case:one:2", "case:two:2",
+                                       "suite:Beta:1", "project:render:0"])
+        self.assertEqual(out["columns"], ["name", "cases", "status", "time", "trend", "latest"])
+        self.assertEqual(out["benchColumns"], ["name", "cases", "median", "mean", "ci", "p99",
+                                               "iterations", "samples", "outliers", "trend"])
+        self.assertEqual(out["sceneColumns"], ["name", "entities", "drawn", "culled", "mean_ms", "p99", "fps", "trend"])
+        self.assertEqual((out["rows"], out["toggles"]), (6, 4))
+        self.assertEqual((out["projectRows"], out["suiteRows"], out["caseRows"]), (2, 2, 2))
+        self.assertEqual(out["details"], 1)
+        self.assertEqual(out["heads"], 6)
+        self.assertTrue(out["sorted"])
+        self.assertTrue(out["arrow"])
+        self.assertEqual(out["projectCells"], ["▾core2 suites", "3", "3 pass", "0.600", "", "e1 · when"])
+        self.assertEqual(out["suiteCells"], ["▾Alpha", "2", "2 pass", "0.400", "", "e1 · when"])
+        self.assertEqual(out["caseCells"], ["one", "", "pass", "0.1000", "", ""])
+        self.assertEqual(out["failCells"][2], "fail")
+        self.assertEqual(out["benchSuite"], ["▾Static", "2", "270 ns", "202 ns", "", "", "", "", "", ""])
+        self.assertEqual(out["benchCase"],
+                         ["set_leaf", "", "180 ns", "181 ns", "±1.67%", "240 ns", "12k", "100", "3", ""])
+        self.assertIn("ci95 178 ns – 184 ns", out["benchMeta"])
+        self.assertIn("12k iterations", out["benchMeta"])
+        self.assertIn("3 outliers", out["benchMeta"])
+        self.assertEqual(out["sceneCells"], ["▾static_100k2 runs", "110k", "94k", "16k", "1.250", "2.600", "800", ""])
+        self.assertEqual(out["sceneDetails"], 1)
+        self.assertEqual(out["tiles"], 2)
+        self.assertIn('value="core"', out["toolbar"])
+        self.assertIn("4 of 10 rows", out["toolbar"])
+        self.assertIn('data-expand="tests"', out["toolbar"])
+        self.assertIn('data-collapse="tests"', out["toolbar"])
+
+    def test_report_tree_filters_and_sorts_at_every_level(self):
+        out = self.run_tree_js("""
+const nodes = testTreeNodes(TESTS);
+const shape = list => list.map(p => [p.name, (p.children || []).map(s => [s.name, s.children.map(c => c.name)])]);
+const searchRows = treeRows(treeFilter(nodes, "culls"), [], true);
+const bench = benchTreeNodes(BENCH);
+console.log(JSON.stringify({
+  all: shape(nodes),
+  case: shape(treeFilter(nodes, "culls")),
+  suite: shape(treeFilter(nodes, "alpha")),
+  project: shape(treeFilter(nodes, "render")),
+  none: treeFilter(nodes, "zzz").length,
+  searchRows: searchRows.map(r => [r.node.name, r.open, r.depth]),
+  byTime: treeSort(nodes, { key: "time", dir: -1 }).map(p => p.name),
+  byTimeUp: treeSort(nodes, { key: "time", dir: 1 }).map(p => p.name),
+  byName: treeSort(nodes, { key: "name", dir: -1 }).map(p => p.name),
+  byStatus: treeSort(nodes, { key: "status", dir: -1 }).map(p => p.name),
+  suitesByTime: treeSort(nodes, { key: "time", dir: -1 })[0].children.map(s => s.name),
+  casesByTime: treeSort(nodes, { key: "time", dir: -1 })[0].children[0].children.map(c => c.name),
+  byMedian: treeSort(bench[0].children, { key: "median", dir: -1 }).map(s => s.name),
+  byCases: treeSort(bench[0].children, { key: "cases", dir: -1 }).map(s => s.name),
+  byOutliers: treeSort(bench[0].children[1].children, { key: "outliers", dir: -1 }).map(c => c.name),
+  missingLast: treeSort(bench[0].children[1].children, { key: "p99", dir: -1 }).map(c => c.name),
+  filteredCount: treeCount(treeFilter(nodes, "alpha")),
+}));
+""")
+        self.assertEqual(out["all"], [["core", [["Alpha", ["one", "two"]], ["Beta", ["three"]]]],
+                                      ["render", [["Gamma", ["draws", "culls"]]]]])
+        self.assertEqual(out["case"], [["render", [["Gamma", ["culls"]]]]])
+        self.assertEqual(out["suite"], [["core", [["Alpha", ["one", "two"]]]]])
+        self.assertEqual(out["project"], [["render", [["Gamma", ["draws", "culls"]]]]])
+        self.assertEqual(out["none"], 0)
+        self.assertEqual(out["searchRows"], [["render", True, 0], ["Gamma", True, 1], ["culls", False, 2]])
+        self.assertEqual(out["byTime"], ["render", "core"])
+        self.assertEqual(out["byTimeUp"], ["core", "render"])
+        self.assertEqual(out["byName"], ["render", "core"])
+        self.assertEqual(out["byStatus"], ["render", "core"])
+        self.assertEqual(out["suitesByTime"], ["Gamma"])
+        self.assertEqual(out["casesByTime"], ["draws", "culls"])
+        self.assertEqual(out["byMedian"], ["Dynamic", "Static"])
+        self.assertEqual(out["byCases"], ["Static", "Dynamic"])
+        self.assertEqual(out["byOutliers"], ["set_leaf", "read_leaf"])
+        self.assertEqual(out["missingLast"], ["set_leaf", "read_leaf"])
+        self.assertEqual(out["filteredCount"], 4)
 
     def write_wasm(self, epic):
         directory = os.path.join(pm.DB, epic, "deliverable", "wasm")
