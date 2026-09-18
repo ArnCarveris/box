@@ -150,6 +150,29 @@ static void box_texture_chain(
     }
 }
 
+/** Flip the rows of a square image so the bottom row of the source comes first.
+ *
+ * @param pixels RGBA8 texels of the image
+ * @param size Edge length of the image
+ */
+static void box_texture_flip(
+    uint8_t *pixels,
+    uint32_t size)
+{
+    ecs_size_t stride = (ecs_size_t)size * 4;
+    uint8_t *tmp = ecs_os_malloc(stride);
+    uint32_t y;
+    for (y = 0; y < size / 2; y ++) {
+        uint8_t *a = pixels + (size_t)y * (size_t)stride;
+        uint8_t *b = pixels + (size_t)(size - 1 - y) * (size_t)stride;
+        ecs_os_memcpy(tmp, a, stride);
+        ecs_os_memcpy(a, b, stride);
+        ecs_os_memcpy(b, tmp, stride);
+    }
+
+    ecs_os_free(tmp);
+}
+
 void box_texture_image(
     const uint8_t *src,
     int32_t width,
@@ -165,6 +188,7 @@ void box_texture_image(
     out->source_width = width;
     out->source_height = height;
     box_texture_scale(src, (uint32_t)width, (uint32_t)height, size, out->pixels);
+    box_texture_flip(out->pixels, size);
     box_texture_chain(out->pixels, size);
 }
 

@@ -37,6 +37,11 @@ extern ECS_COMPONENT_DECLARE(TextureRefs);
 
 /** Scale an RGBA8 image into the mip chain of the size class it belongs to.
  *
+ * Every image the module publishes goes through here, both files and rasterized
+ * SVGs, and the rows are flipped before the chain is built: the first row of the
+ * published texture is the bottom row of the source image, so uv v = 0 is the
+ * bottom of the artwork, which is the convention the mesh generators follow.
+ *
  * @param src RGBA8 source pixels
  * @param width Width of the source image
  * @param height Height of the source image
