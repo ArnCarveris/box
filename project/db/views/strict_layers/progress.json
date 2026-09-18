@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T16:40:03.035+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "views/layers",
+    "views/render_command"
+  ]
+}
