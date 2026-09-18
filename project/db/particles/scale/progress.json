@@ -1,0 +1,13 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-18T08:28:19.775+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "particles/dynamics",
+    "particles/appearance",
+    "particles/control",
+    "views_and_culling/frustum_culling"
+  ]
+}
