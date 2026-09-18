@@ -1,0 +1,60 @@
+{
+    "id": "geometry",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the procedural mesh generators",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Flat",
+            "testcases": [
+                "quad",
+                "triangle",
+                "right_triangle",
+                "ngon_matches_triangle_at_three_sides",
+                "ngon_clamps_minimum",
+                "ngon"
+            ]
+        }, {
+            "id": "Box",
+            "testcases": [
+                "box",
+                "rounded_box",
+                "rounded_box_clamps_radius",
+                "rounded_box_clamps_segments",
+                "triangle_prism",
+                "right_triangle_prism"
+            ]
+        }, {
+            "id": "Round",
+            "testcases": [
+                "sphere_smooth",
+                "sphere_flat",
+                "hemisphere_smooth",
+                "hemisphere_flat",
+                "icosphere_base_smooth",
+                "icosphere_base_flat",
+                "icosphere_subdivided"
+            ]
+        }, {
+            "id": "Axis",
+            "testcases": [
+                "cone_smooth",
+                "cone_flat",
+                "cylinder_smooth",
+                "cylinder_flat",
+                "frustum_smooth",
+                "frustum_flat",
+                "capsule_smooth",
+                "capsule_flat",
+                "tube_smooth",
+                "tube_flat",
+                "tube_open_arc",
+                "torus_smooth",
+                "torus_flat"
+            ]
+        }]
+    }
+}
