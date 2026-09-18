@@ -9,6 +9,7 @@
 #include <box.h>
 #include "../shader/shader_internal.h"
 #include "../renderer/gtao.h"
+#include "../renderer/ssr.h"
 
 /** One entry of the effect stack while it is being ordered */
 typedef struct box_effect_src_t {

@@ -340,6 +340,7 @@ typedef struct box_view_t {
     uint32_t effect_first;  /**< First pass of its chain in the packet effect array */
     uint32_t effect_count;  /**< Passes of its chain */
     uint32_t effect_inputs; /**< BOX_EFFECT bits the passes of its chain need */
+    float clip[16];         /**< World to clip of this frame, for a pass that marches */
     float inv_clip[16];     /**< Clip to world of this frame, for the motion pass */
     float prev_clip[16];    /**< World to clip of the previous frame of the view */
     int32_t priority;       /**< Order in the frame, lower renders first */

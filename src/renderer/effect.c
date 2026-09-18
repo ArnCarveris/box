@@ -635,6 +635,7 @@ static void box_effect_uniform_write(
     u.frame[1] = (float)p->time;
     u.frame[2] = box_effect_decode_flag(hdr, srgb);
     u.frame[3] = box_effect_encode_flag(hdr, srgb, last);
+    memcpy(u.clip, view->clip, sizeof(u.clip));
     memcpy(u.inv_clip, view->inv_clip, sizeof(u.inv_clip));
     wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
         (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE, &u, sizeof(u));

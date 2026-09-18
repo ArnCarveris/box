@@ -502,6 +502,7 @@ static void box_view_motion(
     memcpy(proj.v, v->proj, sizeof(proj.v));
     mat4 clip = mat4_mul(&proj, &view);
     mat4 inverse = mat4_inverse(&clip);
+    memcpy(v->clip, clip.v, sizeof(clip.v));
     memcpy(v->inv_clip, inverse.v, sizeof(inverse.v));
 
     while (ecs_vec_count(&state->view_clip) <= index) {

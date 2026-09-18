@@ -1,6 +1,6 @@
 #include "include/fullscreen.wgsl"
 #include "include/fx_params.wgsl"
-#include "include/octahedral.wgsl"
+#include "include/gbuffer.wgsl"
 
 // Ground truth ambient occlusion of a view, in two passes the frame runs for
 // the effect that asked for the occlusion input. The trace walks a few slices

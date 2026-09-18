@@ -2,7 +2,7 @@
 
 #include "fullscreen.wgsl"
 #include "fx_params.wgsl"
-#include "octahedral.wgsl"
+#include "gbuffer.wgsl"
 
 @group(0) @binding(0) var<uniform> fx: Effect;
 @group(0) @binding(1) var fx_color: texture_2d<f32>;
@@ -33,8 +33,8 @@ fn fx_sample(uv: vec2<f32>) -> vec4<f32> {
 }
 
 // The normal attachment holds the world normal octahedrally in its first two
-// channels and the indirect diffuse and indirect specular fraction of the pixel
-// in the other two.
+// channels, the indirect diffuse fraction of the pixel in the third and the
+// indirect specular fraction packed with the roughness in the fourth.
 fn fx_normal_texel(uv: vec2<f32>) -> vec4<f32> {
   let size = vec2<i32>(textureDimensions(fx_normal, 0));
   let c = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0, 0), size - vec2(1, 1));
@@ -45,8 +45,11 @@ fn fx_world_normal(uv: vec2<f32>) -> vec3<f32> {
   return oct_decode(fx_normal_texel(uv).xy);
 }
 
-fn fx_indirect(uv: vec2<f32>) -> vec2<f32> {
-  return fx_normal_texel(uv).zw;
+// The indirect diffuse fraction, the indirect specular fraction and the
+// roughness of the surface a pixel shows.
+fn fx_indirect(uv: vec2<f32>) -> vec3<f32> {
+  let texel = fx_normal_texel(uv);
+  return vec3(texel.z, gb_specular(texel.w), gb_roughness(texel.w));
 }
 
 // Ambient occlusion the frame gathered for this pass, one where it gathered none.

@@ -382,6 +382,7 @@ typedef struct box_effect_uniform_t {
     float size[4];                      /**< Target width, height and their reciprocals */
     float eye[4];                       /**< Camera position, w is the display encode flag */
     float frame[4];                     /**< Delta, time, and the decode and encode flags */
+    float clip[16];                     /**< World to clip of the view, for a pass that marches */
     float inv_clip[16];                 /**< Clip to world of the view */
 } box_effect_uniform_t;
 

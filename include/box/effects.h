@@ -98,6 +98,21 @@ ECS_STRUCT(Gtao, {
     bool half_res;  /**< The trace runs at half the resolution, default true */
 });
 
+/** Screen space reflections marched over the depth of the view.
+ *
+ * A ray that finds nothing, a surface rougher than the maximum and a hit that
+ * leaves the image all fall back to the prefiltered environment the mesh pass
+ * already used, so the traced and the untraced parts of a frame meet without a
+ * boundary.
+ */
+ECS_STRUCT(Ssr, {
+    float steps;          /**< Steps a reflection ray marches, 0 takes 24 */
+    float thickness;      /**< World thickness a surface is given, 0 takes 0.4 */
+    float max_roughness;  /**< Roughness the reflection fades out at, 0 takes 0.6 */
+    float intensity;      /**< Fraction of the traced reflection that reaches the image */
+    float fade;           /**< Fraction of the image a hit fades out over at its edges */
+});
+
 /** Height based fog integrated along the view ray */
 ECS_STRUCT(Fog, {
     vec3 color;        /**< Linear color of the fog */

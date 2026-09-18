@@ -10,6 +10,7 @@ struct Effect {
   size: vec4<f32>,
   eye: vec4<f32>,
   frame: vec4<f32>,
+  clip: mat4x4<f32>,
   inv_clip: mat4x4<f32>,
 };
 

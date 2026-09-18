@@ -295,7 +295,10 @@ box { effects { stack { bloom {
 ```
 
 `gtao` (order 600) traces horizon based ambient occlusion over the depth at half
-resolution and darkens the indirect diffuse light of a pixel with it, `fog` (700)
+resolution and darkens the indirect diffuse light of a pixel with it, `ssr` (650)
+marches the depth for a reflection and replaces the indirect specular light of a
+pixel with what it found, falling back to the prefiltered environment on a miss,
+`fog` (700)
 integrates a height fog along the view ray it rebuilds from the
 depth, `bloom` (800) mixes in a pyramid of the image, `auto_exposure` (850) scales
 it by the exposure its histogram adapted to and `tonemap` (900) maps the result
@@ -303,13 +306,15 @@ onto the display and dithers it. Two of them ask the frame for work through thei
 own inputs: `pyramid` builds the mip chain of the image the pass reads,
 `exposure` runs the histogram and adaptation compute passes over it and
 `occlusion` traces, denoises and accumulates the ambient occlusion of the view.
-The second attachment of the mesh pass carries the world normal octahedrally and
-the indirect diffuse and specular fraction of a pixel, which is how a pass
-changes the indirect light of a pixel and leaves the direct light alone. Targets
+The second attachment of the mesh pass carries the world normal octahedrally,
+the indirect diffuse fraction of a pixel and its indirect specular fraction
+packed with the roughness, which is how a pass changes the indirect light of a
+pixel and leaves the direct light alone. Targets
 between two passes are RGBA16F, so what an earlier pass pushes past white reaches
 the tone map. `height_fog.flecs`, `bloom.flecs`, `auto_exposure.flecs` and
 `tonemap.flecs` under `test/integration/visual` show one effect each, and
-`gtao.flecs` shows a room corner with the occlusion on next to `gtao_off.flecs`.
+`gtao.flecs` shows a room corner with the occlusion on next to `gtao_off.flecs`
+and `ssr.flecs` a glossy floor reflecting colored boxes next to `ssr_off.flecs`.
 
 ## Benchmarks
 

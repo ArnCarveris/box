@@ -10,7 +10,7 @@
 #include "../../../src/render/render_internal.h"
 
 /** Effect shaders the engine registers next to the builtin slots */
-#define LAYER_EFFECT_SHADERS (6)
+#define LAYER_EFFECT_SHADERS (7)
 
 static ecs_world_t *w;
 static box_packet_t packet;

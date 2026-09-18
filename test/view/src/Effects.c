@@ -11,6 +11,7 @@
 #include "../../../src/render/render_internal.h"
 #include "../../../src/renderer/bloom.h"
 #include "../../../src/renderer/gtao.h"
+#include "../../../src/renderer/ssr.h"
 #include "../../../src/renderer/fog.h"
 #include "../../../src/renderer/exposure.h"
 
@@ -807,4 +808,90 @@ void Effects_gtao_parameters_reach_the_pass(void)
     test_flt(pass->params[4], 0.0f);
     test_flt(pass->params[5], 0.0f);
     test_int(packet.view.effect_inputs & BOX_EFFECT_OCCLUSION, BOX_EFFECT_OCCLUSION);
+}
+
+void Effects_ssr_march_hits_a_floor(void)
+{
+    // effects/ssr
+    float scene[6] = { 12.0f, 11.0f, 10.0f, 9.0f, 8.4f, 8.0f };
+    float ray[6] = { 11.0f, 10.5f, 10.0f, 9.2f, 8.5f, 8.2f };
+    test_int(box_ssr_march(scene, ray, 6, 0.4f), 3);
+    test_bool(box_ssr_behind(9.2f, 9.0f, 0.4f), true);
+    test_bool(box_ssr_behind(8.9f, 9.0f, 0.4f), false);
+    test_bool(box_ssr_behind(20.0f, 9.0f, 0.4f), false);
+}
+
+void Effects_ssr_march_misses_off_screen(void)
+{
+    // effects/ssr
+    float empty[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float ray[4] = { 4.0f, 8.0f, 12.0f, 16.0f };
+    test_int(box_ssr_march(empty, ray, 4, 0.4f), -1);
+
+    float behind[4] = { 20.0f, 20.0f, 20.0f, 20.0f };
+    test_int(box_ssr_march(behind, ray, 4, 0.4f), -1);
+}
+
+void Effects_ssr_weight_falls_with_the_roughness(void)
+{
+    // effects/ssr
+    test_flt(box_ssr_roughness_weight(0.0f, 0.6f), 1.0f);
+    test_flt(box_ssr_roughness_weight(0.3f, 0.6f), 1.0f);
+    test_flt(box_ssr_roughness_weight(0.6f, 0.6f), 0.0f);
+    test_flt(box_ssr_roughness_weight(0.9f, 0.6f), 0.0f);
+    float middle = box_ssr_roughness_weight(0.45f, 0.6f);
+    test_assert(middle > 0.0f && middle < 1.0f);
+    test_assert(box_ssr_roughness_weight(0.5f, 0.6f) < middle);
+
+    test_flt(box_ssr_edge_fade(0.5f, 0.5f, 0.12f), 1.0f);
+    test_flt(box_ssr_edge_fade(0.0f, 0.5f, 0.12f), 0.0f);
+    test_flt(box_ssr_edge_fade(0.5f, 1.0f, 0.12f), 0.0f);
+    float near_edge = box_ssr_edge_fade(0.06f, 0.5f, 0.12f);
+    test_assert(near_edge > 0.0f && near_edge < 1.0f);
+}
+
+void Effects_builtin_ssr_is_off_by_default(void)
+{
+    // effects/ssr
+    ecs_entity_t ssr = ecs_lookup(w, "box.effects.stack.ssr");
+    test_assert(ssr != 0);
+    const Effect *fx = ecs_get(w, ssr, Effect);
+    test_assert(fx != NULL);
+    test_bool(fx->enabled, false);
+    test_bool(fx->depth, true);
+    test_bool(fx->normals, true);
+    test_bool(fx->occlusion, false);
+    test_int(fx->order, 650);
+    test_assert(fx->order > ecs_get(w, ecs_lookup(w, "box.effects.stack.gtao"), Effect)->order);
+    test_assert(fx->order < ecs_get(w, ecs_lookup(w, "box.effects.stack.fog"), Effect)->order);
+
+    const Ssr *params = ecs_get(w, ssr, Ssr);
+    test_assert(params != NULL);
+    test_flt(params->steps, (float)BOX_SSR_STEPS);
+    test_flt(params->thickness, BOX_SSR_THICKNESS);
+    test_flt(params->max_roughness, BOX_SSR_MAX_ROUGHNESS);
+    test_flt(params->fade, BOX_SSR_FADE);
+
+    box_render_extract(w, &packet);
+    test_int(packet.effects.count, 0);
+}
+
+void Effects_ssr_parameters_reach_the_pass(void)
+{
+    // effects/ssr
+    ecs_entity_t ssr = ecs_lookup(w, "box.effects.stack.ssr");
+    ecs_get_mut(w, ssr, Effect)->enabled = true;
+    ecs_modified(w, ssr, Effect);
+    ecs_set(w, ssr, Ssr, { .steps = 32.0f, .thickness = 0.25f, .max_roughness = 0.4f,
+        .intensity = 0.8f, .fade = 0.2f });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH | BOX_EFFECT_NORMALS);
+    test_flt(pass->params[0], 32.0f);
+    test_flt(pass->params[1], 0.25f);
+    test_flt(pass->params[2], 0.4f);
+    test_flt(pass->params[3], 0.8f);
+    test_flt(pass->params[4], 0.2f);
 }
