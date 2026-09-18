@@ -40,6 +40,72 @@
             ],
             "setup": true,
             "teardown": true
+        }, {
+            "id": "Script",
+            "testcases": [
+                "read_source",
+                "read_by_basename",
+                "unknown_file",
+                "write_changes_world",
+                "write_parse_error_keeps_state",
+                "grep_lines",
+                "patch_changes_world",
+                "patch_compounds",
+                "patch_hunk_mismatch"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
+            "id": "Patch",
+            "testcases": [
+                "single_hunk",
+                "multiple_hunks",
+                "addition_at_end",
+                "deletion",
+                "diff_headers_ignored",
+                "context_mismatch",
+                "no_hunks"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
+            "id": "Logs",
+            "testcases": [
+                "filter_by_level",
+                "numeric_level",
+                "oldest_first",
+                "count_cap",
+                "wrap_around",
+                "log_file_in_process_dir",
+                "default_arguments",
+                "invalid_level_name"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
+            "id": "Http",
+            "testcases": [
+                "new_returns_session",
+                "new_names_are_unique",
+                "close_deletes_session",
+                "close_unknown_session",
+                "exec_returns_output",
+                "exec_url_encoded_cmd",
+                "exec_post_body",
+                "exec_unknown_session",
+                "exec_error_gives_400",
+                "exec_without_cmd",
+                "resource_returns_file",
+                "resource_png_content_type",
+                "resource_traversal_refused",
+                "resource_missing_gives_404",
+                "unknown_endpoint_gives_404",
+                "dequeue_system_runs",
+                "app_port_starts_server",
+                "port_zero_stops_server"
+            ],
+            "setup": true,
+            "teardown": true
         }]
     }
 }
