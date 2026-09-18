@@ -76,6 +76,12 @@
                     "extract_10k_with_layers",
                     "extract_10k_two_views"
                 ]
+            },
+            {
+                "id": "Frustum",
+                "benchcases": [
+                    "cull_100k_cpu"
+                ]
             }
         ]
     }
