@@ -12,5 +12,6 @@
 
 #include "box/types.h"
 #include "box/core.h"
+#include "box/surface.h"
 
 #endif
