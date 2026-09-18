@@ -1,0 +1,20 @@
+{
+    "id": "bench_command",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for box.command dispatch, path lookup and value parsing",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Dispatch",
+            "benchcases": [
+                "help",
+                "ls_scope",
+                "path_lookup",
+                "set_expression"
+            ]
+        }]
+    }
+}

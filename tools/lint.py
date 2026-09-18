@@ -5,7 +5,7 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_PATHS = ["include", "src", "apps", "test"]
+DEFAULT_PATHS = ["include", "src", "apps", "test", "bench"]
 EXTENSIONS = (".c", ".h", ".m")
 MAX_LINE = 100
 MAX_FUNCTION_LINES = 200
@@ -21,7 +21,8 @@ class Lint:
         self.path = path
         self.lines = lines
         self.problems = []
-        self.is_test = path.startswith("test/") or "/test/" in path
+        self.is_bench = path.startswith("bench/") or "/bench/" in path
+        self.is_test = self.is_bench or path.startswith("test/") or "/test/" in path
         self.is_header = path.endswith(".h")
 
     def report(self, line, message):
@@ -109,7 +110,7 @@ class Lint:
             j -= 1
         if j < 0 or not self.lines[j].strip().endswith("*/"):
             is_static = self.lines[start].startswith("static")
-            if not self.is_test and (is_static or self.is_header):
+            if (self.is_bench or not self.is_test) and (is_static or self.is_header):
                 self.report(start + 1, f"{name}: missing doc comment")
             return
         k = j
@@ -162,6 +163,11 @@ class Lint:
         for name, start, brace_line, end in self.function_bodies():
             if end is None:
                 self.check_comment(name, start, brace_line)
+                continue
+            if self.is_bench and self.lines[start].startswith("static"):
+                self.check_signature(name, start, brace_line)
+                self.check_comment(name, start, brace_line)
+                self.check_body(name, brace_line, end)
                 continue
             if self.is_test:
                 self.check_body(name, brace_line, end)

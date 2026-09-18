@@ -1,0 +1,24 @@
+{
+    "id": "bench_transform",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.transform module",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Static",
+            "benchcases": [
+                "set_leaf_position",
+                "set_root_position",
+                "reparent"
+            ]
+        }, {
+            "id": "Dynamic",
+            "benchcases": [
+                "propagate_subtree"
+            ]
+        }]
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "id": "bench_render",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.render extract step",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Extract",
+            "benchcases": [
+                "static_1_changed",
+                "static_100_changed",
+                "static_1000_changed",
+                "dynamic_10k"
+            ]
+        }]
+    }
+}
