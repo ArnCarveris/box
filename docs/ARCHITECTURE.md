@@ -34,7 +34,7 @@ Two hard rules keep the concerns apart:
 | `box.material` | `Rgb`, `PbrMaterial`, `Emissive`, `Tint`, textures, material layers |
 | `box.camera`, `box.light`, `box.view` | cameras, lights, views and layers |
 | `box.render` | Extract system, frame packets, handoff queue to the renderer thread |
-| `box.input` | device layer (`Input` singleton, event queues, `keys` codes) and action layer (`InputMap`) |
+| `box.input` | device layer (`Input` singleton, event queues, `keys` codes) and action layer (`InputAction`, `InputMap`, `Binding`, key masks, emitted actions) |
 | `box.command` | terminal sessions, HTTP endpoints, script functions for commands |
 | `box.checkpoint` | script state capture and restore |
 | `box.monitor` | `CpuMonitor`, `EcsStats` and `SystemMonitor` singletons, sampled only while present |

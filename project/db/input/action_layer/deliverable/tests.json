@@ -1,0 +1,26 @@
+{
+  "project": "input",
+  "timestamp": "2026-09-18T21:30:16Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.025485,
+  "tests": [
+    {"suite": "Actions", "case": "a_binding_presses_holds_and_releases", "status": "pass", "elapsed": 0.012741},
+    {"suite": "Actions", "case": "a_modifier_binding_matches_its_side", "status": "pass", "elapsed": 0.012704},
+    {"suite": "Actions", "case": "a_family_modifier_matches_either_side", "status": "pass", "elapsed": 0.012701},
+    {"suite": "Actions", "case": "a_more_specific_binding_wins", "status": "pass", "elapsed": 0.012717},
+    {"suite": "Actions", "case": "a_pure_modifier_binding_fires_while_it_is_held", "status": "pass", "elapsed": 0.012498},
+    {"suite": "Actions", "case": "a_key_binding_claims_the_modifier_of_a_pure_binding", "status": "pass", "elapsed": 0.012540},
+    {"suite": "Actions", "case": "two_actions_share_one_mask", "status": "pass", "elapsed": 0.012680},
+    {"suite": "Actions", "case": "two_masks_share_one_action", "status": "pass", "elapsed": 0.012860},
+    {"suite": "Actions", "case": "rebinding_moves_the_action_to_another_key", "status": "pass", "elapsed": 0.011888},
+    {"suite": "Actions", "case": "unbinding_releases_the_action", "status": "pass", "elapsed": 0.011866},
+    {"suite": "Actions", "case": "a_disabled_map_stops_its_bindings", "status": "pass", "elapsed": 0.011610},
+    {"suite": "Actions", "case": "a_key_pair_on_a_map_binds_an_action", "status": "pass", "elapsed": 0.011934},
+    {"suite": "Actions", "case": "emitting_fires_an_action_without_a_key", "status": "pass", "elapsed": 0.011645},
+    {"suite": "Actions", "case": "the_event_list_holds_the_phases_of_the_frame", "status": "pass", "elapsed": 0.011817},
+    {"suite": "Actions", "case": "a_script_authors_the_map", "status": "pass", "elapsed": 0.011865},
+    {"suite": "Actions", "case": "the_scene_map_binds_its_actions", "status": "pass", "elapsed": 0.012481}
+  ]
+}

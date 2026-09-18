@@ -137,6 +137,11 @@ filled in OnLoad from the OS events the platform layer queues and from injected 
 which are indistinguishable from real input; key codes are ASCII where possible and are
 exported as script constants under `keys` (`keys.W`, `keys.MouseLeft`).
 
+`apps/box_app/etc/scenes/input_map.flecs` is the action layer map: actions are entities
+under the `actions` scope with an `InputAction`, an entity with `InputMap` binds them with
+`(keys.W, actions.Forward)` pairs or with `Binding` children that carry a full key mask
+like `keys.Ctrl|keys.S`, and a UI button or a command fires the same action without a key.
+
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
 rasterization and light baking stay off the frame; `JobStats` reports the queue.
