@@ -189,6 +189,28 @@
                 "teardown": true
             },
             {
+                "id": "Tiling",
+                "testcases": [
+                    "component_defaults",
+                    "untiled_instance_is_the_identity",
+                    "transform_reaches_the_instance",
+                    "box_projection_tiles_every_face",
+                    "cylinder_projection_tiles_the_circumference",
+                    "radial_projection_tiles_radius_and_arc",
+                    "meters_projection_stretches_the_mesh_uv",
+                    "fit_rounds_the_tile_count",
+                    "partial_tiles_keep_the_fraction",
+                    "min_tiles_raises_the_count",
+                    "wrap_mode_reaches_the_instance",
+                    "mirror_wrap_folds_the_uv",
+                    "clamp_wrap_holds_the_range",
+                    "inherited_from_a_prefab",
+                    "scale_change_updates_the_tiling"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Movement",
                 "testcases": [
                     "velocity_integrates_position",
