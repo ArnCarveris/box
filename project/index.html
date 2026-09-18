@@ -208,7 +208,9 @@ aside h2, .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing
 <div class="tooltip" id="tooltip"></div>
 
 <script>
-const state = { data: null, epic: null, view: "board", zoom: 6, item: null };
+const state = { data: null, epic: null, view: "board", zoom: 6, item: null, scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0 } };
+const UI_KEY = "box-ui:" + location.pathname;
+let saveTimer = 0, restoring = false;
 const ICONS = {
   complete: '<svg viewBox="0 0 10 10"><path d="M1.5 5.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   "in progress": '<svg viewBox="0 0 10 10"><path d="M2 1.5v7l6-3.5z" fill="currentColor"/></svg>',
@@ -226,6 +228,51 @@ const dur = (a, b) => {
   if (h < 48) return h.toFixed(1) + "h";
   return (h / 24).toFixed(1) + "d";
 };
+
+function saveUi() {
+  try {
+    localStorage.setItem(UI_KEY, JSON.stringify({
+      view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
+    }));
+  } catch (e) {}
+}
+
+function saveSoon() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveUi, 200);
+}
+
+function loadUi() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(UI_KEY) || "null"); } catch (e) {}
+  if (!saved) return;
+  if (saved.view === "board" || saved.view === "timeline") state.view = saved.view;
+  if (saved.epic) state.epic = saved.epic;
+  if (saved.item) state.item = saved.item;
+  if (saved.zoom > 0) state.zoom = saved.zoom;
+  if (saved.scroll) Object.assign(state.scroll, saved.scroll);
+}
+
+function applyView() {
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+  document.getElementById("board").hidden = state.view !== "board";
+  document.getElementById("timeline").hidden = state.view !== "timeline";
+}
+
+function trackScroll(el, key) {
+  el.onscroll = () => {
+    if (restoring) return;
+    state.scroll[key] = el.scrollTop;
+    saveSoon();
+  };
+}
+
+function restoreScroll(el, top, left) {
+  restoring = true;
+  el.scrollTop = top;
+  if (left != null) el.scrollLeft = left;
+  requestAnimationFrame(() => { restoring = false; });
+}
 
 function chip(status) {
   return `<span class="chip ${cls(status)}">${ICONS[status] || ""}${esc(status)}</span>`;
@@ -304,6 +351,7 @@ function renderEpics() {
     </button>`;
   }).join("") || `<div class="empty-state">No epics yet</div>`;
   el.querySelectorAll(".epic").forEach(b => b.onclick = () => { state.epic = b.dataset.epic; render(); });
+  restoreScroll(document.querySelector("aside"), state.scroll.aside);
 }
 
 function renderBoard() {
@@ -334,9 +382,11 @@ function renderBoard() {
     </div>`;
   board.innerHTML = epicCard + (cards.join("") || `<div class="empty-state">No tasks yet</div>`);
   board.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
+  restoreScroll(document.getElementById("content"), state.scroll.content);
 }
 
 function openPanel(path) {
+  if (path !== state.item) state.scroll.panel = 0;
   state.item = path;
   const item = findItem(path);
   const panel = document.getElementById("panel");
@@ -363,7 +413,9 @@ function openPanel(path) {
     ${item.children.length ? `<h2>${item.children[0].level}s</h2><ul class="subtasks">${item.children.map(s => `
       <li class="${cls(s.status)}" data-item="${esc(s.path)}"><span class="dot ${cls(s.status)}"></span><span class="t">${esc(s.readme.title || s.name)}</span><time>${s.start_time ? dur(s.start_time, s.end_time) : ""}</time></li>`).join("")}</ul>` : ""}`;
   panel.classList.add("open");
-  document.getElementById("close").onclick = () => { state.item = null; panel.classList.remove("open"); };
+  restoreScroll(panel, state.scroll.panel);
+  saveSoon();
+  document.getElementById("close").onclick = () => { state.item = null; state.scroll.panel = 0; panel.classList.remove("open"); saveUi(); };
   panel.querySelectorAll("[data-item]").forEach(el => el.onclick = () => openPanel(el.dataset.item));
   const readme = item.deliverables.find(d => /readme\.md$/i.test(d.name));
   if (readme) fetch(readme.url).then(r => r.text()).then(t => {
@@ -413,11 +465,25 @@ function renderTimeline() {
     </div>`;
   const scroll = document.getElementById("tl-scroll");
   const labels = document.getElementById("tl-label-rows");
-  scroll.onscroll = () => { labels.style.transform = `translateY(${-scroll.scrollTop}px)`; };
-  document.getElementById("zoom-in").onclick = () => { state.zoom = Math.min(120, state.zoom * 1.5); renderTimeline(); };
-  document.getElementById("zoom-out").onclick = () => { state.zoom = Math.max(1, state.zoom / 1.5); renderTimeline(); };
+  scroll.onscroll = () => {
+    labels.style.transform = `translateY(${-scroll.scrollTop}px)`;
+    if (restoring) return;
+    state.scroll.tlx = scroll.scrollLeft;
+    state.scroll.tly = scroll.scrollTop;
+    saveSoon();
+  };
+  const rezoom = z => {
+    state.scroll.tlx *= z / state.zoom;
+    state.zoom = z;
+    renderTimeline();
+    saveUi();
+  };
+  document.getElementById("zoom-in").onclick = () => rezoom(Math.min(120, state.zoom * 1.5));
+  document.getElementById("zoom-out").onclick = () => rezoom(Math.max(1, state.zoom / 1.5));
   document.getElementById("zoom-now").onclick = () => { scroll.scrollLeft = x(now) - scroll.clientWidth * .7; };
-  scroll.scrollLeft = Math.max(0, x(now) - scroll.clientWidth * .7);
+  if (state.scroll.tlx || state.scroll.tly) restoreScroll(scroll, state.scroll.tly, state.scroll.tlx);
+  else scroll.scrollLeft = Math.max(0, x(now) - scroll.clientWidth * .7);
+  labels.style.transform = `translateY(${-scroll.scrollTop}px)`;
   const tip = document.getElementById("tooltip");
   tl.querySelectorAll("[data-item]").forEach(el => {
     el.onclick = () => openPanel(el.dataset.item);
@@ -438,10 +504,10 @@ function render() {
   }
   renderHeader();
   renderEpics();
-  document.getElementById("board").hidden = state.view !== "board";
-  document.getElementById("timeline").hidden = state.view !== "timeline";
+  applyView();
   if (state.view === "board") renderBoard(); else renderTimeline();
   if (state.item) openPanel(state.item);
+  saveUi();
 }
 
 async function refresh() {
@@ -455,8 +521,10 @@ async function refresh() {
 }
 
 document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x === b));
-  state.view = b.dataset.view; render();
+  state.view = b.dataset.view;
+  applyView();
+  render();
+  saveSoon();
 });
 document.getElementById("theme").onclick = () => {
   const cur = document.documentElement.dataset.theme;
@@ -467,12 +535,19 @@ document.getElementById("theme").onclick = () => {
 try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 function applyHash() {
   const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get("view")) { state.view = h.get("view"); document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x.dataset.view === state.view)); }
+  if (h.get("view")) state.view = h.get("view");
   if (h.get("epic")) state.epic = h.get("epic");
   if (h.get("item")) state.item = h.get("item");
+  applyView();
   render();
 }
+loadUi();
+applyView();
+trackScroll(document.getElementById("content"), "content");
+trackScroll(document.querySelector("aside"), "aside");
+trackScroll(document.getElementById("panel"), "panel");
 window.onhashchange = applyHash;
+window.addEventListener("pagehide", saveUi);
 applyHash();
 refresh();
 setInterval(refresh, 5000);
