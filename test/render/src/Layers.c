@@ -103,7 +103,7 @@ void Layers_registration_produces_the_ordered_command(void)
 
     test_int(layers[0].order, 0);
     test_int(layers[3].order, 30);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 1);
     box_shader_cmd_t *cmd = box_vec_at(&packet.shader_create, 0);
     test_uint(cmd->handle, BOX_SHADER_MESH);
     test_assert(strstr(cmd->source, "fn layer_3(") != NULL);
@@ -118,7 +118,7 @@ void Layers_command_is_sent_once(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 1);
 
     uint32_t i;
     for (i = 0; i < packet.shader_create.count; i ++) {
@@ -164,7 +164,7 @@ void Layers_unregistration_renumbers_and_resends(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 1);
     test_int(box_instance_layers(&((box_static_update_t*)box_vec_at(&packet.static_updates,
         0))->data), 1u << 2);
 

@@ -163,8 +163,12 @@ fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
 
 #include "generated/layers.wgsl"
 
-@fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)
-    -> @location(0) vec4<f32> {
+struct MeshOut {
+  @location(0) color: vec4<f32>,
+  @location(1) normal: vec4<f32>,
+};
+
+fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>) -> vec4<f32> {
   let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);
   let uv = wrap_uv(in.uv_mode, projected);
   let dp1 = dpdx(in.world_pos);
@@ -262,6 +266,21 @@ fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
     color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
     spec = pow(max(spec, vec3(0.0)), vec3(1.0 / 2.2));
   }
+  *out_normal = sn;
   return resolve(color, spec, s.albedo, s.alpha, in.clip.xy, roughness, sn, v,
     blend);
+}
+
+@fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)
+    -> @location(0) vec4<f32> {
+  var normal = vec3<f32>(0.0);
+  return mesh_shade(in, front, &normal);
+}
+
+@fragment fn fs_normal(in: VertexOut, @builtin(front_facing) front: bool) -> MeshOut {
+  var normal = vec3<f32>(0.0);
+  var out: MeshOut;
+  out.color = mesh_shade(in, front, &normal);
+  out.normal = vec4(normalize(normal) * 0.5 + vec3(0.5), 1.0);
+  return out;
 }

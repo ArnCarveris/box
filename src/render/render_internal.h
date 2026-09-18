@@ -94,6 +94,7 @@ typedef struct RenderState {
     ecs_vec_t sort_tmp;       /**< Scratch of the radix sort, reused every frame */
     ecs_vec_t view_list;      /**< box_view_src_t of the views of this frame */
     ecs_vec_t view_env;       /**< box_view_env_t of the previous packet, per view index */
+    ecs_vec_t view_clip;      /**< mat4 world to clip of the previous packet, per view index */
     ecs_vec_t dead_targets;   /**< uint32_t render target handles waiting for the next packet */
     uint32_t target_count;    /**< Render target handles handed out so far */
     int32_t view_count;       /**< View entities the world holds */

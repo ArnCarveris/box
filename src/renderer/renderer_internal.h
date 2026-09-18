@@ -28,6 +28,15 @@
 /** Edge length of the split sum BRDF lookup texture */
 #define BOX_ENV_BRDF_SIZE (64)
 
+/** Intermediate targets the post process passes of a frame share */
+#define BOX_EFFECT_POOL_MAX (8)
+
+/** Byte stride between two post process uniforms, the alignment a dynamic offset needs */
+#define BOX_EFFECT_UNIFORM_STRIDE (256)
+
+/** Format of the motion vector target, which holds a signed uv delta per texel */
+#define BOX_EFFECT_MOTION_FORMAT (WGPUTextureFormat_RG16Float)
+
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
 
@@ -307,6 +316,34 @@ typedef struct box_capture_t {
 } box_capture_t;
 #endif
 
+/** Intermediate color target the post process passes share */
+typedef struct box_gpu_pool_t {
+    WGPUTexture texture; /**< The target, NULL until the entry is first used */
+    WGPUTextureView view; /**< View of the target */
+    uint32_t width;      /**< Width in pixels */
+    uint32_t height;     /**< Height in pixels */
+    WGPUTextureFormat format; /**< Format of the target */
+    bool in_use;         /**< A pass of the current view holds it */
+} box_gpu_pool_t;
+
+/** Pipeline of one effect shader, built the first time the pass runs */
+typedef struct box_gpu_effect_t {
+    WGPURenderPipeline pipeline; /**< The pass pipeline, NULL when it did not compile */
+    bool tried;                  /**< The source was compiled once already */
+} box_gpu_effect_t;
+
+/** Uniform block of one post process pass */
+typedef struct box_effect_uniform_t {
+    float params[BOX_EFFECT_PARAM_MAX]; /**< Parameters of its parameter component */
+    float size[4];                      /**< Target width, height and their reciprocals */
+} box_effect_uniform_t;
+
+/** Uniform block of the motion vector pass */
+typedef struct box_motion_uniform_t {
+    float inv_clip[16];  /**< Clip to world of this frame */
+    float prev_clip[16]; /**< World to clip of the previous frame */
+} box_motion_uniform_t;
+
 /** Everything the renderer needs to produce frames */
 struct box_renderer_t {
     box_renderer_desc_t desc;        /**< Creation parameters */
@@ -330,9 +367,29 @@ struct box_renderer_t {
     WGPURenderPipeline blur_down;    /**< Thirteen tap downsample of a level into the next */
     WGPURenderPipeline blur_up;      /**< Eight tap tent upsample, mixed into the level above */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
-    char *shader_src[BOX_SHADER_BUILTIN_MAX]; /**< Preprocessed WGSL of every builtin slot */
+    box_vec_t shaders;               /**< char* of the preprocessed WGSL, indexed by handle */
+    box_gpu_pool_t pool[BOX_EFFECT_POOL_MAX]; /**< Intermediate targets the passes share */
+    box_gpu_pool_t *effect_scene;    /**< Target the passes of the current view read first */
+    box_gpu_pool_t *effect_normal;   /**< World normal target of the current view, or NULL */
+    box_gpu_pool_t *effect_motion;   /**< Motion vector target of the current view, or NULL */
+    uint32_t effect_run[BOX_EFFECT_MAX]; /**< Passes of the current view that have a pipeline */
+    uint32_t effect_run_count;       /**< Passes in that list */
     bool shader_failed;              /**< A shader did not compile and was already reported */
     bool initialized;                /**< The pipelines were built from the builtin sources */
+    WGPURenderPipeline normal_pipeline; /**< Mesh pipeline that also writes world normals */
+    box_vec_t effect_pipelines;      /**< box_gpu_effect_t indexed by shader handle */
+    WGPUBindGroupLayout effect_layout;  /**< Uniforms, inputs and sampler of an effect pass */
+    WGPUPipelineLayout effect_pipeline_layout; /**< Pipeline layout of every effect pass */
+    WGPUSampler effect_sampler;      /**< Linear clamped sampler the passes read through */
+    WGPUBuffer effect_uniform;       /**< Parameters of the passes, one dynamic slot each */
+    uint32_t effect_uniform_slots;   /**< Slots the parameter buffer holds */
+    WGPUTexture effect_dummy;        /**< One texel color target bound to unused inputs */
+    WGPUTextureView effect_dummy_view; /**< View of that texture */
+    WGPUTexture effect_depth_dummy;  /**< One texel depth target bound to an unused input */
+    WGPUTextureView effect_depth_dummy_view; /**< View of that texture */
+    WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
+    WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
+    WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
@@ -918,6 +975,78 @@ bool box_shader_ready(
  */
 void box_shader_fini(
     box_renderer_t *r);
+
+/** Create the bind group layouts, sampler and dummies of the post process passes.
+ *
+ * @param r The renderer
+ */
+void box_effect_init(
+    box_renderer_t *r);
+
+/** Release the pipelines, the target pool and the resources of the passes.
+ *
+ * @param r The renderer
+ */
+void box_effect_fini(
+    box_renderer_t *r);
+
+/** Drop the cached pipeline of a shader handle so the next pass rebuilds it.
+ *
+ * @param r The renderer
+ * @param handle The shader handle
+ */
+void box_effect_invalidate(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Size the uniform buffer of the passes for a packet.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_effect_frame(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Take the targets the chain of a view needs and count the passes that can run.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @return The number of passes that will run, 0 when the view draws directly
+ */
+uint32_t box_effect_prepare(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p);
+
+/** Record the pass that writes the motion vectors of a view.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param index Index of the view in the packet
+ * @param encoder The command encoder
+ */
+void box_effect_motion(
+    box_renderer_t *r,
+    const box_view_t *view,
+    uint32_t index,
+    WGPUCommandEncoder encoder);
+
+/** Record the chain of a view and release the targets it took.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @param encoder The command encoder
+ * @param dst The render target view the last pass writes
+ */
+void box_effect_run(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView dst);
 
 /** Create the resource tables that do not need a shader to exist.
  *

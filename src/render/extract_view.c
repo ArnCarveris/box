@@ -7,6 +7,7 @@
  */
 
 #include "render_internal.h"
+#include "../effects/effects_internal.h"
 #include <stdlib.h>
 
 /** Degrees in one radian, the unit the camera field of view is given in */
@@ -479,6 +480,39 @@ static void box_view_cull(
     v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
+/** Fill the reprojection matrices a motion vector pass of a view reads.
+ *
+ * The previous world to clip of a view is kept per view index, so a view that
+ * appears for the first time reports no motion instead of a jump. Only a chain
+ * that asked for motion pays for the inverse, so a view without one does not.
+ *
+ * @param state The registry
+ * @param index Index of the view in the packet
+ * @param v The view to fill
+ */
+static void box_view_motion(
+    RenderState *state,
+    int32_t index,
+    box_view_t *v)
+{
+    mat4 view;
+    mat4 proj;
+    memcpy(view.v, v->view, sizeof(view.v));
+    memcpy(proj.v, v->proj, sizeof(proj.v));
+    mat4 clip = mat4_mul(&proj, &view);
+    mat4 inverse = mat4_inverse(&clip);
+    memcpy(v->inv_clip, inverse.v, sizeof(inverse.v));
+
+    while (ecs_vec_count(&state->view_clip) <= index) {
+        mat4 *created = ecs_vec_append_t(NULL, &state->view_clip, mat4);
+        *created = clip;
+    }
+
+    mat4 *stored = ecs_vec_get_t(&state->view_clip, mat4, index);
+    memcpy(v->prev_clip, stored->v, sizeof(stored->v));
+    *stored = clip;
+}
+
 /** Fill one view of the packet from its view entity and its camera.
  *
  * @param world The world
@@ -507,6 +541,11 @@ static void box_view_fill(
     box_view_environment(world, state, src->entity, index, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
     box_render_extract_transparent(world, state, p, v);
+    box_effects_extract(world, src->entity, p, v);
+    if (v->effect_inputs & BOX_EFFECT_MOTION) {
+        box_view_motion(state, index, v);
+    }
+
     v->dynamic_first = 0;
     if (state->layer_used) {
         v->dynamic_first = p->dynamic_batches.count;

@@ -94,8 +94,32 @@
 /** Shader slot of the blur chain of the background copy */
 #define BOX_SHADER_BLUR (11)
 
+/** Shader slot of the pass that writes the motion vectors of a view */
+#define BOX_SHADER_MOTION (12)
+
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (12)
+#define BOX_SHADER_BUILTIN_MAX (13)
+
+/** Floats the parameter block of a post process effect holds */
+#define BOX_EFFECT_PARAM_MAX (16)
+
+/** Vectors the parameter block of a post process effect holds */
+#define BOX_EFFECT_PARAM_VECS (BOX_EFFECT_PARAM_MAX / 4)
+
+/** Effects one view can chain */
+#define BOX_EFFECT_MAX (8)
+
+/** The pass reads the image the view rendered */
+#define BOX_EFFECT_COLOR (1u)
+
+/** The pass reads the depth target of the view */
+#define BOX_EFFECT_DEPTH (2u)
+
+/** The pass reads the world normals the mesh pass wrote */
+#define BOX_EFFECT_NORMALS (4u)
+
+/** The pass reads the motion vectors of the view */
+#define BOX_EFFECT_MOTION (8u)
 
 /** Shader handle of a shader that has none yet, which asks for a new one */
 #define BOX_SHADER_NONE (0xFFFFFFFFu)
@@ -283,6 +307,11 @@ typedef struct box_view_t {
     uint32_t translucent_count; /**< Sorted draws of the view that read the background copy */
     uint32_t shadows;       /**< The view casts and receives shadows */
     uint32_t effects;       /**< The view runs its post process effects */
+    uint32_t effect_first;  /**< First pass of its chain in the packet effect array */
+    uint32_t effect_count;  /**< Passes of its chain */
+    uint32_t effect_inputs; /**< BOX_EFFECT bits the passes of its chain need */
+    float inv_clip[16];     /**< Clip to world of this frame, for the motion pass */
+    float prev_clip[16];    /**< World to clip of the previous frame of the view */
     int32_t priority;       /**< Order in the frame, lower renders first */
     uint32_t layer_mask;    /**< Layers the view shows, BOX_VIEW_LAYER_ALL for every layer */
     uint32_t caster_mask;   /**< Layers that cast its shadows, BOX_VIEW_LAYER_ALL for all */
@@ -362,6 +391,36 @@ typedef struct box_mesh_cmd_t {
     float bounds_min[3];    /**< Local bounds minimum of the unscaled mesh */
     float bounds_max[3];    /**< Local bounds maximum of the unscaled mesh */
 } box_mesh_cmd_t;
+
+/** One post process pass of a view, in the order the chain runs them */
+typedef struct box_effect_t {
+    uint32_t shader;  /**< Shader handle of the pass */
+    uint32_t inputs;  /**< BOX_EFFECT bits of the inputs the pass declared */
+    float scale;      /**< Resolution scale of its output, 1 for the view size */
+    float params[BOX_EFFECT_PARAM_MAX]; /**< Uniform block of its parameter component */
+} box_effect_t;
+
+/** Size of an intermediate target at a resolution scale.
+ *
+ * @param width Width of the view in pixels
+ * @param height Height of the view in pixels
+ * @param scale Resolution scale, 0 and 1 both keep the view size
+ * @param out_width Receives the width, never 0
+ * @param out_height Receives the height, never 0
+ */
+static inline void box_effect_size(
+    uint32_t width,
+    uint32_t height,
+    float scale,
+    uint32_t *out_width,
+    uint32_t *out_height)
+{
+    float s = scale > 0.0f ? scale : 1.0f;
+    uint32_t w = (uint32_t)((float)width * s + 0.5f);
+    uint32_t h = (uint32_t)((float)height * s + 0.5f);
+    *out_width = w ? w : 1;
+    *out_height = h ? h : 1;
+}
 
 /** WGSL module to compile, the renderer takes ownership of the source */
 typedef struct box_shader_cmd_t {
@@ -669,6 +728,7 @@ typedef struct box_packet_t {
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
     box_vec_t transparent;                   /**< box_transparent_t, sorted back to front */
+    box_vec_t effects;                       /**< box_effect_t of the chain of every view */
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
     box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
@@ -697,6 +757,7 @@ static inline void box_packet_init(
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
     box_vec_init(&p->transparent, sizeof(box_transparent_t));
+    box_vec_init(&p->effects, sizeof(box_effect_t));
     box_vec_init(&p->lights, sizeof(box_light_t));
     box_vec_init(&p->bake_lights, sizeof(box_light_t));
     box_vec_init(&p->emitters, sizeof(box_emitter_t));
@@ -731,6 +792,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
     box_vec_clear(&p->transparent);
+    box_vec_clear(&p->effects);
     box_vec_clear(&p->lights);
     box_vec_clear(&p->bake_lights);
     box_vec_clear(&p->emitters);
@@ -757,6 +819,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
     box_vec_fini(&p->transparent);
+    box_vec_fini(&p->effects);
     box_vec_fini(&p->lights);
     box_vec_fini(&p->bake_lights);
     box_vec_fini(&p->emitters);

@@ -96,6 +96,12 @@
                     "fit_cascades",
                     "casters_100k"
                 ]
+            },
+            {
+                "id": "Effects",
+                "benchcases": [
+                    "extract_chain"
+                ]
             }
         ]
     }

@@ -46,8 +46,8 @@ const char* box_shader_source(
     uint32_t handle)
 {
     const char *result = NULL;
-    if (handle < BOX_SHADER_BUILTIN_MAX) {
-        result = r->shader_src[handle];
+    if (handle < r->shaders.count) {
+        result = *(char**)box_vec_at(&r->shaders, handle);
     }
 
     return result;
@@ -56,10 +56,10 @@ const char* box_shader_source(
 bool box_shader_ready(
     box_renderer_t *r)
 {
-    bool result = true;
+    bool result = r->shaders.count >= BOX_SHADER_BUILTIN_MAX;
     uint32_t i;
     for (i = 0; i < BOX_SHADER_BUILTIN_MAX && result; i ++) {
-        result = r->shader_src[i] != NULL;
+        result = *(char**)box_vec_at(&r->shaders, i) != NULL;
     }
 
     return result;
@@ -112,6 +112,7 @@ static void box_shader_rebuild(
     case BOX_SHADER_BAKE_GRID:
     case BOX_SHADER_BAKE: box_bake_fini(r); box_bake_init(r); break;
     case BOX_SHADER_BLUR: box_transparent_fini(r); box_transparent_init(r); break;
+    case BOX_SHADER_MOTION: box_effect_fini(r); box_effect_init(r); break;
     default: break;
     }
 
@@ -123,20 +124,29 @@ void box_shader_apply(
     box_renderer_t *r,
     const box_packet_t *p)
 {
+    if (!r->shaders.size) {
+        box_vec_init(&r->shaders, sizeof(char*));
+    }
+
     uint32_t i;
     for (i = 0; i < p->shader_create.count; i ++) {
         box_shader_cmd_t *cmd = box_vec_at(&p->shader_create, i);
-        if (cmd->handle >= BOX_SHADER_BUILTIN_MAX) {
-            free(cmd->source);
-            cmd->source = NULL;
+        while (r->shaders.count <= cmd->handle) {
+            *(char**)box_vec_push(&r->shaders) = NULL;
+        }
+
+        char **slot = box_vec_at(&r->shaders, cmd->handle);
+        free(*slot);
+        *slot = cmd->source;
+        cmd->source = NULL;
+        if (!r->initialized) {
             continue;
         }
 
-        free(r->shader_src[cmd->handle]);
-        r->shader_src[cmd->handle] = cmd->source;
-        cmd->source = NULL;
-        if (r->initialized) {
+        if (cmd->handle < BOX_SHADER_BUILTIN_MAX) {
             box_shader_rebuild(r, cmd->handle);
+        } else {
+            box_effect_invalidate(r, cmd->handle);
         }
     }
 }
@@ -145,8 +155,9 @@ void box_shader_fini(
     box_renderer_t *r)
 {
     uint32_t i;
-    for (i = 0; i < BOX_SHADER_BUILTIN_MAX; i ++) {
-        free(r->shader_src[i]);
-        r->shader_src[i] = NULL;
+    for (i = 0; i < r->shaders.count; i ++) {
+        free(*(char**)box_vec_at(&r->shaders, i));
     }
+
+    box_vec_fini(&r->shaders);
 }

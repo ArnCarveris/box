@@ -141,6 +141,27 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Effects",
+                "testcases": [
+                    "builtin_grade_is_off_by_default",
+                    "chain_runs_in_order",
+                    "disabled_effect_is_skipped",
+                    "enabling_an_effect_rebuilds_the_chain",
+                    "effect_without_a_shader_is_skipped",
+                    "view_list_overrides_the_stack",
+                    "view_without_a_list_runs_the_stack",
+                    "view_toggle_skips_the_chain",
+                    "inputs_are_the_union_of_the_passes",
+                    "disabled_pass_does_not_ask_for_its_inputs",
+                    "parameters_come_from_the_parameter_component",
+                    "two_passes_of_one_scale_share_a_target_size",
+                    "half_scale_pass_asks_for_half_the_target",
+                    "two_views_keep_their_own_range"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

@@ -159,6 +159,94 @@ void box_frame_init(
     r->mesh_layout = wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
     r->pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
         true, NULL);
+    box_effect_init(r);
+}
+
+/** Mesh pipeline that writes the world normals into a second color attachment.
+ *
+ * The variant is built the first time a chain asks for normals and kept until the
+ * mesh shader changes, because a scene without such an effect never needs it.
+ *
+ * @param r The renderer
+ * @return The pipeline, NULL when the mesh shader has no normal stage
+ */
+static WGPURenderPipeline box_frame_normal_pipeline(
+    box_renderer_t *r)
+{
+    if (r->normal_pipeline) {
+        goto done;
+    }
+
+    WGPUVertexAttribute vertex_attrs[4] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
+        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
+            .shaderLocation = 12 }
+    };
+    WGPUVertexAttribute instance_attrs[9] = {
+        { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 },
+        { .format = WGPUVertexFormat_Uint32x2, .offset = 96, .shaderLocation = 9 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = 104, .shaderLocation = 10 },
+        { .format = WGPUVertexFormat_Uint32, .offset = 120, .shaderLocation = 11 }
+    };
+    WGPUVertexBufferLayout layouts[2] = {
+        {
+            .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = 4,
+            .attributes = vertex_attrs
+        }, {
+            .arrayStride = sizeof(box_instance_t),
+            .stepMode = WGPUVertexStepMode_Instance,
+            .attributeCount = 9,
+            .attributes = instance_attrs
+        }
+    };
+    WGPUColorTargetState targets[2] = {
+        { .format = r->format, .writeMask = WGPUColorWriteMask_All },
+        { .format = r->format, .writeMask = WGPUColorWriteMask_All }
+    };
+    WGPUFragmentState fragment = {
+        .module = r->mesh_shader,
+        .entryPoint = { .data = "fs_normal", .length = WGPU_STRLEN },
+        .targetCount = 2,
+        .targets = targets
+    };
+    WGPUDepthStencilState depth = {
+        .format = WGPUTextureFormat_Depth32Float,
+        .depthWriteEnabled = WGPUOptionalBool_True,
+        .depthCompare = WGPUCompareFunction_Greater,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always },
+        .stencilReadMask = 0xFFFFFFFF,
+        .stencilWriteMask = 0xFFFFFFFF
+    };
+    WGPURenderPipelineDescriptor desc = {
+        .layout = r->mesh_layout,
+        .vertex = {
+            .module = r->mesh_shader,
+            .entryPoint = { .data = "vs_main", .length = WGPU_STRLEN },
+            .bufferCount = 2,
+            .buffers = layouts
+        },
+        .fragment = &fragment,
+        .depthStencil = &depth,
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_TriangleList,
+            .cullMode = WGPUCullMode_Back,
+            .frontFace = WGPUFrontFace_CW
+        },
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF }
+    };
+    r->normal_pipeline = wgpuDeviceCreateRenderPipeline(r->device, &desc);
+done:
+    return r->normal_pipeline;
 }
 
 bool box_frame_rebuild(
@@ -180,6 +268,11 @@ bool box_frame_rebuild(
         box_transparent_reset(r);
         wgpuRenderPipelineRelease(r->pipeline);
         wgpuShaderModuleRelease(previous);
+        if (r->normal_pipeline) {
+            wgpuRenderPipelineRelease(r->normal_pipeline);
+            r->normal_pipeline = NULL;
+        }
+
         r->pipeline = pipeline;
     } else {
         r->mesh_shader = previous;
@@ -328,24 +421,36 @@ static void box_frame_uncovered(
     box_hiz_build(r, encoder);
     box_hiz_dispatch(r, encoder, BOX_HIZ_PASS_NEW);
 
-    WGPURenderPassColorAttachment color = {
-        .view = attachment,
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = WGPULoadOp_Load,
-        .storeOp = WGPUStoreOp_Store
+    WGPURenderPassColorAttachment color[2] = {
+        {
+            .view = attachment,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .loadOp = WGPULoadOp_Load,
+            .storeOp = WGPUStoreOp_Store
+        }
     };
+    uint32_t attachments = 1;
+    if (r->effect_normal) {
+        color[1].view = r->effect_normal->view;
+        color[1].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+        color[1].loadOp = WGPULoadOp_Load;
+        color[1].storeOp = WGPUStoreOp_Store;
+        attachments = 2;
+    }
+
     WGPURenderPassDepthStencilAttachment depth = {
         .view = r->v->depth_view,
         .depthLoadOp = WGPULoadOp_Load,
         .depthStoreOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = {
-        .colorAttachmentCount = 1,
-        .colorAttachments = &color,
+        .colorAttachmentCount = attachments,
+        .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-    wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
+    wgpuRenderPassEncoderSetPipeline(pass,
+        attachments == 2 ? box_frame_normal_pipeline(r) : r->pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
@@ -403,6 +508,11 @@ static void box_frame_view(
 
     box_view_select(r, index);
     box_view_prepare(r, view);
+    uint32_t passes = box_effect_prepare(r, view, p);
+    if (passes && r->effect_scene) {
+        target = r->effect_scene->texture;
+    }
+
     box_transparent_needed(r, view);
     box_lights_update(r, view, p);
     box_frame_write_view(r, view);
@@ -419,14 +529,26 @@ static void box_frame_view(
     }
 
     WGPUTextureView attachment = wgpuTextureCreateView(target, NULL);
-    bool clear = box_frame_first_use(p, index);
-    WGPURenderPassColorAttachment color = {
-        .view = attachment,
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = clear ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .storeOp = WGPUStoreOp_Store,
-        .clearValue = { view->clear[0], view->clear[1], view->clear[2], view->clear[3] }
+    bool clear = passes ? true : box_frame_first_use(p, index);
+    WGPURenderPassColorAttachment color[2] = {
+        {
+            .view = attachment,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .loadOp = clear ? WGPULoadOp_Clear : WGPULoadOp_Load,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = { view->clear[0], view->clear[1], view->clear[2], view->clear[3] }
+        }
     };
+    uint32_t attachments = 1;
+    if (r->effect_normal) {
+        color[1].view = r->effect_normal->view;
+        color[1].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+        color[1].loadOp = WGPULoadOp_Clear;
+        color[1].storeOp = WGPUStoreOp_Store;
+        color[1].clearValue.a = 1.0;
+        attachments = 2;
+    }
+
     WGPURenderPassDepthStencilAttachment depth = {
         .view = r->v->depth_view,
         .depthLoadOp = WGPULoadOp_Clear,
@@ -434,12 +556,13 @@ static void box_frame_view(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor pass_desc = {
-        .colorAttachmentCount = 1,
-        .colorAttachments = &color,
+        .colorAttachmentCount = attachments,
+        .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
-    wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
+    wgpuRenderPassEncoderSetPipeline(pass,
+        attachments == 2 ? box_frame_normal_pipeline(r) : r->pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
@@ -459,6 +582,18 @@ static void box_frame_view(
 
     if (view->transparent_count) {
         box_frame_sorted(r, view, p, encoder, target, attachment);
+    }
+
+    if (passes) {
+        box_effect_motion(r, view, index, encoder);
+        WGPUTextureView final = wgpuTextureCreateView(surface, NULL);
+        if (view->target) {
+            wgpuTextureViewRelease(final);
+            final = wgpuTextureCreateView(box_target_get(r, view->target)->color, NULL);
+        }
+
+        box_effect_run(r, view, p, encoder, final);
+        wgpuTextureViewRelease(final);
     }
 
     wgpuTextureViewRelease(attachment);
@@ -514,6 +649,7 @@ void box_frame_render(
     box_cull_frame(r, p);
     box_shadow_frame(r, p);
     box_transparent_upload(r, p);
+    box_effect_frame(r, p);
 
     WGPUTexture surface = box_frame_target(r);
     if (!surface) {

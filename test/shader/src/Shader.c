@@ -114,7 +114,7 @@ void Shader_builtin_mesh_shader_reaches_the_packet(void)
     // effects/shader_component
     box_render_extract(w, &packet);
 
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 1);
     const char *source = shader_source(BOX_SHADER_MESH);
     test_assert(source != NULL);
     test_assert(strstr(source, "@vertex fn vs_main") != NULL);
@@ -163,7 +163,7 @@ void Shader_unchanged_shader_is_sent_once(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Shader, { .path = "etc/simple.wgsl" });
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 1);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + 2);
     shader_drain();
 
     box_render_extract(w, &packet);

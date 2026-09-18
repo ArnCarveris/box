@@ -33,7 +33,8 @@ static const box_shader_builtin_t box_shader_builtins[] = {
     { "env_filter", "etc/shaders/env_filter.wgsl", BOX_SHADER_ENV_FILTER },
     { "bake_grid", "etc/shaders/bake_grid.wgsl", BOX_SHADER_BAKE_GRID },
     { "bake", "etc/shaders/bake.wgsl", BOX_SHADER_BAKE },
-    { "blur", "etc/shaders/blur.wgsl", BOX_SHADER_BLUR }
+    { "blur", "etc/shaders/blur.wgsl", BOX_SHADER_BLUR },
+    { "motion", "etc/shaders/motion.wgsl", BOX_SHADER_MOTION }
 };
 
 /** Registry destructor releasing the sources that never reached a packet.

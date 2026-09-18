@@ -51,6 +51,7 @@ ECS_STRUCT(View, {
     ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
     ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
     ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
+    ecs_entity_t effect_list[8];   /**< Effects the view runs, empty runs the global stack */
     rgb clear;            /**< Color the target is cleared to */
     float clear_alpha;    /**< Alpha the target is cleared to */
     int32_t priority;     /**< Order in the frame, lower renders first */

@@ -29,6 +29,7 @@ static void box_view_ctor(
         v[i].target = 0;
         memset(v[i].layers, 0, sizeof(v[i].layers));
         memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
+        memset(v[i].effect_list, 0, sizeof(v[i].effect_list));
         v[i].clear.r = BOX_VIEW_CLEAR_R;
         v[i].clear.g = BOX_VIEW_CLEAR_G;
         v[i].clear.b = BOX_VIEW_CLEAR_B;

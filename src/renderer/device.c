@@ -296,8 +296,10 @@ void box_device_fini(
     box_cull_fini(r);
     box_shadow_fini(r);
     box_layers_fini(r);
+    box_effect_fini(r);
     box_shader_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
+    if (r->normal_pipeline) wgpuRenderPipelineRelease(r->normal_pipeline);
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);
     if (r->mesh_shader) wgpuShaderModuleRelease(r->mesh_shader);
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);
