@@ -1,0 +1,22 @@
+{
+  "project": "controller",
+  "timestamp": "2026-09-18T22:01:23Z",
+  "pass": 12,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.033914,
+  "tests": [
+    {"suite": "Person", "case": "the_module_binds_the_character_actions", "status": "pass", "elapsed": 0.016480},
+    {"suite": "Person", "case": "the_character_stands_at_eye_height", "status": "pass", "elapsed": 0.016552},
+    {"suite": "Person", "case": "gravity_pulls_the_character_down", "status": "pass", "elapsed": 0.017403},
+    {"suite": "Person", "case": "walking_moves_in_the_view_plane", "status": "pass", "elapsed": 0.016988},
+    {"suite": "Person", "case": "running_is_faster_than_walking", "status": "pass", "elapsed": 0.018025},
+    {"suite": "Person", "case": "a_jump_rises_and_lands", "status": "pass", "elapsed": 0.017153},
+    {"suite": "Person", "case": "a_jump_needs_the_ground", "status": "pass", "elapsed": 0.018158},
+    {"suite": "Person", "case": "crouching_lowers_the_eye", "status": "pass", "elapsed": 0.017763},
+    {"suite": "Person", "case": "the_fly_toggle_switches_to_free_flight", "status": "pass", "elapsed": 0.017303},
+    {"suite": "Person", "case": "the_terrain_sets_the_ground", "status": "pass", "elapsed": 0.016100},
+    {"suite": "Person", "case": "the_ground_height_holds_the_character", "status": "pass", "elapsed": 0.015556},
+    {"suite": "Person", "case": "the_controller_writes_orientation_and_lookat", "status": "pass", "elapsed": 0.015428}
+  ]
+}

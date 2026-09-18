@@ -151,7 +151,9 @@ and drags through them.
 `Right`, `Up`, `Down`, `Fast` and `Look` actions the module binds to WASD, QE, shift and the
 right mouse button under `box.input.map`; it writes `Position`, `Orientation` and `LookAt`,
 turns with the cursor while the surface captures it, and keeps `clearance` above the bounds of
-its `terrain` entity.
+its `terrain` entity. `FirstPersonController` walks the same actions in the XZ plane with a walk
+and a run speed, falls with gravity, jumps with `Jump`, lowers its eye with `Crouch` and toggles
+free flight with `Fly`; `test/integration/visual/first_person.flecs` stands it in a small level.
 
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
@@ -237,6 +239,41 @@ recomposed when a scene registers or removes a layer.
 
 `test/integration/visual/shader_macro.flecs` is the macro check: the same scene with
 `DEBUG_NORMALS=1` on the builtin mesh shader, which outputs world normals as color.
+
+## Post process effects
+
+An effect is an entity with an `Effect` component that names a `Shader`, an order, a
+resolution `scale` and the inputs its pass reads, plus a parameter component the
+engine copies into the uniform block the shader sees as `fx.params`:
+
+```
+using box.effects
+
+grade {
+  Effect: {shader: box.effects.shaders.color_grade, order: 100, enabled: true, color: true}
+  ColorGrade: {exposure: 0.7, saturation: 1.8}
+}
+```
+
+A view runs the effects its `effect_list` names, or every enabled effect of the world
+in `order` when the list is empty, and `View.effects: false` turns the chain off.
+Enabling or disabling an effect, changing its order or changing the list of a view
+reconfigures the chain on the next frame, because the chain is rebuilt during extract.
+
+The renderer runs the chain after the transparent pass and before the capture. A view
+with a chain draws into a pooled target instead of its own, the passes ping pong
+between pooled targets of the size their scale asks for and the last pass writes the
+image of the view; targets are handed back after the chain, so the passes of one view
+and the views of a frame share the same textures. The declared inputs decide what the
+frame produces: the depth target is bound as it is, the world normals come from a
+second color attachment the mesh pass writes through its `fs_normal` stage, and the
+motion vectors come from a pass that reprojects the depth with the view projection of
+the previous frame into an RG16F target. An input no enabled pass asks for costs
+nothing and binds a one texel dummy. `include/effect.wgsl` gives a pass its bindings,
+`fx_sample`, `fx_view_depth`, `fx_world_normal` and `fx_motion_vector`.
+
+`test/integration/visual/effect_toggle.flecs` is the effect check: the same scene with
+the color grade enabled, which is visibly brighter and more saturated.
 
 ## Benchmarks
 
