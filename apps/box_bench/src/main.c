@@ -240,11 +240,13 @@ int main(
 
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxJob);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxRender);
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxMovement);
+    ECS_IMPORT(world, BoxMonitor);
 
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
