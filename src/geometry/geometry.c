@@ -8,20 +8,24 @@
 
 /** Assign the cached mesh for a key to an entity with the given instance scale.
  *
- * @param world The world
+ * The mesh is set through the stage of the observer, because a shape that
+ * arrives with an instantiated prefab is set while the entity is being moved
+ * to its table, where a direct set would move it a second time.
+ *
+ * @param it The observer iterator
  * @param e The entity
  * @param key The mesh key
  * @param scale The instance scale
  */
 static void box_shape_apply(
-    ecs_world_t *world,
+    ecs_iter_t *it,
     ecs_entity_t e,
     const box_mesh_key_t *key,
     vec3 scale)
 {
     RenderMesh mesh = { .scale = scale };
-    mesh.handle = box_mesh_cache_get(world, key, &mesh.bounds_min, &mesh.bounds_max);
-    ecs_set_ptr(world, e, RenderMesh, &mesh);
+    mesh.handle = box_mesh_cache_get(it->world, key, &mesh.bounds_min, &mesh.bounds_max);
+    ecs_set_ptr(it->stage, e, RenderMesh, &mesh);
 }
 
 /** Key with only a kind, for unit shapes.
@@ -48,7 +52,7 @@ static void box_on_box(
     box_mesh_key_t key = box_key(BoxShapeBox);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(b[i].x, b[i].y, b[i].z));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(b[i].x, b[i].y, b[i].z));
     }
 }
 
@@ -63,7 +67,7 @@ static void box_on_quad(
     box_mesh_key_t key = box_key(BoxShapeQuad);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(q[i].x, q[i].y, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(q[i].x, q[i].y, 1));
     }
 }
 
@@ -78,7 +82,7 @@ static void box_on_rect(
     box_mesh_key_t key = box_key(BoxShapeQuad);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r[i].width, r[i].height, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r[i].width, r[i].height, 1));
     }
 }
 
@@ -93,7 +97,7 @@ static void box_on_triangle(
     box_mesh_key_t key = box_key(BoxShapeTriangle);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(t[i].x, t[i].y, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(t[i].x, t[i].y, 1));
     }
 }
 
@@ -108,7 +112,7 @@ static void box_on_right_triangle(
     box_mesh_key_t key = box_key(BoxShapeRightTriangle);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(t[i].x, t[i].y, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(t[i].x, t[i].y, 1));
     }
 }
 
@@ -123,7 +127,7 @@ static void box_on_triangle_prism(
     box_mesh_key_t key = box_key(BoxShapeTrianglePrism);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(t[i].x, t[i].y, t[i].z));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(t[i].x, t[i].y, t[i].z));
     }
 }
 
@@ -138,7 +142,7 @@ static void box_on_right_triangle_prism(
     box_mesh_key_t key = box_key(BoxShapeRightTrianglePrism);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(t[i].x, t[i].y, t[i].z));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(t[i].x, t[i].y, t[i].z));
     }
 }
 
@@ -154,7 +158,7 @@ static void box_on_ngon(
     for (i = 0; i < it->count; i ++) {
         box_mesh_key_t key = { .kind = BoxShapeNGon, .i0 = n[i].sides };
         float r = n[i].radius > 0 ? n[i].radius : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, 1));
     }
 }
 
@@ -170,7 +174,7 @@ static void box_on_sphere(
     for (i = 0; i < it->count; i ++) {
         box_mesh_key_t key = { .kind = BoxShapeSphere, .i0 = s[i].segments, .smooth = s[i].smooth };
         float r = s[i].radius > 0 ? s[i].radius : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, r));
     }
 }
 
@@ -188,7 +192,7 @@ static void box_on_hemisphere(
             .kind = BoxShapeHemiSphere, .i0 = s[i].segments, .smooth = s[i].smooth
         };
         float r = s[i].radius > 0 ? s[i].radius : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, r));
     }
 }
 
@@ -206,7 +210,7 @@ static void box_on_icosphere(
             .kind = BoxShapeIcoSphere, .i0 = s[i].segments, .smooth = s[i].smooth
         };
         float r = s[i].radius > 0 ? s[i].radius : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, r));
     }
 }
 
@@ -223,7 +227,7 @@ static void box_on_cone(
         box_mesh_key_t key = { .kind = BoxShapeCone, .i0 = c[i].segments, .smooth = c[i].smooth };
         float r = c[i].radius > 0 ? c[i].radius : 1.0f;
         float l = c[i].length > 0 ? c[i].length : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, l, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, l, r));
     }
 }
 
@@ -242,7 +246,7 @@ static void box_on_cylinder(
         };
         float r = c[i].radius > 0 ? c[i].radius : 1.0f;
         float l = c[i].length > 0 ? c[i].length : 1.0f;
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, l, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, l, r));
     }
 }
 
@@ -262,7 +266,7 @@ static void box_on_torus(
             .kind = BoxShapeTorus, .i0 = t[i].segments, .i1 = t[i].rings,
             .smooth = t[i].smooth, .f0 = tube / r
         };
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, r));
     }
 }
 
@@ -281,7 +285,7 @@ static void box_on_capsule(
             .kind = BoxShapeCapsule, .i0 = c[i].segments, .smooth = c[i].smooth,
             .f0 = c[i].length / r
         };
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, r, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, r, r));
     }
 }
 
@@ -302,7 +306,7 @@ static void box_on_tube(
             .kind = BoxShapeTube, .i0 = t[i].segments, .smooth = t[i].smooth,
             .f0 = thickness / r, .f1 = t[i].arc > 0 ? t[i].arc : 6.28318530f
         };
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(r, l, r));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(r, l, r));
     }
 }
 
@@ -322,7 +326,7 @@ static void box_on_frustum(
             .kind = BoxShapeFrustum, .i0 = f[i].segments, .smooth = f[i].smooth,
             .f0 = f[i].radius_top / rb
         };
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(rb, l, rb));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(rb, l, rb));
     }
 }
 
@@ -340,7 +344,7 @@ static void box_on_rounded_box(
             .kind = BoxShapeRoundedBox, .i0 = b[i].segments,
             .f0 = b[i].x, .f1 = b[i].y, .f2 = b[i].z, .f3 = b[i].radius
         };
-        box_shape_apply(it->world, it->entities[i], &key, vec3_new(1, 1, 1));
+        box_shape_apply(it, it->entities[i], &key, vec3_new(1, 1, 1));
     }
 }
 
