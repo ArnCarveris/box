@@ -22,7 +22,8 @@ bake3 run box_app --local-env -- --headless --frames 10    # headless run, exits
 
 Options: `--headless`, `--frames <n>`, `--timeout <s|infinite>`, `--cpu-budget <0..1>`,
 `--fps <n>`, `--port <n>` (command endpoints, default 27750, 0 disables the server).
-Headless runs require `--frames` or `--timeout`, write their temporary
+Headless runs step with a fixed delta of one over `--fps` (60 by default) so captures are
+deterministic, require `--frames` or `--timeout`, write their temporary
 files to `/tmp/box/<pid>` and refuse to start when the machine's load exceeds its
 core count. A scene that sets `Surface.write_to_file` writes each frame as PNG:
 

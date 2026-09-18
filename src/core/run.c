@@ -25,7 +25,13 @@ static void box_tick(
     box_loop_t *loop)
 {
     ecs_world_t *world = loop->world;
-    if (!ecs_progress(world, 0)) {
+    const App *cfg = ecs_singleton_get(world, App);
+    float delta = 0;
+    if (cfg->headless) {
+        delta = (float)(1.0 / (cfg->target_fps > 0 ? cfg->target_fps : 60.0));
+    }
+
+    if (!ecs_progress(world, delta)) {
         loop->done = true;
         goto done;
     }
