@@ -592,6 +592,8 @@ function renderBoard() {
 
 function closePanel() {
   panelKey = "";
+  const planSvg = document.getElementById("plan-svg");
+  if (planSvg) planHover(planSvg, null);
   const panel = document.getElementById("panel");
   panel.classList.remove("open");
   clearTimeout(panelTimer);
@@ -1765,9 +1767,15 @@ function bindPlan(el) {
   };
   svg.querySelectorAll("[data-node]").forEach(node => {
     node.addEventListener("mouseenter", () => planHover(svg, node.dataset.node));
-    node.addEventListener("mouseleave", () => planHover(svg, null));
-    node.onclick = () => openPanel(node.dataset.node);
+    node.addEventListener("mouseleave", () => planHover(svg, planSelected()));
+    node.onclick = () => { openPanel(node.dataset.node); planHover(svg, planSelected()); };
   });
+  planHover(svg, planSelected());
+}
+
+function planSelected() {
+  const svg = document.getElementById("plan-svg");
+  return state.item && svg && svg.querySelector(`[data-node="${CSS.escape(state.item)}"]`) ? state.item : null;
 }
 
 async function savePriority(name, value) {
@@ -1835,7 +1843,7 @@ function render() {
   else if (state.view === "plan") renderPlan();
   else if (state.view === "tests") renderTests();
   else renderBenchmarks();
-  if (state.item && (state.view === "board" || state.view === "timeline")) openPanel(state.item);
+  if (state.item && (state.view === "board" || state.view === "timeline" || state.view === "plan")) openPanel(state.item);
   else closePanel();
   saveUi();
 }
