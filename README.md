@@ -238,11 +238,23 @@ python3 project/pm.py status           # print the tree in the terminal
 
 Work is tracked as epics, tasks and subtasks under `project/db`. Each item has
 a `README.md` with its goal and a `progress.json` with its status and timing;
-tasks and epics keep test reports, screenshots and notes in `deliverable/`.
+tasks and epics keep test reports, screenshots and notes in `deliverable/`. An
+epic also has a `priority` in its `progress.json`, an integer that is 100 when
+missing and where lower runs first.
 
-The **Plan** tab draws the epics as a node diagram with their dependencies and a
-chain of order arrows from `project/db/plan.json`; dragging an arrow head onto an
-epic replans it after that epic with `POST /api/plan` (started epics stay first).
+The tool derives the execution order from that: a task is ready when every
+dependency is complete (an epic as a dependency counts as complete when that
+epic is), and among the ready tasks the one from the epic with the lowest
+priority goes first, then the oldest one. That order fills the **Next up** list
+on the board and sorts unstarted epics and tasks everywhere the page lists them.
+
+The **Plan** tab draws one node per task, colored by status and grouped into a
+horizontal band per epic in priority order, with the columns left to right by
+dependency depth and the dependency edges between tasks, stronger when they
+cross epics. Hovering a task lights up what it waits for and what waits for it;
+the filter bar shows one epic or only unfinished tasks, and the diagram pans and
+zooms. The priority box in an epic's detail panel writes the new value with
+`POST /api/priority` and reorders the page.
 
 Besides the board, timeline and plan, the page has a **Tests** tab (per test
 project a table of suites with the time of the latest report and a chart of time per suite
@@ -259,9 +271,10 @@ local instance** opens it on `http://localhost:27750`.
 
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
+python3 project/pm.py new epic <epic> "Title" --priority 65   # lower runs first, 100 by default
 python3 project/pm.py start <epic>/<task>
 python3 project/pm.py done <epic>/<task>
-python3 project/pm.py check            # validates READMEs, statuses, dependencies and plan.json
+python3 project/pm.py check            # READMEs, statuses, dependencies, priorities and dependency cycles
 ```
 
 ## Layout

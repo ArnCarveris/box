@@ -1,32 +1,15 @@
 # Roadmap
 
-Epic order after the command and inspector epics, as general guidance. The
-order the tool uses lives in `project/db/plan.json`, which seeded it from this
-list; it sorts unstarted epics on the status page and is edited by dragging the
-order arrows on the Plan tab (dependencies say what actually blocks what):
-
-1. lighting
-2. textures
-3. materials
-4. views
-5. culling
-6. effects
-7. sky
-8. weather
-9. responsiveness
-10. meshes (custom meshes, shape registry, glTF)
-11. shapes_2d
-12. splines
-13. input
-14. controllers
-15. collision
-16. picking
-17. ui
-18. transitions
-19. monitoring
-20. checkpoints
-21. lod
-22. particles
+Every epic carries a `priority` in its `progress.json`: an integer where lower
+runs first, 100 when the field is missing, seeded in steps of ten from the order
+this file used to list so there is room to slot an epic in between. Set one with
+`pm.py new epic <name> "Title" --priority 65`, or from the priority box in the
+epic panel of the status page, which posts to `/api/priority`. The tool derives
+the execution order from the priorities and the dependencies: a task is ready
+when its dependencies are complete, and the ready task from the epic with the
+lowest priority comes first, then the oldest. Dependencies say what actually
+blocks what, so `pm.py check` warns when an epic sits before an epic it depends
+on, and reports tasks that can never become ready because of a cycle.
 
 Adjustments made so the order is consistent with the dependency graph:
 
