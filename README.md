@@ -68,6 +68,11 @@ icons in `apps/box_app/etc/svg/` rasterized by `Svg` at 64, 256 and 1024 pixels 
 shown side by side on quads, so the same vector art is blocky on the left and crisp
 on the right.
 
+`test/integration/visual/tiling.flecs` is the tiling check: one checker texture
+at one meter over boxes of one, two and six meters, a cylinder and a sphere, with a
+second row that offsets the texture transform, mirrors and clamps the wrap mode and
+tiles the same material at three sizes.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights
