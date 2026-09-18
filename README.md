@@ -46,6 +46,10 @@ camera { Position: {0, 4, -12}  LookAt: {0, 0.5, 0}  Camera: {fov: 55} }
 sphere { Position: {-3, 1, 0}  Sphere: {segments: 32, smooth: true, radius: 1}  Rgb: {80, 160, 240} }
 ```
 
+`apps/box_app/etc/scenes/capture_camera.flecs` adds `Capture: {path:
+"/tmp/box/capture_camera.png"}` to its camera, which renders that camera to the
+PNG once and removes the component again.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.
