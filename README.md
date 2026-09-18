@@ -73,6 +73,63 @@ python3 tools/integration.py bench             # writes test/integration/out/<sc
 bake3 run box_bench --local-env --cfg release -- ../../test/integration/bench/static_100k.flecs --churn 1-1000
 ```
 
+## Benchmarks
+
+`bench/<module>` holds one bake3 bench project per engine module, mirroring the
+test projects. Cases always run sequentially in one process, so `-j` has no
+effect on them.
+
+```sh
+bake3 run bench/transform --local-env -- -j 1 --json report.json  # one project
+bake3 run bench/render --local-env --cfg release -- Extract.dynamic_10k
+bake3 run bench/geometry --local-env -- --time 2 --samples 50     # longer budget
+python3 tools/bench.py --env bench                                # every project
+```
+
+`tools/bench.py` builds and runs every project under `bench/` in release and
+writes `<out>/<project>.json` (`bench/out` by default). With `--baseline <dir>`
+it compares each report against the same file in that directory and prints the
+cases that changed by more than `--threshold` (5% by default):
+
+```sh
+python3 tools/bench.py --env bench --out bench/out \
+    --baseline project/db/scene_core/deliverable
+```
+
+A benchcase is a `void <Suite>_<case>(bench_t *b)` function in
+`bench/<module>/src/<Suite>.c`, listed in the `bench` section of the project's
+`project.json`; bake generates the harness and stubs for cases that are missing.
+Build the world before the loop, measure inside it, exclude per iteration setup
+that cannot be hoisted with `bench_pause`/`bench_resume`, keep results with
+`bench_keep` and declare how many items an iteration processes with
+`bench_set_items`:
+
+```c
+void Extract_static_100_changed(bench_t *b)
+{
+    // epic/task
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    /* build the scene and the packet */
+    bench_set_items(b, 100);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        /* touch 100 entities */
+        bench_resume(b);
+        box_render_extract(world, &packet);
+        bench_keep(packet.static_updates.count);
+    }
+
+    ecs_fini(world);
+}
+```
+
+A report holds median, mean, standard deviation, a 95% confidence interval and
+the raw samples per case. Reports attached under `project/db` show up in the
+**Microbenchmarks** table of the Benchmarks tab of the status page.
+
 ## WebAssembly
 
 ```sh
@@ -105,8 +162,9 @@ tasks and epics keep test reports, screenshots and notes in `deliverable/`.
 Besides the board and timeline, the page has a **Tests** tab (pass/fail/time per
 test project and suite from every `tests.json`, with charts of cases and run time
 over time and per-suite case lists) and a **Benchmarks** tab (latest frame timing
-per bench scene with mean and p99 over time). Both read the aggregated
-`/api/tests` and `/api/benchmarks` endpoints served by `pm.py serve`.
+per bench scene with mean and p99 over time, plus a **Microbenchmarks** table
+with the median and confidence interval of every bake3 benchcase). Both read the
+aggregated `/api/tests` and `/api/benchmarks` endpoints served by `pm.py serve`.
 
 ```sh
 python3 project/pm.py new task <epic>/<task> "Title" --brief "One sentence." --deps <epic>/<other>
@@ -119,10 +177,12 @@ python3 project/pm.py check            # validates READMEs, statuses and depende
 
 ```
 apps/box_app/   the engine executable, its scenes under etc/ and the wasm shell page
+bench/          bake3 bench projects, one per engine module
 design/         design brief and datamodel sketches (documentation only)
 docs/           architecture notes
 include/box/    public headers, one per module
 project/        project management tool and its database
 src/            engine sources, one directory per flecs module (see docs/ARCHITECTURE.md)
 test/           unit test projects
+tools/          lint, integration and benchmark scripts
 ```

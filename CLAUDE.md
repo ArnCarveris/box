@@ -50,3 +50,24 @@ bake3 run test/core --local-env=<name> -- -j 8
 Work is tracked with `project/pm.py` (see README). A task is complete only when
 its `deliverable/tests.json` exists, produced with `--json` from the affected
 test suites.
+
+A task that touches a hot path (transform propagation, mesh generation, extract,
+command dispatch) adds or updates a benchcase under `bench/<module>` and attaches
+the report of the affected bench project as `deliverable/bench.json`:
+
+```sh
+bake3 run bench/transform --local-env=<name> --cfg release -- \
+    --json project/db/<epic>/<task>/deliverable/bench.json
+```
+
+`project/pm.py check` warns for a completed task outside the `project_tool` epic
+that has no `deliverable/bench*.json`; the warning does not fail the check, so
+skip it when the task changed nothing that runs per frame.
+
+An epic attaches one report per bench project plus a baseline comparison against
+the previous epic:
+
+```sh
+python3 tools/bench.py --env <name> --out project/db/<epic>/deliverable \
+    --baseline project/db/<previous epic>/deliverable
+```
