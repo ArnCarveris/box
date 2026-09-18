@@ -279,6 +279,7 @@ void box_device_fini(
     box_renderer_t *r)
 {
     box_scene_fini(r);
+    box_lights_fini(r);
     if (r->pipeline) wgpuRenderPipelineRelease(r->pipeline);
     if (r->view_group) wgpuBindGroupRelease(r->view_group);
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);

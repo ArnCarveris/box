@@ -7,6 +7,7 @@
 #define BOX_RENDERER_INTERNAL_H
 
 #include "renderer.h"
+#include "cluster.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -58,6 +59,16 @@ struct box_renderer_t {
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
+    WGPUBuffer lights;               /**< Light storage buffer of the frame */
+    uint32_t light_capacity;         /**< Lights the light buffer can hold */
+    WGPUBuffer clusters;             /**< Light offset and count per cluster */
+    WGPUBuffer light_indices;        /**< Light indices of every cluster */
+    WGPUComputePipeline cluster_pipeline; /**< Cluster assignment pass */
+    WGPUBindGroupLayout cluster_layout;   /**< Layout of the compute bind group */
+    WGPUBindGroup cluster_group;     /**< View, lights and grid of the compute pass */
+    WGPUBindGroupLayout light_layout; /**< Layout of the fragment light bind group */
+    WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads */
+    box_cluster_t grid;              /**< Grid the cluster buffers were built for */
     uint32_t width;                  /**< Current target width */
     uint32_t height;                 /**< Current target height */
     volatile bool ready;             /**< Device and targets are usable */
@@ -140,8 +151,45 @@ void box_scene_draw(
 void box_scene_fini(
     box_renderer_t *r);
 
+/** Create the cluster pipeline, its bind group layouts and the light buffer.
+ *
+ * @param r The renderer
+ */
+void box_lights_init(
+    box_renderer_t *r);
+
+/** Upload the packet lights and rebuild the grid buffers when the settings changed.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_lights_update(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Record the compute pass that assigns the lights to clusters.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param encoder The command encoder
+ */
+void box_lights_dispatch(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder);
+
+/** Release the light and cluster resources.
+ *
+ * @param r The renderer
+ */
+void box_lights_fini(
+    box_renderer_t *r);
+
 /** WGSL source of the lit instanced mesh shader */
 extern const char *box_mesh_shader_wgsl;
+
+/** WGSL source of the cluster assignment compute shader */
+extern const char *box_cluster_shader_wgsl;
 
 /** Read back a texture and write it as PNG.
  *

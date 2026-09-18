@@ -45,6 +45,7 @@ void box_frame_init(
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
     box_frame_init_view(r);
+    box_lights_init(r);
 
     WGPUShaderSourceWGSL wgsl = {
         .chain = { .sType = WGPUSType_ShaderSourceWGSL },
@@ -80,9 +81,10 @@ void box_frame_init(
         }
     };
 
+    WGPUBindGroupLayout group_layouts[2] = { r->view_layout, r->light_layout };
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
-        .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &r->view_layout
+        .bindGroupLayoutCount = 2,
+        .bindGroupLayouts = group_layouts
     };
     WGPUPipelineLayout pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
@@ -171,6 +173,9 @@ void box_frame_render(
 {
     box_device_resize(r, p->width, p->height);
     box_scene_apply(r, p);
+    if (p->has_view) {
+        box_lights_update(r, p);
+    }
 
     WGPUTexture target = box_frame_target(r);
     if (!target) {
@@ -183,6 +188,9 @@ void box_frame_render(
 
     WGPUTextureView view = wgpuTextureCreateView(target, NULL);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
+    if (p->has_view) {
+        box_lights_dispatch(r, p, encoder);
+    }
 
     WGPURenderPassColorAttachment color = {
         .view = view,
@@ -206,6 +214,7 @@ void box_frame_render(
     if (p->has_view) {
         wgpuRenderPassEncoderSetPipeline(pass, r->pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, r->view_group, 0, NULL);
+        wgpuRenderPassEncoderSetBindGroup(pass, 1, r->light_group, 0, NULL);
         box_scene_draw(r, p, pass);
     }
 
