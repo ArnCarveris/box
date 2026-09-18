@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>box</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #050508; }
+  canvas { display: block; width: 100%; height: 100%; }
+  canvas:focus { outline: none; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 12px; color: #ddd; background: #050508;
+    font: 14px/1.5 -apple-system, system-ui, sans-serif; text-align: center;
+  }
+  #overlay.hidden { display: none; }
+  #overlay .detail { color: #888; font-size: 12px; max-width: 32em; }
+</style>
+</head>
+<body>
+<canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<div id="overlay"><div id="message">Starting…</div><div class="detail" id="detail"></div></div>
+{{{ SCRIPT }}}
+<script>
+(function () {
+  var canvas = document.getElementById('canvas');
+  var overlay = document.getElementById('overlay');
+  var message = document.getElementById('message');
+  var detail = document.getElementById('detail');
+  function fail(text, note) { message.textContent = text; detail.textContent = note || ''; }
+  if (!navigator.gpu) {
+    fail('WebGPU is not available in this browser.', 'Use a recent Chrome, Edge or Safari.');
+    return;
+  }
+  canvas.addEventListener('pointerdown', function () { canvas.focus(); });
+  window.addEventListener('box-first-frame', function () {
+    requestAnimationFrame(function () { overlay.classList.add('hidden'); canvas.focus(); });
+  }, { once: true });
+  {{{ EXPORT_NAME }}}({
+    canvas: canvas,
+    arguments: location.hash ? decodeURIComponent(location.hash.slice(1)).split(' ') : [],
+    print: function (text) { console.log(text); },
+    printErr: function (text) { console.error(text); },
+    setStatus: function (text) { if (text) { message.textContent = text; } }
+  }).catch(function (err) {
+    fail('Failed to start.', String(err && err.message ? err.message : err));
+    console.error(err);
+  });
+})();
+</script>
+</body>
+</html>

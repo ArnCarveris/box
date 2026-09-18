@@ -38,6 +38,7 @@
                 "cflags": ["--use-port=emdawnwebgpu"],
                 "ldflags": [
                     "--use-port=emdawnwebgpu",
+                    "-sDEFAULT_TO_CXX=1",
                     "-sALLOW_MEMORY_GROWTH=1",
                     "-sSTACK_SIZE=8388608",
                     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"

@@ -5,6 +5,9 @@
 
 #include "renderer_internal.h"
 #include <stdlib.h>
+#ifdef BOX_PLATFORM_WEB
+#include <emscripten/emscripten.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 
@@ -20,6 +23,11 @@ static void box_renderer_consume(
     if (r->ready) {
         box_frame_render(r, p);
         r->frames ++;
+#ifdef BOX_PLATFORM_WEB
+        if (r->frames == 1) {
+            emscripten_run_script("window.dispatchEvent(new Event('box-first-frame'))");
+        }
+#endif
     }
     box_queue_release(&r->queue, p);
 }
@@ -56,7 +64,13 @@ box_renderer_t* box_renderer_create(
 {
     box_renderer_t *r = calloc(1, sizeof(box_renderer_t));
     r->desc = *desc;
-    r->desc.canvas_selector = desc->canvas_selector ? strdup(desc->canvas_selector) : NULL;
+    r->desc.canvas_selector = NULL;
+    if (desc->canvas_selector) {
+        size_t len = strlen(desc->canvas_selector) + 1;
+        char *copy = malloc(len);
+        memcpy(copy, desc->canvas_selector, len);
+        r->desc.canvas_selector = copy;
+    }
     box_queue_init(&r->queue);
 
 #ifndef BOX_PLATFORM_WEB

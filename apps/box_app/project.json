@@ -4,5 +4,11 @@
     "value": {
         "description": "Runs the box engine with a scene",
         "use": ["box"]
+    },
+    "lang.c": {
+        "${target em}": {
+            "shell": "shell.html",
+            "embed": ["etc"]
+        }
     }
 }

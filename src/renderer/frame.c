@@ -132,7 +132,9 @@ void box_frame_render(
     }
 
     if (r->surface) {
+#ifndef BOX_PLATFORM_WEB
         wgpuSurfacePresent(r->surface);
+#endif
         wgpuTextureRelease(target);
     }
     wgpuTextureViewRelease(view);

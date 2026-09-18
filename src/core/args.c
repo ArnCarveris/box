@@ -57,7 +57,11 @@ int box_parse_args(
             goto error;
         } else {
             ecs_singleton_modified(world, App);
-            ecs_script(world, { .filename = arg });
+            if (!ecs_script(world, { .filename = arg })) {
+                ecs_err("failed to load scene '%s'", arg);
+                goto error;
+            }
+            app = ecs_singleton_ensure(world, App);
         }
     }
 
