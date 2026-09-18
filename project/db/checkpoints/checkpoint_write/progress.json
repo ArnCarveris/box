@@ -1,11 +1,11 @@
 {
   "kind": "feature",
   "status": "pending",
-  "created": "2026-09-18T08:28:26.417+00:00",
+  "created": "2026-09-18T08:28:26.617+00:00",
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "command"
-  ],
-  "priority": 12
+    "checkpoints/script_reload",
+    "command/script"
+  ]
 }

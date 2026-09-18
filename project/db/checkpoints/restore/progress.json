@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "instrumentation/checkpoint_write",
-    "instrumentation/script_reload"
+    "checkpoints/checkpoint_write",
+    "checkpoints/script_reload"
   ]
 }
