@@ -1,0 +1,28 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-18T07:42:08Z",
+  "pass": 18,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.049324,
+  "tests": [
+    {"suite": "Http", "case": "new_returns_session", "status": "pass", "elapsed": 0.023275},
+    {"suite": "Http", "case": "new_names_are_unique", "status": "pass", "elapsed": 0.024048},
+    {"suite": "Http", "case": "close_deletes_session", "status": "pass", "elapsed": 0.023031},
+    {"suite": "Http", "case": "close_unknown_session", "status": "pass", "elapsed": 0.021775},
+    {"suite": "Http", "case": "exec_returns_output", "status": "pass", "elapsed": 0.022999},
+    {"suite": "Http", "case": "exec_url_encoded_cmd", "status": "pass", "elapsed": 0.024373},
+    {"suite": "Http", "case": "exec_post_body", "status": "pass", "elapsed": 0.024217},
+    {"suite": "Http", "case": "exec_unknown_session", "status": "pass", "elapsed": 0.021373},
+    {"suite": "Http", "case": "exec_error_gives_400", "status": "pass", "elapsed": 0.014837},
+    {"suite": "Http", "case": "exec_without_cmd", "status": "pass", "elapsed": 0.014689},
+    {"suite": "Http", "case": "resource_returns_file", "status": "pass", "elapsed": 0.015596},
+    {"suite": "Http", "case": "resource_png_content_type", "status": "pass", "elapsed": 0.015874},
+    {"suite": "Http", "case": "resource_traversal_refused", "status": "pass", "elapsed": 0.016015},
+    {"suite": "Http", "case": "resource_missing_gives_404", "status": "pass", "elapsed": 0.014476},
+    {"suite": "Http", "case": "unknown_endpoint_gives_404", "status": "pass", "elapsed": 0.014280},
+    {"suite": "Http", "case": "dequeue_system_runs", "status": "pass", "elapsed": 0.014640},
+    {"suite": "Http", "case": "app_port_starts_server", "status": "pass", "elapsed": 0.012634},
+    {"suite": "Http", "case": "port_zero_stops_server", "status": "pass", "elapsed": 0.012068}
+  ]
+}
