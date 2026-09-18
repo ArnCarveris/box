@@ -1,0 +1,45 @@
+{
+    "id": "job",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.job worker pool",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Job",
+                "testcases": [
+                    "submit_and_complete",
+                    "run_happens_on_a_worker",
+                    "completion_runs_on_the_main_thread",
+                    "completion_runs_in_preupdate",
+                    "main_thread_fallback_runs_jobs_inline",
+                    "cancel_a_queued_job",
+                    "cancel_an_unknown_job",
+                    "supersede_a_group",
+                    "budget_defers_completions",
+                    "stats_report_the_queue",
+                    "stats_report_completions",
+                    "flush_runs_every_job",
+                    "shutdown_with_jobs_in_flight",
+                    "shutdown_runs_completions_when_flagged",
+                    "stress_100k_jobs"
+                ]
+            },
+            {
+                "id": "Priority",
+                "testcases": [
+                    "higher_priority_runs_first",
+                    "near_the_eye_runs_first",
+                    "eye_is_taken_at_submit_time",
+                    "prioritize_near_off_keeps_submit_order",
+                    "single_worker_runs_in_priority_order"
+                ]
+            }
+        ]
+    }
+}
