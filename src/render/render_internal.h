@@ -31,8 +31,9 @@ typedef struct RenderInstance {
 
 /** Depth and index of one entry of the sorted draw list */
 typedef struct box_sort_key_t {
-    float depth;    /**< View space depth of the instance origin */
+    uint32_t key;   /**< Depth as an unsigned value that sorts back to front */
     uint32_t index; /**< Index in the sorted draw list */
+    float depth;    /**< View space depth of the instance origin */
 } box_sort_key_t;
 
 /** Module wide registry, stored as a singleton */
@@ -48,6 +49,7 @@ typedef struct RenderState {
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
+    ecs_vec_t sort_tmp;       /**< Scratch of the radix sort, reused every frame */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *captures;    /**< Camera entities that request a capture */

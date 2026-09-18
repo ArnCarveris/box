@@ -7,7 +7,9 @@
  */
 
 #include "render_internal.h"
-#include <stdlib.h>
+
+/** Entries the sorted list orders by insertion instead of by radix passes */
+#define BOX_SORT_SMALL (32)
 
 uint32_t box_render_blend_mode(
     ecs_world_t *world,
@@ -94,26 +96,78 @@ done:
     return;
 }
 
-/** Order two sort keys, putting the instance farthest from the camera first.
+/** Turn a view space depth into an unsigned key that orders back to front.
  *
- * @param a The first key
- * @param b The second key
- * @return -1 when a is farther, 1 when b is farther, 0 when they tie
+ * @param depth The view space depth
+ * @return The key, smaller for an instance farther from the camera
  */
-static int box_render_sort_cmp(
-    const void *a,
-    const void *b)
+static uint32_t box_render_sort_bits(
+    float depth)
 {
-    const box_sort_key_t *ka = a;
-    const box_sort_key_t *kb = b;
-    int result = 0;
-    if (ka->depth < kb->depth) {
-        result = 1;
-    } else if (ka->depth > kb->depth) {
-        result = -1;
-    }
+    uint32_t bits;
+    memcpy(&bits, &depth, sizeof(bits));
+    bits ^= (bits & 0x80000000u) ? 0xFFFFFFFFu : 0x80000000u;
 
-    return result;
+    return ~bits;
+}
+
+/** Order a short run of sort keys by insertion.
+ *
+ * @param keys The keys
+ * @param count Keys in the array
+ */
+static void box_render_sort_small(
+    box_sort_key_t *keys,
+    int32_t count)
+{
+    int32_t i;
+    for (i = 1; i < count; i ++) {
+        box_sort_key_t key = keys[i];
+        int32_t j = i - 1;
+        while (j >= 0 && keys[j].key > key.key) {
+            keys[j + 1] = keys[j];
+            j --;
+        }
+
+        keys[j + 1] = key;
+    }
+}
+
+/** Order the sort keys with four byte wide radix passes.
+ *
+ * @param keys The keys, sorted in place
+ * @param tmp Scratch array of the same length
+ * @param count Keys in the arrays
+ */
+static void box_render_sort_radix(
+    box_sort_key_t *keys,
+    box_sort_key_t *tmp,
+    int32_t count)
+{
+    int32_t shift;
+    for (shift = 0; shift < 32; shift += 8) {
+        uint32_t offsets[256] = {0};
+        int32_t i;
+        for (i = 0; i < count; i ++) {
+            offsets[(keys[i].key >> shift) & 0xFF] ++;
+        }
+
+        uint32_t total = 0;
+        int32_t bucket;
+        for (bucket = 0; bucket < 256; bucket ++) {
+            uint32_t bucket_count = offsets[bucket];
+            offsets[bucket] = total;
+            total += bucket_count;
+        }
+
+        for (i = 0; i < count; i ++) {
+            tmp[offsets[(keys[i].key >> shift) & 0xFF] ++] = keys[i];
+        }
+
+        box_sort_key_t *swap = keys;
+        keys = tmp;
+        tmp = swap;
+    }
 }
 
 /** Fill the sort keys with the view space depth of every listed instance.
@@ -140,10 +194,16 @@ static void box_render_sort_keys(
         ecs_assert(transform != NULL, ECS_INTERNAL_ERROR, NULL);
         vec3 origin = mat4_transform_point(&view, mat4_get_translation(&transform->m));
         keys[i].depth = origin.z;
+        keys[i].key = box_render_sort_bits(origin.z);
         keys[i].index = (uint32_t)i;
     }
 
-    qsort(keys, (size_t)count, sizeof(box_sort_key_t), box_render_sort_cmp);
+    if (count <= BOX_SORT_SMALL) {
+        box_render_sort_small(keys, count);
+    } else {
+        ecs_vec_set_count_t(NULL, &state->sort_tmp, box_sort_key_t, count);
+        box_render_sort_radix(keys, ecs_vec_first_t(&state->sort_tmp, box_sort_key_t), count);
+    }
 }
 
 void box_render_extract_transparent(
@@ -151,6 +211,10 @@ void box_render_extract_transparent(
     RenderState *state,
     box_packet_t *p)
 {
+    if (!ecs_vec_count(&state->transparent)) {
+        goto done;
+    }
+
     box_render_sort_keys(world, state, p);
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
     ecs_entity_t *entities = ecs_vec_first_t(&state->transparent, ecs_entity_t);
@@ -176,4 +240,6 @@ void box_render_extract_transparent(
 
         box_instance_set_shading(&entry->data, entry->blend, entry->back);
     }
+done:
+    return;
 }
