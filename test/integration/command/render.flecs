@@ -1,0 +1,60 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.command
+
+prefab Ball {
+  Position: {0, 0, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 160, 240}
+  PbrMaterial: {metallic: 0.2, roughness: 0.3}
+}
+
+template Tower {
+  base {
+    Position: {0, 0.25, 0}
+    Box: {1.5, 0.5, 1.5}
+    Rgb: {190, 190, 200}
+  }
+
+  shaft {
+    Position: {0, 1.25, 0}
+    Cylinder: {segments: 24, smooth: true, length: 1.5, radius: 0.35}
+    Rgb: {120, 200, 140}
+  }
+}
+
+scene {
+  camera {
+    Position: {0, 4, -12}
+    LookAt: {0, 0.5, 0}
+    Camera: {fov: 55}
+  }
+
+  sun {
+    Rotation: {0.9, -0.6, 0}
+    DirectionalLight: {intensity: 3}
+  }
+
+  floor {
+    Position: {0, -0.5, 0}
+    Box: {20, 0.2, 20}
+    Rgb: {180, 180, 190}
+  }
+
+  crate {
+    Position: {0, 0.5, 0}
+    Rotation: {0, 0.4, 0}
+    Box: {1, 1, 1}
+    Rgb: {220, 120, 60}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/render.cmd"}
+  }
+}

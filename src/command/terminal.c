@@ -86,6 +86,7 @@ static void box_terminal_open(
 
     char *path = flecs_asprintf("%s/commands.log", dir);
     TerminalSession session = { .dir = ecs_os_strdup(dir), .log = fopen(path, "w") };
+    ecs_vec_init_t(NULL, &session.renders, box_render_job_t, 0);
     if (!session.log) {
         ecs_warn("failed to open session log %s", path);
     }
@@ -162,6 +163,7 @@ void box_terminal_session_fini(
     }
 
     box_terminal_copy(session, NULL);
+    box_render_cmd_fini(session);
 
     if (session->dir) {
         box_rmtree(session->dir);

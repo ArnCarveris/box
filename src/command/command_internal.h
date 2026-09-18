@@ -75,6 +75,20 @@ typedef struct box_command_param_t {
     bool optional;      /**< Argument may be omitted, the command gets zero */
 } box_command_param_t;
 
+/** A render of the render command that waits for its image */
+typedef struct box_render_job_t {
+    ecs_entity_t subject;   /**< Entity the view is framed on */
+    ecs_entity_t scratch;   /**< Instance of a prefab or template, 0 for a live entity */
+    ecs_entity_t view;      /**< The temporary view */
+    ecs_entity_t camera;    /**< The temporary camera */
+    ecs_entity_t light;     /**< The temporary directional light */
+    ecs_entity_t target;    /**< The temporary render target */
+    ecs_entity_t layer;     /**< The temporary layer that holds the subject */
+    char *path;             /**< File the image is written to */
+    int32_t frames;         /**< Frames the render waited so far */
+    bool requested;         /**< The capture of the camera was requested */
+} box_render_job_t;
+
 /** Private state of a terminal session */
 typedef struct TerminalSession {
     char *dir;                                      /**< The session folder */
@@ -83,6 +97,9 @@ typedef struct TerminalSession {
     char *copy_path;                                /**< File the copy is written to */
     box_command_entry_t ring[BOX_COMMAND_LOG_MAX];  /**< Last executed lines */
     int32_t count;                                  /**< Lines executed so far */
+    ecs_vec_t renders;                              /**< box_render_job_t of pending renders */
+    ecs_entity_t view;                              /**< View that keeps the scene on the surface */
+    int32_t render_count;                           /**< Renders started, numbers their files */
 } TerminalSession;
 
 /** Parameter count of a registered command */
@@ -228,6 +245,20 @@ void box_script_init(
  */
 void box_capture_init(
     ecs_world_t *world);
+
+/** Register the render command group and the system that advances its renders.
+ *
+ * @param world The world
+ */
+void box_render_cmd_init(
+    ecs_world_t *world);
+
+/** Release the pending renders of a session.
+ *
+ * @param s The session state
+ */
+void box_render_cmd_fini(
+    TerminalSession *s);
 
 /** Register the http command group.
  *

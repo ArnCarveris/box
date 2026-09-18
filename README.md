@@ -137,7 +137,10 @@ generated harness scene so the session log survives the process folder, strips t
 path of the repository from it and compares it with the `<scene>.expected` next to
 the scene, printing a diff when they differ. A `<scene>_content.flecs` is loaded
 before the scene, which keeps the scripts that commands patch out of the scene
-that holds the terminal.
+that holds the terminal. `command/render.flecs` runs `render` on an entity, a
+prefab and a template; the runner copies the PNGs of a session to
+`test/integration/out/<scene>_<image>.png` while the scene runs, because the
+process removes its folder when it exits.
 
 ## Benchmarks
 

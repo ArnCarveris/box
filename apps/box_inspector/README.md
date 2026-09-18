@@ -45,7 +45,8 @@ cp .bake/local_env/<env>/wasm32-Emscripten/release/bin/box_app/box_app.{html,js,
 transports. In the browser: connect, run `help`, `pwd`, `ls`, `cd box`, `cd /` and `cat camera`;
 run `set camera Position "{2, 6, -14}"` and watch the render pane show the new view within a
 second; run `capture` and open the thumbnail, which links to a `/resource/<file>?session=<id>`
-PNG; run `clear` to empty the log without a request; press **Disconnect**.
+PNG; run `render sphere` and open the thumbnail it prints once that frame rendered; run
+`clear` to empty the log without a request; press **Disconnect**.
 
 ## Known limitations
 

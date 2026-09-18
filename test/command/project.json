@@ -188,6 +188,23 @@
             "setup": true,
             "teardown": true
         }, {
+            "id": "Render",
+            "testcases": [
+                "prints_the_image_path",
+                "numbers_the_images_per_session",
+                "unknown_subject",
+                "without_a_subject",
+                "subject_relative_to_cwd",
+                "frames_the_camera_on_the_bounds",
+                "instantiates_a_prefab",
+                "instantiates_a_template",
+                "cleans_up_when_the_image_appears",
+                "live_entity_joins_and_leaves_the_layer",
+                "headless_run_writes_the_png"
+            ],
+            "setup": true,
+            "teardown": true
+        }, {
             "id": "CaptureEndpoint",
             "testcases": [
                 "unknown_session_gives_404",
