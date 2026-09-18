@@ -20,5 +20,5 @@ for the action layer masks. All 114 names are script constants under `box.input.
 `platform_glfw.c` and `platform_web.c` map their native codes with `box_platform_key_from_native`,
 where web adds pointer lock and page visibility.
 
-39 tests pass in `test/input`, `Input.update_1000_events` costs 1.66 us, test/core and the other
+40 tests pass in `test/input`, `Input.update_1000_events` costs 1.66 us, test/core and the other
 test projects are green, the wasm build links and the lint reports 0 problems.

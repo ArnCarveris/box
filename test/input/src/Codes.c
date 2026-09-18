@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <string.h>
 #include "../../../src/platform/platform.h"
 
 static ecs_world_t *w;
@@ -144,4 +145,22 @@ void Codes_glfw_unknown_keys_map_to_none(void)
     test_int(box_platform_key_from_native(-1), BoxKeyNone);
     test_int(box_platform_key_from_native(302), BoxKeyNone);
     test_int(box_platform_key_from_native(1000), BoxKeyNone);
+}
+
+void Codes_reflection_describes_the_singleton(void)
+{
+    // input/device_layer
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {4, 8} });
+    ecs_progress(w, 0);
+    char *expr = ecs_ptr_to_expr(w, ecs_id(Input), ecs_singleton_get(w, Input));
+    test_assert(expr != NULL);
+    test_assert(strstr(expr, "keys") != NULL);
+    test_assert(strstr(expr, "mouse") != NULL);
+    test_assert(strstr(expr, "focused") != NULL);
+    test_assert(strstr(expr, "window") != NULL);
+    ecs_os_free(expr);
+    const EcsStruct *type = ecs_get(w, ecs_id(Input), EcsStruct);
+    test_assert(type != NULL);
+    test_int(ecs_vec_count(&type->members), 6);
 }

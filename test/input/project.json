@@ -72,7 +72,8 @@
                     "family_modifiers_are_reserved_above_the_slots",
                     "glfw_printable_keys_map_to_themselves",
                     "glfw_named_keys_map_to_spare_codes",
-                    "glfw_unknown_keys_map_to_none"
+                    "glfw_unknown_keys_map_to_none",
+                    "reflection_describes_the_singleton"
                 ],
                 "setup": true,
                 "teardown": true
