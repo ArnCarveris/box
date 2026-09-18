@@ -25,9 +25,9 @@ const AO_HISTORY: f32 = 0.9;
 // Fraction of the view distance two pixels may differ by and still be one surface.
 const AO_TOLERANCE: f32 = 0.05;
 
-// Fraction of the view distance the denoise kernel reaches over, which is wider
-// than the history test because a surface seen at a grazing angle recedes fast.
-const AO_SPREAD: f32 = 0.25;
+// Fraction of the view distance a tap may sit off the tangent plane of the
+// pixel and still be averaged into it by the denoise.
+const AO_SPREAD: f32 = 0.02;
 
 struct AoOut {
   @builtin(position) pos: vec4<f32>,
@@ -48,6 +48,16 @@ fn ao_depth(uv: vec2<f32>) -> f32 {
   return textureLoad(ao_depth_tex, c, 0);
 }
 
+// Centre of the depth texel a coordinate falls in. The depth of a texel belongs
+// to its centre, so a world position rebuilt at the coordinate that was asked
+// for instead sits off the surface by up to half the slope of a texel, which on
+// a floor seen at a grazing angle is metres and scatters the horizons of the
+// trace into bands that follow the texel grid.
+fn ao_snap(uv: vec2<f32>) -> vec2<f32> {
+  let size = max(vec2<f32>(textureDimensions(ao_depth_tex, 0)), vec2(1.0));
+  return (floor(uv * size) + vec2(0.5)) / size;
+}
+
 fn ao_world(uv: vec2<f32>, depth: f32) -> vec3<f32> {
   let ndc = vec3(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, max(depth, 0.0000001));
   let p = fx.inv_clip * vec4(ndc, 1.0);
@@ -65,22 +75,25 @@ fn ao_normal(uv: vec2<f32>) -> vec3<f32> {
   return oct_decode(textureLoad(ao_normal_tex, c, 0).xy);
 }
 
+// Resolution the trace and the resolve run at, which the history of the view
+// has and the effect uniform, whose size is the target of the chain pass, does
+// not. Every step and every kernel offset is measured in these texels.
+fn ao_extent() -> vec2<f32> {
+  return max(vec2<f32>(textureDimensions(ao_hist_tex, 0)), vec2(1.0));
+}
+
 fn ao_motion(uv: vec2<f32>) -> vec2<f32> {
   let size = vec2<i32>(textureDimensions(ao_motion_tex, 0));
   let c = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0, 0), size - vec2(1, 1));
   return textureLoad(ao_motion_tex, c, 0).xy;
 }
 
-// Interleaved gradient noise, which spreads the step offsets of neighbouring
-// pixels so the denoise has something to average.
-fn ao_noise(p: vec2<f32>) -> f32 {
-  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
-}
-
-// Turn the slices of a pixel are rotated by, an ordered four by four pattern.
-// The denoise below averages exactly one four by four block, so every one of
-// the sixteen directions reaches it exactly once and the pattern cancels.
-fn ao_turn(p: vec2<u32>) -> f32 {
+// Ordered four by four pattern, the sixteen values of a block spread over zero
+// to one. Both the slice rotation and the step offset of a pixel come from it,
+// so the whole sampling pattern repeats every four texels and the denoise
+// below, which averages exactly one four by four block, cancels it completely.
+// A noise that does not repeat on that grid leaves structure behind instead.
+fn ao_ordered(p: vec2<u32>) -> f32 {
   let x = p.x & 3u;
   let y = p.y & 3u;
   let a = x ^ y;
@@ -114,7 +127,7 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
     return best;
   }
 
-  let delta = ao_world(uv, d) - p;
+  let delta = ao_world(ao_snap(uv), d) - p;
   let len = length(delta);
   if (len < 0.00001) {
     return best;
@@ -132,7 +145,7 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
   }
 
   let eye = fx.eye.xyz;
-  let p = ao_world(uv, depth);
+  let p = ao_world(ao_snap(uv), depth);
   let to_eye = eye - p;
   let dist = max(length(to_eye), 0.00001);
   let v = to_eye / dist;
@@ -141,16 +154,17 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
   let slices = max(u32(fx.params[0].y), 1u);
   let steps = max(u32(fx.params[0].z), 1u);
 
-  let texel = vec2(1.0) / max(fx.size.xy, vec2(1.0));
-  let side = ao_world(uv + vec2(texel.x, 0.0), depth) - p;
+  let texel = vec2(1.0) / ao_extent();
+  let side = ao_world(ao_snap(uv) + vec2(texel.x, 0.0), depth) - p;
   let per_uv = length(side) / texel.x;
   let uv_radius = clamp(radius / max(per_uv, 0.0001), texel.x, 0.25);
-  var turn = ao_turn(vec2<u32>(in.pos.xy));
+  let pixel = vec2<u32>(in.pos.xy);
+  var turn = ao_ordered(pixel);
   if (fx.params[1].x > 0.5) {
     turn = fract(turn + fract(fx.frame.y * 60.0 * 0.6180339887));
   }
 
-  let jitter = ao_noise(in.pos.xy);
+  let jitter = ao_ordered(pixel + vec2(2u, 1u));
 
   var visibility = 0.0;
   for (var s = 0u; s < slices; s = s + 1u) {
@@ -190,10 +204,32 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
   return vec4(clamp(visibility / f32(slices), 0.0, 1.0), dist, 0.0, 1.0);
 }
 
+// Denoise weight of one tap: how far the surface it saw sits off the tangent
+// plane of the pixel. A tap on the same plane weighs one whatever the angle the
+// surface is seen at, which is what lets the four by four block average evenly
+// and cancel the ordered pattern of the trace; comparing view distances instead
+// collapses the kernel on a floor seen at a grazing angle and leaves the
+// pattern of the trace standing in the image.
+fn ao_plane_weight(tap_uv: vec2<f32>, center: vec3<f32>, normal: vec3<f32>,
+                   dist: f32) -> f32 {
+  let depth = ao_depth(tap_uv);
+  if (depth <= 0.0) {
+    return 0.0001;
+  }
+
+  let off = abs(dot(ao_world(ao_snap(tap_uv), depth) - center, normal)) /
+    max(dist * AO_SPREAD, 0.02);
+  return 1.0 / (1.0 + off * off);
+}
+
 @fragment fn fs_resolve(in: AoOut) -> @location(0) vec4<f32> {
   let size = vec2<i32>(textureDimensions(ao_raw_tex, 0));
   let c = clamp(vec2<i32>(in.pos.xy), vec2(0, 0), size - vec2(1, 1));
+  let texel = vec2(1.0) / ao_extent();
   let dist = textureLoad(ao_raw_tex, c, 0).y;
+  let depth = ao_depth(in.uv);
+  let center = ao_world(ao_snap(in.uv), max(depth, 0.0000001));
+  let normal = ao_normal(in.uv);
   var sum = 0.0;
   var weight = 0.0;
   for (var y = -2; y <= 1; y = y + 1) {
@@ -201,9 +237,8 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
       let s = clamp(c + vec2(x, y), vec2(0, 0), size - vec2(1, 1));
       let tap = textureLoad(ao_raw_tex, s, 0);
       var w = 1.0;
-      if (dist > 0.0) {
-        let delta = abs(tap.y - dist) / max(dist * AO_SPREAD, 0.05);
-        w = 1.0 / (1.0 + delta * delta);
+      if (dist > 0.0 && depth > 0.0) {
+        w = ao_plane_weight(in.uv + vec2(f32(x), f32(y)) * texel, center, normal, dist);
       }
       sum = sum + tap.x * w;
       weight = weight + w;

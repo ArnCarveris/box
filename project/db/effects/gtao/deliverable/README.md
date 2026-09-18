@@ -21,5 +21,17 @@
   the texture and job work of another epic.
 - At 1280x720 over 300 headless frames the passes cost 0.475 ms mean CPU frame time at half
   resolution and 0.626 at full against 0.204 with the effect off, the median of five runs.
+- A first capture banded on flat surfaces. The depth of a texel belongs to its centre, and
+  the trace rebuilt the world position of a sample at the coordinate it had asked for, so on
+  a floor seen at a grazing angle every sample sat up to half a texel of slope off the
+  surface and the horizons scattered along the texel grid. Snapping a sample to the centre of
+  the texel whose depth it reads fixed it; the denoise now weighs a tap by its distance from
+  the tangent plane of the pixel instead of by its view distance, which no longer collapses
+  the kernel at a grazing angle, the trace measures its steps in the texels of the resolution
+  it runs at rather than the view's, and the step offset comes from the same ordered four by
+  four pattern as the slice rotation so the kernel cancels both. Over a flat patch of the
+  floor the residual against a nine by nine mean fell from 3.1 to 2.2 levels out of 255 and
+  over the wall from 3.1 to 1.3, against 1.1 for the same scene with the effect off, which is
+  the dither of the tone map alone.
 - `gtao.png` is a room corner with boxes and spheres at radius 2.5, four slices and power 2,
   next to `gtao_off.png`: the contacts, the corner and the foot of the pillar darken.

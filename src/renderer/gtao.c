@@ -188,7 +188,8 @@ static void box_gtao_resize(
  *
  * @param r The renderer
  * @param raw Occlusion the trace pass wrote, NULL for the trace itself
- * @param history Occlusion of the previous frame, NULL for the trace itself
+ * @param history Occlusion of the previous frame, which both passes bind
+ *   because its extent is the resolution the trace runs at
  * @return The bind group
  */
 static WGPUBindGroup box_gtao_group(
@@ -271,7 +272,8 @@ WGPUTextureView box_gtao_build(
     }
 
     uint32_t dst = r->v->gtao_slot;
-    box_gtao_pass(r, encoder, r->gtao_trace, box_gtao_group(r, NULL, NULL),
+    box_gtao_pass(r, encoder, r->gtao_trace,
+        box_gtao_group(r, NULL, r->v->gtao_hist_view[dst ^ 1]),
         r->v->gtao_raw_view, slot);
     box_gtao_pass(r, encoder, r->gtao_resolve,
         box_gtao_group(r, r->v->gtao_raw_view, r->v->gtao_hist_view[dst ^ 1]),
