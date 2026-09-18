@@ -1,0 +1,106 @@
+{
+    "project": "command",
+    "timestamp": "2026-09-18T07:39:27Z",
+    "pass": 16,
+    "fail": 0,
+    "empty": 0,
+    "elapsed": 0.038741,
+    "tests": [
+        {
+            "suite": "Script",
+            "case": "read_source",
+            "status": "pass",
+            "elapsed": 0.021701
+        },
+        {
+            "suite": "Script",
+            "case": "read_by_basename",
+            "status": "pass",
+            "elapsed": 0.021689
+        },
+        {
+            "suite": "Script",
+            "case": "unknown_file",
+            "status": "pass",
+            "elapsed": 0.021524
+        },
+        {
+            "suite": "Script",
+            "case": "write_changes_world",
+            "status": "pass",
+            "elapsed": 0.021654
+        },
+        {
+            "suite": "Script",
+            "case": "write_parse_error_keeps_state",
+            "status": "pass",
+            "elapsed": 0.020586
+        },
+        {
+            "suite": "Script",
+            "case": "grep_lines",
+            "status": "pass",
+            "elapsed": 0.020565
+        },
+        {
+            "suite": "Script",
+            "case": "patch_changes_world",
+            "status": "pass",
+            "elapsed": 0.021679
+        },
+        {
+            "suite": "Script",
+            "case": "patch_compounds",
+            "status": "pass",
+            "elapsed": 0.021242
+        },
+        {
+            "suite": "Script",
+            "case": "patch_hunk_mismatch",
+            "status": "pass",
+            "elapsed": 0.013624
+        },
+        {
+            "suite": "Patch",
+            "case": "single_hunk",
+            "status": "pass",
+            "elapsed": 0.003745
+        },
+        {
+            "suite": "Patch",
+            "case": "multiple_hunks",
+            "status": "pass",
+            "elapsed": 0.00374
+        },
+        {
+            "suite": "Patch",
+            "case": "addition_at_end",
+            "status": "pass",
+            "elapsed": 0.00381
+        },
+        {
+            "suite": "Patch",
+            "case": "deletion",
+            "status": "pass",
+            "elapsed": 0.004166
+        },
+        {
+            "suite": "Patch",
+            "case": "diff_headers_ignored",
+            "status": "pass",
+            "elapsed": 0.003728
+        },
+        {
+            "suite": "Patch",
+            "case": "context_mismatch",
+            "status": "pass",
+            "elapsed": 0.004249
+        },
+        {
+            "suite": "Patch",
+            "case": "no_hunks",
+            "status": "pass",
+            "elapsed": 0.0037
+        }
+    ]
+}
