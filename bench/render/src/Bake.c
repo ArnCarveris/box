@@ -81,3 +81,51 @@ void Bake_invalidate_one_of_100k(bench_t *b)
     box_packet_fini(&packet);
     ecs_fini(world);
 }
+
+void Bake_probe_count_100k(bench_t *b)
+{
+    // lighting/bake_resolution
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 1920;
+    packet.height = 1080;
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 60, -160});
+    ecs_set(world, camera, Camera, {.fov = 60});
+
+    int32_t i;
+    for (i = 0; i < BENCH_STATIC_LIGHTS; i ++) {
+        ecs_entity_t light = ecs_new(world);
+        ecs_set(world, light, Position, {(float)i * 40 - 60, 10, 0});
+        ecs_set(world, light, PointLight, {.intensity = 20, .range = BENCH_LIGHT_RANGE});
+    }
+
+    for (i = 0; i < BENCH_STATIC_COUNT; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)(i % BENCH_STATIC_ROW) - 200.0f,
+            (float)((i / BENCH_STATIC_ROW) % 25) * 2, (float)(i / 10000) * 6 - 30});
+        ecs_set(world, e, Box, {0.8f, 0.8f, 0.8f});
+    }
+
+    ecs_progress(world, 0.016f);
+    box_render_extract(world, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    box_bake_state_take(&state, BENCH_STATIC_COUNT);
+    bench_set_items(b, BENCH_STATIC_COUNT);
+
+    while (bench_iter(b)) {
+        box_bake_state_apply(&state, &packet);
+        bench_counter(b, "probes", (double)state.probe_count);
+        bench_keep(state.probe_count);
+    }
+
+    box_bake_state_fini(&state);
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}

@@ -5,7 +5,7 @@ using box.camera
 using box.light
 
 $ {
-  BakeSettings: {enabled: true, budget: 128}
+  BakeSettings: {enabled: true}
   EnvironmentLight: {sky_color: {40, 50, 70}, ground_color: {30, 26, 22}, intensity: 0.35}
 }
 

@@ -102,7 +102,17 @@
                     "moved_light_marks_the_probes_in_range",
                     "budget_limits_the_probes_per_frame",
                     "nearest_probes_are_baked_first",
-                    "disabled_settings_drop_the_probes"
+                    "disabled_settings_drop_the_probes",
+                    "baking_is_enabled_by_default",
+                    "grid_dims_from_bounds_and_spacing",
+                    "grid_dims_clamped_to_the_maximum",
+                    "large_instance_gets_a_probe_grid",
+                    "pool_reuses_the_probes_of_a_removed_instance",
+                    "grid_probe_sits_on_the_bounds",
+                    "grid_probe_follows_the_instance_scale",
+                    "trilinear_weights_at_the_corners",
+                    "trilinear_weights_at_the_center",
+                    "trilinear_sample_mixes_the_corners"
                 ],
                 "setup": true,
                 "teardown": true

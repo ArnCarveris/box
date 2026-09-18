@@ -23,7 +23,8 @@
         }, {
             "id": "Bake",
             "benchcases": [
-                "invalidate_one_of_100k"
+                "invalidate_one_of_100k",
+                "probe_count_100k"
             ]
         }, {
             "id": "Lights",
