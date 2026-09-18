@@ -1,0 +1,49 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {255, 255, 255}, ground_color: {235, 238, 245}, intensity: 1.4}
+}
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.3, 0.2, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+icons {
+  small {
+    Svg: {file: "etc/svg/filter.svg", width: 128, height: 128}
+  }
+
+  large {
+    Svg: {file: "etc/svg/filter.svg", width: 1024, height: 1024}
+  }
+}
+
+panels {
+  left {
+    Position: {-2.4, 0, 0}
+    Quad: {4.2, 4.2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.small}
+  }
+
+  right {
+    Position: {2.4, 0, 0}
+    Quad: {4.2, 4.2}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: icons.large}
+  }
+}

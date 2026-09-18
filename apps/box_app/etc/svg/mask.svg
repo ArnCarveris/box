@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="256" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+    <mask id="fademask">
+      <rect width="256" height="256" fill="url(#fade)"/>
+    </mask>
+  </defs>
+  <rect width="256" height="256" fill="#12202f"/>
+  <g mask="url(#fademask)">
+    <rect x="16" y="16" width="224" height="224" fill="#ff6b6b"/>
+    <circle cx="128" cy="128" r="72" fill="#ffd166"/>
+  </g>
+</svg>

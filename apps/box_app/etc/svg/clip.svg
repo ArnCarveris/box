@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <clipPath id="star">
+      <path d="M128 18L158 96L242 96L174 146L200 226L128 178L56 226L82 146L14 96L98 96Z"/>
+    </clipPath>
+  </defs>
+  <rect width="256" height="256" fill="#101826"/>
+  <g clip-path="url(#star)">
+    <rect width="256" height="86" fill="#4cc9f0"/>
+    <rect y="86" width="256" height="86" fill="#ffd166"/>
+    <rect y="172" width="256" height="84" fill="#f72585"/>
+  </g>
+</svg>
