@@ -1,10 +1,11 @@
 {
   "kind": "feature",
   "status": "pending",
-  "created": "2026-09-18T08:27:56.192+00:00",
+  "created": "2026-09-18T09:02:39.609+00:00",
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling/view"
-  ]
+    "views"
+  ],
+  "priority": 5
 }

@@ -1,11 +1,12 @@
 {
   "kind": "feature",
   "status": "pending",
-  "created": "2026-09-18T08:27:56.162+00:00",
+  "created": "2026-09-18T08:27:56.259+00:00",
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling/view",
-    "lighting/clustered_forward"
+    "views/view",
+    "views/layers",
+    "culling/frustum_culling"
   ]
 }

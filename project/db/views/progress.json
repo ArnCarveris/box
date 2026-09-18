@@ -1,12 +1,12 @@
 {
   "kind": "feature",
   "status": "pending",
-  "created": "2026-09-18T08:27:56.096+00:00",
+  "created": "2026-09-18T09:02:39.592+00:00",
   "start_time": null,
   "end_time": null,
   "dependencies": [
     "lighting",
     "materials"
   ],
-  "priority": 3
+  "priority": 4
 }

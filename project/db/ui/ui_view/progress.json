@@ -5,7 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling/view",
+    "views/view",
     "geometry_extensions/shapes_2d"
   ]
 }

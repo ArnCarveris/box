@@ -5,6 +5,6 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "views_and_culling/view"
+    "views/view"
   ]
 }

@@ -6,7 +6,7 @@
   "end_time": null,
   "dependencies": [
     "input_and_controllers",
-    "views_and_culling"
+    "views"
   ],
   "priority": 9
 }

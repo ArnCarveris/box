@@ -6,6 +6,6 @@
   "end_time": null,
   "dependencies": [
     "effects/shader_component",
-    "views_and_culling/view"
+    "views/view"
   ]
 }

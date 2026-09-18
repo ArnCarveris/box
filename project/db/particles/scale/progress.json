@@ -8,6 +8,6 @@
     "particles/dynamics",
     "particles/appearance",
     "particles/control",
-    "views_and_culling/frustum_culling"
+    "culling/frustum_culling"
   ]
 }

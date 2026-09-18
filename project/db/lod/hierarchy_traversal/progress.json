@@ -6,7 +6,7 @@
   "end_time": null,
   "dependencies": [
     "lod/screen_space_error",
-    "views_and_culling/hi_z",
+    "culling/hi_z",
     "lod/hlod_proxies"
   ]
 }

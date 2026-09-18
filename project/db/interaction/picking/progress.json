@@ -7,6 +7,6 @@
   "dependencies": [
     "interaction/spatial_index",
     "input_and_controllers/device_layer",
-    "views_and_culling/view"
+    "views/view"
   ]
 }
