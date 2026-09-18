@@ -14,6 +14,7 @@
 #include "blur.h"
 #include "bloom.h"
 #include "exposure.h"
+#include "gtao.h"
 #include "hiz.h"
 #include "queue.h"
 #include "gpu.h"
@@ -49,6 +50,17 @@
 
 /** Target formats a pass is compiled for: the view format and the float one */
 #define BOX_EFFECT_FORMATS (2)
+
+/** Format of the second attachment of the mesh pass.
+ *
+ * The attachment holds the world normal octahedrally in its first two channels
+ * and the indirect diffuse and indirect specular fraction of the pixel in the
+ * other two, which is what a pass changing the indirect light of a pixel needs.
+ */
+#define BOX_EFFECT_NORMAL_FORMAT (WGPUTextureFormat_RGBA16Float)
+
+/** Format the ambient occlusion passes keep their occlusion and view depth in */
+#define BOX_GTAO_FORMAT (WGPUTextureFormat_RG16Float)
 
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
@@ -265,6 +277,14 @@ typedef struct box_gpu_view_t {
     uint32_t bloom_levels;           /**< Levels its pyramid holds, 0 until it has one */
     uint32_t bloom_width;            /**< Width of the finest level of its pyramid */
     uint32_t bloom_height;           /**< Height of the finest level of its pyramid */
+    WGPUTexture gtao_raw;            /**< Occlusion and view depth the trace pass wrote */
+    WGPUTextureView gtao_raw_view;   /**< View of that texture */
+    WGPUTexture gtao_hist[2];        /**< Accumulated occlusion of this frame and the last */
+    WGPUTextureView gtao_hist_view[2]; /**< View of each of them */
+    uint32_t gtao_width;             /**< Width the occlusion textures were created for */
+    uint32_t gtao_height;            /**< Height the occlusion textures were created for */
+    uint32_t gtao_slot;              /**< History entry this frame writes */
+    bool gtao_valid;                 /**< The other entry holds the occlusion of a frame */
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
@@ -423,6 +443,11 @@ struct box_renderer_t {
     WGPUTextureView effect_dummy_view; /**< View of that texture */
     WGPUTexture effect_depth_dummy;  /**< One texel depth target bound to an unused input */
     WGPUTextureView effect_depth_dummy_view; /**< View of that texture */
+    WGPUTexture effect_cube_dummy;   /**< One texel cubemap bound when a view has no environment */
+    WGPUTextureView effect_cube_dummy_view; /**< Cube view of that texture */
+    WGPUBindGroupLayout gtao_layout; /**< Depth, normals, motion and history of the AO passes */
+    WGPURenderPipeline gtao_trace;   /**< Horizon search over the depth of the view */
+    WGPURenderPipeline gtao_resolve; /**< Bilateral denoise and temporal accumulation */
     WGPUComputePipeline exposure_histogram; /**< Log luminance histogram of the image */
     WGPUComputePipeline exposure_average;   /**< Weighted average and the adaptation step */
     WGPUBindGroupLayout exposure_layout;    /**< Uniform, image, histogram and state */
@@ -1146,6 +1171,49 @@ void box_exposure_dispatch(
     uint32_t slot,
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder);
+
+/** Create the layout and the pipelines of the ambient occlusion passes.
+ *
+ * @param r The renderer
+ */
+void box_gtao_init(
+    box_renderer_t *r);
+
+/** Release the pipelines of the ambient occlusion passes.
+ *
+ * @param r The renderer
+ */
+void box_gtao_fini(
+    box_renderer_t *r);
+
+/** Release the occlusion textures of one view.
+ *
+ * @param v The view
+ */
+void box_gtao_view_fini(
+    box_gpu_view_t *v);
+
+/** Trace, denoise and accumulate the ambient occlusion of the current view.
+ *
+ * @param r The renderer
+ * @param fx The pass that asked for the occlusion input
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param encoder The command encoder
+ * @return The texture holding the occlusion, NULL when the passes are missing
+ */
+WGPUTextureView box_gtao_build(
+    box_renderer_t *r,
+    const box_effect_t *fx,
+    uint32_t slot,
+    WGPUCommandEncoder encoder);
+
+/** Prefiltered environment cubemap of the current view.
+ *
+ * @param r The renderer
+ * @return The cube view, a one texel dummy when the view has no environment
+ */
+WGPUTextureView box_environment_specular(
+    box_renderer_t *r);
 
 /** Create the pipelines of the bloom pyramid.
  *

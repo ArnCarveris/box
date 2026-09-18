@@ -44,6 +44,7 @@ ECS_STRUCT(Effect, {
     bool motion;         /**< The pass reads the motion vectors of the view */
     bool pyramid;        /**< The frame blurs the image the pass reads into a pyramid */
     bool exposure;       /**< The frame adapts the exposure of the view from its parameters */
+    bool occlusion;      /**< The frame traces the ambient occlusion of the view for the pass */
 });
 
 /** Exposure and saturation of the trivial grading pass */
@@ -80,6 +81,21 @@ ECS_STRUCT(Bloom, {
     float radius;        /**< 0 to 1, levels of the pyramid that feed back */
     float knee;          /**< Soft knee luminance, 0 lets every texel bloom */
     float firefly_clamp; /**< Luminance a texel is clamped to on the first downsample */
+});
+
+/** Horizon based ambient occlusion of the indirect diffuse light of a pixel.
+ *
+ * The trace runs at half the resolution of the view by default and is upsampled
+ * with a depth aware filter, so the cost of the effect falls by four while the
+ * occlusion still follows the silhouettes of the scene.
+ */
+ECS_STRUCT(Gtao, {
+    float radius;   /**< World radius the horizon search covers, 0 takes 1 */
+    float slices;   /**< Slices of the hemisphere a pixel walks, 0 takes 2 */
+    float steps;    /**< Steps one side of a slice marches, 0 takes 4 */
+    float power;    /**< Exponent the occlusion is raised to, 0 takes 1 */
+    bool temporal;  /**< The occlusion accumulates over frames, default true */
+    bool half_res;  /**< The trace runs at half the resolution, default true */
 });
 
 /** Height based fog integrated along the view ray */

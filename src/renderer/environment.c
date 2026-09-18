@@ -537,6 +537,20 @@ void box_environment_update(
     }
 }
 
+WGPUTextureView box_environment_specular(
+    box_renderer_t *r)
+{
+    WGPUTextureView result = r->effect_cube_dummy_view;
+    if (r->v && r->v->env_slot < BOX_ENV_SLOTS) {
+        box_gpu_env_t *e = &r->envs[r->v->env_slot];
+        if (e->specular_view) {
+            result = e->specular_view;
+        }
+    }
+
+    return result;
+}
+
 void box_environment_fini(
     box_renderer_t *r)
 {

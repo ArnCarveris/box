@@ -258,6 +258,7 @@ static void box_effect_append(
     pass->inputs |= fx->motion ? BOX_EFFECT_MOTION : 0u;
     pass->inputs |= fx->pyramid ? BOX_EFFECT_PYRAMID : 0u;
     pass->inputs |= fx->exposure ? BOX_EFFECT_EXPOSURE : 0u;
+    pass->inputs |= fx->occlusion ? BOX_EFFECT_OCCLUSION : 0u;
     box_effect_params(world, state, e, pass->params);
     v->effect_inputs |= pass->inputs;
     v->effect_count ++;

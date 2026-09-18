@@ -31,6 +31,9 @@ static void box_effect_ctor(
         fx[i].depth = false;
         fx[i].normals = false;
         fx[i].motion = false;
+        fx[i].pyramid = false;
+        fx[i].exposure = false;
+        fx[i].occlusion = false;
     }
 }
 
@@ -121,6 +124,30 @@ static void box_bloom_ctor(
     }
 }
 
+/** Gtao constructor: two slices at half resolution with the history on.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_gtao_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    Gtao *gtao = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        gtao[i].radius = BOX_GTAO_RADIUS;
+        gtao[i].slices = (float)BOX_GTAO_SLICES;
+        gtao[i].steps = (float)BOX_GTAO_STEPS;
+        gtao[i].power = BOX_GTAO_POWER;
+        gtao[i].temporal = true;
+        gtao[i].half_res = true;
+    }
+}
+
 /** Fog constructor: a thin grey haze that starts at the camera.
  *
  * @param ptr The components
@@ -205,11 +232,13 @@ typedef struct box_effect_builtin_t {
 } box_effect_builtin_t;
 
 /** Effects the engine registers */
-#define BOX_EFFECT_BUILTIN_COUNT (5)
+#define BOX_EFFECT_BUILTIN_COUNT (6)
 
 /** The effects every world gets, in the order they run */
 static const box_effect_builtin_t box_effect_builtins[] = {
     { "color_grade", "etc/shaders/color_grade.wgsl", 100, BOX_EFFECT_COLOR },
+    { "gtao", "etc/shaders/gtao.wgsl", 600, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH |
+        BOX_EFFECT_NORMALS | BOX_EFFECT_MOTION | BOX_EFFECT_OCCLUSION },
     { "fog", "etc/shaders/fog.wgsl", 700, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH },
     { "bloom", "etc/shaders/bloom.wgsl", 800, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID },
     { "auto_exposure", "etc/shaders/auto_exposure.wgsl", 850,
@@ -248,7 +277,8 @@ static ecs_entity_t box_effect_builtin(
         .normals = (builtin->inputs & BOX_EFFECT_NORMALS) != 0,
         .motion = (builtin->inputs & BOX_EFFECT_MOTION) != 0,
         .pyramid = (builtin->inputs & BOX_EFFECT_PYRAMID) != 0,
-        .exposure = (builtin->inputs & BOX_EFFECT_EXPOSURE) != 0
+        .exposure = (builtin->inputs & BOX_EFFECT_EXPOSURE) != 0,
+        .occlusion = (builtin->inputs & BOX_EFFECT_OCCLUSION) != 0
     });
 
     return result;
@@ -275,10 +305,11 @@ static void box_effect_stack(
     }
 
     ecs_add(world, created[0], ColorGrade);
-    ecs_add(world, created[1], Fog);
-    ecs_add(world, created[2], Bloom);
-    ecs_add(world, created[3], AutoExposure);
-    ecs_add(world, created[4], ToneMapping);
+    ecs_add(world, created[1], Gtao);
+    ecs_add(world, created[2], Fog);
+    ecs_add(world, created[3], Bloom);
+    ecs_add(world, created[4], AutoExposure);
+    ecs_add(world, created[5], ToneMapping);
 }
 
 void BoxEffectsImport(
@@ -293,6 +324,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, AutoExposure);
     ECS_META_COMPONENT(world, ToneMapping);
     ECS_META_COMPONENT(world, Bloom);
+    ECS_META_COMPONENT(world, Gtao);
     ECS_META_COMPONENT(world, Fog);
     ECS_COMPONENT_DEFINE(world, EffectState);
 
@@ -301,6 +333,7 @@ void BoxEffectsImport(
     ecs_set_hooks(world, AutoExposure, { .ctor = box_exposure_ctor });
     ecs_set_hooks(world, ToneMapping, { .ctor = box_tonemap_ctor });
     ecs_set_hooks(world, Bloom, { .ctor = box_bloom_ctor });
+    ecs_set_hooks(world, Gtao, { .ctor = box_gtao_ctor });
     ecs_set_hooks(world, Fog, { .ctor = box_fog_ctor });
     ecs_set_hooks(world, EffectState, {
         .ctor = flecs_default_ctor,

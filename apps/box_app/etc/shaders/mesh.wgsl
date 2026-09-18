@@ -16,6 +16,7 @@
 #include "include/shadow.wgsl"
 #include "include/textures.wgsl"
 #include "include/common.wgsl"
+#include "include/octahedral.wgsl"
 #include "include/tiling.wgsl"
 #include "include/pbr.wgsl"
 #include "include/cluster.wgsl"
@@ -168,7 +169,11 @@ struct MeshOut {
   @location(1) normal: vec4<f32>,
 };
 
-fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>) -> vec4<f32> {
+// Luminance weights the indirect fractions of a pixel are measured with.
+const MESH_LUMA: vec3<f32> = vec3(0.2126, 0.7152, 0.0722);
+
+fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
+    out_indirect: ptr<function, vec2<f32>>) -> vec4<f32> {
   let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);
   let uv = wrap_uv(in.uv_mode, projected);
   let dp1 = dpdx(in.world_pos);
@@ -245,7 +250,8 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>) 
   let metallic = s.metallic;
   let roughness = clamp(s.roughness, 0.04, 1.0);
   let sun = u.sun_color * u.sun_intensity;
-  let env = environment(sn, v, s.albedo, metallic, roughness);
+  let parts = environment_parts(sn, v, s.albedo, metallic, roughness);
+  let env = parts.diffuse + parts.specular;
   let is_baked = in.params.z > 0.5;
   let shadow = shadow_factor(in.world_pos, gn);
   var spec = vec3<f32>(0.0);
@@ -255,9 +261,15 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>) 
   var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow +
     env + s.emissive;
   color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);
+  var indirect = parts.diffuse;
   if (is_baked) {
-    color = color + baked(in.slot, in.local, sn, s.albedo, metallic);
+    let probe = baked(in.slot, in.local, sn, s.albedo, metallic);
+    color = color + probe;
+    indirect = indirect + probe;
   }
+  let total = max(dot(max(color, vec3(0.0)), MESH_LUMA), 1e-4);
+  *out_indirect = clamp(vec2(dot(max(indirect, vec3(0.0)), MESH_LUMA) / total,
+    dot(max(parts.specular, vec3(0.0)), MESH_LUMA) / total), vec2(0.0), vec2(1.0));
 #if DEBUG_NORMALS
   color = sn * 0.5 + vec3(0.5);
   spec = vec3<f32>(0.0);
@@ -274,13 +286,20 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>) 
 @fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)
     -> @location(0) vec4<f32> {
   var normal = vec3<f32>(0.0);
-  return mesh_shade(in, front, &normal);
+  var indirect = vec2<f32>(0.0);
+  return mesh_shade(in, front, &normal, &indirect);
 }
 
+// The second attachment holds the world normal octahedrally in its first two
+// channels and the indirect diffuse and indirect specular fraction of the pixel
+// in the other two, which is what an ambient occlusion or a reflection pass
+// needs to change the indirect light of a pixel without touching the direct.
 @fragment fn fs_normal(in: VertexOut, @builtin(front_facing) front: bool) -> MeshOut {
   var normal = vec3<f32>(0.0);
+  var indirect = vec2<f32>(0.0);
   var out: MeshOut;
-  out.color = mesh_shade(in, front, &normal);
-  out.normal = vec4(normalize(normal) * 0.5 + vec3(0.5), 1.0);
+  out.color = mesh_shade(in, front, &normal, &indirect);
+  let oct = oct_encode(normalize(normal));
+  out.normal = vec4(oct.x, oct.y, indirect.x, indirect.y);
   return out;
 }

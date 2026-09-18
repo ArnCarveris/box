@@ -180,7 +180,12 @@
                     "fog_parameters_reach_the_pass",
                     "chain_gives_the_view_a_float_target",
                     "float_target_moves_the_gamma_encode",
-                    "chain_encodes_once_at_the_end"
+                    "chain_encodes_once_at_the_end",
+                    "gtao_horizon_of_a_flat_plane",
+                    "gtao_horizon_of_a_corner",
+                    "gtao_runs_at_half_resolution",
+                    "builtin_gtao_is_off_by_default",
+                    "gtao_parameters_reach_the_pass"
                 ],
                 "setup": true,
                 "teardown": true

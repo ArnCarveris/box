@@ -2,6 +2,7 @@
 
 #include "fullscreen.wgsl"
 #include "fx_params.wgsl"
+#include "octahedral.wgsl"
 
 @group(0) @binding(0) var<uniform> fx: Effect;
 @group(0) @binding(1) var fx_color: texture_2d<f32>;
@@ -11,6 +12,8 @@
 @group(0) @binding(5) var fx_motion: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> fx_exposure: Exposure;
 @group(0) @binding(7) var fx_pyramid: texture_2d<f32>;
+@group(0) @binding(8) var fx_ao: texture_2d<f32>;
+@group(0) @binding(9) var fx_env: texture_cube<f32>;
 
 struct FxOut {
   @builtin(position) pos: vec4<f32>,
@@ -29,10 +32,33 @@ fn fx_sample(uv: vec2<f32>) -> vec4<f32> {
   return textureSampleLevel(fx_color, fx_sampler, uv, 0.0);
 }
 
-fn fx_world_normal(uv: vec2<f32>) -> vec3<f32> {
+// The normal attachment holds the world normal octahedrally in its first two
+// channels and the indirect diffuse and indirect specular fraction of the pixel
+// in the other two.
+fn fx_normal_texel(uv: vec2<f32>) -> vec4<f32> {
   let size = vec2<i32>(textureDimensions(fx_normal, 0));
   let c = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0, 0), size - vec2(1, 1));
-  return textureLoad(fx_normal, c, 0).xyz * 2.0 - vec3(1.0);
+  return textureLoad(fx_normal, c, 0);
+}
+
+fn fx_world_normal(uv: vec2<f32>) -> vec3<f32> {
+  return oct_decode(fx_normal_texel(uv).xy);
+}
+
+fn fx_indirect(uv: vec2<f32>) -> vec2<f32> {
+  return fx_normal_texel(uv).zw;
+}
+
+// Ambient occlusion the frame gathered for this pass, one where it gathered none.
+fn fx_ao_sample(uv: vec2<f32>) -> f32 {
+  return textureSampleLevel(fx_ao, fx_sampler, uv, 0.0).x;
+}
+
+// Prefiltered environment of the view at a roughness, which a reflection pass
+// falls back to when its march finds nothing.
+fn fx_env_sample(dir: vec3<f32>, roughness: f32) -> vec3<f32> {
+  let mip = clamp(roughness, 0.0, 1.0) * (f32(ENV_MIPS) - 1.0);
+  return textureSampleLevel(fx_env, fx_sampler, dir, mip).rgb;
 }
 
 fn fx_motion_vector(uv: vec2<f32>) -> vec2<f32> {

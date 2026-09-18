@@ -10,7 +10,7 @@
 #include "../../../src/shader/shader_internal.h"
 
 /** Effect shaders the engine registers next to the builtin slots */
-#define SHADER_EFFECT_COUNT (5)
+#define SHADER_EFFECT_COUNT (6)
 
 static ecs_world_t *w;
 static box_packet_t packet;

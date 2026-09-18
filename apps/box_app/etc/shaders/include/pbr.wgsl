@@ -10,17 +10,33 @@ fn shade(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, albedo: vec3<f32>,
   return (albedo * (1.0 - metallic) + f0 * spec) * ndl;
 }
 
-fn environment(n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
-    metallic: f32, roughness: f32) -> vec3<f32> {
+// The two halves of the image based lighting of a surface, which the normal
+// stage of the mesh pass reports separately so a post process pass knows which
+// fraction of a pixel is indirect diffuse and which is indirect specular.
+struct Indirect {
+  diffuse: vec3<f32>,
+  specular: vec3<f32>,
+};
+
+fn environment_parts(n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
+    metallic: f32, roughness: f32) -> Indirect {
   let ndv = max(dot(n, v), 1e-4);
   let f0 = mix(vec3(0.04), albedo, metallic);
   let irradiance = textureSampleLevel(env_irradiance, env_sampler, n, 0.0).rgb;
-  let diffuse = irradiance * albedo * (1.0 - metallic);
   let r = reflect(-v, n);
   let mip = roughness * (f32(ENV_MIPS) - 1.0);
   let prefiltered = textureSampleLevel(env_specular, env_sampler, r, mip).rgb;
   let ab = textureSampleLevel(env_brdf, env_sampler, vec2(ndv, roughness), 0.0).xy;
-  return diffuse + prefiltered * (f0 * ab.x + vec3(ab.y));
+  var out: Indirect;
+  out.diffuse = irradiance * albedo * (1.0 - metallic);
+  out.specular = prefiltered * (f0 * ab.x + vec3(ab.y));
+  return out;
+}
+
+fn environment(n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
+    metallic: f32, roughness: f32) -> vec3<f32> {
+  let parts = environment_parts(n, v, albedo, metallic, roughness);
+  return parts.diffuse + parts.specular;
 }
 
 fn glass_specular(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, albedo: vec3<f32>,

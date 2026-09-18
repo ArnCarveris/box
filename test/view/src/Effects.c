@@ -10,6 +10,7 @@
 #include <string.h>
 #include "../../../src/render/render_internal.h"
 #include "../../../src/renderer/bloom.h"
+#include "../../../src/renderer/gtao.h"
 #include "../../../src/renderer/fog.h"
 #include "../../../src/renderer/exposure.h"
 
@@ -720,4 +721,90 @@ void Effects_chain_encodes_once_at_the_end(void)
     test_flt(box_effect_encode_flag(true, false, false), 0.0f);
     test_flt(box_effect_encode_flag(true, true, true), 0.0f);
     test_flt(box_effect_encode_flag(false, false, false), 1.0f);
+}
+
+void Effects_gtao_horizon_of_a_flat_plane(void)
+{
+    // effects/gtao
+    float open = box_gtao_slice(0.0f, -BOX_GTAO_HALF_PI, BOX_GTAO_HALF_PI, 1.0f);
+    test_assert(fabsf(open - 1.0f) < 0.0001f);
+
+    float tilted = box_gtao_slice(0.5f, -BOX_GTAO_HALF_PI, BOX_GTAO_HALF_PI, 1.0f);
+    test_assert(fabsf(tilted - 1.0f) < 0.005f);
+
+    float wider = box_gtao_slice(0.0f, -3.0f, 3.0f, 1.0f);
+    test_assert(fabsf(wider - 1.0f) < 0.0001f);
+}
+
+void Effects_gtao_horizon_of_a_corner(void)
+{
+    // effects/gtao
+    float half = box_gtao_slice(0.0f, -BOX_GTAO_HALF_PI, 0.0f, 1.0f);
+    test_assert(fabsf(half - 0.5f) < 0.0001f);
+
+    float closed = box_gtao_slice(0.0f, 0.0f, 0.0f, 1.0f);
+    test_assert(closed < 0.0001f);
+
+    float corner = box_gtao_slice(0.0f, -0.4f, 0.4f, 1.0f);
+    test_assert(corner < half);
+    test_assert(corner > 0.0f);
+    test_assert(box_gtao_slice(0.0f, -0.4f, 0.4f, 0.5f) < corner);
+}
+
+void Effects_gtao_runs_at_half_resolution(void)
+{
+    // effects/gtao
+    test_uint(box_gtao_size(1280, true), 640);
+    test_uint(box_gtao_size(720, true), 360);
+    test_uint(box_gtao_size(1280, false), 1280);
+    test_uint(box_gtao_size(1, true), 1);
+}
+
+void Effects_builtin_gtao_is_off_by_default(void)
+{
+    // effects/gtao
+    ecs_entity_t gtao = ecs_lookup(w, "box.effects.stack.gtao");
+    test_assert(gtao != 0);
+    const Effect *fx = ecs_get(w, gtao, Effect);
+    test_assert(fx != NULL);
+    test_bool(fx->enabled, false);
+    test_bool(fx->depth, true);
+    test_bool(fx->normals, true);
+    test_bool(fx->motion, true);
+    test_bool(fx->occlusion, true);
+    test_int(fx->order, 600);
+    test_assert(fx->order < ecs_get(w, ecs_lookup(w, "box.effects.stack.fog"), Effect)->order);
+
+    const Gtao *params = ecs_get(w, gtao, Gtao);
+    test_assert(params != NULL);
+    test_flt(params->radius, BOX_GTAO_RADIUS);
+    test_flt(params->slices, (float)BOX_GTAO_SLICES);
+    test_flt(params->steps, (float)BOX_GTAO_STEPS);
+    test_bool(params->half_res, true);
+
+    box_render_extract(w, &packet);
+    test_int(packet.effects.count, 0);
+}
+
+void Effects_gtao_parameters_reach_the_pass(void)
+{
+    // effects/gtao
+    ecs_entity_t gtao = ecs_lookup(w, "box.effects.stack.gtao");
+    ecs_get_mut(w, gtao, Effect)->enabled = true;
+    ecs_modified(w, gtao, Effect);
+    ecs_set(w, gtao, Gtao, { .radius = 2.5f, .slices = 3.0f, .steps = 8.0f, .power = 1.5f,
+        .temporal = false, .half_res = false });
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 1);
+    box_effect_t *pass = box_vec_at(&packet.effects, 0);
+    test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH | BOX_EFFECT_NORMALS |
+        BOX_EFFECT_MOTION | BOX_EFFECT_OCCLUSION);
+    test_flt(pass->params[0], 2.5f);
+    test_flt(pass->params[1], 3.0f);
+    test_flt(pass->params[2], 8.0f);
+    test_flt(pass->params[3], 1.5f);
+    test_flt(pass->params[4], 0.0f);
+    test_flt(pass->params[5], 0.0f);
+    test_int(packet.view.effect_inputs & BOX_EFFECT_OCCLUSION, BOX_EFFECT_OCCLUSION);
 }

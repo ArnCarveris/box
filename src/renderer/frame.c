@@ -216,7 +216,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
     WGPUColorTargetState targets[2] = {
         { .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
             .writeMask = WGPUColorWriteMask_All },
-        { .format = r->format, .writeMask = WGPUColorWriteMask_All }
+        { .format = BOX_EFFECT_NORMAL_FORMAT, .writeMask = WGPUColorWriteMask_All }
     };
     WGPUFragmentState fragment = {
         .module = r->mesh_shader,
@@ -608,7 +608,6 @@ static void box_frame_view(
         color[1].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
         color[1].loadOp = WGPULoadOp_Clear;
         color[1].storeOp = WGPUStoreOp_Store;
-        color[1].clearValue.a = 1.0;
         attachments = 2;
     }
 

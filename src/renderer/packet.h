@@ -103,8 +103,11 @@
 /** Shader slot of the downsample and upsample passes of the bloom pyramid */
 #define BOX_SHADER_PYRAMID (14)
 
+/** Ambient occlusion trace and resolve passes the occlusion input runs */
+#define BOX_SHADER_GTAO (15)
+
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (15)
+#define BOX_SHADER_BUILTIN_MAX (16)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -132,6 +135,9 @@
 
 /** The frame adapts the exposure of the view from the parameters of the pass */
 #define BOX_EFFECT_EXPOSURE (32u)
+
+/** The frame traces the ambient occlusion of the view and binds it for the pass */
+#define BOX_EFFECT_OCCLUSION (64u)
 
 /** Bins of the log luminance histogram the exposure pass builds */
 #define BOX_EXPOSURE_BINS (256)
