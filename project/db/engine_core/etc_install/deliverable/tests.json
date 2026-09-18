@@ -1,0 +1,52 @@
+{
+ "project": "bake3",
+ "pass": 7,
+ "fail": 0,
+ "empty": 0,
+ "elapsed": 0,
+ "tests": [
+  {
+   "suite": "EtcInstall",
+   "name": "install_on_build",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "refresh_and_remove_stale",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "private_project_skipped",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "local_env_named",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "local_env_unnamed",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "run_exports_bake_home_and_environment",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "EtcInstall",
+   "name": "info_prints_etc_path",
+   "status": "pass",
+   "time": 0
+  }
+ ],
+ "timestamp": null
+}
