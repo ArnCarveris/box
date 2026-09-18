@@ -1,0 +1,17 @@
+{
+  "scene": "/tmp/claude-501/city_off.flecs",
+  "entities": 20001,
+  "static": 20001,
+  "dynamic": 0,
+  "churn": [0, 0],
+  "frames": 300,
+  "mean_ms": 0.247,
+  "p50_ms": 0.183,
+  "p99_ms": 0.408,
+  "max_ms": 17.901,
+  "fps": 4050.6,
+  "drawn": 13225,
+  "culled": 6776,
+  "occluded": 0,
+  "shadow_static_rebuilds": 0
+}

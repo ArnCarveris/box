@@ -1,0 +1,24 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T20:54:42Z",
+  "pass": 14,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.033235,
+  "tests": [
+    {"suite": "HiZ", "case": "levels_of_a_view", "status": "pass", "elapsed": 0.018634},
+    {"suite": "HiZ", "case": "reduction_of_a_four_by_four_block", "status": "pass", "elapsed": 0.018612},
+    {"suite": "HiZ", "case": "reduction_covers_an_odd_edge", "status": "pass", "elapsed": 0.018612},
+    {"suite": "HiZ", "case": "sphere_on_the_axis_projects_to_the_center", "status": "pass", "elapsed": 0.020020},
+    {"suite": "HiZ", "case": "sphere_off_the_axis_projects_beside_it", "status": "pass", "elapsed": 0.020316},
+    {"suite": "HiZ", "case": "sphere_across_the_near_plane_takes_the_view", "status": "pass", "elapsed": 0.018496},
+    {"suite": "HiZ", "case": "mip_holds_the_rectangle_in_two_texels", "status": "pass", "elapsed": 0.018581},
+    {"suite": "HiZ", "case": "pyramid_hides_a_sphere_behind_a_wall", "status": "pass", "elapsed": 0.018483},
+    {"suite": "HiZ", "case": "pyramid_keeps_a_sphere_in_front_of_a_wall", "status": "pass", "elapsed": 0.014313},
+    {"suite": "HiZ", "case": "pyramid_keeps_a_sphere_that_straddles_a_wall", "status": "pass", "elapsed": 0.013983},
+    {"suite": "HiZ", "case": "a_clamped_rectangle_is_never_hidden", "status": "pass", "elapsed": 0.013962},
+    {"suite": "HiZ", "case": "settings_fall_back_to_the_singleton", "status": "pass", "elapsed": 0.014212},
+    {"suite": "HiZ", "case": "view_without_settings_occludes_by_default", "status": "pass", "elapsed": 0.014470},
+    {"suite": "HiZ", "case": "disabled_culling_disables_occlusion", "status": "pass", "elapsed": 0.014128}
+  ]
+}
