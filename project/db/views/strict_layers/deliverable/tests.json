@@ -1,0 +1,32 @@
+{
+  "project": "view",
+  "timestamp": "2026-09-18T17:26:35Z",
+  "pass": 22,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.046078,
+  "tests": [
+    {"suite": "Layers", "case": "membership_assigns_a_bit", "status": "pass", "elapsed": 0.014419},
+    {"suite": "Layers", "case": "entity_in_two_layers_has_both_bits", "status": "pass", "elapsed": 0.013977},
+    {"suite": "Layers", "case": "entity_without_a_layer_has_no_bits", "status": "pass", "elapsed": 0.014050},
+    {"suite": "Layers", "case": "empty_view_list_shows_everything", "status": "pass", "elapsed": 0.014747},
+    {"suite": "Layers", "case": "view_list_restricts_the_mask", "status": "pass", "elapsed": 0.016216},
+    {"suite": "Layers", "case": "static_slots_are_grouped_by_mask", "status": "pass", "elapsed": 0.014953},
+    {"suite": "Layers", "case": "leaving_a_layer_regroups_the_slots", "status": "pass", "elapsed": 0.014564},
+    {"suite": "Layers", "case": "dynamic_instances_are_filtered_per_view", "status": "pass", "elapsed": 0.014373},
+    {"suite": "Layers", "case": "transparent_entries_are_filtered_per_view", "status": "pass", "elapsed": 0.015230},
+    {"suite": "Layers", "case": "lights_are_restricted_to_a_layer", "status": "pass", "elapsed": 0.014748},
+    {"suite": "Layers", "case": "two_views_show_their_own_layer", "status": "pass", "elapsed": 0.017130},
+    {"suite": "Layers", "case": "view_list_holds_eight_entries", "status": "pass", "elapsed": 0.015204},
+    {"suite": "Layers", "case": "past_the_bit_limit_get_no_bit", "status": "pass", "elapsed": 0.023762},
+    {"suite": "Layers", "case": "prefab_layer_is_inherited", "status": "pass", "elapsed": 0.015271},
+    {"suite": "Layers", "case": "caster_mask_comes_from_shadow_layers", "status": "pass", "elapsed": 0.016805},
+    {"suite": "Layers", "case": "scene_without_layers_keeps_its_packet", "status": "pass", "elapsed": 0.014383},
+    {"suite": "Layers", "case": "strict_view_defaults_to_off", "status": "pass", "elapsed": 0.014667},
+    {"suite": "Layers", "case": "strict_view_hides_unlayered_static_runs", "status": "pass", "elapsed": 0.014855},
+    {"suite": "Layers", "case": "strict_view_hides_unlayered_dynamic", "status": "pass", "elapsed": 0.014205},
+    {"suite": "Layers", "case": "strict_view_hides_unlayered_transparent", "status": "pass", "elapsed": 0.014213},
+    {"suite": "Layers", "case": "strict_view_hides_unlayered_lights", "status": "pass", "elapsed": 0.013900},
+    {"suite": "Layers", "case": "strict_view_without_layers_shows_everything", "status": "pass", "elapsed": 0.014345}
+  ]
+}
