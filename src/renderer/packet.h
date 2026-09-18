@@ -34,6 +34,12 @@
 /** Layer mask of a view that lists no layers, which shows every layer */
 #define BOX_VIEW_LAYER_ALL (0xFFFFFFFFu)
 
+/** Cascades a view can split its shadow map into */
+#define BOX_SHADOW_CASCADE_MAX (4)
+
+/** Radii the light frustum of a cascade reaches behind its sphere for casters */
+#define BOX_SHADOW_EXTRUDE (2.0f)
+
 /** Point and spot lights a packet can carry */
 #define BOX_LIGHT_MAX (4096)
 
@@ -82,6 +88,9 @@
 /** Bit the back face mode of an instance starts at in its mode word */
 #define BOX_MODE_BACK_SHIFT (12)
 
+/** Bit that keeps an instance out of the shadow map of a view */
+#define BOX_MODE_NOCAST_SHIFT (14)
+
 /** Bit the material layer mask of an instance starts at in its mode word */
 #define BOX_MODE_LAYER_SHIFT (16)
 
@@ -110,6 +119,9 @@ typedef struct box_instance_t {
 
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
+
+/** Word the tiling, blend, back face, caster and layer modes of an instance sit in */
+#define BOX_INSTANCE_MODE (30)
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
 typedef struct box_light_t {
@@ -178,6 +190,17 @@ typedef struct box_view_t {
     uint32_t env_generation; /**< Changes when the extracted environment changes */
     uint32_t layers_enabled; /**< The view applies the registered material layers */
     uint32_t pad[3];        /**< Padding to the 16 byte GPU stride */
+    float shadow_matrix[BOX_SHADOW_CASCADE_MAX * 16]; /**< World to clip of every cascade */
+    float shadow_split[4];  /**< View depth a cascade ends at, the last is the distance */
+    float shadow_offset[4]; /**< World offset along the normal of a cascade, its texel size */
+    float shadow_bias[4];   /**< Depth offset of the comparison of a cascade, in clip units */
+    float shadow_fade;      /**< Fraction of the last cascade the shadows fade out over */
+    float shadow_distance;  /**< View depth the shadows reach */
+    float shadow_texel;     /**< Uv size of one texel of a cascade */
+    float shadow_pad;       /**< Padding to the 16 byte GPU stride */
+    uint32_t shadow_cascades; /**< Cascades the view renders, 0 when it has no shadows */
+    uint32_t shadow_filter; /**< PCF taps the comparison takes per axis */
+    uint32_t shadow_pad2[2]; /**< Padding to the 16 byte GPU stride */
     uint32_t target;        /**< Render target handle, 0 draws into the surface */
     uint32_t width;         /**< Target width in pixels */
     uint32_t height;        /**< Target height in pixels */
@@ -195,6 +218,8 @@ typedef struct box_view_t {
     uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
     uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
     uint32_t strict_layers; /**< A view that lists layers draws its members only */
+    uint32_t shadow_resolution; /**< Edge of one cascade of its shadow map in texels */
+    float shadow_bounds[BOX_SHADOW_CASCADE_MAX * 4]; /**< Sphere of a cascade, center and radius */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */
@@ -230,6 +255,19 @@ static inline bool box_view_shows(
     uint32_t mask)
 {
     return box_layer_shown(mask, v->layer_mask, v->strict_layers != 0);
+}
+
+/** Check whether the entities of a membership mask cast the shadows of a view.
+ *
+ * @param v The view
+ * @param mask The membership mask, 0 for an entity that joined no layer
+ * @return True when the shadow pass of the view draws it
+ */
+static inline bool box_view_casts(
+    const box_view_t *v,
+    uint32_t mask)
+{
+    return box_layer_shown(mask, v->caster_mask, v->strict_layers != 0);
 }
 
 /** Render target to create or resize, the renderer owns the texture */
@@ -412,8 +450,35 @@ static inline void box_instance_set_shading(
     uint32_t blend,
     uint32_t back)
 {
-    inst->uv_mode &= ~0xFF00u;
+    inst->uv_mode &= ~0x3F00u;
     inst->uv_mode |= (blend << BOX_MODE_BLEND_SHIFT) | (back << BOX_MODE_BACK_SHIFT);
+}
+
+/** Write whether an instance is drawn into the shadow map into its mode word.
+ *
+ * The bit is set when the instance is not a caster, so an instance without any
+ * material component keeps a mode word of zero.
+ *
+ * @param inst The instance
+ * @param caster The instance casts a shadow
+ */
+static inline void box_instance_set_caster(
+    box_instance_t *inst,
+    bool caster)
+{
+    inst->uv_mode &= ~(1u << BOX_MODE_NOCAST_SHIFT);
+    inst->uv_mode |= caster ? 0u : (1u << BOX_MODE_NOCAST_SHIFT);
+}
+
+/** Check whether the mode word of an instance marks it as a shadow caster.
+ *
+ * @param inst The instance
+ * @return True when the shadow pass draws it
+ */
+static inline bool box_instance_caster(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode & (1u << BOX_MODE_NOCAST_SHIFT)) == 0;
 }
 
 /** Write the enabled material layers of an instance into its mode word.

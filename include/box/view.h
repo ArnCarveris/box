@@ -12,8 +12,9 @@
  * overrides it for that view only. BakeSettings follows the same rule through
  * the first view of the frame, because the probe bake is shared by every view.
  *
- * CullSettings follows the same rule: a view without one culls with the settings
- * of the singleton, and a world without either culls with the defaults.
+ * CullSettings and ShadowSettings follow the same rule: a view without one culls
+ * and shadows with the settings of the singleton, and a world without either
+ * uses the defaults.
  *
  * A layer is any entity an entity or a light joins with the pair (Layer, layer).
  * A view lists the layers it shows and the layers that cast its shadows; both
@@ -71,6 +72,52 @@ ECS_STRUCT(View, {
  * the layers of that prefab.
  */
 extern ECS_TAG_DECLARE(Layer);
+
+/** Cascaded shadow maps of a view, with the singleton as its default.
+ *
+ * The cascades split the camera frustum between its near plane and max_distance,
+ * split_lambda blending a logarithmic split with a uniform one. depth_bias and
+ * normal_offset are given in texels of the cascade, so they hold their meaning
+ * at any resolution. A value of zero takes the default of cascades, resolution,
+ * max_distance and filter_size; a bias of zero is a bias of zero.
+ */
+ECS_STRUCT(ShadowSettings, {
+    int32_t cascades;    /**< Cascades of the shadow map, default 4, at most 4 */
+    int32_t resolution;  /**< Edge of one cascade in texels, default 2048 */
+    float max_distance;  /**< View distance the shadows reach, default 200 */
+    float split_lambda;  /**< 0 splits uniformly, 1 logarithmically, default 0.7 */
+    float depth_bias;    /**< Depth offset of the comparison in texels, default 2 */
+    float normal_offset; /**< Offset along the geometric normal in texels, default 1.5 */
+    int32_t filter_size; /**< PCF taps per axis, default 3, at most 7 */
+    float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
+});
+
+/** Cascades a view splits its shadow map into by default */
+#define BOX_SHADOW_CASCADES (4)
+
+/** Edge of one cascade of a shadow map in texels */
+#define BOX_SHADOW_RESOLUTION (2048)
+
+/** View distance the shadows of a view reach */
+#define BOX_SHADOW_DISTANCE (200.0f)
+
+/** Blend of the logarithmic and the uniform cascade split */
+#define BOX_SHADOW_LAMBDA (0.7f)
+
+/** Depth offset of the shadow comparison in texels of the cascade */
+#define BOX_SHADOW_BIAS (2.0f)
+
+/** Offset of the shadow lookup along the geometric normal, in texels */
+#define BOX_SHADOW_NORMAL (1.5f)
+
+/** PCF taps the shadow comparison takes per axis */
+#define BOX_SHADOW_FILTER (3)
+
+/** PCF taps per axis a view can ask for */
+#define BOX_SHADOW_FILTER_MAX (7)
+
+/** Fraction of the last cascade the shadows fade out over */
+#define BOX_SHADOW_FADE (0.2f)
 
 /** Frustum culling of a view, with the singleton as its default */
 ECS_STRUCT(CullSettings, {

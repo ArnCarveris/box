@@ -281,8 +281,7 @@ void box_render_extract_transparent(
         box_transparent_t *entry = box_vec_push(&p->transparent);
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
-        box_render_fill_instance(world, e, mesh, transform, false, state->textured,
-            state->tiled, state->layered ? state : NULL, &entry->data);
+        box_render_fill_instance(world, e, mesh, transform, false, state, &entry->data);
 
         entry->blend = box_render_blend_mode(world, e);
         entry->back = box_render_back_mode(world, e);

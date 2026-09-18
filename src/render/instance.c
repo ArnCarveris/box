@@ -129,6 +129,19 @@ static void box_render_on_blended(
     }
 }
 
+/** A NoShadow tag exists, so extract resolves the caster flag of changed entities.
+ *
+ * @param it Iterator over the entities that gained the tag
+ */
+static void box_render_on_shadowless(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->shadowless = true;
+    }
+}
+
 /** An opacity or tint exists, so extract resolves the alpha of changed entities.
  *
  * @param it Iterator over the entities that gained the component
@@ -289,15 +302,27 @@ void box_render_instance_bounds(
     out[3] = sqrtf(radius);
 }
 
+bool box_render_casts_shadow(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = true;
+    ecs_entity_t cur = e;
+    while (cur && result) {
+        result = !ecs_has_id(world, cur, NoShadow);
+        cur = ecs_get_target(world, cur, EcsChildOf, 0);
+    }
+
+    return result;
+}
+
 void box_render_fill_instance(
     ecs_world_t *world,
     ecs_entity_t e,
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
-    bool textured,
-    bool tiled,
-    const RenderState *layers,
+    const RenderState *state,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
@@ -328,15 +353,25 @@ void box_render_fill_instance(
     out->params[3] = 0.0f;
 
     memset(out->textures, 0, sizeof(out->textures));
-    if (textured) {
+    if (state->textured) {
         box_render_fill_textures(world, e, out);
     }
 
-    box_render_fill_uv(world, e, mesh, &m, tiled, out);
-    if (layers) {
-        box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
+    box_render_fill_uv(world, e, mesh, &m, state->tiled, out);
+    if (state->layered) {
+        box_instance_set_layers(out, box_render_layer_mask(world, state, e));
     }
 
+    bool caster = !state->shadowless || box_render_casts_shadow(world, e);
+    if (caster && state->blended) {
+        caster = box_render_blend_mode(world, e) == BOX_BLEND_OPAQUE;
+    }
+
+    if (caster && state->translucent) {
+        caster = out->color[3] >= 1.0f;
+    }
+
+    box_instance_set_caster(out, caster);
     box_render_instance_bounds(mesh, &m, out->bounds);
 }
 
@@ -364,6 +399,13 @@ void box_render_instance_init(
     box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
     box_render_watch_flag(world, ecs_id(Tint), box_render_on_translucent);
     box_render_watch_flag(world, ecs_id(ActualTint), box_render_on_translucent);
+    box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = NoShadow }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_render_on_dynamic
+    });
 
     ecs_observer(world, {
         .query.terms = {{ .id = DynamicTransform }},

@@ -62,6 +62,32 @@ static void box_cull_ctor(
     }
 }
 
+/** ShadowSettings constructor: four cascades of 2048 texels over 200 units.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_shadow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ShadowSettings *s = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        s[i].cascades = BOX_SHADOW_CASCADES;
+        s[i].resolution = BOX_SHADOW_RESOLUTION;
+        s[i].max_distance = BOX_SHADOW_DISTANCE;
+        s[i].split_lambda = BOX_SHADOW_LAMBDA;
+        s[i].depth_bias = BOX_SHADOW_BIAS;
+        s[i].normal_offset = BOX_SHADOW_NORMAL;
+        s[i].filter_size = BOX_SHADOW_FILTER;
+        s[i].fade = BOX_SHADOW_FADE;
+    }
+}
+
 void BoxViewImport(
     ecs_world_t *world)
 {
@@ -72,12 +98,14 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, RenderTarget);
     ECS_META_COMPONENT(world, View);
     ECS_META_COMPONENT(world, CullSettings);
+    ECS_META_COMPONENT(world, ShadowSettings);
     ECS_COMPONENT_DEFINE(world, ViewImpl);
     ECS_COMPONENT_DEFINE(world, RenderTargetImpl);
     ECS_TAG_DEFINE(world, Layer);
 
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
     ecs_set_hooks(world, CullSettings, { .ctor = box_cull_ctor });
+    ecs_set_hooks(world, ShadowSettings, { .ctor = box_shadow_ctor });
     ecs_set_hooks(world, RenderTarget, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ViewImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderTargetImpl, { .ctor = flecs_default_ctor });

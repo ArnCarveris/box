@@ -80,6 +80,7 @@ typedef struct RenderState {
     bool blended;             /**< A blend or back face mode exists, so instances read them */
     bool translucent;         /**< An opacity or tint exists, so instances resolve their alpha */
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
+    bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
@@ -370,9 +371,7 @@ void box_render_instance_bounds(
  * @param mesh Its render mesh
  * @param transform Its world transform
  * @param baked The instance reads a baked probe instead of the static lights
- * @param textured The world holds textures, so the PBR slots are resolved
- * @param tiled The world holds tiling components, so the uv transform is derived
- * @param layers The registry when a material enables a layer, NULL when none does
+ * @param state The registry, whose flags say which components the world holds
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -381,10 +380,18 @@ void box_render_fill_instance(
     const RenderMesh *mesh,
     const WorldTransform *transform,
     bool baked,
-    bool textured,
-    bool tiled,
-    const RenderState *layers,
+    const RenderState *state,
     box_instance_t *out);
+
+/** Check whether an entity and its ancestors let it cast a shadow.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return True when neither the entity nor an ancestor carries NoShadow
+ */
+bool box_render_casts_shadow(
+    ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Fill the uv transform and mode of an instance from its material components.
  *
@@ -604,6 +611,67 @@ void box_render_extract_views(
     RenderState *state,
     box_packet_t *p,
     ecs_entity_t capture);
+
+/** Shadow settings of a view, the view first, the singleton after, defaults last.
+ *
+ * Every field is clamped to the range it is valid in, so the caller can use the
+ * result without testing it again.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param out The settings to fill
+ * @return The filled settings
+ */
+const ShadowSettings* box_render_shadow_settings(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ShadowSettings *out);
+
+/** Split a depth range into the far distances of every cascade.
+ *
+ * A lambda of zero splits the range uniformly, a lambda of one logarithmically.
+ *
+ * @param near_ View depth the first cascade starts at
+ * @param distance View depth the last cascade ends at
+ * @param lambda Blend of the logarithmic and the uniform split
+ * @param cascades Cascades to split into
+ * @param out The far distance of every cascade
+ */
+void box_render_shadow_splits(
+    float near_,
+    float distance,
+    float lambda,
+    int32_t cascades,
+    float *out);
+
+/** World space corners of the camera frustum slice between two view depths.
+ *
+ * @param v The view
+ * @param near_ View depth the slice starts at
+ * @param far_ View depth the slice ends at
+ * @param out The eight corners, the near four first
+ */
+void box_render_shadow_corners(
+    const box_view_t *v,
+    float near_,
+    float far_,
+    vec3 *out);
+
+/** Fill the cascades, splits and biases of the shadow map of one view.
+ *
+ * A view without shadows or a world without a directional light leaves the
+ * cascade count at zero, which is what a frame without a shadow pass reads.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param sun The world holds a directional light
+ * @param v The view to fill
+ */
+void box_render_extract_shadows(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    bool sun,
+    box_view_t *v);
 
 /** Register the observers that count the views and release removed targets.
  *

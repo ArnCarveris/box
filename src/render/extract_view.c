@@ -283,8 +283,9 @@ static void box_view_camera(
  * @param world The world
  * @param state The registry
  * @param v The view to fill
+ * @return True when the world holds a directional light
  */
-static void box_view_sun(
+static bool box_view_sun(
     ecs_world_t *world,
     RenderState *state,
     box_view_t *v)
@@ -292,9 +293,11 @@ static void box_view_sun(
     vec3 dir = vec3_normalize(vec3_new(0.4f, -1.0f, 0.3f));
     float intensity = 3.0f;
     vec3 color = vec3_new(1, 1, 1);
+    bool result = false;
 
     ecs_iter_t it = ecs_query_iter(world, state->suns);
     if (ecs_query_next(&it)) {
+        result = true;
         DirectionalLight *light = ecs_field(&it, DirectionalLight, 0);
         WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
         dir = vec3_normalize(mat4_transform_dir(&transform->m, vec3_new(0, 0, 1)));
@@ -315,6 +318,8 @@ static void box_view_sun(
     v->sun_color[0] = color.x;
     v->sun_color[1] = color.y;
     v->sun_color[2] = color.z;
+
+    return result;
 }
 
 /** Check whether two environment lights hold the same values.
@@ -495,7 +500,8 @@ static void box_view_fill(
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
     box_view_cull(world, src->entity, v);
-    box_view_sun(world, state, v);
+    bool sun = box_view_sun(world, state, v);
+    box_render_extract_shadows(world, src->entity, sun, v);
     box_view_environment(world, state, src->entity, index, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
     box_render_extract_transparent(world, state, p, v);

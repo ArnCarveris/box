@@ -79,6 +79,29 @@
                 "teardown": true
             },
             {
+                "id": "Shadows",
+                "testcases": [
+                    "splits_are_uniform_at_lambda_zero",
+                    "splits_are_logarithmic_at_lambda_one",
+                    "default_splits_blend_both",
+                    "cascades_cover_the_camera_range",
+                    "cascade_holds_the_slice_corners",
+                    "texel_snapping_keeps_the_matrix",
+                    "casters_exclude_no_shadow",
+                    "casters_exclude_transparent",
+                    "casters_respect_shadow_layers",
+                    "settings_fall_back_to_the_singleton",
+                    "settings_are_clamped",
+                    "view_without_shadows_has_no_cascades",
+                    "world_without_a_sun_has_no_cascades",
+                    "static_delta_inside_a_cascade_marks_it_dirty",
+                    "static_delta_outside_a_cascade_keeps_it",
+                    "camera_rotation_marks_every_cascade"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Frustum",
                 "testcases": [
                     "planes_of_a_known_projection",

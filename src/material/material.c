@@ -9,6 +9,7 @@
 #include "material_internal.h"
 
 ECS_TAG_DECLARE(DynamicMaterial);
+ECS_TAG_DECLARE(NoShadow);
 ECS_TAG_DECLARE(MaterialLayerOn);
 
 /** Table of linear values for every display encoded byte */
@@ -153,6 +154,7 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, LayerParams);
     ECS_META_COMPONENT(world, MaterialLayerSettings);
     ECS_TAG_DEFINE(world, DynamicMaterial);
+    ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, MaterialLayerOn);
 
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
@@ -175,6 +177,7 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(BlendMode), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(BackFaceMode), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, DynamicMaterial, EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, NoShadow, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, MaterialLayerOn, EcsOnInstantiate, EcsInherit);
 
     box_tint_init(world);

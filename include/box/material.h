@@ -157,6 +157,9 @@ extern ECS_TAG_DECLARE(MaterialLayerOn);
 /** Material properties may change every frame, applies to descendants */
 extern ECS_TAG_DECLARE(DynamicMaterial);
 
+/** Keeps an entity and its descendants out of the shadow pass of every view */
+extern ECS_TAG_DECLARE(NoShadow);
+
 /** Convert a display encoded byte to a linear float.
  *
  * @param value The byte
