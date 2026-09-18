@@ -39,6 +39,32 @@ ECS_STRUCT(CameraController, {
     vec3 velocity;        /**< Velocity in units per second, written every frame */
 });
 
+/** First person controller of a character, driven by the same movement actions.
+ *
+ * The controller walks in the XZ plane at the walk or the run speed, falls with
+ * gravity, jumps from the ground and lowers its eye while Crouch is held. The Fly
+ * action toggles free flight, which moves like the camera controller. The ground
+ * is the top of the bounds of the terrain entity, or the ground height when there
+ * is none, and a member that is zero or less takes its default.
+ */
+ECS_STRUCT(FirstPersonController, {
+    float walk;           /**< Units per second while walking, 4 by default */
+    float run;            /**< Units per second while Run is held, 8 by default */
+    float jump;           /**< Upward speed of a jump, 5 by default */
+    float gravity;        /**< Downward acceleration, 18 by default */
+    float eye;            /**< Height of the eye above the ground, 1.7 by default */
+    float crouch;         /**< Height of the eye while crouching, 0.9 by default */
+    float acceleration;   /**< How fast the velocity follows the input, 12 by default */
+    float sensitivity;    /**< Radians turned per point of cursor movement */
+    ecs_entity_t terrain; /**< Entity whose bounds are the ground, 0 for the height */
+    float ground;         /**< Height of the ground without a terrain entity */
+    float yaw;            /**< Yaw in radians, written every frame */
+    float pitch;          /**< Pitch in radians, written every frame */
+    vec3 velocity;        /**< Velocity in units per second, written every frame */
+    bool grounded;        /**< The character stands on the ground */
+    bool flying;          /**< Free flight, toggled by the Fly action */
+});
+
 /** Register the box.controller module.
  *
  * @param world The world

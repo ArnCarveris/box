@@ -15,6 +15,12 @@
                 "benchcases": [
                     "update_100_controllers"
                 ]
+            },
+            {
+                "id": "Person",
+                "benchcases": [
+                    "update_100_characters"
+                ]
             }
         ]
     }

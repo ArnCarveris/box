@@ -78,10 +78,14 @@ void box_controller_actions_init(
         {"Up", "Move up", BoxKeyE},
         {"Down", "Move down", BoxKeyQ},
         {"Fast", "Move faster while held", BoxKeyShift},
-        {"Look", "Turn with the cursor while held", BoxKeyMouseRight}
+        {"Look", "Turn with the cursor while held", BoxKeyMouseRight},
+        {"Jump", "Jump from the ground", BoxKeySpace},
+        {"Crouch", "Lower the eye while held", BoxKeyCtrl},
+        {"Run", "Walk at the run speed while held", BoxKeyShift},
+        {"Fly", "Toggle free flight", BoxKeyF}
     };
 
-    ecs_entity_t created[8];
+    ecs_entity_t created[12];
     int32_t i, count = (int32_t)(sizeof(binds) / sizeof(binds[0]));
     for (i = 0; i < count; i ++) {
         created[i] = box_controller_action(
@@ -97,5 +101,9 @@ void box_controller_actions_init(
     actions->down = created[5];
     actions->fast = created[6];
     actions->look = created[7];
+    actions->jump = created[8];
+    actions->crouch = created[9];
+    actions->run = created[10];
+    actions->fly = created[11];
     ecs_singleton_modified(world, ControllerActions);
 }

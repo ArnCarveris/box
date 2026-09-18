@@ -31,6 +31,25 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Person",
+                "testcases": [
+                    "the_module_binds_the_character_actions",
+                    "the_character_stands_at_eye_height",
+                    "gravity_pulls_the_character_down",
+                    "walking_moves_in_the_view_plane",
+                    "running_is_faster_than_walking",
+                    "a_jump_rises_and_lands",
+                    "a_jump_needs_the_ground",
+                    "crouching_lowers_the_eye",
+                    "the_fly_toggle_switches_to_free_flight",
+                    "the_terrain_sets_the_ground",
+                    "the_ground_height_holds_the_character",
+                    "the_controller_writes_orientation_and_lookat"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
