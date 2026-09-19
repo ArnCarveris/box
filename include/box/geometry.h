@@ -27,16 +27,15 @@ extern "C" {
  * of three. Two entities whose data is identical share one uploaded mesh, which
  * is released when the last of them lets go of it.
  *
- * Colors multiply the albedo per vertex; a mesh without colors renders as white
- * colors would, and the alpha that would scale roughness waits for a color type
- * with an alpha channel.
+ * Colors multiply the albedo per vertex and their alpha scales the roughness;
+ * a mesh without colors renders as opaque white would.
  */
 ECS_STRUCT(Mesh3, {
     ecs_vec(vec3) vertices;    /**< Vertex positions */
     ecs_vec(vec3) normals;     /**< Vertex normals, empty to derive them per face */
     ecs_vec(vec2) uvs;         /**< Texture coordinates, empty for zeros */
     ecs_vec(uint32_t) indices; /**< Three indices per triangle, empty to draw in order */
-    ecs_vec(rgb) colors;       /**< Per vertex color, one per vertex or empty */
+    ecs_vec(rgba) colors;      /**< Per vertex color and alpha, one per vertex or empty */
 });
 
 /** Box with size x, y, z */

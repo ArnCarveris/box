@@ -26,7 +26,7 @@
 /** Element size of every vector member of a Mesh3, in declaration order */
 static const ecs_size_t box_mesh3_elem[BOX_MESH3_VECTORS] = {
     ECS_SIZEOF(vec3), ECS_SIZEOF(vec3), ECS_SIZEOF(vec2),
-    ECS_SIZEOF(uint32_t), ECS_SIZEOF(rgb)
+    ECS_SIZEOF(uint32_t), ECS_SIZEOF(rgba)
 };
 
 /** Collect the vector members of a Mesh3 in declaration order.
@@ -246,9 +246,9 @@ static void box_mesh3_derive_normals(
 
 /** Pack the per vertex colors of a Mesh3 into the stream the upload reads.
  *
- * The component holds display encoded colors without an alpha channel, so the
- * alpha of every vertex is opaque and leaves the roughness of the material
- * alone. A mesh without colors keeps an empty stream, which uploads as white.
+ * The component holds a display encoded color and an alpha per vertex, which
+ * the mesh shader multiplies into the roughness. A mesh without colors keeps
+ * an empty stream, which uploads as opaque white.
  *
  * @param m The component, already checked
  * @param out The mesh to fill, its vertex count is set
@@ -257,7 +257,7 @@ static void box_mesh3_colors(
     const Mesh3 *m,
     box_mesh_data_t *out)
 {
-    const rgb *colors = ecs_vec_first_t(&m->colors, rgb);
+    const rgba *colors = ecs_vec_first_t(&m->colors, rgba);
     uint32_t i;
 
     if (!colors) {
@@ -267,7 +267,7 @@ static void box_mesh3_colors(
     out->colors = ecs_os_malloc_n(uint32_t, out->vertex_count);
     for (i = 0; i < out->vertex_count; i ++) {
         out->colors[i] = (uint32_t)colors[i].r | ((uint32_t)colors[i].g << 8) |
-            ((uint32_t)colors[i].b << 16) | 0xFF000000u;
+            ((uint32_t)colors[i].b << 16) | ((uint32_t)colors[i].a << 24);
     }
 done:
     return;
