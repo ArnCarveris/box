@@ -116,6 +116,7 @@ static void box_shader_rebuild(
     case BOX_SHADER_PYRAMID:
     case BOX_SHADER_MOTION: box_effect_fini(r); box_effect_init(r); break;
     case BOX_SHADER_OVERLAY: box_overlay_fini(r); box_overlay_init(r); break;
+    case BOX_SHADER_LINES: box_lines_fini(r); break;
     default: break;
     }
 

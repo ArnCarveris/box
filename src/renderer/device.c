@@ -299,6 +299,7 @@ void box_device_fini(
     box_layers_fini(r);
     box_effect_fini(r);
     box_overlay_fini(r);
+    box_lines_fini(r);
     box_shader_fini(r);
     uint32_t slot;
     for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {

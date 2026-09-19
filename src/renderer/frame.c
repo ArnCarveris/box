@@ -699,6 +699,7 @@ static void box_frame_view(
         box_frame_sorted(r, view, p, encoder, target, attachment);
     }
 
+    box_lines_record(r, encoder, attachment, hdr);
     if (passes) {
         box_effect_motion(r, view, index, encoder);
         WGPUTextureView final = wgpuTextureCreateView(surface, NULL);
@@ -766,6 +767,7 @@ void box_frame_render(
     box_cull_frame(r, p);
     box_shadow_frame(r, p);
     box_transparent_upload(r, p);
+    box_lines_upload(r, p);
     box_effect_frame(r, p);
 
     WGPUTexture surface = box_frame_target(r);

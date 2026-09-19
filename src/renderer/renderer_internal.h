@@ -492,6 +492,11 @@ struct box_renderer_t {
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
     WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
+    WGPURenderPipeline lines_pipeline[BOX_EFFECT_FORMATS]; /**< Line list pass per target format */
+    bool lines_tried[BOX_EFFECT_FORMATS]; /**< The line pipeline of a format was built once */
+    WGPUBuffer lines_buffer;         /**< Vertex buffer of the line list of the frame */
+    uint32_t lines_capacity;         /**< Vertices the line buffer can hold */
+    uint32_t lines_count;            /**< Vertices the line buffer holds this frame */
     WGPUBindGroupLayout overlay_layout; /**< Uniform and rectangles of the overlay pass */
     WGPURenderPipeline overlay_pipeline; /**< Pass that draws the rectangles of a panel */
     box_vec_t overlays;              /**< box_gpu_overlay_t indexed by view index */
@@ -1116,6 +1121,43 @@ void box_effect_init(
  * @param r The renderer
  */
 void box_effect_fini(
+    box_renderer_t *r);
+
+/** Upload the line list of a packet into the vertex buffer of the renderer.
+ *
+ * A packet without lines allocates nothing and leaves the buffer alone, so a
+ * frame that draws no debug geometry pays for none of this.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_lines_upload(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Draw the line list of the frame over the image of a view.
+ *
+ * The pass runs after the opaque and the sorted draws and before the effect
+ * chain, reads the depth the scene left behind without writing it, and takes
+ * the matrices and the encoding of the target from the view uniform, so a line
+ * is hidden by what stands in front of it.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param attachment The render target view the view draws into
+ * @param hdr The passes of the view write the float scene target
+ */
+void box_lines_record(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView attachment,
+    bool hdr);
+
+/** Release the pipelines and the vertex buffer of the line pass.
+ *
+ * @param r The renderer
+ */
+void box_lines_fini(
     box_renderer_t *r);
 
 /** Build the pipeline and the bind group layout of the frame rate overlay.

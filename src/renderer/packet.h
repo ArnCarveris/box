@@ -142,8 +142,11 @@
 /** Shader slot of the pass that draws the rectangles of the frame rate panel */
 #define BOX_SHADER_OVERLAY (16)
 
+/** Shader slot of the pass that draws the debug line list */
+#define BOX_SHADER_LINES (17)
+
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (17)
+#define BOX_SHADER_BUILTIN_MAX (18)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -986,6 +989,17 @@ typedef struct box_dynamic_batch_t {
     uint32_t count;         /**< Instances in the batch */
 } box_dynamic_batch_t;
 
+/** One end of a debug line segment, two of them making a segment.
+ *
+ * The color is display encoded RGBA in one word, which the line pass converts
+ * to the space of the target it writes, so a producer of lines never has to
+ * know whether the view renders into a float or an eight bit image.
+ */
+typedef struct box_line_vertex_t {
+    float pos[3];    /**< End of the segment in world space */
+    uint32_t color;  /**< Display encoded RGBA, red in the low byte */
+} box_line_vertex_t;
+
 /** All work the renderer performs for one frame */
 typedef struct box_packet_t {
     uint32_t frame;                          /**< Frame number */
@@ -1018,6 +1032,7 @@ typedef struct box_packet_t {
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
     box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
+    box_vec_t lines;                         /**< box_line_vertex_t, two per debug line segment */
     box_bake_t bake;                         /**< Settings of the baked lighting pass */
     box_sky_t sky;                           /**< Atmosphere of the frame, inactive without one */
     uint32_t sky_lut_shader;                 /**< Shader handle of the sky table passes */
@@ -1052,6 +1067,7 @@ static inline void box_packet_init(
     box_vec_init(&p->lights, sizeof(box_light_t));
     box_vec_init(&p->bake_lights, sizeof(box_light_t));
     box_vec_init(&p->emitters, sizeof(box_emitter_t));
+    box_vec_init(&p->lines, sizeof(box_line_vertex_t));
 }
 
 /** Reset per frame fields while keeping vector storage.
@@ -1091,6 +1107,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->lights);
     box_vec_clear(&p->bake_lights);
     box_vec_clear(&p->emitters);
+    box_vec_clear(&p->lines);
 }
 
 /** Release the vectors of a packet.
@@ -1118,6 +1135,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->lights);
     box_vec_fini(&p->bake_lights);
     box_vec_fini(&p->emitters);
+    box_vec_fini(&p->lines);
 }
 
 #endif
