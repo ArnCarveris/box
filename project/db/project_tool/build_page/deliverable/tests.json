@@ -1,0 +1,376 @@
+{
+  "project": "project_tool",
+  "timestamp": "2026-09-18T23:59:57Z",
+  "pass": 61,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 8.891576708992943,
+  "tests": [
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_benchmarks_builds_micro_suite_history",
+      "status": "pass",
+      "elapsed": 0.002210583072155714
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_benchmarks_keeps_scene_counters",
+      "status": "pass",
+      "elapsed": 0.0008219170849770308
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_benchmarks_latest_per_scene",
+      "status": "pass",
+      "elapsed": 0.0016600422095507383
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_benchmarks_reads_micro_reports",
+      "status": "pass",
+      "elapsed": 0.001392665784806013
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_benchmarks_summarizes_every_level",
+      "status": "pass",
+      "elapsed": 0.0013793751131743193
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_builds_reads_every_build_report",
+      "status": "pass",
+      "elapsed": 0.5093071248847991
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_handles_empty_db",
+      "status": "pass",
+      "elapsed": 0.00030137505382299423
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_tests_builds_suite_and_case_history",
+      "status": "pass",
+      "elapsed": 0.0015146250370889902
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_tests_falls_back_to_mtime",
+      "status": "pass",
+      "elapsed": 0.001117875101044774
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_tests_per_project_and_suite",
+      "status": "pass",
+      "elapsed": 0.0014089581090956926
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_tests_summarizes_every_level",
+      "status": "pass",
+      "elapsed": 0.0013094998430460691
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_aggregate_tests_trend_keeps_the_last_reports_only",
+      "status": "pass",
+      "elapsed": 0.00911466614343226
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_brief_carries_the_task_epic_and_dependency_reports",
+      "status": "pass",
+      "elapsed": 0.002175208181142807
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_brief_falls_back_to_the_spec_of_a_dependency_without_a_report",
+      "status": "pass",
+      "elapsed": 0.0015463330782949924
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_brief_holds_every_rule_block",
+      "status": "pass",
+      "elapsed": 0.001104000024497509
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_brief_names_the_environment_and_the_owned_files",
+      "status": "pass",
+      "elapsed": 0.0011643331963568926
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_brief_refuses_an_epic_and_a_missing_task",
+      "status": "pass",
+      "elapsed": 0.0006185830570757389
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_build_tree_renders_reports_projects_and_steps",
+      "status": "pass",
+      "elapsed": 0.054315665969625115
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_applies_the_epic_rules_only_after_the_process_task",
+      "status": "pass",
+      "elapsed": 0.0035553749185055494
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_passes_clean_tree",
+      "status": "pass",
+      "elapsed": 0.0012034159153699875
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_reports_problems",
+      "status": "pass",
+      "elapsed": 0.0016059160698205233
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_reports_tasks_that_can_never_become_ready",
+      "status": "pass",
+      "elapsed": 0.0028867910150438547
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_warns_for_a_complete_task_missing_its_report",
+      "status": "pass",
+      "elapsed": 0.0017755841836333275
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_warns_for_completed_task_without_bench_report",
+      "status": "pass",
+      "elapsed": 0.004935417091473937
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_check_warns_when_an_epic_runs_before_its_dependency",
+      "status": "pass",
+      "elapsed": 0.001469958107918501
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_content_type_per_extension",
+      "status": "pass",
+      "elapsed": 0.00021691713482141495
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliver_copies_the_bench_report",
+      "status": "pass",
+      "elapsed": 0.002265583025291562
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliver_fails_on_a_failing_or_missing_run",
+      "status": "pass",
+      "elapsed": 0.00109504209831357
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliver_merges_one_report_per_project",
+      "status": "pass",
+      "elapsed": 0.0015798339154571295
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliver_reports_a_missing_bench_run",
+      "status": "pass",
+      "elapsed": 0.0012030000798404217
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliver_runs_bake3_and_writes_the_report",
+      "status": "pass",
+      "elapsed": 0.00114866578951478
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliverable_route_serves_wasm_with_its_content_type",
+      "status": "pass",
+      "elapsed": 1.5059677080716938
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliverables_recognise_build_reports",
+      "status": "pass",
+      "elapsed": 0.0013808750081807375
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_deliverables_summarize_test_reports",
+      "status": "pass",
+      "elapsed": 0.001371457939967513
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_derived_order_covers_subtasks_and_skips_started_tasks",
+      "status": "pass",
+      "elapsed": 0.0021174580324441195
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_derived_order_follows_dependencies_then_priority_then_creation",
+      "status": "pass",
+      "elapsed": 0.005552874878048897
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_accepts_a_subtask_without_a_deliverable",
+      "status": "pass",
+      "elapsed": 0.0016598750371485949
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_accepts_screenshots_instead_of_an_integration_folder",
+      "status": "pass",
+      "elapsed": 0.0020883751567453146
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_checks_the_epic_report_sections_and_length",
+      "status": "pass",
+      "elapsed": 0.0022334998939186335
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_force_completes_with_a_warning",
+      "status": "pass",
+      "elapsed": 0.0012052920646965504
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_refuses_a_task_without_tests_and_bench",
+      "status": "pass",
+      "elapsed": 0.0017861251253634691
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_refuses_an_epic_with_an_open_task_and_accepts_a_discarded_one",
+      "status": "pass",
+      "elapsed": 0.0027433328796178102
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_requires_the_whole_epic_deliverable",
+      "status": "pass",
+      "elapsed": 0.0028897079173475504
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_done_skips_the_bench_report_when_the_task_opts_out",
+      "status": "pass",
+      "elapsed": 0.002004707930609584
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_epic_priority_defaults_and_is_seeded",
+      "status": "pass",
+      "elapsed": 0.002432124922052026
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_epics_and_tasks_sort_by_priority_and_derived_order",
+      "status": "pass",
+      "elapsed": 0.004440083168447018
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_inspector_route_404_when_the_page_is_missing",
+      "status": "pass",
+      "elapsed": 0.5018080831505358
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_inspector_route_reads_the_page_from_disk",
+      "status": "pass",
+      "elapsed": 1.003890542080626
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_new_creates_tree",
+      "status": "pass",
+      "elapsed": 0.0018062919843941927
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_new_rejects_wrong_depth_and_missing_parent",
+      "status": "pass",
+      "elapsed": 0.0002000001259148121
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_next_honours_the_count_and_skips_started_tasks",
+      "status": "pass",
+      "elapsed": 0.0026028749998658895
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_next_lists_ready_unstarted_tasks_in_order",
+      "status": "pass",
+      "elapsed": 0.0025846250355243683
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_next_prints_dependencies",
+      "status": "pass",
+      "elapsed": 0.00172904203645885
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_plan_page_filters_by_epic_and_unfinished_tasks",
+      "status": "pass",
+      "elapsed": 0.048245207872241735
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_plan_page_lays_out_tasks_in_dependency_columns",
+      "status": "pass",
+      "elapsed": 0.046562250005081296
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_priority_post_rejects_unknown_epics_and_bad_values",
+      "status": "pass",
+      "elapsed": 4.013392166001722
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_priority_post_rewrites_progress_and_the_state",
+      "status": "pass",
+      "elapsed": 1.003900249954313
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_report_tree_filters_and_sorts_at_every_level",
+      "status": "pass",
+      "elapsed": 0.05541141703724861
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_report_tree_renders_projects_suites_and_cases",
+      "status": "pass",
+      "elapsed": 0.04805837501771748
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_state_links_epics_with_a_wasm_deliverable",
+      "status": "pass",
+      "elapsed": 0.002443915931507945
+    },
+    {
+      "suite": "PmTests",
+      "case": "test_status_transitions_set_times",
+      "status": "pass",
+      "elapsed": 0.001124958973377943
+    }
+  ]
+}
