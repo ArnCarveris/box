@@ -64,6 +64,44 @@ void Events_hover_resumes_a_handler(void)
     test_bool(ecs_has_id(w, ball, fired_tag), true);
 }
 
+void Events_a_waiter_registered_while_already_hovered_resumes_on_the_next_update(void)
+{
+    // picking/hover_race
+    ecs_entity_t ball = ecs_entity(w, { .name = "ball" });
+    ecs_set(w, ball, Position, {0, 0, 0});
+    ecs_set(w, ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, ball, Hovered), true);
+
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "template Target {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "  async {\n"
+        "    await on.hover(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n" });
+    test_assert(s != 0);
+
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, ball, Hovered), true);
+    test_bool(ecs_has_id(w, ball, fired_tag), false);
+
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, ball, fired_tag), true);
+}
+
 void Events_the_hovered_tag_follows_the_cursor(void)
 {
     // picking/picking

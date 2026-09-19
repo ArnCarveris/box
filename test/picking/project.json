@@ -53,6 +53,7 @@
                 "id": "Events",
                 "testcases": [
                     "hover_resumes_a_handler",
+                    "a_waiter_registered_while_already_hovered_resumes_on_the_next_update",
                     "the_hovered_tag_follows_the_cursor",
                     "press_resumes_a_handler",
                     "release_resumes_a_handler",
