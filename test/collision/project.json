@@ -1,0 +1,36 @@
+{
+    "id": "collision",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.collision module",
+        "public": false,
+        "use": ["box"]
+    },
+    "test": {
+        "testsuites": [{
+            "id": "Roots",
+            "testcases": [
+                "prefab_instance_is_root",
+                "prefab_is_not_a_root",
+                "template_instance_is_root",
+                "manual_root_aggregates",
+                "empty_root_has_no_bounds",
+                "aggregates_children",
+                "aggregates_deep_hierarchy",
+                "aggregates_parent_storage",
+                "own_bounds_are_included",
+                "child_added_updates_bounds",
+                "child_removed_updates_bounds",
+                "child_moved_updates_bounds",
+                "reparent_out_of_root",
+                "reparent_into_other_root",
+                "nested_root_counts_once",
+                "local_bounds_are_root_space",
+                "rigid_root_move_transforms_local_bounds",
+                "rigid_root_child_change_reaggregates",
+                "non_rigid_root_reaggregates_on_move",
+                "deleted_root_is_forgotten"
+            ]
+        }]
+    }
+}

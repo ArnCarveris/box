@@ -26,6 +26,7 @@
 #include "box/effects.h"
 #include "box/texture.h"
 #include "box/movement.h"
+#include "box/collision.h"
 #include "box/controller.h"
 #include "box/surface.h"
 #include "box/sky.h"
