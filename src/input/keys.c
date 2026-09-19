@@ -3,7 +3,8 @@
  * @brief Exports the key codes as script constants under the keys scope.
  *
  * Every constant is also a script variable holding the key mask of the key, so a
- * binding writes keys.W and combines a modifier with keys.Ctrl | keys.S.
+ * binding writes keys.W and combines a modifier with keys.Ctrl | keys.S. The any
+ * families are constants like every other one, so a title screen binds keys.Any.
  */
 
 #include "input_internal.h"
@@ -131,7 +132,10 @@ static const box_key_name_t box_key_names[] = {
     {"Shift", BoxKeyShift},
     {"Ctrl", BoxKeyCtrl},
     {"Alt", BoxKeyAlt},
-    {"Super", BoxKeySuper}
+    {"Super", BoxKeySuper},
+    {"Any", BoxKeyAny},
+    {"AnyKey", BoxKeyAnyKey},
+    {"AnyMouse", BoxKeyAnyMouse}
 };
 
 /** Give a key constant the key mask of its code as a script variable.

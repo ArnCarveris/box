@@ -130,6 +130,26 @@
                 "teardown": true
             },
             {
+                "id": "AnyKey",
+                "testcases": [
+                    "a_key_fires_the_any_binding",
+                    "a_mouse_button_fires_the_any_binding",
+                    "a_modifier_fires_the_any_binding",
+                    "the_event_carries_the_key_that_fired_it",
+                    "the_key_that_went_down_this_frame_is_the_one_reported",
+                    "a_frame_without_a_key_does_not_fire",
+                    "the_key_family_leaves_the_mouse_buttons_alone",
+                    "the_mouse_family_leaves_the_keys_alone",
+                    "a_binding_with_a_modifier_needs_the_modifier",
+                    "a_higher_map_that_consumes_keeps_the_key_from_an_any_binding",
+                    "an_any_binding_that_consumes_keeps_its_key_from_a_lower_map",
+                    "a_key_pair_of_a_map_binds_the_any_family",
+                    "the_binding_list_of_the_action_holds_the_family"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Events",
                 "testcases": [
                     "a_script_resumes_on_the_pressed_frame",

@@ -65,9 +65,10 @@ extern "C" {
  * Every other key takes a spare code in a range ASCII leaves unused: the lowercase
  * range 97 to 126 holds the arrows, the modifiers and the navigation block, 14 to 25
  * hold F1 to F12 and the remaining control and punctuation gaps hold the keypad. The
- * mouse buttons are codes 128 and 129 so they bind like keys, and the four family
- * modifiers above them are mask only codes the action layer resolves to modifier
- * bits; they are not slots of Input.keys.
+ * mouse buttons are codes 128 and 129 so they bind like keys, and the codes above
+ * them are mask only: the four family modifiers the action layer resolves to
+ * modifier bits and the three any families a binding takes to resolve on whatever
+ * key or button is down. None of them are slots of Input.keys.
  */
 typedef enum box_key_t {
     BoxKeyNone = 0,           /**< No key */
@@ -183,7 +184,10 @@ typedef enum box_key_t {
     BoxKeyShift = 130,        /**< Either shift, mask only */
     BoxKeyCtrl = 131,         /**< Either control, mask only */
     BoxKeyAlt = 132,          /**< Either alt, mask only */
-    BoxKeySuper = 133         /**< Either super, mask only */
+    BoxKeySuper = 133,        /**< Either super, mask only */
+    BoxKeyAny = 134,          /**< Any key or mouse button, mask only */
+    BoxKeyAnyKey = 135,       /**< Any key of the keyboard, mask only */
+    BoxKeyAnyMouse = 136      /**< Any mouse button, mask only */
 } box_key_t;
 
 #ifdef __cplusplus

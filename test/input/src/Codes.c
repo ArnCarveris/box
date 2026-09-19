@@ -55,7 +55,7 @@ void Codes_spare_codes_are_unique_and_fit_the_table(void)
     // input/device_layer
     ecs_entity_t keys = ecs_lookup(w, "box.input.keys");
     test_assert(keys != 0);
-    bool seen[BoxKeySuper + 1] = {0};
+    bool seen[BoxKeyAnyMouse + 1] = {0};
     int32_t count = 0;
     ecs_iter_t it = ecs_children(w, keys);
     while (ecs_children_next(&it)) {
@@ -65,14 +65,14 @@ void Codes_spare_codes_are_unique_and_fit_the_table(void)
                 w, it.entities[i], EcsConstant, ecs_i32_t);
             test_assert(value != NULL);
             test_assert(value[0] >= 0);
-            test_assert(value[0] <= BoxKeySuper);
+            test_assert(value[0] <= BoxKeyAnyMouse);
             test_bool(seen[value[0]], false);
             seen[value[0]] = true;
             count ++;
         }
     }
 
-    test_int(count, 114);
+    test_int(count, 117);
     test_bool(seen[BoxKeyLeft], true);
     test_bool(seen[BoxKeyF12], true);
     test_bool(seen[BoxKeyKpEqual], true);

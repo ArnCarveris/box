@@ -6,7 +6,9 @@
  * highest down and a binding that declares consume takes its key and its action
  * away from every layer below it, which is what a UI map over the map of a game
  * needs. A binding that does not say so leaves the layers below alone, so
- * nothing is swallowed by accident and a handler decides the rest.
+ * nothing is swallowed by accident and a handler decides the rest. A binding on
+ * one of the any families resolves on whatever key of that family is down and
+ * reports that key, so a title screen awaits one action.
  */
 
 #include "input_internal.h"
@@ -500,6 +502,112 @@ static uint64_t box_input_resolve_mods(
     return result;
 }
 
+/** Slot range one of the any families of the keys scope covers.
+ *
+ * @param code The key code of the binding
+ * @param first Receives the first slot of the range
+ * @param last Receives the slot after the range
+ * @return Whether the code is one of the any families
+ */
+static bool box_input_any_range(
+    int32_t code,
+    int32_t *first,
+    int32_t *last)
+{
+    bool result = true;
+    first[0] = 1;
+    last[0] = BOX_KEY_COUNT;
+    switch (code) {
+    case BoxKeyAny: break;
+    case BoxKeyAnyKey: last[0] = BoxKeyMouseLeft; break;
+    case BoxKeyAnyMouse: first[0] = BoxKeyMouseLeft; break;
+    default: result = false; break;
+    }
+
+    return result;
+}
+
+/** Find the key of a range that fires an any binding of a layer.
+ *
+ * A key that went down this frame wins over one that is only still held, so the
+ * event of the binding names the key a screen is waiting for, and a key a layer
+ * above took is left out the way it is for a binding that names it.
+ *
+ * @param in The Input singleton
+ * @param layer The layer being resolved
+ * @param first First slot of the range
+ * @param last Slot after the range
+ * @return The key code that fires the binding, or 0 when none does
+ */
+static int32_t box_input_any_key(
+    const Input *in,
+    const box_layer_t *layer,
+    int32_t first,
+    int32_t last)
+{
+    int32_t i, result = 0;
+    for (i = first; i < last; i ++) {
+        if (!in->keys[i].state || layer->consumed[i]) {
+            continue;
+        }
+
+        if (in->keys[i].pressed) {
+            result = i;
+            break;
+        }
+
+        result = result ? result : i;
+    }
+
+    return result;
+}
+
+/** Resolve the bindings of one layer that any key of a family fires.
+ *
+ * @param state The module state
+ * @param layer The layer being resolved
+ * @param in The Input singleton
+ * @param held Modifier bits of the frame
+ * @return The modifier families the resolved bindings claim
+ */
+static uint64_t box_input_resolve_any(
+    InputState *state,
+    const box_layer_t *layer,
+    const Input *in,
+    uint64_t held)
+{
+    uint64_t result = 0;
+    int32_t i, count = ecs_vec_count(&state->bound);
+    box_binding_t *bound = ecs_vec_first_t(&state->bound, box_binding_t);
+    for (i = 0; i < count; i ++) {
+        uint64_t mods = 0;
+        int32_t first, last, fired;
+        int32_t key = box_input_split(bound[i].mask, &mods);
+        if (!box_input_any_range(key, &first, &last)) {
+            continue;
+        }
+
+        fired = box_input_any_key(in, layer, first, last);
+        if (!fired || !box_input_in_layer(state, layer, &bound[i], fired)) {
+            continue;
+        }
+
+        if (!box_input_mods_match(mods, held)) {
+            continue;
+        }
+
+        box_active_t *out = ecs_vec_append_t(NULL, &state->active, box_active_t);
+        out->action = bound[i].action;
+        out->source = bound[i].entity;
+        out->mask = (uint64_t)fired | mods;
+        out->priority = bound[i].priority;
+        out->consume = bound[i].consume;
+        result |= box_input_families_of(mods);
+    }
+
+    return result;
+}
+
 /** Find the highest priority of the bindings of the frame below a priority.
  *
  * @param state The module state
@@ -565,6 +673,7 @@ static void box_input_resolve(
     while (box_input_next_layer(state, below, &layer.priority)) {
         uint64_t claimed = box_input_resolve_keys(state, &layer, in, held);
         claimed |= layer.claimed;
+        claimed |= box_input_resolve_any(state, &layer, in, held);
         layer.claimed = claimed |
             box_input_resolve_mods(state, &layer, held, claimed);
         box_input_take(state, &layer);

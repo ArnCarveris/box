@@ -181,6 +181,9 @@ exported as script constants under `keys` (`keys.W`, `keys.MouseLeft`).
 under the `actions` scope with an `InputAction`, an entity with `InputMap` binds them with
 `(keys.W, actions.Forward)` pairs or with `Binding` children that carry a full key mask
 like `keys.Ctrl|keys.S`, and a UI button or a command fires the same action without a key.
+`keys.Any`, `keys.AnyKey` and `keys.AnyMouse` are masks that resolve on whatever key,
+keyboard key or mouse button is down and report the one that fired through the mask of the
+action event, so a title screen binds one action instead of every key.
 A script task awaits an action with `await on.pressed(actions.Forward)` inside an `async`
 block, next to `on.down`, `on.up` and `on.dragged`; the await returns the source that fired
 the action, and `on.dragged` returns where the drag began and where the cursor is now, in
