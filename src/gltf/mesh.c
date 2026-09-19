@@ -63,11 +63,25 @@ static void box_gltf_flip_v(
     }
 }
 
+/** Convert a linear alpha to the byte the mesh shader multiplies into roughness.
+ *
+ * @param value The linear alpha
+ * @return The encoded byte
+ */
+static uint8_t box_gltf_alpha(
+    float value)
+{
+    float v = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+
+    return (uint8_t)(v * 255.0f + 0.5f);
+}
+
 /** Read the per vertex colors of a primitive into the color stream of a Mesh3.
  *
- * A glTF color is linear and a box rgb is display encoded, so every channel is
- * encoded on the way in. The alpha of a vec4 color scales the opacity of the
- * material in glTF, which a Mesh3 does not carry, so it is dropped.
+ * A glTF color is linear and a box rgb is display encoded, so every color
+ * channel is encoded on the way in. The alpha of a vec4 color is linear
+ * already and scales the roughness through the vertex color, so it is kept
+ * as is; a vec3 color leaves every vertex opaque.
  *
  * @param accessor The color accessor
  * @param vec The color vector to fill
@@ -84,16 +98,17 @@ static void box_gltf_colors(
 
     cgltf_accessor_unpack_floats(accessor, floats,
         (cgltf_size)count * (cgltf_size)components);
-    ecs_vec_init_t(NULL, vec, rgb, count);
-    ecs_vec_set_count_t(NULL, vec, rgb, count);
+    ecs_vec_init_t(NULL, vec, rgba, count);
+    ecs_vec_set_count_t(NULL, vec, rgba, count);
 
-    rgb *out = ecs_vec_first_t(vec, rgb);
+    rgba *out = ecs_vec_first_t(vec, rgba);
     for (i = 0; i < count; i ++) {
         const float *c = &floats[i * components];
 
         out[i].r = box_gltf_srgb(c[0]);
         out[i].g = box_gltf_srgb(c[1]);
         out[i].b = box_gltf_srgb(c[2]);
+        out[i].a = components > 3 ? box_gltf_alpha(c[3]) : 255;
     }
 
     ecs_os_free(floats);
