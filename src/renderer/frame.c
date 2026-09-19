@@ -203,6 +203,7 @@ void box_frame_init(
         true, NULL, false, BOX_NORMALS_NONE);
     box_effect_init(r);
     box_overlay_init(r);
+    box_upscale_init(r);
 }
 
 /** Mesh pipeline that writes the world normals into a second color attachment.
@@ -784,11 +785,13 @@ void box_frame_render(
     box_lines_upload(r, p);
     box_effect_frame(r, p);
 
-    WGPUTexture surface = box_frame_target(r);
-    if (!surface) {
+    WGPUTexture present = box_frame_target(r);
+    if (!present) {
         goto done;
     }
 
+    WGPUTexture scaled = box_upscale_begin(r, p);
+    WGPUTexture surface = scaled ? scaled : present;
     box_timing_frame(r);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
     box_timing_record(r, encoder);
@@ -796,6 +799,10 @@ void box_frame_render(
     uint32_t i;
     for (i = 0; i < p->views.count; i ++) {
         box_frame_view(r, p, i, encoder, surface);
+    }
+
+    if (scaled) {
+        box_upscale_blit(r, encoder, present);
     }
 
     box_cull_record(r, encoder);
@@ -810,14 +817,14 @@ void box_frame_render(
     box_timing_publish(r);
 
     if (p->capture_path[0]) {
-        box_capture_texture(r, box_frame_capture_target(r, p, surface), p->capture_path);
+        box_capture_texture(r, box_frame_capture_target(r, p, present), p->capture_path);
     }
 
     if (r->surface) {
 #ifndef BOX_PLATFORM_WEB
         wgpuSurfacePresent(r->surface);
 #endif
-        wgpuTextureRelease(surface);
+        wgpuTextureRelease(present);
     }
 
 done:

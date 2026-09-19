@@ -19,6 +19,7 @@
 #include "lut.h"
 #include "hiz.h"
 #include "overlay.h"
+#include "upscale.h"
 #include "sky.h"
 #include "particle.h"
 #include "queue.h"
@@ -495,6 +496,14 @@ struct box_renderer_t {
     WGPUBindGroupLayout blur_layout; /**< Source texture and sampler of a blur pass */
     WGPURenderPipeline blur_down[BOX_EFFECT_FORMATS]; /**< Thirteen tap downsample of a level */
     WGPURenderPipeline blur_up[BOX_EFFECT_FORMATS]; /**< Eight tap tent upsample, mixed up */
+    WGPUTexture upscale;             /**< Scaled image the surface views draw into */
+    WGPUTextureView upscale_view;    /**< View of that image */
+    WGPUBindGroup upscale_group;     /**< Binding of that image and its sampler */
+    WGPUSampler upscale_sampler;     /**< Linear sampler the magnifying pass reads with */
+    WGPUBindGroupLayout upscale_layout; /**< Layout of the magnifying pass */
+    WGPURenderPipeline upscale_pipeline; /**< Full screen pass that magnifies the image */
+    uint32_t upscale_width;          /**< Width the scaled image has */
+    uint32_t upscale_height;         /**< Height it has */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
     WGPUBuffer modulator_buffer;     /**< Parameter block of every light modulator */
     box_vec_t shaders;               /**< char* of the preprocessed WGSL, indexed by handle */

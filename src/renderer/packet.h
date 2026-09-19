@@ -1281,6 +1281,8 @@ typedef struct box_packet_t {
     float delta;                             /**< Seconds the frame advanced the world */
     uint32_t width;                          /**< Target width in pixels */
     uint32_t height;                         /**< Target height in pixels */
+    uint32_t scaled_width;                   /**< Width the surface views render at */
+    uint32_t scaled_height;                  /**< Height the surface views render at */
     float clear[4];                          /**< Clear color, linear RGBA */
     char capture_path[BOX_CAPTURE_PATH_MAX]; /**< PNG to write, empty for none */
     box_view_t view;                         /**< Copy of the first view, for readers of one view */
@@ -1379,6 +1381,8 @@ static inline void box_packet_reset(
     p->delta = 0;
     p->width = 0;
     p->height = 0;
+    p->scaled_width = 0;
+    p->scaled_height = 0;
     p->capture_path[0] = '\0';
     p->has_view = false;
     p->capture_view = BOX_VIEW_NONE;

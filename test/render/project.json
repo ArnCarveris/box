@@ -565,6 +565,20 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Resolution",
+                "testcases": [
+                    "a_surface_view_takes_the_scaled_size",
+                    "an_unscaled_surface_view_keeps_the_window_size",
+                    "a_render_target_keeps_its_own_size",
+                    "the_surface_reports_the_size_it_renders_at",
+                    "a_scale_of_one_reports_the_window_size",
+                    "a_scale_below_one_is_the_full_resolution",
+                    "the_capture_keeps_the_window_size"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

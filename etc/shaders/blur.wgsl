@@ -55,3 +55,7 @@ fn tap(uv: vec2<f32>) -> vec4<f32> {
   sum = sum + tap(in.uv + vec2(-o.x, -o.y)) * 2.0;
   return sum / 12.0;
 }
+
+@fragment fn fs_blit(in: Out) -> @location(0) vec4<f32> {
+  return tap(in.uv);
+}

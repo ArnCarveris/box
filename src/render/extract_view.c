@@ -234,8 +234,8 @@ static void box_view_target(
     box_view_t *v)
 {
     v->target = 0;
-    v->width = p->width;
-    v->height = p->height;
+    v->width = p->scaled_width ? p->scaled_width : p->width;
+    v->height = p->scaled_height ? p->scaled_height : p->height;
     memcpy(v->clear, p->clear, sizeof(v->clear));
     const View *view = e ? ecs_get(world, e, View) : NULL;
     if (!view) {

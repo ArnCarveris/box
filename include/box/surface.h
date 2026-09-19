@@ -56,7 +56,14 @@ ECS_ENUM(TextureCacheMode, {
     TextureCacheOn = 2       /**< Reserved for a processed texture cache */
 });
 
-/** Window or offscreen render target, actual_* and point_* are written by the engine */
+/** Window or offscreen render target, actual_*, point_* and scaled_* are written by the engine.
+ *
+ * resolution_scale is the only one of the sizes an author sets: it divides the
+ * framebuffer the scene is drawn into, which is blitted up to the window at the
+ * end of the frame. Everything authored stays in points, so a UI tree keeps its
+ * logical size, a picking ray keeps taking a normalized cursor and a capture
+ * writes the window size; only the pixels of the scene get cheaper.
+ */
 ECS_STRUCT(Surface, {
     int32_t width;          /**< Requested width in points */
     int32_t height;         /**< Requested height in points */
@@ -64,6 +71,9 @@ ECS_STRUCT(Surface, {
     int32_t actual_height;  /**< Framebuffer height in pixels */
     int32_t point_width;    /**< Window width in points */
     int32_t point_height;   /**< Window height in points */
+    float resolution_scale; /**< Divides the pixels the scene is rendered at, 2 is half */
+    int32_t scaled_width;   /**< Width the scene is rendered at, written by the engine */
+    int32_t scaled_height;  /**< Height the scene is rendered at, written by the engine */
     bool vsync;             /**< Present with vertical sync */
     bool keep_source_textures; /**< Keep the pixels of a loaded texture in memory */
     bool cursor_captured;   /**< Lock the cursor to the window and hide it */

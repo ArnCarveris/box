@@ -1,6 +1,11 @@
 /**
  * @file surface/surface.c
  * @brief Creates windows and renderers from Surface components and submits frames.
+ *
+ * The framebuffer of a surface keeps the size of its window, and
+ * resolution_scale divides the size the scene is rendered at: the packet of the
+ * frame carries both, every view that draws into the surface takes the scaled
+ * one and the renderer blits its image up to the window before it presents.
  */
 
 #define BOX_SURFACE_IMPL
@@ -136,7 +141,29 @@ static void box_surface_impl_dtor(
     }
 }
 
-/** Poll window events and publish the actual size to the Surface.
+/** Divide one axis of the framebuffer by the resolution scale of a surface.
+ *
+ * @param pixels The framebuffer size of the axis
+ * @param scale The scale, one or less for the full resolution
+ * @return The size the scene is rendered at, at least one pixel
+ */
+static int32_t box_surface_scaled(
+    int32_t pixels,
+    float scale)
+{
+    int32_t result = pixels;
+    if (scale > 1.0f) {
+        result = (int32_t)((float)pixels / scale + 0.5f);
+    }
+
+    if (result < 1) {
+        result = pixels > 0 ? 1 : 0;
+    }
+
+    return result;
+}
+
+/** Poll window events and publish the actual and scaled size to the Surface.
  *
  * @param it Iterator over surfaces
  */
@@ -152,15 +179,18 @@ static void BoxSurfacePoll(
             s[i].actual_height = s[i].height;
             s[i].point_width = s[i].width;
             s[i].point_height = s[i].height;
-            continue;
+        } else {
+            box_window_poll(impl[i].window);
+            box_window_size(impl[i].window, &s[i].actual_width, &s[i].actual_height,
+                &s[i].point_width, &s[i].point_height);
+            if (box_window_should_close(impl[i].window)) {
+                ecs_quit(it->world);
+            }
         }
 
-        box_window_poll(impl[i].window);
-        box_window_size(impl[i].window, &s[i].actual_width, &s[i].actual_height,
-            &s[i].point_width, &s[i].point_height);
-        if (box_window_should_close(impl[i].window)) {
-            ecs_quit(it->world);
-        }
+        float scale = s[i].resolution_scale;
+        s[i].scaled_width = box_surface_scaled(s[i].actual_width, scale);
+        s[i].scaled_height = box_surface_scaled(s[i].actual_height, scale);
     }
 }
 
@@ -226,6 +256,8 @@ static void BoxSurfaceAcquire(
         p->delta = ecs_get_world_info(it->world)->delta_time;
         p->width = (uint32_t)s[i].actual_width;
         p->height = (uint32_t)s[i].actual_height;
+        p->scaled_width = (uint32_t)s[i].scaled_width;
+        p->scaled_height = (uint32_t)s[i].scaled_height;
         p->clear[0] = 0.02f;
         p->clear[1] = 0.02f;
         p->clear[2] = 0.03f;
