@@ -211,6 +211,30 @@
                     "the_weather_keeps_the_amounts_it_was_asked_for",
                     "a_world_without_the_particle_module_still_wets_and_greys"
                 ]
+            },
+            {
+                "id": "Effect",
+                "testcases": [
+                    "a_play_makes_an_instance_of_the_template",
+                    "the_instance_is_placed_at_the_position",
+                    "a_template_without_an_emitter_plays_nothing",
+                    "the_scale_multiplies_the_sizes_and_the_speeds",
+                    "a_scale_of_zero_plays_the_template_as_it_is",
+                    "a_second_play_while_the_first_runs_makes_a_second_instance",
+                    "the_instance_is_retired_after_the_last_particle_dies",
+                    "a_play_reuses_a_retired_instance",
+                    "a_pool_belongs_to_one_template",
+                    "the_emission_ends_when_the_bursts_have_gone_off",
+                    "the_flash_fades_over_the_seconds_of_the_template",
+                    "the_flash_is_dark_when_its_fade_is_over",
+                    "a_replay_lights_the_flash_again",
+                    "a_flash_that_outlasts_the_particles_holds_the_instance",
+                    "the_burst_of_the_template_reaches_the_packet",
+                    "a_retired_instance_is_left_out_of_the_packet",
+                    "three_plays_reach_the_packet_as_three_blocks"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

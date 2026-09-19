@@ -25,6 +25,11 @@
  * clock its ParticleBurst schedules go off on, so every control of the effect
  * is a component write that a script, the REST API or a terminal command makes
  * without an endpoint of its own.
+ *
+ * An effect that plays once at a point of the world is a template of those
+ * components: box_particle_burst_at and particle.burst_at play it from a pool
+ * of instances per template and hand the instance back when its last particle
+ * has died, so nothing is created or deleted per hit.
  */
 
 #ifndef BOX_PARTICLE_H
@@ -293,6 +298,58 @@ ECS_STRUCT(ParticleStats, {
     int32_t spawned;   /**< Particles the frame spawned */
     int64_t bytes;     /**< Bytes those pools cost on the device */
 });
+
+/** Fading flash of an effect, next to the emitter of its template.
+ *
+ * An effect that lights the scene it goes off in carries a PointLight and this
+ * component: the play fades the intensity of the light from `intensity` to
+ * nothing over `seconds` and leaves it dark after, so the muzzle flash of a
+ * template is two components of that template instead of code that creates a
+ * light per shot and deletes it again.
+ */
+ECS_STRUCT(EffectFlash, {
+    float intensity; /**< Intensity the flash starts at, 0 takes the one of the light */
+    float seconds;   /**< Seconds it fades over, 0 for a fifth of a second */
+});
+
+/** One shot play of an effect template, on the instance that is playing it.
+ *
+ * box_particle_burst_at takes an instance of a template from the pool of that
+ * template, places it, scales it and plays it from the top. The engine ends the
+ * emission once the bursts of the template have all gone off and hands the
+ * instance back to the pool the moment its last particle has died, so the same
+ * hit effect fired a hundred times a second costs the entities of one pool
+ * instead of one entity per hit.
+ */
+ECS_STRUCT(ParticleEffect, {
+    ecs_entity_t effect; /**< Template the instance was made from */
+    float scale;         /**< Size of the play, 1 for the template as it was authored */
+    double time;         /**< Seconds into the play, written every frame */
+    double emit;         /**< Seconds into the play the emission ends at */
+    double retire;       /**< Seconds into the play the instance is freed at */
+});
+
+/** Play an effect template once at a point of the world.
+ *
+ * The template is one entity, an ordinary prefab or script template holding the
+ * emitter of the effect, its curves, its bursts, its appearance and an optional
+ * PointLight with an EffectFlash. The play takes a free instance of that
+ * template from its pool or makes one, so a stream of hits reuses the same
+ * entities, and the scale multiplies the sizes, the speeds and the spawn volume
+ * of the emitter, which is what lets one template cover a small and a large
+ * explosion.
+ *
+ * @param world The world
+ * @param effect The effect template
+ * @param position Where the effect plays, in world space
+ * @param scale Size of the play, 0 or less for the size of the template
+ * @return The instance that is playing, 0 when the template holds no emitter
+ */
+ecs_entity_t box_particle_burst_at(
+    ecs_world_t *world,
+    ecs_entity_t effect,
+    vec3 position,
+    float scale);
 
 /** Register the box.particle module.
  *

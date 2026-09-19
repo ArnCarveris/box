@@ -281,6 +281,7 @@ void BoxParticleImport(
     ECS_IMPORT(world, BoxSpline);
     ECS_IMPORT(world, BoxShader);
     ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, BoxLight);
 
     ECS_META_COMPONENT(world, EmitterShape);
     ECS_META_COMPONENT(world, ParticleRange);
@@ -298,6 +299,8 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleBurst);
     ECS_META_COMPONENT(world, ParticleSettings);
     ECS_META_COMPONENT(world, ParticleStats);
+    ECS_META_COMPONENT(world, EffectFlash);
+    ECS_META_COMPONENT(world, ParticleEffect);
     ECS_COMPONENT_DEFINE(world, ParticleEmitterImpl);
     ECS_COMPONENT_DEFINE(world, ParticleState);
 
@@ -308,6 +311,8 @@ void BoxParticleImport(
     ecs_set_hooks(world, ParticleAppearance, { .ctor = box_particle_appearance_ctor });
     ecs_set_hooks(world, ParticleSettings, { .ctor = box_particle_settings_ctor });
     ecs_set_hooks(world, ParticleEmitterImpl, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, EffectFlash, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ParticleEffect, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ParticleState, {
         .ctor = flecs_default_ctor,
         .dtor = box_particle_state_dtor
@@ -342,9 +347,20 @@ void BoxParticleImport(
         .cache_kind = EcsQueryCacheAuto
     });
 
+    ecs_query_t *effects = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "effects" }),
+        .terms = {
+            { .id = ecs_id(ParticleEffect), .inout = EcsIn },
+            { .id = EcsDisabled }
+        },
+        .flags = EcsQueryMatchDisabled,
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     ParticleState *state = ecs_singleton_ensure(world, ParticleState);
     state->emitters = query;
     state->bursts = bursts;
+    state->effects = effects;
     ecs_vec_init_t(NULL, &state->views, box_particle_view_t, 0);
     ecs_singleton_modified(world, ParticleState);
     ecs_singleton_ensure(world, ParticleSettings);
@@ -353,6 +369,20 @@ void BoxParticleImport(
     ecs_singleton_modified(world, ParticleStats);
 
     box_particle_functions_init(world, ecs_id(BoxParticle));
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxParticleEffects" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(ParticleEffect) },
+            { .id = ecs_id(ParticlePlayback) },
+            { .id = ecs_id(PointLight), .oper = EcsOptional,
+                .src.id = EcsSelf },
+            { .id = ecs_id(EffectFlash), .oper = EcsOptional,
+                .src.id = EcsSelf, .inout = EcsIn }
+        },
+        .callback = BoxParticleEffects
+    });
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(ParticleEmitter) }},

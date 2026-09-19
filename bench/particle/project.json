@@ -32,6 +32,13 @@
                     "resample_mesh_1k_triangles",
                     "resample_spline"
                 ]
+            },
+            {
+                "id": "Effect",
+                "benchcases": [
+                    "play_100_effects",
+                    "update_100_playing_effects"
+                ]
             }
         ]
     }

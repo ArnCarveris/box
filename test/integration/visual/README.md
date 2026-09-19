@@ -54,6 +54,7 @@ Rules for adding one:
 | Views and render targets | `two_views` | The world from a front camera and from a 3/4 camera into a texture target. |
 | Render layers | `layers_views` | Two views showing only their own layer, lights and the shared object. |
 | Frustum culling | `culling` | Identical with culling on and off; the bench reports culled counts. |
+| Surface resolution scale | `resolution_scale` | The scene drawn at half the pixels and magnified: soft edges with the UI panel at its logical size. |
 | The Hidden switch | `hidden` | Half the columns of a grid gone, a hidden sphere group and a hidden sphere inside a group gone, the post of the hidden lamp unlit. |
 | Cascaded shadows | `shadows`, `shadows_low_sun`, `shadows_dynamic` | Shadows attached to casters, sharp near and softer far, no acne, no seams, moving casters. |
 | Parent and ChildOf hierarchies | `parent_tree` | A spinning Parent tree carrying arms and hands, a mixed tower. |
@@ -85,6 +86,7 @@ Rules for adding one:
 | Particle emitter shapes | `particles_shapes` | Six streams a few frames old: point, sphere, box, disc, the surface of a mesh and a spline, one color each. |
 | Particle forces and collision | `particles_forces` | A jet splashing off a plate, a plume blown over by wind with turbulence and a burst of sparks with a speed and a color variance flattened on the floor. |
 | Particle appearances and blending | `particles_appearance` | Five emitters: soft sprite smoke fading into a wall, additive fire down its gradient, sparks, a sprite sheet whose frames grow with the age, and star billboards of a mesh. |
+| One shot effects | `one_shot_effects` | One effect template played at three scales a frame into its burst, each with its fading flash on the ground. |
 | Particle playback and bursts | `particles_control` | A burst caught two frames into its flight, a schedule of three pulses as nested shells, a running stream and the empty ground where a stopped emitter stands. |
 | Impostors | `lod_impostors` | Four mast yards fanning away: the near one keeps its masts, the two behind it are billboards of the eight views captured into their atlas, and the farthest is small enough for the box over its bounds again. |
 

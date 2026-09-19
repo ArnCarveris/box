@@ -7,6 +7,9 @@
  * by hand: they add a ParticlePlayback to an entity that has an emitter and set
  * the state or the reset trigger on it, and they answer whether the entity is
  * an emitter at all, so a script can branch on a name it was handed.
+ *
+ * particle.burst_at is the one shot: it plays an effect template once at a
+ * point of the world from the pool of that template.
  */
 
 #include "particle_internal.h"
@@ -142,6 +145,27 @@ static void box_particle_fn_time(
     *(ecs_f64_t*)result->ptr = playback ? playback->time : 0.0;
 }
 
+/** particle.burst_at: play an effect template once at a point of the world.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments: the template, the position and the scale
+ * @param result Receives the instance that plays, 0 when there is no emitter
+ */
+static void box_particle_fn_burst_at(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+
+    *(ecs_entity_t*)result->ptr = box_particle_burst_at(ctx->world,
+        *(ecs_entity_t*)argv[0].ptr,
+        *(vec3*)argv[1].ptr,
+        *(ecs_f32_t*)argv[2].ptr);
+}
+
 /** Register one playback function that takes an emitter and answers a boolean.
  *
  * @param world The world
@@ -174,6 +198,18 @@ void box_particle_functions_init(
     box_particle_function(world, module, "pause", box_particle_fn_pause);
     box_particle_function(world, module, "stop", box_particle_fn_stop);
     box_particle_function(world, module, "reset", box_particle_fn_reset);
+
+    ecs_function(world, {
+        .name = "burst_at",
+        .parent = module,
+        .return_type = ecs_id(ecs_entity_t),
+        .params = {
+            { .name = "effect", .type = ecs_id(ecs_entity_t) },
+            { .name = "position", .type = ecs_id(vec3) },
+            { .name = "scale", .type = ecs_id(ecs_f32_t) }
+        },
+        .callback = box_particle_fn_burst_at
+    });
 
     ecs_function(world, {
         .name = "time",

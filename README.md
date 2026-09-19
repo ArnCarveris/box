@@ -128,6 +128,20 @@ resolves into its children and grandchildren next to an untinted white box.
 boxes and spheres around the camera with a row behind it, which `CullSettings`
 on a view or as a singleton switches off for a bit identical comparison.
 
+`test/integration/visual/resolution_scale.flecs` is the resolution scale check:
+the same checkered floor, crate, ball, post and UI panel rendered at
+`Surface: {resolution_scale: 2}`, which is half the pixels on each axis
+magnified back to the window. `resolution_scale` divides the framebuffer the
+scene is drawn into; one and anything below it is the full resolution, two is a
+quarter of the pixels and the knob a quality tier turns on a weak GPU. The swap
+chain keeps the size of the window, every view that draws into the surface
+renders at the scaled size with its depth target, its effect chain and its
+overlay, and one linear pass magnifies the image before the frame is presented.
+Everything authored stays in points: a UI tree keeps its logical size,
+`box_picking_ray` keeps taking a normalized cursor and a `Surface.write_to_file`
+capture writes the window size. `Surface.scaled_width` and
+`Surface.scaled_height` report what the scene got.
+
 `test/integration/visual/hidden.flecs` is the visibility check: half the columns
 of a grid carry `box.render.Hidden`, one group of spheres is hidden through its
 parent, one sphere of a second group is hidden on its own, and one of two lamps
@@ -707,6 +721,33 @@ drive it without an endpoint of its own: `set fireworks.firework ParticlePlaybac
 {state: ParticlePaused}` freezes it from a session. The module also registers the same
 controls as script functions, `particle.start`, `particle.pause`, `particle.stop`,
 `particle.reset` and `particle.time`, which each take the emitter entity.
+
+An effect that plays once at a point of the world is a template of those components: a
+prefab holding the emitter, its bursts, its curves, its appearance and an optional
+`PointLight` with an `EffectFlash` that fades it. `box_particle_burst_at(world, effect,
+position, scale)` and `particle.burst_at(effect, position, scale)` take a free instance
+of that template from its pool or make one, place it, scale its sizes, speeds and spawn
+volume and play it from the top; the engine ends the emission once the bursts have gone
+off and hands the instance back to the pool a lifetime later, when its last particle has
+died, so a hundred hits a second cost the entities of one pool instead of one per hit.
+`ParticleEffect` on the instance reports the template, the scale and the times it is
+stopped and freed at. `test/integration/visual/one_shot_effects.flecs` plays one template
+at three scales.
+
+```
+using box.particle
+
+effects {
+  prefab Spark {
+    ParticleEmitter: {max: 600, rate: 0, shape: EmitterSphere, radius: 0.7}
+    ParticleBurst: {count: 300, at: 0}
+    PointLight: {intensity: 8, range: 7}
+    EffectFlash: {seconds: 0.6}
+  }
+}
+
+const hit = box.particle.burst_at(effects.Spark, {0, 1, 0}, 1.5)
+```
 
 `ParticleSettings` is the singleton that holds what every emitter of a world shares.
 `max_total` caps what the pools hold together and `spawn_per_frame` caps what a frame

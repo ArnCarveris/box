@@ -1,0 +1,62 @@
+// Three plays of one effect template at three scales, caught a frame into
+// their burst: box_particle_burst_at takes an instance of the template from its
+// pool, places it, scales it and lets it retire itself when the last particle
+// has died, and the PointLight of the template flashes with it.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.particle
+
+camera {
+  Position: {0, 2.5, -12}
+  LookAt: {0, 1.2, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 0.8}
+}
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {30, 0.5, 30}
+  Rgb: {90, 92, 100}
+  PbrMaterial: {roughness: 0.85}
+}
+
+wall {
+  Position: {0, 2, 6}
+  Box: {24, 4, 0.5}
+  Rgb: {110, 105, 100}
+  PbrMaterial: {roughness: 0.9}
+}
+
+effects {
+  prefab Spark {
+    ParticleEmitter: {
+      max: 600, rate: 0, shape: EmitterSphere, radius: 0.7,
+      direction: {0, 1, 0}, spread: 90,
+      speed: {min: 1, max: 2},
+      lifetime: {min: 0.7, max: 1.0},
+      size: {min: 0.14, max: 0.22},
+      opacity: {min: 0.3, max: 0.4},
+      color: {255, 180, 90},
+      seed: 41
+    }
+    ParticleBurst: {count: 300, at: 0}
+    ParticleForces: {}
+    ParticleCurves: {
+      opacity: {start: 1, early: 0.9, late: 0.5, end: 0}
+    }
+    PointLight: {intensity: 8, range: 7}
+    EffectFlash: {seconds: 0.6}
+  }
+}
+
+const small = box.particle.burst_at(effects.Spark, {-4.5, 1.2, 0}, 0.6)
+const plain = box.particle.burst_at(effects.Spark, {0, 1.4, 0}, 1)
+const large = box.particle.burst_at(effects.Spark, {4.5, 1.8, 0}, 1.8)

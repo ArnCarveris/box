@@ -65,6 +65,7 @@ extern ECS_COMPONENT_DECLARE(ParticleEmitterImpl);
 typedef struct ParticleState {
     ecs_query_t *emitters;    /**< Entities holding a ParticleEmitter */
     ecs_query_t *bursts;      /**< Burst schedules with the emitter they belong to */
+    ecs_query_t *effects;     /**< Instances of the effect pools that are free */
     ecs_vec_t views;          /**< box_particle_view_t of the views of the frame */
     uint64_t asked;           /**< Particles the emitters asked to spawn last frame */
     ecs_entity_t sim_shader;  /**< Shader entity of the spawn and the integrate pass */
@@ -72,6 +73,13 @@ typedef struct ParticleState {
 } ParticleState;
 
 extern ECS_COMPONENT_DECLARE(ParticleState);
+
+/** Fade the flashes of the effects that play and free the ones that are over.
+ *
+ * @param it Iterator over the instances that are playing
+ */
+void BoxParticleEffects(
+    ecs_iter_t *it);
 
 /** Write the emitters of a world into a frame packet.
  *
