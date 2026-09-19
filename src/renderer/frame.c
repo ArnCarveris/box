@@ -702,6 +702,7 @@ static void box_frame_view(
         box_frame_sorted(r, view, p, encoder, target, attachment);
     }
 
+    box_particle_record(r, p, encoder, attachment, hdr);
     box_lines_record(r, encoder, attachment, hdr);
     if (passes) {
         box_effect_motion(r, view, index, encoder);
@@ -781,6 +782,7 @@ void box_frame_render(
     box_timing_frame(r);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
     box_timing_record(r, encoder);
+    box_particle_simulate(r, p, encoder);
     uint32_t i;
     for (i = 0; i < p->views.count; i ++) {
         box_frame_view(r, p, i, encoder, surface);

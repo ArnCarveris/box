@@ -154,6 +154,7 @@ void box_shader_apply(
         }
 
         box_sky_invalidate(r, cmd->handle);
+        box_particle_invalidate(r, cmd->handle);
     }
 }
 

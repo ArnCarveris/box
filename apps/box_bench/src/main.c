@@ -361,6 +361,7 @@ static void box_bench_init(
     ECS_IMPORT(world, BoxCollision);
     ECS_IMPORT(world, BoxPicking);
     ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, BoxParticle);
     ECS_IMPORT(world, BoxController);
     ECS_IMPORT(world, BoxMonitor);
     ECS_IMPORT(world, BoxScript);

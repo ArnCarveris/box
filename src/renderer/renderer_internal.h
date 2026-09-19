@@ -19,6 +19,7 @@
 #include "hiz.h"
 #include "overlay.h"
 #include "sky.h"
+#include "particle.h"
 #include "queue.h"
 
 /** Faces of a cubemap */
@@ -625,6 +626,7 @@ struct box_renderer_t {
     bool hiz_used;                   /**< The frame recorded occlusion dispatches */
     uint32_t hiz_tested;             /**< Instances the last read back occlusion pass tested */
     uint32_t hiz_occluded;           /**< Instances the last read back occlusion pass hid */
+    box_particle_gpu_t particles;    /**< Pools, pipelines and layouts of the particles */
     box_renderer_stats_t stats;      /**< Instance counts of the last frame */
     box_timing_t timing;             /**< Passes of the frame in flight and of the resolved one */
     WGPUQuerySet timing_set;         /**< Timestamps the passes of a frame write */

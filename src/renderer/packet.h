@@ -1063,6 +1063,83 @@ typedef struct box_dynamic_batch_t {
     uint32_t count;         /**< Instances in the batch */
 } box_dynamic_batch_t;
 
+/** Particles one workgroup of the spawn and the integrate pass covers */
+#define BOX_PARTICLE_GROUP (64)
+
+/** Workgroups one dispatch may have on an axis, the least a device guarantees */
+#define BOX_PARTICLE_GROUPS_MAX (65535)
+
+/** Particles one emitter can keep alive, a pool the widest dispatch still covers */
+#define BOX_PARTICLE_MAX (BOX_PARTICLE_GROUPS_MAX * BOX_PARTICLE_GROUP)
+
+/** Points the shape table of one emitter holds, sampled from a mesh or a curve */
+#define BOX_PARTICLE_POINTS (64)
+
+/** Words the counter buffer of a pool holds: free slots, live particles and two spares */
+#define BOX_PARTICLE_COUNTS (4)
+
+/** Spawn point of an emitter without a volume, its origin */
+#define BOX_PARTICLE_POINT (0)
+
+/** Spawn point drawn from the sphere of the radius */
+#define BOX_PARTICLE_SPHERE (1)
+
+/** Spawn point drawn from the box of the extents */
+#define BOX_PARTICLE_BOX (2)
+
+/** Spawn point drawn from the disc of the radius in the XZ plane */
+#define BOX_PARTICLE_DISC (3)
+
+/** Spawn point drawn from the surface table of a mesh */
+#define BOX_PARTICLE_MESH (4)
+
+/** Spawn point drawn from the sample table of a curve */
+#define BOX_PARTICLE_SPLINE (5)
+
+/** The pool of the emitter is emptied before the frame spawns into it */
+#define BOX_PARTICLE_RESET (1u)
+
+/** One point of the shape table of an emitter, in the space of its transform */
+typedef struct box_particle_point_t {
+    float position[4]; /**< Point of the surface or the curve, w unused */
+    float normal[4];   /**< Unit direction the point emits along, w unused */
+} box_particle_point_t;
+
+/** Parameters of one emitter, the only particle data the packet carries.
+ *
+ * The fields up to the padding are the uniform block the spawn and integrate
+ * passes read and must keep their layout; the fields after it stay on the CPU
+ * and tell the renderer which pool the block belongs to and where its shape
+ * table sits in the packet.
+ */
+typedef struct box_particle_emitter_t {
+    float transform[12];    /**< Rows of the 3x4 world matrix of the emitter */
+    float color[4];         /**< Linear color a particle starts with, w unused */
+    float acceleration[4];  /**< Constant acceleration in world units, w unused */
+    float direction[4];     /**< Emission direction in emitter space, w its spread cosine */
+    float extents[4];       /**< Half extents of the box shape, w the radius of the others */
+    float speed[2];         /**< Lowest and highest initial speed */
+    float lifetime[2];      /**< Lowest and highest lifetime in seconds */
+    float size[2];          /**< Lowest and highest initial size */
+    float rotation[2];      /**< Lowest and highest initial rotation in radians */
+    float opacity[2];       /**< Lowest and highest initial opacity */
+    float delta;            /**< Seconds the simulation advances this frame */
+    float pad;              /**< Padding to the 16 byte GPU stride */
+    uint32_t max;           /**< Particles the pool holds */
+    uint32_t spawn;         /**< Particles the frame spawns, already clamped to the pool */
+    uint32_t first;         /**< Particles the emitter spawned before this frame */
+    uint32_t shape;         /**< One of the BOX_PARTICLE shape constants */
+    uint32_t seed;          /**< Seed the random draw of a particle is hashed from */
+    uint32_t point_count;   /**< Points of its shape table, 0 for a shape without one */
+    uint32_t flags;         /**< BOX_PARTICLE_RESET and the playback bits above it */
+    uint32_t pad2;          /**< Padding to the 16 byte GPU stride */
+    uint32_t id;            /**< Pool of the emitter, the low word of its entity */
+    uint32_t point_first;   /**< First point of its shape table in the packet */
+} box_particle_emitter_t;
+
+/** Bytes of an emitter that the uniform buffer of its pool holds */
+#define BOX_PARTICLE_UNIFORM_SIZE (offsetof(box_particle_emitter_t, id))
+
 /** One end of a debug line segment, two of them making a segment.
  *
  * The color is display encoded RGBA in one word, which the line pass converts
@@ -1111,6 +1188,10 @@ typedef struct box_packet_t {
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
     box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
     box_vec_t lines;                         /**< box_line_vertex_t, two per debug line segment */
+    box_vec_t particles;                     /**< box_particle_emitter_t of every emitter */
+    box_vec_t particle_points;               /**< box_particle_point_t of the shape tables */
+    uint32_t particle_sim_shader;            /**< Shader handle of the spawn and integrate passes */
+    uint32_t particle_draw_shader;           /**< Shader handle of the point sprite pass */
     box_bake_t bake;                         /**< Settings of the baked lighting pass */
     box_sky_t sky;                           /**< Atmosphere of the frame, inactive without one */
     uint32_t sky_lut_shader;                 /**< Shader handle of the sky table passes */
@@ -1127,6 +1208,8 @@ static inline void box_packet_init(
     memset(p, 0, sizeof(box_packet_t));
     p->sky_lut_shader = BOX_SHADER_NONE;
     p->sky_shader = BOX_SHADER_NONE;
+    p->particle_sim_shader = BOX_SHADER_NONE;
+    p->particle_draw_shader = BOX_SHADER_NONE;
     box_vec_init(&p->views, sizeof(box_view_t));
     box_vec_init(&p->target_create, sizeof(box_target_cmd_t));
     box_vec_init(&p->target_destroy, sizeof(uint32_t));
@@ -1149,6 +1232,8 @@ static inline void box_packet_init(
     box_vec_init(&p->bake_lights, sizeof(box_light_t));
     box_vec_init(&p->emitters, sizeof(box_emitter_t));
     box_vec_init(&p->lines, sizeof(box_line_vertex_t));
+    box_vec_init(&p->particles, sizeof(box_particle_emitter_t));
+    box_vec_init(&p->particle_points, sizeof(box_particle_point_t));
 }
 
 /** Reset per frame fields while keeping vector storage.
@@ -1172,6 +1257,8 @@ static inline void box_packet_reset(
     p->capture_view = BOX_VIEW_NONE;
     p->sky_lut_shader = BOX_SHADER_NONE;
     p->sky_shader = BOX_SHADER_NONE;
+    p->particle_sim_shader = BOX_SHADER_NONE;
+    p->particle_draw_shader = BOX_SHADER_NONE;
     memset(&p->view, 0, sizeof(box_view_t));
     memset(&p->sky, 0, sizeof(box_sky_t));
     box_vec_clear(&p->views);
@@ -1195,6 +1282,8 @@ static inline void box_packet_reset(
     box_vec_clear(&p->bake_lights);
     box_vec_clear(&p->emitters);
     box_vec_clear(&p->lines);
+    box_vec_clear(&p->particles);
+    box_vec_clear(&p->particle_points);
 }
 
 /** Release the vectors of a packet.
@@ -1226,6 +1315,8 @@ static inline void box_packet_fini(
     box_vec_fini(&p->bake_lights);
     box_vec_fini(&p->emitters);
     box_vec_fini(&p->lines);
+    box_vec_fini(&p->particles);
+    box_vec_fini(&p->particle_points);
 }
 
 #endif

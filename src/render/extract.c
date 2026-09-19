@@ -10,6 +10,7 @@
 #include "../surface/surface_internal.h"
 #include "../job/job_internal.h"
 #include "../collision/collision_internal.h"
+#include "../particle/particle_internal.h"
 
 bool box_render_is_dynamic(
     ecs_world_t *world,
@@ -309,6 +310,7 @@ void box_render_extract(
         box_job_set_eye(world, vec3_new(v->eye[0], v->eye[1], v->eye[2]));
     }
 
+    box_particle_extract(world, p);
     box_render_extract_emitters(world, state, p);
     box_render_lod_capture(world, state, p);
     box_render_validate(world);
