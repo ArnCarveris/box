@@ -319,10 +319,18 @@ static void box_ui_measure(
 {
     UiState *state = box_ui_state(world);
     int32_t i;
+    bool texts = state->texts != 0;
     for (i = ecs_vec_count(&state->places) - 1; i >= 0; i --) {
         UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
+        if (p->glyph) {
+            continue;
+        }
 
         box_ui_read(world, p);
+        if (texts) {
+            box_ui_text_measure(world, p);
+        }
+
         box_ui_fit(p);
         if (p->parent >= 0 && !p->has_anchor) {
             box_ui_add(ecs_vec_get_t(&state->places, UiPlace, p->parent), p);
@@ -344,6 +352,9 @@ static void box_ui_arrange(
         UiPlace *parent = p->parent >= 0 ?
             ecs_vec_get_t(&state->places, UiPlace, p->parent) : NULL;
         bool placed = false;
+        if (p->glyph) {
+            continue;
+        }
 
         if (!parent) {
             p->x = p->local_x;
@@ -381,4 +392,5 @@ void box_ui_layout(
 {
     box_ui_measure(world);
     box_ui_arrange(world);
+    box_ui_text_build(world);
 }

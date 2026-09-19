@@ -115,7 +115,9 @@ static int32_t box_ui_collect(
     UiVisit *first = ecs_vec_append_t(NULL, &state->stack, UiVisit);
     first->e = e;
     first->parent = -1;
+    first->glyph = false;
 
+    bool texts = state->texts != 0;
     while (ecs_vec_count(&state->stack)) {
         int32_t last = ecs_vec_count(&state->stack) - 1;
         UiVisit visit = ecs_vec_get_t(&state->stack, UiVisit, last)[0];
@@ -126,6 +128,7 @@ static int32_t box_ui_collect(
         memset(place, 0, sizeof(UiPlace));
         place->e = visit.e;
         place->parent = visit.parent;
+        place->glyph = visit.glyph;
         ecs_vec_clear(&state->nodes);
         box_hierarchy_collect(world, visit.e, &state->nodes);
 
@@ -138,6 +141,7 @@ static int32_t box_ui_collect(
                 UiVisit *next = ecs_vec_append_t(NULL, &state->stack, UiVisit);
                 next->e = child;
                 next->parent = index;
+                next->glyph = texts && ecs_has_id(world, child, UiGlyph);
             }
         }
     }
@@ -175,13 +179,21 @@ void box_ui_walk(
     }
 
     UiImpl tree = *stored;
-    box_ui_state(world)->instanced = false;
+    UiState *state = box_ui_state(world);
+    state->instanced = false;
+    state->respawn = false;
     int32_t count = box_ui_collect(world, e, &tree);
     if (tree.relayout) {
         box_ui_layout(world);
     }
 
-    if (tree.dirty || box_ui_state(world)->instanced) {
+    state = box_ui_state(world);
+    if (state->respawn) {
+        count = box_ui_collect(world, e, &tree);
+    }
+
+    state = box_ui_state(world);
+    if (tree.dirty || state->instanced || state->respawn) {
         box_ui_number_places(world, e, &tree);
     }
 
@@ -365,11 +377,12 @@ void box_ui_tree_init(
     });
 
     ecs_id_t placed[] = {
-        ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor)
+        ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor),
+        ecs_id(Text), ecs_id(Font), ecs_id(Rgb)
     };
 
     int32_t i;
-    for (i = 0; i < 4; i ++) {
+    for (i = 0; i < 7; i ++) {
         ecs_observer(world, {
             .query.terms = {
                 { .id = placed[i], .inout = EcsInOutNone },

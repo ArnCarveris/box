@@ -32,6 +32,7 @@ typedef struct UiNode {
 typedef struct UiVisit {
     ecs_entity_t e; /**< The node */
     int32_t parent; /**< Place of the parent, -1 for the root of the tree */
+    bool glyph;     /**< The node is a glyph quad the text pass placed */
 } UiVisit;
 
 /** Place of one node in the walk of its tree and the box the layout gave it.
@@ -49,6 +50,8 @@ typedef struct UiPlace {
     bool has_layout;  /**< The node arranges its children */
     bool has_anchor;  /**< The node is pinned to its parent */
     bool has_rect;    /**< The node has a rectangle the box resizes */
+    bool has_text;    /**< The node holds a string the pass draws */
+    bool glyph;       /**< The node is a glyph quad, which the pass does not place */
     float x;          /**< X of the centre of the box in the tree */
     float y;          /**< Y of the centre of the box in the tree */
     float width;      /**< Width of the box */
@@ -70,13 +73,88 @@ typedef struct UiState {
     ecs_vec_t nodes;    /**< ecs_entity_t children of the node a walk visits */
     ecs_vec_t places;   /**< UiPlace of every node of the tree being walked */
     int32_t trees;      /**< Trees the world holds, zero skips the observers */
+    int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
     bool busy;          /**< An update runs, the observers mark no tree */
     bool instanced;     /**< A node gained a shape, its depth bias is missing */
+    bool respawn;       /**< The text pass made or dropped glyphs, collect again */
 } UiState;
+
+/** One glyph of a font, rasterized into the atlas of that font */
+typedef struct box_ui_glyph_t {
+    float advance;   /**< Pixels the pen moves after the glyph */
+    float bearing_x; /**< Pixels from the pen to the left of the bitmap */
+    float top;       /**< Pixels from the baseline down to the top of the bitmap */
+    int32_t x;       /**< Column of the bitmap in the atlas */
+    int32_t y;       /**< Row of the bitmap in the atlas, from its top */
+    int32_t width;   /**< Width of the bitmap in texels */
+    int32_t height;  /**< Height of the bitmap in texels */
+} box_ui_glyph_t;
+
+/** Glyph atlas of one font file at one em size, grown as glyphs arrive.
+ *
+ * The glyphs are packed on shelves: a glyph goes right of the last one on the
+ * shelf being filled, and a glyph that does not fit opens a shelf below it.
+ * When the last shelf runs out of room the atlas doubles, which keeps every
+ * glyph where it is but changes every uv, so the epoch is raised and every
+ * element that drew with the atlas builds its quads again.
+ */
+typedef struct box_ui_atlas_t {
+    char *path;           /**< Font file as the component spells it */
+    float size;           /**< Em size the glyphs are rasterized at */
+    void *font;           /**< stbtt_fontinfo of the parsed file */
+    uint8_t *data;        /**< Bytes of the file, which the parsed font points into */
+    uint8_t *coverage;    /**< One byte per texel of the atlas, rows from the top */
+    ecs_map_t glyphs;     /**< box_ui_glyph_t* keyed by code point */
+    ecs_entity_t texture; /**< Entity that holds the uploaded atlas */
+    ecs_entity_t prefab;  /**< Prefab the glyph quads inherit their material from */
+    int32_t edge;         /**< Edge length of the atlas in texels */
+    int32_t pen_x;        /**< Column the next glyph of the shelf is written at */
+    int32_t pen_y;        /**< Row the shelf being filled starts at */
+    int32_t shelf;        /**< Height of the shelf being filled */
+    uint32_t epoch;       /**< Times the atlas grew, part of the fingerprint of a build */
+    float scale;          /**< Factor from font units to pixels */
+    float ascent;         /**< Pixels from the baseline to the top of the line */
+    float descent;        /**< Pixels from the baseline down to the bottom of the line */
+    float line_gap;       /**< Pixels between the bottom of a line and the next top */
+    bool dirty;           /**< The atlas gained glyphs and has to be uploaded */
+    bool failed;          /**< The font file could not be read or parsed */
+} box_ui_atlas_t;
+
+/** One glyph the layout of a string placed in the box of its element */
+typedef struct box_ui_quad_t {
+    const box_ui_glyph_t *glyph; /**< Glyph of the atlas the quad shows */
+    float x;                     /**< Pixels from the left of the box to the bitmap */
+    float y;                     /**< Pixels from the top of the box down to the bitmap */
+} box_ui_quad_t;
+
+/** Size a string takes when it is laid out in a box */
+typedef struct box_ui_extent_t {
+    float width;   /**< Width of the widest line */
+    float height;  /**< Height of the lines together */
+    int32_t lines; /**< Lines the string was broken into */
+} box_ui_extent_t;
+
+/** Glyph quads of a text element, added with Text */
+typedef struct TextImpl {
+    ecs_vec_t quads; /**< ecs_entity_t of the glyph elements the last build made */
+    uint64_t hash;   /**< Fingerprint of what the last build drew */
+    float width;     /**< Width the last measure found */
+    float height;    /**< Height the last measure found */
+} TextImpl;
+
+/** Font atlases and the scratch space of the text pass, stored as a singleton */
+typedef struct UiFonts {
+    ecs_vec_t atlases; /**< box_ui_atlas_t* of every font file and size in use */
+    ecs_vec_t quads;   /**< box_ui_quad_t of the string being laid out */
+    bool grown;        /**< An atlas grew, every tree has to lay out again */
+} UiFonts;
 
 extern ECS_COMPONENT_DECLARE(UiImpl);
 extern ECS_COMPONENT_DECLARE(UiNode);
 extern ECS_COMPONENT_DECLARE(UiState);
+extern ECS_TAG_DECLARE(UiGlyph);
+extern ECS_COMPONENT_DECLARE(TextImpl);
+extern ECS_COMPONENT_DECLARE(UiFonts);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
  *
@@ -195,5 +273,120 @@ void box_ui_walk(
  */
 void box_ui_layout(
     ecs_world_t *world);
+
+/** Direct pointer to the font registry singleton, never a deferred copy.
+ *
+ * @param world The world
+ * @return The registry
+ */
+UiFonts* box_ui_fonts(
+    ecs_world_t *world);
+
+/** Atlas of a font file at an em size, parsed and opened the first time.
+ *
+ * @param world The world
+ * @param path The font file, empty or NULL for the font the engine ships
+ * @param size The em size in pixels, 0 for BOX_UI_FONT_SIZE
+ * @return The atlas, which carries its failed flag when the file was unreadable
+ */
+box_ui_atlas_t* box_ui_atlas(
+    ecs_world_t *world,
+    const char *path,
+    float size);
+
+/** Atlas an element draws with, from its Font, that of an ancestor or the default.
+ *
+ * @param world The world
+ * @param e The element
+ * @return The atlas
+ */
+box_ui_atlas_t* box_ui_atlas_of(
+    ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Glyph of a code point, rasterized into the atlas the first time it is asked.
+ *
+ * @param world The world
+ * @param atlas The atlas
+ * @param codepoint The code point
+ * @return The glyph, or NULL when the font has none and no atlas holds room
+ */
+const box_ui_glyph_t* box_ui_atlas_glyph(
+    ecs_world_t *world,
+    box_ui_atlas_t *atlas,
+    int32_t codepoint);
+
+/** Upload the atlases that gained glyphs and give them their texture entity.
+ *
+ * @param world The world
+ */
+void box_ui_atlas_upload(
+    ecs_world_t *world);
+
+/** Release the atlases of a world.
+ *
+ * @param fonts The registry
+ */
+void box_ui_atlas_fini(
+    UiFonts *fonts);
+
+/** Distance between two baselines of an element, from its Text or its font.
+ *
+ * @param atlas The atlas of the element
+ * @param text The Text of the element
+ * @return The line height in pixels
+ */
+float box_ui_text_line_height(
+    const box_ui_atlas_t *atlas,
+    const Text *text);
+
+/** Lay a string out in a box, wrapping it and filling the quads of the registry.
+ *
+ * @param world The world
+ * @param atlas The atlas the glyphs come from
+ * @param text The Text of the element
+ * @param wrap Width the lines are broken at, 0 to break on newlines only
+ * @param box Width the lines are aligned in, 0 to align them in their own width
+ * @param out Receives the size the string takes
+ */
+void box_ui_text_run(
+    ecs_world_t *world,
+    box_ui_atlas_t *atlas,
+    const Text *text,
+    float wrap,
+    float box,
+    box_ui_extent_t *out);
+
+/** Measure the text of a node into its place and remember it for the build.
+ *
+ * @param world The world
+ * @param p The place of the node
+ */
+void box_ui_text_measure(
+    ecs_world_t *world,
+    UiPlace *p);
+
+/** Give every text node of the collected tree the glyph quads of its string.
+ *
+ * @param world The world
+ */
+void box_ui_text_build(
+    ecs_world_t *world);
+
+/** Register the components, the hooks and the observers of the text pass.
+ *
+ * @param world The world
+ */
+void box_ui_text_init(
+    ecs_world_t *world);
+
+/** Register the text.measure, text.wrap and text.label script functions.
+ *
+ * @param world The world
+ * @param module The box.ui module entity
+ */
+void box_ui_functions_init(
+    ecs_world_t *world,
+    ecs_entity_t module);
 
 #endif

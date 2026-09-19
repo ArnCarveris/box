@@ -42,6 +42,14 @@
  * parent instead and takes no room in the row or the column. The pass runs for
  * a tree that changed and for no other, so a UI that stands still costs
  * nothing.
+ *
+ * A node with a Text is measured by that pass too: its glyphs are rasterized
+ * into the atlas of its Font, the string is wrapped to the width its Layout
+ * gives it and the element ends up as large as the lines it holds. The glyphs
+ * are emitted as ordinary children of the element, one textured quad each, so
+ * text takes the same 2D shape path as every other element and the renderer
+ * knows nothing about it. The helpers text.measure, text.wrap and text.label
+ * offer the same measuring, wrapping and building to a script.
  */
 
 #ifndef BOX_UI_H
@@ -125,6 +133,38 @@ ECS_STRUCT(Anchor, {
     float y;  /**< Offset from that edge on the y axis */
 });
 
+/** Font a text element rasterizes its glyphs with, inherited by its subtree.
+ *
+ * The path is resolved against the search path of the engine, so
+ * `etc/fonts/B612-Regular.ttf` finds the font the framework installs as well as
+ * one an application ships. A text element takes the Font of its own entity,
+ * else the nearest one above it in the tree, else the font the engine ships at
+ * BOX_UI_FONT_SIZE logical pixels. One atlas is rasterized per file and size
+ * and is shared by every element that asks for it.
+ */
+ECS_STRUCT(Font, {
+    char *path; /**< Font file, empty for the font the engine ships */
+    float size; /**< Em size the glyphs are rasterized at, 0 for the default */
+});
+
+/** String drawn as one textured quad per glyph, sized by the layout pass.
+ *
+ * The element is as wide and as tall as the text it holds, unless its Layout
+ * gives it a width or a height, and a Layout width also wraps the string: the
+ * words that do not fit move to the next line and a newline in the value always
+ * breaks. The lines are aligned inside the box by align, the first baseline
+ * sits one ascent below its top and the next ones follow at line_height. The
+ * glyphs themselves are children of the element, drawn over it like every other
+ * node of the tree, in the Rgb of the element, which the build hands them as
+ * the emissive color of an alpha blended quad so a glyph composites over what
+ * is behind it instead of being lit like a surface.
+ */
+ECS_STRUCT(Text, {
+    char *value;       /**< The string, UTF-8 */
+    float line_height; /**< Logical pixels between two baselines, 0 for the font default */
+    Align align;       /**< Alignment of the lines inside the box of the element */
+});
+
 /** Rectangle an element covers, written by the layout pass and read only.
  *
  * The rectangle is in the logical pixels of the view of its tree, with x and y
@@ -159,6 +199,15 @@ ECS_STRUCT(Bounds, {
 
 /** Nodes one tree can hold before its deepest node reaches the near plane */
 #define BOX_UI_NODE_MAX (99900)
+
+/** Font the engine ships, which a text element without a Font uses */
+#define BOX_UI_FONT "etc/fonts/B612-Regular.ttf"
+
+/** Em size a text element rasterizes at when its Font gives none */
+#define BOX_UI_FONT_SIZE (16.0f)
+
+/** Edge length of a glyph atlas before it grew, one texture size class */
+#define BOX_UI_ATLAS_SIZE (256)
 
 /** Register the box.ui module.
  *
