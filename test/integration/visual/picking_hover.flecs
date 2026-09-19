@@ -1,0 +1,77 @@
+// A row of boxes with the cursor pinned over the middle one, whose on.hover
+// handler tints it while Hovered is present: the ray, the root resolution and
+// the script event bubbling shown as a picture instead of a command log.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.picking
+using box.command
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+camera {
+  Position: {0, 0, -10}
+  Camera: {fov: 60}
+}
+
+template Hoverable {
+  mut hover = 0
+  async {
+    await on.hover(this)
+    hover = 1
+  }
+
+  if hover == 1 {
+    Tint: {255, 220, 60, 220}
+  }
+}
+
+row {
+  a {
+    Position: {-4, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {90, 140, 220}
+    Hoverable
+  }
+
+  b {
+    Position: {-2, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {90, 200, 140}
+    Hoverable
+  }
+
+  c {
+    Position: {0, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {220, 120, 60}
+    Hoverable
+  }
+
+  d {
+    Position: {2, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {200, 90, 200}
+    Hoverable
+  }
+
+  e {
+    Position: {4, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {200, 200, 90}
+    Hoverable
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    TerminalInput: {line: "mouse.sweep 0,270 480,270 2 2"}
+  }
+}
