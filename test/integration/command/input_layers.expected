@@ -1,0 +1,14 @@
+$ key.down Q
+Q down
+$ key.down E
+E down
+$ get ui_map InputMap
+{enabled: true, priority: 1, consume: true}
+$ get game_map InputMap
+{enabled: true, priority: 0, consume: false}
+$ get actions.Close InputAction
+{description: "Close the panel the UI holds", pressed: true, held: true, released: false, value: 1}
+$ get actions.Inventory InputAction
+{description: "Open the inventory of the game", pressed: false, held: false, released: false, value: 0}
+$ get actions.Pipette InputAction
+{description: "Pick what the cursor is over", pressed: false, held: true, released: false, value: 1}

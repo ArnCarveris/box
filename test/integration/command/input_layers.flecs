@@ -1,0 +1,56 @@
+// Two maps bind the same key. The UI map sits a layer above the map of the game
+// and consumes what it binds, so E fires the action of the UI alone and the
+// action the game map binds to the same key never sees it, while Q, which only
+// the game map binds, still arrives. The agent holds Q, waits until its action
+// fired, holds E, waits again and then runs the command file, which prints the
+// two maps and the three actions while both keys are down.
+using flecs.script
+using box.input
+using box.command
+
+actions {
+  Close { InputAction: {description: "Close the panel the UI holds"} }
+  Inventory { InputAction: {description: "Open the inventory of the game"} }
+  Pipette { InputAction: {description: "Pick what the cursor is over"} }
+}
+
+ui_map {
+  InputMap: {enabled: true, priority: 1, consume: true}
+  (keys.E, actions.Close)
+}
+
+game_map {
+  InputMap: {enabled: true, priority: 0}
+  (keys.E, actions.Inventory)
+  (keys.Q, actions.Pipette)
+}
+
+template Agent {
+  mut picked = 0
+  mut closed = 0
+
+  async {
+    await on.pressed(actions.Pipette)
+    picked = 1
+  }
+
+  async {
+    await on.pressed(actions.Close)
+    closed = 1
+  }
+
+  if closed == 1 {
+    CommandScript: {path: "../../test/integration/command/input_layers.cmd"}
+  } else if picked == 1 {
+    TerminalInput: {line: "key.down E"}
+  } else {
+    TerminalInput: {line: "key.down Q"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    Agent
+  }
+}
