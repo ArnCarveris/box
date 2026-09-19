@@ -17,6 +17,7 @@
                     "cpu_monitor",
                     "ecs_stats",
                     "system_monitor",
+                    "gpu_timings",
                     "sample_cost"
                 ]
             }

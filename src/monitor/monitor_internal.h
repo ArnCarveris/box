@@ -50,6 +50,13 @@ void box_stats_monitor_init(
 void box_system_monitor_init(
     ecs_world_t *world);
 
+/** Register the system that publishes the per pass GPU times of the renderer.
+ *
+ * @param world The world
+ */
+void box_gpu_monitor_init(
+    ecs_world_t *world);
+
 /** Register the FpsOverlay defaults and the system that publishes its window.
  *
  * @param world The world

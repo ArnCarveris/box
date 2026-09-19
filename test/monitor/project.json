@@ -74,6 +74,27 @@
                 ]
             },
             {
+                "id": "Gpu",
+                "testcases": [
+                    "empty_collector_reports_nothing",
+                    "passes_take_two_timestamps_each",
+                    "a_pass_outside_a_frame_is_not_timed",
+                    "a_full_frame_drops_the_passes_past_it",
+                    "a_long_pass_name_is_truncated",
+                    "resolve_publishes_the_milliseconds",
+                    "passes_with_one_name_are_summed",
+                    "a_backwards_timestamp_is_no_time",
+                    "resolve_names_the_frame_it_measured",
+                    "a_pending_frame_holds_back_the_next_one",
+                    "a_dropped_frame_releases_the_collector",
+                    "a_frame_without_passes_is_not_resolved",
+                    "an_end_without_a_frame_changes_nothing",
+                    "resolve_ignores_the_timestamps_it_did_not_record",
+                    "absent_component_is_not_published",
+                    "a_world_without_a_renderer_reports_no_passes"
+                ]
+            },
+            {
                 "id": "Spikes",
                 "testcases": [
                     "empty_run_reports_nothing",

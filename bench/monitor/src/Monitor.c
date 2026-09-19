@@ -113,6 +113,21 @@ void Monitor_system_monitor(bench_t *b)
     ecs_fini(world);
 }
 
+void Monitor_gpu_timings(bench_t *b)
+{
+    // monitoring/gpu_timings
+    ecs_world_t *world = box_bench_world();
+    ecs_singleton_add(world, GpuTimings);
+    ecs_progress(world, 0.016f);
+    bench_set_items(b, BENCH_SYSTEM_COUNT);
+
+    while (bench_iter(b)) {
+        ecs_progress(world, 0.016f);
+    }
+
+    ecs_fini(world);
+}
+
 void Monitor_sample_cost(bench_t *b)
 {
     // monitoring/cpu_monitor

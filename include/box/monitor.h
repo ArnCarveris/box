@@ -28,6 +28,9 @@ extern "C" {
 /** Entries of the phase list of a system monitor, which the ECS_STRUCT spells out */
 #define BOX_MONITOR_PHASES (8)
 
+/** Render passes a GPU monitor reports, which the ECS_STRUCT spells out */
+#define BOX_MONITOR_PASSES (16)
+
 /** Seconds a CPU monitor averages its samples over by default */
 #define BOX_MONITOR_WINDOW (1.0)
 
@@ -100,6 +103,30 @@ ECS_STRUCT(SystemMonitor, {
     int32_t system_count;  /**< Systems that spent time in the frame */
     SystemTime slowest[8]; /**< Slowest systems of the frame, slowest first */
     PhaseTime phases[8];   /**< Milliseconds per phase, in pipeline order */
+});
+
+/** Name of a render pass and the time it spent on the GPU in one frame */
+ECS_STRUCT(GpuPassTime, {
+    char *name;     /**< Name of the pass, NULL when the entry is unused */
+    double time_ms; /**< Milliseconds the GPU spent in the pass */
+});
+
+/** Per pass GPU timings of the rendered frames, collected while the singleton exists.
+ *
+ * Setting the component makes the renderer write a timestamp around every pass
+ * it records; removing it stops the queries and releases what they need, so a
+ * world without the component pays for nothing. The timestamps of a frame are
+ * read back one or two frames later, which is the frame the numbers name. The
+ * passes are those of the renderer and of the effect chain of a view, and a
+ * name that several views or shadow cascades record holds what they spent
+ * together. A device without the timestamp query feature reports no passes.
+ */
+ECS_STRUCT(GpuTimings, {
+    bool supported;         /**< The device can time its passes, written by the engine */
+    int32_t frame;          /**< Frame of the renderer the passes were measured in */
+    int32_t pass_count;     /**< Passes that frame recorded, at most sixteen */
+    double frame_ms;        /**< Milliseconds those passes add up to */
+    GpuPassTime passes[16]; /**< The passes, in the order the frame recorded them */
 });
 
 /** Corner of a view an overlay panel is pinned to */

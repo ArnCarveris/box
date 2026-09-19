@@ -86,6 +86,8 @@ void BoxMonitorImport(
     ECS_META_COMPONENT(world, CpuMonitor);
     ECS_META_COMPONENT(world, EcsStats);
     ECS_META_COMPONENT(world, SystemMonitor);
+    ECS_META_COMPONENT(world, GpuPassTime);
+    ECS_META_COMPONENT(world, GpuTimings);
     ECS_META_COMPONENT(world, FpsCorner);
     ECS_META_COMPONENT(world, FpsOverlay);
 
@@ -94,9 +96,12 @@ void BoxMonitorImport(
     ecs_set_hooks(world, CpuMonitor, { .ctor = box_cpu_monitor_ctor });
     ecs_set_hooks(world, EcsStats, { .ctor = box_stats_ctor });
     ecs_set_hooks(world, SystemMonitor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, GpuPassTime, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, GpuTimings, { .ctor = flecs_default_ctor });
 
     box_cpu_monitor_init(world);
     box_stats_monitor_init(world);
     box_system_monitor_init(world);
+    box_gpu_monitor_init(world);
     box_fps_overlay_init(world);
 }
