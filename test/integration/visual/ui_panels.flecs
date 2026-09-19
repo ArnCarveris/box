@@ -1,0 +1,120 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.ui
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 2}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {24, 0.2, 24}
+  Rgb: {150, 155, 165}
+  PbrMaterial: {roughness: 0.9}
+}
+
+prop_box {
+  Position: {-6.6, 0.6, 1}
+  Rotation: {0, 0.5, 0}
+  Box: {1.6, 1.2, 1.6}
+  Rgb: {210, 90, 70}
+}
+
+prop_sphere {
+  Position: {6.4, 1, 0.5}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {80, 150, 230}
+  PbrMaterial: {metallic: 0.2, roughness: 0.35}
+}
+
+ui {
+  Ui: {}
+  Position: {0, 0, 0}
+  Rect: {600, 300}
+  Border: {radius: 20, width: 3, color: {120, 140, 190, 255}}
+  Rgb: {32, 36, 48}
+
+  header {
+    Position: {0, 110, 0}
+    Rect: {560, 50}
+    Border: {radius: 12}
+    Rgb: {58, 74, 112}
+
+    header_dot {
+      Position: {-250, 0, 0}
+      Circle: {radius: 14}
+      Rgb: {245, 205, 95}
+    }
+
+    header_bar {
+      Position: {40, 0, 0}
+      Rect: {380, 14}
+      Border: {radius: 7}
+      Rgb: {150, 170, 215}
+    }
+  }
+
+  panel_a {
+    Position: {-130, -40, 0}
+    Rect: {280, 180}
+    Border: {radius: 16, width: 2, color: {95, 115, 160, 255}}
+    Rgb: {46, 54, 72}
+
+    a_row_one {
+      Position: {0, 50, 0}
+      Rect: {240, 34}
+      Border: {radius: 8}
+      Rgb: {74, 96, 138}
+    }
+
+    a_row_two {
+      Position: {0, 5, 0}
+      Rect: {240, 34}
+      Border: {radius: 8}
+      Rgb: {74, 96, 138}
+    }
+
+    a_badge {
+      Position: {-152, -62, 0}
+      Circle: {radius: 30}
+      Rgb: {235, 120, 95}
+    }
+  }
+
+  panel_b {
+    Position: {110, -55, 0}
+    Rect: {300, 190}
+    Border: {radius: 16, width: 2, color: {95, 115, 160, 255}}
+    Rgb: {40, 62, 60}
+
+    b_row_one {
+      Position: {0, 55, 0}
+      Rect: {260, 34}
+      Border: {radius: 8}
+      Rgb: {70, 130, 110}
+    }
+
+    b_badge {
+      Position: {-175, -20, 0}
+      Circle: {radius: 26}
+      Rgb: {120, 215, 170}
+    }
+
+    b_line {
+      Position: {-110, -60, 0}
+      Line: {x1: 0, y1: 0, x2: 220, y2: 0, thickness: 6}
+      Rgb: {200, 235, 220}
+    }
+  }
+}
