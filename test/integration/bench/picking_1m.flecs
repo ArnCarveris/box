@@ -1,0 +1,67 @@
+// The picking scale scene: 50000 nested clusters of a drawn tower over twenty
+// colliders each, the same layout bench/picking measures a pick against, with
+// a camera that flies the length of the grid so the spatial index a pick
+// queries rebuilds under motion instead of standing still.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+using box.collision
+using box.script
+
+$ { ScriptSettings: {enabled: false} }
+
+$ { EnvironmentLight: {sky_color: {110, 130, 170}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+ground {
+  Position: {446, -0.25, 446}
+  Box: {940, 0.5, 940}
+  Rgb: {70, 74, 82}
+  PbrMaterial: {roughness: 0.9}
+}
+
+template Cluster {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  prop tint: f32 = 0
+
+  tower {
+    Position: {0, 1, 0}
+    Box: {0.8, 2, 0.8}
+    Rgb: {120 + tint, 150 - tint, 210 - tint}
+    PbrMaterial: {roughness: 0.7}
+  }
+
+  for j in 0..20 {
+    _ {
+      Position: {(j % 5) * 0.6 - 1.2, (j / 5) * 0.6 + 0.3, 0}
+      SphereCollider: {radius: 0.25}
+      AABB: {
+        min: {x + (j % 5) * 0.6 - 1.45, (j / 5) * 0.6 + 0.05, z - 0.25}
+        max: {x + (j % 5) * 0.6 - 0.95, (j / 5) * 0.6 + 0.55, z + 0.25}
+      }
+    }
+  }
+}
+
+clusters {
+  for i in 0..50000 {
+    _ {
+      Position: {(i % 224) * 4, 0, (i / 224) * 4}
+      Cluster: {x: (i % 224) * 4, z: (i / 224) * 4, tint: (i * 17) % 60}
+    }
+  }
+}
+
+camera {
+  Position: {2, 1.7, -5}
+  Camera: {fov: 65}
+  Velocity: {0, 0, 10}
+}

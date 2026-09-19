@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:20.060+00:00",
   "start_time": "2026-09-19T06:38:38.651+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T06:49:10.715+00:00",
   "dependencies": [
     "picking/picking"
   ]
