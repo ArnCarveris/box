@@ -1,0 +1,28 @@
+{
+ "project": "bake3",
+ "pass": 3,
+ "fail": 0,
+ "empty": 0,
+ "elapsed": 0,
+ "tests": [
+  {
+   "suite": "Timeout",
+   "name": "case_past_timeout_reported",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "Timeout",
+   "name": "quiet_case_not_killed",
+   "status": "pass",
+   "time": 0
+  },
+  {
+   "suite": "Timeout",
+   "name": "idle_worker_uses_no_cpu",
+   "status": "pass",
+   "time": 0
+  }
+ ],
+ "timestamp": null
+}
