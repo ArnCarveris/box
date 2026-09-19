@@ -297,11 +297,18 @@ static float box_sky_fade(
 
 /** Hand the view the body that reaches the camera brightest.
  *
+ * An overcast world keeps the body it is lit by and the direction that body
+ * stands in, and only blends the color toward the grey of its own luminance,
+ * dimmed by what a full cloud deck lets through. That is what lets the sun
+ * keep moving behind the clouds while the scene under them flattens.
+ *
  * @param state The registry holding the two bodies
+ * @param overcast Part of the sky the cloud deck of the weather covers
  * @param v The view to light
  */
 static void box_sky_shine(
     const SkyState *state,
+    float overcast,
     box_view_t *v)
 {
     const box_body_t *body = &state->sun;
@@ -311,10 +318,12 @@ static void box_sky_shine(
         body = &state->moon;
     }
 
+    float flat = box_sky_luma(body->light) * BOX_WEATHER_OVERCAST_LIGHT;
+
     int32_t i;
     for (i = 0; i < 3; i ++) {
         v->sun_dir[i] = -body->dir[i];
-        v->sun_color[i] = body->light[i];
+        v->sun_color[i] = body->light[i] + (flat - body->light[i]) * overcast;
     }
 
     v->sun_intensity = 1.0f;
@@ -357,7 +366,10 @@ bool box_sky_celestial(
     float r = sky.bounds[0] + fmaxf(altitude, BOX_SKY_LIFT);
     box_sky_absorb(&sky, r, 1.0f, &state->sun);
     box_sky_absorb(&sky, r, state->phase, &state->moon);
-    box_sky_shine(state, v);
+
+    WeatherAmounts weather;
+    box_sky_weather(world, &weather);
+    box_sky_shine(state, weather.overcast, v);
     result = true;
 done:
     return result;

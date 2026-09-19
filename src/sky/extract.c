@@ -157,6 +157,25 @@ static void box_sky_look(
     sky->turbulence[3] = (float)p->time;
 }
 
+/** Write the overcast of the weather into the spare slot of the night color.
+ *
+ * The sky pass and the environment face of a view blend their radiance toward
+ * a flat grey with it, which is how a world gets a cloud deck without the
+ * atmosphere it is drawn from holding one: the medium, the sun and both
+ * expensive tables stay the clear sky they were.
+ *
+ * @param world The world
+ * @param sky The parameter block to fill
+ */
+static void box_sky_overcast(
+    ecs_world_t *world,
+    box_sky_t *sky)
+{
+    WeatherAmounts weather;
+    box_sky_weather(world, &weather);
+    sky->night[3] = weather.overcast;
+}
+
 /** Altitude of the camera of a frame over the planet, in kilometers.
  *
  * @param p The packet
@@ -202,7 +221,7 @@ static bool box_sky_medium_equal(
  *
  * @param a The first block
  * @param b The second block
- * @param epsilon Radians the sun may have moved between the two
+ * @param epsilon Radians the sun may have moved and overcast it may have gained
  * @return true when the sky of the first block is the sky of the second
  */
 static bool box_sky_view_equal(
@@ -214,6 +233,7 @@ static bool box_sky_view_equal(
         vec3_new(b->sun_dir[0], b->sun_dir[1], b->sun_dir[2]));
 
     return vec3_length(moved) <= epsilon &&
+        fabsf(a->night[3] - b->night[3]) <= epsilon &&
         memcmp(a->sun_color, b->sun_color, sizeof(float) * 3) == 0 &&
         memcmp(a->night, b->night, sizeof(float) * 3) == 0 &&
         a->mie_params[0] == b->mie_params[0];
@@ -281,6 +301,7 @@ void box_sky_extract(
     box_sky_medium(a, sky);
     box_sky_sun(world, sky);
     box_sky_look(a, p, sky);
+    box_sky_overcast(world, sky);
     box_sky_bodies(world, a, p, sky);
     sky->active = 1;
 

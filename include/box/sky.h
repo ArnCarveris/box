@@ -13,6 +13,9 @@
  * table, which is why distance haze and the sky cannot drift apart, and an
  * `EnvironmentLight` whose `source` names the atmosphere entity prefilters its
  * image based lighting from the sky instead of from its two colors.
+ *
+ * A `Weather` blends overcast, fog and rain on top of that atmosphere without
+ * replacing it, so the sun of a world keeps moving behind an overcast sky.
  */
 
 #ifndef BOX_SKY_H
@@ -135,6 +138,40 @@ ECS_STRUCT(TimeOfDay, {
     float daylight; /**< Written every frame: 0 in the dark, 1 with the sun up */
 });
 
+/** Amounts of the three weather states a frame is drawn with
+ *
+ * The three are independent: a world can be overcast without fog and foggy
+ * without rain, and every amount runs from a clear zero to a full one.
+ */
+ECS_STRUCT(WeatherAmounts, {
+    float overcast; /**< Part of the sky the cloud deck covers */
+    float fog;      /**< Part of the fog the air is thickened by */
+    float rain;     /**< Part of the rain that falls on the world */
+});
+
+/** Weather of a world, blended on top of the atmosphere
+ *
+ * The three amounts are targets an agent, a script or a command writes, and
+ * `current` is what the frame is drawn with: it eases toward the targets over
+ * `transition` seconds, so a weather that is set from a command arrives over a
+ * second instead of between two frames. The first frame of a weather snaps,
+ * which is what makes a scene that starts overcast overcast in its first
+ * capture.
+ *
+ * Overcast blends the sky and the light of the body that lights the view
+ * toward a flat grey, fog raises the density of the fog the sky drives and
+ * rain drives the amount of the wetness material layer. The atmosphere stays
+ * the base under all three, so the sun keeps moving behind the clouds.
+ */
+ECS_STRUCT(Weather, {
+    float overcast;   /**< Cloud deck the sky is blended toward, 0 to 1 */
+    float fog;        /**< Fog the air is thickened by, 0 to 1 */
+    float rain;       /**< Rain that falls on the world, 0 to 1 */
+    float transition; /**< Seconds an amount eases over, 0 takes four */
+
+    WeatherAmounts current; /**< Written every frame: the amounts of this frame */
+});
+
 /** Day of the year a clock without one runs on, the summer solstice */
 #define BOX_TIME_DAY_OF_YEAR (172.0f)
 
@@ -152,6 +189,18 @@ ECS_STRUCT(TimeOfDay, {
 
 /** Sine of the sun elevation the daylight factor leaves zero at */
 #define BOX_TIME_DAYLIGHT_LOW (-0.1045f)
+
+/** Seconds a weather amount eases over when the component names none */
+#define BOX_WEATHER_TRANSITION (4.0f)
+
+/** Distance from its target an easing amount is snapped onto it at */
+#define BOX_WEATHER_EPSILON (0.0005f)
+
+/** Part of the direct light a full overcast leaves on the scene */
+#define BOX_WEATHER_OVERCAST_LIGHT (0.45f)
+
+/** Density the sky driven fog is multiplied by at full fog */
+#define BOX_WEATHER_FOG_GAIN (14.0f)
 
 /** Default half angle of the sun disk in radians */
 #define BOX_SKY_DISK_RADIUS (0.00465f)

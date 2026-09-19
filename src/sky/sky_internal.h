@@ -26,9 +26,26 @@ typedef struct box_body_t {
     bool present;   /**< The world names the body and it holds a transform */
 } box_body_t;
 
+/** Blend state of a Weather, added next to it
+ *
+ * The amounts a frame is drawn with live here rather than in the component,
+ * because writing a new target over the component is exactly what a command
+ * does and that write must not lose the weather the world is standing in. The
+ * system copies them into `Weather.current` every frame. A weather starts at
+ * the amounts it was authored with instead of easing in from a clear sky,
+ * which is why the state knows whether it ran before.
+ */
+typedef struct WeatherBlend {
+    WeatherAmounts amounts; /**< Amounts the frame is drawn with */
+    bool started;           /**< The amounts were blended at least once */
+} WeatherBlend;
+
+extern ECS_COMPONENT_DECLARE(WeatherBlend);
+
 /** Module wide registry of the atmosphere, stored as a singleton */
 typedef struct SkyState {
     ecs_query_t *atmospheres; /**< Entities holding an Atmosphere component */
+    ecs_query_t *weathers;    /**< Entities holding a Weather component */
     ecs_entity_t lut_shader;  /**< Shader entity of the table passes */
     ecs_entity_t sky_shader;  /**< Shader entity of the sky and haze pass */
     box_sky_t last;           /**< Parameter block the sky view table was rendered from */
@@ -53,6 +70,23 @@ extern ECS_COMPONENT_DECLARE(SkyState);
  * @return The first entity holding an Atmosphere, 0 when the world has none
  */
 ecs_entity_t box_sky_entity(
+    ecs_world_t *world);
+
+/** Read the weather amounts a frame of a world is drawn with.
+ *
+ * @param world The world
+ * @param out The amounts to fill, left clear when the world has no weather
+ * @return true when the world holds a Weather component
+ */
+bool box_sky_weather(
+    ecs_world_t *world,
+    WeatherAmounts *out);
+
+/** Register the systems that blend the weather of a world.
+ *
+ * @param world The world
+ */
+void box_sky_weather_init(
     ecs_world_t *world);
 
 /** Take a value or its default when it is not above zero.
@@ -154,6 +188,7 @@ void box_sky_time_init(
  * the camera, lit by the body that lights the view, and the density is the
  * extinction of that medium per world unit, falling off with the scale height
  * of its aerosol layer, so the fog, the aerial perspective and the sky agree.
+ * The fog amount of the weather of the world multiplies that density.
  *
  * @param world The world
  * @param v The view the fog is seen from

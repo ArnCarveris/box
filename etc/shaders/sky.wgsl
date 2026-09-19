@@ -3,6 +3,10 @@
 // is not it writes the light the air between the camera and the surface
 // scattered, with what is left of the surface behind it in the alpha channel,
 // so one premultiplied blend covers both.
+//
+// The overcast of the weather flattens all of it: the sky view radiance
+// carries the cloud deck, the sun, the moon and the stars fade out behind it
+// and the haze in front of the geometry loses its color with them.
 
 #define SKY_BINDING 0
 #define SKY_TRANS_BINDING 1
@@ -136,10 +140,12 @@ fn sky_stars(dir: vec3<f32>) -> vec3<f32> {
   let r = sky_eye_radius();
   let ro = vec3(0.0, r, 0.0);
 
+  let overcast = sky_overcast();
   if (depth <= 0.0) {
     let night = sky_stars(warped) * sky_transmittance(r, clamp(warped.y, -1.0, 1.0));
-    let radiance = sky_view_radiance(warped) + sky_disk(warped, ro, r, sun_cos, width) +
+    let bodies = sky_disk(warped, ro, r, sun_cos, width) +
       sky_moon(warped, ro, r, moon_cos, moon_width) + night;
+    let radiance = sky_view_radiance(warped) + bodies * (1.0 - overcast);
     return vec4(sky_encode(radiance), 1.0);
   }
 
@@ -157,5 +163,6 @@ fn sky_stars(dir: vec3<f32>) -> vec3<f32> {
   var transmittance = vec3(1.0);
   let gathered = sky_march(ro, dir, distance_km, SKY_AERIAL_STEPS, density,
     &transmittance);
-  return vec4(sky_encode(gathered), 1.0 - dot(transmittance, vec3(1.0 / 3.0)));
+  let haze = mix(gathered, vec3(sky_luminance(gathered)), overcast);
+  return vec4(sky_encode(haze), 1.0 - dot(transmittance, vec3(1.0 / 3.0)));
 }

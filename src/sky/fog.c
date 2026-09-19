@@ -6,7 +6,9 @@
  * fills all four from its own coefficients at the altitude of the camera and
  * from the body that lights the view, so the haze in front of a hill, the
  * aerial perspective of the sky pass and the sky behind it are the same air
- * and cannot drift apart over a day.
+ * and cannot drift apart over a day. The fog of a Weather thickens that air
+ * without touching its color, so a foggy morning is the morning it was, and
+ * the overcast of the same weather flattens that color with the sky.
  */
 
 #include "sky_internal.h"
@@ -29,6 +31,9 @@
 
 /** Half width in kilometers of the ozone layer */
 #define BOX_SKY_FOG_OZONE_SPAN (15.0f)
+
+/** Weights the luminance of a fog color is measured with */
+static const float box_sky_fog_luma[3] = { 0.2126f, 0.7152f, 0.0722f };
 
 /** Scattering and extinction of the medium at one altitude, per channel */
 typedef struct box_sky_air_t {
@@ -84,6 +89,28 @@ static void box_sky_fog_color(
     }
 }
 
+/** Blend the color of the fog toward the grey of its own luminance.
+ *
+ * The air of an overcast world is lit by a cloud deck instead of by the sun
+ * and the blue sky around it, so the haze in front of a hill loses its color
+ * with the sky behind it and the two stay the same air.
+ *
+ * @param overcast Part of the sky the cloud deck of the weather covers
+ * @param color The three channels to flatten
+ */
+static void box_sky_fog_flatten(
+    float overcast,
+    float *color)
+{
+    float luma = color[0] * box_sky_fog_luma[0] + color[1] * box_sky_fog_luma[1] +
+        color[2] * box_sky_fog_luma[2];
+
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        color[i] += (luma - color[i]) * overcast;
+    }
+}
+
 bool box_sky_fog(
     ecs_world_t *world,
     const box_view_t *v,
@@ -115,8 +142,12 @@ bool box_sky_fog(
     }
 
     box_sky_fog_color(&air, light, night, &out[BOX_SKY_FOG_COLOR]);
+    WeatherAmounts weather;
+    box_sky_weather(world, &weather);
+    box_sky_fog_flatten(weather.overcast, &out[BOX_SKY_FOG_COLOR]);
+    float gain = 1.0f + weather.fog * (BOX_WEATHER_FOG_GAIN - 1.0f);
     float extinct = (air.extinct[0] + air.extinct[1] + air.extinct[2]) / 3.0f;
-    out[BOX_SKY_FOG_DENSITY] = extinct * box_sky_or(a->fog_intensity, 1.0f) / units;
+    out[BOX_SKY_FOG_DENSITY] = extinct * box_sky_or(a->fog_intensity, 1.0f) * gain / units;
     out[BOX_SKY_FOG_FALLOFF] = 1.0f / (sky.bounds[3] * units);
     out[BOX_SKY_FOG_HEIGHT] = a->sea_level_y;
     result = true;

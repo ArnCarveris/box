@@ -294,12 +294,53 @@ fn sky_march(ro: vec3<f32>, rd: vec3<f32>, t_max: f32, steps: i32, density: f32,
 }
 #endif
 
+// Brightness the overcast deck of the weather has against the zenith of the
+// clear sky it covers, which keeps a grey day about as bright as the day it is.
+const SKY_OVERCAST_GAIN: f32 = 6.0;
+
+// Part of its zenith radiance the deck keeps at the horizon. A cloud deck is
+// far flatter than the clear sky it covers, which is most of what makes an
+// overcast day read as one.
+const SKY_OVERCAST_FLOOR: f32 = 0.65;
+
+// Part of the sky the cloud deck of the weather covers, which the extract
+// writes into the spare channel of the night color.
+fn sky_overcast() -> f32 {
+  return sky.night.w;
+}
+
+// Radiance of a flat cloud deck lit by a reference luminance, brightest
+// overhead and dimmest at the horizon, as an overcast sky is.
+fn sky_overcast_deck(dir: vec3<f32>, reference: f32) -> vec3<f32> {
+  return vec3(reference * mix(SKY_OVERCAST_FLOOR, 1.0, clamp(dir.y, 0.0, 1.0)));
+}
+
+// Luminance of a radiance, which is the grey the deck flattens it to.
+fn sky_luminance(c: vec3<f32>) -> f32 {
+  return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
 #ifdef SKY_VIEW_BINDING
+fn sky_view_sample(dir: vec3<f32>, r: f32) -> vec3<f32> {
+  return textureSampleLevel(sky_view_lut, sky_sampler, sky_view_uv(dir, r), 0.0).rgb;
+}
+
 // Radiance the sky view table holds for a direction, which is the sky without
-// the sun disk and without anything the geometry of the view covers.
+// the sun disk and without anything the geometry of the view covers, with the
+// cloud deck of the weather blended over it. The table itself stays the clear
+// sky of the atmosphere, so the deck costs one extra sample and neither the
+// medium nor the sun of the world has to move for it.
 fn sky_view_radiance(dir: vec3<f32>) -> vec3<f32> {
-  return textureSampleLevel(sky_view_lut, sky_sampler,
-    sky_view_uv(dir, sky_eye_radius()), 0.0).rgb;
+  let r = sky_eye_radius();
+  let clear = sky_view_sample(dir, r);
+  let overcast = sky_overcast();
+  if (overcast <= 0.0) {
+    return clear;
+  }
+
+  let reference = sky_luminance(sky_view_sample(vec3(0.0, 1.0, 0.0), r)) *
+    SKY_OVERCAST_GAIN;
+  return mix(clear, sky_overcast_deck(dir, reference), overcast);
 }
 #endif
 
