@@ -49,6 +49,13 @@
                     "city_256k_leaves_close",
                     "cluster_4k_roots"
                 ]
+            },
+            {
+                "id": "Prune",
+                "benchcases": [
+                    "city_without_pruning",
+                    "city_with_pruning"
+                ]
             }
         ]
     }

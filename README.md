@@ -142,6 +142,16 @@ million leaves under 50000 tower roots with a flying camera, which draws about
 36000 instances a frame and only fits in the instance buffer because the
 traversal replaces the distant towers.
 
+`test/integration/visual/lod_pruning.flecs` is the detail pruning check: three
+open frames at 70, 150 and 290 units, too sparse for a proxy, whose bolts and
+railings the traversal drops as their projected contribution falls while the
+columns, the floors and a `LodPin` sign stay. The contribution of a node is the
+edge of the square with the area of the widest face of its bounds, scaled by the
+color contrast against its parent, so a part that carries the color of what it
+sits on counts for a quarter of its size. `LodPin` on an entity holds it and
+everything below it out of the test, which is what `lod_pruning_off.flecs` uses
+to draw every part.
+
 `test/integration/visual/occlusion.flecs` is the Hi-Z occlusion check: a wall in
 front of 2400 boxes whose capture is bit identical to `occlusion_off.flecs`,
 next to `occlusion_sweep.flecs`, which `python3 tools/occlusion_sweep.py` sweeps

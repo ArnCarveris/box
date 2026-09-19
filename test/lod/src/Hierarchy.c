@@ -336,3 +336,198 @@ void Hierarchy_the_walk_reports_what_it_cost(void)
     box_packet_fini(&p);
     ecs_fini(w);
 }
+
+void Hierarchy_a_detail_that_stops_contributing_is_pruned(void)
+{
+    // lod/detail_pruning
+    ecs_world_t *w = ecs_init();
+    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, BoxCollision);
+    box_packet_t p;
+
+    ecs_singleton_set(w, LodSettings, {
+        .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
+    });
+
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -200});
+    ecs_set(w, cam, LookAt, {0, 0, 0});
+    ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {0, 0, 0});
+
+    ecs_entity_t front = ecs_new(w);
+    ecs_add_pair(w, front, EcsChildOf, root);
+    ecs_set(w, front, Position, {0, 0, 0});
+    ecs_set(w, front, Box, {10, 10, 1});
+    ecs_set(w, front, Rgb, {140, 140, 140});
+
+    ecs_entity_t back = ecs_new(w);
+    ecs_add_pair(w, back, EcsChildOf, root);
+    ecs_set(w, back, Position, {0, 0, 40});
+    ecs_set(w, back, Box, {10, 10, 1});
+    ecs_set(w, back, Rgb, {140, 140, 140});
+
+    ecs_entity_t bolt = ecs_new(w);
+    ecs_add_pair(w, bolt, EcsChildOf, root);
+    ecs_set(w, bolt, Position, {4, 4, -1});
+    ecs_set(w, bolt, Box, {0.4f, 0.4f, 0.4f});
+    ecs_set(w, bolt, Rgb, {240, 90, 60});
+
+    ecs_add(w, root, RootBounds);
+
+    box_packet_init(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+    box_collision_update(w);
+
+    box_packet_reset(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+    box_collision_update(w);
+
+    test_bool(ecs_get(w, front, RenderInstance)->lod_hidden, false);
+    test_bool(ecs_get(w, back, RenderInstance)->lod_hidden, false);
+    test_bool(ecs_get(w, bolt, RenderInstance)->lod_hidden, true);
+    test_int(p.dynamic_instances.count, 0);
+
+    box_ray_hit_t hit;
+    test_bool(box_collision_ray(w, vec3_new(4, 4, -50), vec3_new(0, 0, 1), 100, &hit), true);
+    test_assert(hit.entity == bolt);
+    test_assert(ecs_has(w, bolt, Box));
+    test_assert(ecs_get_parent(w, bolt) == root);
+
+    box_packet_fini(&p);
+    ecs_fini(w);
+}
+
+void Hierarchy_a_pinned_detail_survives_pruning(void)
+{
+    // lod/detail_pruning
+    ecs_world_t *w = ecs_init();
+    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, BoxCollision);
+    box_packet_t p;
+
+    ecs_singleton_set(w, LodSettings, {
+        .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
+    });
+
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -200});
+    ecs_set(w, cam, LookAt, {0, 0, 0});
+    ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {0, 0, 0});
+
+    ecs_entity_t front = ecs_new(w);
+    ecs_add_pair(w, front, EcsChildOf, root);
+    ecs_set(w, front, Position, {0, 0, 0});
+    ecs_set(w, front, Box, {10, 10, 1});
+    ecs_set(w, front, Rgb, {140, 140, 140});
+
+    ecs_entity_t back = ecs_new(w);
+    ecs_add_pair(w, back, EcsChildOf, root);
+    ecs_set(w, back, Position, {0, 0, 40});
+    ecs_set(w, back, Box, {10, 10, 1});
+    ecs_set(w, back, Rgb, {140, 140, 140});
+
+    ecs_entity_t bolt = ecs_new(w);
+    ecs_add_pair(w, bolt, EcsChildOf, root);
+    ecs_set(w, bolt, Position, {4, 4, -1});
+    ecs_set(w, bolt, Box, {0.4f, 0.4f, 0.4f});
+    ecs_set(w, bolt, Rgb, {240, 90, 60});
+
+    ecs_entity_t sign = ecs_new(w);
+    ecs_add_pair(w, sign, EcsChildOf, root);
+    ecs_add(w, sign, LodPin);
+    ecs_set(w, sign, Position, {-4, 4, -1});
+    ecs_set(w, sign, Box, {0.4f, 0.4f, 0.4f});
+    ecs_set(w, sign, Rgb, {240, 220, 80});
+
+    ecs_add(w, root, RootBounds);
+
+    box_packet_init(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+    box_collision_update(w);
+
+    box_packet_reset(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+
+    test_bool(ecs_get(w, bolt, RenderInstance)->lod_hidden, true);
+    test_bool(ecs_get(w, sign, RenderInstance)->lod_hidden, false);
+    box_packet_fini(&p);
+    ecs_fini(w);
+}
+
+void Hierarchy_the_walk_reports_what_it_pruned(void)
+{
+    // lod/detail_pruning
+    ecs_world_t *w = ecs_init();
+    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, BoxCollision);
+    box_packet_t p;
+    int32_t i;
+
+    ecs_singleton_set(w, LodSettings, {
+        .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
+    });
+    ecs_singleton_set(w, LodStats, {0});
+
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -200});
+    ecs_set(w, cam, LookAt, {0, 0, 0});
+    ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {0, 0, 0});
+
+    ecs_entity_t front = ecs_new(w);
+    ecs_add_pair(w, front, EcsChildOf, root);
+    ecs_set(w, front, Position, {0, 0, 0});
+    ecs_set(w, front, Box, {10, 10, 1});
+    ecs_set(w, front, Rgb, {140, 140, 140});
+
+    ecs_entity_t back = ecs_new(w);
+    ecs_add_pair(w, back, EcsChildOf, root);
+    ecs_set(w, back, Position, {0, 0, 40});
+    ecs_set(w, back, Box, {10, 10, 1});
+    ecs_set(w, back, Rgb, {140, 140, 140});
+
+    for (i = 0; i < 5; i ++) {
+        ecs_entity_t bolt = ecs_new(w);
+        ecs_add_pair(w, bolt, EcsChildOf, root);
+        ecs_set(w, bolt, Position, {(float)i - 2.0f, 4, -1});
+        ecs_set(w, bolt, Box, {0.4f, 0.4f, 0.4f});
+        ecs_set(w, bolt, Rgb, {240, 90, 60});
+    }
+
+    ecs_add(w, root, RootBounds);
+
+    box_packet_init(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+    box_collision_update(w);
+
+    box_packet_reset(&p);
+    p.width = 1920;
+    p.height = 1080;
+    box_render_extract(w, &p);
+
+    const LodStats *stats = ecs_singleton_get(w, LodStats);
+    test_assert(stats != NULL);
+    test_int(stats->pruned, 5);
+    test_int(stats->drawn, 2);
+    test_int(stats->proxies, 0);
+    box_packet_fini(&p);
+    ecs_fini(w);
+}

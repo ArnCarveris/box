@@ -142,7 +142,11 @@ a node the coarse depth grid of the renderer hides resolves to its proxy, a node
 whose projected error is under the threshold of the view resolves to its proxy
 and releases its children, and every other node descends. The decisions of the
 views are votes on the node, and descending wins, so a leaf one view draws is
-drawn. A node that resolves to a proxy hides the renderables of its subtree once,
+drawn. Between the proxy and the descent sits the contribution test: a node whose
+widest face, scaled by the color contrast against its parent, projects under the
+same threshold is dropped with its whole subtree, unless it or an ancestor
+carries `LodPin`. A node that has a proxy keeps it, so pruning only ever drops
+what would otherwise be drawn in full. A node that resolves to a proxy hides the renderables of its subtree once,
 which releases their static slots, and leaves one box instance in the dynamic
 batches of the frame; a leaf the walk reaches is shown again, which is a dirty
 mark and an ordinary static extraction. Nothing else changes: the entities, their

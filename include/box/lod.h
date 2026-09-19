@@ -518,6 +518,9 @@ ECS_STRUCT(LodStats, {
 /** The walk of this frame dropped the node because it contributes too little */
 #define BOX_LOD_VOTE_PRUNE (8u)
 
+/** Part of its size a node contributes when its material matches its parent */
+#define BOX_LOD_CONTRAST_FLOOR (0.25f)
+
 /** Roots a tree keeps loose before it groups them into spatial clusters */
 #define BOX_LOD_CLUSTER_MIN (16)
 
@@ -538,7 +541,7 @@ typedef struct box_lod_node_t {
     vec3 max;            /**< Maximum corner of the world bounds of the subtree */
     float error;         /**< Detail the proxy of the node loses, in world units */
     float weight;        /**< Volume the subtree of the node fills */
-    float contribution;  /**< Size the node contributes against its parent, in world units */
+    float contribution;  /**< Size the node adds to its parent, in world units */
     float color[4];      /**< Linear albedo and opacity the subtree averages to */
     float material[2];   /**< Metallic and roughness the subtree averages to */
     uint64_t id;         /**< Entity the node was built from, 0 for a cluster */

@@ -1,0 +1,104 @@
+// Three open frames at 70, 150 and 290 units. The frames themselves are far too
+// sparse for a proxy, so the traversal keeps them and drops the parts that stop
+// contributing: the bolts go first, then the railings, while the columns and the
+// floors stay and the pinned sign survives at every distance. lod_pruning_off
+// pins the whole frame instead, which keeps every part.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.lod
+
+$ { BakeSettings: {enabled: false} }
+
+$ { LodSettings: {enabled: true, quality: 1, error_px: 1.5, hysteresis: 0.25} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.8, -0.6, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+camera {
+  Position: {0, 18, -30}
+  LookAt: {0, 18, 200}
+  Camera: {fov: 60, far_: 2000}
+}
+
+ground {
+  Position: {0, -0.5, 200}
+  Scale: {400, 1, 700}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+template Frame {
+  for i in 0..4 {
+    _ {
+      Position: {(i % 2) * 11.2 - 5.6, 20, (i / 2) * 11.2 - 5.6}
+      Scale: {0.8, 40, 0.8}
+      Box: {1, 1, 1}
+      Rgb: {118, 122, 130}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+
+  for i in 0..6 {
+    _ {
+      Position: {0, i * 8 + 0.25, 0}
+      Scale: {12, 0.5, 12}
+      Box: {1, 1, 1}
+      Rgb: {132, 134, 138}
+      PbrMaterial: {roughness: 0.75}
+    }
+  }
+
+  for i in 0..20 {
+    _ {
+      Position: {(i % 2) * 11.2 - 5.6, (i / 4) * 8 + 1.4, ((i / 2) % 2) * 5.6 - 2.8}
+      Scale: {0.1, 0.1, 11}
+      Box: {1, 1, 1}
+      Rgb: {224, 176, 70}
+      PbrMaterial: {roughness: 0.4}
+    }
+  }
+
+  for i in 0..48 {
+    _ {
+      Position: {(i % 4) * 3.6 - 5.4, (i / 8) * 8 + 1.1, ((i / 4) % 2) * 11.2 - 5.6}
+      Scale: {0.8, 0.8, 0.8}
+      Box: {1, 1, 1}
+      Rgb: {216, 96, 72}
+      PbrMaterial: {roughness: 0.35}
+    }
+  }
+
+  sign {
+    Position: {0, 12, -6.2}
+    Scale: {1.2, 0.8, 0.2}
+    Box: {1, 1, 1}
+    Rgb: {250, 240, 120}
+    PbrMaterial: {roughness: 0.2}
+    Emissive: {strength: 0.8, color: {250, 240, 120}}
+    LodPin
+  }
+}
+
+tower_near {
+  Position: {-16, 0, 40}
+  Frame: {}
+}
+
+tower_middle {
+  Position: {14, 0, 120}
+  Frame: {}
+}
+
+tower_far {
+  Position: {-6, 0, 260}
+  Frame: {}
+}

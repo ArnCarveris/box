@@ -187,7 +187,25 @@
                     "the_traversal_leaves_the_entities_alone",
                     "settings_off_draws_every_leaf",
                     "turning_the_settings_off_shows_the_leaves_again",
-                    "the_walk_reports_what_it_cost"
+                    "the_walk_reports_what_it_cost",
+                    "a_detail_that_stops_contributing_is_pruned",
+                    "a_pinned_detail_survives_pruning",
+                    "the_walk_reports_what_it_pruned"
+                ]
+            },
+            {
+                "id": "Prune",
+                "testcases": [
+                    "the_contribution_is_the_widest_face_of_a_node",
+                    "a_contrasting_material_contributes_all_of_it",
+                    "a_node_under_the_threshold_is_dropped",
+                    "pruning_a_parent_prunes_its_descendants",
+                    "a_pinned_node_is_never_pruned",
+                    "a_pin_holds_the_whole_subtree",
+                    "a_proxy_wins_over_pruning",
+                    "a_root_is_never_pruned",
+                    "no_threshold_prunes_nothing",
+                    "the_threshold_moves_with_the_distance"
                 ]
             }
         ]

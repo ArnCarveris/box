@@ -361,6 +361,51 @@ float box_lod_tree_shell(
     return result;
 }
 
+/** Size a node adds to what its parent shows, in world units.
+ *
+ * The size is the edge of the square with the area of the widest face of the
+ * bounds, so a bolt and a long thin railing both count for what they cover and
+ * not for how far they reach, and the material contrast against the parent
+ * scales it: a part that carries the color of what it sits on adds a quarter of
+ * its size, a part that stands out adds all of it.
+ *
+ * @param n The node
+ * @param parent The parent of the node, NULL for a root
+ * @return The contribution in world units
+ */
+static float box_lod_tree_contribution(
+    const box_lod_node_t *n,
+    const box_lod_node_t *parent)
+{
+    vec3 extent = vec3_sub(n->max, n->min);
+    float axis[3] = { extent.x, extent.y, extent.z };
+    float contrast = 0.0f;
+    int32_t c;
+    for (c = 0; c < 2; c ++) {
+        int32_t d;
+        for (d = c + 1; d < 3; d ++) {
+            if (axis[d] > axis[c]) {
+                float swap = axis[c];
+
+                axis[c] = axis[d];
+                axis[d] = swap;
+            }
+        }
+    }
+
+    for (c = 0; parent && c < 3; c ++) {
+        float diff = n->color[c] - parent->color[c];
+
+        diff = diff < 0.0f ? -diff : diff;
+        contrast = diff > contrast ? diff : contrast;
+    }
+
+    contrast = contrast > 1.0f ? 1.0f : contrast;
+
+    return sqrtf(axis[0] * axis[1]) *
+        (BOX_LOD_CONTRAST_FLOOR + (1.0f - BOX_LOD_CONTRAST_FLOOR) * contrast);
+}
+
 /** Turn the weighted sums an interior node collected into its averages.
  *
  * @param n The node
@@ -452,6 +497,13 @@ void box_lod_tree_refresh(
 
         p->material[0] += n->material[0] * weight;
         p->material[1] += n->material[1] * weight;
+    }
+
+    for (i = 0; i < count; i ++) {
+        box_lod_node_t *n = box_lod_node(tree, order[i]);
+        const box_lod_node_t *p = n->parent >= 0 ? box_lod_node(tree, n->parent) : NULL;
+
+        n->contribution = box_lod_tree_contribution(n, p);
     }
 }
 
@@ -649,6 +701,26 @@ static bool box_lod_walk_collapse(
     return result;
 }
 
+/** Decide whether a node contributes too little to be worth drawing.
+ *
+ * A root has nothing to be insignificant against and a node the author pinned
+ * is never dropped, which holds for everything below it because a child
+ * inherits the pin of its parent.
+ *
+ * @param n The node
+ * @param desc The view and its threshold
+ * @param scale Pixels one world unit covers at the bounds of the node
+ * @return True when the node and its subtree are dropped
+ */
+static bool box_lod_walk_prune(
+    const box_lod_node_t *n,
+    const box_lod_walk_desc_t *desc,
+    float scale)
+{
+    return desc->prune_px > 0.0f && n->parent >= 0 &&
+        !(n->flags & BOX_LOD_NODE_PIN) && scale * n->contribution < desc->prune_px;
+}
+
 /** Record a decision on a node and hand it to the caller.
  *
  * @param desc The walk
@@ -702,17 +774,12 @@ void box_lod_tree_walk(
 
         box_lod_bounds_t bounds = { .min = n->min, .max = n->max };
         float scale = box_lod_error_scale(&bounds, &desc->camera, desc->viewport_px);
-        if (desc->prune_px > 0.0f && n->parent >= 0 && !(n->flags & BOX_LOD_NODE_PIN) &&
-            scale * n->contribution < desc->prune_px)
-        {
-            stats.pruned ++;
-            box_lod_walk_emit(desc, n, cur, BOX_LOD_VOTE_PRUNE);
-            continue;
-        }
-
+        bool prune = box_lod_walk_prune(n, desc, scale);
         if (n->flags & BOX_LOD_NODE_LEAF) {
-            stats.drawn ++;
-            box_lod_walk_emit(desc, n, cur, BOX_LOD_VOTE_DRAW);
+            stats.pruned += prune;
+            stats.drawn += !prune;
+            box_lod_walk_emit(desc, n, cur,
+                prune ? BOX_LOD_VOTE_PRUNE : BOX_LOD_VOTE_DRAW);
             continue;
         }
 
@@ -722,7 +789,7 @@ void box_lod_tree_walk(
             stats.occluded ++;
         }
 
-        if (!collapse && !(n->flags & BOX_LOD_NODE_OPEN)) {
+        if (!collapse && !prune && !(n->flags & BOX_LOD_NODE_OPEN)) {
             collapse = !desc->open || !desc->open(desc->ctx, cur);
             n = box_lod_node(tree, cur);
         }
@@ -730,6 +797,12 @@ void box_lod_tree_walk(
         if (collapse) {
             stats.proxies ++;
             box_lod_walk_emit(desc, n, cur, BOX_LOD_VOTE_COLLAPSE);
+            continue;
+        }
+
+        if (prune) {
+            stats.pruned ++;
+            box_lod_walk_emit(desc, n, cur, BOX_LOD_VOTE_PRUNE);
             continue;
         }
 

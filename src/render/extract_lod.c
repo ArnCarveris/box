@@ -607,6 +607,9 @@ static void box_render_lod_root(
         lod->sum_weight > 0.0f ? lod->sum_material[1] * inv : 0.5f, lod->sum_weight);
     n->leaves = rb->count > 0 ? rb->count : 1;
     n->flags = (n->flags & ~BOX_LOD_NODE_LEAF) | BOX_RENDER_LOD_HIDDEN;
+    if (ecs_has_id(lod->world, (ecs_entity_t)n->id, LodPin)) {
+        n->flags |= BOX_LOD_NODE_PIN;
+    }
 }
 
 /** Stack cluster nodes over the roots until only a handful are left.
@@ -908,7 +911,8 @@ void box_render_lod_update(
         box_lod_walk_desc_t desc = {
             .camera = view->camera, .viewport_px = view->viewport_px,
             .threshold = view->threshold, .hysteresis = view->hysteresis,
-            .stamp = lod->stamp, .visible = box_render_lod_visible,
+            .prune_px = view->threshold, .stamp = lod->stamp,
+            .visible = box_render_lod_visible,
             .hidden = i ? NULL : box_render_lod_occluded,
             .open = box_render_lod_open, .emit = box_render_lod_emit, .ctx = lod
         };

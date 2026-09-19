@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:26.091+00:00",
   "start_time": "2026-09-19T13:56:06.163+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T15:09:55.308+00:00",
   "dependencies": [
     "lod/screen_space_error",
     "collision/aabb_roots"
