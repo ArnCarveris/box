@@ -525,3 +525,28 @@ void Events_a_cancelled_task_drops_its_waiter(void)
     ecs_progress(w, 0);
     test_int(ecs_vec_count(&state->waiters), 0);
 }
+
+void Events_a_click_fires_the_action_of_the_entity(void)
+{
+    // ui/ui_events
+    ecs_entity_t action = ecs_new(w);
+    ecs_set(w, action, InputAction, {.description = NULL});
+    ecs_entity_t ball = ecs_new(w);
+    ecs_set(w, ball, Position, {0, 0, 0});
+    ecs_set(w, ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_set(w, ball, Action, {.action = action});
+    ecs_progress(w, 0);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, ball, Hovered), true);
+
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    test_bool(ecs_get(w, action, InputAction)->pressed, false);
+
+    ecs_progress(w, 0);
+    test_bool(ecs_get(w, action, InputAction)->pressed, true);
+    test_bool(ecs_get(w, action, InputAction)->released, true);
+}

@@ -40,6 +40,13 @@
                     "extract_ten_opaque_panels",
                     "ten_transparent_panels_unchanged"
                 ]
+            },
+            {
+                "id": "Hit",
+                "benchcases": [
+                    "hit_10k_tree",
+                    "hit_10k_tree_beside_it"
+                ]
             }
         ]
     }

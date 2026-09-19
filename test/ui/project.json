@@ -192,6 +192,45 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Hit",
+                "testcases": [
+                    "element_under_the_point_is_found",
+                    "point_outside_every_element_hits_nothing",
+                    "deepest_element_under_the_point_wins",
+                    "later_sibling_wins_where_two_overlap",
+                    "element_without_a_rectangle_is_not_hit",
+                    "rotated_element_follows_its_corners",
+                    "scaled_element_covers_its_scaled_rectangle",
+                    "element_of_another_view_is_not_hit",
+                    "clipped_child_of_a_transparent_subtree_is_not_hit",
+                    "glyphs_of_a_label_are_not_hit",
+                    "element_that_left_the_tree_is_not_hit",
+                    "moved_element_is_hit_where_it_went",
+                    "world_without_a_tree_hits_nothing"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Events",
+                "testcases": [
+                    "hovered_marks_the_element_under_the_cursor",
+                    "hover_resumes_a_handler",
+                    "click_resumes_a_handler",
+                    "click_bubbles_to_the_parent",
+                    "a_child_handler_consumes_the_click",
+                    "drag_resumes_a_handler",
+                    "an_element_consumes_the_pick_before_the_scene",
+                    "the_scene_is_picked_beside_the_tree",
+                    "a_click_emits_the_action_of_the_element",
+                    "the_action_of_an_ancestor_fires",
+                    "a_handler_receives_the_point_in_logical_pixels",
+                    "an_element_that_appears_under_a_still_cursor_is_hovered"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
