@@ -397,3 +397,75 @@ void Textures_row_zero_is_the_bottom_of_the_file(void)
     test_int(top[2], 0);
     test_int(texture_errors, 0);
 }
+
+void Textures_pager_spreads_a_class_over_pages(void)
+{
+    // textures/layer_cap
+    static uint32_t handles[600];
+    int32_t i;
+    for (i = 0; i < 600; i ++) {
+        handles[i] = box_render_texture_create(w, 0, 256, NULL, true);
+        test_assert(handles[i] != 0);
+        test_int(box_texture_class(handles[i]), 0);
+        test_int(box_texture_layer(handles[i]), (uint32_t)i);
+        test_int(box_texture_page(handles[i]), (uint32_t)i / BOX_TEXTURE_PAGE_LAYERS);
+        test_int(box_texture_page_layer(handles[i]), (uint32_t)i % BOX_TEXTURE_PAGE_LAYERS);
+    }
+
+    const RenderState *state = ecs_singleton_get(w, RenderState);
+    test_assert(state != NULL);
+    int32_t used = 0;
+    for (i = 0; i < BOX_TEXTURE_PAGES; i ++) {
+        used += state->pages[i].used;
+    }
+
+    test_int(used, 3);
+    test_int(state->pages[0].count, BOX_TEXTURE_PAGE_LAYERS);
+    test_int(state->pages[1].count, BOX_TEXTURE_PAGE_LAYERS);
+    test_int(state->pages[2].count, 600 - 2 * BOX_TEXTURE_PAGE_LAYERS);
+
+    box_instance_t inst;
+    memset(&inst, 0, sizeof(box_instance_t));
+    box_instance_set_texture(&inst, 0, handles[599]);
+    test_int(box_instance_texture(&inst, 0), handles[599]);
+    test_int(texture_errors, 0);
+}
+
+void Textures_pager_reuses_a_released_layer(void)
+{
+    // textures/layer_cap
+    static uint32_t handles[600];
+    int32_t i;
+    for (i = 0; i < 600; i ++) {
+        handles[i] = box_render_texture_create(w, 0, 256, NULL, true);
+    }
+
+    box_render_texture_destroy(w, handles[5]);
+    box_render_texture_destroy(w, handles[300]);
+    test_int(box_render_texture_create(w, 0, 256, NULL, true), handles[5]);
+    test_int(box_render_texture_create(w, 0, 256, NULL, true), handles[300]);
+    test_int(box_render_texture_create(w, 0, 256, NULL, true),
+        box_texture_handle(0, 600));
+
+    const RenderState *state = ecs_singleton_get(w, RenderState);
+    int32_t used = 0;
+    for (i = 0; i < BOX_TEXTURE_PAGES; i ++) {
+        used += state->pages[i].used;
+    }
+
+    test_int(used, 3);
+    test_int(texture_errors, 0);
+}
+
+void Textures_pager_out_of_pages_leaves_no_handle(void)
+{
+    // textures/layer_cap
+    int32_t i;
+    for (i = 0; i < BOX_TEXTURE_PAGES * BOX_TEXTURE_PAGE_LAYERS; i ++) {
+        test_assert(box_render_texture_create(w, 0, 256, NULL, true) != 0);
+    }
+
+    test_int(box_render_texture_create(w, 0, 256, NULL, true), 0);
+    test_int(box_render_texture_create(w, 0, 512, NULL, true), 0);
+    test_int(texture_errors, 1);
+}

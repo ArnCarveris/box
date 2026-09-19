@@ -198,7 +198,10 @@
                     "deleting_a_texture_unbinds_and_warns",
                     "missing_file_leaves_no_handle",
                     "kept_source_pixels_survive_the_upload",
-                    "row_zero_is_the_bottom_of_the_file"
+                    "row_zero_is_the_bottom_of_the_file",
+                    "pager_spreads_a_class_over_pages",
+                    "pager_reuses_a_released_layer",
+                    "pager_out_of_pages_leaves_no_handle"
                 ],
                 "setup": true,
                 "teardown": true
