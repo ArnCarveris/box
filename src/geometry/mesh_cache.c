@@ -91,6 +91,12 @@ static void box_mesh_generate(
     case BoxShapeRoundedBox:
         box_mesh_rounded_box(out, key->f0, key->f1, key->f2, key->f3, key->i0);
         break;
+    case BoxShapeLine:
+        box_mesh_line(out, key->f0, key->f1, key->f2, key->f3, key->f4);
+        break;
+    case BoxShapeImage:
+        box_mesh_image(out, key->f0, key->f1, key->f2, key->f3, key->f4);
+        break;
     }
 }
 

@@ -71,21 +71,6 @@ static void box_on_quad(
     }
 }
 
-/** Rect observer.
- *
- * @param it Iterator over changed rects
- */
-static void box_on_rect(
-    ecs_iter_t *it)
-{
-    Rect *r = ecs_field(it, Rect, 0);
-    box_mesh_key_t key = box_key(BoxShapeQuad);
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        box_shape_apply(it, it->entities[i], &key, vec3_new(r[i].width, r[i].height, 1));
-    }
-}
-
 /** Triangle observer.
  *
  * @param it Iterator over changed triangles
@@ -392,16 +377,21 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Frustum);
     ECS_META_COMPONENT(world, RoundedBox);
     ECS_META_COMPONENT(world, Rect);
+    ECS_META_COMPONENT(world, Circle);
+    ECS_META_COMPONENT(world, Border);
+    ECS_META_COMPONENT(world, Line);
+    ECS_META_COMPONENT(world, ImageFit);
+    ECS_META_COMPONENT(world, Image);
     ECS_META_COMPONENT(world, Star);
 
     box_mesh_cache_init(world);
     box_mesh3_init(world);
     box_shape_init(world);
+    box_shape2d_init(world);
     box_shape_example_init(world);
 
     box_shape_watch(world, ecs_id(Box), box_on_box);
     box_shape_watch(world, ecs_id(Quad), box_on_quad);
-    box_shape_watch(world, ecs_id(Rect), box_on_rect);
     box_shape_watch(world, ecs_id(Triangle), box_on_triangle);
     box_shape_watch(world, ecs_id(RightTriangle), box_on_right_triangle);
     box_shape_watch(world, ecs_id(TrianglePrism), box_on_triangle_prism);

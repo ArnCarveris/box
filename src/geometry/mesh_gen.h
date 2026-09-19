@@ -85,6 +85,42 @@ void box_mesh_ngon(
     box_mesh_data_t *out,
     int32_t sides);
 
+/** Thick line segment in the XY plane facing -Z, with square ends.
+ *
+ * The uvs run from 0 to 1 along the segment in U and across it in V.
+ *
+ * @param out The mesh to fill
+ * @param x1 X of the first end
+ * @param y1 Y of the first end
+ * @param x2 X of the second end
+ * @param y2 Y of the second end
+ * @param thickness Width of the segment
+ */
+void box_mesh_line(
+    box_mesh_data_t *out,
+    float x1,
+    float y1,
+    float x2,
+    float y2,
+    float thickness);
+
+/** Unit square in the XY plane facing -Z whose uvs show a region of a texture.
+ *
+ * @param out The mesh to fill
+ * @param u0 Left edge of the region
+ * @param v0 Bottom edge of the region
+ * @param u1 Right edge of the region
+ * @param v1 Top edge of the region
+ * @param rotation Degrees the region is turned by around its center
+ */
+void box_mesh_image(
+    box_mesh_data_t *out,
+    float u0,
+    float v0,
+    float u1,
+    float v1,
+    float rotation);
+
 /** Unit radius UV sphere.
  *
  * @param out The mesh to fill

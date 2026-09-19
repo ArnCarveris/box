@@ -178,6 +178,120 @@ ECS_STRUCT(Rect, {
     float height; /**< Height */
 });
 
+/** Filled disc in the XY plane.
+ *
+ * A circle without a segment count picks one from its radius, so a small disc
+ * costs a handful of triangles and a large one stays round. The count is
+ * quantized, which lets circles of nearby radii share one cached mesh.
+ */
+ECS_STRUCT(Circle, {
+    float radius;     /**< Radius */
+    int32_t segments; /**< Segments around the rim, 0 to derive them from the radius */
+});
+
+/** Rounded corners and an inset border on the rectangle of the entity.
+ *
+ * A border adds the pair (With, Rect), so setting it on a bare entity gives it
+ * a rectangle to draw on. Both the corner radii and the edge widths are
+ * evaluated in the fragment stage from the local position of the pixel, which
+ * is why changing one of them never rebuilds a mesh. A zero corner takes the
+ * radius shorthand, a zero edge takes the width shorthand and a color without
+ * alpha takes the Rgb of the entity. Radii and widths are lengths in the local
+ * space of the rectangle and are clamped to half of its smallest side.
+ */
+ECS_STRUCT(Border, {
+    float radius;              /**< Corner radius every zero corner takes */
+    float radius_top_left;     /**< Top left corner radius */
+    float radius_top_right;    /**< Top right corner radius */
+    float radius_bottom_left;  /**< Bottom left corner radius */
+    float radius_bottom_right; /**< Bottom right corner radius */
+    float width;               /**< Edge width every zero edge takes */
+    float top_width;           /**< Width of the top edge */
+    float bottom_width;        /**< Width of the bottom edge */
+    float left_width;          /**< Width of the left edge */
+    float right_width;         /**< Width of the right edge */
+    rgba color;                /**< Border color, a zero alpha takes the Rgb of the entity */
+});
+
+/** Thick line segment in the XY plane, in the local space of the entity.
+ *
+ * The segment runs from x1, y1 to x2, y2 and is thickness wide, with square
+ * ends. Its uvs run along the segment in U and across it in V.
+ */
+ECS_STRUCT(Line, {
+    float x1;        /**< X of the first end */
+    float y1;        /**< Y of the first end */
+    float x2;        /**< X of the second end */
+    float y2;        /**< Y of the second end */
+    float thickness; /**< Width of the segment, 0 for one hundredth of its length */
+});
+
+/** How the uv region of an image is fitted onto its rectangle */
+ECS_ENUM(ImageFit, {
+    ImageStretch = 0, /**< The region is stretched over the rectangle */
+    ImageCover = 1,   /**< The region is cropped until it fills the rectangle undistorted */
+    ImageContain = 2  /**< The region is widened until it fits the rectangle undistorted */
+});
+
+/** Region of a texture drawn on the rectangle of the entity.
+ *
+ * The texture itself is bound through PbrTextures like any other material, and
+ * the image only says which part of it is shown: u0, v0 to u1, v1, turned by
+ * rotation degrees around the center of the region. An image adds the pair
+ * (With, Rect), so the rectangle is what it is drawn on, and a zero region is
+ * read as the whole texture. Cover and Contain need the pixel size of the
+ * texture, which the image takes from its texture entity, or from the albedo
+ * slot of the entity when it names none.
+ */
+ECS_STRUCT(Image, {
+    ecs_entity_t texture; /**< Texture the fit measures, 0 for the albedo slot */
+    ImageFit fit;         /**< How the region is fitted onto the rectangle */
+    float u0;             /**< Left edge of the region */
+    float v0;             /**< Top edge of the region */
+    float u1;             /**< Right edge of the region, 0 for one */
+    float v1;             /**< Bottom edge of the region, 0 for one */
+    float rotation;       /**< Degrees the region is turned by around its center */
+});
+
+/** Corners a rounded rectangle carries, in the order the packed radii use */
+#define BOX_SHAPE2D_CORNERS (4)
+
+/** Edges a border carries, in the order the packed widths use */
+#define BOX_SHAPE2D_EDGES (4)
+
+/** Signed distance from a point to a rounded rectangle centered on the origin.
+ *
+ * The distance is negative inside the shape, zero on its outline and positive
+ * outside it, and it is the same function the fragment stage evaluates, so a
+ * test can check the coverage of a border at a point without a GPU.
+ *
+ * @param x X of the point in the local space of the rectangle
+ * @param y Y of the point in the local space of the rectangle
+ * @param half_width Half of the width of the rectangle
+ * @param half_height Half of the height of the rectangle
+ * @param radii Corner radii, top left, top right, bottom right and bottom left
+ * @return The signed distance
+ */
+float box_shape2d_distance(
+    float x,
+    float y,
+    float half_width,
+    float half_height,
+    const float *radii);
+
+/** Coverage of a rounded rectangle at a point, one inside and zero outside.
+ *
+ * The outline is softened over the given width, which the fragment stage takes
+ * from the size of a pixel, so the edge of a shape is antialiased.
+ *
+ * @param distance The signed distance to the outline
+ * @param softness Width the outline is softened over, 0 for a hard edge
+ * @return The coverage in 0..1
+ */
+float box_shape2d_coverage(
+    float distance,
+    float softness);
+
 /** Key that identifies the mesh of a registered shape in the cache.
  *
  * Two shapes with the same key share one uploaded mesh, so a shape puts what

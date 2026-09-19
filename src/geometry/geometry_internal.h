@@ -27,7 +27,9 @@ typedef enum box_shape_kind_t {
     BoxShapeCapsule,          /**< Capsule */
     BoxShapeTube,             /**< Tube */
     BoxShapeFrustum,          /**< Truncated cone */
-    BoxShapeRoundedBox        /**< Rounded box */
+    BoxShapeRoundedBox,       /**< Rounded box */
+    BoxShapeLine,             /**< Thick line segment */
+    BoxShapeImage             /**< Quad showing a region of a texture */
 } box_shape_kind_t;
 
 /** Parameters that are baked into a generated mesh */
@@ -40,6 +42,7 @@ typedef struct box_mesh_key_t {
     float f1;               /**< Second ratio parameter */
     float f2;               /**< Third ratio parameter */
     float f3;               /**< Fourth ratio parameter */
+    float f4;               /**< Fifth ratio parameter */
 } box_mesh_key_t;
 
 /** Look up or generate the mesh for a key.
@@ -129,6 +132,21 @@ uint32_t box_mesh_cache_shape(
  */
 void box_shape_init(
     ecs_world_t *world);
+
+/** Register the 2D shape components and the observers that resolve them.
+ *
+ * @param world The world
+ */
+void box_shape2d_init(
+    ecs_world_t *world);
+
+/** Segments a circle of a radius is drawn with, quantized so meshes are shared.
+ *
+ * @param radius The radius
+ * @return The segment count
+ */
+int32_t box_circle_segments(
+    float radius);
 
 /** Register the Star shape through the public registration API.
  *
