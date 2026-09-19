@@ -1,0 +1,43 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.gltf
+
+camera {
+  Position: {0, 3.4, -9.5}
+  LookAt: {0, 1.2, 0}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.8, -0.55, 0}
+  DirectionalLight: {intensity: 1.8}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {65, 62, 58}, intensity: 0.7} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {120, 120, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+crate {
+  Position: {-3, 0, 0}
+  Gltf: {path: "etc/models/crate.gltf", scale: 2}
+}
+
+sample {
+  Position: {0, 1, 0}
+  Gltf: {path: "etc/models/box_vertex_colors.gltf", scale: 1.6}
+}
+
+sphere {
+  Position: {3.2, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {220, 220, 225}
+  PbrMaterial: {roughness: 0.35}
+}

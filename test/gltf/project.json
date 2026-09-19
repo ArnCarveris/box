@@ -1,0 +1,66 @@
+{
+    "id": "gltf",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the glTF loader of the box.gltf module",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Load",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "loads_the_default_scene",
+                    "node_transform_is_mirrored_in_z",
+                    "rotation_is_mirrored_in_z",
+                    "child_nodes_become_child_entities",
+                    "one_entity_per_primitive",
+                    "named_scene_is_loaded",
+                    "unknown_scene_is_reported",
+                    "missing_file_is_reported",
+                    "scale_scales_the_root_nodes",
+                    "setting_another_path_replaces_the_tree",
+                    "removing_the_component_removes_the_tree",
+                    "deleting_the_entity_removes_the_tree",
+                    "application_children_are_left_alone"
+                ]
+            },
+            {
+                "id": "Mesh",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "primitive_gets_a_render_mesh",
+                    "mesh_is_uploaded",
+                    "positions_are_mirrored_in_z",
+                    "winding_survives_the_mirror",
+                    "normals_are_mirrored_in_z",
+                    "uv_v_is_flipped",
+                    "primitives_with_the_same_data_share_a_mesh",
+                    "unloading_frees_the_mesh"
+                ]
+            },
+            {
+                "id": "Material",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "base_color_becomes_rgb",
+                    "metallic_and_roughness_are_kept",
+                    "alpha_becomes_opacity_and_blend_mode",
+                    "double_sided_becomes_a_back_face_mode",
+                    "one_texture_entity_per_image",
+                    "albedo_slot_binds_the_image",
+                    "embedded_image_is_uploaded",
+                    "referenced_image_is_loaded",
+                    "untextured_primitive_has_no_slots"
+                ]
+            }
+        ]
+    }
+}

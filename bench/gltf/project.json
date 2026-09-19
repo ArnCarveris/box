@@ -1,0 +1,22 @@
+{
+    "id": "bench_gltf",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for loading a glTF file into entities, meshes and materials",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Load",
+                "benchcases": [
+                    "mesh_100k",
+                    "nodes_500"
+                ]
+            }
+        ]
+    }
+}

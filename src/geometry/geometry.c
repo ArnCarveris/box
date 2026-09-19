@@ -1,10 +1,14 @@
 /**
  * @file geometry/geometry.c
  * @brief Registers shape components and turns them into RenderMesh through observers.
+ *
+ * The module also imports box.gltf, which loads a file into the Mesh3 meshes
+ * and materials of a child tree and is therefore a user of the mesh cache.
  */
 
 #define BOX_GEOMETRY_IMPL
 #include "geometry_internal.h"
+#include <box/gltf.h>
 
 /** Assign the cached mesh for a key to an entity with the given instance scale.
  *
@@ -417,4 +421,6 @@ void BoxGeometryImport(
     box_shape_watch(world, ecs_id(Tube), box_on_tube);
     box_shape_watch(world, ecs_id(Frustum), box_on_frustum);
     box_shape_watch(world, ecs_id(RoundedBox), box_on_rounded_box);
+
+    ECS_IMPORT(world, BoxGltf);
 }
