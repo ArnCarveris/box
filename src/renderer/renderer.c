@@ -41,6 +41,12 @@ static void box_renderer_discard(
         cmd->source = NULL;
     }
 
+    for (i = 0; i < p->lut_create.count; i ++) {
+        box_lut_cmd_t *cmd = box_vec_at(&p->lut_create, i);
+        free(cmd->texels);
+        cmd->texels = NULL;
+    }
+
     box_queue_release(&r->queue, p);
 }
 

@@ -774,6 +774,7 @@ void box_frame_render(
 
     box_layers_apply(r, p);
     box_modulators_apply(r, p);
+    box_lut_apply(r, p);
     box_texture_apply(r, p);
     box_target_apply(r, p);
     box_scene_apply(r, p);

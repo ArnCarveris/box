@@ -90,6 +90,16 @@ static void box_effect_floats(
         goto done;
     }
 
+    if (ecs_has(world, type, EcsEnum)) {
+        if (*at < BOX_EFFECT_PARAM_MAX) {
+            out[*at] = (float)*(const int32_t*)ptr;
+        }
+
+        plain[0] = false;
+        (*at) ++;
+        goto done;
+    }
+
     const EcsStruct *desc = ecs_get(world, type, EcsStruct);
     if (!desc) {
         goto done;
@@ -263,6 +273,15 @@ static void box_effect_append(
     box_effect_params(world, state, e, pass->params);
     if (ecs_has(world, e, Fog)) {
         box_sky_fog(world, v, pass->params);
+    }
+
+    const ToneMapping *tone = ecs_get(world, e, ToneMapping);
+    if (tone && tone->curve == ToneMapTony) {
+        if (box_effect_lut(state, p)) {
+            pass->inputs |= BOX_EFFECT_LUT;
+        } else {
+            pass->params[BOX_EFFECT_TONE_CURVE] = (float)ToneMapNeutral;
+        }
     }
 
     v->effect_inputs |= pass->inputs;

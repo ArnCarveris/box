@@ -114,7 +114,7 @@ static void box_effect_release(
 static void box_effect_layout(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry entries[10] = {
+    WGPUBindGroupLayoutEntry entries[11] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -183,9 +183,16 @@ static void box_effect_layout(
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_Cube
             }
+        }, {
+            .binding = 10,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_3D
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor desc = { .entryCount = 10, .entries = entries };
+    WGPUBindGroupLayoutDescriptor desc = { .entryCount = 11, .entries = entries };
     r->effect_layout = wgpuDeviceCreateBindGroupLayout(r->device, &desc);
 
     WGPUPipelineLayoutDescriptor layout_desc = {
@@ -232,6 +239,7 @@ static void box_effect_dummies(
         .mipLevelCount = 1,
         .sampleCount = 1
     };
+    box_lut_init(r);
     r->effect_cube_dummy = wgpuDeviceCreateTexture(r->device, &cube_desc);
     WGPUTextureViewDescriptor cube_view = {
         .format = BOX_EFFECT_HDR_FORMAT,
@@ -558,7 +566,7 @@ static void box_effect_pass(
         goto done;
     }
 
-    WGPUBindGroupEntry entries[10] = {
+    WGPUBindGroupEntry entries[11] = {
         { .binding = 0, .buffer = r->effect_uniform, .size = sizeof(box_effect_uniform_t) },
         { .binding = 1, .textureView = src->view },
         { .binding = 2, .sampler = r->effect_sampler },
@@ -572,11 +580,13 @@ static void box_effect_pass(
             .size = sizeof(box_exposure_state_t) },
         { .binding = 7, .textureView = pyramid ? pyramid : r->effect_dummy_view },
         { .binding = 8, .textureView = ao ? ao : r->effect_dummy_view },
-        { .binding = 9, .textureView = box_environment_specular(r) }
+        { .binding = 9, .textureView = box_environment_specular(r) },
+        { .binding = 10, .textureView = (fx->inputs & BOX_EFFECT_LUT) ?
+            box_lut_view(r) : r->lut_dummy_view }
     };
     WGPUBindGroupDescriptor group_desc = {
         .layout = r->effect_layout,
-        .entryCount = 10,
+        .entryCount = 11,
         .entries = entries
     };
     WGPUBindGroup group = wgpuDeviceCreateBindGroup(r->device, &group_desc);
@@ -742,6 +752,7 @@ void box_effect_fini(
     if (r->effect_depth_dummy) wgpuTextureRelease(r->effect_depth_dummy);
     if (r->effect_cube_dummy_view) wgpuTextureViewRelease(r->effect_cube_dummy_view);
     if (r->effect_cube_dummy) wgpuTextureRelease(r->effect_cube_dummy);
+    box_lut_fini(r);
     if (r->effect_pipeline_layout) wgpuPipelineLayoutRelease(r->effect_pipeline_layout);
     if (r->effect_layout) wgpuBindGroupLayoutRelease(r->effect_layout);
     r->motion_pipeline = NULL;

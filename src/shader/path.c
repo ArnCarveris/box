@@ -277,6 +277,32 @@ done:
     return result;
 }
 
+void* box_shader_read_bytes(
+    const char *path,
+    size_t *size)
+{
+    void *result = NULL;
+    *size = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        goto done;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long bytes = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (bytes <= 0) {
+        fclose(f);
+        goto done;
+    }
+
+    result = ecs_os_malloc((ecs_size_t)bytes);
+    *size = fread(result, 1, (size_t)bytes, f);
+    fclose(f);
+done:
+    return result;
+}
+
 char* box_shader_read(
     const char *path)
 {

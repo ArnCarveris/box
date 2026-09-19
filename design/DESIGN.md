@@ -252,7 +252,8 @@ The project shall be validated in the following way:
         - with improvement for firefly reduction
     - auto_exposure
     - fog (height based fog)
-    - tony (tone mapping, include dithering)
+    - tone mapping, include dithering
+        - A choice of operator: a hue preserving curve and the Tony McMapface lookup
     - ssr
 - The framework shall use inversed Z for improved depth precision
 - The framework shall support views and layers

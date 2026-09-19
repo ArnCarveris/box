@@ -14,6 +14,7 @@
 @group(0) @binding(7) var fx_pyramid: texture_2d<f32>;
 @group(0) @binding(8) var fx_ao: texture_2d<f32>;
 @group(0) @binding(9) var fx_env: texture_cube<f32>;
+@group(0) @binding(10) var fx_lut: texture_3d<f32>;
 
 struct FxOut {
   @builtin(position) pos: vec4<f32>,
@@ -62,6 +63,18 @@ fn fx_ao_sample(uv: vec2<f32>) -> f32 {
 fn fx_env_sample(dir: vec3<f32>, roughness: f32) -> vec3<f32> {
   let mip = clamp(roughness, 0.0, 1.0) * (f32(ENV_MIPS) - 1.0);
   return textureSampleLevel(fx_env, fx_sampler, dir, mip).rgb;
+}
+
+// Display transform lookup of the frame. An open ended stimulus is folded into
+// the unit cube with x / (x + 1) and the sample is nudged half a texel inside
+// it, which is the mapping the cube was baked with; a pass that did not ask for
+// the cube reads one black texel.
+fn fx_lut_sample(stimulus: vec3<f32>) -> vec3<f32> {
+  let dims = vec3<f32>(textureDimensions(fx_lut));
+  let encoded = stimulus / (stimulus + vec3(1.0));
+  let uv = clamp(encoded * ((dims - vec3(1.0)) / dims) + vec3(0.5) / dims,
+    vec3(0.0), vec3(1.0));
+  return textureSampleLevel(fx_lut, fx_sampler, uv, 0.0).rgb;
 }
 
 fn fx_motion_vector(uv: vec2<f32>) -> vec2<f32> {

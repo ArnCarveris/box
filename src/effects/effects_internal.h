@@ -29,9 +29,24 @@ typedef struct EffectState {
     bool layout_raw[BOX_EFFECT_LAYOUT_MAX];    /**< The component is floats end to end */
     int32_t layout_size[BOX_EFFECT_LAYOUT_MAX]; /**< Bytes such a component copies */
     int32_t layout_count; /**< Entries of that table in use */
+    bool lut_sent;        /**< The display transform cube reached a packet */
+    bool lut_failed;      /**< The cube could not be read, which was logged once */
 } EffectState;
 
 extern ECS_COMPONENT_DECLARE(EffectState);
+
+/** Make sure the display transform lookup cube reached the renderer.
+ *
+ * The cube is read and sent the first time a pass asks for it; a cube that
+ * cannot be read is reported once and the pass falls back to the neutral curve.
+ *
+ * @param state The registry
+ * @param p The packet
+ * @return true when the renderer has the cube
+ */
+bool box_effect_lut(
+    EffectState *state,
+    box_packet_t *p);
 
 /** Build the effect chain of one view into a packet.
  *

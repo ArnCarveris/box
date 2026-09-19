@@ -93,6 +93,16 @@ bool box_shader_resolve(
 char* box_shader_read(
     const char *path);
 
+/** Read a file into a newly allocated buffer of its own bytes.
+ *
+ * @param path The file
+ * @param size Receives the bytes that were read, zero when it could not be read
+ * @return The contents, or NULL when the file could not be read
+ */
+void* box_shader_read_bytes(
+    const char *path,
+    size_t *size);
+
 /** Preprocess a WGSL file into one source.
  *
  * @param world The world, which supplies the generated includes, NULL for none

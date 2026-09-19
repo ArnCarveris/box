@@ -16,6 +16,7 @@
 #include "bloom.h"
 #include "exposure.h"
 #include "gtao.h"
+#include "lut.h"
 #include "hiz.h"
 #include "overlay.h"
 #include "sky.h"
@@ -518,6 +519,10 @@ struct box_renderer_t {
     WGPUTextureView effect_depth_dummy_view; /**< View of that texture */
     WGPUTexture effect_cube_dummy;   /**< One texel cubemap bound when a view has no environment */
     WGPUTextureView effect_cube_dummy_view; /**< Cube view of that texture */
+    WGPUTexture lut_texture;         /**< Display transform lookup cube, once one was uploaded */
+    WGPUTextureView lut_view;        /**< 3D view of that cube, NULL until it arrives */
+    WGPUTexture lut_dummy;           /**< One texel cube bound while no pass asked for one */
+    WGPUTextureView lut_dummy_view;  /**< 3D view of that texture */
     WGPUBindGroupLayout gtao_layout; /**< Depth, normals, motion and history of the AO passes */
     WGPURenderPipeline gtao_trace;   /**< Horizon search over the depth of the view */
     WGPURenderPipeline gtao_resolve; /**< Bilateral denoise and temporal accumulation */

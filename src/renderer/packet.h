@@ -185,6 +185,12 @@
 /** The frame traces the ambient occlusion of the view and binds it for the pass */
 #define BOX_EFFECT_OCCLUSION (64u)
 
+/** The pass reads the display transform lookup cube the engine ships */
+#define BOX_EFFECT_LUT (128u)
+
+/** Float of the tone mapping parameter block that names its display transform */
+#define BOX_EFFECT_TONE_CURVE (2)
+
 /** Bins of the log luminance histogram the exposure pass builds */
 #define BOX_EXPOSURE_BINS (256)
 
@@ -656,6 +662,12 @@ static inline float box_effect_encode_flag(
 
     return result;
 }
+
+/** Display transform lookup cube to upload, the renderer owns the texel array */
+typedef struct box_lut_cmd_t {
+    uint32_t dim;     /**< Texels along one edge of the cube */
+    uint32_t *texels; /**< dim cubed RGB9E5 texels, freed by the renderer */
+} box_lut_cmd_t;
 
 /** WGSL module to compile, the renderer takes ownership of the source */
 typedef struct box_shader_cmd_t {
@@ -1282,6 +1294,7 @@ typedef struct box_packet_t {
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
     box_vec_t texture_destroy;               /**< uint32_t handles */
     box_vec_t shader_create;                 /**< box_shader_cmd_t of the shaders that changed */
+    box_vec_t lut_create;                    /**< box_lut_cmd_t of the lookup cubes to upload */
     uint32_t layer_count;                    /**< Layers the scene has registered */
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     uint32_t modulator_count;                /**< Light modulators the scene has registered */
@@ -1331,6 +1344,7 @@ static inline void box_packet_init(
     box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
     box_vec_init(&p->texture_destroy, sizeof(uint32_t));
     box_vec_init(&p->shader_create, sizeof(box_shader_cmd_t));
+    box_vec_init(&p->lut_create, sizeof(box_lut_cmd_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->static_groups, sizeof(box_static_group_t));
@@ -1382,6 +1396,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->texture_create);
     box_vec_clear(&p->texture_destroy);
     box_vec_clear(&p->shader_create);
+    box_vec_clear(&p->lut_create);
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->static_groups);
@@ -1414,6 +1429,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->texture_create);
     box_vec_fini(&p->texture_destroy);
     box_vec_fini(&p->shader_create);
+    box_vec_fini(&p->lut_create);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->static_groups);

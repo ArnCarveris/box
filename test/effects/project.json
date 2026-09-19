@@ -1,0 +1,29 @@
+{
+    "id": "effects",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.effects passes and their parameter blocks",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "ToneMap",
+                "testcases": [
+                    "the_neutral_curve_is_the_default",
+                    "the_curve_reaches_the_parameter_block",
+                    "the_tony_pass_reads_the_lookup",
+                    "the_cube_reaches_the_packet_once",
+                    "the_lookup_maps_black_to_black",
+                    "the_lookup_rises_with_the_stimulus",
+                    "the_lookup_desaturates_a_bright_color"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}

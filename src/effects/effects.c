@@ -348,6 +348,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, Effect);
     ECS_META_COMPONENT(world, ColorGrade);
     ECS_META_COMPONENT(world, AutoExposure);
+    ECS_META_COMPONENT(world, ToneMapOperator);
     ECS_META_COMPONENT(world, ToneMapping);
     ECS_META_COMPONENT(world, Bloom);
     ECS_META_COMPONENT(world, Gtao);

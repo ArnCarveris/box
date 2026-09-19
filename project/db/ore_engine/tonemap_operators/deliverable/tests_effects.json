@@ -1,0 +1,18 @@
+{
+  "project": "effects",
+  "timestamp": "2026-09-19T21:05:49Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.033852,
+  "tests": [
+    {"suite": "ToneMap", "case": "the_neutral_curve_is_the_default", "status": "pass", "elapsed": 0.032345},
+    {"suite": "ToneMap", "case": "the_curve_reaches_the_parameter_block", "status": "pass", "elapsed": 0.033772},
+    {"suite": "ToneMap", "case": "the_tony_pass_reads_the_lookup", "status": "pass", "elapsed": 0.033507},
+    {"suite": "ToneMap", "case": "the_cube_reaches_the_packet_once", "status": "pass", "elapsed": 0.033484},
+    {"suite": "ToneMap", "case": "the_lookup_maps_black_to_black", "status": "pass", "elapsed": 0.033521},
+    {"suite": "ToneMap", "case": "the_lookup_rises_with_the_stimulus", "status": "pass", "elapsed": 0.033568},
+    {"suite": "ToneMap", "case": "the_lookup_desaturates_a_bright_color", "status": "pass", "elapsed": 0.033473}
+  ]
+}

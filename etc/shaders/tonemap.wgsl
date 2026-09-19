@@ -1,5 +1,9 @@
 #include "include/effect.wgsl"
 
+// The operator of a pass is the third float of its block: zero is the neutral
+// curve below and one reads the display transform cube the engine ships, which
+// is the Tony McMapface lookup the pass binds when it selects that operator.
+//
 // Hue preserving display transform in the spirit of Tony McMapface: the peak
 // channel is compressed onto a shoulder and the result is blended towards white
 // as it saturates, which is the desaturation the reference LUT is known for
@@ -34,7 +38,14 @@ fn tonemap(color: vec3<f32>) -> vec3<f32> {
     white = 1.0;
   }
 
-  let mapped = tonemap(fx_to_linear(source.rgb) / white);
+  let stimulus = max(fx_to_linear(source.rgb) / white, vec3(0.0));
+  var mapped = vec3<f32>(0.0);
+  if (fx.params[0].z > 0.5) {
+    mapped = fx_lut_sample(stimulus);
+  } else {
+    mapped = tonemap(stimulus);
+  }
+
   var out = fx_to_display(mapped);
   if (fx.params[0].y > 0.5) {
     out = out + vec3((fx_bayer(vec2<u32>(in.pos.xy)) - 0.5) / 255.0);

@@ -69,10 +69,17 @@ ECS_STRUCT(AutoExposure, {
     bool pinned;        /**< The exposure keeps its value instead of adapting */
 });
 
+/** Display transform a tone mapping pass applies to the exposed image */
+ECS_ENUM(ToneMapOperator, {
+    ToneMapNeutral = 0, /**< Hue preserving neutral curve, the default */
+    ToneMapTony = 1     /**< Tony McMapface, a 48 cube the engine loads at first use */
+});
+
 /** Curve and dithering of the tone map pass, the last pass of the chain */
 ECS_STRUCT(ToneMapping, {
-    float white;  /**< Linear value that reaches display white, 0 takes 1 */
-    bool dither;  /**< Ordered 8 by 8 dither of one output step */
+    float white;           /**< Linear value that reaches display white, 0 takes 1 */
+    bool dither;           /**< Ordered 8 by 8 dither of one output step */
+    ToneMapOperator curve; /**< Display transform of the pass, the neutral curve by default */
 });
 
 /** Wide kernel bloom gathered from a mip pyramid of the image */

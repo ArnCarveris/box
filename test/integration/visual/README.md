@@ -58,6 +58,7 @@ Rules for adding one:
 | Parent and ChildOf hierarchies | `parent_tree` | A spinning Parent tree carrying arms and hands, a mixed tower. |
 | Tint composition | `tint` | Primary tints on single objects and on every hierarchy flavor, parent color plus child darkening on the grandchild. |
 | Every effect at once | `showcase`, `showcase_off` | The whole chain over transparency, glass, layers and PBR textures; the pair shows what the chain does to the same content. |
+| Tone map operators | `tonemap`, `tonemap_tony` | The same shapes under the neutral curve and under the Tony McMapface lookup, which lifts the midtones and desaturates the bright ones. |
 | Post process effects | `tonemap`, `auto_exposure`, `bloom`, `gtao`, `gtao_off`, `ssr`, `ssr_off`, `height_fog`, `effect_toggle`, `shader_macro` | Each effect on its own content against its off pair; the toggle scene flips one effect, the macro scene compiles a shader variant. |
 | Occlusion culling | `occlusion`, `occlusion_off`, `occlusion_sweep` | Identical pictures with Hi-Z on and off; the sweep shows a camera passing occluders. |
 | Sky and atmosphere | `atmosphere_noon`, `atmosphere_sunrise`, `atmosphere_sunset`, `time_of_day_morning`, `time_of_day_noon`, `time_of_day_night`, `celestial`, `celestial_moon`, `sky_fog` | Hillaire sky at three sun heights, the day cycle, sun and moon discs, aerial fog. |
