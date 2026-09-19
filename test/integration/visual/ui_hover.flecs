@@ -1,0 +1,72 @@
+// A row of UI buttons over a 3D scene with the cursor on the middle one, whose
+// on.hover handler recolors it: the Bounds hit test, the script event that the
+// UI view raises before the scene and hover styling written in script.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.ui
+using box.picking
+using box.command
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+crate {
+  Position: {0, 0.75, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {200, 120, 70}
+}
+
+template Button {
+  mut hover = 0
+  Rect: {200, 64}
+  Border: {radius: 12}
+  async {
+    await on.hover(this)
+    hover = 1
+  }
+
+  if hover == 1 {
+    Rgb: {245, 205, 95}
+  } else {
+    Rgb: {52, 66, 100}
+  }
+}
+
+ui {
+  Ui: {height: 540}
+  Position: {0, -170, 0}
+  Layout: {direction: Row, width: 900, height: 120,
+           padding: 16, spacing: 24, h: Center, v: Middle}
+  Border: {radius: 20, width: 3, color: {120, 140, 190, 255}}
+  Rgb: {30, 34, 46}
+
+  Button first
+  Button second
+  Button third
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    TerminalInput: {line: "mouse.move 480,440"}
+  }
+}

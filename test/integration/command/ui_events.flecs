@@ -1,0 +1,114 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.input
+using box.picking
+using box.ui
+using box.command
+
+Clicked {}
+Saved {}
+
+actions {
+  Save { InputAction: {description: "Save the scene"} }
+}
+
+input_map {
+  InputMap
+  (keys.S, actions.Save)
+}
+
+camera {
+  Position: {0, 0, -10}
+  Camera: {fov: 60}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+template Button {
+  mut clicks = 0
+  Rect: {240, 72}
+  Border: {radius: 12}
+  Rgb: {52, 66, 100}
+  Action: {action: actions.Save}
+  async {
+    await on.click(this)
+    clicks = 1
+  }
+
+  if clicks == 1 {
+    Clicked
+  }
+
+  label {
+    Rect: {120, 24}
+    Rgb: {200, 215, 245}
+  }
+}
+
+template Watcher {
+  mut fired = 0
+  async {
+    await on.pressed(actions.Save)
+    fired = 1
+  }
+
+  if fired == 1 {
+    Saved
+  }
+}
+
+ui {
+  Ui: {height: 540}
+  Layout: {direction: Row, width: 900, height: 140,
+           padding: 16, spacing: 24, h: Center, v: Middle}
+  Rgb: {30, 34, 46}
+
+  Button save
+}
+
+Watcher watcher
+
+template Agent {
+  mut hovered = 0
+  mut fired = 0
+  mut left = 0
+
+  async {
+    await on.hover(ui.save)
+    hovered = 1
+  }
+
+  async {
+    await on.pressed(actions.Save)
+    fired = 1
+  }
+
+  async {
+    await on.hover(ui)
+    left = 1
+  }
+
+  if left == 1 {
+    CommandScript: {path: "../../test/integration/command/ui_events.cmd"}
+  } else if fired == 1 {
+    TerminalInput: {line: "mouse.move 400,360"}
+  } else if hovered == 1 {
+    TerminalInput: {line: "mouse.click left 640,360"}
+  } else {
+    TerminalInput: {line: "mouse.move 640,360"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    Agent
+  }
+}
