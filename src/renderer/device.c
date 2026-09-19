@@ -373,6 +373,7 @@ void box_device_fini(
     box_cull_fini(r);
     box_shadow_fini(r);
     box_layers_fini(r);
+    box_modulators_fini(r);
     box_effect_fini(r);
     box_overlay_fini(r);
     box_lines_fini(r);

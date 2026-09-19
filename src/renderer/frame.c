@@ -14,7 +14,7 @@
 static void box_frame_init_view(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry layout_entries[4] = {
+    WGPUBindGroupLayoutEntry layout_entries[5] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -40,9 +40,16 @@ static void box_frame_init_view(
             .binding = 3,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Comparison }
+        }, {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .minBindingSize = BOX_MODULATOR_UNIFORM_SIZE
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = layout_entries };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 5, .entries = layout_entries };
     r->view_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 }
 
@@ -171,6 +178,7 @@ void box_frame_init(
     box_renderer_t *r)
 {
     box_layers_init(r);
+    box_modulators_init(r);
     box_shadow_init(r);
     box_frame_init_view(r);
     box_lights_init(r);
@@ -765,6 +773,7 @@ void box_frame_render(
     }
 
     box_layers_apply(r, p);
+    box_modulators_apply(r, p);
     box_texture_apply(r, p);
     box_target_apply(r, p);
     box_scene_apply(r, p);

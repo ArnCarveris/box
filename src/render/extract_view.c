@@ -327,10 +327,12 @@ bool box_render_view_sun(
     float intensity = 3.0f;
     vec3 color = vec3_new(1, 1, 1);
     bool result = false;
+    ecs_entity_t sun = 0;
 
     ecs_iter_t it = ecs_query_iter(world, state->suns);
     if (ecs_query_next(&it)) {
         result = true;
+        sun = it.entities[0];
         DirectionalLight *light = ecs_field(&it, DirectionalLight, 0);
         WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
         dir = vec3_normalize(mat4_transform_dir(&transform->m, vec3_new(0, 0, 1)));
@@ -351,6 +353,12 @@ bool box_render_view_sun(
     v->sun_color[0] = color.x;
     v->sun_color[1] = color.y;
     v->sun_color[2] = color.z;
+    v->sun_modulator = 0;
+    if (state->modulated && sun) {
+        v->sun_modulator = box_render_modulator_mask(world, state, sun);
+    }
+
+    v->frame_time = (float)ecs_get_world_info(world)->world_time_total;
     result = box_sky_celestial(world, v) || result;
 
     return result;

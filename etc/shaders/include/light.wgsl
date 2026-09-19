@@ -10,5 +10,5 @@ struct Light {
   cos_outer: f32,
   kind: u32,
   is_static: u32,
-  pad: f32,
+  modulator: u32,
 };

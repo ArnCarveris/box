@@ -1,0 +1,66 @@
+// ore_engine/cloud_shadows
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.shader
+using box.sky
+
+$ {
+  EnvironmentLight: {sky_color: {126, 148, 188}, ground_color: {78, 74, 62}, intensity: 0.6}
+}
+
+$ { Weather: {overcast: 0.7} }
+
+plugins {
+  clouds { Shader: {path: "etc/shaders/light/clouds.wgsl"} }
+}
+
+camera {
+  Position: {0, 30, -52}
+  LookAt: {0, 0, 14}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.3, 0}
+  DirectionalLight: {intensity: 3.2}
+  LightModulator: {shader: plugins.clouds}
+  CloudShadows: {scale: 24, speed: 2, softness: 0.5}
+}
+
+plain {
+  Position: {0, -0.5, 20}
+  Box: {220, 1, 220}
+  Rgb: {142, 150, 122}
+  PbrMaterial: {roughness: 0.95}
+}
+
+barn {
+  Position: {-18, 4, 6}
+  Box: {12, 8, 9}
+  Rgb: {186, 168, 148}
+  PbrMaterial: {roughness: 0.85}
+}
+
+silo {
+  Position: {-6, 6, 18}
+  Cylinder: {segments: 32, radius: 3, length: 12}
+  Rgb: {206, 202, 196}
+  PbrMaterial: {roughness: 0.6}
+}
+
+boulder {
+  Position: {14, 3, 4}
+  Sphere: {segments: 32, smooth: true, radius: 3}
+  Rgb: {150, 146, 140}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall {
+  Position: {26, 2, 26}
+  Box: {36, 4, 2}
+  Rgb: {172, 166, 152}
+  PbrMaterial: {roughness: 0.9}
+}

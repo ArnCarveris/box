@@ -22,6 +22,15 @@
 #include "include/cluster.wgsl"
 #include "include/shape2d.wgsl"
 #include "include/surface.wgsl"
+#include "include/light_modulator.wgsl"
+
+struct LightModulatorBlock {
+  p: array<LightModulatorParams, MODULATOR_MAX>,
+};
+
+@group(0) @binding(4) var<uniform> light_modulators: LightModulatorBlock;
+
+#include "generated/light_modulators.wgsl"
 
 fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {
   var result = 0.0;
@@ -161,7 +170,11 @@ fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
       let cone = clamp((cd - lt.cos_outer) / span, 0.0, 1.0);
       atten = atten * cone * cone;
     }
-    let radiance = lt.color * lt.intensity * atten;
+    var radiance = lt.color * lt.intensity * atten;
+    if (lt.modulator != 0u) {
+      radiance = radiance *
+        box_light_modulate_all(lt.modulator, world_pos, n, l, u.frame_time);
+    }
     sum = sum + shade(n, v, l, albedo, metallic, roughness) * radiance;
   }
   return sum;
@@ -275,8 +288,13 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   if ((blend == 1u || blend == 2u) && u.plain_blend == 0u) {
     spec = glass_specular(sn, v, l, s.albedo, metallic, roughness, sun, shadow);
   }
-  var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow +
-    env + s.emissive;
+  var direct = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow;
+  if (u.sun_modulator != 0u) {
+    direct = direct *
+      box_light_modulate_all(u.sun_modulator, in.world_pos, sn, l, u.frame_time);
+  }
+
+  var color = direct + env + s.emissive;
   color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);
   var indirect = parts.diffuse;
   if (is_baked) {

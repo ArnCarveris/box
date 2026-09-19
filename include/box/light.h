@@ -49,6 +49,42 @@ ECS_STRUCT(SpotLight, {
     float outer_angle; /**< Zero intensity cone half angle */
 });
 
+/** Plugin that scales the direct light of a light at every shaded point
+ *
+ * The shader is a `Shader` entity whose WGSL file defines `fn
+ * box_light_modulate(p: vec3<f32>, n: vec3<f32>, l: vec3<f32>, time: f32,
+ * params: LightModulatorParams) -> vec3<f32>`, a color multiplier of the direct
+ * light at the shaded world position. The renderer splices that file into the
+ * mesh shader with one function per modulated light and multiplies the term of
+ * the light after its shadow, so a modulator never reaches the indirect light.
+ * A light without one costs nothing and compiles the plain shader.
+ *
+ * The modulator sits on the light or on a child of it, which is how one light
+ * carries more than one: their multipliers multiply. The parameters of a
+ * modulator are an ordinary component next to it that was registered with
+ * box_light_modulator_params.
+ */
+ECS_STRUCT(LightModulator, {
+    ecs_entity_t shader; /**< Shader entity of the plugin, without one it is skipped */
+    bool enabled;        /**< The modulator runs, default true */
+});
+
+/** Parameters of the cloud shadow plugin, `etc/shaders/light/clouds.wgsl` */
+ECS_STRUCT(CloudShadows, {
+    float scale;    /**< World units one cell of the deck covers, 0 takes 40 */
+    float speed;    /**< World units the deck drifts per second, 0 takes 4 */
+    float density;  /**< Light the deck takes at its thickest, 0 takes the overcast */
+    float softness; /**< Width of the edge between cloud and gap, 0 takes 0.35 */
+});
+
+/** Parameters of the caustics plugin, `etc/shaders/light/caustics.wgsl` */
+ECS_STRUCT(Caustics, {
+    float scale;     /**< World units one cell of the pattern covers, 0 takes 2 */
+    float speed;     /**< Rate the pattern animates at, 0 takes 1 */
+    float intensity; /**< Brightness of a band over the plain light, 0 takes 1 */
+    float depth;     /**< World height of the water surface the pattern falls through */
+});
+
 /** Environment light that lights the scene from every direction, a singleton
  *
  * The source is reserved for the cubemap texture or sky entity that later
@@ -123,6 +159,24 @@ ECS_STRUCT(ClusterSettings, {
 
 /** Intensity of the environment light a world without one gets */
 #define BOX_ENV_INTENSITY (0.25f)
+
+/** Added to a component entity to let it fill the parameter block of a modulator.
+ *
+ * The engine reads the reflection of the component that sits next to a
+ * LightModulator and writes its floats into the sixteen float block the
+ * modulate function receives, in member order, so a plugin ships an ordinary
+ * component and a script line instead of engine code.
+ */
+extern ECS_TAG_DECLARE(LightModulatorParams);
+
+/** Register a component as the parameter block of a light modulator plugin.
+ *
+ * @param world The world
+ * @param component The component entity
+ */
+void box_light_modulator_params(
+    ecs_world_t *world,
+    ecs_entity_t component);
 
 /** Register the box.light module.
  *

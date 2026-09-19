@@ -47,6 +47,7 @@ static void box_render_state_dtor(
         }
 
         ecs_vec_fini_t(NULL, &state[i].layers, box_layer_t);
+        ecs_vec_fini_t(NULL, &state[i].modulators, box_modulator_t);
         ecs_vec_fini_t(NULL, &state[i].view_layers, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
         box_render_lod_free(state[i].lod);
@@ -67,6 +68,7 @@ static void box_render_state_dtor(
         if (state[i].lights) ecs_query_fini(state[i].lights);
         if (state[i].emitters) ecs_query_fini(state[i].emitters);
         if (state[i].layer_query) ecs_query_fini(state[i].layer_query);
+        if (state[i].modulator_query) ecs_query_fini(state[i].modulator_query);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);
         if (state[i].lod_roots) ecs_query_fini(state[i].lod_roots);
@@ -132,6 +134,7 @@ void BoxRenderImport(
     }
 
     ecs_vec_init_t(NULL, &state->layers, box_layer_t, 0);
+    ecs_vec_init_t(NULL, &state->modulators, box_modulator_t, 0);
     ecs_vec_init_t(NULL, &state->view_layers, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->dirty, ecs_entity_t, 0);
     state->lod = box_render_lod_new();
@@ -151,6 +154,7 @@ void BoxRenderImport(
     box_render_instance_init(world);
     box_render_extract_init(world);
     ECS_IMPORT(world, BoxShader);
+    box_render_modulators_init(world);
     ECS_IMPORT(world, BoxEffects);
     ECS_IMPORT(world, BoxSky);
 }

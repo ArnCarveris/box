@@ -295,6 +295,10 @@ The material system shall support:
 - PBR textures (albedo, emissive, roughness, normal)
     - Texture tiling/wrapping
     - Texture transforms
+- Light modulators for custom lighting
+    - A project authored WGSL function that scales the direct light of one light
+    - Must be extendable per project without an engine change, parameters being a reflected component
+    - Included: cloud shadows driven by the weather, water caustics
 - Material layers for custom effects
     - Must be extendable per project
     - Must be enableable per material

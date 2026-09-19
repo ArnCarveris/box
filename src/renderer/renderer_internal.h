@@ -104,6 +104,9 @@
 /** Bytes of the uniform block holding the parameters of every material layer */
 #define BOX_LAYER_UNIFORM_SIZE (BOX_LAYER_MAX * sizeof(box_layer_params_t))
 
+/** Bytes of the uniform buffer the light modulator parameters live in */
+#define BOX_MODULATOR_UNIFORM_SIZE (BOX_MODULATOR_MAX * sizeof(box_modulator_params_t))
+
 /** Static instances a batch may hold before the renderer stops mirroring it on the CPU */
 #define BOX_CULL_MIRROR_MAX (4096)
 
@@ -492,6 +495,7 @@ struct box_renderer_t {
     WGPURenderPipeline blur_down[BOX_EFFECT_FORMATS]; /**< Thirteen tap downsample of a level */
     WGPURenderPipeline blur_up[BOX_EFFECT_FORMATS]; /**< Eight tap tent upsample, mixed up */
     WGPUBuffer layer_buffer;         /**< Parameters of every material layer */
+    WGPUBuffer modulator_buffer;     /**< Parameter block of every light modulator */
     box_vec_t shaders;               /**< char* of the preprocessed WGSL, indexed by handle */
     box_gpu_pool_t pool[BOX_EFFECT_POOL_MAX]; /**< Intermediate targets the passes share */
     box_gpu_pool_t *effect_scene;    /**< Target the passes of the current view read first */
@@ -1232,6 +1236,29 @@ void box_layers_apply(
  * @param r The renderer
  */
 void box_layers_fini(
+    box_renderer_t *r);
+
+/** Create the uniform buffer the light modulator parameters live in.
+ *
+ * @param r The renderer
+ */
+void box_modulators_init(
+    box_renderer_t *r);
+
+/** Upload the modulator parameter blocks a packet carries.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_modulators_apply(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Release the modulator uniform buffer.
+ *
+ * @param r The renderer
+ */
+void box_modulators_fini(
     box_renderer_t *r);
 
 /** Take the shader sources a packet carries and rebuild what they feed.

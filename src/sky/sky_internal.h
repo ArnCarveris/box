@@ -42,10 +42,25 @@ typedef struct WeatherBlend {
 
 extern ECS_COMPONENT_DECLARE(WeatherBlend);
 
+/** Whether the density of a cloud deck belongs to the weather or to its author
+ *
+ * A CloudShadows left at a zero density follows the overcast of the world, so
+ * a scene that asks for clouds and for weather gets one deck instead of two
+ * settings that drift apart. Remembering what was written last is what tells a
+ * density an author assigned from the one of the previous frame.
+ */
+typedef struct CloudShadowsBlend {
+    float written;  /**< Density the weather wrote last */
+    bool automatic; /**< The density follows the overcast of the weather */
+} CloudShadowsBlend;
+
+extern ECS_COMPONENT_DECLARE(CloudShadowsBlend);
+
 /** Module wide registry of the atmosphere, stored as a singleton */
 typedef struct SkyState {
     ecs_query_t *atmospheres; /**< Entities holding an Atmosphere component */
     ecs_query_t *weathers;    /**< Entities holding a Weather component */
+    ecs_query_t *clouds;      /**< Entities holding a CloudShadows the weather may drive */
     ecs_query_t *cameras;     /**< Entities holding a Camera, whose first one the rain follows */
     ecs_entity_t rain;        /**< Emitter of the rain, created the first time a world rains */
     ecs_entity_t lut_shader;  /**< Shader entity of the table passes */

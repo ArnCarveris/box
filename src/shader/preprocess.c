@@ -63,6 +63,7 @@ typedef struct box_pp_builtin_t {
 static const box_pp_builtin_t box_pp_builtins[] = {
     { "SHADOW_CASCADE_MAX", BOX_PP_STR(BOX_SHADOW_CASCADE_MAX) },
     { "LAYER_MAX", BOX_PP_STR(BOX_LAYER_MAX) },
+    { "MODULATOR_MAX", BOX_PP_STR(BOX_MODULATOR_MAX) },
     { "INSTANCE_WORDS", BOX_PP_STR(BOX_INSTANCE_WORDS) },
     { "INSTANCE_BOUNDS", BOX_PP_STR(BOX_INSTANCE_BOUNDS) },
     { "INSTANCE_MODE", BOX_PP_STR(BOX_INSTANCE_MODE) },

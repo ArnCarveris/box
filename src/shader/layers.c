@@ -54,6 +54,8 @@ char* box_shader_generated(
     char *result = NULL;
     if (!strcmp(name, "layers.wgsl")) {
         result = box_shader_layers_wgsl(world);
+    } else if (!strcmp(name, "light_modulators.wgsl")) {
+        result = box_shader_modulators_wgsl(world);
     }
 
     return result;

@@ -1,0 +1,70 @@
+// ore_engine/cloud_shadows
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.shader
+
+$ {
+  EnvironmentLight: {sky_color: {96, 140, 164}, ground_color: {28, 58, 66}, intensity: 0.35}
+}
+
+plugins {
+  caustics { Shader: {path: "etc/shaders/light/caustics.wgsl"} }
+}
+
+camera {
+  Position: {0, 11, -17}
+  LookAt: {0, 1, 1}
+  Camera: {fov: 58}
+}
+
+sun {
+  Rotation: {1.05, -0.25, 0}
+  DirectionalLight: {intensity: 1.6}
+  LightModulator: {shader: plugins.caustics}
+  Caustics: {scale: 1.6, speed: 1.5, intensity: 1.4, depth: 4}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {24, 1, 24}
+  Rgb: {78, 128, 138}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall_back {
+  Position: {0, 3, 12}
+  Box: {24, 8, 1}
+  Rgb: {96, 146, 156}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall_left {
+  Position: {-12, 3, 0}
+  Box: {1, 8, 24}
+  Rgb: {96, 146, 156}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall_right {
+  Position: {12, 3, 0}
+  Box: {1, 8, 24}
+  Rgb: {96, 146, 156}
+  PbrMaterial: {roughness: 0.9}
+}
+
+step {
+  Position: {-6, 0.6, -6}
+  Box: {6, 1.2, 6}
+  Rgb: {86, 136, 146}
+  PbrMaterial: {roughness: 0.85}
+}
+
+ball {
+  Position: {5, 1.6, 2}
+  Sphere: {segments: 32, smooth: true, radius: 1.6}
+  Rgb: {206, 198, 182}
+  PbrMaterial: {roughness: 0.55}
+}

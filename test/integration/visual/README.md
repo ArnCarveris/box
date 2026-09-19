@@ -50,6 +50,7 @@ Rules for adding one:
 | Blend modes and back faces | `blending`, `back_faces` | Overlapping panels in several modes sorted correctly; the three back face modes. |
 | Milk glass transmission | `milk_glass`, `glass_sweep` | A frosted and a clear panel; six panels from sharp to fully frosted with no blockiness. |
 | Material layers | `layers` | A crate and sphere plain, with dust, edge wear, grime, wetness and all four. |
+| Light modulator plugins | `cloud_shadows`, `caustics` | A drifting cloud deck darkening the sun over a plain, driven by the overcast of the weather; caustic bands brightening a pool floor and fading out up the walls above the water plane. |
 | Views and render targets | `two_views` | The world from a front camera and from a 3/4 camera into a texture target. |
 | Render layers | `layers_views` | Two views showing only their own layer, lights and the shared object. |
 | Frustum culling | `culling` | Identical with culling on and off; the bench reports culled counts. |

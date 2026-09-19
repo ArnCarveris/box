@@ -296,6 +296,8 @@ void box_lod_impostor_capture(
     memcpy(v->sun_dir, lit->sun_dir, sizeof(v->sun_dir));
     memcpy(v->sun_color, lit->sun_color, sizeof(v->sun_color));
     v->sun_intensity = lit->sun_intensity;
+    v->sun_modulator = lit->sun_modulator;
+    v->frame_time = lit->frame_time;
     v->env_generation = lit->env_generation;
     v->cluster = lit->cluster;
     v->cluster.near_ = depth * 0.01f;

@@ -1,124 +1,131 @@
 {
-  "id": "bench_render",
-  "type": "application",
-  "value": {
-    "description": "Benchmarks for the box.render extract step",
-    "public": false,
-    "use": [
-      "box"
-    ]
-  },
-  "bench": {
-    "benchsuites": [
-      {
-        "id": "Extract",
-        "benchcases": [
-          "static_1_changed",
-          "static_100_changed",
-          "static_1000_changed",
-          "static_1000_changed_parent",
-          "dynamic_10k"
+    "id": "bench_render",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.render extract step",
+        "public": false,
+        "use": [
+            "box"
         ]
-      },
-      {
-        "id": "View",
-        "benchcases": [
-          "extract_two_views"
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Extract",
+                "benchcases": [
+                    "static_1_changed",
+                    "static_100_changed",
+                    "static_1000_changed",
+                    "static_1000_changed_parent",
+                    "dynamic_10k"
+                ]
+            },
+            {
+                "id": "View",
+                "benchcases": [
+                    "extract_two_views"
+                ]
+            },
+            {
+                "id": "Environment",
+                "benchcases": [
+                    "extract"
+                ]
+            },
+            {
+                "id": "Bake",
+                "benchcases": [
+                    "invalidate_one_of_100k",
+                    "probe_count_100k",
+                    "churn_1000_of_100k"
+                ]
+            },
+            {
+                "id": "Lights",
+                "benchcases": [
+                    "extract_1000_moving",
+                    "extract_1000_culled"
+                ]
+            },
+            {
+                "id": "Textures",
+                "benchcases": [
+                    "extract_1000_materials"
+                ]
+            },
+            {
+                "id": "Tiling",
+                "benchcases": [
+                    "extract_10k"
+                ]
+            },
+            {
+                "id": "Svg",
+                "benchcases": [
+                    "rasterize_256"
+                ]
+            },
+            {
+                "id": "SvgJobs",
+                "benchcases": [
+                    "rasterize_1000_while_rendering"
+                ]
+            },
+            {
+                "id": "Blending",
+                "benchcases": [
+                    "transparent_10k"
+                ]
+            },
+            {
+                "id": "Layers",
+                "benchcases": [
+                    "extract_10k_with_layers",
+                    "extract_10k_two_views"
+                ]
+            },
+            {
+                "id": "Frustum",
+                "benchcases": [
+                    "cull_100k_cpu"
+                ]
+            },
+            {
+                "id": "HiZ",
+                "benchcases": [
+                    "project_100k"
+                ]
+            },
+            {
+                "id": "Shadows",
+                "benchcases": [
+                    "fit_cascades",
+                    "casters_100k"
+                ]
+            },
+            {
+                "id": "Effects",
+                "benchcases": [
+                    "extract_chain"
+                ]
+            },
+            {
+                "id": "Sky",
+                "benchcases": [
+                    "extract_steady",
+                    "extract_moving_sun",
+                    "extract_moon_and_stars",
+                    "advance_the_clock",
+                    "extract_sky_fog"
+                ]
+            },
+            {
+                "id": "Modulators",
+                "benchcases": [
+                    "extract_10k_plain_sun",
+                    "extract_10k_modulated_sun"
+                ]
+            }
         ]
-      },
-      {
-        "id": "Environment",
-        "benchcases": [
-          "extract"
-        ]
-      },
-      {
-        "id": "Bake",
-        "benchcases": [
-          "invalidate_one_of_100k",
-          "probe_count_100k",
-          "churn_1000_of_100k"
-        ]
-      },
-      {
-        "id": "Lights",
-        "benchcases": [
-          "extract_1000_moving",
-          "extract_1000_culled"
-        ]
-      },
-      {
-        "id": "Textures",
-        "benchcases": [
-          "extract_1000_materials"
-        ]
-      },
-      {
-        "id": "Tiling",
-        "benchcases": [
-          "extract_10k"
-        ]
-      },
-      {
-        "id": "Svg",
-        "benchcases": [
-          "rasterize_256"
-        ]
-      },
-      {
-        "id": "SvgJobs",
-        "benchcases": [
-          "rasterize_1000_while_rendering"
-        ]
-      },
-      {
-        "id": "Blending",
-        "benchcases": [
-          "transparent_10k"
-        ]
-      },
-      {
-        "id": "Layers",
-        "benchcases": [
-          "extract_10k_with_layers",
-          "extract_10k_two_views"
-        ]
-      },
-      {
-        "id": "Frustum",
-        "benchcases": [
-          "cull_100k_cpu"
-        ]
-      },
-      {
-        "id": "HiZ",
-        "benchcases": [
-          "project_100k"
-        ]
-      },
-      {
-        "id": "Shadows",
-        "benchcases": [
-          "fit_cascades",
-          "casters_100k"
-        ]
-      },
-      {
-        "id": "Effects",
-        "benchcases": [
-          "extract_chain"
-        ]
-      },
-      {
-        "id": "Sky",
-        "benchcases": [
-          "extract_steady",
-          "extract_moving_sun",
-          "extract_moon_and_stars",
-          "advance_the_clock",
-          "extract_sky_fog"
-        ]
-      }
-    ]
-  }
+    }
 }

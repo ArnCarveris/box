@@ -11,14 +11,16 @@
 void box_view_group(
     box_renderer_t *r)
 {
-    WGPUBindGroupEntry group_entries[4] = {
+    WGPUBindGroupEntry group_entries[5] = {
         { .binding = 0, .buffer = r->v->view_buffer, .size = BOX_VIEW_UNIFORM_SIZE },
         { .binding = 1, .buffer = r->layer_buffer, .size = BOX_LAYER_UNIFORM_SIZE }
     };
     box_shadow_bind_group(r, group_entries + 2, 2);
+    group_entries[4] = (WGPUBindGroupEntry){ .binding = 4,
+        .buffer = r->modulator_buffer, .size = BOX_MODULATOR_UNIFORM_SIZE };
     WGPUBindGroupDescriptor group_desc = {
         .layout = r->view_layout,
-        .entryCount = 4,
+        .entryCount = 5,
         .entries = group_entries
     };
     if (r->v->view_group) wgpuBindGroupRelease(r->v->view_group);

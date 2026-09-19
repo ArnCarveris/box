@@ -88,6 +88,14 @@ typedef struct box_layer_t {
     int32_t order;       /**< Application order the list was sorted by */
 } box_layer_t;
 
+/** One registered light modulator, the index of an entry being its modulator bit */
+typedef struct box_modulator_t {
+    ecs_entity_t entity; /**< Entity holding the LightModulator, the light or a child */
+    ecs_entity_t light;  /**< Light the modulator scales */
+    ecs_entity_t shader; /**< Shader entity of the plugin */
+    ecs_entity_t params; /**< Parameter component next to it, 0 when it has none */
+} box_modulator_t;
+
 /** One view of the frame, in the order the views are rendered */
 typedef struct box_view_src_t {
     ecs_entity_t entity;  /**< The View entity, 0 for the view a world without views gets */
@@ -135,6 +143,11 @@ typedef struct RenderState {
     bool transitioned;        /**< A transition exists, so instances resolve displayed values */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
+    bool modulators_dirty;    /**< A light modulator changed, so the mesh shader recomposes */
+    bool modulators_reported; /**< The light modulator limit was already logged */
+    bool modulated;           /**< A light modulator exists, so lights resolve their mask */
+    ecs_vec_t modulators;     /**< box_modulator_t, the index of an entry being its bit */
+    ecs_query_t *modulator_query; /**< Entities holding a LightModulator */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
     ecs_vec_t view_layers;    /**< ecs_entity_t per render layer, the index being its bit */
     uint32_t ui_mask;         /**< Layer bits of the UI trees, hidden by every other view */
@@ -410,6 +423,16 @@ void box_render_extract_textures(
  * @return The registrations, NULL when there are none
  */
 const box_layer_t* box_render_layers(
+    ecs_world_t *world,
+    int32_t *count);
+
+/** Light modulator registrations, rebuilt when one of them changed.
+ *
+ * @param world The world
+ * @param count Receives the number of registrations
+ * @return The registrations, NULL when there are none
+ */
+const box_modulator_t* box_render_modulators(
     ecs_world_t *world,
     int32_t *count);
 
@@ -1082,6 +1105,39 @@ uint32_t box_render_layer_mask(
  * @param p The packet
  */
 void box_render_extract_layers(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Register the observers that track light modulator registrations.
+ *
+ * @param world The world
+ */
+void box_render_modulators_init(
+    ecs_world_t *world);
+
+/** Resolve the modulators of a light into a mask of modulator bits.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The light entity
+ * @return One bit per modulator, the bit being its index in the registry
+ */
+uint32_t box_render_modulator_mask(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e);
+
+/** Send the parameter block of every light modulator with the packet.
+ *
+ * The registration list itself never travels: it composes the mesh shader,
+ * which reaches the renderer as a shader source like any other reload.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_modulators(
     ecs_world_t *world,
     RenderState *state,
     box_packet_t *p);

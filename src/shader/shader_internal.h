@@ -151,4 +151,23 @@ void box_shader_reload(
 void box_shader_layers_changed(
     ecs_world_t *world);
 
+/** Build the WGSL of the registered light modulators of a world.
+ *
+ * Every registration becomes `box_light_modulate_<index>`, spliced from the
+ * file of its plugin, and `box_light_modulate_all` multiplies the ones the
+ * modulator mask of a light names.
+ *
+ * @param world The world
+ * @return The source, owned by the caller
+ */
+char* box_shader_modulators_wgsl(
+    ecs_world_t *world);
+
+/** Reload the builtin mesh shader after the light modulator list changed.
+ *
+ * @param world The world
+ */
+void box_shader_modulators_changed(
+    ecs_world_t *world);
+
 #endif

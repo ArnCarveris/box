@@ -95,16 +95,19 @@ void BoxSkyImport(
     ECS_META_COMPONENT(world, Weather);
     ECS_META_COMPONENT(world, Rain);
     ECS_COMPONENT_DEFINE(world, WeatherBlend);
+    ECS_COMPONENT_DEFINE(world, CloudShadowsBlend);
     ECS_COMPONENT_DEFINE(world, SkyState);
 
     ecs_add_pair(world, ecs_id(Stars), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(Weather), EcsWith, ecs_id(WeatherBlend));
+    ecs_add_pair(world, ecs_id(CloudShadows), EcsWith, ecs_id(CloudShadowsBlend));
     ecs_set_hooks(world, Atmosphere, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Stars, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, TimeOfDay, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Weather, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Rain, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, WeatherBlend, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, CloudShadowsBlend, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, SkyState, { .ctor = flecs_default_ctor });
 
     ecs_query_t *query = ecs_query(world, {
@@ -119,10 +122,20 @@ void BoxSkyImport(
         .cache_kind = EcsQueryCacheAuto
     });
 
+    ecs_query_t *clouds = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "cloud_query" }),
+        .terms = {
+            { .id = ecs_id(CloudShadows), .inout = EcsInOut },
+            { .id = ecs_id(CloudShadowsBlend), .inout = EcsInOut }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
     ecs_entity(world, { .name = "shaders" });
     SkyState *state = ecs_singleton_ensure(world, SkyState);
     state->atmospheres = query;
     state->weathers = weathers;
+    state->clouds = clouds;
     ecs_singleton_modified(world, SkyState);
 
     box_sky_time_init(world);

@@ -79,7 +79,7 @@ static void box_light_fill(
     out->cos_outer = -1.0f;
     out->type = BOX_LIGHT_POINT;
     out->is_static = 0;
-    out->pad = 0;
+    out->modulator = 0;
 }
 
 /** Turn a light into a spot light: forward axis of the transform and cone cosines.
@@ -116,6 +116,7 @@ static void box_light_cone(
  * @param is_static Neither the light nor an ancestor carries a dynamic tag
  * @param visible The view shows the layers of the light
  * @param bake The unculled static lights of the bake are collected too
+ * @param state The registry, for the modulators of the light
  * @param p The packet
  */
 static void box_light_extract(
@@ -125,6 +126,7 @@ static void box_light_extract(
     bool is_static,
     bool visible,
     bool bake,
+    const RenderState *state,
     box_packet_t *p)
 {
     bool spot = ecs_field_id(it, 0) == ecs_id(SpotLight);
@@ -146,6 +148,10 @@ static void box_light_extract(
     }
 
     light.is_static = is_static ? 1u : 0u;
+    if (state->modulated) {
+        light.modulator = box_render_modulator_mask(it->world, state, it->entities[i]);
+    }
+
     if (visible && box_frustum_sphere(frustum, light.position, light.range)) {
         *(box_light_t*)box_vec_push(&p->lights) = light;
     }
@@ -189,7 +195,7 @@ void box_render_extract_lights(
 
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
-            box_light_extract(&it, i, &frustum, is_static, visible, bake, p);
+            box_light_extract(&it, i, &frustum, is_static, visible, bake, state, p);
         }
     }
 

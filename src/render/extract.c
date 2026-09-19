@@ -268,6 +268,7 @@ void box_render_extract(
     box_render_lod_update(world, state, p);
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
+    box_render_extract_modulators(world, state, p);
     box_shader_extract(world, p);
     box_render_extract_meshes(state, p);
     box_render_extract_textures(state, p);

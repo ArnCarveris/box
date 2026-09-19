@@ -44,6 +44,12 @@
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_LAYER_MAX (16)
 
+/** Light modulators a scene can register, one bit each in the light modulator mask */
+#define BOX_MODULATOR_MAX (16)
+
+/** Floats the parameter block of one light modulator holds */
+#define BOX_MODULATOR_PARAMS (16)
+
 /** Planes of a view frustum: left, right, bottom, top, near and far */
 #define BOX_FRUSTUM_PLANES (6)
 
@@ -325,7 +331,7 @@ typedef struct box_light_t {
     float cos_outer;     /**< Cosine of the zero intensity cone half angle */
     uint32_t type;       /**< BOX_LIGHT_POINT or BOX_LIGHT_SPOT */
     uint32_t is_static;  /**< Light and its ancestors have no dynamic tag */
-    float pad;           /**< Padding to the 16 byte GPU stride */
+    uint32_t modulator;  /**< Modulator slots of the light, one bit each, 0 for none */
 } box_light_t;
 
 /** One emissive static instance, treated as a sphere light by the bake */
@@ -414,7 +420,8 @@ typedef struct box_view_t {
     uint32_t env_generation; /**< Changes when the extracted environment changes */
     uint32_t layers_enabled; /**< The view applies the registered material layers */
     uint32_t plain_blend;   /**< Blended fragments composite source over, without the glass model */
-    uint32_t pad[2];        /**< Padding to the 16 byte GPU stride */
+    uint32_t sun_modulator; /**< Modulator slots of the sun, one bit each, 0 for none */
+    float frame_time;       /**< Seconds since the world started, for an animated modulator */
     float shadow_matrix[BOX_SHADOW_CASCADE_MAX * 16]; /**< World to clip of every cascade */
     float shadow_split[4];  /**< View depth a cascade ends at, the last is the distance */
     float shadow_offset[4]; /**< World offset along the normal of a cascade, its texel size */
@@ -661,6 +668,11 @@ typedef struct box_layer_params_t {
     float a[4]; /**< First parameter vector */
     float b[4]; /**< Second parameter vector */
 } box_layer_params_t;
+
+/** Parameter block of one light modulator, as the modulator uniform expects it */
+typedef struct box_modulator_params_t {
+    float v[BOX_MODULATOR_PARAMS]; /**< Floats of the parameter component, in member order */
+} box_modulator_params_t;
 
 /** Texture to upload, the renderer takes ownership of the pixel array */
 typedef struct box_texture_cmd_t {
@@ -1272,6 +1284,8 @@ typedef struct box_packet_t {
     box_vec_t shader_create;                 /**< box_shader_cmd_t of the shaders that changed */
     uint32_t layer_count;                    /**< Layers the scene has registered */
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
+    uint32_t modulator_count;                /**< Light modulators the scene has registered */
+    box_modulator_params_t modulator_params[BOX_MODULATOR_MAX]; /**< Block of every modulator */
     box_vec_t static_updates;                /**< box_static_update_t */
     box_vec_t static_counts;                 /**< box_static_count_t */
     box_vec_t static_groups;                 /**< box_static_group_t of the meshes that regrouped */
