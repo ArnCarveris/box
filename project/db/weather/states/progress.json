@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:25.546+00:00",
   "start_time": "2026-09-19T04:13:30.875+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T04:32:42.861+00:00",
   "dependencies": [
     "sky/sky_ibl",
     "materials/material_layers"
