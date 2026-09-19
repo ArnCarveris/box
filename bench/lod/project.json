@@ -2,7 +2,7 @@
     "id": "bench_lod",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the LOD proxy generator",
+        "description": "Benchmarks for the LOD proxy generator and the mesh merge",
         "public": false,
         "use": [
             "box"
@@ -24,6 +24,14 @@
                     "error_100k_perspective",
                     "error_100k_orthographic",
                     "select_100k"
+                ]
+            },
+            {
+                "id": "Mesh",
+                "benchcases": [
+                    "merge_100k",
+                    "merge_100k_welded",
+                    "simplify_100k"
                 ]
             }
         ]
