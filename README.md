@@ -231,13 +231,18 @@ shows toward the one that was assigned and replaces whatever was in flight, so a
 twice in a frame restarts from what is displayed instead of jumping. `Position`, `Rotation`,
 `Scale`, `Rgb`, `Tint`, `Emissive` and `Opacity` are covered out of the box, and adding
 `Transitionable` to any reflected component of up to four floats or bytes registers that one as
-well. The timing functions are `Linear`, `Ease`, `EaseIn`, `EaseOut` and `EaseInOut`. Only
-entities that have a transition carry the private record that drives it, so a scene without
-transitions pays nothing, and Extract re-reads those entities every frame until the last one ends
-and then stops. Adding `(TransitionValue, Component)` to an entity asks the engine to keep the
-interpolated value of that component there for scripts to read.
-`test/integration/visual/transitions.flecs` captures a position, a color, a scale and an emission
-halfway through their transitions.
+well; with member entities the map keys a single member, as in
+`Transition: [Position.x: {duration: 0.4}]`. The timing functions are `Linear`, `Ease`, `EaseIn`,
+`EaseOut` and `EaseInOut`. Only entities that have a transition carry the private record that
+drives it, so a scene without transitions pays nothing. A static entity uploads its transition
+once, on the frame it starts, and the renderer thread computes the value of every later frame from
+that record and reports the transition back when it ends, so the main thread does nothing per
+frame while a transition runs and a transitioning entity never becomes dynamic. Adding
+`(TransitionValue, Component)` to an entity asks the engine to keep the interpolated value of that
+component there for scripts to read. `test/integration/visual/transitions.flecs` captures a
+position, a color, a scale and an emission halfway through their transitions, and
+`test/integration/bench/transitions_10k.flecs` runs ten thousand entities with ten transitions
+each.
 
 `box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and

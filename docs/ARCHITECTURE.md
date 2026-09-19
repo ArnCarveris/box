@@ -91,13 +91,25 @@ A `Transition` names the components whose displayed value moves toward the value
 the author assigns instead of jumping to it. The author facing component always
 holds the assigned value; the module records the value that is displayed, the
 target, the start time and the parameters in a private `TransitionState` that
-only entities with a transition carry. Extract asks that record for the value of
-the frame, composes the pose components back into the instance matrix under the
-transform of the parent and re-reads a transitioning entity every frame until a
-view has shown the end of it, so an entity that transitions does not become
-dynamic and stops costing anything once it settles. The interpolation itself is
-`box_transition_eval` over one record, which reads nothing but the record, so it
-can move next to the instance on the renderer thread.
+only entities with a transition carry. Extract writes that record onto the frame
+packet once, on the frame the transition starts: a `box_transition_cmd_t` names
+the mesh and static slot of the instance, the values the author assigned, the
+world transform of the parent and the scale and bounds of the mesh, followed by
+one `box_transition_rec_t` per channel of the instance the transition moves
+(position, rotation, scale, rgb, tint, opacity and emission). The renderer keeps
+the record next to the slot, computes the transform, the bounds, the color and
+the emission of every later frame from it in `box_transition_fill` and writes the
+slot again, so the main thread does nothing per frame while a transition runs and
+a transitioning static entity never becomes dynamic. The instances the renderer
+moved are appended to the static updates of the packet, which is how the shadow
+cascade cache and the probe descriptors of the bake see them. When the last
+record of an instance ends the renderer keeps the final value, retires the record
+and reports the slot back in `transitions_done` of the packet it returns, which
+the next extract turns back into the entity and clears its bookkeeping without
+polling. The interpolation itself is `box_transition_lerp`, an inline of the
+renderer header that reads nothing but its arguments, so the game side, which
+still resolves the displayed value of dynamic and sorted instances and of the
+`(TransitionValue, Component)` pair, runs the same code.
 
 ## Static and dynamic content
 
