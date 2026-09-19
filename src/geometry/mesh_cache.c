@@ -62,6 +62,25 @@ static void box_geometry_state_dtor(
     }
 }
 
+/** Compare two mesh keys field by field.
+ *
+ * The keys are compared by value and not by their bytes, because the padding
+ * of a key that a caller filled in on its stack is whatever that stack held,
+ * which would split one mesh into an entry per caller.
+ *
+ * @param a The first key
+ * @param b The second key
+ * @return True when both keys describe the same mesh
+ */
+static bool box_mesh_key_equal(
+    const box_mesh_key_t *a,
+    const box_mesh_key_t *b)
+{
+    return a->kind == b->kind && a->i0 == b->i0 && a->i1 == b->i1 &&
+        a->smooth == b->smooth && a->f0 == b->f0 && a->f1 == b->f1 &&
+        a->f2 == b->f2 && a->f3 == b->f3 && a->f4 == b->f4;
+}
+
 /** Generate the mesh described by a key.
  *
  * @param key The key
@@ -112,7 +131,7 @@ uint32_t box_mesh_cache_get(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->entries) && !entry; i ++) {
         box_mesh_entry_t *candidate = ecs_vec_get_t(&state->entries, box_mesh_entry_t, i);
-        if (!memcmp(&candidate->key, key, sizeof(box_mesh_key_t))) {
+        if (box_mesh_key_equal(&candidate->key, key)) {
             entry = candidate;
         }
     }
