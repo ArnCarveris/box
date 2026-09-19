@@ -187,6 +187,10 @@ environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmo
 draws the sun disk, a phase correct moon and a star field (`celestial.flecs`), attenuates the sun
 light by the atmosphere, drives fog from the same tables (`sky_fog.flecs`), and `TimeOfDay` moves the
 sun, moon and stars by hour, date and latitude (`time_of_day_morning.flecs` and siblings).
+`box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
+per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and
+answers ray, sphere, box and frustum queries from a bounding volume hierarchy in microseconds over
+a million colliders.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
 rebuilds no mesh), see `shapes_2d.flecs`.

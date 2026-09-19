@@ -43,6 +43,7 @@ Two hard rules keep the concerns apart:
 | `box.checkpoint` | script state capture and restore |
 | `box.monitor` | `CpuMonitor`, `EcsStats` and `SystemMonitor` singletons, sampled only while present |
 | `box.script` | scene loading, incremental template instantiation |
+| `box.collision` | root bounds, per shape colliders, a bounding volume hierarchy with ray, sphere, box and frustum queries |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | later | `box.ui`, `box.particles`, `box.transition`, `box.spline`, `box.lod`, `box.atmosphere` |
 

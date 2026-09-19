@@ -1,8 +1,8 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "in progress",
   "created": "2026-09-18T08:28:20.464+00:00",
-  "start_time": null,
+  "start_time": "2026-09-19T05:23:46.775+00:00",
   "end_time": null,
   "dependencies": [
     "controllers/first_person",
