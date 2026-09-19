@@ -345,7 +345,7 @@ typedef struct box_sky_t {
     float abs_haze[4];      /**< Grey haze absorption per kilometer, w unused */
     float mie_params[4];    /**< Anisotropy, haze distance, disk cosine and disk radiance */
     float world_scale[4];   /**< Units per kilometer, its inverse, sea level y, ground km */
-    float night[4];         /**< Radiance the sky keeps after sunset, w unused */
+    float night[4];         /**< Radiance the sky keeps after sunset, w is the overcast amount */
     float turbulence[4];    /**< Warp amount, spatial scale, speed and the time of the frame */
     float moon_dir[4];      /**< Direction toward the moon, w the cosine of its disk */
     float moon_color[4];    /**< Radiance of the moon over the medium, w its lit fraction */

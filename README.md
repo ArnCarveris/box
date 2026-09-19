@@ -187,6 +187,8 @@ environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmo
 draws the sun disk, a phase correct moon and a star field (`celestial.flecs`), attenuates the sun
 light by the atmosphere, drives fog from the same tables (`sky_fog.flecs`), and `TimeOfDay` moves the
 sun, moon and stars by hour, date and latitude (`time_of_day_morning.flecs` and siblings).
+`Weather` blends overcast and fog amounts over the atmosphere with smooth transitions
+(`weather_overcast.flecs`, `weather_fog.flecs`); rain drives the wetness layer until the particles epic adds the emitter.
 
 ## Tests
 
