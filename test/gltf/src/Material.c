@@ -40,6 +40,7 @@ void Material_setup(void)
     material_log_prev = ecs_os_api.log_;
     ecs_os_api.log_ = material_log;
     ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, BoxGltf);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;

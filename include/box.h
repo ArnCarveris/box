@@ -20,6 +20,7 @@
 #include "box/light.h"
 #include "box/material.h"
 #include "box/geometry.h"
+#include "box/gltf.h"
 #include "box/render.h"
 #include "box/shader.h"
 #include "box/effects.h"
