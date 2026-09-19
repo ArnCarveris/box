@@ -86,7 +86,7 @@ ECS_STRUCT(Action, {
 /** What a pick found, the value a script handler receives */
 ECS_STRUCT(PickHit, {
     ecs_entity_t entity;   /**< Entity the pick resolved to, 0 when it hit nothing */
-    ecs_entity_t collider; /**< Entity whose collider the ray hit */
+    ecs_entity_t collider; /**< Entity whose collider the ray hit, 0 when a source answered */
     ecs_entity_t view;     /**< View the ray was built from, 0 when a camera gave it */
     vec3 point;            /**< Hit position in world space */
     vec3 normal;           /**< Surface normal of the collider at the hit */
