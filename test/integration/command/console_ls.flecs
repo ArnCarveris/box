@@ -1,0 +1,70 @@
+// The in game console running the same ls the HTTP terminal runs in shell.cmd,
+// reproducing a crash reported from a manual run of box_app: press backtick,
+// type ls, press return.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.input
+using box.ui
+using box.command
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+crate {
+  Position: {0, 0.75, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {200, 120, 70}
+}
+
+actions {
+  Console { InputAction: {description: "Open and close the in game console"} }
+  ConsoleLine { InputAction: {description: "A line was submitted in the console"} }
+}
+
+$ {
+  Console: {}
+}
+
+template Watcher {
+  mut ran = 0
+
+  async {
+    await on.pressed(actions.ConsoleLine)
+    ran = 1
+  }
+
+  if ran == 1 {
+    CommandScript: {path: "../../test/integration/command/console_ls.cmd"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    TerminalInput: {line: "key.press Grave"}
+    Watcher
+  }
+
+  typist {
+    Terminal: {}
+    TerminalInput: {line: "key.type \"ls\n\""}
+  }
+}

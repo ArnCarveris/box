@@ -168,7 +168,8 @@ static void box_ui_console_load(
         goto done;
     }
 
-    if (!ecs_script(world, { .filename = resolved })) {
+    ecs_entity_t script = ecs_new(world);
+    if (!ecs_script(world, { .entity = script, .filename = resolved })) {
         ecs_err("box.ui: failed to load '%s'", resolved);
         goto done;
     }

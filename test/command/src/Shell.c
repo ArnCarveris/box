@@ -618,3 +618,13 @@ void Shell_ls_escapes_dots(void)
     test_assert(strstr(out, "scene\\.x\\.flecs") != NULL);
     ecs_os_free(out);
 }
+
+void Shell_ls_root_entity_with_empty_name(void)
+{
+    // ore_engine/console_ls_crash
+    ecs_entity_t e = ecs_new(w);
+    ecs_set_name(w, e, "");
+    char *out = box_command_run(w, session, "ls", NULL);
+    test_assert(out[0] == '\n');
+    ecs_os_free(out);
+}

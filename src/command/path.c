@@ -316,5 +316,7 @@ char* box_path_escape(
         ecs_strbuf_appendch(&buf, p[0]);
     }
 
-    return ecs_strbuf_get(&buf);
+    char *result = ecs_strbuf_get(&buf);
+
+    return result ? result : ecs_os_strdup("");
 }

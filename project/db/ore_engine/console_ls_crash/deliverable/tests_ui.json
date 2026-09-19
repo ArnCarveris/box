@@ -1,0 +1,22 @@
+{
+  "project": "ui",
+  "timestamp": "2026-09-19T23:27:56Z",
+  "pass": 11,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.163081,
+  "tests": [
+    {"suite": "Console", "case": "singleton_installs_the_grave_binding", "status": "pass", "elapsed": 0.061606},
+    {"suite": "Console", "case": "grave_key_opens_and_closes_the_overlay", "status": "pass", "elapsed": 0.066718},
+    {"suite": "Console", "case": "open_loads_the_script_and_takes_its_parts", "status": "pass", "elapsed": 0.066417},
+    {"suite": "Console", "case": "open_creates_its_terminal_session", "status": "pass", "elapsed": 0.063231},
+    {"suite": "Console", "case": "open_holds_the_keyboard", "status": "pass", "elapsed": 0.066713},
+    {"suite": "Console", "case": "closed_overlay_is_not_drawn", "status": "pass", "elapsed": 0.066504},
+    {"suite": "Console", "case": "submitted_line_runs_on_the_session", "status": "pass", "elapsed": 0.162935},
+    {"suite": "Console", "case": "scrollback_shows_the_session_log", "status": "pass", "elapsed": 0.068783},
+    {"suite": "Console", "case": "submitted_line_fires_the_line_action", "status": "pass", "elapsed": 0.061435},
+    {"suite": "Console", "case": "script_is_loaded_once", "status": "pass", "elapsed": 0.058386},
+    {"suite": "Console", "case": "script_awaits_the_console_action", "status": "pass", "elapsed": 0.055202}
+  ]
+}
