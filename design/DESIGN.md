@@ -436,6 +436,7 @@ The material system shall support:
 - The UI library shall (therefore) not contain any widget-specific logic
 - The UI library shall provide utility helpers for building text widgets
     - These utilities should be usable from flecs script
+- UI widgets shall be written in flecs script as templates over the layout, text, shape and event components; the engine shall provide primitives (layout, text helpers, clipping, focus, events) and no native widget code beyond the text helpers, so that every screen is data a checkpoint can write and an agent can read
 
 ## Transitions
 - The framework shall support transitions for all authorable continuous values
