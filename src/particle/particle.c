@@ -276,8 +276,8 @@ void BoxParticleImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxParticle);
-    ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxSpline);
     ECS_IMPORT(world, BoxShader);
     ECS_IMPORT(world, BoxCollision);

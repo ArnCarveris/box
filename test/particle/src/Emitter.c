@@ -122,3 +122,25 @@ void Emitter_a_world_without_an_emitter_compiles_no_shader(void)
 
     ecs_fini(w);
 }
+
+void Emitter_a_geometry_world_after_a_particle_only_world_keeps_its_ids(void)
+{
+    // ore_engine/component_id_drift
+    ecs_world_t *w1 = ecs_init();
+    ECS_IMPORT(w1, BoxParticle);
+    ecs_fini(w1);
+
+    ecs_world_t *w2 = ecs_init();
+    ECS_IMPORT(w2, BoxGeometry);
+
+    ecs_entity_t e = ecs_new(w2);
+    ecs_set(w2, e, Box, { 1, 2, 3 });
+
+    const Box *box = ecs_get(w2, e, Box);
+    test_assert(box != NULL);
+    test_flt(box->x, 1);
+    test_flt(box->y, 2);
+    test_flt(box->z, 3);
+
+    ecs_fini(w2);
+}
