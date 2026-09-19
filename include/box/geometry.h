@@ -27,8 +27,9 @@ extern "C" {
  * of three. Two entities whose data is identical share one uploaded mesh, which
  * is released when the last of them lets go of it.
  *
- * Colors are kept and validated but not uploaded yet: the vertex format of the
- * renderer has no color channel, so widening it is a separate task.
+ * Colors multiply the albedo per vertex; a mesh without colors renders as white
+ * colors would, and the alpha that would scale roughness waits for a color type
+ * with an alpha channel.
  */
 ECS_STRUCT(Mesh3, {
     ecs_vec(vec3) vertices;    /**< Vertex positions */

@@ -83,7 +83,7 @@
                     "rejects_a_normal_count_mismatch",
                     "rejects_a_color_count_mismatch",
                     "rejects_an_empty_mesh",
-                    "colors_are_accepted_but_not_uploaded",
+                    "colors_are_accepted_and_uploaded",
                     "differing_colors_upload_separately",
                     "colors_are_uploaded",
                     "colors_default_to_white"

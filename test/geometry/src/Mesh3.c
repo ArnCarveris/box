@@ -455,7 +455,7 @@ void Mesh3_rejects_an_empty_mesh(void)
     test_int(packet.mesh_create.count, 0);
 }
 
-void Mesh3_colors_are_accepted_but_not_uploaded(void)
+void Mesh3_colors_are_accepted_and_uploaded(void)
 {
     // meshes/mesh3
     ecs_entity_t e = ecs_new(w);
