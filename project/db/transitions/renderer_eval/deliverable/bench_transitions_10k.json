@@ -1,0 +1,33 @@
+{
+  "kind": "bench",
+  "results": [
+    {
+      "scene": "test/integration/bench/transitions_10k.flecs",
+      "entities": 10000,
+      "static": 10000,
+      "dynamic": 0,
+      "churn": [
+        167,
+        167
+      ],
+      "lights": 0,
+      "light_churn": 0,
+      "frames": 300,
+      "mean_ms": 9.213,
+      "p50_ms": 9.37,
+      "p99_ms": 15.489,
+      "max_ms": 18.212,
+      "fps": 108.5,
+      "drawn": 9995,
+      "culled": 5,
+      "occluded": 0,
+      "shadow_static_rebuilds": 300,
+      "spike_factor": 4.0,
+      "spike_budget_ms": 36.851,
+      "attributed": true,
+      "spike_count": 0,
+      "spikes": [],
+      "status": "pass"
+    }
+  ]
+}
