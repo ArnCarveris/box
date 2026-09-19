@@ -208,6 +208,9 @@ closed one, and the sweep follows the curve of its own entity when it names none
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and
 answers ray, sphere, box and frustum queries from a bounding volume hierarchy in microseconds over
 a million colliders.
+`CollisionSettings: {debug: DebugAll}` draws the colliders and the root bounds a view sees as
+wireframes over the image (`DebugColliders`, `DebugBounds` or `DebugNone`, which costs a frame
+nothing), see `test/integration/visual/collision_debug.flecs`.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
 rebuilds no mesh), see `shapes_2d.flecs`.

@@ -1,0 +1,83 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.collision
+
+$ { CollisionSettings: {margin: 0.25, dynamic: true, enabled: true, debug: DebugAll} }
+
+$ { EnvironmentLight: {sky_color: {90, 115, 155}, ground_color: {45, 42, 38}, intensity: 1} }
+
+template Tower {
+  base {
+    Position: {0, 0.3, 0}
+    Box: {1.4, 0.6, 1.4}
+    Rgb: {120, 120, 130}
+  }
+
+  shaft {
+    Position: {0, 1.6, 0}
+    Box: {0.8, 2, 0.8}
+    Rgb: {170, 150, 120}
+  }
+
+  cap {
+    Position: {0, 3, 0}
+    Sphere: {segments: 16, smooth: true, radius: 0.55}
+    Rgb: {220, 180, 90}
+  }
+}
+
+camera {
+  Position: {0, 4.5, -13}
+  LookAt: {0, 1.2, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.1}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {24, 1, 16}
+  Rgb: {70, 74, 82}
+  PbrMaterial: {roughness: 0.9}
+}
+
+sphere {
+  Position: {-4.5, 1.2, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1.2}
+  Rgb: {80, 160, 240}
+}
+
+crate {
+  Position: {-1.5, 1, 0}
+  Rotation: {0, 0.5, 0}
+  Box: {1.8, 2, 1.8}
+  Rgb: {220, 90, 70}
+}
+
+capsule {
+  Position: {1.5, 1.3, 0}
+  Capsule: {segments: 20, smooth: true, length: 1.4, radius: 0.6}
+  Rgb: {235, 235, 235}
+}
+
+cone {
+  Position: {4, 0.9, 0}
+  Cone: {segments: 24, smooth: true, length: 1.8, radius: 0.8}
+  Rgb: {120, 210, 140}
+}
+
+tower_left {
+  Position: {-6.5, 0, 4}
+  Tower: {}
+}
+
+tower_right {
+  Position: {6.5, 0, 4}
+  Tower: {}
+}
