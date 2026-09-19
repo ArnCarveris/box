@@ -1,0 +1,67 @@
+{
+    "id": "lod",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the LOD proxy generator",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Cluster",
+                "testcases": [
+                    "one_primitive_is_one_box",
+                    "two_groups_split_by_distance",
+                    "the_budget_caps_the_shape_count",
+                    "more_shapes_lower_the_error",
+                    "a_shape_covers_the_bounds_of_its_inputs",
+                    "a_round_cluster_becomes_a_sphere",
+                    "a_tall_cluster_becomes_a_capsule",
+                    "the_proxy_bounds_cover_the_subtree"
+                ]
+            },
+            {
+                "id": "Error",
+                "testcases": [
+                    "an_exact_box_has_no_error",
+                    "a_gap_between_inputs_raises_the_error",
+                    "splitting_a_gap_removes_the_error",
+                    "the_error_bound_buys_more_shapes",
+                    "the_error_is_the_edge_of_the_missed_volume",
+                    "the_error_scales_with_the_subtree"
+                ]
+            },
+            {
+                "id": "Material",
+                "testcases": [
+                    "every_material_keeps_a_shape",
+                    "a_shape_carries_the_material_of_its_inputs",
+                    "the_budget_follows_the_volume",
+                    "materials_never_share_a_shape"
+                ]
+            },
+            {
+                "id": "Determinism",
+                "testcases": [
+                    "the_same_input_builds_the_same_proxy",
+                    "a_fresh_builder_builds_the_same_proxy",
+                    "an_unrelated_build_leaves_no_trace"
+                ]
+            },
+            {
+                "id": "Degenerate",
+                "testcases": [
+                    "an_empty_subtree_has_no_proxy",
+                    "a_zero_sized_primitive_is_finite",
+                    "overlapping_primitives_become_one_shape",
+                    "more_shapes_than_primitives",
+                    "a_flat_primitive_keeps_its_plane",
+                    "reversed_bounds_are_normalized"
+                ]
+            }
+        ]
+    }
+}
