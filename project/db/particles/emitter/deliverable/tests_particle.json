@@ -1,0 +1,32 @@
+{
+  "project": "particle",
+  "timestamp": "2026-09-19T17:41:43Z",
+  "pass": 21,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.097328,
+  "tests": [
+    {"suite": "Emitter", "case": "defaults_are_a_white_upward_stream", "status": "pass", "elapsed": 0.033319},
+    {"suite": "Emitter", "case": "emitter_gets_a_transform_and_its_bookkeeping", "status": "pass", "elapsed": 0.032547},
+    {"suite": "Emitter", "case": "authored_members_keep_the_other_defaults", "status": "pass", "elapsed": 0.033290},
+    {"suite": "Emitter", "case": "shaders_are_created_with_the_first_emitter", "status": "pass", "elapsed": 0.031513},
+    {"suite": "Emitter", "case": "a_world_without_an_emitter_compiles_no_shader", "status": "pass", "elapsed": 0.032311},
+    {"suite": "Extract", "case": "no_block_without_an_emitter", "status": "pass", "elapsed": 0.032919},
+    {"suite": "Extract", "case": "block_carries_the_world_transform", "status": "pass", "elapsed": 0.033445},
+    {"suite": "Extract", "case": "block_carries_the_shape_and_the_spread", "status": "pass", "elapsed": 0.032669},
+    {"suite": "Extract", "case": "block_carries_the_ranges_and_the_seed", "status": "pass", "elapsed": 0.031649},
+    {"suite": "Extract", "case": "color_reaches_the_block_as_linear", "status": "pass", "elapsed": 0.033249},
+    {"suite": "Extract", "case": "spawn_count_on_the_fixed_clock", "status": "pass", "elapsed": 0.031649},
+    {"suite": "Extract", "case": "fractional_rate_accumulates_over_frames", "status": "pass", "elapsed": 0.032830},
+    {"suite": "Extract", "case": "a_rate_of_zero_spawns_nothing", "status": "pass", "elapsed": 0.032875},
+    {"suite": "Extract", "case": "spawn_is_clamped_to_the_maximum", "status": "pass", "elapsed": 0.032239},
+    {"suite": "Extract", "case": "maximum_is_clamped_to_the_pool_ceiling", "status": "pass", "elapsed": 0.032644},
+    {"suite": "Extract", "case": "the_pool_resets_when_the_maximum_changes", "status": "pass", "elapsed": 0.032327},
+    {"suite": "Extract", "case": "first_counts_the_particles_spawned_before", "status": "pass", "elapsed": 0.031757},
+    {"suite": "Extract", "case": "mesh_shape_samples_the_surface", "status": "pass", "elapsed": 0.030621},
+    {"suite": "Extract", "case": "spline_shape_samples_the_curve", "status": "pass", "elapsed": 0.031678},
+    {"suite": "Extract", "case": "a_shape_without_a_table_carries_no_points", "status": "pass", "elapsed": 0.031487},
+    {"suite": "Extract", "case": "the_render_extract_fills_the_emitters", "status": "pass", "elapsed": 0.031362}
+  ]
+}
