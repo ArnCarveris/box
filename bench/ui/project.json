@@ -24,6 +24,14 @@
                     "layout_10k_tree",
                     "layout_10k_unchanged"
                 ]
+            },
+            {
+                "id": "Text",
+                "benchcases": [
+                    "layout_1000_glyphs",
+                    "layout_1000_glyphs_unchanged",
+                    "measure_1000_glyphs"
+                ]
             }
         ]
     }
