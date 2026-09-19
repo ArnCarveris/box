@@ -20,3 +20,13 @@ deliverable, every other scene unchanged.
 
 - `src/renderer/overlay.c`, `src/monitor/fps.c`, `test/monitor/src/Fps.c`,
   `test/integration/visual/fps_overlay.flecs`, `project/db/monitoring/fps_overlay/README.md`
+
+## Reopened
+
+`fps` in the `box_app` console shows only the frame rate number; the panel with the frame
+time graph (background, reference lines and bars) is missing. The overlay must show the number
+and the graph together in the application, not only in the headless visual scene. Find why the
+renderer overlay does not draw for the target the command enables (the view the command picks
+against the view the renderer draws the overlay for, the surface scale, or the overlay pass
+being skipped when the UI view is present) and fix it, checked with a capture of the running
+application.

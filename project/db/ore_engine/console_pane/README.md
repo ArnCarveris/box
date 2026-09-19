@@ -20,3 +20,11 @@ visual scene refreshed and its screenshot in the deliverable, the console comman
 
 - `etc/ui/console.flecs`, `test/integration/visual/console.flecs`,
   `test/integration/command/console.cmd`, `project/db/ui/console/README.md`
+
+## Reopened
+
+The pane renders grey in `box_app`, not black at 75% opacity. Find why `Rgb {0, 0, 0}` with
+`Opacity {0.75}` does not produce a 25% darkened scene (the composite path of a transparent
+subtree, its clear colour, colour space or tonemap of the UI view, or the blend of the quad)
+and fix it in the engine, checked in a capture of the real application, not only the visual
+scene.
