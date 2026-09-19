@@ -6,6 +6,9 @@
  * directive, every other line has its identifiers substituted and is appended
  * to the output. Errors carry the file and the line they happened on, which is
  * the file of the include the error sits in, not the file that included it.
+ * A file keeps the path it was asked for, not the path it was found at, so an
+ * include of it goes through the search path again and an app can override a
+ * file the engine ships.
  */
 
 #include "shader_internal.h"
@@ -400,19 +403,21 @@ static void box_pp_include(
     }
 
     char resolved[BOX_SHADER_PATH_MAX];
-    if (!box_shader_resolve(path, resolved, sizeof(resolved)) &&
-        !box_shader_resolve(name, resolved, sizeof(resolved)))
-    {
-        box_pp_error(pp, f->path, f->line, "include not found");
-        goto done;
+    const char *logical = path;
+    if (!box_shader_resolve(path, resolved, sizeof(resolved))) {
+        logical = name;
+        if (!box_shader_resolve(name, resolved, sizeof(resolved))) {
+            box_pp_error(pp, f->path, f->line, "include not found");
+            goto done;
+        }
     }
 
-    if (box_pp_open(pp, resolved)) {
+    if (box_pp_open(pp, logical)) {
         box_pp_error(pp, f->path, f->line, "cyclic include");
         goto done;
     }
 
-    if (box_pp_seen(pp, resolved)) {
+    if (box_pp_seen(pp, logical)) {
         goto done;
     }
 
@@ -422,7 +427,7 @@ static void box_pp_include(
         goto done;
     }
 
-    box_pp_text(pp, resolved, text);
+    box_pp_text(pp, logical, text);
     ecs_os_free(text);
 done:
     return;
@@ -685,7 +690,12 @@ void box_shader_preprocess(
     }
 
     box_pp_macros(&pp, macros);
-    char *text = box_shader_read(path);
+    char resolved[BOX_SHADER_PATH_MAX];
+    char *text = NULL;
+    if (box_shader_resolve(path, resolved, sizeof(resolved))) {
+        text = box_shader_read(resolved);
+    }
+
     if (!text) {
         box_pp_error(&pp, path, 0, "file could not be read");
     } else {

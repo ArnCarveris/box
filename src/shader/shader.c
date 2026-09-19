@@ -174,7 +174,7 @@ static void box_shader_update(
     }
 
     box_shader_result_t result;
-    box_shader_preprocess(world, resolved, shader->macros, &result);
+    box_shader_preprocess(world, shader->path, shader->macros, &result);
     if (result.error) {
         ecs_err("box.shader: %s", result.error);
         box_shader_status(world, e, result.error);
@@ -256,6 +256,8 @@ void BoxShaderImport(
 {
     ECS_MODULE(world, BoxShader);
     ECS_IMPORT(world, BoxTypes);
+
+    box_shader_path_init();
 
     ECS_META_COMPONENT(world, Shader);
     ECS_META_COMPONENT(world, ShaderStatus);

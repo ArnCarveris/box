@@ -61,11 +61,19 @@ typedef struct box_shader_result_t {
     char *error;  /**< "file:line: message" of the first error, NULL when it succeeded */
 } box_shader_result_t;
 
+/** Build the search path of the engine from the environment.
+ *
+ * The module import calls this, so a process that changes `BAKE_HOME` or its
+ * working directory picks the change up by calling it again.
+ */
+void box_shader_path_init(void);
+
 /** Resolve a shader path against the search path of the engine.
  *
- * The entries are the working directory, `apps/box_app` under the working
- * directory or the nearest ancestor of it that has one, and the directory of
- * the executable, in that order. An absolute path is used as it is.
+ * The entries are the path as written, `<BAKE_HOME>/etc/box` for a path under
+ * `etc/`, the nearest ancestor of the working directory with an `etc/shaders`,
+ * `apps/box_app` at or above it and the directory of the executable, in that
+ * order. An absolute path is used as it is.
  *
  * @param path The path as the component spells it
  * @param out Receives the readable path
@@ -88,7 +96,7 @@ char* box_shader_read(
 /** Preprocess a WGSL file into one source.
  *
  * @param world The world, which supplies the generated includes, NULL for none
- * @param path The file, already resolved against the search path
+ * @param path The file as it is spelled, resolved against the search path
  * @param macros Comma separated NAME=value list of the component, NULL for none
  * @param out Receives the source or the error, both owned by the caller
  */

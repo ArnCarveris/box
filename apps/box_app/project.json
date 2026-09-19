@@ -8,7 +8,7 @@
     "lang.c": {
         "${target em}": {
             "shell": "shell.html",
-            "embed": ["etc"]
+            "embed": ["etc", "../../etc"]
         }
     }
 }

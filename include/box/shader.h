@@ -8,9 +8,13 @@
  * shader in place and reports the file and line through ShaderStatus.
  *
  * Paths are resolved against the shader search path: the working directory,
- * `apps/box_app` under the working directory or the nearest ancestor of it that
- * has one, and the directory of the executable, in that order. On wasm the
- * files are embedded under `etc`, which the working directory entry finds.
+ * the framework assets bake3 installed at `<BAKE_HOME>/etc/box`, the nearest
+ * ancestor of the working directory with an `etc/shaders`, `apps/box_app` at or
+ * above it and the directory of the executable, in that order. The shaders of
+ * the engine live in the `etc` of the framework, an application keeps its own
+ * under its `etc` and a file it ships wins over the engine copy when the
+ * application runs from its own folder. On wasm both are embedded under `etc`,
+ * which the working directory entry finds.
  *
  * The preprocessor understands `#include "file"` relative to the including file,
  * `#define NAME value` with identifier substitution, `#if NAME`, `#ifdef NAME`,
