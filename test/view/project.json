@@ -171,6 +171,7 @@
                     "bloom_levels_follow_the_radius",
                     "karis_weight_falls_with_the_luminance",
                     "builtin_bloom_is_off_by_default",
+                    "builtin_stack_orders_exposure_before_bloom_before_tonemap",
                     "bloom_parameters_reach_the_pass",
                     "fog_integrates_a_level_ray",
                     "fog_integral_matches_a_numeric_one",

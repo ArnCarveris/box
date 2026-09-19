@@ -416,7 +416,7 @@ void Effects_builtin_exposure_and_tonemap_are_off(void)
     test_assert(fx != NULL);
     test_bool(fx->enabled, false);
     test_bool(fx->exposure, true);
-    test_int(fx->order, 850);
+    test_int(fx->order, 800);
     test_uint(fx->shader, ecs_lookup(w, "box.effects.shaders.auto_exposure"));
 
     const Effect *map = ecs_get(w, tonemap, Effect);
@@ -526,7 +526,7 @@ void Effects_builtin_bloom_is_off_by_default(void)
     test_bool(fx->enabled, false);
     test_bool(fx->pyramid, true);
     test_bool(fx->color, true);
-    test_int(fx->order, 800);
+    test_int(fx->order, 850);
     test_assert(fx->order < ecs_get(w, ecs_lookup(w, "box.effects.stack.tonemap"), Effect)->order);
     test_uint(fx->shader, ecs_lookup(w, "box.effects.shaders.bloom"));
 
@@ -539,6 +539,43 @@ void Effects_builtin_bloom_is_off_by_default(void)
 
     box_render_extract(w, &packet);
     test_int(packet.effects.count, 0);
+}
+
+void Effects_builtin_stack_orders_exposure_before_bloom_before_tonemap(void)
+{
+    // effects/bloom_exposure_order
+    ecs_entity_t fog = ecs_lookup(w, "box.effects.stack.fog");
+    ecs_entity_t exposure = ecs_lookup(w, "box.effects.stack.auto_exposure");
+    ecs_entity_t bloom = ecs_lookup(w, "box.effects.stack.bloom");
+    ecs_entity_t tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    test_assert(fog != 0);
+    test_assert(exposure != 0);
+    test_assert(bloom != 0);
+    test_assert(tonemap != 0);
+
+    int32_t fog_order = ecs_get(w, fog, Effect)->order;
+    int32_t exposure_order = ecs_get(w, exposure, Effect)->order;
+    int32_t bloom_order = ecs_get(w, bloom, Effect)->order;
+    int32_t tonemap_order = ecs_get(w, tonemap, Effect)->order;
+    test_assert(fog_order < exposure_order);
+    test_assert(exposure_order < bloom_order);
+    test_assert(bloom_order < tonemap_order);
+
+    ecs_get_mut(w, exposure, Effect)->enabled = true;
+    ecs_modified(w, exposure, Effect);
+    ecs_get_mut(w, bloom, Effect)->enabled = true;
+    ecs_modified(w, bloom, Effect);
+    ecs_get_mut(w, tonemap, Effect)->enabled = true;
+    ecs_modified(w, tonemap, Effect);
+    box_render_extract(w, &packet);
+
+    test_int(packet.effects.count, 3);
+    box_effect_t *first = box_vec_at(&packet.effects, 0);
+    box_effect_t *second = box_vec_at(&packet.effects, 1);
+    box_effect_t *third = box_vec_at(&packet.effects, 2);
+    test_int(first->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_EXPOSURE);
+    test_int(second->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID);
+    test_int(third->inputs, BOX_EFFECT_COLOR);
 }
 
 void Effects_bloom_parameters_reach_the_pass(void)
