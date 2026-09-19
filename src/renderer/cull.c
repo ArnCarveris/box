@@ -149,15 +149,18 @@ static void box_cull_grow(
     box_renderer_t *r,
     uint32_t count)
 {
-    if (count <= r->v->visible_capacity) {
+    uint32_t limit = box_device_instances(r, true);
+    if (count <= r->v->visible_capacity || r->v->visible_capacity >= limit) {
         goto done;
     }
 
-    uint32_t grown = r->v->visible_capacity ? r->v->visible_capacity * 2 : BOX_CULL_CAPACITY;
-    if (grown < count) {
-        grown = count;
+    uint64_t doubled = r->v->visible_capacity ?
+        (uint64_t)r->v->visible_capacity * 2 : BOX_CULL_CAPACITY;
+    if (doubled < count) {
+        doubled = count;
     }
 
+    uint32_t grown = doubled > limit ? limit : (uint32_t)doubled;
     if (r->v->visible) wgpuBufferRelease(r->v->visible);
     r->v->visible = box_cull_buffer(r, WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage |
         WGPUBufferUsage_CopyDst, (uint64_t)grown * sizeof(box_instance_t));
@@ -432,27 +435,36 @@ static void box_cull_dynamic(
  * behind what the upload of the frame fills.
  *
  * @param r The renderer
+ * @param limit Instances the visible buffer of the view may hold at most
  * @return Instances the visible buffer of the view must hold
  */
 static uint32_t box_cull_reserve(
-    box_renderer_t *r)
+    box_renderer_t *r,
+    uint32_t limit)
 {
     uint32_t result = 0;
     uint32_t i;
     for (i = 0; i < r->v->draws.count; i ++) {
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
-        if (draw->args == BOX_CULL_NO_ARGS) {
-            draw->first = result;
-            result += draw->count;
+        if (draw->args != BOX_CULL_NO_ARGS) {
+            continue;
         }
+
+        draw->count = draw->count > limit - result ? limit - result : draw->count;
+        draw->limit = draw->count;
+        draw->first = result;
+        result += draw->count;
     }
 
     for (i = 0; i < r->v->draws.count; i ++) {
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
-        if (draw->args != BOX_CULL_NO_ARGS) {
-            draw->first = result;
-            result += draw->limit;
+        if (draw->args == BOX_CULL_NO_ARGS) {
+            continue;
         }
+
+        draw->limit = draw->limit > limit - result ? limit - result : draw->limit;
+        draw->first = result;
+        result += draw->limit;
     }
 
     return result;
@@ -597,7 +609,7 @@ void box_cull_view(
     }
 
     box_cull_dynamic(r, view, p, &frustum);
-    uint32_t total = box_cull_reserve(r);
+    uint32_t total = box_cull_reserve(r, box_device_instances(r, true));
     box_cull_grow(r, total ? total : 1);
     box_cull_write(r);
     box_cull_upload(r, &frustum);

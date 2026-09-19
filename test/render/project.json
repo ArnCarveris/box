@@ -49,6 +49,12 @@
         "teardown": true
       },
       {
+        "id": "Instances",
+        "testcases": [
+          "static_1m_renders_a_frame"
+        ]
+      },
+      {
         "id": "Lights",
         "testcases": [
           "point_light_extracted",

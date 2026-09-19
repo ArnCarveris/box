@@ -553,27 +553,36 @@ static void box_shadow_dynamics(
 /** Give every caster draw its slice of the caster buffer of the view.
  *
  * @param r The renderer
+ * @param limit Instances the caster buffer of the view may hold at most
  * @return Instances the caster buffer must hold
  */
 static uint32_t box_shadow_reserve(
-    box_renderer_t *r)
+    box_renderer_t *r,
+    uint32_t limit)
 {
     uint32_t result = 0;
     uint32_t i;
     for (i = 0; i < r->v->shadow_draws.count; i ++) {
         box_shadow_draw_t *draw = box_vec_at(&r->v->shadow_draws, i);
-        if (draw->args == BOX_CULL_NO_ARGS) {
-            draw->first = result;
-            result += draw->count;
+        if (draw->args != BOX_CULL_NO_ARGS) {
+            continue;
         }
+
+        draw->count = draw->count > limit - result ? limit - result : draw->count;
+        draw->limit = draw->count;
+        draw->first = result;
+        result += draw->count;
     }
 
     for (i = 0; i < r->v->shadow_draws.count; i ++) {
         box_shadow_draw_t *draw = box_vec_at(&r->v->shadow_draws, i);
-        if (draw->args != BOX_CULL_NO_ARGS) {
-            draw->first = result;
-            result += draw->limit;
+        if (draw->args == BOX_CULL_NO_ARGS) {
+            continue;
         }
+
+        draw->limit = draw->limit > limit - result ? limit - result : draw->limit;
+        draw->first = result;
+        result += draw->limit;
     }
 
     return result;
@@ -588,15 +597,18 @@ static void box_shadow_grow(
     box_renderer_t *r,
     uint32_t count)
 {
-    if (count <= r->v->shadow_capacity) {
+    uint32_t limit = box_device_instances(r, true);
+    if (count <= r->v->shadow_capacity || r->v->shadow_capacity >= limit) {
         goto done;
     }
 
-    uint32_t grown = r->v->shadow_capacity ? r->v->shadow_capacity * 2 : BOX_SHADOW_CAPACITY;
-    if (grown < count) {
-        grown = count;
+    uint64_t doubled = r->v->shadow_capacity ?
+        (uint64_t)r->v->shadow_capacity * 2 : BOX_SHADOW_CAPACITY;
+    if (doubled < count) {
+        doubled = count;
     }
 
+    uint32_t grown = doubled > limit ? limit : (uint32_t)doubled;
     if (r->v->shadow_instances) wgpuBufferRelease(r->v->shadow_instances);
     r->v->shadow_instances = box_shadow_buffer(r, WGPUBufferUsage_Vertex |
         WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
@@ -697,7 +709,7 @@ void box_shadow_prepare(
         box_shadow_dynamics(r, view, p, i);
     }
 
-    uint32_t total = box_shadow_reserve(r);
+    uint32_t total = box_shadow_reserve(r, box_device_instances(r, true));
     box_shadow_grow(r, total ? total : 1);
     box_shadow_upload(r, view);
 done:

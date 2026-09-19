@@ -93,9 +93,34 @@ static void box_on_device_error(
     box_renderer_t *r = userdata1;
     if (r) {
         r->device_error = true;
+        r->device_errors ++;
     }
 
     box_device_report("device error", message);
+}
+
+/** Ask the adapter for the limits the device should be created with.
+ *
+ * The defaults cap a buffer at 256 MiB and a storage binding at 128 MiB, which
+ * a scene of a million instances passes; the adapter usually allows far more,
+ * and what it allows is the ceiling the instance buffers grow against.
+ *
+ * @param r The renderer
+ * @return The limits to require, NULL when the adapter reports none
+ */
+static const WGPULimits* box_device_limits(
+    box_renderer_t *r)
+{
+    const WGPULimits *result = NULL;
+    r->limits = (WGPULimits)WGPU_LIMITS_INIT;
+    if (wgpuAdapterGetLimits(r->adapter, &r->limits) == WGPUStatus_Success) {
+        result = &r->limits;
+    } else {
+        r->limits.maxBufferSize = BOX_DEVICE_BUFFER_DEFAULT;
+        r->limits.maxStorageBufferBindingSize = BOX_DEVICE_STORAGE_DEFAULT;
+    }
+
+    return result;
 }
 
 /** Create the window surface from the platform surface source.
@@ -217,6 +242,7 @@ static void box_on_adapter_web(
     box_renderer_t *r = userdata1;
     if (r->adapter) {
         WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
+        desc.requiredLimits = box_device_limits(r);
         desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
         desc.uncapturedErrorCallbackInfo.userdata1 = r;
         WGPURequestDeviceCallbackInfo info = {
@@ -263,6 +289,7 @@ int box_device_init(
     }
 
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
+    desc.requiredLimits = box_device_limits(r);
     desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
     desc.uncapturedErrorCallbackInfo.userdata1 = r;
     WGPURequestDeviceCallbackInfo device_info = {
@@ -280,6 +307,23 @@ int box_device_init(
 #endif
 done:
     return result;
+}
+
+uint32_t box_device_instances(
+    const box_renderer_t *r,
+    bool storage)
+{
+    uint64_t bytes = r->limits.maxBufferSize;
+    if (storage && r->limits.maxStorageBufferBindingSize < bytes) {
+        bytes = r->limits.maxStorageBufferBindingSize;
+    }
+
+    uint64_t result = bytes / sizeof(box_instance_t);
+    if (result > BOX_DEVICE_INSTANCES_MAX) {
+        result = BOX_DEVICE_INSTANCES_MAX;
+    }
+
+    return (uint32_t)result;
 }
 
 void box_device_fini(

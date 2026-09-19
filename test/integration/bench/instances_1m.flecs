@@ -1,0 +1,57 @@
+// A million drawn cubes: 50000 template instances of twenty cubes each, seen
+// from above. The scene exists to keep the renderer drawing past the instance
+// buffer cap that used to abort a frame at a few hundred thousand instances.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.script
+
+$ { ScriptSettings: {enabled: false} }
+
+$ { EnvironmentLight: {sky_color: {110, 130, 170}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+camera {
+  Position: {450, 620, -420}
+  LookAt: {450, 0, 450}
+  Camera: {fov: 60}
+}
+
+ground {
+  for i in 0..400 {
+    _ {
+      Position: {(i % 20) * 47 + 23, -0.25, (i / 20) * 47 + 23}
+      Box: {47, 0.5, 47}
+      Rgb: {70, 74, 82}
+      PbrMaterial: {roughness: 0.9}
+    }
+  }
+}
+
+template Cluster {
+  prop tint: f32 = 0
+
+  for j in 0..20 {
+    _ {
+      Position: {(j % 5) * 0.6 - 1.2, (j / 5) * 0.6 + 0.3, 0}
+      Box: {0.5, 0.5, 0.5}
+      Rgb: {120 + tint, 150 - tint, 210 - tint}
+      PbrMaterial: {roughness: 0.7}
+    }
+  }
+}
+
+clusters {
+  for i in 0..50000 {
+    _ {
+      Position: {(i % 224) * 4, 0, (i / 224) * 4}
+      Cluster: {tint: (i * 17) % 60}
+    }
+  }
+}

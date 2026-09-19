@@ -129,6 +129,14 @@ void box_renderer_stats(
 uint32_t box_renderer_frames(
     const box_renderer_t *r);
 
+/** Number of device errors the renderer reported since it was created.
+ *
+ * @param r The renderer
+ * @return Error count
+ */
+uint32_t box_renderer_errors(
+    const box_renderer_t *r);
+
 #ifdef __cplusplus
 }
 #endif

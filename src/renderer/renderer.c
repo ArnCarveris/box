@@ -273,3 +273,9 @@ uint32_t box_renderer_frames(
 {
     return r->frames;
 }
+
+uint32_t box_renderer_errors(
+    const box_renderer_t *r)
+{
+    return r->device_errors;
+}

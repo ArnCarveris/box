@@ -102,11 +102,17 @@ static void box_scene_grow_statics(
     box_gpu_mesh_t *m,
     uint32_t capacity)
 {
-    uint32_t grown = m->static_capacity ? m->static_capacity * 2 : 64;
-    if (grown < capacity) {
-        grown = capacity;
+    uint32_t limit = box_device_instances(r, true);
+    if (m->static_capacity >= limit) {
+        goto done;
     }
 
+    uint64_t doubled = m->static_capacity ? (uint64_t)m->static_capacity * 2 : 64;
+    if (doubled < capacity) {
+        doubled = capacity;
+    }
+
+    uint32_t grown = doubled > limit ? limit : (uint32_t)doubled;
     WGPUBufferUsage usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst |
         WGPUBufferUsage_CopySrc | WGPUBufferUsage_Storage;
     WGPUBuffer buffer = box_scene_buffer(r, usage, (uint64_t)grown * sizeof(box_instance_t));
@@ -123,6 +129,8 @@ static void box_scene_grow_statics(
 
     m->statics = buffer;
     m->static_capacity = grown;
+done:
+    return;
 }
 
 /** Keep the CPU mirror of a static buffer in step with an instance update.
@@ -167,17 +175,20 @@ static void box_scene_upload_dynamics(
     box_renderer_t *r,
     const box_packet_t *p)
 {
+    uint32_t limit = box_device_instances(r, false);
     uint32_t count = p->dynamic_instances.count;
+    count = count > limit ? limit : count;
     if (!count) {
         goto done;
     }
 
     if (count > r->dynamic_capacity) {
-        uint32_t grown = r->dynamic_capacity ? r->dynamic_capacity * 2 : 1024;
-        if (grown < count) {
-            grown = count;
+        uint64_t doubled = r->dynamic_capacity ? (uint64_t)r->dynamic_capacity * 2 : 1024;
+        if (doubled < count) {
+            doubled = count;
         }
 
+        uint32_t grown = doubled > limit ? limit : (uint32_t)doubled;
         if (r->dynamics) wgpuBufferRelease(r->dynamics);
         r->dynamics = box_scene_buffer(r, WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
             (uint64_t)grown * sizeof(box_instance_t));
@@ -188,6 +199,74 @@ static void box_scene_upload_dynamics(
         (size_t)count * sizeof(box_instance_t));
 done:
     return;
+}
+
+/** Write the staged run of static instances to its mesh buffer and clear it.
+ *
+ * @param r The renderer
+ * @param mesh The mesh the run belongs to
+ * @param first The slot the run starts at
+ */
+static void box_scene_flush_statics(
+    box_renderer_t *r,
+    uint32_t mesh,
+    uint32_t first)
+{
+    if (!r->static_staging.count) {
+        goto done;
+    }
+
+    box_gpu_mesh_t *m = box_scene_mesh(r, mesh);
+    wgpuQueueWriteBuffer(r->gpu_queue, m->statics,
+        (uint64_t)first * sizeof(box_instance_t), box_vec_at(&r->static_staging, 0),
+        (size_t)r->static_staging.count * sizeof(box_instance_t));
+    box_vec_clear(&r->static_staging);
+done:
+    return;
+}
+
+/** Apply the static instance updates of a packet, one write per run of slots.
+ *
+ * A scene of a million instances sends a million updates on the frame it loads,
+ * which is a second of queue calls when every slot is written on its own.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+static void box_scene_write_statics(
+    box_renderer_t *r,
+    const box_packet_t *p)
+{
+    uint32_t mesh = 0xFFFFFFFFu;
+    uint32_t first = 0;
+    uint32_t i;
+    for (i = 0; i < p->static_updates.count; i ++) {
+        box_static_update_t *u = box_vec_at(&p->static_updates, i);
+        box_gpu_mesh_t *m = box_scene_mesh(r, u->mesh);
+        if (u->slot >= m->static_capacity) {
+            box_scene_flush_statics(r, mesh, first);
+            box_scene_grow_statics(r, m, u->slot + 1);
+        }
+
+        if (u->slot >= m->static_capacity) {
+            continue;
+        }
+
+        if (u->mesh != mesh || u->slot != first + r->static_staging.count) {
+            box_scene_flush_statics(r, mesh, first);
+            mesh = u->mesh;
+            first = u->slot;
+        }
+
+        *(box_instance_t*)box_vec_push(&r->static_staging) = u->data;
+        box_scene_mirror(m, u->slot, &u->data);
+        if (r->static_staging.count >= BOX_SCENE_UPLOAD_RUN) {
+            box_scene_flush_statics(r, mesh, first);
+            first += BOX_SCENE_UPLOAD_RUN;
+        }
+    }
+
+    box_scene_flush_statics(r, mesh, first);
 }
 
 void box_scene_apply(
@@ -211,7 +290,7 @@ void box_scene_apply(
             box_scene_grow_statics(r, m, c->count);
         }
 
-        m->static_count = c->count;
+        m->static_count = c->count > m->static_capacity ? m->static_capacity : c->count;
         if (c->count > BOX_CULL_MIRROR_MAX && m->mirror_valid) {
             box_vec_clear(&m->mirror);
             m->mirror_valid = false;
@@ -232,17 +311,7 @@ void box_scene_apply(
         }
     }
 
-    for (i = 0; i < p->static_updates.count; i ++) {
-        box_static_update_t *u = box_vec_at(&p->static_updates, i);
-        box_gpu_mesh_t *m = box_scene_mesh(r, u->mesh);
-        if (u->slot >= m->static_capacity) {
-            box_scene_grow_statics(r, m, u->slot + 1);
-        }
-
-        wgpuQueueWriteBuffer(r->gpu_queue, m->statics,
-            (uint64_t)u->slot * sizeof(box_instance_t), &u->data, sizeof(box_instance_t));
-        box_scene_mirror(m, u->slot, &u->data);
-    }
+    box_scene_write_statics(r, p);
 
     if (!box_cull_packet(p)) {
         box_scene_upload_dynamics(r, p);
@@ -356,6 +425,7 @@ void box_scene_fini(
     }
 
     box_vec_fini(&r->meshes);
+    box_vec_fini(&r->static_staging);
     if (r->dynamics) wgpuBufferRelease(r->dynamics);
     r->dynamics = NULL;
     r->dynamic_capacity = 0;

@@ -100,6 +100,18 @@
 /** Static instances a batch may hold before the renderer stops mirroring it on the CPU */
 #define BOX_CULL_MIRROR_MAX (4096)
 
+/** Static instances one upload of a packet writes at most, which bounds the staging run */
+#define BOX_SCENE_UPLOAD_RUN (4096)
+
+/** Bytes a buffer may hold when the adapter reports no limits, the WebGPU default */
+#define BOX_DEVICE_BUFFER_DEFAULT (268435456ull)
+
+/** Bytes a storage binding may cover when the adapter reports no limits */
+#define BOX_DEVICE_STORAGE_DEFAULT (134217728ull)
+
+/** Instances a buffer may hold at most, the range a slot index of an instance covers */
+#define BOX_DEVICE_INSTANCES_MAX (0xFFFFFFFFull)
+
 /** Byte stride between two culling uniforms, the alignment a dynamic offset needs */
 #define BOX_CULL_UNIFORM_STRIDE (256)
 
@@ -504,6 +516,8 @@ struct box_renderer_t {
     double overlay_time;             /**< Packet time of the previous frame, for the interval */
     bool overlay_timed;              /**< A previous packet time was recorded */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
+    volatile uint32_t device_errors; /**< Device errors reported since the device was created */
+    WGPULimits limits;               /**< Limits the device was created with */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
     box_vec_t views;                 /**< box_gpu_view_t, one per view of the packet */
@@ -512,6 +526,7 @@ struct box_renderer_t {
     box_gpu_env_t envs[BOX_ENV_SLOTS]; /**< Prefiltered environments the views share */
     box_sky_gpu_t sky;               /**< Tables and pipelines of the atmosphere */
     uint32_t env_clock;              /**< Counts the environments bound, to pick an entry */
+    box_vec_t static_staging;        /**< box_instance_t run a static upload coalesces into */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
     WGPUComputePipeline cluster_pipeline; /**< Cluster assignment pass */
@@ -625,6 +640,16 @@ struct box_renderer_t {
  */
 int box_device_init(
     box_renderer_t *r);
+
+/** Instances one buffer of the device may hold, from the limits it was made with.
+ *
+ * @param r The renderer
+ * @param storage The buffer is bound as a storage buffer, which is capped lower
+ * @return The instance count
+ */
+uint32_t box_device_instances(
+    const box_renderer_t *r,
+    bool storage);
 
 /** Release device, adapter, surface and instance.
  *

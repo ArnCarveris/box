@@ -129,6 +129,13 @@ past walls at 60 units per second and compares frame by frame with occlusion on
 and off; `CullSettings.occlusion` switches the test off and `hiz_levels` caps the
 depth pyramid.
 
+`test/integration/bench/instances_1m.flecs` is the instance volume check: a
+million small cubes in 50000 template instances over a tiled ground, seen from
+above. The renderer asks the adapter for its own limits instead of the WebGPU
+defaults, grows every instance buffer by doubling up to what those limits allow
+and writes the static slots of a packet one run of neighbouring slots at a time,
+so a scene of this size renders instead of failing on an oversized buffer.
+
 Entities are static unless they or an ancestor have `DynamicTransform` or
 `DynamicMaterial`; static entities are only re-uploaded when a component changes.
 `Velocity` and `AngularVelocity` from `box.movement` mark entities dynamic.
