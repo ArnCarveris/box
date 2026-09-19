@@ -54,6 +54,7 @@ struct VertexIn {
   @location(10) uv_xform: vec4<f32>,
   @location(11) uv_mode: u32,
   @location(12) bounds_pos: vec4<f32>,
+  @location(13) vertex_color: vec4<f32>,
 };
 
 struct VertexOut {
@@ -72,6 +73,7 @@ struct VertexOut {
   @location(11) @interpolate(flat) uv_xform: vec4<f32>,
   @location(12) @interpolate(flat) uv_mode: u32,
   @location(13) bounds_pos: vec3<f32>,
+  @location(14) vertex_color: vec4<f32>,
 };
 
 @vertex fn vs_main(in: VertexIn) -> VertexOut {
@@ -99,6 +101,7 @@ struct VertexOut {
   out.uv_xform = in.uv_xform;
   out.uv_mode = in.uv_mode;
   out.bounds_pos = in.bounds_pos.xyz;
+  out.vertex_color = in.vertex_color;
   out.local = vec3<f32>(0.0);
   if (in.params.z > 0.5) {
     out.local = probe_coord(u32(in.params.w), world.xyz);
@@ -193,10 +196,10 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     gn = -gn;
   }
   var n = gn;
-  var albedo = in.color.rgb;
+  var albedo = in.color.rgb * srgb_to_linear(in.vertex_color.rgb);
   var alpha = in.color.a;
   var emitted = in.emissive.rgb;
-  var rough = in.params.y;
+  var rough = in.params.y * in.vertex_color.a;
   var slot_albedo = in.textures.x & 0xFFFFu;
   var slot_emissive = in.textures.x >> 16u;
   var slot_rough = in.textures.y & 0xFFFFu;

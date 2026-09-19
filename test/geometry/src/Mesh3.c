@@ -516,3 +516,63 @@ void Mesh3_differing_colors_upload_separately(void)
     box_render_extract(w, &packet);
     test_int(packet.mesh_create.count, 2);
 }
+
+void Mesh3_colors_are_uploaded(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    Mesh3 *m = ecs_ensure(w, e, Mesh3);
+
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
+    ecs_vec_init_t(NULL, &m->colors, rgb, 3);
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){255, 0, 0};
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 128, 0};
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 0, 64};
+    ecs_modified(w, e, Mesh3);
+
+    box_render_extract(w, &packet);
+    test_int(packet.mesh_create.count, 1);
+
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *bytes = (const uint8_t*)cmd->vertices;
+    size_t stride = (size_t)BOX_VERTEX_FLOATS * sizeof(float);
+
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET], 255);
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 1], 0);
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 2], 0);
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 3], 255);
+    test_int(bytes[stride + BOX_VERTEX_COLOR_OFFSET + 1], 128);
+    test_int(bytes[stride * 2 + BOX_VERTEX_COLOR_OFFSET + 2], 64);
+    test_int(bytes[stride * 2 + BOX_VERTEX_COLOR_OFFSET + 3], 255);
+}
+
+void Mesh3_colors_default_to_white(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    Mesh3 *m = ecs_ensure(w, e, Mesh3);
+
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
+    ecs_modified(w, e, Mesh3);
+
+    box_render_extract(w, &packet);
+    test_int(packet.mesh_create.count, 1);
+
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *bytes = (const uint8_t*)cmd->vertices;
+    uint32_t v, c;
+    for (v = 0; v < cmd->vertex_count; v ++) {
+        const uint8_t *color = bytes + (size_t)v * BOX_VERTEX_FLOATS * sizeof(float) +
+            BOX_VERTEX_COLOR_OFFSET;
+
+        for (c = 0; c < 4; c ++) {
+            test_int(color[c], 255);
+        }
+    }
+}

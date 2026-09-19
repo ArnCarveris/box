@@ -69,12 +69,14 @@ WGPURenderPipeline box_frame_pipeline(
     bool hdr,
     uint32_t normals)
 {
-    WGPUVertexAttribute vertex_attrs[4] = {
+    WGPUVertexAttribute vertex_attrs[5] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
-            .shaderLocation = 12 }
+            .shaderLocation = 12 },
+        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
+            .shaderLocation = 13 }
     };
     WGPUVertexAttribute instance_attrs[9] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 0, .shaderLocation = 3 },
@@ -91,7 +93,7 @@ WGPURenderPipeline box_frame_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 4,
+            .attributeCount = 5,
             .attributes = vertex_attrs
         }, {
             .arrayStride = stride,
@@ -208,12 +210,14 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         goto done;
     }
 
-    WGPUVertexAttribute vertex_attrs[4] = {
+    WGPUVertexAttribute vertex_attrs[5] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
-            .shaderLocation = 12 }
+            .shaderLocation = 12 },
+        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
+            .shaderLocation = 13 }
     };
     WGPUVertexAttribute instance_attrs[9] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
@@ -230,7 +234,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 4,
+            .attributeCount = 5,
             .attributes = vertex_attrs
         }, {
             .arrayStride = sizeof(box_instance_t),

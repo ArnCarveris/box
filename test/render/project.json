@@ -40,7 +40,9 @@
           "reparent_between_storages_requeues_subtree",
           "delete_parent_node_frees_slots",
           "instance_color_is_the_composed_tint",
-          "tinted_opaque_entity_stays_static"
+          "tinted_opaque_entity_stays_static",
+          "primitive_vertices_are_white",
+          "vertex_color_is_kept_beside_the_instance_color"
         ],
         "setup": true,
         "teardown": true

@@ -625,3 +625,59 @@ void Extract_tinted_opaque_entity_stays_static(void)
     test_flt(u->data.color[3], 1.0f);
     test_bool(ecs_get(w, e, RenderInstance)->transparent, false);
 }
+
+void Extract_primitive_vertices_are_white(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Box, {1, 1, 1});
+    box_render_extract(w, &packet);
+    test_int(packet.mesh_create.count, 1);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *bytes = (const uint8_t*)cmd->vertices;
+    uint32_t v, c;
+    for (v = 0; v < cmd->vertex_count; v ++) {
+        const uint8_t *color = bytes + (size_t)v * BOX_VERTEX_FLOATS * sizeof(float) +
+            BOX_VERTEX_COLOR_OFFSET;
+
+        for (c = 0; c < 4; c ++) {
+            test_int(color[c], 255);
+        }
+    }
+
+    free(cmd->vertices);
+    free(cmd->indices);
+}
+
+void Extract_vertex_color_is_kept_beside_the_instance_color(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    Mesh3 *m = ecs_ensure(w, e, Mesh3);
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
+    ecs_vec_init_t(NULL, &m->colors, rgb, 3);
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 255, 0};
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 255, 0};
+    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 255, 0};
+    ecs_modified(w, e, Mesh3);
+    ecs_set(w, e, Rgb, {255, 0, 0});
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 1);
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.color[0], 1.0f);
+    test_flt(u->data.color[1], 0.0f);
+    test_int(packet.mesh_create.count, 1);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *color = (const uint8_t*)cmd->vertices + BOX_VERTEX_COLOR_OFFSET;
+    test_int(color[0], 0);
+    test_int(color[1], 255);
+    test_int(color[2], 0);
+    test_int(color[3], 255);
+    free(cmd->vertices);
+    free(cmd->indices);
+}

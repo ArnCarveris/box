@@ -19,11 +19,26 @@
 /** Longest capture path stored in a packet */
 #define BOX_CAPTURE_PATH_MAX (512)
 
-/** Floats per vertex: position, normal, uv and the packed bounds local position */
-#define BOX_VERTEX_FLOATS (9)
+/** Version of the vertex layout, bumped whenever its channels change.
+ *
+ * The renderer, the mesh upload and the mesh shader read one stride, so a build
+ * that mixes a vertex buffer of one version with a pipeline of another misreads
+ * every vertex. The version keys the layout so a mismatch is caught where the
+ * layout is asserted instead of showing up as scrambled geometry.
+ */
+#define BOX_VERTEX_VERSION (2)
+
+/** Floats per vertex: position, normal, uv, the packed bounds local position and the color */
+#define BOX_VERTEX_FLOATS (10)
 
 /** Bytes from a vertex to its packed local position, a Unorm10_10_10_2 value */
 #define BOX_VERTEX_LOCAL_OFFSET (32)
+
+/** Bytes from a vertex to its per vertex color, a Unorm8x4 value */
+#define BOX_VERTEX_COLOR_OFFSET (36)
+
+/** Per vertex color of a mesh that carries none, which leaves the material alone */
+#define BOX_VERTEX_COLOR_WHITE (0xFFFFFFFFu)
 
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_LAYER_MAX (16)

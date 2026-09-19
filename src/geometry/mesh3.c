@@ -244,6 +244,35 @@ static void box_mesh3_derive_normals(
     }
 }
 
+/** Pack the per vertex colors of a Mesh3 into the stream the upload reads.
+ *
+ * The component holds display encoded colors without an alpha channel, so the
+ * alpha of every vertex is opaque and leaves the roughness of the material
+ * alone. A mesh without colors keeps an empty stream, which uploads as white.
+ *
+ * @param m The component, already checked
+ * @param out The mesh to fill, its vertex count is set
+ */
+static void box_mesh3_colors(
+    const Mesh3 *m,
+    box_mesh_data_t *out)
+{
+    const rgb *colors = ecs_vec_first_t(&m->colors, rgb);
+    uint32_t i;
+
+    if (!colors) {
+        goto done;
+    }
+
+    out->colors = ecs_os_malloc_n(uint32_t, out->vertex_count);
+    for (i = 0; i < out->vertex_count; i ++) {
+        out->colors[i] = (uint32_t)colors[i].r | ((uint32_t)colors[i].g << 8) |
+            ((uint32_t)colors[i].b << 16) | 0xFF000000u;
+    }
+done:
+    return;
+}
+
 /** Build the mesh data a Mesh3 describes, filling in what it leaves out.
  *
  * @param m The component, already checked
@@ -262,6 +291,7 @@ static void box_mesh3_build(
 
     box_mesh_builder_init(&builder, out, vertices, indices ? indices : vertices);
     memcpy(out->positions, ecs_vec_first(&m->vertices), (size_t)vertices * 3 * sizeof(float));
+    box_mesh3_colors(m, out);
     if (uvs) {
         memcpy(out->uvs, uvs, (size_t)vertices * 2 * sizeof(float));
     } else {

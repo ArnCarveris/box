@@ -10,6 +10,10 @@
 
 #include "render_internal.h"
 
+_Static_assert(BOX_VERTEX_VERSION == 2 &&
+    BOX_VERTEX_COLOR_OFFSET + 4 == BOX_VERTEX_FLOATS * (int)sizeof(float),
+    "the color closes the vertex, bump BOX_VERTEX_VERSION when the layout changes");
+
 /** Pack the position of a vertex inside the mesh bounds into four bytes.
  *
  * @param p The vertex position
@@ -72,6 +76,8 @@ uint32_t box_render_mesh_create(
         memcpy(dst + 6, data->uvs + (size_t)v * 2, 2 * sizeof(float));
         uint32_t local = box_render_pack_local(pos, data->bounds_min, extent);
         memcpy(dst + 8, &local, sizeof(local));
+        uint32_t color = data->colors ? data->colors[v] : BOX_VERTEX_COLOR_WHITE;
+        memcpy(dst + 9, &color, sizeof(color));
     }
 
     return handle;
