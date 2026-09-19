@@ -45,7 +45,7 @@ floor {
 }
 
 prefabs {
-  Crate : Prefab {
+  prefab Crate {
     Box: {2.6, 2.6, 2.6}
     Rgb: {196, 74, 56}
     PbrMaterial: {metallic: 0.1, roughness: 0.55}
@@ -54,7 +54,7 @@ prefabs {
     (MaterialLayerOn, box.material.layers.grime)
   }
 
-  Ball : Prefab {
+  prefab Ball {
     Sphere: {segments: 40, smooth: true, radius: 1.2}
     Rgb: {72, 140, 210}
     PbrMaterial: {metallic: 0.2, roughness: 0.45}

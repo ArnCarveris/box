@@ -51,7 +51,7 @@ hidden_columns {
 }
 
 prefabs {
-  Ball : Prefab {
+  prefab Ball {
     Sphere: {segments: 32, smooth: true, radius: 0.8}
     Rgb: {96, 168, 232}
     PbrMaterial: {metallic: 0.2, roughness: 0.4}
