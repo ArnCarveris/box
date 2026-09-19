@@ -1,0 +1,26 @@
+$ key.press A 12
+A down for 12 frames
+$ ls box.monitor
+BoxCollectStats
+BoxCollectSystems
+BoxGpuTimingsOnRemove
+BoxPublishFps
+BoxPublishGpuTimings
+BoxSampleCpu
+BoxStatsOnSet
+BoxSystemMonitorOnRemove
+BoxSystemMonitorOnSet
+CpuMonitor
+EcsStats
+FpsCorner
+FpsOverlay
+GpuPassTime
+GpuTimings
+PhaseTime
+SystemMonitor
+SystemTime
+
+$ has box.monitor.GpuTimings box.monitor.GpuTimings
+true
+$ get box.monitor.GpuTimings box.monitor.GpuTimings
+{supported: true, frame: 2, pass_count: 10, frame_ms: 7.817254, passes: [{name: "shadow", time_ms: 0.373835}, {name: "opaque", time_ms: 0.288083}, {name: "motion", time_ms: 0.272625}, {name: "gtao", time_ms: 1.236667}, {name: "effect.0", time_ms: 0.669125}, {name: "exposure", time_ms: 0.068917}, {name: "effect.1", time_ms: 0.73175}, {name: "bloom", time_ms: 3.78096}, {name: "effect.2", time_ms: 0.192375}, {name: "effect.3", time_ms: 0.202917}, {name: null, time_ms: 0}, {name: null, time_ms: 0}, {name: null, time_ms: 0}, {name: null, time_ms: 0}, {name: null, time_ms: 0}, {name: null, time_ms: 0}]}

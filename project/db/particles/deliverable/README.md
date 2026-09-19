@@ -9,7 +9,7 @@
 - Rain as a weather state: `Weather.rain` creates one emitter under the sky, a box volume following the camera, drives its rate, drop size, wind, ground kill collision and playback from the blended amount, adds that amount to the overcast, the fog and the material wetness layer, and fills the column with a burst on the first frame; streaks come from a new `ParticleAppearance.stretch`.
 
 ## Verification
-- TESTS_PLACEHOLDER
+- 1993 unit tests across 21 projects, all passing; `test/particle` is new with 157 tests over the `Appearance`, `Collision`, `Emitter`, `Extract`, `Forces`, `Playback`, `Rain`, `Random`, `Scale` suites.
 - Scenes in `integration/`: `particles_shapes` (a stream from each spawn shape), `particles_forces` (a fountain under gravity and wind with bounces), `particles_appearance` (one emitter per appearance and blend), `particles_control` (a burst frozen mid flight, with its command log driving every state), `weather_rain` and `weather_rain_heavy` (the same scene under light and heavy rain); every earlier scene bit identical. `particles_10m.json` records ten million particles over ten emitters at 10.5 ms mean and 17.1 ms p99 in release, 95 fps against the 60 the brief asks for, and `particles_fill.json` 11200 screen filling soft sprites at 10.7 ms.
 - Benchmarks in `bench/` against the LOD epic: a million particles simulate and draw in 0.49 ms, the extract costs 240 ns per emitter with budgets, forces, curves, playback and four schedules, and the C twin of the shaders in `src/particle/simulate.h` is what the integrator, curve and collision tests check.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.

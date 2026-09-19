@@ -1,0 +1,26 @@
+$ get effects.fountain ParticlePlayback
+{state: ParticleStopped, time: 0, reset: false}
+$ set effects.fountain ParticlePlayback {state: ParticlePlaying}
+effects.fountain
+$ get effects.fountain ParticlePlayback
+{state: ParticlePlaying, time: 0, reset: false}
+$ set effects.fountain ParticlePlayback {state: ParticlePaused}
+effects.fountain
+$ get effects.fountain ParticlePlayback
+{state: ParticlePaused, time: 0, reset: false}
+$ set effects.fountain ParticlePlayback {state: ParticleStopped}
+effects.fountain
+$ get effects.fountain ParticlePlayback
+{state: ParticleStopped, time: 0, reset: false}
+$ set effects.fountain ParticlePlayback {state: ParticlePlaying, reset: true}
+effects.fountain
+$ get effects.fountain ParticlePlayback
+{state: ParticlePlaying, time: 0, reset: true}
+$ get effects.fountain.puffs ParticleBurst
+{count: 120, at: 0.25, repeat: 0}
+$ set effects.fountain.puffs ParticleBurst {count: 400, at: 0.5, repeat: 2}
+effects.fountain.puffs
+$ get effects.fountain.puffs ParticleBurst
+{count: 400, at: 0.5, repeat: 2}
+$ has effects.fountain box.particle.ParticlePlayback
+true
