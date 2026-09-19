@@ -83,6 +83,7 @@ void BoxCommandImport(
     ECS_MODULE(world, BoxCommand);
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, BoxCheckpoint);
 
     ECS_META_COMPONENT(world, Terminal);
     ECS_META_COMPONENT(world, TerminalInput);
@@ -111,6 +112,7 @@ void BoxCommandImport(
     box_logs_init(world);
     box_script_init(world);
     box_capture_init(world);
+    box_checkpoint_cmd_init(world);
     box_render_cmd_init(world);
     box_fps_cmd_init(world);
     box_input_cmd_init(world);

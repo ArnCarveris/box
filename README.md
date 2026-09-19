@@ -260,6 +260,20 @@ active camera. `Ui.view` binds a view that the scene authored instead of creatin
 `test/integration/visual/ui_panels.flecs` and `ui_panels_small.flecs`, the same tree at two
 logical sizes.
 
+`box.checkpoint` writes the state of a running instance back into the scripts that loaded it.
+The `checkpoint [name]` command walks every managed script, substitutes the current values of
+the components of the entities that script owns into a copy of its source and writes it as
+`<script>.flecs` in `<process folder>/checkpoints/<name>`, the folder it prints; the folder
+goes when the process folder goes, and the `Checkpoint` singleton points `dir` somewhere else,
+keeps `last` and counts the checkpoints an instance wrote. Only the edited statements change,
+so comments, layout and the expressions of untouched statements survive byte for byte.
+A component whose value the engine derives, such as `WorldTransform` or `RenderMesh`, carries
+the `NoCheckpoint` tag and keeps the text the author wrote; an entity that no script statement
+declares cannot be written back at all and the command lists it as `not checkpointed: <path>`
+instead of dropping it silently, which covers entities created by a command, by C code or by a
+`for` loop of a script. `test/integration/command/checkpoint.flecs` checkpoints a scene, moves
+a crate, checkpoints again and adds an entity that no script owns.
+
 ## Tests
 
 ```sh
@@ -267,7 +281,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, job, input, controller, script
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered

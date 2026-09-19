@@ -1,0 +1,17 @@
+using box.transform
+using box.geometry
+using box.material
+
+scene {
+  crate {
+    Position: {3, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {220, 120, 60}
+  }
+
+  ball {
+    Position: {-4, 0, 0}
+    Sphere: {segments: 16, smooth: false, radius: 1}
+    Rgb: {80, 160, 240}
+  }
+}

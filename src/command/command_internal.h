@@ -247,6 +247,13 @@ void box_script_init(
 void box_capture_init(
     ecs_world_t *world);
 
+/** Register the checkpoint command.
+ *
+ * @param world The world
+ */
+void box_checkpoint_cmd_init(
+    ecs_world_t *world);
+
 /** Register the render command group and the system that advances its renders.
  *
  * @param world The world

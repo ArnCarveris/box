@@ -1,0 +1,22 @@
+{
+    "id": "bench_checkpoint",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for writing a checkpoint of a large scene",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Write",
+                "benchcases": [
+                    "scene_5000",
+                    "report_5000"
+                ]
+            }
+        ]
+    }
+}

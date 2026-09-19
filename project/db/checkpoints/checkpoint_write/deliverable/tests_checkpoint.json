@@ -1,0 +1,31 @@
+{
+  "project": "checkpoint",
+  "timestamp": "2026-09-19T08:09:10Z",
+  "pass": 20,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.044080,
+  "tests": [
+    {"suite": "Write", "case": "writes_a_file_per_script", "status": "pass", "elapsed": 0.013363},
+    {"suite": "Write", "case": "values_are_updated", "status": "pass", "elapsed": 0.012482},
+    {"suite": "Write", "case": "layout_and_comments_are_preserved", "status": "pass", "elapsed": 0.013207},
+    {"suite": "Write", "case": "derived_components_are_left_out", "status": "pass", "elapsed": 0.012524},
+    {"suite": "Write", "case": "component_added_at_runtime_is_written", "status": "pass", "elapsed": 0.013164},
+    {"suite": "Write", "case": "script_without_a_file_uses_its_name", "status": "pass", "elapsed": 0.012972},
+    {"suite": "Write", "case": "entity_without_a_statement_is_reported", "status": "pass", "elapsed": 0.013124},
+    {"suite": "Write", "case": "template_body_entities_are_reported", "status": "pass", "elapsed": 0.013156},
+    {"suite": "Write", "case": "checkpoint_reloads_into_the_same_state", "status": "pass", "elapsed": 0.012569},
+    {"suite": "Folder", "case": "folder_is_under_the_process_folder", "status": "pass", "elapsed": 0.010270},
+    {"suite": "Folder", "case": "folder_is_removed_when_the_instance_stops", "status": "pass", "elapsed": 0.011832},
+    {"suite": "Folder", "case": "repeated_checkpoints_get_their_own_folder", "status": "pass", "elapsed": 0.012299},
+    {"suite": "Folder", "case": "named_checkpoint_uses_the_name", "status": "pass", "elapsed": 0.009521},
+    {"suite": "Folder", "case": "dir_overrides_the_process_folder", "status": "pass", "elapsed": 0.011491},
+    {"suite": "Report", "case": "unowned_entity_is_reported", "status": "pass", "elapsed": 0.010896},
+    {"suite": "Report", "case": "owned_entity_is_not_reported", "status": "pass", "elapsed": 0.011481},
+    {"suite": "Report", "case": "entity_without_a_value_is_not_reported", "status": "pass", "elapsed": 0.010776},
+    {"suite": "Report", "case": "command_returns_the_folder", "status": "pass", "elapsed": 0.019657},
+    {"suite": "Report", "case": "command_reports_an_unowned_entity", "status": "pass", "elapsed": 0.019738},
+    {"suite": "Report", "case": "command_takes_a_name", "status": "pass", "elapsed": 0.018927}
+  ]
+}

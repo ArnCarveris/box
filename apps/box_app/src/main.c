@@ -31,6 +31,7 @@ int main(
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxJob);
     ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, BoxCheckpoint);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxInput);
     ECS_IMPORT(world, BoxTransform);

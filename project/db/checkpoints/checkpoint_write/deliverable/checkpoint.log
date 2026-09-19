@@ -1,0 +1,14 @@
+$ checkpoint
+../../test/integration/out/checkpoint/0
+$ set scene.crate Position "{3, 0, 0}"
+scene.crate
+$ checkpoint after
+../../test/integration/out/checkpoint/after
+$ touch scene.extra
+scene.extra
+$ set scene.extra Position "{9, 0, 0}"
+scene.extra
+$ checkpoint unowned
+../../test/integration/out/checkpoint/unowned
+not checkpointed: scene.extra
+

@@ -34,6 +34,7 @@
 #include "box/sky.h"
 #include "box/input.h"
 #include "box/command.h"
+#include "box/checkpoint.h"
 #include "box/monitor.h"
 #include "box/ui.h"
 #include "box/script.h"

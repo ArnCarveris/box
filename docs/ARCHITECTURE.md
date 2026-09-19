@@ -114,6 +114,25 @@ line leaves open continues on the next line. `Terminal.log` copies the session l
 to a file outside the process folder, which is how the command integration tests
 collect it.
 
+## Checkpoints
+
+`box.checkpoint` turns the state of an instance back into script source. The
+`checkpoint` command walks every managed script, records the value of every
+component of every entity the script owns in an edit set of the script addon and
+writes the source that the edit set produces to
+`<process folder>/checkpoints/<name>/<script>.flecs`. Only edited statements
+change, so the rest of the file survives byte for byte. The `Checkpoint`
+singleton points the folder elsewhere and keeps the last one and the count.
+
+What a checkpoint leaves out is as important as what it writes. A component the
+engine derives, such as `WorldTransform` or the handles in `RenderMesh`, carries
+the `NoCheckpoint` tag, which keeps the statement the author wrote; the module
+tags the components of the box modules when a checkpoint runs. An entity that no
+statement of a script declares cannot be written back at all: entities created
+by C code, by a command or inside a `for` loop have no source location, so they
+are reported as `not checkpointed: <path>` instead of being dropped. Entities of
+a template body are shared by every instance and are counted, not written.
+
 ## Headless and agents
 
 Every process creates `/tmp/box/<pid>` and removes it on exit. `--headless`
