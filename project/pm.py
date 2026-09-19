@@ -50,6 +50,9 @@ MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", 
                 "p95_ns", "p99_ns", "outliers", "iterations", "samples", "items_per_sec")
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
+BUILD_KINDS = ("debug", "release", "wasm")
+BUILD_STEP_KINDS = ("compile", "link", "bundle", "discovery", "generate", "etc", "other")
+BUILD_SETUP = "(build)"
 TREND_POINTS = 12
 TEST_TREND = ("pass", "fail", "empty", "cases", "elapsed")
 MICRO_TREND = ("median_ns", "mean_ns", "cases")
@@ -116,6 +119,7 @@ def list_deliverables(path):
                 "url": "/deliverable/" + rel.replace(os.sep, "/"),
                 "size": os.path.getsize(full),
                 "tests": summarize_tests(full) if name.endswith(".json") else None,
+                "build": summarize_build(full) if name.endswith(".json") else None,
             })
     return result
 
@@ -144,6 +148,49 @@ def summarize_tests(path):
         "elapsed": data.get("elapsed", 0),
         "timestamp": data.get("timestamp"),
         "count": len(data.get("tests", [])),
+    }
+
+
+def is_build_data(data):
+    """Tell a bake3 --build-json report from any other report in a deliverable folder."""
+    return (isinstance(data, dict) and isinstance(data.get("steps"), list)
+            and isinstance(data.get("totals"), dict) and "total_sec" in data)
+
+
+def build_kind(data):
+    """Name the kind of a build report: wasm for the web target, else its cfg."""
+    target = data.get("target") if isinstance(data.get("target"), str) else ""
+    if target == "em" or target.lower().startswith("wasm"):
+        return "wasm"
+    cfg = data.get("cfg")
+    return cfg if isinstance(cfg, str) and cfg else "build"
+
+
+def build_files(totals):
+    """Count the files the projects of a build report compiled."""
+    return sum(number(row.get("files")) for row in totals.values() if isinstance(row, dict))
+
+
+def summarize_build(path):
+    """Summarize a build report for the deliverable listing of an item."""
+    data = read_json(path)
+    if not is_build_data(data):
+        return None
+    totals = data.get("totals") or {}
+    git = data.get("git") if isinstance(data.get("git"), dict) else {}
+    kinds = totals.get("kind") if isinstance(totals.get("kind"), dict) else {}
+    return {
+        "kind": build_kind(data),
+        "cfg": data.get("cfg"),
+        "target": data.get("target"),
+        "ok": data.get("ok") is True,
+        "total_sec": number(data.get("total_sec")),
+        "files": build_files(totals.get("project") or {}),
+        "compile_sec": number(kinds.get("compile")),
+        "link_sec": number(kinds.get("link")),
+        "sha": (git.get("sha") or "")[:7],
+        "timestamp": data.get("timestamp"),
+        "steps": len(data.get("steps") or []),
     }
 
 
@@ -700,6 +747,157 @@ def aggregate_benchmarks(extra_dirs=None):
     }
 
 
+def build_step_nodes(steps):
+    """Turn the step tree of a build report into rows, slowest first, keeping the nesting."""
+    rows = []
+    for step in steps or []:
+        if not isinstance(step, dict):
+            continue
+        rows.append({
+            "name": step.get("name") or "(step)",
+            "kind": step.get("kind") or "other",
+            "project": step.get("project"),
+            "time": round(number(step.get("duration_sec")), 6),
+            "start": round(number(step.get("start_sec")), 6),
+            "ok": step.get("ok") is not False,
+            "object": step.get("object"),
+            "steps": build_step_nodes(step.get("children")),
+        })
+    rows.sort(key=lambda row: (-row["time"], row["name"]))
+    return rows
+
+
+def count_steps(rows):
+    return sum(1 + count_steps(row["steps"]) for row in rows)
+
+
+def build_project_rows(data):
+    """Group the steps of a build report per project, with the setup steps in their own row."""
+    totals = (data.get("totals") or {}).get("project") or {}
+    rows = []
+    setup = []
+    for step in data.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        if step.get("kind") != "project":
+            setup.extend(build_step_nodes([step]))
+            continue
+        name = step.get("project") or step.get("name") or "(project)"
+        summary = totals.get(name) if isinstance(totals.get(name), dict) else {}
+        rows.append({
+            "project": name,
+            "time": round(number(summary.get("total_sec"), number(step.get("duration_sec"))), 6),
+            "compile_sec": round(number(summary.get("compile_sec")), 6),
+            "link_sec": round(number(summary.get("link_sec")), 6),
+            "files": number(summary.get("files")),
+            "ok": step.get("ok") is not False,
+            "steps": build_step_nodes(step.get("children")),
+        })
+    if setup:
+        setup.sort(key=lambda row: (-row["time"], row["name"]))
+        rows.insert(0, {"project": BUILD_SETUP, "time": round(sum(row["time"] for row in setup), 6),
+                        "compile_sec": 0.0, "link_sec": 0.0, "files": 0,
+                        "ok": all(row["ok"] for row in setup), "steps": setup})
+    return rows
+
+
+def build_reports():
+    """Read every bake3 build report under project/db, oldest first."""
+    reports = []
+    for entry in deliverable_reports():
+        data = entry["data"]
+        if not is_build_data(data):
+            continue
+        totals = data.get("totals") or {}
+        kinds = totals.get("kind") if isinstance(totals.get("kind"), dict) else {}
+        git = data.get("git") if isinstance(data.get("git"), dict) else {}
+        host = data.get("host") if isinstance(data.get("host"), dict) else {}
+        projects = build_project_rows(data)
+        stamp, source = report_time(entry["full"], data)
+        reports.append({
+            "item": entry["item"], "file": entry["file"], "url": entry["url"],
+            "kind": build_kind(data), "cfg": data.get("cfg"), "target": data.get("target"),
+            "environment": data.get("environment"), "time": stamp, "time_source": source,
+            "total_sec": round(number(data.get("total_sec")), 6), "ok": data.get("ok") is True,
+            "files": build_files(totals.get("project") or {}),
+            "compile_sec": round(number(kinds.get("compile")), 6),
+            "link_sec": round(number(kinds.get("link")), 6),
+            "kinds": {key: round(number(kinds.get(key)), 6) for key in BUILD_STEP_KINDS if key in kinds},
+            "sha": git.get("sha") or "", "short_sha": (git.get("sha") or "")[:7],
+            "dirty": bool(git.get("dirty")), "branch": git.get("branch"),
+            "os": host.get("os"), "cpu_count": number(host.get("cpu_count")),
+            "steps": sum(count_steps(row["steps"]) for row in projects), "projects": projects,
+        })
+    reports.sort(key=lambda report: (time_value(report["time"]), report["kind"], report["file"]))
+    return reports
+
+
+def build_histories(reports):
+    """Fold the reports into a history per kind and per kind and project, oldest first."""
+    kinds = {}
+    projects = {}
+    for report in reports:
+        kinds.setdefault(report["kind"], []).append({
+            "time": report["time"], "item": report["item"], "kind": report["kind"], "url": report["url"],
+            "total_sec": report["total_sec"], "files": report["files"], "sha": report["short_sha"],
+            "compile_sec": report["compile_sec"], "link_sec": report["link_sec"],
+        })
+        for row in report["projects"]:
+            projects.setdefault(report["kind"] + "|" + row["project"], []).append({
+                "time": report["time"], "item": report["item"], "project": row["project"],
+                "total_sec": row["time"], "compile_sec": row["compile_sec"],
+                "link_sec": row["link_sec"], "files": row["files"],
+            })
+    kinds = {key: rows[-TREND_POINTS:] for key, rows in kinds.items()}
+    return kinds, {key: rows[-TREND_POINTS:] for key, rows in projects.items()}
+
+
+def build_kind_rows(reports, history):
+    """Summarize the latest report of every build kind, debug, release and wasm first."""
+    rows = []
+    for kind in sorted({report["kind"] for report in reports}):
+        own = [report for report in reports if report["kind"] == kind]
+        latest = own[-1]
+        rows.append({
+            "kind": kind, "reports": len(own), "latest": latest["time"], "item": latest["item"],
+            "url": latest["url"], "file": latest["file"], "total_sec": latest["total_sec"],
+            "files": latest["files"], "compile_sec": latest["compile_sec"], "link_sec": latest["link_sec"],
+            "sha": latest["short_sha"], "ok": all(report["ok"] for report in own),
+            "trend": history.get(kind, []),
+        })
+    rows.sort(key=lambda row: (BUILD_KINDS.index(row["kind"]) if row["kind"] in BUILD_KINDS
+                               else len(BUILD_KINDS), row["kind"]))
+    return rows
+
+
+def build_overall(reports, kinds):
+    """Summarize every build report: the latest one plus the total of the latest per kind."""
+    latest = reports[-1] if reports else {}
+    names = {row["project"] for report in reports for row in report["projects"] if row["project"] != BUILD_SETUP}
+    trend = sorted((point for row in kinds for point in row["trend"]), key=lambda p: time_value(p["time"]))
+    return {
+        "reports": len(reports), "kinds": len(kinds), "projects": len(names),
+        "steps": sum(report["steps"] for report in reports),
+        "files": latest.get("files", 0), "compile_sec": latest.get("compile_sec", 0),
+        "link_sec": latest.get("link_sec", 0),
+        "total_sec": round(sum(row["total_sec"] for row in kinds), 6),
+        "sha": latest.get("short_sha", ""), "dirty": latest.get("dirty", False),
+        "branch": latest.get("branch"), "latest": latest.get("time"),
+        "ok": all(report["ok"] for report in reports) if reports else True,
+        "trend": trend,
+    }
+
+
+def aggregate_builds():
+    reports = build_reports()
+    kind_history, project_history = build_histories(reports)
+    kinds = build_kind_rows(reports, kind_history)
+    return {
+        "generated": now(), "reports": reports, "kinds": kinds, "kind_history": kind_history,
+        "project_history": project_history, "overall": build_overall(reports, kinds),
+    }
+
+
 def collect_state():
     epics = load_epics()
     plan = derived_plan(epics)
@@ -722,6 +920,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(aggregate_tests())
         if route == "/api/benchmarks":
             return self.send_json(aggregate_benchmarks())
+        if route == "/api/builds":
+            return self.send_json(aggregate_builds())
         if route == "/inspector":
             if not os.path.isfile(INSPECTOR):
                 return self.send_error(404, "apps/box_inspector/index.html is not there yet")

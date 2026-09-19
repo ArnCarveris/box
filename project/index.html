@@ -258,10 +258,10 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 .cell.name .nt { font-size: 11px; flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cell.status { display: flex; gap: 4px; align-items: center; }
 .cell.trend { display: flex; justify-content: flex-end; }
-.trow.lvl-project { background: var(--surface-2); }
-.trow.lvl-project .nm { font-weight: 650; }
-.trow.lvl-suite .nm, .trow.lvl-scene .nm { font-weight: 600; }
-.trow.lvl-case .nm { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.trow.lvl-project, .trow.lvl-build { background: var(--surface-2); }
+.trow.lvl-project .nm, .trow.lvl-build .nm { font-weight: 650; }
+.trow.lvl-suite .nm, .trow.lvl-scene .nm, .trow.lvl-bproject .nm { font-weight: 600; }
+.trow.lvl-case .nm, .trow.lvl-bstep .nm { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
 .trow[data-toggle] { cursor: pointer; }
 .trow[data-toggle]:hover { background: var(--band); }
 .trow.open { box-shadow: inset 2px 0 0 var(--accent); }
@@ -278,10 +278,12 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 .tree.t-tests { --cols: minmax(130px, 1fr) 54px 150px 78px 92px 156px; }
 .tree.t-bench { --cols: minmax(130px, 1fr) 56px 80px 80px 64px 76px 62px 70px 74px 92px; }
 .tree.t-scenes { --cols: minmax(130px, 1fr) 72px 72px 72px 78px 78px 64px 92px; }
+.tree.t-build { --cols: minmax(130px, 1fr) 84px 56px 92px 78px 78px 82px 92px 156px; }
 @media (max-width: 1240px) {
   .tree.t-tests { --cols: minmax(130px, 1fr) 54px 150px 78px 92px; }
   .tree.t-bench { --cols: minmax(130px, 1fr) 56px 86px 86px 92px; }
   .tree.t-scenes { --cols: minmax(130px, 1fr) 72px 78px 78px 64px 92px; }
+  .tree.t-build { --cols: minmax(130px, 1fr) 84px 56px 78px 92px; }
   .cell.c-wide { display: none; }
   .cell.meta { display: block; }
 }
@@ -289,6 +291,7 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
   .tree.t-tests { --cols: minmax(110px, 1fr) 128px 74px; }
   .tree.t-bench { --cols: minmax(110px, 1fr) 86px; }
   .tree.t-scenes { --cols: minmax(110px, 1fr) 74px 74px; }
+  .tree.t-build { --cols: minmax(110px, 1fr) 78px; }
   .cell.c-mid { display: none; }
 }
 .plan { position: relative; height: 100%; min-height: 0; overflow: hidden; }
@@ -353,6 +356,7 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
     <button data-view="plan">Plan</button>
     <button data-view="tests">Tests</button>
     <button data-view="benchmarks">Benchmarks</button>
+    <button data-view="build">Build</button>
   </div>
   <div class="tiles" id="tiles"></div>
   <a class="link" href="/inspector?http=http://localhost:27750" target="_blank" rel="noopener"
@@ -370,6 +374,7 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
     <div id="plan" class="plan" hidden></div>
     <div id="tests" class="page" hidden></div>
     <div id="benchmarks" class="page" hidden></div>
+    <div id="build" class="page" hidden></div>
     <div class="panel" id="panel" hidden></div>
   </div>
 </main>
@@ -377,14 +382,16 @@ table.data.sub th, table.data.sub td { padding: 4px 8px; font-size: 12px; }
 
 <script>
 const state = {
-  data: null, tests: null, bench: null, epic: null, view: "board", zoom: 6, item: null,
-  suites: [], benchSuites: [], scenes: [], hidden: {}, planView: null, planFilter: { epic: "", open: false },
+  data: null, tests: null, bench: null, build: null, epic: null, view: "board", zoom: 6, item: null,
+  suites: [], benchSuites: [], scenes: [], builds: [], hidden: {}, planView: null,
+  planFilter: { epic: "", open: false },
   testsUi: { sort: { key: "name", dir: 1 }, search: "", charts: false },
   benchUi: { sort: { key: "name", dir: 1 }, search: "", charts: false },
-  scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0, plan: 0 },
+  buildUi: { sort: { key: "name", dir: 1 }, search: "", charts: false },
+  scroll: { content: 0, aside: 0, panel: 0, tlx: 0, tly: 0, tests: 0, bench: 0, build: 0, plan: 0 },
 };
-const VIEWS = ["board", "timeline", "plan", "tests", "benchmarks"];
-const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench", plan: "plan" };
+const VIEWS = ["board", "timeline", "plan", "tests", "benchmarks", "build"];
+const CONTENT_KEY = { board: "content", tests: "tests", benchmarks: "bench", build: "build", plan: "plan" };
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"];
 const UI_KEY = "box-ui:" + location.pathname;
 let saveTimer = 0, panelTimer = 0, searchTimer = 0, restoring = false;
@@ -414,8 +421,9 @@ function saveUi() {
   try {
     localStorage.setItem(UI_KEY, JSON.stringify({
       view: state.view, epic: state.epic, item: state.item, zoom: state.zoom, scroll: state.scroll,
-      suites: state.suites, benchSuites: state.benchSuites, scenes: state.scenes, hidden: state.hidden,
-      testsUi: state.testsUi, benchUi: state.benchUi, planView: state.planView, planFilter: state.planFilter,
+      suites: state.suites, benchSuites: state.benchSuites, scenes: state.scenes, builds: state.builds,
+      hidden: state.hidden, testsUi: state.testsUi, benchUi: state.benchUi, buildUi: state.buildUi,
+      planView: state.planView, planFilter: state.planFilter,
     }));
   } catch (e) {}
 }
@@ -438,7 +446,8 @@ function loadUi() {
   if (saved.hidden && typeof saved.hidden === "object") state.hidden = saved.hidden;
   if (Array.isArray(saved.scenes)) state.scenes = saved.scenes;
   else if (saved.scene) state.scenes = ["scene:" + saved.scene];
-  for (const key of ["testsUi", "benchUi"]) {
+  if (Array.isArray(saved.builds)) state.builds = saved.builds;
+  for (const key of ["testsUi", "benchUi", "buildUi"]) {
     const ui = saved[key];
     if (!ui || typeof ui !== "object") continue;
     if (typeof ui.search === "string") state[key].search = ui.search;
@@ -888,6 +897,17 @@ const TREE_COLS = {
     { key: "fps", label: "FPS", cls: "num c-mid" },
     { key: "trend", label: "Trend", cls: "trend c-mid" },
   ],
+  build: [
+    { key: "name", label: "Name", cls: "name" },
+    { key: "kind", label: "Kind", cls: "c-mid" },
+    { key: "files", label: "Files", cls: "num c-mid" },
+    { key: "compile", label: "Compile (s)", cls: "num c-wide" },
+    { key: "link", label: "Link (s)", cls: "num c-wide" },
+    { key: "time", label: "Time (s)", cls: "num" },
+    { key: "sha", label: "Commit", cls: "mono muted c-wide" },
+    { key: "trend", label: "Trend", cls: "trend c-mid" },
+    { key: "latest", label: "Report", cls: "muted c-wide" },
+  ],
 };
 
 function trendPoints(rows, field) {
@@ -964,6 +984,32 @@ function sceneTreeNodes(d) {
       trend: trendPoints(own, "mean_ms"), detail: true, children: [],
     };
   });
+}
+
+function buildStepNodes(steps, key, color) {
+  return (steps || []).map(s => ({
+    key: key + "|" + s.name, name: s.name, level: "bstep", color, kind: s.kind, time: s.time,
+    ok: s.ok, object: s.object, children: buildStepNodes(s.steps, key + "|" + s.name, color),
+  }));
+}
+
+function buildTreeNodes(d) {
+  const kinds = d.kind_history || {}, hist = d.project_history || {};
+  return (d.reports || []).map((r, i) => ({
+    key: "b:" + r.file, name: r.item || r.file, level: "build", color: SERIES[i % SERIES.length],
+    note: (r.cfg || "") + (r.target ? " · " + r.target : ""), kind: r.kind, files: r.files,
+    compile: r.compile_sec, link: r.link_sec, time: r.total_sec, sha: r.short_sha, dirty: r.dirty,
+    ok: r.ok, steps: r.steps, latest: r.time, item: r.item, url: r.url, file: r.file, buildKind: r.kind,
+    trend: trendPoints(kinds[r.kind], "total_sec"), detail: true,
+    children: (r.projects || []).map((p, j) => ({
+      key: "b:" + r.file + "|" + p.project, name: p.project, level: "bproject",
+      color: SERIES[(i + j + 1) % SERIES.length], files: p.files, compile: p.compile_sec, link: p.link_sec,
+      time: p.time, ok: p.ok, item: r.item, buildKind: r.kind, project: p.project,
+      note: (p.steps || []).length + ((p.steps || []).length === 1 ? " step" : " steps"),
+      trend: trendPoints(hist[r.kind + "|" + p.project], "total_sec"), detail: true,
+      children: buildStepNodes(p.steps, "b:" + r.file + "|" + p.project, SERIES[(i + j + 1) % SERIES.length]),
+    })),
+  }));
 }
 
 function treeValue(node, key) {
@@ -1108,7 +1154,24 @@ function sceneCell(row, col) {
   return "";
 }
 
-const TREE_CELLS = { tests: testCell, bench: benchCell, scenes: sceneCell };
+function buildCell(row, col) {
+  const n = row.node;
+  const sec = v => v == null ? "" : (+v).toFixed(3);
+  switch (col.key) {
+    case "name": return treeName(row);
+    case "kind": return n.kind ? `<span class="chip ${n.ok === false ? "fail" : "pending"}">${esc(n.kind)}</span>` : "";
+    case "files": return n.files ? String(n.files) : "";
+    case "compile": return n.level === "bstep" ? "" : sec(n.compile);
+    case "link": return n.level === "bstep" ? "" : sec(n.link);
+    case "time": return sec(n.time);
+    case "sha": return n.sha ? esc(n.sha) + (n.dirty ? "*" : "") : "";
+    case "trend": return treeSpark(n, p => (+p.v).toFixed(2) + "s");
+    case "latest": return n.latest ? esc((n.item || "db") + " · " + fmtDate(n.latest)) : "";
+  }
+  return "";
+}
+
+const TREE_CELLS = { tests: testCell, bench: benchCell, scenes: sceneCell, build: buildCell };
 
 function treeMeta(row) {
   const n = row.node;
@@ -1122,6 +1185,11 @@ function treeMeta(row) {
   if (n.entities != null) bits.push(countText(n.entities) + " entities");
   if (n.drawn != null) bits.push(countText(n.drawn) + " drawn · " + countText(n.culled) + " culled");
   if (n.fps != null) bits.push((+n.fps).toFixed(0) + " fps");
+  if (n.object) bits.push(n.object);
+  if (n.level === "build" || n.level === "bproject") {
+    bits.push("compile " + (+n.compile).toFixed(3) + "s · link " + (+n.link).toFixed(3) + "s");
+  }
+  if (n.level === "build") bits.push(n.buildKind + " · " + n.steps + " steps" + (n.sha ? " · " + n.sha : ""));
   if (n.latest) bits.push((n.item || "db") + " · " + fmtDate(n.latest));
   return bits.length ? esc(bits.join(" · ")) : "";
 }
@@ -1158,10 +1226,17 @@ function treeDetailHtml(row, detail) {
   return html ? `<div class="tree-detail" style="--depth:${row.depth}">${html}</div>` : "";
 }
 
+const TREE_HINT = {
+  tests: "Filter by project, suite or case",
+  bench: "Filter by project, suite or case",
+  scenes: "Filter by scene",
+  build: "Filter by epic, project or file",
+};
+
 function treeToolbar(id, ui, rows, total) {
   return `<div class="tools">
     <input type="search" data-search="${esc(id)}" value="${esc(ui.search)}"
-      placeholder="Filter by project, suite or case" aria-label="Filter rows by name">
+      placeholder="${esc(TREE_HINT[id] || "Filter rows by name")}" aria-label="Filter rows by name">
     <button type="button" data-expand="${esc(id)}">Expand all</button>
     <button type="button" data-collapse="${esc(id)}">Collapse all</button>
     <span class="muted">${rows} of ${total} rows</span>
@@ -1482,6 +1557,107 @@ function renderBenchmarks() {
   });
   bindTips(el);
   restoreScroll(document.getElementById("content"), state.scroll.bench);
+}
+
+function buildDetail(row, d, width) {
+  const n = row.node;
+  const w = Math.max(320, width - 40 - row.depth * 16);
+  const hist = d.project_history || {};
+  const report = n.url ? `<div class="tree-note">report
+    <a href="${esc(n.url)}" target="_blank">${esc(n.file || n.item || n.url)}</a></div>` : "";
+  const point = (h, v) => ({
+    t: +new Date(h.time), v,
+    tip: `${h.item || "db"} · ${(+v).toFixed(3)}s`,
+    sub: `${fmtDate(h.time)} · ${h.files || 0} file(s) · compile ${(+h.compile_sec).toFixed(2)}s · link ${(+h.link_sec).toFixed(2)}s`,
+  });
+  if (n.level === "build") {
+    const series = (n.children || []).map((p, i) => {
+      const key = "build:" + n.buildKind + "|" + p.project;
+      return {
+        key, name: p.project, color: p.color, dash: seriesDash(i), hidden: !!state.hidden[key],
+        points: (hist[n.buildKind + "|" + p.project] || []).map(h => point(h, h.total_sec)),
+      };
+    });
+    return `<div class="card-title"><h3>Time per project</h3>
+      <span>${esc(n.buildKind)} builds, seconds per report · click a legend entry to hide a line</span></div>
+      ${lineChart({ width: w, height: 200, label: n.name + " build time per project", yLabel: "seconds",
+        yFormat: v => v.toFixed(2), series })}${report}`;
+  }
+  if (n.level === "bproject") {
+    const rows = hist[n.buildKind + "|" + n.project] || [];
+    return `<div class="card-title"><h3>Time over time</h3>
+      <span>${esc(n.project)} in ${esc(n.buildKind)} builds · ${rows.length} report(s)</span></div>
+      ${lineChart({ width: w, height: 180, label: n.project + " build time over time", yLabel: "seconds",
+        yFormat: v => v.toFixed(2), series: [
+          { name: "total", color: n.color, points: rows.map(h => point(h, h.total_sec)) },
+          { name: "compile", color: "var(--s3)", dash: "5 4", points: rows.map(h => point(h, h.compile_sec)) },
+          { name: "link", color: "var(--s4)", dash: "2 3", points: rows.map(h => point(h, h.link_sec)) },
+        ] })}`;
+  }
+  return "";
+}
+
+function buildSummary(d, ui, width) {
+  const o = d.overall || {};
+  const kinds = d.kinds || [];
+  const tiles = kinds.map((k, i) => ({
+    label: k.kind, value: (+k.total_sec).toFixed(2) + "s", note: k.files + " files",
+    color: SERIES[i % SERIES.length], tip: k.kind + " build time per report",
+    points: (k.trend || []).map(h => ({ t: +new Date(h.time), v: h.total_sec })),
+  }));
+  tiles.push({ label: "Files", value: o.files, note: "latest" },
+    { label: "Link", value: (+o.link_sec || 0).toFixed(2) + "s" },
+    { label: "Commit", value: (o.sha || "—") + (o.dirty ? "*" : "") },
+    { label: "Reports", value: o.reports, note: o.steps + " steps" });
+  const point = (h, v) => ({
+    t: +new Date(h.time), v,
+    tip: `${h.kind} · ${(+v).toFixed(3)}s`,
+    sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.files || 0} file(s)${h.sha ? " · " + h.sha : ""}`,
+  });
+  const stepKinds = ["compile", "link", "bundle", "etc"];
+  const charts = !ui.charts ? "" : `
+    <div class="card-title"><h3>Build time over time</h3><span>one line per kind, one point per report</span></div>
+    ${lineChart({ width, label: "build time per kind over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
+      series: kinds.map((k, i) => ({ name: k.kind, color: SERIES[i % SERIES.length],
+        points: (k.trend || []).map(h => point(h, h.total_sec)) })) })}
+    <div class="card-title"><h3>Split by step kind</h3><span>compile and link time of every report</span></div>
+    ${lineChart({ width, label: "build time per step kind over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
+      series: stepKinds.map((kind, i) => ({ name: kind, color: SERIES[(i + 2) % SERIES.length],
+        points: (d.reports || []).filter(r => r.kinds && r.kinds[kind] != null)
+          .map(r => ({ t: +new Date(r.time), v: r.kinds[kind], tip: `${kind} · ${(+r.kinds[kind]).toFixed(3)}s`,
+            sub: `${fmtDate(r.time)} · ${r.item || "db"} · ${r.kind}` })) })) })}`;
+  return `<div class="card">
+    <div class="card-title"><h3>All builds</h3>
+      <span>${caseChip(o.ok === false ? "fail" : "pass")} · ${o.projects} project(s) ·
+      latest report ${esc(fmtDate(o.latest))}</span></div>
+    ${statTiles(tiles)}
+    <button class="more" type="button" data-charts="build">${ui.charts ? "▾" : "▸"} trend charts</button>
+    ${charts}</div>`;
+}
+
+function renderBuild() {
+  const el = document.getElementById("build");
+  const d = state.build;
+  if (!d) { el.innerHTML = `<div class="empty-state">Loading build reports…</div>`; return; }
+  if (d.stale || !d.overall) { el.innerHTML = STALE_SERVER; return; }
+  if (!d.reports.length) {
+    el.innerHTML = `<div class="empty-state">No build reports under project/db ·
+      <code>python3 tools/epic.py &lt;epic&gt;</code> writes them</div>`;
+    return;
+  }
+  const w = chartWidth(el);
+  const ui = state.buildUi;
+  const caret = treeSearchCaret("build");
+  const nodes = buildTreeNodes(d);
+  const rows = treeRows(treeSort(treeFilter(nodes, ui.search), ui.sort), state.builds, !!ui.search.trim());
+  el.innerHTML = buildSummary(d, ui, w) + `<div class="card">
+    <div class="card-title"><h3>Reports, projects and steps</h3>
+      <span>click a row to open it, a column header to sort</span></div>
+    ${treeToolbar("build", ui, rows.length, treeCount(nodes))}
+    ${treeHtml("build", rows, ui.sort, row => buildDetail(row, d, w))}</div>`;
+  bindTree(el, "build", state.builds, nodes, ui, renderBuild, caret);
+  bindTips(el);
+  restoreScroll(document.getElementById("content"), state.scroll.build);
 }
 
 // --- plan logic (extracted by test_pm.py, keep free of DOM access) ---
@@ -1842,7 +2018,8 @@ function render() {
   else if (state.view === "timeline") renderTimeline();
   else if (state.view === "plan") renderPlan();
   else if (state.view === "tests") renderTests();
-  else renderBenchmarks();
+  else if (state.view === "benchmarks") renderBenchmarks();
+  else renderBuild();
   if (state.item && (state.view === "board" || state.view === "timeline" || state.view === "plan")) openPanel(state.item);
   else closePanel();
   saveUi();
@@ -1857,6 +2034,7 @@ async function loadApi(path) {
 async function loadView() {
   if (state.view === "tests") state.tests = await loadApi("/api/tests");
   if (state.view === "benchmarks") state.bench = await loadApi("/api/benchmarks");
+  if (state.view === "build") state.build = await loadApi("/api/builds");
 }
 
 async function refresh() {
@@ -1896,7 +2074,7 @@ let resizeTimer = 0;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    if (state.data && (state.view === "tests" || state.view === "benchmarks")) render();
+    if (state.data && ["tests", "benchmarks", "build"].includes(state.view)) render();
   }, 150);
 });
 loadUi();

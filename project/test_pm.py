@@ -124,6 +124,41 @@ globalThis.BENCH = {
     { scene: "static_100k", mean_ms: 1.25, p99_ms: 2.6, fps: 800, time: "2026-01-02T10:00:00Z", file: "s1" },
   ],
 };
+const buildPoint = (time, item, total) => ({ time, item, kind: "release", total_sec: total, files: 3,
+  compile_sec: 3, link_sec: 1, sha: "aaaaaaa" });
+globalThis.BUILDS = {
+  overall: { reports: 2, kinds: 2, projects: 2, steps: 18, files: 3, compile_sec: 3, link_sec: 1,
+    total_sec: 8.5, sha: "bbbbbbb", dirty: true, branch: "main", latest: "2026-01-02T10:00:00Z", ok: true,
+    trend: [buildPoint("2026-01-01T10:00:00Z", "e1", 2.5), buildPoint("2026-01-02T10:00:00Z", "e2", 6)] },
+  kinds: [
+    { kind: "release", reports: 1, latest: "2026-01-01T10:00:00Z", item: "e1", total_sec: 2.5, files: 3,
+      compile_sec: 3, link_sec: 1, sha: "aaaaaaa", ok: true,
+      trend: [buildPoint("2026-01-01T10:00:00Z", "e1", 2.5)] },
+    { kind: "wasm", reports: 1, latest: "2026-01-02T10:00:00Z", item: "e2", total_sec: 6, files: 3,
+      compile_sec: 3, link_sec: 1, sha: "bbbbbbb", ok: true,
+      trend: [buildPoint("2026-01-02T10:00:00Z", "e2", 6)] },
+  ],
+  kind_history: {
+    release: [buildPoint("2026-01-01T10:00:00Z", "e1", 2.5)],
+    wasm: [buildPoint("2026-01-02T10:00:00Z", "e2", 6)],
+  },
+  project_history: { "release|box": [{ time: "2026-01-01T10:00:00Z", item: "e1", project: "box",
+    total_sec: 1.2, compile_sec: 3, link_sec: 0.2, files: 2 }] },
+  reports: [
+    { item: "e1", file: "e1/deliverable/build_native.json", url: "/u/b1", kind: "release", cfg: "release",
+      target: "arm64-Darwin", time: "2026-01-01T10:00:00Z", total_sec: 2.5, ok: true, files: 3,
+      compile_sec: 3, link_sec: 1, kinds: { compile: 3, link: 1 }, short_sha: "aaaaaaa", dirty: true, steps: 3,
+      projects: [{ project: "box", time: 1.2, compile_sec: 3, link_sec: 0.2, files: 2, ok: true, steps: [
+        { name: "src/a.c", kind: "compile", time: 2, ok: true, object: "/obj/a.o", steps: [] },
+        { name: "link", kind: "link", time: 0.2, ok: true, steps: [
+          { name: "embed", kind: "link", time: 0.1, ok: true, steps: [] }] }] }] },
+    { item: "e2", file: "e2/deliverable/build_wasm.json", url: "/u/b2", kind: "wasm", cfg: "release",
+      target: "em", time: "2026-01-02T10:00:00Z", total_sec: 6, ok: true, files: 3, compile_sec: 3,
+      link_sec: 1, kinds: { compile: 3, link: 1 }, short_sha: "bbbbbbb", dirty: false, steps: 1,
+      projects: [{ project: "(build)", time: 0.5, compile_sec: 0, link_sec: 0, files: 0, ok: true, steps: [
+        { name: "flecs", kind: "bundle", time: 0.5, ok: true, steps: [] }] }] },
+  ],
+};
 """
 
 
@@ -577,6 +612,100 @@ class PmTests(unittest.TestCase):
         self.assertEqual(latest["bench_transform/Dynamic.propagate_subtree"]["samples"], 20)
         self.assertEqual(latest["bench_transform/Dynamic.propagate_subtree"]["suite"], "Dynamic")
 
+    def build_json(self, cfg, target, stamp, total, sha):
+        return {
+            "tool": "bake3", "tool_version": "1.0.0", "timestamp": stamp,
+            "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 8},
+            "cfg": cfg, "target": target, "environment": "epic",
+            "git": {"sha": sha, "dirty": True, "branch": "main"},
+            "total_sec": total, "ok": True,
+            "totals": {
+                "kind": {"compile": 3.0, "link": 1.0, "bundle": 0.5, "discovery": 0.1, "etc": 0.02},
+                "project": {"box": {"total_sec": 1.2, "compile_sec": 3.0, "link_sec": 0.2, "files": 2},
+                            "box_app": {"total_sec": 0.8, "compile_sec": 0.3, "link_sec": 0.8, "files": 1}},
+            },
+            "steps": [
+                {"name": "discovery", "kind": "discovery", "project": None, "start_sec": 0.0,
+                 "duration_sec": 0.1, "ok": True, "children": [
+                     {"name": "resolve dependencies", "kind": "discovery", "project": None, "start_sec": 0.0,
+                      "duration_sec": 0.05, "ok": True, "children": []}]},
+                {"name": "flecs", "kind": "bundle", "project": "box", "start_sec": 0.1,
+                 "duration_sec": 0.5, "ok": True, "children": []},
+                {"name": "box", "kind": "project", "project": "box", "start_sec": 0.6,
+                 "duration_sec": 1.2, "ok": True, "children": [
+                     {"name": "src/b.c", "kind": "compile", "project": "box", "start_sec": 0.6,
+                      "duration_sec": 1.0, "ok": True, "object": "/obj/b.o", "children": []},
+                     {"name": "src/a.c", "kind": "compile", "project": "box", "start_sec": 0.6,
+                      "duration_sec": 2.0, "ok": True, "object": "/obj/a.o", "children": []},
+                     {"name": "link", "kind": "link", "project": "box", "start_sec": 1.6,
+                      "duration_sec": 0.2, "ok": True, "children": []}]},
+                {"name": "box_app", "kind": "project", "project": "box_app", "start_sec": 1.8,
+                 "duration_sec": 0.8, "ok": True, "children": [
+                     {"name": "src/main.c", "kind": "compile", "project": "box_app", "start_sec": 1.8,
+                      "duration_sec": 0.3, "ok": True, "object": "/obj/main.o", "children": []},
+                     {"name": "link", "kind": "link", "project": "box_app", "start_sec": 2.1,
+                      "duration_sec": 0.8, "ok": True, "children": [
+                          {"name": "embed", "kind": "link", "project": "box_app", "start_sec": 2.1,
+                           "duration_sec": 0.4, "ok": True, "children": []}]}]},
+            ],
+        }
+
+    def test_aggregate_builds_reads_every_build_report(self):
+        self.new("epic", "e1", "Epic")
+        self.new("epic", "e2", "Epic two")
+        self.write_report("e1/deliverable/build_native.json",
+                          self.build_json("release", "arm64-Darwin", "2026-01-01T10:00:00Z", 2.5, "a" * 40))
+        self.write_report("e2/deliverable/build_wasm.json",
+                          self.build_json("release", "em", "2026-01-02T10:00:00Z", 6.0, "b" * 40))
+        self.write_report("e2/deliverable/tests.json", {"project": "core", "pass": 1, "tests": []})
+        data = pm.aggregate_builds()
+
+        self.assertEqual([(r["item"], r["kind"]) for r in data["reports"]],
+                         [("e1", "release"), ("e2", "wasm")])
+        self.assertEqual([k["kind"] for k in data["kinds"]], ["release", "wasm"])
+        report = data["reports"][0]
+        self.assertEqual((report["files"], report["compile_sec"], report["link_sec"]), (3, 3.0, 1.0))
+        self.assertEqual((report["short_sha"], report["dirty"], report["branch"]), ("a" * 7, True, "main"))
+        self.assertEqual(report["url"], "/deliverable/e1/deliverable/build_native.json")
+        self.assertEqual([p["project"] for p in report["projects"]], [pm.BUILD_SETUP, "box", "box_app"])
+        setup, box, app = report["projects"]
+        self.assertEqual([s["name"] for s in setup["steps"]], ["flecs", "discovery"])
+        self.assertEqual([s["name"] for s in setup["steps"][1]["steps"]], ["resolve dependencies"])
+        self.assertEqual([s["name"] for s in box["steps"]], ["src/a.c", "src/b.c", "link"])
+        self.assertEqual((box["files"], box["compile_sec"], box["link_sec"]), (2, 3.0, 0.2))
+        self.assertEqual(box["steps"][0]["object"], "/obj/a.o")
+        self.assertEqual([s["name"] for s in app["steps"][0]["steps"]], ["embed"])
+        self.assertEqual(report["steps"], 9)
+
+        self.assertEqual([p["total_sec"] for p in data["kind_history"]["release"]], [2.5])
+        self.assertEqual([p["item"] for p in data["kind_history"]["wasm"]], ["e2"])
+        self.assertEqual([p["total_sec"] for p in data["project_history"]["release|box"]], [1.2])
+        overall = data["overall"]
+        self.assertEqual((overall["reports"], overall["kinds"], overall["projects"]), (2, 2, 2))
+        self.assertEqual((overall["files"], overall["sha"], overall["total_sec"]), (3, "b" * 7, 8.5))
+        self.assertEqual(overall["latest"], "2026-01-02T10:00:00Z")
+        self.assertEqual([p["kind"] for p in overall["trend"]], ["release", "wasm"])
+
+        status, ctype, body = self.get("/api/builds")
+        self.assertEqual((status, ctype), (200, "application/json"))
+        self.assertEqual(len(json.loads(body)["reports"]), 2)
+
+    def test_deliverables_recognise_build_reports(self):
+        self.new("epic", "e1", "Epic")
+        self.write_report("e1/deliverable/build_wasm.json",
+                          self.build_json("release", "em", "2026-01-02T10:00:00Z", 6.0, "c" * 40))
+        self.write_report("e1/deliverable/tests.json", {"project": "core", "pass": 1, "tests": []})
+        names = {d["name"]: d for d in pm.collect_state()["epics"][0]["deliverables"]}
+
+        build = names["build_wasm.json"]["build"]
+        self.assertEqual((build["kind"], build["cfg"], build["target"]), ("wasm", "release", "em"))
+        self.assertEqual((build["files"], build["total_sec"], build["ok"]), (3, 6.0, True))
+        self.assertEqual((build["compile_sec"], build["link_sec"], build["sha"]), (3.0, 1.0, "c" * 7))
+        self.assertEqual(build["steps"], 4)
+        self.assertIsNone(names["build_wasm.json"]["tests"])
+        self.assertIsNone(names["tests.json"]["build"])
+        self.assertEqual(names["tests.json"]["tests"]["project"], "core")
+
     def test_check_warns_for_completed_task_without_bench_report(self):
         config = os.path.join(pm.BENCH_PROJECTS, "transform", "project.json")
         os.makedirs(os.path.dirname(config))
@@ -948,6 +1077,7 @@ console.log(JSON.stringify({
         self.assertIn('value="core"', out["toolbar"])
         self.assertIn("4 of 10 rows", out["toolbar"])
         self.assertIn('data-expand="tests"', out["toolbar"])
+        self.assertIn("Filter by project, suite or case", out["toolbar"])
         self.assertIn('data-collapse="tests"', out["toolbar"])
 
     def test_report_tree_filters_and_sorts_at_every_level(self):
@@ -1003,6 +1133,66 @@ console.log(JSON.stringify({
         for name, body in files:
             with open(os.path.join(directory, name), "wb") as f:
                 f.write(body)
+
+    def test_build_tree_renders_reports_projects_and_steps(self):
+        out = self.run_tree_js("""
+const nodes = buildTreeNodes(BUILDS);
+const collapsed = treeRows(nodes, [], false);
+const open = treeRows(nodes, ["b:e1/deliverable/build_native.json",
+                              "b:e1/deliverable/build_native.json|box"], false);
+const markup = treeHtml("build", open, { key: "time", dir: -1 },
+  row => row.node.level === "build" ? "<em>chart</em>" : "");
+console.log(JSON.stringify({
+  columns: TREE_COLS.build.map(c => c.key),
+  count: treeCount(nodes),
+  collapsed: collapsed.map(r => [r.node.name, r.node.level, r.leaf]),
+  open: open.map(r => r.node.level + ":" + r.node.name + ":" + r.depth),
+  rows: count(markup, "data-row="),
+  reportRows: count(markup, "lvl-build"),
+  projectRows: count(markup, "lvl-bproject"),
+  stepRows: count(markup, "lvl-bstep"),
+  details: count(markup, "tree-detail"),
+  heads: count(markup, "data-sort="),
+  reportCells: cellText(rowOf(open, "b:e1/deliverable/build_native.json"), "build"),
+  projectCells: cellText(rowOf(open, "b:e1/deliverable/build_native.json|box"), "build"),
+  stepCells: cellText(rowOf(open, "b:e1/deliverable/build_native.json|box|src/a.c"), "build"),
+  stepMeta: treeMeta(rowOf(open, "b:e1/deliverable/build_native.json|box|src/a.c")),
+  reportMeta: treeMeta(rowOf(open, "b:e1/deliverable/build_native.json")),
+  byTime: treeSort(nodes, { key: "time", dir: -1 }).map(n => n.name),
+  byName: treeSort(nodes, { key: "name", dir: 1 }).map(n => n.name),
+  stepsByTime: treeSort(nodes, { key: "time", dir: -1 })[1].children[0].children.map(s => s.name),
+  fileSearch: treeRows(treeFilter(nodes, "src/a.c"), [], true).map(r => r.node.name),
+  projectSearch: treeFilter(nodes, "box").map(n => n.children.map(c => c.name)),
+  noMatch: treeFilter(nodes, "zzz").length,
+  tiles: count(statTiles(BUILDS.kinds.map(k => ({ label: k.kind, value: k.total_sec + "s",
+    points: k.trend.map(p => ({ t: 1, v: p.total_sec })) }))), 'class="stat"'),
+  toolbar: treeToolbar("build", { search: "" }, 2, 8),
+}));
+""")
+        self.assertEqual(out["columns"], ["name", "kind", "files", "compile", "link", "time", "sha",
+                                          "trend", "latest"])
+        self.assertEqual(out["count"], 8)
+        self.assertEqual(out["collapsed"], [["e1", "build", False], ["e2", "build", False]])
+        self.assertEqual(out["open"], ["build:e1:0", "bproject:box:1", "bstep:src/a.c:2", "bstep:link:2",
+                                       "build:e2:0"])
+        self.assertEqual((out["rows"], out["reportRows"], out["projectRows"], out["stepRows"]), (5, 2, 1, 2))
+        self.assertEqual((out["details"], out["heads"]), (1, 9))
+        self.assertEqual(out["reportCells"],
+                         ["▾e1release · arm64-Darwin", "release", "3", "3.000", "1.000", "2.500",
+                          "aaaaaaa*", "", "e1 · when"])
+        self.assertEqual(out["projectCells"], ["▾box2 steps", "", "2", "3.000", "0.200", "1.200", "", "", ""])
+        self.assertEqual(out["stepCells"], ["src/a.c", "compile", "", "", "", "2.000", "", "—", ""])
+        self.assertIn("/obj/a.o", out["stepMeta"])
+        self.assertIn("compile 3.000s · link 1.000s", out["reportMeta"])
+        self.assertIn("release · 3 steps · aaaaaaa", out["reportMeta"])
+        self.assertEqual(out["byTime"], ["e2", "e1"])
+        self.assertEqual(out["byName"], ["e1", "e2"])
+        self.assertEqual(out["stepsByTime"], ["src/a.c", "link"])
+        self.assertEqual(out["fileSearch"], ["e1", "box", "src/a.c"])
+        self.assertEqual(out["projectSearch"], [["box"]])
+        self.assertEqual((out["noMatch"], out["tiles"]), (0, 2))
+        self.assertIn("Filter by epic, project or file", out["toolbar"])
+        self.assertIn("2 of 8 rows", out["toolbar"])
 
     def test_state_links_epics_with_a_wasm_deliverable(self):
         self.new("epic", "e1", "Epic one")

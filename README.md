@@ -426,6 +426,10 @@ interval for bake3 benchmarks, plus a scene section with frame timing. Both read
 the aggregated `/api/tests` and `/api/benchmarks` endpoints served by `pm.py
 serve`, which summarize every level of that tree.
 
+The **Build** tab reads the `build*.json` reports of `tools/epic.py` from
+`/api/builds` in the same layout: tiles per kind (debug, release, wasm), files, link
+time and commit, then a report to project to step tree, slowest files first.
+
 The server also serves `apps/box_inspector/index.html` at `/inspector`. An epic
 with a `deliverable/wasm/` build gets an **Inspect** link on its card and in its
 detail panel that opens the inspector on that image; the header link **Inspect
