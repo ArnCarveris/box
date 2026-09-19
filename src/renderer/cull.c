@@ -670,7 +670,7 @@ void box_cull_dispatch(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "cull");
     wgpuComputePassEncoderSetPipeline(pass, r->cull_pipeline);
     uint32_t i;
     for (i = 0; i < r->cull_jobs.count; i ++) {

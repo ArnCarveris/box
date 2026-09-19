@@ -252,7 +252,7 @@ static void box_bloom_pass(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "bloom");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     if (mix) {
         WGPUColor weight = { BOX_BLOOM_MIX_WEIGHT, BOX_BLOOM_MIX_WEIGHT, BOX_BLOOM_MIX_WEIGHT,

@@ -6,6 +6,7 @@
 #ifndef BOX_RENDERER_INTERNAL_H
 #define BOX_RENDERER_INTERNAL_H
 
+#include "gpu.h"
 #include "renderer.h"
 #include "cluster.h"
 #include "frustum.h"
@@ -19,7 +20,6 @@
 #include "overlay.h"
 #include "sky.h"
 #include "queue.h"
-#include "gpu.h"
 
 /** Faces of a cubemap */
 #define BOX_ENV_FACES (6)
@@ -617,6 +617,15 @@ struct box_renderer_t {
     uint32_t hiz_tested;             /**< Instances the last read back occlusion pass tested */
     uint32_t hiz_occluded;           /**< Instances the last read back occlusion pass hid */
     box_renderer_stats_t stats;      /**< Instance counts of the last frame */
+    box_timing_t timing;             /**< Passes of the frame in flight and of the resolved one */
+    WGPUQuerySet timing_set;         /**< Timestamps the passes of a frame write */
+    WGPUBuffer timing_resolve;       /**< Resolved timestamps of a recorded frame */
+    WGPUBuffer timing_readback;      /**< Mappable copy of those timestamps */
+    volatile bool timing_enabled;    /**< The world asked for the timings of every pass */
+    bool timing_supported;           /**< The device has the timestamp query feature */
+    bool timing_busy;                /**< The readback buffer is waiting for its map */
+    bool timing_encoded;             /**< The resolve of that frame was encoded */
+    uint32_t timing_wait;            /**< Frames that map has been waited for */
     WGPUBuffer cull_readback;        /**< Mappable copy of the arguments of a recorded frame */
     uint32_t cull_readback_capacity; /**< Draws the readback buffer can hold */
     uint32_t cull_readback_count;    /**< Draws the pending readback holds */

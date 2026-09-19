@@ -55,6 +55,14 @@
         ]
       },
       {
+        "id": "Gpu",
+        "testcases": [
+          "timings_are_off_until_they_are_asked_for",
+          "enabled_timings_report_the_passes_of_a_frame",
+          "disabled_timings_stop_the_queries"
+        ]
+      },
+      {
         "id": "Lights",
         "testcases": [
           "point_light_extracted",

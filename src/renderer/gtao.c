@@ -243,7 +243,7 @@ static void box_gtao_pass(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "gtao");
     uint32_t offset = slot * BOX_EFFECT_UNIFORM_STRIDE;
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);

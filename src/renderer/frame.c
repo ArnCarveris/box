@@ -450,7 +450,7 @@ static void box_frame_sorted(
         .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "sorted");
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
@@ -533,7 +533,7 @@ static void box_frame_uncovered(
         .depthStencilAttachment = &depth
     };
     bool hdr = r->effect_scene != NULL;
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "uncovered");
     wgpuRenderPassEncoderSetPipeline(pass, attachments == 2 ?
         box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr));
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
@@ -677,7 +677,7 @@ static void box_frame_view(
         .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &pass_desc, "opaque");
     wgpuRenderPassEncoderSetPipeline(pass, attachments == 2 ?
         box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr));
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
@@ -778,18 +778,22 @@ void box_frame_render(
         goto done;
     }
 
+    box_timing_frame(r);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(r->device, NULL);
+    box_timing_record(r, encoder);
     uint32_t i;
     for (i = 0; i < p->views.count; i ++) {
         box_frame_view(r, p, i, encoder, surface);
     }
 
     box_cull_record(r, encoder);
+    box_timing_close(r);
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
     wgpuCommandBufferRelease(cmd);
     wgpuCommandEncoderRelease(encoder);
     box_cull_publish(r);
+    box_timing_publish(r);
 
     if (p->capture_path[0]) {
         box_capture_texture(r, box_frame_capture_target(r, p, surface), p->capture_path);

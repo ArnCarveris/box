@@ -341,7 +341,7 @@ static void box_transparent_blur_pass(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "glass");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     if (mix) {
         WGPUColor weight = { BOX_BLUR_MIX_WEIGHT, BOX_BLUR_MIX_WEIGHT, BOX_BLUR_MIX_WEIGHT,

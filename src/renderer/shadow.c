@@ -767,7 +767,7 @@ void box_shadow_dispatch(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "shadow.cull");
     wgpuComputePassEncoderSetPipeline(pass, r->cull_pipeline);
     uint32_t i;
     for (i = 0; i < r->shadow_jobs.count; i ++) {
@@ -809,7 +809,7 @@ static void box_shadow_pass(
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "shadow");
     wgpuRenderPassEncoderSetPipeline(pass, r->shadow_pipeline);
     uint32_t offset = cascade * BOX_CULL_UNIFORM_STRIDE;
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->shadow_group, 1, &offset);

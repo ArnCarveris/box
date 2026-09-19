@@ -17,6 +17,8 @@ extern "C" {
 /** Opaque renderer handle */
 typedef struct box_renderer_t box_renderer_t;
 
+#include "timing.h"
+
 /** Instance counts of the last frame the renderer drew.
  *
  * The counts of the compute culled batches come from a read back of the draw
@@ -28,6 +30,22 @@ typedef struct box_renderer_stats_t {
     uint32_t occluded; /**< Instances the depth pyramid of a view found hidden behind others */
     uint32_t shadow_rebuilds; /**< Cached static cascade layers the frame rendered again */
 } box_renderer_stats_t;
+
+/** Per pass GPU times of the last frame the renderer resolved.
+ *
+ * The passes are named after the pass structure of the renderer and after the
+ * position of an effect in the chain of its view, and a name that several
+ * views or cascades record holds what they spent together. The numbers come
+ * from a read back of the timestamps, so they trail the frame they belong to
+ * by one or two frames.
+ */
+typedef struct box_renderer_gpu_t {
+    box_timing_pass_t passes[BOX_TIMING_PASS_MAX]; /**< Passes of the frame, in record order */
+    uint32_t count;   /**< Passes the frame recorded, one entry per name */
+    uint32_t frame;   /**< Frame the renderer measured them in */
+    double frame_ms;  /**< Milliseconds the passes add up to */
+    bool supported;   /**< The device can time its passes */
+} box_renderer_gpu_t;
 
 /** Parameters for creating a renderer */
 typedef struct box_renderer_desc_t {
@@ -120,6 +138,27 @@ uint32_t box_renderer_static_count(
 void box_renderer_stats(
     const box_renderer_t *r,
     box_renderer_stats_t *out);
+
+/** Record the GPU time of every pass of a frame, or stop recording it.
+ *
+ * Nothing is created and no pass is timed while this is off, and a device
+ * without the timestamp query feature reports no passes either way.
+ *
+ * @param r The renderer
+ * @param enable Time the passes of the frames that follow
+ */
+void box_renderer_set_gpu_timings(
+    box_renderer_t *r,
+    bool enable);
+
+/** Per pass GPU times of the last frame the renderer resolved.
+ *
+ * @param r The renderer
+ * @param out The times to fill
+ */
+void box_renderer_gpu_timings(
+    const box_renderer_t *r,
+    box_renderer_gpu_t *out);
 
 /** Number of frames the renderer has presented.
  *

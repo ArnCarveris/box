@@ -123,6 +123,30 @@ static const WGPULimits* box_device_limits(
     return result;
 }
 
+#ifndef BOX_PLATFORM_WEB
+/** Features the device asks the adapter for, which the adapter has to have.
+ *
+ * The timestamp query is the only optional feature the renderer uses, and a
+ * device without it renders the same frames and reports no pass times.
+ *
+ * @param r The renderer
+ * @param out Receives the features to require
+ * @return The number of features
+ */
+static size_t box_device_features(
+    box_renderer_t *r,
+    WGPUFeatureName *out)
+{
+    size_t result = 0;
+    if (wgpuAdapterHasFeature(r->adapter, WGPUFeatureName_TimestampQuery)) {
+        out[result] = WGPUFeatureName_TimestampQuery;
+        result ++;
+    }
+
+    return result;
+}
+#endif
+
 /** Create the window surface from the platform surface source.
  *
  * @param r The renderer
@@ -194,6 +218,9 @@ static void box_device_complete(
     box_renderer_t *r)
 {
     r->gpu_queue = wgpuDeviceGetQueue(r->device);
+#ifndef BOX_PLATFORM_WEB
+    r->timing_supported = wgpuDeviceHasFeature(r->device, WGPUFeatureName_TimestampQuery);
+#endif
     box_device_select_format(r);
     box_device_resize(r, r->desc.width, r->desc.height);
     box_frame_resources(r);
@@ -288,8 +315,11 @@ int box_device_init(
         goto done;
     }
 
+    WGPUFeatureName features[1];
     WGPUDeviceDescriptor desc = WGPU_DEVICE_DESCRIPTOR_INIT;
     desc.requiredLimits = box_device_limits(r);
+    desc.requiredFeatures = features;
+    desc.requiredFeatureCount = box_device_features(r, features);
     desc.uncapturedErrorCallbackInfo.callback = box_on_device_error;
     desc.uncapturedErrorCallbackInfo.userdata1 = r;
     WGPURequestDeviceCallbackInfo device_info = {
@@ -329,6 +359,7 @@ uint32_t box_device_instances(
 void box_device_fini(
     box_renderer_t *r)
 {
+    box_timing_fini(r);
     box_view_fini(r);
     box_target_fini(r);
     box_scene_fini(r);

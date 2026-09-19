@@ -420,7 +420,7 @@ static void box_hiz_level_pass(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "depth");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->hiz_source[slot][level], 0, NULL);
     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
@@ -496,7 +496,7 @@ void box_hiz_dispatch(
         goto done;
     }
 
-    WGPUComputePassEncoder encoded = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder encoded = box_timing_compute(r, encoder, "occlusion");
     wgpuComputePassEncoderSetPipeline(encoded,
         pass == BOX_HIZ_PASS_NEW ? r->hiz_second : r->hiz_first);
     uint32_t i;

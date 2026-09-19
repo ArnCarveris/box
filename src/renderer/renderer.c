@@ -268,6 +268,29 @@ void box_renderer_stats(
     *out = r->stats;
 }
 
+void box_renderer_set_gpu_timings(
+    box_renderer_t *r,
+    bool enable)
+{
+    r->timing_enabled = enable;
+}
+
+void box_renderer_gpu_timings(
+    const box_renderer_t *r,
+    box_renderer_gpu_t *out)
+{
+    uint32_t count = r->timing.count;
+    if (count > BOX_TIMING_PASS_MAX) {
+        count = BOX_TIMING_PASS_MAX;
+    }
+
+    memcpy(out->passes, r->timing.passes, count * sizeof(box_timing_pass_t));
+    out->count = count;
+    out->frame = r->timing.resolved;
+    out->frame_ms = r->timing.frame_ms;
+    out->supported = r->timing_supported;
+}
+
 uint32_t box_renderer_frames(
     const box_renderer_t *r)
 {

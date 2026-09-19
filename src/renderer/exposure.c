@@ -174,14 +174,14 @@ void box_exposure_dispatch(
     uint32_t offset = slot * BOX_EFFECT_UNIFORM_STRIDE;
     uint32_t groups_x = (src->width + BOX_EXPOSURE_GROUP - 1) / BOX_EXPOSURE_GROUP;
     uint32_t groups_y = (src->height + BOX_EXPOSURE_GROUP - 1) / BOX_EXPOSURE_GROUP;
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "exposure");
     wgpuComputePassEncoderSetPipeline(pass, r->exposure_histogram);
     wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
     wgpuComputePassEncoderDispatchWorkgroups(pass, groups_x, groups_y, 1);
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
 
-    WGPUComputePassEncoder adapt = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassEncoder adapt = box_timing_compute(r, encoder, "exposure");
     wgpuComputePassEncoderSetPipeline(adapt, r->exposure_average);
     wgpuComputePassEncoderSetBindGroup(adapt, 0, group, 1, &offset);
     wgpuComputePassEncoderDispatchWorkgroups(adapt, 1, 1, 1);

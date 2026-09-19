@@ -159,7 +159,7 @@ void box_lines_record(
         .colorAttachments = &color,
         .depthStencilAttachment = &depth
     };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "lines");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, r->lines_buffer, 0,

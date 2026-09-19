@@ -525,7 +525,7 @@ void box_overlay_record(
     };
     WGPURenderPassDescriptor pass_desc = {
         .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &pass_desc, "overlay");
     wgpuRenderPassEncoderSetPipeline(pass, r->overlay_pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, entry->group, 0, NULL);
     wgpuRenderPassEncoderDraw(pass, 6, (uint32_t)count, 0, 0);

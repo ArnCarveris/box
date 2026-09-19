@@ -21,6 +21,7 @@
  */
 
 #include "renderer_internal.h"
+#include <stdio.h>
 
 /** Create or resize the texture of a pool entry.
  *
@@ -515,7 +516,7 @@ void box_effect_motion(
         .clearValue = { 0.0, 0.0, 0.0, 0.0 }
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "motion");
     uint32_t offset = 0;
     wgpuRenderPassEncoderSetPipeline(pass, r->motion_pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
@@ -532,6 +533,7 @@ done:
  * @param r The renderer
  * @param fx The pass
  * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param chain Index of the pass in the chain of its view, which names it
  * @param src The target the pass reads
  * @param dst The render target view the pass writes
  * @param encoder The command encoder
@@ -543,6 +545,7 @@ static void box_effect_pass(
     box_renderer_t *r,
     const box_effect_t *fx,
     uint32_t slot,
+    uint32_t chain,
     box_gpu_pool_t *src,
     WGPUTextureView dst,
     WGPUCommandEncoder encoder,
@@ -586,7 +589,9 @@ static void box_effect_pass(
         .clearValue = { 0.0, 0.0, 0.0, 1.0 }
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    char name[BOX_TIMING_NAME_MAX];
+    snprintf(name, sizeof(name), "effect.%u", chain);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, name);
     uint32_t offset = slot * BOX_EFFECT_UNIFORM_STRIDE;
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
@@ -683,7 +688,7 @@ void box_effect_run(
             ao = box_gtao_build(r, fx, slot, encoder);
         }
 
-        box_effect_pass(r, fx, slot, src, out, encoder, !last, pyramid, ao);
+        box_effect_pass(r, fx, slot, i, src, out, encoder, !last, pyramid, ao);
         if (src != r->effect_scene) {
             box_effect_release(src);
         }

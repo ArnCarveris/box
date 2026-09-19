@@ -525,7 +525,7 @@ void box_sky_record(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "sky");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, box_sky_group(r), 0, NULL);
     wgpuRenderPassEncoderDraw(pass, BOX_SKY_VERTICES, 1, 0, 0);
@@ -555,7 +555,7 @@ void box_sky_environment_face(
         .storeOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "sky.env");
     uint32_t offset = index * BOX_ENV_STRIDE;
     wgpuRenderPassEncoderSetPipeline(pass, r->sky.env_pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->sky.env_group, 1, &offset);
