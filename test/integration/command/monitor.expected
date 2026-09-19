@@ -1,12 +1,15 @@
 $ ls box.monitor
 BoxCollectStats
 BoxCollectSystems
+BoxPublishFps
 BoxSampleCpu
 BoxStatsOnSet
 BoxSystemMonitorOnRemove
 BoxSystemMonitorOnSet
 CpuMonitor
 EcsStats
+FpsCorner
+FpsOverlay
 PhaseTime
 SystemMonitor
 SystemTime
