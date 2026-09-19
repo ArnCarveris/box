@@ -44,10 +44,10 @@ Two hard rules keep the concerns apart:
 | `box.monitor` | `CpuMonitor`, `EcsStats` and `SystemMonitor` singletons, sampled only while present |
 | `box.script` | scene loading, incremental template instantiation |
 | `box.collision` | root bounds, per shape colliders, a bounding volume hierarchy with ray, sphere, box and frustum queries |
-| `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events |
+| `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events, the `Action` a click fires and the source a view without colliders answers its pick with |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
-| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree |
+| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
 | later | `box.particles`, `box.lod`, `box.atmosphere` |
 

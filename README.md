@@ -265,7 +265,11 @@ template Button {
 An event starts at the entity the pick resolved to and bubbles up the parent chain until a
 handler consumes it, so a parent only hears what its children leave alone. A frame in which the
 cursor stands still costs no ray query at all, and `PickSettings` holds the reach, the drag
-threshold and the switch. `test/integration/command/picking.flecs` hovers and clicks a crate
+threshold and the switch. An entity that carries an `Action` fires it through the input action
+layer when a click resolves on it, and the click walks up the parent chain to the nearest one, so
+a widget and a key binding share one action. A view whose contents have no collider answers its
+own pick before the ray query runs, which is how `box.ui` resolves the cursor against the
+rectangles of its trees. `test/integration/command/picking.flecs` hovers and clicks a crate
 through the `mouse.*` commands and keeps the log.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
@@ -355,6 +359,39 @@ panel {
 }
 
 const label = text.label(panel.button, "caption", "Save changes")
+```
+
+A tree answers the pick of its own view, because a UI element has no collider:
+`box_ui_hit(world, view, x, y)` resolves a point in the logical pixels of a view against the
+`Bounds` of the nodes it draws and the node drawn over every other node that holds the point
+wins, which is the deepest node of the topmost subtree. The test runs in the frame of each node,
+so a rotated or a scaled element is hit where it is drawn, a node without a rectangle holds
+nothing and a child that a transparent subtree clips away is not hit either. The view of a tree
+renders over the scene and picks before it, so an element under the cursor consumes the pick and
+the ray of the scene never runs, while a cursor beside the tree reaches the scene as before. A
+hit raises the script events a collider raises, `on.hover`, `on.press`, `on.release`, `on.click`
+and `on.drag`, bubbling up the tree until a handler consumes them, with `Hovered` on the element
+under the cursor and the `Action` of an element firing on a click. Every widget, hover styling
+included, is written in script; the module holds no widget of its own. See
+`test/integration/visual/ui_hover.flecs` and `test/integration/command/ui_events.flecs`:
+
+```
+template Button {
+  mut hover = 0
+  Rect: {200, 64}
+  Border: {radius: 12}
+  Action: {action: actions.Save}
+  async {
+    await on.hover(this)
+    hover = 1
+  }
+
+  if hover == 1 {
+    Rgb: {245, 205, 95}
+  } else {
+    Rgb: {52, 66, 100}
+  }
+}
 ```
 
 `box.checkpoint` writes the state of a running instance back into the scripts that loaded it.
