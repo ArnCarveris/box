@@ -30,6 +30,18 @@
  * apart: the UI view draws the members of that layer only, and every other view
  * hides them. A world whose only views are UI views still draws its active
  * camera, so a scene does not lose its image when it gains a UI.
+ *
+ * A layout pass runs after the walk and gives every node of a tree a Bounds,
+ * the rectangle the node covers in the logical pixels of its view, with its
+ * centre in x, y like a Position and a Rect. A node takes its size from the
+ * Layout that sizes it, from its Rect, or from its content when it arranges
+ * children and no size is given. A Layout places the children of a node in a
+ * row or a column in child order, with padding around them, spacing between
+ * them and an alignment on both axes, and writes the Position of every child it
+ * places; a child with an Anchor is pinned to an edge or the centre of its
+ * parent instead and takes no room in the row or the column. The pass runs for
+ * a tree that changed and for no other, so a UI that stands still costs
+ * nothing.
  */
 
 #ifndef BOX_UI_H
@@ -53,6 +65,78 @@ ECS_STRUCT(Ui, {
     float height;      /**< Logical pixels the view shows vertically, 0 follows the surface */
     float scale;       /**< Surface points one logical pixel covers, default 1 */
     int32_t priority;  /**< Order of a created view in the frame, default 1000 */
+});
+
+/** Where an element or the children of a layout sit on the x axis */
+ECS_ENUM(Align, {
+    AlignLeft = 0,   /**< Against the left edge */
+    AlignCenter = 1, /**< In the middle */
+    AlignRight = 2   /**< Against the right edge */
+});
+
+/** Where an element or the children of a layout sit on the y axis */
+ECS_ENUM(VAlign, {
+    VAlignTop = 0,    /**< Against the top edge */
+    VAlignMiddle = 1, /**< In the middle */
+    VAlignBottom = 2  /**< Against the bottom edge */
+});
+
+/** Axis a layout places the children of an element along */
+ECS_ENUM(Direction, {
+    DirectionNone = 0,   /**< The children keep the position they were given */
+    DirectionRow = 1,    /**< The children follow each other to the right */
+    DirectionColumn = 2  /**< The children follow each other downward */
+});
+
+/** Arranges the children of an element in a row or a column, in child order.
+ *
+ * The box of the element is width by height, and a side that is zero takes the
+ * matching side of the Rect of the element, or the size of its content when
+ * that side is zero too: a row is then as wide as its children plus the spacing
+ * between them and the padding around them, and a column as tall. The padding
+ * insets the box on every side, the children are placed in the box that is
+ * left, and h and v align them: along the axis of the layout the alignment
+ * moves the whole group, across it every child on its own. An element that has
+ * a Rect has it resized to the box, so the rectangle of a panel is what its
+ * layout worked out.
+ */
+ECS_STRUCT(Layout, {
+    Direction direction; /**< Axis the children are placed along */
+    float padding;       /**< Logical pixels between the box and its children */
+    float spacing;       /**< Logical pixels between two children */
+    float width;         /**< Width of the box, 0 takes the Rect or the content */
+    float height;        /**< Height of the box, 0 takes the Rect or the content */
+    Align h;             /**< Alignment on the x axis */
+    VAlign v;            /**< Alignment on the y axis */
+});
+
+/** Pins an element to an edge or the centre of its parent, with an offset.
+ *
+ * The element is placed against the edges h and v name, inside the padding of
+ * the layout of its parent when it has one, and x and y move it from there
+ * toward the inside of the parent. An element in the middle of an axis is moved
+ * along that axis instead, x to the right and y up. An anchored element is not
+ * part of the row or the column of its parent and does not add to its content.
+ */
+ECS_STRUCT(Anchor, {
+    Align h;  /**< Edge of the parent the element is pinned to on the x axis */
+    VAlign v; /**< Edge of the parent the element is pinned to on the y axis */
+    float x;  /**< Offset from that edge on the x axis */
+    float y;  /**< Offset from that edge on the y axis */
+});
+
+/** Rectangle an element covers, written by the layout pass and read only.
+ *
+ * The rectangle is in the logical pixels of the view of its tree, with x and y
+ * at the centre of the element like a Position and width and height the size
+ * the layout gave it, so an element covers x - width / 2 to x + width / 2 and
+ * y - height / 2 to y + height / 2.
+ */
+ECS_STRUCT(Bounds, {
+    float x;      /**< X of the centre of the element */
+    float y;      /**< Y of the centre of the element */
+    float width;  /**< Width of the element */
+    float height; /**< Height of the element */
 });
 
 /** Order in the frame a created UI view renders at, after the views of a scene */

@@ -4,7 +4,9 @@
  *
  * The walk of a tree is a pre-order walk, so a node is numbered after its
  * parent and after the subtrees of its earlier siblings. The number becomes the
- * depth bias of its instance, which is what draws a child over its parent.
+ * depth bias of its instance, which is what draws a child over its parent. The
+ * walk leaves the nodes it found in the places of the registry, which the
+ * layout pass reads instead of walking the tree a second time.
  */
 
 #include "ui_internal.h"
@@ -38,6 +40,26 @@ void box_ui_mark(
     UiImpl *impl = ecs_get_mut(world, root, UiImpl);
     if (impl) {
         impl->dirty = true;
+        impl->relayout = true;
+    }
+
+done:
+    return;
+}
+
+void box_ui_mark_layout(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const UiNode *node = ecs_get(world, e, UiNode);
+    ecs_entity_t root = node ? node->root : box_ui_root(world, e);
+    if (!root) {
+        goto done;
+    }
+
+    UiImpl *impl = ecs_get_mut(world, root, UiImpl);
+    if (impl) {
+        impl->relayout = true;
     }
 
 done:
@@ -74,44 +96,100 @@ static void box_ui_number(
     box_render_set_depth(world, e, -(float)order * BOX_UI_STEP);
 }
 
+/** Collect the nodes of a tree into the places of the registry, in pre-order.
+ *
+ * @param world The world
+ * @param e The root of the tree
+ * @param tree The private state of the root
+ * @return The nodes the tree holds
+ */
+static int32_t box_ui_collect(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const UiImpl *tree)
+{
+    UiState *state = box_ui_state(world);
+
+    ecs_vec_clear(&state->places);
+    ecs_vec_clear(&state->stack);
+    UiVisit *first = ecs_vec_append_t(NULL, &state->stack, UiVisit);
+    first->e = e;
+    first->parent = -1;
+
+    while (ecs_vec_count(&state->stack)) {
+        int32_t last = ecs_vec_count(&state->stack) - 1;
+        UiVisit visit = ecs_vec_get_t(&state->stack, UiVisit, last)[0];
+        ecs_vec_remove_last(&state->stack);
+
+        int32_t index = ecs_vec_count(&state->places);
+        UiPlace *place = ecs_vec_append_t(NULL, &state->places, UiPlace);
+        memset(place, 0, sizeof(UiPlace));
+        place->e = visit.e;
+        place->parent = visit.parent;
+        ecs_vec_clear(&state->nodes);
+        box_hierarchy_collect(world, visit.e, &state->nodes);
+
+        int32_t i;
+        for (i = ecs_vec_count(&state->nodes) - 1; i >= 0; i --) {
+            ecs_entity_t child = ecs_vec_get_t(&state->nodes, ecs_entity_t, i)[0];
+            bool skip = child == tree->view || child == tree->camera ||
+                ecs_has(world, child, Ui);
+            if (!skip) {
+                UiVisit *next = ecs_vec_append_t(NULL, &state->stack, UiVisit);
+                next->e = child;
+                next->parent = index;
+            }
+        }
+    }
+
+    return ecs_vec_count(&state->places);
+}
+
+/** Number the collected nodes of a tree and join them to its layer.
+ *
+ * @param world The world
+ * @param e The root of the tree
+ * @param tree The private state of the root
+ */
+static void box_ui_number_places(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const UiImpl *tree)
+{
+    UiState *state = box_ui_state(world);
+    int32_t i, count = ecs_vec_count(&state->places);
+    for (i = 0; i < count; i ++) {
+        UiPlace *place = ecs_vec_get_t(&state->places, UiPlace, i);
+
+        box_ui_number(world, place->e, e, tree, i);
+    }
+}
+
 void box_ui_walk(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    UiState *state = box_ui_state(world);
     const UiImpl *stored = ecs_get(world, e, UiImpl);
     if (!stored) {
         goto done;
     }
 
     UiImpl tree = *stored;
-    int32_t order = 0;
+    box_ui_state(world)->instanced = false;
+    int32_t count = box_ui_collect(world, e, &tree);
+    if (tree.relayout) {
+        box_ui_layout(world);
+    }
 
-    ecs_vec_clear(&state->stack);
-    ecs_vec_append_t(NULL, &state->stack, ecs_entity_t)[0] = e;
-    while (ecs_vec_count(&state->stack)) {
-        int32_t last = ecs_vec_count(&state->stack) - 1;
-        ecs_entity_t node = ecs_vec_get_t(&state->stack, ecs_entity_t, last)[0];
-        ecs_vec_remove_last(&state->stack);
-        box_ui_number(world, node, e, &tree, order ++);
-        ecs_vec_clear(&state->nodes);
-        box_hierarchy_collect(world, node, &state->nodes);
-
-        int32_t i;
-        for (i = ecs_vec_count(&state->nodes) - 1; i >= 0; i --) {
-            ecs_entity_t child = ecs_vec_get_t(&state->nodes, ecs_entity_t, i)[0];
-            bool skip = child == tree.view || child == tree.camera ||
-                ecs_has(world, child, Ui);
-            if (!skip) {
-                ecs_vec_append_t(NULL, &state->stack, ecs_entity_t)[0] = child;
-            }
-        }
+    if (tree.dirty || box_ui_state(world)->instanced) {
+        box_ui_number_places(world, e, &tree);
     }
 
     UiImpl *impl = ecs_get_mut(world, e, UiImpl);
     if (impl) {
-        impl->count = order;
+        impl->count = count;
         impl->dirty = false;
+        impl->relayout = false;
     }
 
 done:
@@ -146,6 +224,7 @@ void box_ui_drop(
 
         box_render_set_depth(world, cur, 0);
         ecs_remove(world, cur, UiNode);
+        ecs_remove(world, cur, Bounds);
     }
 
     ecs_vec_fini_t(NULL, &todo, ecs_entity_t);
@@ -166,7 +245,7 @@ static void box_ui_on_parent(
 {
     ecs_world_t *world = it->world;
     UiState *state = box_ui_state(world);
-    if (!state->trees) {
+    if (!state->trees || state->busy) {
         goto done;
     }
 
@@ -207,9 +286,39 @@ static void box_ui_on_instance(
         goto done;
     }
 
+    state->instanced = true;
+    if (state->busy) {
+        goto done;
+    }
+
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         box_ui_mark(it->world, it->entities[i]);
+    }
+
+done:
+    return;
+}
+
+/** Layout observer: a node that was sized, moved or pinned needs a new layout.
+ *
+ * The observer is matched with UiNode, so it hears the nodes of a tree only and
+ * the entities of the scene around them cost nothing. A component set on an
+ * entity before it joins a tree is picked up by the walk that adds it.
+ *
+ * @param it Iterator over the nodes that changed
+ */
+static void box_ui_on_layout(
+    ecs_iter_t *it)
+{
+    UiState *state = box_ui_state(it->world);
+    if (!state->trees || state->busy) {
+        goto done;
+    }
+
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_ui_mark_layout(it->world, it->entities[i]);
     }
 
 done:
@@ -254,4 +363,20 @@ void box_ui_tree_init(
         .events = { EcsOnAdd },
         .callback = box_ui_on_instance
     });
+
+    ecs_id_t placed[] = {
+        ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor)
+    };
+
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        ecs_observer(world, {
+            .query.terms = {
+                { .id = placed[i], .inout = EcsInOutNone },
+                { .id = ecs_id(UiNode), .inout = EcsInOutFilter }
+            },
+            .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+            .callback = box_ui_on_layout
+        });
+    }
 }

@@ -57,6 +57,7 @@ static void box_ui_impl_ctor(
     memset(ptr, 0, (size_t)count * sizeof(UiImpl));
     for (i = 0; i < count; i ++) {
         impl[i].dirty = true;
+        impl[i].relayout = true;
     }
 }
 
@@ -76,8 +77,9 @@ static void box_ui_state_dtor(
     int32_t i;
     for (i = 0; i < count; i ++) {
         ecs_vec_fini_t(NULL, &state[i].roots, ecs_entity_t);
-        ecs_vec_fini_t(NULL, &state[i].stack, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &state[i].stack, UiVisit);
         ecs_vec_fini_t(NULL, &state[i].nodes, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &state[i].places, UiPlace);
     }
 }
 
@@ -106,6 +108,7 @@ static void box_ui_on_set(
         }
 
         impl[i].dirty = true;
+        impl[i].relayout = true;
     }
 }
 
@@ -128,6 +131,7 @@ void box_ui_update(
     ecs_world_t *world)
 {
     UiState *state = box_ui_state(world);
+    state->busy = true;
     ecs_vec_clear(&state->roots);
     ecs_iter_t it = ecs_each(world, Ui);
     while (ecs_each_next(&it)) {
@@ -148,10 +152,13 @@ void box_ui_update(
 
         box_ui_bind(world, ui, impl);
         box_ui_sync(world, ui, impl);
-        if (impl->dirty) {
+        if (impl->dirty || impl->relayout) {
             box_ui_walk(world, e);
         }
     }
+
+    state = box_ui_state(world);
+    state->busy = false;
 }
 
 /** Update system: bind, size and number every tree of the world.
@@ -174,7 +181,13 @@ void BoxUiImport(
     ECS_IMPORT(world, BoxRender);
     ECS_IMPORT(world, BoxGeometry);
 
+    ECS_META_COMPONENT(world, Align);
+    ECS_META_COMPONENT(world, VAlign);
+    ECS_META_COMPONENT(world, Direction);
     ECS_META_COMPONENT(world, Ui);
+    ECS_META_COMPONENT(world, Layout);
+    ECS_META_COMPONENT(world, Anchor);
+    ECS_META_COMPONENT(world, Bounds);
     ECS_COMPONENT_DEFINE(world, UiImpl);
     ECS_COMPONENT_DEFINE(world, UiNode);
     ECS_COMPONENT_DEFINE(world, UiState);
@@ -182,6 +195,9 @@ void BoxUiImport(
     ecs_set_hooks(world, Ui, { .ctor = box_ui_ctor });
     ecs_set_hooks(world, UiImpl, { .ctor = box_ui_impl_ctor });
     ecs_set_hooks(world, UiNode, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Bounds, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiState, {
         .ctor = flecs_default_ctor,
         .dtor = box_ui_state_dtor
@@ -191,11 +207,14 @@ void BoxUiImport(
     ecs_add_pair(world, ecs_id(Ui), EcsWith, EcsOrderedChildren);
     ecs_add_pair(world, ecs_id(UiImpl), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(UiNode), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(Bounds), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(Layout), EcsWith, EcsOrderedChildren);
 
     UiState *state = ecs_singleton_ensure(world, UiState);
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &state->stack, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->stack, UiVisit, 0);
     ecs_vec_init_t(NULL, &state->nodes, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->places, UiPlace, 0);
 
     ecs_observer(world, {
         .query.terms = {

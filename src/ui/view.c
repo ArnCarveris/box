@@ -159,6 +159,7 @@ void box_ui_bind(
 
     box_hierarchy_set_parent(world, impl->layer, impl->view);
     impl->dirty = true;
+    impl->relayout = true;
 done:
     return;
 }

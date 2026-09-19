@@ -1,0 +1,384 @@
+/**
+ * @file ui/layout.c
+ * @brief Sizes the nodes of a UI tree and places them in rows and columns.
+ *
+ * The pass runs over the places the walk collected, which are in pre-order.
+ * Measuring goes backward over them, so a node is sized after the children that
+ * size it, and placing goes forward, so a node is placed after the parent that
+ * places it and the row of that parent is still where its earlier children left
+ * it. Everything is worked out in the pixels of the view, and a node that the
+ * layout placed gets the Position that difference asks for, which is what the
+ * transform of the frame and the extract after it read.
+ */
+
+#include "ui_internal.h"
+
+/** Read the components the layout of a node needs into its place.
+ *
+ * The size of the node is the size of its Layout, and a side of that size that
+ * is zero takes the side of the Rect of the node, which leaves the sides the
+ * content has to fill at zero.
+ *
+ * @param world The world
+ * @param p The place of the node
+ */
+static void box_ui_read(
+    ecs_world_t *world,
+    UiPlace *p)
+{
+    const Layout *l = ecs_get(world, p->e, Layout);
+    const Anchor *a = ecs_get(world, p->e, Anchor);
+    const Rect *r = ecs_get(world, p->e, Rect);
+    const Position *pos = ecs_get(world, p->e, Position);
+
+    p->has_layout = l != NULL;
+    p->has_anchor = a != NULL;
+    p->has_rect = r != NULL;
+    if (l) {
+        p->layout = *l;
+        p->width = l->width;
+        p->height = l->height;
+    }
+
+    if (a) {
+        p->anchor = *a;
+    }
+
+    if (pos) {
+        p->local_x = pos->x;
+        p->local_y = pos->y;
+    }
+
+    if (r && p->width == 0) {
+        p->width = r->width;
+    }
+
+    if (r && p->height == 0) {
+        p->height = r->height;
+    }
+
+}
+
+/** Give the sides of a box that are still zero the size of its content.
+ *
+ * @param p The place of the node
+ */
+static void box_ui_fit(
+    UiPlace *p)
+{
+    if (!p->has_layout) {
+        goto done;
+    }
+
+    const Layout *l = &p->layout;
+    float pad = l->padding * 2;
+    float gap = p->flow > 1 ? l->spacing * (float)(p->flow - 1) : 0;
+    if (p->width == 0) {
+        p->width = pad + (l->direction == DirectionRow ?
+            p->sum_width + gap : p->max_width);
+    }
+
+    if (p->height == 0) {
+        p->height = pad + (l->direction == DirectionColumn ?
+            p->sum_height + gap : p->max_height);
+    }
+
+done:
+    return;
+}
+
+/** Add the box of a child to the content of its parent.
+ *
+ * @param parent The place of the parent
+ * @param child The place of the child
+ */
+static void box_ui_add(
+    UiPlace *parent,
+    const UiPlace *child)
+{
+    parent->sum_width += child->width;
+    parent->sum_height += child->height;
+    parent->flow ++;
+    if (child->width > parent->max_width) {
+        parent->max_width = child->width;
+    }
+
+    if (child->height > parent->max_height) {
+        parent->max_height = child->height;
+    }
+}
+
+/** X of a box of a given width against an edge of the box of its parent.
+ *
+ * @param parent The place of the parent
+ * @param pad Padding that insets the box of the parent
+ * @param width Width of the box that is aligned
+ * @param h Edge of the parent the box is aligned against
+ * @return X of the centre of the aligned box
+ */
+static float box_ui_align_x(
+    const UiPlace *parent,
+    float pad,
+    float width,
+    Align h)
+{
+    float half = parent->width * 0.5f - pad - width * 0.5f;
+    float result = parent->x;
+    if (h == AlignLeft) {
+        result = parent->x - half;
+    } else if (h == AlignRight) {
+        result = parent->x + half;
+    }
+
+    return result;
+}
+
+/** Y of a box of a given height against an edge of the box of its parent.
+ *
+ * @param parent The place of the parent
+ * @param pad Padding that insets the box of the parent
+ * @param height Height of the box that is aligned
+ * @param v Edge of the parent the box is aligned against
+ * @return Y of the centre of the aligned box
+ */
+static float box_ui_align_y(
+    const UiPlace *parent,
+    float pad,
+    float height,
+    VAlign v)
+{
+    float half = parent->height * 0.5f - pad - height * 0.5f;
+    float result = parent->y;
+    if (v == VAlignTop) {
+        result = parent->y + half;
+    } else if (v == VAlignBottom) {
+        result = parent->y - half;
+    }
+
+    return result;
+}
+
+/** Put the cursor of a layout where its first child goes.
+ *
+ * The cursor is the edge the next child starts at, so the whole group of
+ * children is moved by the alignment along the axis of the layout.
+ *
+ * @param p The place of the node
+ */
+static void box_ui_start(
+    UiPlace *p)
+{
+    const Layout *l = &p->layout;
+    float gap = p->flow > 1 ? l->spacing * (float)(p->flow - 1) : 0;
+    if (l->direction == DirectionRow) {
+        float total = p->sum_width + gap;
+
+        p->cursor = p->x - p->width * 0.5f + l->padding;
+        if (l->h == AlignCenter) {
+            p->cursor = p->x - total * 0.5f;
+        } else if (l->h == AlignRight) {
+            p->cursor = p->x + p->width * 0.5f - l->padding - total;
+        }
+    } else {
+        float total = p->sum_height + gap;
+
+        p->cursor = p->y + p->height * 0.5f - l->padding;
+        if (l->v == VAlignMiddle) {
+            p->cursor = p->y + total * 0.5f;
+        } else if (l->v == VAlignBottom) {
+            p->cursor = p->y - p->height * 0.5f + l->padding + total;
+        }
+    }
+}
+
+/** Place a child at the cursor of the layout of its parent and move it on.
+ *
+ * @param parent The place of the parent
+ * @param child The place of the child
+ */
+static void box_ui_flow(
+    UiPlace *parent,
+    UiPlace *child)
+{
+    const Layout *l = &parent->layout;
+    if (l->direction == DirectionRow) {
+        child->x = parent->cursor + child->width * 0.5f;
+        child->y = box_ui_align_y(parent, l->padding, child->height, l->v);
+        parent->cursor += child->width + l->spacing;
+    } else {
+        child->y = parent->cursor - child->height * 0.5f;
+        child->x = box_ui_align_x(parent, l->padding, child->width, l->h);
+        parent->cursor -= child->height + l->spacing;
+    }
+}
+
+/** Pin a child against the edges of its parent its anchor names.
+ *
+ * @param parent The place of the parent
+ * @param child The place of the child
+ */
+static void box_ui_pin(
+    const UiPlace *parent,
+    UiPlace *child)
+{
+    const Anchor *a = &child->anchor;
+    float pad = parent->has_layout ? parent->layout.padding : 0;
+
+    child->x = box_ui_align_x(parent, pad, child->width, a->h);
+    child->y = box_ui_align_y(parent, pad, child->height, a->v);
+    child->x += a->h == AlignRight ? -a->x : a->x;
+    child->y += a->v == VAlignTop ? -a->y : a->y;
+}
+
+/** Give a node the position the layout worked out for it.
+ *
+ * @param world The world
+ * @param e The node
+ * @param x X relative to the parent of the node
+ * @param y Y relative to the parent of the node
+ */
+static void box_ui_move(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float x,
+    float y)
+{
+    Position *pos = ecs_get_mut(world, e, Position);
+    if (!pos) {
+        ecs_set(world, e, Position, { x, y, 0 });
+        goto done;
+    }
+
+    if (pos->x == x && pos->y == y) {
+        goto done;
+    }
+
+    pos->x = x;
+    pos->y = y;
+    ecs_modified(world, e, Position);
+done:
+    return;
+}
+
+/** Give the rectangle of a node the size of the box its layout worked out.
+ *
+ * @param world The world
+ * @param e The node
+ * @param width Width of the box
+ * @param height Height of the box
+ */
+static void box_ui_resize(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float width,
+    float height)
+{
+    Rect *r = ecs_get_mut(world, e, Rect);
+    if (!r || (r->width == width && r->height == height)) {
+        goto done;
+    }
+
+    r->width = width;
+    r->height = height;
+    ecs_modified(world, e, Rect);
+done:
+    return;
+}
+
+/** Publish the box of a node as the Bounds authors read.
+ *
+ * @param world The world
+ * @param p The place of the node
+ */
+static void box_ui_bounds(
+    ecs_world_t *world,
+    const UiPlace *p)
+{
+    Bounds *b = ecs_get_mut(world, p->e, Bounds);
+    if (!b) {
+        ecs_set(world, p->e, Bounds, {
+            .x = p->x, .y = p->y, .width = p->width, .height = p->height
+        });
+        goto done;
+    }
+
+    b->x = p->x;
+    b->y = p->y;
+    b->width = p->width;
+    b->height = p->height;
+done:
+    return;
+}
+
+/** Size every collected node, the children of a node before the node itself.
+ *
+ * @param world The world
+ */
+static void box_ui_measure(
+    ecs_world_t *world)
+{
+    UiState *state = box_ui_state(world);
+    int32_t i;
+    for (i = ecs_vec_count(&state->places) - 1; i >= 0; i --) {
+        UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
+
+        box_ui_read(world, p);
+        box_ui_fit(p);
+        if (p->parent >= 0 && !p->has_anchor) {
+            box_ui_add(ecs_vec_get_t(&state->places, UiPlace, p->parent), p);
+        }
+    }
+}
+
+/** Place every collected node, a node before the nodes below it.
+ *
+ * @param world The world
+ */
+static void box_ui_arrange(
+    ecs_world_t *world)
+{
+    UiState *state = box_ui_state(world);
+    int32_t i, count = ecs_vec_count(&state->places);
+    for (i = 0; i < count; i ++) {
+        UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
+        UiPlace *parent = p->parent >= 0 ?
+            ecs_vec_get_t(&state->places, UiPlace, p->parent) : NULL;
+        bool placed = false;
+
+        if (!parent) {
+            p->x = p->local_x;
+            p->y = p->local_y;
+        } else if (p->has_anchor) {
+            box_ui_pin(parent, p);
+            placed = true;
+        } else if (parent->has_layout &&
+            parent->layout.direction != DirectionNone)
+        {
+            box_ui_flow(parent, p);
+            placed = true;
+        } else {
+            p->x = parent->x + p->local_x;
+            p->y = parent->y + p->local_y;
+        }
+
+        if (placed) {
+            box_ui_move(world, p->e, p->x - parent->x, p->y - parent->y);
+        }
+
+        if (p->has_layout) {
+            box_ui_start(p);
+            if (p->has_rect) {
+                box_ui_resize(world, p->e, p->width, p->height);
+            }
+        }
+
+        box_ui_bounds(world, p);
+    }
+}
+
+void box_ui_layout(
+    ecs_world_t *world)
+{
+    box_ui_measure(world);
+    box_ui_arrange(world);
+}
