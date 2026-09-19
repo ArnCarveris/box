@@ -13,6 +13,12 @@
                 "instantiate_10k",
                 "order_100k"
             ]
+        }, {
+            "id": "Load",
+            "benchcases": [
+                "scene_10k",
+                "scene_50k"
+            ]
         }]
     }
 }
