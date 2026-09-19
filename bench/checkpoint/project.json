@@ -13,7 +13,9 @@
             {
                 "id": "Write",
                 "benchcases": [
+                    "scene_500",
                     "scene_5000",
+                    "scene_50000",
                     "report_5000"
                 ]
             },
