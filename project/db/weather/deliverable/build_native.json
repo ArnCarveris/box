@@ -1,0 +1,1485 @@
+{
+  "tool": "bake3",
+  "tool_version": "1.0.0",
+  "timestamp": "2026-09-19T04:41:37Z",
+  "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 16},
+  "cfg": "release",
+  "target": "arm64-Darwin",
+  "environment": "next",
+  "git": {"sha": "43d111430e9e1333a58c4023e8f63ff26c2b74f7", "dirty": true, "branch": "main"},
+  "total_sec": 3.398101,
+  "ok": true,
+  "totals": {
+    "kind": {
+      "compile": 6.270119,
+      "link": 2.326890,
+      "bundle": 0.054941,
+      "discovery": 0.005856,
+      "generate": 0.000032,
+      "etc": 0.003592,
+      "other": 0.000000
+    },
+    "project": {
+      "box": {"total_sec": 1.068652, "compile_sec": 6.236238, "link_sec": 0.043118, "files": 129},
+      "box_app": {"total_sec": 2.323112, "compile_sec": 0.033881, "link_sec": 2.283772, "files": 1}
+    }
+  },
+  "steps": [
+    {
+      "name": "discovery",
+      "kind": "discovery",
+      "project": null,
+      "start_sec": 0.000006,
+      "duration_sec": 0.005861,
+      "ok": true,
+      "children": [
+        {
+          "name": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.000008,
+          "duration_sec": 0.005792,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "resolve dependencies",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.005800,
+          "duration_sec": 0.000064,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "flecs",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.005883,
+      "duration_sec": 0.052081,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "stb",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.058042,
+      "duration_sec": 0.000118,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "cgltf",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.058219,
+      "duration_sec": 0.000080,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "resvg",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.058359,
+      "duration_sec": 0.000184,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "glfw",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.058594,
+      "duration_sec": 0.000779,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "wgpu_native",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.059438,
+      "duration_sec": 0.001699,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "box",
+      "kind": "project",
+      "project": "box",
+      "start_sec": 0.061262,
+      "duration_sec": 1.013711,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box",
+          "start_sec": 0.061268,
+          "duration_sec": 0.000025,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/renderer/hiz.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083524,
+          "duration_sec": 0.062430,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/hiz.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/effect.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083537,
+          "duration_sec": 0.061262,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/effect.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083556,
+          "duration_sec": 0.061768,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/sky.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083567,
+          "duration_sec": 0.059630,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/sky.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bloom.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083582,
+          "duration_sec": 0.055705,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/bloom.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/scene.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083590,
+          "duration_sec": 0.060560,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/scene.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083612,
+          "duration_sec": 0.104675,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.083634,
+          "duration_sec": 0.045195,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.128841,
+          "duration_sec": 0.033117,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.139298,
+          "duration_sec": 0.128814,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/image.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.143212,
+          "duration_sec": 0.149105,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/image.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.144163,
+          "duration_sec": 0.036570,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/gtao.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.144805,
+          "duration_sec": 0.038774,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/gtao.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.145330,
+          "duration_sec": 0.045642,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/device.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.145960,
+          "duration_sec": 0.036561,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/device.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.161967,
+          "duration_sec": 0.038850,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/renderer.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.180745,
+          "duration_sec": 0.039287,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/renderer.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/frame.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.182528,
+          "duration_sec": 0.048068,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/frame.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/overlay.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.183588,
+          "duration_sec": 0.051256,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/overlay.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/environment.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.188297,
+          "duration_sec": 0.047148,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/environment.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.190983,
+          "duration_sec": 0.038046,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.200829,
+          "duration_sec": 0.036879,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/exposure.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.220045,
+          "duration_sec": 0.034441,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/exposure.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/cull.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.229039,
+          "duration_sec": 0.083773,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/renderer/cull.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/monitor.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.230604,
+          "duration_sec": 0.036477,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/monitor.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/stats.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.234855,
+          "duration_sec": 0.035821,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/stats.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/fps.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.235451,
+          "duration_sec": 0.033994,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/fps.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/cpu_sample.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.237717,
+          "duration_sec": 0.034255,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/cpu_sample.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/systems.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.254496,
+          "duration_sec": 0.037860,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/systems.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/spike.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.267090,
+          "duration_sec": 0.037845,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/monitor/spike.c.o",
+          "children": []
+        },
+        {
+          "name": "src/types/types.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.268120,
+          "duration_sec": 0.033636,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/types/types.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.269453,
+          "duration_sec": 0.044032,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/weather.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.270682,
+          "duration_sec": 0.038930,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/weather.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/sky.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.271979,
+          "duration_sec": 0.037934,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/sky.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/time.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.292327,
+          "duration_sec": 0.050326,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/time.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/celestial.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.292364,
+          "duration_sec": 0.052246,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/celestial.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/fog.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.301765,
+          "duration_sec": 0.037190,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/sky/fog.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/args.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.304943,
+          "duration_sec": 0.035261,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/core/args.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/process.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.309623,
+          "duration_sec": 0.036364,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/core/process.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/cpu.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.309919,
+          "duration_sec": 0.047570,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/core/cpu.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/run.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.312822,
+          "duration_sec": 0.035475,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/core/run.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/core.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.313492,
+          "duration_sec": 0.032998,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/core/core.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/update.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.338963,
+          "duration_sec": 0.045906,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/update.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.340212,
+          "duration_sec": 0.036772,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/input.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.342662,
+          "duration_sec": 0.039089,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/input.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/keys.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.344619,
+          "duration_sec": 0.039546,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/keys.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.345996,
+          "duration_sec": 0.055114,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/events.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.346501,
+          "duration_sec": 0.038345,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/input/events.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/billboard.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.348306,
+          "duration_sec": 0.037091,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/camera/billboard.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.357499,
+          "duration_sec": 0.033550,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/camera/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.376996,
+          "duration_sec": 0.052671,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.381758,
+          "duration_sec": 0.052221,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract_lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.384174,
+          "duration_sec": 0.066475,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract_view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.384851,
+          "duration_sec": 0.043891,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/instance.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.384877,
+          "duration_sec": 0.050801,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/instance.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.385405,
+          "duration_sec": 0.040529,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.391061,
+          "duration_sec": 0.041735,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.401119,
+          "duration_sec": 0.065644,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.425947,
+          "duration_sec": 0.044655,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract_bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/batch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.428749,
+          "duration_sec": 0.041864,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/batch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.429678,
+          "duration_sec": 0.051865,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/extract_shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/view_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.432806,
+          "duration_sec": 0.040958,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/view_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/mesh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.433986,
+          "duration_sec": 0.040470,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/mesh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/tiling.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.435683,
+          "duration_sec": 0.040531,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/render/tiling.c.o",
+          "children": []
+        },
+        {
+          "name": "src/surface/surface.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.450660,
+          "duration_sec": 0.045748,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/surface/surface.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/gltf.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.466773,
+          "duration_sec": 0.037840,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/gltf/gltf.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/material.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.470622,
+          "duration_sec": 0.044540,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/gltf/material.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/load.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.470634,
+          "duration_sec": 0.045521,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/gltf/load.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/mesh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.473771,
+          "duration_sec": 0.040044,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/gltf/mesh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.474466,
+          "duration_sec": 0.036152,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/script/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/pending.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.476225,
+          "duration_sec": 0.049974,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/script/pending.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/controller.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.481551,
+          "duration_sec": 0.033184,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/controller/controller.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/look.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.496419,
+          "duration_sec": 0.037794,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/controller/look.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/person.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.504626,
+          "duration_sec": 0.038763,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/controller/person.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.510625,
+          "duration_sec": 0.038312,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/controller/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.513821,
+          "duration_sec": 0.039713,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/controller/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/movement/movement.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.514743,
+          "duration_sec": 0.040054,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/movement/movement.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/pool.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.515167,
+          "duration_sec": 0.052565,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/job/pool.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.516165,
+          "duration_sec": 0.038634,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/job/job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/view/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.526207,
+          "duration_sec": 0.040202,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/view/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg_job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.534223,
+          "duration_sec": 0.049428,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/texture/svg_job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.543399,
+          "duration_sec": 0.045599,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/texture/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/refs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.548947,
+          "duration_sec": 0.042372,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/texture/refs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/load.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.553543,
+          "duration_sec": 0.468989,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/texture/load.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.554813,
+          "duration_sec": 0.052884,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/texture/svg.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.554827,
+          "duration_sec": 0.037763,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/shader/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/preprocess.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.566419,
+          "duration_sec": 0.053927,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/shader/preprocess.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.567740,
+          "duration_sec": 0.042323,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/shader/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.583660,
+          "duration_sec": 0.043455,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/shader/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/light/light.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.589010,
+          "duration_sec": 0.036556,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/light/light.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/dispatch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.591332,
+          "duration_sec": 0.043887,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/dispatch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/patch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.592597,
+          "duration_sec": 0.038001,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/patch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/terminal.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.607708,
+          "duration_sec": 0.040581,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/terminal.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command_script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.610073,
+          "duration_sec": 0.038239,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/command_script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.620356,
+          "duration_sec": 0.039046,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/command.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.625574,
+          "duration_sec": 0.050991,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/search.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.627126,
+          "duration_sec": 0.049488,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/search.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/shell.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.630610,
+          "duration_sec": 0.045920,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/shell.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/endpoint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.635228,
+          "duration_sec": 0.036888,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/endpoint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.648301,
+          "duration_sec": 0.040888,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/fps.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.648316,
+          "duration_sec": 0.038903,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/fps.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.659414,
+          "duration_sec": 0.039821,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/base64.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.672125,
+          "duration_sec": 0.036284,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/base64.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/http.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.676540,
+          "duration_sec": 0.038990,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/http.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/builtin.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.676571,
+          "duration_sec": 0.036830,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/builtin.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.676620,
+          "duration_sec": 0.038875,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/wasm.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.687228,
+          "duration_sec": 0.033188,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/wasm.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/logs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.689198,
+          "duration_sec": 0.040880,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/logs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/input_cmd.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.699249,
+          "duration_sec": 0.051298,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/command/input_cmd.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_box.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.708417,
+          "duration_sec": 0.039897,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_box.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_axis.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.713411,
+          "duration_sec": 0.035065,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_axis.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh3.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.715504,
+          "duration_sec": 0.063269,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh3.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/shape_example.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.715535,
+          "duration_sec": 0.034650,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/shape_example.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_round.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.720428,
+          "duration_sec": 0.040968,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_round.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/geometry.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.730088,
+          "duration_sec": 0.052550,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/geometry.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_cache.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.748325,
+          "duration_sec": 0.041546,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_cache.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_flat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.748482,
+          "duration_sec": 0.037009,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_flat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_data.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.750196,
+          "duration_sec": 0.053382,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/mesh_data.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/shape.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.750556,
+          "duration_sec": 0.038115,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/geometry/shape.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.761408,
+          "duration_sec": 0.047421,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/effects/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/effects.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.778786,
+          "duration_sec": 0.049368,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/effects/effects.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/static.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.782648,
+          "duration_sec": 0.038400,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/transform/static.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/transform.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.785503,
+          "duration_sec": 0.040505,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/transform/transform.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/lookat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.788681,
+          "duration_sec": 0.035401,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/transform/lookat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/hierarchy.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.789879,
+          "duration_sec": 0.033806,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/transform/hierarchy.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/dynamic.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.803587,
+          "duration_sec": 0.037916,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/transform/dynamic.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/tint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.808837,
+          "duration_sec": 0.038812,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/material/tint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.821060,
+          "duration_sec": 0.032979,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/material/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/material.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.823695,
+          "duration_sec": 0.038357,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/arm64-Darwin-release/obj/src/material/material.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box",
+          "start_sec": 1.022551,
+          "duration_sec": 0.043118,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "etc",
+          "kind": "etc",
+          "project": "box",
+          "start_sec": 1.065725,
+          "duration_sec": 0.002230,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "box_app",
+      "kind": "project",
+      "project": "box_app",
+      "start_sec": 1.074986,
+      "duration_sec": 2.323112,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box_app",
+          "start_sec": 1.075001,
+          "duration_sec": 0.000006,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/main.c",
+          "kind": "compile",
+          "project": "box_app",
+          "start_sec": 1.078546,
+          "duration_sec": 0.033881,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box_app/arm64-Darwin-release/obj/src/main.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box_app",
+          "start_sec": 1.112441,
+          "duration_sec": 2.283772,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "etc",
+          "kind": "etc",
+          "project": "box_app",
+          "start_sec": 3.396270,
+          "duration_sec": 0.001363,
+          "ok": true,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+$ cd scene
+scene
+$ query boxes "box.geometry.Box, box.transform.Position"
+terminals.agent0.boxes
+$ iter boxes
+terminals.agent0.boxes
+$ next 2
+scene.floor	{x: 10, y: 1, z: 10}	{x: 0, y: -0.5, z: 0}
+scene.crates.red	{x: 1, y: 1, z: 1}	{x: -2, y: 0.5, z: 0}
+
+$ next
+scene.crates.blue	{x: 1, y: 1, z: 1}	{x: 2, y: 0.5, z: 0}
+
+$ done
+terminals.agent0.boxes
+$ grep 180
+scene.floor	box.material.Rgb	{r: 180, g: 180, b: 190}
+
+$ grep_recur Rgb 220
+scene.crates.red	box.material.Rgb	{r: 220, g: 80, b: 60}
+
