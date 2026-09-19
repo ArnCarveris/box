@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "pending",
+  "created": "2026-09-19T02:57:59.370+00:00",
+  "start_time": null,
+  "end_time": null,
+  "dependencies": [
+    "meshes/mesh3"
+  ]
+}

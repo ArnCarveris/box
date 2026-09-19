@@ -176,6 +176,11 @@ and machine CPU usage, the flecs statistics addon and the per system frame
 breakdown as components; a source is only sampled while its singleton exists,
 and the CPU budget of a headless run shares the CpuMonitor sampling.
 
+`Mesh3` holds script authored vertices, normals, uvs and indices and joins the instanced path
+through the same mesh cache as the primitives (`test/integration/visual/mesh3.flecs`), and a
+`Shape` registration lets a project add its own parametric shape with the same sharing; the
+engine ships a small `Star` as the example (`custom_shape.flecs`).
+
 ## Tests
 
 ```sh
