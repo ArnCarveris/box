@@ -21,7 +21,8 @@
       {
         "id": "Eval",
         "benchcases": [
-          "eval_100k_records"
+          "eval_100k_records",
+          "fill_10k_instances"
         ]
       }
     ]
