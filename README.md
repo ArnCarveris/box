@@ -22,6 +22,12 @@ bake3 run box_app --local-env -- --headless --frames 10    # headless run, exits
 
 Options: `--headless`, `--frames <n>`, `--timeout <s|infinite>`, `--cpu-budget <0..1>`,
 `--fps <n>`, `--port <n>` (command endpoints, default 27750, 0 disables the server).
+An application adds options of its own as `AppOption` entities before it calls
+`box_parse_args`: the name of the entity is the flag, its value lands in the member of a
+singleton component the scene then reads, and `--help` lists it with the engine's. The
+value comes from `--flag=value`, from `AppOption.fallback` when the flag stands alone, from
+`true` when the member is a bool, and from the next argument otherwise; a flag no option
+claims is still an error.
 Headless runs step with a fixed delta of one over `--fps` (60 by default) so captures are
 deterministic, require `--frames` or `--timeout`, write their temporary
 files to `/tmp/box/<pid>` and refuse to start when the machine's load exceeds its
@@ -905,7 +911,24 @@ pixel with what it found, falling back to the prefiltered environment on a miss,
 integrates a height fog along the view ray it rebuilds from the
 depth, `bloom` (800) mixes in a pyramid of the image, `auto_exposure` (850) scales
 it by the exposure its histogram adapted to and `tonemap` (900) maps the result
-onto the display and dithers it. Two of them ask the frame for work through their
+onto the display and dithers it. `ToneMapping.curve` picks the display transform
+of that last pass: `ToneMapNeutral` is the hue preserving curve every scene is
+baselined with and `ToneMapTony` reads the Tony McMapface lookup, a 48 cube of
+RGB9E5 texels under `etc/shaders/lut/` that the engine loads and uploads as a 3D
+texture the first time a pass selects it, so a scene that stays on the curve pays
+neither the file nor the texture:
+
+```
+box { effects { stack { tonemap {
+  Effect: {enabled: true}
+  ToneMapping: {white: 1, dither: true, curve: ToneMapTony}
+} } } }
+```
+
+The pass folds the exposed stimulus into the cube with `x / (x + 1)` and samples
+half a texel inside it, which is the mapping the cube was baked with;
+`test/integration/visual/tonemap_tony.flecs` is the same content as
+`tonemap.flecs` with the operator switched over. Two of them ask the frame for work through their
 own inputs: `pyramid` builds the mip chain of the image the pass reads,
 `exposure` runs the histogram and adaptation compute passes over it and
 `occlusion` traces, denoises and accumulates the ambient occlusion of the view.

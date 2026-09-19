@@ -2,7 +2,9 @@
  * @file box/core.h
  * @brief Engine bootstrap: process folder, headless options and the frame loop.
  *
- * The box.core module owns the App singleton and runs the main loop.
+ * The box.core module owns the App singleton and runs the main loop. An
+ * application adds its own command line options as AppOption entities before it
+ * calls box_parse_args, which writes them into the components they name.
  */
 
 #ifndef BOX_CORE_H
@@ -35,6 +37,21 @@ ECS_STRUCT(App, {
     char *process_dir;    /**< Folder with temporary files, written by the engine */
 });
 
+/** One command line option an application adds to the parser.
+ *
+ * The option is an entity and its name is the flag without the dashes, so an
+ * entity options.stresstest is --stresstest. What follows the flag lands in a
+ * member of a singleton component, which is how the scene reads it: the text
+ * after --flag=value, the fallback when the flag stands alone, true when the
+ * member is a bool and the flag stands alone, and the next argument otherwise.
+ * An option of the world is listed by --help next to the options of the engine.
+ */
+ECS_STRUCT(AppOption, {
+    ecs_entity_t member; /**< Member of a singleton component the value lands in */
+    char *fallback;      /**< Value the bare flag takes, none when it needs one */
+    char *description;   /**< What the option does, as --help prints it */
+});
+
 /** Register the box.core module.
  *
  * @param world The world
@@ -53,6 +70,16 @@ int box_parse_args(
     ecs_world_t *world,
     int argc,
     char *argv[]);
+
+/** Build the usage text of the engine options and the options of the world.
+ *
+ * @param world The world
+ * @param exe Name the executable was started with
+ * @return The text, which the caller frees
+ */
+char* box_args_usage(
+    ecs_world_t *world,
+    const char *exe);
 
 /** Run the frame loop until a stop condition from App is met.
  *

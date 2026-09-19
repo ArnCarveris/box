@@ -28,7 +28,7 @@ Two hard rules keep the concerns apart:
 | Module | Owns |
 |---|---|
 | `box.types` | `vec2/3/4`, `mat4`, `rgb` and math helpers |
-| `box.core` | `App` singleton, command line, process folder, frame loop, CPU budget |
+| `box.core` | `App` singleton, command line with the `AppOption` entities of an application, process folder, frame loop, CPU budget |
 | `box.surface` | `Surface` component; setting it brings up a window or offscreen target |
 | `box.transform` | `Position/Rotation/Scale/WorldTransform`, static vs dynamic propagation, AABB |
 | `box.geometry` | primitive shape components, mesh cache, shape registry; the level ladder of a parametric shape, whose mesh the reduction picks per frame from the projected error of the instance |
@@ -36,7 +36,7 @@ Two hard rules keep the concerns apart:
 | `box.camera`, `box.light`, `box.view` | cameras, lights, views and layers; `LightModulator` with the reflected parameter component a plugin registers, and the shipped `CloudShadows` and `Caustics`; `LodSettings` holds the LOD quality, the error threshold in pixels, the more aggressive shadow threshold and the hysteresis band of a view, with the singleton as its default |
 | `box.render` | Extract system, frame packets, handoff queue to the renderer thread; the LOD node hierarchy, which it builds from the collision roots and walks once per view at the head of every extract |
 | `box.shader` | `Shader` component, WGSL preprocessor, builtin shaders under `box.shader.builtin`, the generated includes that compose the material layers and the light modulators into the mesh shader |
-| `box.effects` | `Effect` entities, the per view post process chain and its parameters |
+| `box.effects` | `Effect` entities, the per view post process chain and its parameters, the display transform lookup cube the tone map pass loads at first use |
 | `box.input` | device layer (`Input` singleton, event queues, `keys` codes) and action layer (`InputAction`, `InputMap` layers with `priority` and `consume`, `Binding`, key masks including the `keys.Any` families, emitted actions, the `Raise` record with `event.stop` and `input.consume`, `on.pressed` and `on.dragged` script events) |
 | `box.controller` | `CameraController`, `FirstPersonController`, their default actions and the systems that move them |
 | `box.command` | terminal sessions, HTTP endpoints, script functions for commands |

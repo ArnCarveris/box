@@ -6,6 +6,14 @@
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
+#include <string.h>
+
+/** Settings of the stress test an application option writes */
+typedef struct Stress {
+    bool enabled;   /**< The stress test runs */
+    int32_t seconds; /**< Seconds the stress test lasts */
+    char *mode;     /**< Name of the mode it runs in */
+} Stress;
 
 static ecs_world_t* args_world(void)
 {
@@ -127,6 +135,251 @@ void Args_missing_scene_fails(void)
     ecs_world_t *world = args_world();
     ecs_log_set_level(-4);
     char *argv[] = { "box", "/tmp/box_does_not_exist.flecs" };
+    test_int(box_parse_args(world, 2, argv), -1);
+    ecs_log_set_level(-1);
+    ecs_fini(world);
+}
+
+void Args_a_flag_option_sets_its_bool_member(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.enabled");
+    o->description = ecs_os_strdup("run the stress test");
+    test_assert(o->member != 0);
+    ecs_modified(world, option, AppOption);
+
+    char *argv[] = { "box", "--stresstest" };
+    test_int(box_parse_args(world, 2, argv), 0);
+    test_bool(ecs_singleton_get(world, Stress)->enabled, true);
+    ecs_fini(world);
+}
+
+void Args_an_option_takes_the_value_behind_its_equals_sign(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.seconds");
+    o->fallback = ecs_os_strdup("30");
+    ecs_modified(world, option, AppOption);
+
+    char *argv[] = { "box", "--stresstest=45" };
+    test_int(box_parse_args(world, 2, argv), 0);
+    test_int(ecs_singleton_get(world, Stress)->seconds, 45);
+    ecs_fini(world);
+}
+
+void Args_an_option_without_a_value_takes_its_fallback(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.seconds");
+    o->fallback = ecs_os_strdup("30");
+    ecs_modified(world, option, AppOption);
+
+    char *argv[] = { "box", "--stresstest" };
+    test_int(box_parse_args(world, 2, argv), 0);
+    test_int(ecs_singleton_get(world, Stress)->seconds, 30);
+    ecs_fini(world);
+}
+
+void Args_an_option_that_needs_a_value_takes_the_next_argument(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.mode" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.mode");
+    ecs_modified(world, option, AppOption);
+
+    char *argv[] = { "box", "--mode", "mining", "--fps", "30" };
+    test_int(box_parse_args(world, 5, argv), 0);
+    test_str(ecs_singleton_get(world, Stress)->mode, "mining");
+    test_flt(ecs_singleton_get(world, App)->target_fps, 30);
+    ecs_fini(world);
+}
+
+void Args_an_option_that_needs_a_value_fails_without_one(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.mode" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.mode");
+    ecs_modified(world, option, AppOption);
+
+    ecs_log_set_level(-4);
+    char *argv[] = { "box", "--mode" };
+    test_int(box_parse_args(world, 2, argv), -1);
+    ecs_log_set_level(-1);
+    ecs_fini(world);
+}
+
+void Args_an_unclaimed_option_still_fails(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.enabled");
+    ecs_modified(world, option, AppOption);
+
+    ecs_log_set_level(-4);
+    char *argv[] = { "box", "--bogus" };
+    test_int(box_parse_args(world, 2, argv), -1);
+    ecs_log_set_level(-1);
+    ecs_fini(world);
+}
+
+void Args_the_usage_text_lists_the_options_of_the_world(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.seconds");
+    o->fallback = ecs_os_strdup("30");
+    o->description = ecs_os_strdup("run the stress test");
+    ecs_modified(world, option, AppOption);
+
+    char *usage = box_args_usage(world, "box");
+    test_assert(strstr(usage, "--headless") != NULL);
+    test_assert(strstr(usage, "--stresstest[=<value>]") != NULL);
+    test_assert(strstr(usage, "run the stress test") != NULL);
+    ecs_os_free(usage);
+    ecs_fini(world);
+}
+
+void Args_a_scene_still_loads_next_to_an_option(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.seconds");
+    o->fallback = ecs_os_strdup("30");
+    ecs_modified(world, option, AppOption);
+
+    const char *path = "/tmp/box_args_option_scene.flecs";
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs("$ { box.core.App: {frames: 7} }\n", f);
+    fclose(f);
+    char *argv[] = { "box", "--stresstest=45", (char*)path };
+    test_int(box_parse_args(world, 3, argv), 0);
+    test_int(ecs_singleton_get(world, App)->frames, 7);
+    test_int(ecs_singleton_get(world, Stress)->seconds, 45);
+    remove(path);
+    ecs_fini(world);
+}
+
+void Args_an_option_with_a_bad_value_fails(void)
+{
+    // ore_engine/app_args
+    ecs_world_t *world = args_world();
+    ECS_COMPONENT(world, Stress);
+    ecs_struct(world, {
+        .entity = ecs_id(Stress),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "seconds", .type = ecs_id(ecs_i32_t) },
+            { .name = "mode", .type = ecs_id(ecs_string_t) }
+        }
+    });
+
+    ecs_entity_t option = ecs_entity(world, { .name = "options.stresstest" });
+    AppOption *o = ecs_ensure(world, option, AppOption);
+    o->member = ecs_lookup(world, "Stress.enabled");
+    ecs_modified(world, option, AppOption);
+
+    ecs_log_set_level(-4);
+    char *argv[] = { "box", "--stresstest=maybe" };
     test_int(box_parse_args(world, 2, argv), -1);
     ecs_log_set_level(-1);
     ecs_fini(world);

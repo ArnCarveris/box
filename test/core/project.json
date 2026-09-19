@@ -19,7 +19,16 @@
                 "fps",
                 "unknown_option_fails",
                 "scene_file_loads",
-                "missing_scene_fails"
+                "missing_scene_fails",
+                "a_flag_option_sets_its_bool_member",
+                "an_option_takes_the_value_behind_its_equals_sign",
+                "an_option_without_a_value_takes_its_fallback",
+                "an_option_that_needs_a_value_takes_the_next_argument",
+                "an_option_that_needs_a_value_fails_without_one",
+                "an_unclaimed_option_still_fails",
+                "the_usage_text_lists_the_options_of_the_world",
+                "a_scene_still_loads_next_to_an_option",
+                "an_option_with_a_bad_value_fails"
             ]
         }, {
             "id": "App",
