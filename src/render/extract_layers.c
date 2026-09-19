@@ -204,6 +204,7 @@ void box_render_layers_init(
         .terms = {{ .id = ecs_id(MaterialLayer), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
+    state->layer_query_entity = state->layer_query->entity;
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(MaterialLayer) }},

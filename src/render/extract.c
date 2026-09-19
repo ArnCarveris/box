@@ -401,6 +401,7 @@ void box_render_extract_init(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+    state->dynamic_entity = state->dynamic->entity;
     state->views = ecs_query(world, {
         .terms = {
             { .id = ecs_id(View), .inout = EcsIn },
@@ -408,6 +409,7 @@ void box_render_extract_init(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+    state->views_entity = state->views->entity;
     state->targets = ecs_query(world, {
         .terms = {
             { .id = ecs_id(RenderTarget), .inout = EcsIn },
@@ -415,6 +417,7 @@ void box_render_extract_init(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+    state->targets_entity = state->targets->entity;
     state->cameras = ecs_query(world, {
         .terms = {
             { .id = ecs_id(Camera), .inout = EcsIn },
@@ -442,6 +445,7 @@ void box_render_extract_init(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+    state->lights_entity = state->lights->entity;
     state->surfaces = ecs_query(world, {
         .terms = {{ .id = ecs_id(SurfaceImpl) }}
     });
@@ -460,6 +464,7 @@ void box_render_extract_init(
         },
         .cache_kind = EcsQueryCacheAuto
     });
+    state->emitters_entity = state->emitters->entity;
 
     ECS_SYSTEM(world, BoxRenderExtract, EcsPreStore, 0);
 }

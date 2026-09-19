@@ -13,6 +13,33 @@ ECS_COMPONENT_DECLARE(RenderGroup);
 ECS_TAG_DECLARE(RenderSoftShape);
 ECS_TAG_DECLARE(Hidden);
 
+/** Free a cached query unless flecs already destroyed the entity it bound to
+ * the query's cache, which happens when the query's own table is torn down
+ * before the registry's during ecs_fini and frees the query as a side effect.
+ *
+ * @param world The world
+ * @param query The query, or NULL when it was never created
+ * @param entity The entity flecs bound to the query's cache, or 0 when the
+ * query has no cache and so is never freed by anything but this call
+ */
+static void box_render_cached_query_fini(
+    ecs_world_t *world,
+    ecs_query_t *query,
+    ecs_entity_t entity)
+{
+    if (!query) {
+        goto done;
+    }
+
+    if (entity && !ecs_is_alive(world, entity)) {
+        goto done;
+    }
+
+    ecs_query_fini(query);
+done:
+    return;
+}
+
 /** Registry destructor releasing batches, pending meshes and queries.
  *
  * @param ptr The component
@@ -60,19 +87,22 @@ static void box_render_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].view_env, box_view_env_t);
         ecs_vec_fini_t(NULL, &state[i].view_clip, mat4);
         ecs_vec_fini_t(NULL, &state[i].dead_targets, uint32_t);
-        if (state[i].views) ecs_query_fini(state[i].views);
-        if (state[i].targets) ecs_query_fini(state[i].targets);
-        if (state[i].dynamic) ecs_query_fini(state[i].dynamic);
-        if (state[i].cameras) ecs_query_fini(state[i].cameras);
-        if (state[i].captures) ecs_query_fini(state[i].captures);
-        if (state[i].suns) ecs_query_fini(state[i].suns);
-        if (state[i].lights) ecs_query_fini(state[i].lights);
-        if (state[i].emitters) ecs_query_fini(state[i].emitters);
-        if (state[i].layer_query) ecs_query_fini(state[i].layer_query);
-        if (state[i].modulator_query) ecs_query_fini(state[i].modulator_query);
-        if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
-        if (state[i].instances) ecs_query_fini(state[i].instances);
-        if (state[i].lod_roots) ecs_query_fini(state[i].lod_roots);
+        ecs_world_t *world = state[i].world;
+        box_render_cached_query_fini(world, state[i].views, state[i].views_entity);
+        box_render_cached_query_fini(world, state[i].targets, state[i].targets_entity);
+        box_render_cached_query_fini(world, state[i].dynamic, state[i].dynamic_entity);
+        box_render_cached_query_fini(world, state[i].cameras, 0);
+        box_render_cached_query_fini(world, state[i].captures, 0);
+        box_render_cached_query_fini(world, state[i].suns, 0);
+        box_render_cached_query_fini(world, state[i].lights, state[i].lights_entity);
+        box_render_cached_query_fini(world, state[i].emitters, state[i].emitters_entity);
+        box_render_cached_query_fini(world, state[i].layer_query,
+            state[i].layer_query_entity);
+        box_render_cached_query_fini(world, state[i].modulator_query,
+            state[i].modulator_query_entity);
+        box_render_cached_query_fini(world, state[i].surfaces, 0);
+        box_render_cached_query_fini(world, state[i].instances, 0);
+        box_render_cached_query_fini(world, state[i].lod_roots, state[i].lod_roots_entity);
     }
 }
 
@@ -127,6 +157,7 @@ void BoxRenderImport(
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(RenderInstance));
 
     RenderState *state = ecs_singleton_ensure(world, RenderState);
+    state->world = world;
     ecs_vec_init_t(NULL, &state->batches, box_batch_t, 0);
     box_render_mesh_init(state);
     ecs_vec_init_t(NULL, &state->pending_textures, box_texture_cmd_t, 0);

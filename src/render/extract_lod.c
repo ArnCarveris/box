@@ -1692,6 +1692,7 @@ void box_render_lod_roots(
         .flags = EcsQueryDetectChanges,
         .cache_kind = EcsQueryCacheAuto
     });
+    state->lod_roots_entity = state->lod_roots->entity;
 done:
     return;
 }

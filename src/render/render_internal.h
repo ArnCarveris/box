@@ -127,6 +127,7 @@ typedef struct box_texture_page_t {
 
 /** Module wide registry, stored as a singleton */
 typedef struct RenderState {
+    ecs_world_t *world;       /**< World the registry and its cached queries belong to */
     ecs_vec_t batches;        /**< box_batch_t indexed by mesh handle */
     ecs_vec_t pending_meshes; /**< box_mesh_cmd_t waiting for the next packet */
     ecs_vec_t dead_meshes;    /**< uint32_t mesh handles waiting for the next packet */
@@ -151,6 +152,7 @@ typedef struct RenderState {
     bool modulated;           /**< A light modulator exists, so lights resolve their mask */
     ecs_vec_t modulators;     /**< box_modulator_t, the index of an entry being its bit */
     ecs_query_t *modulator_query; /**< Entities holding a LightModulator */
+    ecs_entity_t modulator_query_entity; /**< Entity flecs bound to modulator_query's cache */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
     ecs_vec_t view_layers;    /**< ecs_entity_t per render layer, the index being its bit */
     uint32_t ui_mask;         /**< Layer bits of the UI trees, hidden by every other view */
@@ -170,17 +172,24 @@ typedef struct RenderState {
     int32_t view_count;       /**< View entities the world holds */
     int32_t target_live;      /**< RenderTarget entities the world holds */
     ecs_query_t *views;       /**< View entities */
+    ecs_entity_t views_entity; /**< Entity flecs bound to views' cache */
     ecs_query_t *targets;     /**< Render target entities */
+    ecs_entity_t targets_entity; /**< Entity flecs bound to targets' cache */
     ecs_query_t *dynamic;     /**< Entities extracted every frame */
+    ecs_entity_t dynamic_entity; /**< Entity flecs bound to dynamic's cache */
     ecs_query_t *cameras;     /**< Camera entities */
     ecs_query_t *captures;    /**< Camera entities that request a capture */
     ecs_query_t *suns;        /**< Directional light entities */
     ecs_query_t *lights;      /**< Point and spot light entities */
+    ecs_entity_t lights_entity; /**< Entity flecs bound to lights' cache */
     ecs_query_t *emitters;    /**< Static entities with an Emissive material */
+    ecs_entity_t emitters_entity; /**< Entity flecs bound to emitters' cache */
     ecs_query_t *layer_query; /**< Entities holding a MaterialLayer registration */
+    ecs_entity_t layer_query_entity; /**< Entity flecs bound to layer_query's cache */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
     ecs_query_t *lod_roots;   /**< Collision roots the LOD hierarchy is built from */
+    ecs_entity_t lod_roots_entity; /**< Entity flecs bound to lod_roots' cache */
     box_lod_state_t *lod;     /**< The LOD hierarchy and what the last walk decided */
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */

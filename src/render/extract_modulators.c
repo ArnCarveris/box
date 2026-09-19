@@ -298,6 +298,7 @@ void box_render_modulators_init(
         .terms = {{ .id = ecs_id(LightModulator), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
+    state->modulator_query_entity = state->modulator_query->entity;
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(LightModulator) }},

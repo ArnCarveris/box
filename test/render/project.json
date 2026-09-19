@@ -596,6 +596,13 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Fini",
+                "testcases": [
+                    "controller_then_ui_finishes_cleanly",
+                    "every_module_reverse_dependency_order_finishes_cleanly"
+                ]
             }
         ]
     }
