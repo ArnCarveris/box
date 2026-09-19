@@ -57,9 +57,17 @@ typedef struct box_waiter_t {
     ecs_script_future_t *future;   /**< Future of the awaiting task */
 } box_waiter_t;
 
+/** Last raise of a phase that reached no waiter, kept until one registers */
+typedef struct box_missed_t {
+    ecs_entity_t action; /**< Action the raise was about */
+    ActionPhase phase;   /**< Phase it reached */
+    ecs_entity_t source; /**< Binding or emitter the raise came from */
+} box_missed_t;
+
 /** Private list of the script tasks that await an action */
 typedef struct ActionWaiters {
     ecs_vec_t waiters; /**< box_waiter_t, one per pending await */
+    ecs_vec_t missed;  /**< box_missed_t, one per phase no waiter has caught up to */
 } ActionWaiters;
 
 extern ECS_COMPONENT_DECLARE(ActionWaiters);
@@ -165,8 +173,9 @@ void box_input_events_init(
  * @param action The action that fired
  * @param phase The phase it reached
  * @param source Binding or emitter the phase comes from
+ * @return Number of waiters the raise resolved
  */
-void box_input_deliver(
+int32_t box_input_deliver(
     ecs_world_t *world,
     ecs_entity_t action,
     ActionPhase phase,

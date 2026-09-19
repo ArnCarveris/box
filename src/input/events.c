@@ -26,7 +26,35 @@ static ActionWaiters* box_input_waiters(
     return result;
 }
 
+/** Find the missed raise of an action's phase.
+ *
+ * @param waiters The waiters
+ * @param action The action to find
+ * @param phase The phase to find
+ * @return Index of the missed raise, or -1 when the phase has none
+ */
+static int32_t box_input_missed_find(
+    const ActionWaiters *waiters,
+    ecs_entity_t action,
+    ActionPhase phase)
+{
+    int32_t result = -1;
+    int32_t i, count = ecs_vec_count(&waiters->missed);
+    for (i = 0; i < count; i ++) {
+        const box_missed_t *missed = ecs_vec_get_t(&waiters->missed, box_missed_t, i);
+        if (missed->action == action && missed->phase == phase) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
 /** Suspend a task until the action of the argument reaches the phase.
+ *
+ * Delivers the missed raise of the phase right away when the frame that raised it
+ * reached no waiter, the way `box_pick_hover` retries a missed hover, so a waiter
+ * that registers in the frame a scene loads still catches the events of that frame.
  *
  * @param ctx Call context, whose ctx holds the phase
  * @param argc Number of arguments
@@ -42,8 +70,15 @@ static void box_input_wait(
     ActionPhase phase = (ActionPhase)(uintptr_t)ctx->ctx;
     ecs_entity_t action = argc == 1 ? *(ecs_entity_t*)argv[0].ptr : 0;
     ActionWaiters *waiters = box_input_waiters(ctx->world);
+    int32_t missed = waiters ? box_input_missed_find(waiters, action, phase) : -1;
     if (!action || !waiters) {
         ecs_script_future_reject(future, "on.pressed expects an action entity");
+        ecs_script_future_release(future);
+    } else if (missed >= 0) {
+        ecs_entity_t source = ecs_vec_get_t(&waiters->missed, box_missed_t, missed)->source;
+        ecs_vec_remove_ordered_t(&waiters->missed, box_missed_t, missed);
+        ecs_script_future_resolve(future, &(ecs_value_t){
+            .type = ecs_id(ecs_entity_t), .ptr = &source });
         ecs_script_future_release(future);
     } else {
         box_waiter_t *waiter = ecs_vec_append_t(
@@ -97,17 +132,18 @@ static void box_input_waiters_dtor(
         }
 
         ecs_vec_fini_t(NULL, &waiters[i].waiters, box_waiter_t);
+        ecs_vec_fini_t(NULL, &waiters[i].missed, box_missed_t);
     }
 }
 
-void box_input_deliver(
+int32_t box_input_deliver(
     ecs_world_t *world,
     ecs_entity_t action,
     ActionPhase phase,
     ecs_entity_t source)
 {
     ActionWaiters *waiters = box_input_waiters(world);
-    int32_t i = 0;
+    int32_t i = 0, delivered = 0;
     while (waiters && i < ecs_vec_count(&waiters->waiters)) {
         box_waiter_t *waiter = ecs_vec_get_t(
             &waiters->waiters, box_waiter_t, i);
@@ -121,7 +157,10 @@ void box_input_deliver(
         ecs_script_future_resolve(future, &(ecs_value_t){
             .type = ecs_id(ecs_entity_t), .ptr = &source });
         ecs_script_future_release(future);
+        delivered ++;
     }
+
+    return delivered;
 }
 
 void box_input_events_init(
@@ -137,6 +176,7 @@ void box_input_events_init(
 
     ActionWaiters *waiters = ecs_singleton_ensure(world, ActionWaiters);
     ecs_vec_init_t(NULL, &waiters->waiters, box_waiter_t, 0);
+    ecs_vec_init_t(NULL, &waiters->missed, box_missed_t, 0);
 
     ecs_entity_t on = ecs_entity(world, {
         .name = "on", .parent = ecs_lookup(world, "flecs.script") });
@@ -155,14 +195,56 @@ void box_input_events_init(
     }
 }
 
+/** Keep or clear the missed raise of an action's phase.
+ *
+ * @param waiters The waiters
+ * @param action The action the raise is about
+ * @param phase The phase it reached
+ * @param source Binding or emitter the raise came from
+ * @param delivered Number of waiters the raise resolved
+ */
+static void box_input_missed_update(
+    ActionWaiters *waiters,
+    ecs_entity_t action,
+    ActionPhase phase,
+    ecs_entity_t source,
+    int32_t delivered)
+{
+    int32_t index = box_input_missed_find(waiters, action, phase);
+    box_missed_t *missed;
+    if (delivered) {
+        if (index >= 0) {
+            ecs_vec_remove_ordered_t(&waiters->missed, box_missed_t, index);
+        }
+
+        goto done;
+    }
+
+    missed = index >= 0
+        ? ecs_vec_get_t(&waiters->missed, box_missed_t, index)
+        : ecs_vec_append_t(NULL, &waiters->missed, box_missed_t);
+    missed->action = action;
+    missed->phase = phase;
+    missed->source = source;
+
+done:
+    return;
+}
+
 void BoxInputRaise(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->world;
+    ActionWaiters *waiters = box_input_waiters(world);
     const ActionEvent *events;
     int32_t i, count = box_input_events(world, &events);
     for (i = 0; i < count; i ++) {
-        box_input_deliver(
+        int32_t delivered = box_input_deliver(
             world, events[i].action, events[i].phase, events[i].source);
+        if (waiters) {
+            box_input_missed_update(
+                waiters, events[i].action, events[i].phase, events[i].source,
+                delivered);
+        }
     }
 }
