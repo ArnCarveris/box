@@ -1,0 +1,74 @@
+{
+    "id": "picking",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.picking module",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Ray",
+                "testcases": [
+                    "center_of_the_default_camera_looks_forward",
+                    "without_a_camera_there_is_no_ray",
+                    "follows_the_cursor_to_the_right",
+                    "follows_the_cursor_up",
+                    "widens_with_the_aspect_of_the_surface",
+                    "camera_aspect_ratio_overrides_the_surface",
+                    "turns_with_the_camera",
+                    "of_an_orthographic_camera_is_parallel",
+                    "a_view_builds_its_ray_from_its_own_camera",
+                    "a_view_without_a_camera_has_no_ray",
+                    "aspect_of_a_render_target_comes_from_the_target"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Pick",
+                "testcases": [
+                    "finds_the_object_under_the_cursor",
+                    "misses_when_the_ray_points_away",
+                    "takes_the_nearest_of_two_objects",
+                    "hit_carries_the_normal_of_the_collider",
+                    "beyond_the_max_distance_is_a_miss",
+                    "resolves_to_the_prefab_root",
+                    "resolves_to_the_template_root",
+                    "a_pickable_descendant_is_the_target",
+                    "a_pickable_between_the_hit_and_the_root_is_the_target",
+                    "an_entity_outside_a_root_targets_itself",
+                    "the_view_with_the_highest_priority_picks_first",
+                    "a_disabled_view_does_not_pick",
+                    "a_view_with_a_render_target_does_not_pick"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Events",
+                "testcases": [
+                    "hover_resumes_a_handler",
+                    "the_hovered_tag_follows_the_cursor",
+                    "press_resumes_a_handler",
+                    "release_resumes_a_handler",
+                    "click_resumes_a_handler",
+                    "drag_resumes_a_handler",
+                    "a_drag_does_not_raise_a_click",
+                    "a_handler_receives_the_hit",
+                    "an_event_bubbles_to_the_parent",
+                    "a_child_handler_consumes_the_event",
+                    "a_still_cursor_runs_no_query",
+                    "every_view_costs_one_query",
+                    "disabled_picking_raises_nothing",
+                    "a_cancelled_task_drops_its_waiter"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}

@@ -211,6 +211,27 @@ a million colliders.
 `CollisionSettings: {debug: DebugAll}` draws the colliders and the root bounds a view sees as
 wireframes over the image (`DebugColliders`, `DebugBounds` or `DebugNone`, which costs a frame
 nothing), see `test/integration/visual/collision_debug.flecs`.
+
+`box.picking` turns the cursor into a ray through the camera of every enabled view that renders
+into the surface and resolves the nearest collider to the entity the author cares about: the
+prefab or template root, unless that collider or an entity between it and the root carries
+`Pickable`. The entity under the cursor carries `Hovered`, and a pick raises `on.hover`,
+`on.press`, `on.release`, `on.click` and `on.drag` as script events that carry the hit entity,
+position and normal:
+
+```
+template Button {
+  async {
+    const hit = await on.click(this)
+  }
+}
+```
+
+An event starts at the entity the pick resolved to and bubbles up the parent chain until a
+handler consumes it, so a parent only hears what its children leave alone. A frame in which the
+cursor stands still costs no ray query at all, and `PickSettings` holds the reach, the drag
+threshold and the switch. `test/integration/command/picking.flecs` hovers and clicks a crate
+through the `mouse.*` commands and keeps the log.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
 rebuilds no mesh), see `shapes_2d.flecs`.

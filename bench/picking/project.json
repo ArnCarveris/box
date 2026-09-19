@@ -1,0 +1,25 @@
+{
+    "id": "bench_picking",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.picking module",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Pick",
+                "benchcases": [
+                    "ray_from_a_camera",
+                    "pick_1m",
+                    "pick_miss_1m",
+                    "target_of_a_nested_hit",
+                    "raise_to_an_empty_chain"
+                ]
+            }
+        ]
+    }
+}

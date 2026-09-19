@@ -1,0 +1,80 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.picking
+using box.command
+
+WasHovered {}
+
+camera {
+  Position: {0, 0, -10}
+  Camera: {fov: 60}
+}
+
+main {
+  View: {camera: camera}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+template Hoverable {
+  mut seen = 0
+  async {
+    await on.hover(this)
+    seen = 1
+  }
+
+  if seen == 1 {
+    WasHovered
+  }
+}
+
+scene {
+  crate {
+    Position: {0, 0, 0}
+    Box: {2, 2, 2}
+    Rgb: {220, 120, 60}
+    Hoverable
+  }
+
+  ball {
+    Position: {-4, 0, 0}
+    Sphere: {radius: 1, segments: 16}
+    Rgb: {80, 160, 240}
+  }
+}
+
+template Agent {
+  mut phase = 0
+  async {
+    await on.hover(scene.crate)
+    phase = 1
+  }
+
+  async {
+    await on.click(scene)
+    phase = 2
+  }
+
+  if phase == 0 {
+    CommandScript: {path: "../../test/integration/command/picking.cmd"}
+  } else if phase == 1 {
+    CommandScript: {path: "../../test/integration/command/picking_hover.cmd"}
+  } else {
+    CommandScript: {path: "../../test/integration/command/picking_after.cmd"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    Agent
+  }
+}

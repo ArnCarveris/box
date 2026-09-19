@@ -1,0 +1,177 @@
+/**
+ * @file box/picking.h
+ * @brief Picking components and the script events a pick under the cursor raises.
+ *
+ * A pick is a ray from the camera of a view through a normalized screen
+ * position, resolved against the spatial index of box.collision. The collider
+ * the ray hits is resolved to the entity an author cares about: the prefab or
+ * template root it belongs to, unless it or an entity between it and that root
+ * carries Pickable, which targets that entity instead.
+ *
+ * The engine picks once per frame for every enabled view that renders into the
+ * surface, and only while the cursor moves: a frame in which the cursor stands
+ * still reuses the hit of the last one and costs no ray query at all. The
+ * entity the cursor points at carries Hovered while it does.
+ *
+ * Hover, press, release, click and drag are derived from that hit and raised as
+ * the on.hover, on.press, on.release, on.click and on.drag script functions, so
+ * a task awaits a pick the way it awaits an action:
+ *
+ *     template Button {
+ *       async {
+ *         const hit = await on.click(this)
+ *       }
+ *     }
+ *
+ * An event starts at the entity the pick resolved to and bubbles up the parent
+ * chain; the first entity with a handler consumes it, so a parent only hears
+ * what its children leave alone.
+ */
+
+#ifndef BOX_PICKING_H
+#define BOX_PICKING_H
+
+#include "types.h"
+
+#ifdef BOX_PICKING_IMPL
+#define ECS_META_IMPL IMPL
+#else
+#define ECS_META_IMPL EXTERN
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Longest distance a ray of a pick travels when the settings leave it open */
+#define BOX_PICK_DISTANCE (1000.0f)
+
+/** Window points a press moves before it becomes a drag */
+#define BOX_PICK_DRAG_THRESHOLD (3.0f)
+
+/** Settings of the picking module, read by every update */
+ECS_STRUCT(PickSettings, {
+    float max_distance;   /**< Longest ray distance that counts as a hit, default 1000 */
+    float drag_threshold; /**< Window points a press moves before it drags, default 3 */
+    bool enabled;         /**< Picks run and raise their events, default true */
+});
+
+/** A descendant of a root that a pick targets instead of targeting the root.
+ *
+ * The tag is inherited on instantiation, so a prefab that marks one of its
+ * children marks that child in every instance.
+ */
+extern ECS_TAG_DECLARE(Pickable);
+
+/** The entity a pick of this frame resolved to, written by the engine */
+extern ECS_TAG_DECLARE(Hovered);
+
+/** What a pick found, the value a script handler receives */
+ECS_STRUCT(PickHit, {
+    ecs_entity_t entity;   /**< Entity the pick resolved to, 0 when it hit nothing */
+    ecs_entity_t collider; /**< Entity whose collider the ray hit */
+    ecs_entity_t view;     /**< View the ray was built from, 0 when a camera gave it */
+    vec3 point;            /**< Hit position in world space */
+    vec3 normal;           /**< Surface normal of the collider at the hit */
+    vec2 cursor;           /**< Normalized cursor position the ray came from */
+    float distance;        /**< Distance of the hit along the ray */
+});
+
+/** Interaction a pick event reports */
+ECS_ENUM(PickEvent, {
+    PickHover = 0,   /**< The cursor moved onto the entity */
+    PickPress = 1,   /**< A mouse button went down on the entity */
+    PickRelease = 2, /**< A mouse button came up over the entity */
+    PickClick = 3,   /**< A press and its release landed on the same entity */
+    PickDrag = 4     /**< The cursor moved while the entity was pressed */
+});
+
+/** Build the world ray of a normalized position in a view.
+ *
+ * The position is the one the Mouse of the Input singleton reports: the origin
+ * is the center of the image, x points right and y points up, and both reach 1
+ * at the edge. A view of 0 takes the first camera of the world, which is what a
+ * world without a View renders.
+ *
+ * @param world The world
+ * @param view The view entity, 0 for the camera a world without views renders
+ * @param cursor Normalized position in the image of the view
+ * @param origin Receives the origin of the ray in world space
+ * @param dir Receives the normalized direction of the ray in world space
+ * @return true when the view has a camera the ray could be built from
+ */
+bool box_picking_ray(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    vec2 cursor,
+    vec3 *origin,
+    vec3 *dir);
+
+/** Resolve the entity a collider belongs to.
+ *
+ * The result is the entity itself or the nearest ancestor that carries
+ * Pickable, and the prefab or template root of the collider when neither
+ * carries one.
+ *
+ * @param world The world
+ * @param collider The entity whose collider was hit
+ * @return The entity a pick of that collider targets
+ */
+ecs_entity_t box_picking_target(
+    const ecs_world_t *world,
+    ecs_entity_t collider);
+
+/** Pick the nearest entity along the ray of a normalized position in a view.
+ *
+ * @param world The world
+ * @param view The view entity, 0 for the camera a world without views renders
+ * @param cursor Normalized position in the image of the view
+ * @param out Receives the hit, which is zeroed when the ray hit nothing
+ * @return true when the ray hit a collider
+ */
+bool box_picking_pick(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    vec2 cursor,
+    PickHit *out);
+
+/** Raise a pick event at the handlers of an entity and of its ancestors.
+ *
+ * The event starts at the entity of the hit and walks up the parent chain. The
+ * first entity whose handlers the event resolves consumes it, so an ancestor of
+ * a consuming entity never sees it.
+ *
+ * @param world The world
+ * @param event The interaction to raise
+ * @param hit The hit the handlers receive
+ * @return The entity that consumed the event, 0 when nothing handled it
+ */
+ecs_entity_t box_picking_raise(
+    ecs_world_t *world,
+    PickEvent event,
+    const PickHit *hit);
+
+/** Get the hit the last pick of the world left behind.
+ *
+ * @param world The world
+ * @param out Receives the hit of the last pick
+ * @return true when the cursor points at an entity
+ */
+bool box_picking_hovered(
+    const ecs_world_t *world,
+    PickHit *out);
+
+/** Register the box.picking module.
+ *
+ * @param world The world
+ */
+void BoxPickingImport(
+    ecs_world_t *world);
+
+#ifdef __cplusplus
+}
+#endif
+
+#undef ECS_META_IMPL
+
+#endif

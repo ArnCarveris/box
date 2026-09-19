@@ -27,6 +27,7 @@
 #include "box/texture.h"
 #include "box/movement.h"
 #include "box/collision.h"
+#include "box/picking.h"
 #include "box/spline.h"
 #include "box/controller.h"
 #include "box/surface.h"

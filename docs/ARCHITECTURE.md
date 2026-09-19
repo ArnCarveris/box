@@ -44,6 +44,7 @@ Two hard rules keep the concerns apart:
 | `box.monitor` | `CpuMonitor`, `EcsStats` and `SystemMonitor` singletons, sampled only while present |
 | `box.script` | scene loading, incremental template instantiation |
 | `box.collision` | root bounds, per shape colliders, a bounding volume hierarchy with ray, sphere, box and frustum queries |
+| `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
 | later | `box.ui`, `box.particles`, `box.transition`, `box.lod`, `box.atmosphere` |
