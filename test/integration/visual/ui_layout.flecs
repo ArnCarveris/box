@@ -1,0 +1,171 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.ui
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 55}
+}
+
+ui {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Layout: {direction: Column, width: 900, height: 500,
+           padding: 16, spacing: 12, h: Center}
+  Border: {radius: 20, width: 3, color: {120, 140, 190, 255}}
+  Rgb: {30, 34, 46}
+
+  header {
+    Layout: {direction: Row, width: 868, height: 56,
+             padding: 10, spacing: 10, v: Middle}
+    Border: {radius: 12}
+    Rgb: {52, 66, 100}
+
+    header_dot {
+      Rect: {28, 28}
+      Border: {radius: 14}
+      Rgb: {245, 205, 95}
+    }
+
+    header_title {
+      Rect: {220, 18}
+      Border: {radius: 9}
+      Rgb: {190, 205, 240}
+    }
+
+    header_sub {
+      Rect: {120, 12}
+      Border: {radius: 6}
+      Rgb: {120, 140, 190}
+    }
+
+    header_badge {
+      Anchor: {h: Right, v: Middle, x: 6}
+      Rect: {90, 30}
+      Border: {radius: 15}
+      Rgb: {235, 120, 95}
+    }
+  }
+
+  body {
+    Layout: {direction: Row, width: 868, height: 330, spacing: 12,
+             h: Center}
+
+    column_left {
+      Layout: {direction: Column, height: 330,
+               padding: 12, spacing: 8, h: Left}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+
+      left_one {
+        Rect: {240, 34}
+        Border: {radius: 8}
+        Rgb: {74, 96, 138}
+      }
+      left_two {
+        Rect: {180, 34}
+        Border: {radius: 8}
+        Rgb: {74, 96, 138}
+      }
+      left_three {
+        Rect: {210, 34}
+        Border: {radius: 8}
+        Rgb: {74, 96, 138}
+      }
+      left_four {
+        Rect: {120, 34}
+        Border: {radius: 8}
+        Rgb: {96, 122, 170}
+      }
+    }
+
+    column_mid {
+      Layout: {direction: Column, width: 300, height: 330,
+               padding: 12, spacing: 10, h: Center, v: Middle}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {38, 60, 58}
+
+      mid_one {
+        Rect: {200, 40}
+        Border: {radius: 10}
+        Rgb: {70, 130, 110}
+      }
+      mid_two {
+        Rect: {140, 40}
+        Border: {radius: 10}
+        Rgb: {70, 130, 110}
+      }
+      mid_three {
+        Rect: {240, 40}
+        Border: {radius: 10}
+        Rgb: {92, 160, 136}
+      }
+
+      mid_pin {
+        Anchor: {h: Right, v: Top, x: 10, y: 10}
+        Rect: {28, 28}
+        Border: {radius: 14}
+        Rgb: {120, 215, 170}
+      }
+    }
+
+    column_right {
+      Layout: {direction: Column, height: 330,
+               padding: 12, spacing: 8, h: Right, v: Bottom}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {56, 46, 68}
+
+      right_one {
+        Rect: {160, 30}
+        Border: {radius: 8}
+        Rgb: {132, 104, 172}
+      }
+      right_two {
+        Rect: {200, 30}
+        Border: {radius: 8}
+        Rgb: {132, 104, 172}
+      }
+      right_three {
+        Rect: {120, 30}
+        Border: {radius: 8}
+        Rgb: {170, 140, 210}
+      }
+
+      right_pin {
+        Anchor: {h: Left, v: Top, x: 12, y: 12}
+        Rect: {40, 40}
+        Border: {radius: 20}
+        Rgb: {96, 78, 128}
+      }
+    }
+  }
+
+  footer {
+    Layout: {direction: Row, width: 868, height: 44,
+             padding: 8, spacing: 10, h: Right, v: Middle}
+    Border: {radius: 12}
+    Rgb: {44, 50, 66}
+
+    footer_note {
+      Anchor: {h: Left, v: Middle, x: 10}
+      Rect: {160, 14}
+      Border: {radius: 7}
+      Rgb: {110, 128, 175}
+    }
+
+    footer_cancel {
+      Rect: {110, 28}
+      Border: {radius: 14}
+      Rgb: {84, 96, 128}
+    }
+    footer_ok {
+      Rect: {130, 28}
+      Border: {radius: 14}
+      Rgb: {110, 160, 235}
+    }
+  }
+}
