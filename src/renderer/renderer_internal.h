@@ -283,6 +283,15 @@ typedef struct box_gpu_view_t {
     bool hiz_history;                /**< The other pyramid holds the depth of the previous frame */
     float hiz_clip[16];              /**< World to clip matrix the history pyramid was built with */
     box_vec_t hiz_meshes;            /**< box_hiz_mesh_t indexed by mesh handle */
+    WGPUBuffer hiz_read;             /**< Readback of one level of the pyramid, for the LOD walk */
+    uint32_t hiz_read_size;          /**< Bytes the readback buffer holds */
+    uint32_t hiz_read_row;           /**< Bytes one row of the readback takes */
+    uint32_t hiz_read_level;         /**< Level of the pyramid the readback copies */
+    bool hiz_read_busy;              /**< The readback is recorded or mapped */
+    bool hiz_read_want;              /**< The view asked for the grid its LOD traversal walks */
+    bool hiz_read_ready;             /**< The readback of this frame is waiting for a map */
+    box_lod_depth_t hiz_depth;       /**< Last grid that arrived, with the matrix of its frame */
+    float hiz_read_clip[16];         /**< Matrix the recorded readback belongs to */
     bool hiz_active;                 /**< The frame recorded occlusion dispatches for the view */
     WGPUBuffer view_buffer;          /**< Uniform buffer holding the view */
     WGPUBindGroup view_group;        /**< Bind group with the view and layer uniforms */
@@ -1049,6 +1058,22 @@ void box_hiz_upload(
 void box_hiz_build(
     box_renderer_t *r,
     WGPUCommandEncoder encoder);
+
+/** Map the depth readback of every view that recorded one.
+ *
+ * @param r The renderer
+ */
+void box_hiz_publish(
+    box_renderer_t *r);
+
+/** Copy the coarse depth of the first view into the packet it is returned with.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_hiz_depth(
+    box_renderer_t *r,
+    box_packet_t *p);
 
 /** Record the occlusion dispatches of one pass of the current view.
  *

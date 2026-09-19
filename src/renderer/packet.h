@@ -514,6 +514,26 @@ static inline bool box_view_casts(
     return box_layer_shown(mask, v->caster_mask, v->strict_layers != 0);
 }
 
+/** Texels on one axis of the depth grid the renderer hands the LOD traversal */
+#define BOX_LOD_DEPTH_MAX (64)
+
+/** Coarse depth of a view the renderer read back, for the LOD traversal.
+ *
+ * The grid is one level of the depth pyramid of a view, small enough to read
+ * back every frame, together with the matrix that level was drawn with. The
+ * traversal reduces it further on the CPU and tests the bounds of a node
+ * against it, so a hidden node stops at its proxy instead of being descended
+ * into. Nothing is dropped on it: the proxy is still drawn and culled on the
+ * GPU, so a stale grid costs detail for a frame and never an object.
+ */
+typedef struct box_lod_depth_t {
+    float values[BOX_LOD_DEPTH_MAX * BOX_LOD_DEPTH_MAX]; /**< Depth of every texel, row by row */
+    float clip[16];  /**< World to clip matrix the grid was drawn with */
+    uint32_t width;  /**< Texels across the grid */
+    uint32_t height; /**< Texels down the grid */
+    uint32_t valid;  /**< The grid holds a readback */
+} box_lod_depth_t;
+
 /** Render target to create or resize, the renderer owns the texture */
 typedef struct box_target_cmd_t {
     uint32_t handle;  /**< Target handle */
@@ -1085,6 +1105,7 @@ typedef struct box_packet_t {
     box_vec_t transitions;                   /**< box_transition_cmd_t of the frame */
     box_vec_t transition_records;            /**< box_transition_rec_t the commands point into */
     box_vec_t transitions_done;              /**< box_transition_done_t the renderer wrote back */
+    box_lod_depth_t lod_depth;               /**< Coarse depth the renderer read back */
     box_vec_t effects;                       /**< box_effect_t of the chain of every view */
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
@@ -1132,8 +1153,9 @@ static inline void box_packet_init(
 
 /** Reset per frame fields while keeping vector storage.
  *
- * The transitions the renderer reported as finished survive the reset, because
- * a producer reads them from the packet it just acquired.
+ * The transitions the renderer reported as finished and the depth grid it read
+ * back survive the reset, because a producer reads both from the packet it just
+ * acquired.
  *
  * @param p The packet
  */

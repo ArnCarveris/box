@@ -157,6 +157,38 @@
                     "an_orthographic_camera_ignores_the_distance",
                     "a_ladder_of_one_level_never_moves"
                 ]
+            },
+            {
+                "id": "Tree",
+                "testcases": [
+                    "a_walk_visits_every_root",
+                    "the_walk_visits_a_parent_before_its_children",
+                    "a_node_under_the_threshold_becomes_a_proxy",
+                    "a_rejected_node_stops_its_subtree",
+                    "a_closed_node_opens_on_demand",
+                    "a_node_without_children_falls_back_to_its_proxy",
+                    "closing_a_node_releases_its_children",
+                    "removing_a_node_drops_its_subtree",
+                    "refresh_aggregates_the_bounds_of_a_subtree",
+                    "refresh_averages_the_look_of_a_subtree",
+                    "clustering_groups_loose_roots",
+                    "clustering_keeps_neighbours_together",
+                    "unclustering_gives_the_roots_back",
+                    "a_cluster_is_rejected_as_one",
+                    "visited_nodes_do_not_grow_with_the_leaves",
+                    "the_band_holds_a_node_at_its_decision"
+                ]
+            },
+            {
+                "id": "Hierarchy",
+                "testcases": [
+                    "a_far_root_is_replaced_by_a_proxy",
+                    "a_near_root_draws_its_leaves",
+                    "the_traversal_leaves_the_entities_alone",
+                    "settings_off_draws_every_leaf",
+                    "turning_the_settings_off_shows_the_leaves_again",
+                    "the_walk_reports_what_it_cost"
+                ]
             }
         ]
     }

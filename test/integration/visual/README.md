@@ -68,6 +68,8 @@ Rules for adding one:
 | Transitions | `transitions` | Color and position transitions captured halfway under the fixed timestep. |
 | UI | `ui_panels`, `ui_panels_small`, `ui_layout`, `ui_text`, `ui_shadow`, `ui_group_alpha`, `ui_group_alpha_direct`, `ui_hover`, `console` | Nested panels at two surface sizes, the layout gallery, paragraphs and a labelled button, box shadows, a transparent group through the texture path against the ghosting direct path, a hovered button, the open console over a scene. |
 | Primitive LOD | `lod_spheres` | A field of spheres at several distances with the segment ladder selected per projected error. |
+| Hierarchical LOD traversal | `lod_city` | 400 tower instances where the near ones keep their base, roof and windows and the far ones are single proxy boxes. |
+| The same city without LOD | `lod_city_off` | The same silhouette with every part of every tower drawn, which is what `lod_city` is compared against by eye. |
 
 ## The showcase scene
 

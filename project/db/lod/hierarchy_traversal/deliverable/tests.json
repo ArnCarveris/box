@@ -1,0 +1,6214 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T14:54:48Z",
+  "pass": 880,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 8.096419,
+  "tests": [
+    {
+      "suite": "Cluster",
+      "case": "one_primitive_is_one_box",
+      "status": "pass",
+      "elapsed": 0.004968,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "two_groups_split_by_distance",
+      "status": "pass",
+      "elapsed": 0.004891,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "the_budget_caps_the_shape_count",
+      "status": "pass",
+      "elapsed": 0.004648,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "more_shapes_lower_the_error",
+      "status": "pass",
+      "elapsed": 0.005427,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "a_shape_covers_the_bounds_of_its_inputs",
+      "status": "pass",
+      "elapsed": 0.005481,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "a_round_cluster_becomes_a_sphere",
+      "status": "pass",
+      "elapsed": 0.004766,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "a_tall_cluster_becomes_a_capsule",
+      "status": "pass",
+      "elapsed": 0.00556,
+      "project": "lod"
+    },
+    {
+      "suite": "Cluster",
+      "case": "the_proxy_bounds_cover_the_subtree",
+      "status": "pass",
+      "elapsed": 0.005381,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "an_exact_box_has_no_error",
+      "status": "pass",
+      "elapsed": 0.004593,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "a_gap_between_inputs_raises_the_error",
+      "status": "pass",
+      "elapsed": 0.004367,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "splitting_a_gap_removes_the_error",
+      "status": "pass",
+      "elapsed": 0.004152,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "the_error_bound_buys_more_shapes",
+      "status": "pass",
+      "elapsed": 0.004153,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "the_error_is_the_edge_of_the_missed_volume",
+      "status": "pass",
+      "elapsed": 0.003926,
+      "project": "lod"
+    },
+    {
+      "suite": "Error",
+      "case": "the_error_scales_with_the_subtree",
+      "status": "pass",
+      "elapsed": 0.004468,
+      "project": "lod"
+    },
+    {
+      "suite": "Material",
+      "case": "every_material_keeps_a_shape",
+      "status": "pass",
+      "elapsed": 0.004176,
+      "project": "lod"
+    },
+    {
+      "suite": "Material",
+      "case": "a_shape_carries_the_material_of_its_inputs",
+      "status": "pass",
+      "elapsed": 0.004093,
+      "project": "lod"
+    },
+    {
+      "suite": "Material",
+      "case": "the_budget_follows_the_volume",
+      "status": "pass",
+      "elapsed": 0.004347,
+      "project": "lod"
+    },
+    {
+      "suite": "Material",
+      "case": "materials_never_share_a_shape",
+      "status": "pass",
+      "elapsed": 0.004334,
+      "project": "lod"
+    },
+    {
+      "suite": "Determinism",
+      "case": "the_same_input_builds_the_same_proxy",
+      "status": "pass",
+      "elapsed": 0.004088,
+      "project": "lod"
+    },
+    {
+      "suite": "Determinism",
+      "case": "a_fresh_builder_builds_the_same_proxy",
+      "status": "pass",
+      "elapsed": 0.00432,
+      "project": "lod"
+    },
+    {
+      "suite": "Determinism",
+      "case": "an_unrelated_build_leaves_no_trace",
+      "status": "pass",
+      "elapsed": 0.004118,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "an_empty_subtree_has_no_proxy",
+      "status": "pass",
+      "elapsed": 0.004111,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "a_zero_sized_primitive_is_finite",
+      "status": "pass",
+      "elapsed": 0.004009,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "overlapping_primitives_become_one_shape",
+      "status": "pass",
+      "elapsed": 0.004062,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "more_shapes_than_primitives",
+      "status": "pass",
+      "elapsed": 0.003939,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "a_flat_primitive_keeps_its_plane",
+      "status": "pass",
+      "elapsed": 0.005159,
+      "project": "lod"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "reversed_bounds_are_normalized",
+      "status": "pass",
+      "elapsed": 0.003856,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "an_error_projects_at_the_nearest_point",
+      "status": "pass",
+      "elapsed": 0.004514,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "twice_the_distance_halves_the_error",
+      "status": "pass",
+      "elapsed": 0.004221,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "the_nearest_point_is_not_the_center",
+      "status": "pass",
+      "elapsed": 0.004382,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "a_camera_inside_the_bounds_stays_finite",
+      "status": "pass",
+      "elapsed": 0.003924,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "a_wider_fov_lowers_the_error",
+      "status": "pass",
+      "elapsed": 0.003865,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "a_taller_viewport_raises_the_error",
+      "status": "pass",
+      "elapsed": 0.00403,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "an_orthographic_error_ignores_the_distance",
+      "status": "pass",
+      "elapsed": 0.004222,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "an_orthographic_error_follows_the_height",
+      "status": "pass",
+      "elapsed": 0.003799,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "the_scale_is_the_error_of_one_unit",
+      "status": "pass",
+      "elapsed": 0.003851,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "a_representation_without_error_is_free",
+      "status": "pass",
+      "elapsed": 0.004095,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "zero_fields_take_the_camera_defaults",
+      "status": "pass",
+      "elapsed": 0.003674,
+      "project": "lod"
+    },
+    {
+      "suite": "Screen",
+      "case": "reversed_bounds_measure_the_same",
+      "status": "pass",
+      "elapsed": 0.004209,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "without_a_current_level_the_threshold_decides",
+      "status": "pass",
+      "elapsed": 0.003646,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "a_level_holds_inside_the_band",
+      "status": "pass",
+      "elapsed": 0.004153,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "an_error_above_the_band_goes_finer",
+      "status": "pass",
+      "elapsed": 0.003817,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "an_error_below_the_band_goes_coarser",
+      "status": "pass",
+      "elapsed": 0.004161,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "the_band_only_widens_the_threshold",
+      "status": "pass",
+      "elapsed": 0.004136,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "without_a_band_the_switch_is_at_the_threshold",
+      "status": "pass",
+      "elapsed": 0.003942,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "the_finest_level_is_the_floor",
+      "status": "pass",
+      "elapsed": 0.003949,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "a_level_out_of_range_is_ignored",
+      "status": "pass",
+      "elapsed": 0.003811,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "a_single_level_is_always_selected",
+      "status": "pass",
+      "elapsed": 0.003708,
+      "project": "lod"
+    },
+    {
+      "suite": "Hysteresis",
+      "case": "a_coarser_threshold_selects_a_coarser_level",
+      "status": "pass",
+      "elapsed": 0.004003,
+      "project": "lod"
+    },
+    {
+      "suite": "Walk",
+      "case": "a_walk_towards_and_away_never_oscillates",
+      "status": "pass",
+      "elapsed": 0.00399,
+      "project": "lod"
+    },
+    {
+      "suite": "Walk",
+      "case": "a_hovering_camera_holds_its_level",
+      "status": "pass",
+      "elapsed": 0.003771,
+      "project": "lod"
+    },
+    {
+      "suite": "Walk",
+      "case": "an_orthographic_zoom_never_oscillates",
+      "status": "pass",
+      "elapsed": 0.004014,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "one_mesh_lands_in_world_space",
+      "status": "pass",
+      "elapsed": 0.004258,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "two_meshes_join_one_group",
+      "status": "pass",
+      "elapsed": 0.004226,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "materials_split_into_groups",
+      "status": "pass",
+      "elapsed": 0.004096,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_material_gathers_every_source",
+      "status": "pass",
+      "elapsed": 0.004041,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "welding_joins_a_shared_edge",
+      "status": "pass",
+      "elapsed": 0.004224,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_unwelded_seam_keeps_both_vertices",
+      "status": "pass",
+      "elapsed": 0.004005,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "identical_vertices_are_shared",
+      "status": "pass",
+      "elapsed": 0.003916,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_mesh_without_normals_gets_them",
+      "status": "pass",
+      "elapsed": 0.003743,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "missing_uvs_and_colors_get_defaults",
+      "status": "pass",
+      "elapsed": 0.003982,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "uvs_and_colors_are_kept",
+      "status": "pass",
+      "elapsed": 0.004021,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "the_bounds_cover_every_source",
+      "status": "pass",
+      "elapsed": 0.00432,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_empty_subtree_merges_to_nothing",
+      "status": "pass",
+      "elapsed": 0.003687,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_index_outside_the_mesh_is_dropped",
+      "status": "pass",
+      "elapsed": 0.003784,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_degenerate_triangle_is_dropped",
+      "status": "pass",
+      "elapsed": 0.004017,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_source_without_vertices_is_skipped",
+      "status": "pass",
+      "elapsed": 0.004042,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "the_same_input_merges_the_same_mesh",
+      "status": "pass",
+      "elapsed": 0.003727,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_flat_grid_loses_triangles",
+      "status": "pass",
+      "elapsed": 0.004385,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_ratio_caps_the_triangles",
+      "status": "pass",
+      "elapsed": 0.004322,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_ratio_of_one_keeps_the_mesh",
+      "status": "pass",
+      "elapsed": 0.004222,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_error_bound_limits_the_loss",
+      "status": "pass",
+      "elapsed": 0.004196,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_error_is_measured_in_world_units",
+      "status": "pass",
+      "elapsed": 0.005195,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_group_keeps_its_own_triangles",
+      "status": "pass",
+      "elapsed": 0.004965,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "unused_vertices_are_dropped",
+      "status": "pass",
+      "elapsed": 0.004282,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_same_mesh_simplifies_the_same_way",
+      "status": "pass",
+      "elapsed": 0.005027,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "an_empty_mesh_has_nothing_to_lose",
+      "status": "pass",
+      "elapsed": 0.003654,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_single_triangle_survives",
+      "status": "pass",
+      "elapsed": 0.004247,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "the_ladder_halves_down_to_the_floor",
+      "status": "pass",
+      "elapsed": 0.003676,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "an_uneven_count_halves_too",
+      "status": "pass",
+      "elapsed": 0.003967,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_shape_at_its_floor_has_one_level",
+      "status": "pass",
+      "elapsed": 0.004099,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_long_ladder_stops_at_its_levels",
+      "status": "pass",
+      "elapsed": 0.003997,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_degenerate_count_has_no_ladder",
+      "status": "pass",
+      "elapsed": 0.003872,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_lower_floor_buys_more_levels",
+      "status": "pass",
+      "elapsed": 0.003924,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "the_chord_error_grows_with_the_radius",
+      "status": "pass",
+      "elapsed": 0.003605,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "more_segments_lower_the_chord_error",
+      "status": "pass",
+      "elapsed": 0.003843,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_near_shape_keeps_the_authored_level",
+      "status": "pass",
+      "elapsed": 0.003867,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_distant_shape_takes_the_coarsest_level",
+      "status": "pass",
+      "elapsed": 0.00395,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_quarter_arc_is_measured_as_its_circle",
+      "status": "pass",
+      "elapsed": 0.004011,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "the_band_holds_the_level_of_the_previous_frame",
+      "status": "pass",
+      "elapsed": 0.004153,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_zero_threshold_holds_the_authored_level",
+      "status": "pass",
+      "elapsed": 0.004146,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "an_orthographic_camera_ignores_the_distance",
+      "status": "pass",
+      "elapsed": 0.004038,
+      "project": "lod"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_ladder_of_one_level_never_moves",
+      "status": "pass",
+      "elapsed": 0.003848,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_walk_visits_every_root",
+      "status": "pass",
+      "elapsed": 0.004417,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "the_walk_visits_a_parent_before_its_children",
+      "status": "pass",
+      "elapsed": 0.003944,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_node_under_the_threshold_becomes_a_proxy",
+      "status": "pass",
+      "elapsed": 0.004122,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_rejected_node_stops_its_subtree",
+      "status": "pass",
+      "elapsed": 0.004322,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_closed_node_opens_on_demand",
+      "status": "pass",
+      "elapsed": 0.004009,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_node_without_children_falls_back_to_its_proxy",
+      "status": "pass",
+      "elapsed": 0.004008,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "closing_a_node_releases_its_children",
+      "status": "pass",
+      "elapsed": 0.004392,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "removing_a_node_drops_its_subtree",
+      "status": "pass",
+      "elapsed": 0.004242,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "refresh_aggregates_the_bounds_of_a_subtree",
+      "status": "pass",
+      "elapsed": 0.004179,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "refresh_averages_the_look_of_a_subtree",
+      "status": "pass",
+      "elapsed": 0.004398,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "clustering_groups_loose_roots",
+      "status": "pass",
+      "elapsed": 0.004515,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "clustering_keeps_neighbours_together",
+      "status": "pass",
+      "elapsed": 0.004272,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "unclustering_gives_the_roots_back",
+      "status": "pass",
+      "elapsed": 0.004713,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "a_cluster_is_rejected_as_one",
+      "status": "pass",
+      "elapsed": 0.004701,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "visited_nodes_do_not_grow_with_the_leaves",
+      "status": "pass",
+      "elapsed": 0.011943,
+      "project": "lod"
+    },
+    {
+      "suite": "Tree",
+      "case": "the_band_holds_a_node_at_its_decision",
+      "status": "pass",
+      "elapsed": 0.004394,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "a_far_root_is_replaced_by_a_proxy",
+      "status": "pass",
+      "elapsed": 0.030782,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "a_near_root_draws_its_leaves",
+      "status": "pass",
+      "elapsed": 0.031788,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "the_traversal_leaves_the_entities_alone",
+      "status": "pass",
+      "elapsed": 0.031724,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "settings_off_draws_every_leaf",
+      "status": "pass",
+      "elapsed": 0.031637,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "turning_the_settings_off_shows_the_leaves_again",
+      "status": "pass",
+      "elapsed": 0.031516,
+      "project": "lod"
+    },
+    {
+      "suite": "Hierarchy",
+      "case": "the_walk_reports_what_it_cost",
+      "status": "pass",
+      "elapsed": 0.031783,
+      "project": "lod"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.030779,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.030053,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.029231,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.030753,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.030453,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.030914,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract",
+      "status": "pass",
+      "elapsed": 0.030116,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract_empty_batch",
+      "status": "pass",
+      "elapsed": 0.029898,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.029963,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.028374,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.030001,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.029984,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.030039,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.029427,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_written_in_the_delta",
+      "status": "pass",
+      "elapsed": 0.029532,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_cover_a_rotated_instance",
+      "status": "pass",
+      "elapsed": 0.02927,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.030926,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.029904,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.031775,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.030495,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.030917,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "parent_tree_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.030438,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_parent_node_children_dynamic",
+      "status": "pass",
+      "elapsed": 0.030427,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mixed_tree_only_dynamic_reuploaded",
+      "status": "pass",
+      "elapsed": 0.031245,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "reparent_between_storages_requeues_subtree",
+      "status": "pass",
+      "elapsed": 0.031708,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_parent_node_frees_slots",
+      "status": "pass",
+      "elapsed": 0.031569,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_color_is_the_composed_tint",
+      "status": "pass",
+      "elapsed": 0.030614,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "tinted_opaque_entity_stays_static",
+      "status": "pass",
+      "elapsed": 0.03012,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "primitive_vertices_are_white",
+      "status": "pass",
+      "elapsed": 0.029556,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_color_is_kept_beside_the_instance_color",
+      "status": "pass",
+      "elapsed": 0.030289,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_alpha_reaches_the_upload",
+      "status": "pass",
+      "elapsed": 0.029514,
+      "project": "render"
+    },
+    {
+      "suite": "Instances",
+      "case": "static_1m_renders_a_frame",
+      "status": "pass",
+      "elapsed": 6.704663,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "timings_are_off_until_they_are_asked_for",
+      "status": "pass",
+      "elapsed": 0.101054,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "enabled_timings_report_the_passes_of_a_frame",
+      "status": "pass",
+      "elapsed": 0.114193,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "disabled_timings_stop_the_queries",
+      "status": "pass",
+      "elapsed": 0.101113,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_extracted",
+      "status": "pass",
+      "elapsed": 0.030981,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_color_is_linear",
+      "status": "pass",
+      "elapsed": 0.031023,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "spot_light_direction_and_cone",
+      "status": "pass",
+      "elapsed": 0.03026,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_is_not_a_spot_cone",
+      "status": "pass",
+      "elapsed": 0.03022,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_behind_camera_culled",
+      "status": "pass",
+      "elapsed": 0.032404,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_far_to_the_side_culled",
+      "status": "pass",
+      "elapsed": 0.032059,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_beyond_far_plane_culled",
+      "status": "pass",
+      "elapsed": 0.031945,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_inside_frustum_kept",
+      "status": "pass",
+      "elapsed": 0.031321,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "range_reaches_into_the_frustum",
+      "status": "pass",
+      "elapsed": 0.030884,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "directional_light_stays_the_sun",
+      "status": "pass",
+      "elapsed": 0.030887,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.030669,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_override_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.030444,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "camera_range_is_the_cluster_depth",
+      "status": "pass",
+      "elapsed": 0.030782,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_of_view_center",
+      "status": "pass",
+      "elapsed": 0.030789,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_follows_screen_position",
+      "status": "pass",
+      "elapsed": 0.029444,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_slices_grow_with_depth",
+      "status": "pass",
+      "elapsed": 0.029724,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "lights_land_in_expected_clusters",
+      "status": "pass",
+      "elapsed": 0.029865,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "moved_light_is_reextracted",
+      "status": "pass",
+      "elapsed": 0.029464,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "defaults_without_component",
+      "status": "pass",
+      "elapsed": 0.029699,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "colors_are_linear",
+      "status": "pass",
+      "elapsed": 0.030482,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "intensity_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.029877,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "zero_intensity_is_one",
+      "status": "pass",
+      "elapsed": 0.029113,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_stable_without_change",
+      "status": "pass",
+      "elapsed": 0.02913,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_changes_on_change",
+      "status": "pass",
+      "elapsed": 0.029439,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "removed_component_restores_defaults",
+      "status": "pass",
+      "elapsed": 0.029172,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "source_is_reserved",
+      "status": "pass",
+      "elapsed": 0.029497,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_light_is_static",
+      "status": "pass",
+      "elapsed": 0.029902,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_is_not_static",
+      "status": "pass",
+      "elapsed": 0.029402,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "light_under_dynamic_parent_is_dynamic",
+      "status": "pass",
+      "elapsed": 0.029622,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_lights_are_listed_unculled",
+      "status": "pass",
+      "elapsed": 0.02918,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_not_in_bake_lights",
+      "status": "pass",
+      "elapsed": 0.029773,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "bake_lights_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.028757,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_defaults",
+      "status": "pass",
+      "elapsed": 0.029056,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_override",
+      "status": "pass",
+      "elapsed": 0.0292,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_static_is_an_emitter",
+      "status": "pass",
+      "elapsed": 0.029926,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_dynamic_is_not_an_emitter",
+      "status": "pass",
+      "elapsed": 0.0298,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitters_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.029762,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_instance_is_flagged_baked",
+      "status": "pass",
+      "elapsed": 0.027336,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "toggle_requeues_every_instance",
+      "status": "pass",
+      "elapsed": 0.028829,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "sh_reconstructs_the_light_direction",
+      "status": "pass",
+      "elapsed": 0.028875,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "voxel_grid_marks_static_geometry",
+      "status": "pass",
+      "elapsed": 0.02872,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_behind_a_wall_is_darker",
+      "status": "pass",
+      "elapsed": 0.029549,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_is_not_occluded_by_its_own_bounds",
+      "status": "pass",
+      "elapsed": 0.02955,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitter_lights_a_probe",
+      "status": "pass",
+      "elapsed": 0.029237,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_its_probe",
+      "status": "pass",
+      "elapsed": 0.027575,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_only_its_neighbourhood",
+      "status": "pass",
+      "elapsed": 0.031391,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_light_marks_the_probes_in_range",
+      "status": "pass",
+      "elapsed": 0.029317,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "budget_limits_the_probes_per_frame",
+      "status": "pass",
+      "elapsed": 0.029607,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "nearest_probes_are_baked_first",
+      "status": "pass",
+      "elapsed": 0.028854,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "disabled_settings_drop_the_probes",
+      "status": "pass",
+      "elapsed": 0.028632,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "baking_is_enabled_by_default",
+      "status": "pass",
+      "elapsed": 0.02882,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_from_bounds_and_spacing",
+      "status": "pass",
+      "elapsed": 0.028689,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_clamped_to_the_maximum",
+      "status": "pass",
+      "elapsed": 0.028934,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "large_instance_gets_a_probe_grid",
+      "status": "pass",
+      "elapsed": 0.029198,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "pool_reuses_the_probes_of_a_removed_instance",
+      "status": "pass",
+      "elapsed": 0.030102,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_sits_on_the_bounds",
+      "status": "pass",
+      "elapsed": 0.029272,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_follows_the_instance_scale",
+      "status": "pass",
+      "elapsed": 0.029235,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_corners",
+      "status": "pass",
+      "elapsed": 0.02899,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_center",
+      "status": "pass",
+      "elapsed": 0.028759,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_sample_mixes_the_corners",
+      "status": "pass",
+      "elapsed": 0.02861,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_without_static_light_marks_only_itself",
+      "status": "pass",
+      "elapsed": 0.028917,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_near_static_light_marks_neighbours",
+      "status": "pass",
+      "elapsed": 0.030567,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_invalidates_the_old_and_the_new_position",
+      "status": "pass",
+      "elapsed": 0.030527,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_keeps_the_pool_layout",
+      "status": "pass",
+      "elapsed": 0.030494,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "unlit_move_defers_the_descriptor_upload",
+      "status": "pass",
+      "elapsed": 0.030668,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "new_light_flushes_the_deferred_descriptors",
+      "status": "pass",
+      "elapsed": 0.029893,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "component_consumed_by_extract",
+      "status": "pass",
+      "elapsed": 0.029417,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "camera_becomes_the_view",
+      "status": "pass",
+      "elapsed": 0.028783,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "two_cameras_over_two_frames",
+      "status": "pass",
+      "elapsed": 0.030523,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "overrides_write_to_file",
+      "status": "pass",
+      "elapsed": 0.030528,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "write_to_file_kept_without_component",
+      "status": "pass",
+      "elapsed": 0.030413,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_is_the_first_camera",
+      "status": "pass",
+      "elapsed": 0.030281,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_without_camera_entity",
+      "status": "pass",
+      "elapsed": 0.030317,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "removed_after_a_deferred_extract",
+      "status": "pass",
+      "elapsed": 0.028047,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_to_children",
+      "status": "pass",
+      "elapsed": 0.028976,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.030603,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_to_parent",
+      "status": "pass",
+      "elapsed": 0.030498,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.030538,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "instance_color_uses_tint_and_opacity",
+      "status": "pass",
+      "elapsed": 0.030453,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "emissive_scaled_by_strength",
+      "status": "pass",
+      "elapsed": 0.030427,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "pbr_defaults",
+      "status": "pass",
+      "elapsed": 0.029881,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_parent_component",
+      "status": "pass",
+      "elapsed": 0.029397,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_change_propagates_through_parent",
+      "status": "pass",
+      "elapsed": 0.031701,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "parent_child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.031239,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_parent_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.030902,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_mixed_tree",
+      "status": "pass",
+      "elapsed": 0.03126,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_through_parent",
+      "status": "pass",
+      "elapsed": 0.03135,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_follows_reparent_between_storages",
+      "status": "pass",
+      "elapsed": 0.029267,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_zero_keeps_the_color",
+      "status": "pass",
+      "elapsed": 0.029143,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_half_blends_the_color",
+      "status": "pass",
+      "elapsed": 0.030843,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_full_replaces_the_color",
+      "status": "pass",
+      "elapsed": 0.030592,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_two_levels",
+      "status": "pass",
+      "elapsed": 0.030874,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_three_levels",
+      "status": "pass",
+      "elapsed": 0.030247,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_over_an_untinted_parent",
+      "status": "pass",
+      "elapsed": 0.030134,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "root_tint_change_recomposes_the_subtree",
+      "status": "pass",
+      "elapsed": 0.029861,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "middle_tint_change_recomposes_below_it",
+      "status": "pass",
+      "elapsed": 0.029662,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_restores_the_ancestor_result",
+      "status": "pass",
+      "elapsed": 0.031439,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_childof_chain",
+      "status": "pass",
+      "elapsed": 0.031491,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_parent_chain",
+      "status": "pass",
+      "elapsed": 0.031507,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_childof_under_parent",
+      "status": "pass",
+      "elapsed": 0.031416,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_parent_under_childof",
+      "status": "pass",
+      "elapsed": 0.031033,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composition_survives_a_reparent",
+      "status": "pass",
+      "elapsed": 0.030897,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "png_loads_into_a_create_command",
+      "status": "pass",
+      "elapsed": 0.0472,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "requested_size_selects_the_class",
+      "status": "pass",
+      "elapsed": 0.064579,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "source_size_picks_the_nearest_class",
+      "status": "pass",
+      "elapsed": 0.052778,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "quality_caps_the_class",
+      "status": "pass",
+      "elapsed": 0.049018,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "new_path_updates_the_same_handle",
+      "status": "pass",
+      "elapsed": 0.047872,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.046632,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "albedo_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.049815,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "every_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.045389,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "prefab_slots_are_inherited",
+      "status": "pass",
+      "elapsed": 0.048982,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "reload_reextracts_dependents",
+      "status": "pass",
+      "elapsed": 0.049143,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "deleting_a_texture_unbinds_and_warns",
+      "status": "pass",
+      "elapsed": 0.046452,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "missing_file_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.043571,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "kept_source_pixels_survive_the_upload",
+      "status": "pass",
+      "elapsed": 0.04273,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "row_zero_is_the_bottom_of_the_file",
+      "status": "pass",
+      "elapsed": 0.040155,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_spreads_a_class_over_pages",
+      "status": "pass",
+      "elapsed": 0.038938,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_reuses_a_released_layer",
+      "status": "pass",
+      "elapsed": 0.0469,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_out_of_pages_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.04524,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "inline_data_rasterizes",
+      "status": "pass",
+      "elapsed": 0.045725,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "file_rasterizes",
+      "status": "pass",
+      "elapsed": 0.046591,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "zero_height_follows_the_width",
+      "status": "pass",
+      "elapsed": 0.067833,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "resize_rerasterizes",
+      "status": "pass",
+      "elapsed": 0.064141,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.040273,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "handle_reaches_a_pbr_slot",
+      "status": "pass",
+      "elapsed": 0.049737,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "texture_and_svg_is_an_error",
+      "status": "pass",
+      "elapsed": 0.048401,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "row_zero_is_the_bottom_of_the_image",
+      "status": "pass",
+      "elapsed": 0.048055,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "text_rasterizes",
+      "status": "pass",
+      "elapsed": 0.047609,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "mask_hides_half",
+      "status": "pass",
+      "elapsed": 0.040871,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "clip_path_keeps_the_clipped_half",
+      "status": "pass",
+      "elapsed": 0.044376,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "queues_a_job_instead_of_rasterizing",
+      "status": "pass",
+      "elapsed": 0.040032,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "previous_image_stays_while_resizing",
+      "status": "pass",
+      "elapsed": 0.055812,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "completion_uploads_on_the_main_thread",
+      "status": "pass",
+      "elapsed": 0.256438,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "new_set_supersedes_the_queued_job",
+      "status": "pass",
+      "elapsed": 0.053335,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "deleting_the_entity_cancels_the_job",
+      "status": "pass",
+      "elapsed": 0.04579,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "bands_split_a_large_image",
+      "status": "pass",
+      "elapsed": 0.071211,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "nearest_texture_rasterizes_first",
+      "status": "pass",
+      "elapsed": 0.044309,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "component_defaults",
+      "status": "pass",
+      "elapsed": 0.030727,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "untiled_instance_is_the_identity",
+      "status": "pass",
+      "elapsed": 0.028958,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "transform_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.028608,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "box_projection_tiles_every_face",
+      "status": "pass",
+      "elapsed": 0.028761,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "cylinder_projection_tiles_the_circumference",
+      "status": "pass",
+      "elapsed": 0.028588,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "radial_projection_tiles_radius_and_arc",
+      "status": "pass",
+      "elapsed": 0.028163,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "meters_projection_stretches_the_mesh_uv",
+      "status": "pass",
+      "elapsed": 0.029006,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "fit_rounds_the_tile_count",
+      "status": "pass",
+      "elapsed": 0.028325,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "partial_tiles_keep_the_fraction",
+      "status": "pass",
+      "elapsed": 0.028538,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "min_tiles_raises_the_count",
+      "status": "pass",
+      "elapsed": 0.028807,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "wrap_mode_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.028257,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "mirror_wrap_folds_the_uv",
+      "status": "pass",
+      "elapsed": 0.029046,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "clamp_wrap_holds_the_range",
+      "status": "pass",
+      "elapsed": 0.028908,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.028332,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "scale_change_updates_the_tiling",
+      "status": "pass",
+      "elapsed": 0.028792,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_of_a_camera_facing_surface",
+      "status": "pass",
+      "elapsed": 0.004021,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_with_screen_y_up",
+      "status": "pass",
+      "elapsed": 0.003712,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_for_a_flipped_normal",
+      "status": "pass",
+      "elapsed": 0.003795,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_follows_swapped_uv_axes",
+      "status": "pass",
+      "elapsed": 0.003569,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "flat_sample_keeps_the_normal",
+      "status": "pass",
+      "elapsed": 0.003784,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_u_tangent",
+      "status": "pass",
+      "elapsed": 0.003625,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_v_tangent",
+      "status": "pass",
+      "elapsed": 0.003746,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "degenerate_derivatives_keep_the_normal",
+      "status": "pass",
+      "elapsed": 0.003686,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_integrates_position",
+      "status": "pass",
+      "elapsed": 0.010295,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "angular_velocity_integrates_rotation",
+      "status": "pass",
+      "elapsed": 0.010277,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_marks_dynamic",
+      "status": "pass",
+      "elapsed": 0.010363,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "built_in_layers_are_registered",
+      "status": "pass",
+      "elapsed": 0.029089,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "registration_produces_the_ordered_command",
+      "status": "pass",
+      "elapsed": 0.03005,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "command_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.029707,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "order_sorts_the_command",
+      "status": "pass",
+      "elapsed": 0.029222,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "unregistration_renumbers_and_resends",
+      "status": "pass",
+      "elapsed": 0.031083,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "material_pair_sets_the_layer_bit",
+      "status": "pass",
+      "elapsed": 0.029491,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "two_layers_set_two_bits",
+      "status": "pass",
+      "elapsed": 0.030376,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "removing_the_pair_clears_the_bit",
+      "status": "pass",
+      "elapsed": 0.029529,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.028532,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "dynamic_instance_gets_the_bit",
+      "status": "pass",
+      "elapsed": 0.029686,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "transparent_instance_keeps_the_bit",
+      "status": "pass",
+      "elapsed": 0.029464,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.029274,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_update_on_change",
+      "status": "pass",
+      "elapsed": 0.028983,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "settings_flag_reaches_the_view",
+      "status": "pass",
+      "elapsed": 0.030381,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "project_layer_gets_a_bit",
+      "status": "pass",
+      "elapsed": 0.03028,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "limit_is_an_error_logged_once",
+      "status": "pass",
+      "elapsed": 0.030718,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "scene_without_layers_keeps_the_flag_off",
+      "status": "pass",
+      "elapsed": 0.028159,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_entity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.027871,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blend_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.02749,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opacity_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.029334,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "full_opacity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.029332,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "tint_alpha_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.028662,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_opaque_mode_blends_as_alpha",
+      "status": "pass",
+      "elapsed": 0.028274,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.028178,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_modes_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.027398,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "every_blend_mode_reaches_the_packet",
+      "status": "pass",
+      "elapsed": 0.029504,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_back_to_front",
+      "status": "pass",
+      "elapsed": 0.029515,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "static_entity_leaves_and_regains_its_slot",
+      "status": "pass",
+      "elapsed": 0.028393,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.028351,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "dynamic_transparent_leaves_the_dynamic_batches",
+      "status": "pass",
+      "elapsed": 0.02832,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "deleted_entity_leaves_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.027397,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "prefab_blend_mode_is_inherited",
+      "status": "pass",
+      "elapsed": 0.028156,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_scene_packet_is_unchanged",
+      "status": "pass",
+      "elapsed": 0.029671,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_zero_roughness_is_the_first_level",
+      "status": "pass",
+      "elapsed": 0.029597,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_full_roughness_is_the_last_level",
+      "status": "pass",
+      "elapsed": 0.02951,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_grows_with_roughness",
+      "status": "pass",
+      "elapsed": 0.029428,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_a_quarter_roughness_is_half_the_chain",
+      "status": "pass",
+      "elapsed": 0.029229,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_half_roughness_follows_the_curve",
+      "status": "pass",
+      "elapsed": 0.02857,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_clamps_roughness_to_the_chain",
+      "status": "pass",
+      "elapsed": 0.029072,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_chain_keeps_its_coarsest_level_large",
+      "status": "pass",
+      "elapsed": 0.030202,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_view_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.030938,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "alpha_blended_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.030486,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "premultiplied_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.030433,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "additive_instance_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.030406,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_count_covers_the_alpha_blended_instances",
+      "status": "pass",
+      "elapsed": 0.028914,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "world_without_an_atmosphere_has_no_sky",
+      "status": "pass",
+      "elapsed": 0.029439,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "world_without_an_atmosphere_registers_no_shader",
+      "status": "pass",
+      "elapsed": 0.029881,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "atmosphere_draws_the_sky_of_every_view",
+      "status": "pass",
+      "elapsed": 0.030828,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "atmosphere_registers_the_shaders_that_compile",
+      "status": "pass",
+      "elapsed": 0.030805,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_direction_comes_from_the_referenced_light",
+      "status": "pass",
+      "elapsed": 0.031407,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_falls_back_to_the_first_directional_light",
+      "status": "pass",
+      "elapsed": 0.030378,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_color_is_the_linear_light_color_times_its_intensity",
+      "status": "pass",
+      "elapsed": 0.030525,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "zero_values_take_the_defaults_of_the_medium",
+      "status": "pass",
+      "elapsed": 0.03048,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "rayleigh_scale_multiplies_the_scattering",
+      "status": "pass",
+      "elapsed": 0.030762,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "black_ground_albedo_takes_its_default",
+      "status": "pass",
+      "elapsed": 0.030532,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "negative_aerial_perspective_turns_the_haze_off",
+      "status": "pass",
+      "elapsed": 0.030523,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "tables_are_dirty_on_the_first_frame",
+      "status": "pass",
+      "elapsed": 0.030714,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "tables_stay_clean_when_nothing_changes",
+      "status": "pass",
+      "elapsed": 0.030591,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "changing_the_medium_makes_the_tables_dirty",
+      "status": "pass",
+      "elapsed": 0.030213,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "changing_the_disk_leaves_the_tables_alone",
+      "status": "pass",
+      "elapsed": 0.030594,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_sun_that_hardly_moves_keeps_the_sky_view",
+      "status": "pass",
+      "elapsed": 0.030183,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_sun_that_moves_renders_the_sky_view_again",
+      "status": "pass",
+      "elapsed": 0.030917,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "small_steps_of_the_sun_add_up_to_a_new_sky_view",
+      "status": "pass",
+      "elapsed": 0.03154,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_camera_that_rises_renders_the_sky_view_again",
+      "status": "pass",
+      "elapsed": 0.031185,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_source_marks_the_view",
+      "status": "pass",
+      "elapsed": 0.031276,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_generation_follows_the_sky_view",
+      "status": "pass",
+      "elapsed": 0.030685,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_of_a_gradient_view_is_untouched",
+      "status": "pass",
+      "elapsed": 0.031234,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "removing_the_atmosphere_clears_the_sky",
+      "status": "pass",
+      "elapsed": 0.029294,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_opposite_the_sun_is_full",
+      "status": "pass",
+      "elapsed": 0.031076,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_at_the_sun_is_new",
+      "status": "pass",
+      "elapsed": 0.030608,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_at_a_right_angle_is_half",
+      "status": "pass",
+      "elapsed": 0.030311,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_direction_comes_from_its_light",
+      "status": "pass",
+      "elapsed": 0.030359,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_disk_takes_its_angular_radius",
+      "status": "pass",
+      "elapsed": 0.030066,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_default_moon_disk_takes_the_default_radius",
+      "status": "pass",
+      "elapsed": 0.030194,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_a_moon_draws_none",
+      "status": "pass",
+      "elapsed": 0.028549,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_radiance_comes_from_its_celestial_light",
+      "status": "pass",
+      "elapsed": 0.030859,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_stars_draws_none",
+      "status": "pass",
+      "elapsed": 0.030739,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_star_field_takes_the_defaults",
+      "status": "pass",
+      "elapsed": 0.030667,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_takes_its_own_values",
+      "status": "pass",
+      "elapsed": 0.030574,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_radiance_comes_from_its_celestial_light",
+      "status": "pass",
+      "elapsed": 0.030487,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "an_unrotated_star_field_keeps_the_axes_of_the_world",
+      "status": "pass",
+      "elapsed": 0.030255,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_rotated_star_field_turns_its_axes",
+      "status": "pass",
+      "elapsed": 0.028426,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_stands_in_the_dark",
+      "status": "pass",
+      "elapsed": 0.031415,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_is_gone_by_day",
+      "status": "pass",
+      "elapsed": 0.031431,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_fade_is_half_between_the_two_elevations",
+      "status": "pass",
+      "elapsed": 0.031355,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_fade_follows_the_elevations_of_the_field",
+      "status": "pass",
+      "elapsed": 0.031301,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sky_keeps_the_radiance_over_the_atmosphere",
+      "status": "pass",
+      "elapsed": 0.031059,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_air_takes_the_blue_out_of_a_low_sun",
+      "status": "pass",
+      "elapsed": 0.028894,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_sun_over_the_atmosphere_keeps_its_radiance",
+      "status": "pass",
+      "elapsed": 0.028505,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_an_atmosphere_keeps_its_light",
+      "status": "pass",
+      "elapsed": 0.031012,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_night_without_a_moon_leaves_the_view_dark",
+      "status": "pass",
+      "elapsed": 0.030995,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_full_moon_lights_the_view_after_sunset",
+      "status": "pass",
+      "elapsed": 0.031077,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_new_moon_leaves_the_night_dark",
+      "status": "pass",
+      "elapsed": 0.031141,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sun_outshines_the_moon_by_day",
+      "status": "pass",
+      "elapsed": 0.031007,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sun_of_the_sky_is_the_light_of_the_view",
+      "status": "pass",
+      "elapsed": 0.030373,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_camera_over_the_haze_keeps_more_of_the_sun",
+      "status": "pass",
+      "elapsed": 0.029205,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_overhead_at_noon_on_the_equator",
+      "status": "pass",
+      "elapsed": 0.019264,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_at_the_latitude_at_noon",
+      "status": "pass",
+      "elapsed": 0.019216,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_rises_in_the_east",
+      "status": "pass",
+      "elapsed": 0.019208,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_sets_in_the_west",
+      "status": "pass",
+      "elapsed": 0.01914,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_under_the_horizon_at_midnight",
+      "status": "pass",
+      "elapsed": 0.018932,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_solstice_tilts_the_sun_by_the_axis",
+      "status": "pass",
+      "elapsed": 0.018732,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_winter_solstice_tilts_the_sun_the_other_way",
+      "status": "pass",
+      "elapsed": 0.018509,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_north_offset_turns_the_compass",
+      "status": "pass",
+      "elapsed": 0.019046,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_day_without_a_date_is_the_solstice",
+      "status": "pass",
+      "elapsed": 0.01838,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "time_scale_advances_the_hour",
+      "status": "pass",
+      "elapsed": 0.018445,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_without_a_scale_holds_the_hour",
+      "status": "pass",
+      "elapsed": 0.018555,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_hour_wraps_into_the_next_day",
+      "status": "pass",
+      "elapsed": 0.018326,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_day_wraps_at_the_end_of_the_year",
+      "status": "pass",
+      "elapsed": 0.018368,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_negative_scale_runs_the_clock_backwards",
+      "status": "pass",
+      "elapsed": 0.01904,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_written_hour_jumps_the_sky_in_the_same_frame",
+      "status": "pass",
+      "elapsed": 0.018372,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_one_by_day",
+      "status": "pass",
+      "elapsed": 0.018564,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_zero_at_night",
+      "status": "pass",
+      "elapsed": 0.01845,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_half_at_the_horizon",
+      "status": "pass",
+      "elapsed": 0.017988,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_full_moon_stands_opposite_the_sun",
+      "status": "pass",
+      "elapsed": 0.018078,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_new_moon_stands_at_the_sun",
+      "status": "pass",
+      "elapsed": 0.018012,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_quarter_moon_stands_at_a_right_angle",
+      "status": "pass",
+      "elapsed": 0.018677,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_moon_phase_of_the_sky_follows_the_clock",
+      "status": "pass",
+      "elapsed": 0.031316,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_star_field_keeps_its_pole_over_the_hours",
+      "status": "pass",
+      "elapsed": 0.018324,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_star_field_turns_with_the_hour",
+      "status": "pass",
+      "elapsed": 0.018126,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_without_lights_of_its_own_takes_them_from_the_sky",
+      "status": "pass",
+      "elapsed": 0.018118,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_that_names_its_own_lights_drives_those",
+      "status": "pass",
+      "elapsed": 0.018109,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_light_that_was_authored_without_a_rotation_gets_one",
+      "status": "pass",
+      "elapsed": 0.018599,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_world_without_an_atmosphere_still_runs_its_clock",
+      "status": "pass",
+      "elapsed": 0.018285,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_of_the_view_is_the_first_pass",
+      "status": "pass",
+      "elapsed": 0.030676,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_color_comes_from_the_sky",
+      "status": "pass",
+      "elapsed": 0.030684,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_low_sun_makes_the_fog_red",
+      "status": "pass",
+      "elapsed": 0.03159,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_night_fog_keeps_the_night_tint",
+      "status": "pass",
+      "elapsed": 0.030754,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_density_follows_the_world_scale",
+      "status": "pass",
+      "elapsed": 0.030019,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_intensity_scales_the_density",
+      "status": "pass",
+      "elapsed": 0.032403,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_falloff_follows_the_aerosol_layer",
+      "status": "pass",
+      "elapsed": 0.029475,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_sits_at_the_sea_level_of_the_sky",
+      "status": "pass",
+      "elapsed": 0.03125,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_over_the_haze_sees_thinner_fog",
+      "status": "pass",
+      "elapsed": 0.031251,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_negative_fog_intensity_keeps_the_authored_fog",
+      "status": "pass",
+      "elapsed": 0.031129,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_world_without_an_atmosphere_keeps_the_authored_fog",
+      "status": "pass",
+      "elapsed": 0.0303,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_sky_leaves_the_framing_of_the_fog_alone",
+      "status": "pass",
+      "elapsed": 0.030071,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_environment_is_filtered_on_the_first_frame",
+      "status": "pass",
+      "elapsed": 0.028927,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_changed_medium_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.030111,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_small_step_of_the_sun_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.031417,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_large_step_of_the_sun_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.031416,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_moving_sun_filters_the_environment_less_often",
+      "status": "pass",
+      "elapsed": 0.032247,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_that_rises_a_little_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.031406,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_that_climbs_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.030021,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_gradient_environment_is_not_touched_by_the_sky",
+      "status": "pass",
+      "elapsed": 0.030042,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_world_without_weather_draws_a_clear_sky",
+      "status": "pass",
+      "elapsed": 0.029136,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_reaches_the_sky",
+      "status": "pass",
+      "elapsed": 0.032449,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_overcast_sits_between_the_two",
+      "status": "pass",
+      "elapsed": 0.032448,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_medium_stays_the_base_under_overcast",
+      "status": "pass",
+      "elapsed": 0.03246,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_sun_keeps_moving_under_overcast",
+      "status": "pass",
+      "elapsed": 0.031616,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_flattens_the_light_of_the_view",
+      "status": "pass",
+      "elapsed": 0.029408,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_overcast_lights_between_the_two",
+      "status": "pass",
+      "elapsed": 0.030736,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.02997,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_sliver_of_overcast_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.031314,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_fog_raises_the_fog_density",
+      "status": "pass",
+      "elapsed": 0.031323,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_fog_sits_between_the_two",
+      "status": "pass",
+      "elapsed": 0.031309,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_fog_leaves_the_color_and_the_framing_alone",
+      "status": "pass",
+      "elapsed": 0.031289,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_rain_wets_the_material_layer",
+      "status": "pass",
+      "elapsed": 0.028751,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_world_without_weather_keeps_the_wetness_layer",
+      "status": "pass",
+      "elapsed": 0.030781,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_first_frame_snaps_to_the_weather",
+      "status": "pass",
+      "elapsed": 0.03077,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_new_target_is_eased_over_the_transition",
+      "status": "pass",
+      "elapsed": 0.031968,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_shorter_transition_moves_further",
+      "status": "pass",
+      "elapsed": 0.03145,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_transition_arrives_at_the_target",
+      "status": "pass",
+      "elapsed": 0.033189,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_write_of_one_amount_keeps_the_others",
+      "status": "pass",
+      "elapsed": 0.031554,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "an_amount_outside_the_range_is_held_inside_it",
+      "status": "pass",
+      "elapsed": 0.029362,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_flattens_the_fog_color",
+      "status": "pass",
+      "elapsed": 0.03097,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_plain_instance_has_no_shape",
+      "status": "pass",
+      "elapsed": 0.029677,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_border_sets_the_shape_bit",
+      "status": "pass",
+      "elapsed": 0.030169,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "radii_are_ratios_of_the_short_side",
+      "status": "pass",
+      "elapsed": 0.029988,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "widths_are_ratios_of_the_short_side",
+      "status": "pass",
+      "elapsed": 0.029896,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "the_half_extents_carry_the_aspect",
+      "status": "pass",
+      "elapsed": 0.028489,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_scale_moves_the_ratios",
+      "status": "pass",
+      "elapsed": 0.028655,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "the_border_color_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.029387,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_colorless_border_takes_the_rgb",
+      "status": "pass",
+      "elapsed": 0.028861,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_radius_change_re_extracts_the_instance",
+      "status": "pass",
+      "elapsed": 0.029165,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_border_survives_the_sorted_pass",
+      "status": "pass",
+      "elapsed": 0.029094,
+      "project": "render"
+    },
+    {
+      "suite": "View",
+      "case": "defaults_of_a_new_view",
+      "status": "pass",
+      "elapsed": 0.0302,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "camera_fills_the_view",
+      "status": "pass",
+      "elapsed": 0.027854,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "views_render_in_priority_order",
+      "status": "pass",
+      "elapsed": 0.030186,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "synthesized_view_matches_an_explicit_one",
+      "status": "pass",
+      "elapsed": 0.031287,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "disabled_view_is_skipped",
+      "status": "pass",
+      "elapsed": 0.030586,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "view_without_camera_is_skipped",
+      "status": "pass",
+      "elapsed": 0.030733,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "view_with_a_dead_camera_is_skipped",
+      "status": "pass",
+      "elapsed": 0.030529,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "impl_holds_the_view_index",
+      "status": "pass",
+      "elapsed": 0.029913,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "environment_of_a_view_overrides_the_singleton",
+      "status": "pass",
+      "elapsed": 0.029442,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "environment_falls_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.028709,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "equal_environments_share_a_generation",
+      "status": "pass",
+      "elapsed": 0.029911,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "cluster_settings_of_a_view_override_the_singleton",
+      "status": "pass",
+      "elapsed": 0.030252,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "cluster_settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.030043,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "material_layers_toggle_reaches_the_view",
+      "status": "pass",
+      "elapsed": 0.029676,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "clear_color_of_a_view_is_linear",
+      "status": "pass",
+      "elapsed": 0.02945,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "lights_are_culled_per_view",
+      "status": "pass",
+      "elapsed": 0.028255,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "sorted_draws_are_sorted_per_view",
+      "status": "pass",
+      "elapsed": 0.028828,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "depth_precision_at_100k",
+      "status": "pass",
+      "elapsed": 0.027588,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "surface_view_has_no_target",
+      "status": "pass",
+      "elapsed": 0.029159,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "target_reaches_the_packet_as_a_create_command",
+      "status": "pass",
+      "elapsed": 0.02874,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "view_names_the_target_handle_and_size",
+      "status": "pass",
+      "elapsed": 0.029023,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "resize_resends_the_create_command",
+      "status": "pass",
+      "elapsed": 0.028941,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "unchanged_target_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.028639,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "deleted_target_is_destroyed",
+      "status": "pass",
+      "elapsed": 0.028707,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "two_targets_get_two_handles",
+      "status": "pass",
+      "elapsed": 0.029418,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "membership_assigns_a_bit",
+      "status": "pass",
+      "elapsed": 0.027915,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "entity_in_two_layers_has_both_bits",
+      "status": "pass",
+      "elapsed": 0.029861,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "entity_without_a_layer_has_no_bits",
+      "status": "pass",
+      "elapsed": 0.029661,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "empty_view_list_shows_everything",
+      "status": "pass",
+      "elapsed": 0.02931,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "view_list_restricts_the_mask",
+      "status": "pass",
+      "elapsed": 0.028415,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "static_slots_are_grouped_by_mask",
+      "status": "pass",
+      "elapsed": 0.029502,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "leaving_a_layer_regroups_the_slots",
+      "status": "pass",
+      "elapsed": 0.029128,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "dynamic_instances_are_filtered_per_view",
+      "status": "pass",
+      "elapsed": 0.027519,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "transparent_entries_are_filtered_per_view",
+      "status": "pass",
+      "elapsed": 0.029398,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "lights_are_restricted_to_a_layer",
+      "status": "pass",
+      "elapsed": 0.028394,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "two_views_show_their_own_layer",
+      "status": "pass",
+      "elapsed": 0.02967,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "view_list_holds_eight_entries",
+      "status": "pass",
+      "elapsed": 0.029834,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "past_the_bit_limit_get_no_bit",
+      "status": "pass",
+      "elapsed": 0.030858,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "prefab_layer_is_inherited",
+      "status": "pass",
+      "elapsed": 0.029636,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "caster_mask_comes_from_shadow_layers",
+      "status": "pass",
+      "elapsed": 0.029534,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "scene_without_layers_keeps_its_packet",
+      "status": "pass",
+      "elapsed": 0.032333,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_defaults_to_off",
+      "status": "pass",
+      "elapsed": 0.029903,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_static_runs",
+      "status": "pass",
+      "elapsed": 0.029366,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_dynamic",
+      "status": "pass",
+      "elapsed": 0.029885,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_transparent",
+      "status": "pass",
+      "elapsed": 0.030353,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_lights",
+      "status": "pass",
+      "elapsed": 0.030254,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_without_layers_shows_everything",
+      "status": "pass",
+      "elapsed": 0.030993,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "parent_subtree_requeued_on_change",
+      "status": "pass",
+      "elapsed": 0.02984,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "splits_are_uniform_at_lambda_zero",
+      "status": "pass",
+      "elapsed": 0.029864,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "splits_are_logarithmic_at_lambda_one",
+      "status": "pass",
+      "elapsed": 0.02901,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "default_splits_blend_both",
+      "status": "pass",
+      "elapsed": 0.027507,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "cascades_cover_the_camera_range",
+      "status": "pass",
+      "elapsed": 0.028494,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "cascade_holds_the_slice_corners",
+      "status": "pass",
+      "elapsed": 0.028987,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "texel_snapping_keeps_the_matrix",
+      "status": "pass",
+      "elapsed": 0.029012,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_exclude_no_shadow",
+      "status": "pass",
+      "elapsed": 0.028635,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_exclude_transparent",
+      "status": "pass",
+      "elapsed": 0.028704,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_respect_shadow_layers",
+      "status": "pass",
+      "elapsed": 0.029461,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.028434,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "settings_are_clamped",
+      "status": "pass",
+      "elapsed": 0.02834,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "view_without_shadows_has_no_cascades",
+      "status": "pass",
+      "elapsed": 0.029143,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "world_without_a_sun_has_no_cascades",
+      "status": "pass",
+      "elapsed": 0.029904,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "static_delta_inside_a_cascade_marks_it_dirty",
+      "status": "pass",
+      "elapsed": 0.030083,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "static_delta_outside_a_cascade_keeps_it",
+      "status": "pass",
+      "elapsed": 0.029186,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "camera_rotation_marks_every_cascade",
+      "status": "pass",
+      "elapsed": 0.029222,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "planes_of_a_known_projection",
+      "status": "pass",
+      "elapsed": 0.02997,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "infinite_far_keeps_a_distant_point",
+      "status": "pass",
+      "elapsed": 0.032867,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "sphere_at_the_boundary",
+      "status": "pass",
+      "elapsed": 0.029588,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "aabb_at_the_boundary",
+      "status": "pass",
+      "elapsed": 0.029165,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "static_instance_carries_its_bounds",
+      "status": "pass",
+      "elapsed": 0.029784,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "dynamic_instance_carries_its_bounds",
+      "status": "pass",
+      "elapsed": 0.029033,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "bounds_refresh_when_the_entity_changes",
+      "status": "pass",
+      "elapsed": 0.029034,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.03034,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "settings_of_a_view_override_the_singleton",
+      "status": "pass",
+      "elapsed": 0.030068,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "view_without_settings_culls_by_default",
+      "status": "pass",
+      "elapsed": 0.029988,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "sorted_draws_behind_the_camera_are_culled",
+      "status": "pass",
+      "elapsed": 0.029358,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "disabled_culling_keeps_every_sorted_draw",
+      "status": "pass",
+      "elapsed": 0.029991,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "levels_of_a_view",
+      "status": "pass",
+      "elapsed": 0.028924,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "reduction_of_a_four_by_four_block",
+      "status": "pass",
+      "elapsed": 0.03213,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "reduction_covers_an_odd_edge",
+      "status": "pass",
+      "elapsed": 0.029317,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_on_the_axis_projects_to_the_center",
+      "status": "pass",
+      "elapsed": 0.028797,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_off_the_axis_projects_beside_it",
+      "status": "pass",
+      "elapsed": 0.029767,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_across_the_near_plane_takes_the_view",
+      "status": "pass",
+      "elapsed": 0.029767,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "mip_holds_the_rectangle_in_two_texels",
+      "status": "pass",
+      "elapsed": 0.028728,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_hides_a_sphere_behind_a_wall",
+      "status": "pass",
+      "elapsed": 0.029672,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_keeps_a_sphere_in_front_of_a_wall",
+      "status": "pass",
+      "elapsed": 0.02868,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_keeps_a_sphere_that_straddles_a_wall",
+      "status": "pass",
+      "elapsed": 0.029769,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "a_clamped_rectangle_is_never_hidden",
+      "status": "pass",
+      "elapsed": 0.029204,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.028179,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "view_without_settings_occludes_by_default",
+      "status": "pass",
+      "elapsed": 0.03056,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "disabled_culling_disables_occlusion",
+      "status": "pass",
+      "elapsed": 0.03058,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_grade_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.029346,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_runs_in_order",
+      "status": "pass",
+      "elapsed": 0.029399,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "disabled_effect_is_skipped",
+      "status": "pass",
+      "elapsed": 0.028773,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "enabling_an_effect_rebuilds_the_chain",
+      "status": "pass",
+      "elapsed": 0.028936,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "effect_without_a_shader_is_skipped",
+      "status": "pass",
+      "elapsed": 0.029065,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_list_overrides_the_stack",
+      "status": "pass",
+      "elapsed": 0.028384,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_without_a_list_runs_the_stack",
+      "status": "pass",
+      "elapsed": 0.030825,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_toggle_skips_the_chain",
+      "status": "pass",
+      "elapsed": 0.030634,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "inputs_are_the_union_of_the_passes",
+      "status": "pass",
+      "elapsed": 0.030447,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "disabled_pass_does_not_ask_for_its_inputs",
+      "status": "pass",
+      "elapsed": 0.029584,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "parameters_come_from_the_parameter_component",
+      "status": "pass",
+      "elapsed": 0.030027,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "two_passes_of_one_scale_share_a_target_size",
+      "status": "pass",
+      "elapsed": 0.029229,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "half_scale_pass_asks_for_half_the_target",
+      "status": "pass",
+      "elapsed": 0.029272,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "two_views_keep_their_own_range",
+      "status": "pass",
+      "elapsed": 0.029927,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "histogram_bins_map_the_log_range",
+      "status": "pass",
+      "elapsed": 0.032201,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "histogram_average_skips_the_black_bin",
+      "status": "pass",
+      "elapsed": 0.031825,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_adapts_at_the_speed_of_its_direction",
+      "status": "pass",
+      "elapsed": 0.032191,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_stays_inside_its_range",
+      "status": "pass",
+      "elapsed": 0.032158,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "pinned_exposure_keeps_its_value",
+      "status": "pass",
+      "elapsed": 0.031349,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_exposure_and_tonemap_are_off",
+      "status": "pass",
+      "elapsed": 0.030801,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "tonemap_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.030939,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_pass_declares_its_input",
+      "status": "pass",
+      "elapsed": 0.029988,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_pyramid_stops_above_the_minimum",
+      "status": "pass",
+      "elapsed": 0.031684,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_levels_follow_the_radius",
+      "status": "pass",
+      "elapsed": 0.031672,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "karis_weight_falls_with_the_luminance",
+      "status": "pass",
+      "elapsed": 0.032098,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_bloom_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.031895,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_stack_orders_exposure_before_bloom_before_tonemap",
+      "status": "pass",
+      "elapsed": 0.032184,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.031428,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_integrates_a_level_ray",
+      "status": "pass",
+      "elapsed": 0.031227,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_integral_matches_a_numeric_one",
+      "status": "pass",
+      "elapsed": 0.031713,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_thins_as_the_ray_climbs",
+      "status": "pass",
+      "elapsed": 0.032267,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_factor_is_capped",
+      "status": "pass",
+      "elapsed": 0.031685,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_fog_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.032054,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.032019,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_gives_the_view_a_float_target",
+      "status": "pass",
+      "elapsed": 0.031256,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "float_target_moves_the_gamma_encode",
+      "status": "pass",
+      "elapsed": 0.031636,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_encodes_once_at_the_end",
+      "status": "pass",
+      "elapsed": 0.031228,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_horizon_of_a_flat_plane",
+      "status": "pass",
+      "elapsed": 0.030598,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_horizon_of_a_corner",
+      "status": "pass",
+      "elapsed": 0.032406,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_runs_at_half_resolution",
+      "status": "pass",
+      "elapsed": 0.031324,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_gtao_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.031734,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.031527,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_march_hits_a_floor",
+      "status": "pass",
+      "elapsed": 0.031146,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_march_misses_off_screen",
+      "status": "pass",
+      "elapsed": 0.031271,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_weight_falls_with_the_roughness",
+      "status": "pass",
+      "elapsed": 0.031145,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_ssr_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.031307,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.032132,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ambient_scale_darkens_the_indirect_fraction",
+      "status": "pass",
+      "elapsed": 0.032166,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "coverage_leaves_the_surface_behind_it",
+      "status": "pass",
+      "elapsed": 0.03134,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "covered_pixel_keeps_its_color",
+      "status": "pass",
+      "elapsed": 0.031676,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "defaults_of_new_settings",
+      "status": "pass",
+      "elapsed": 0.031382,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "a_view_without_settings_takes_the_defaults",
+      "status": "pass",
+      "elapsed": 0.031398,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "settings_of_a_view_override_the_singleton",
+      "status": "pass",
+      "elapsed": 0.031546,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.031422,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "quality_scales_both_thresholds",
+      "status": "pass",
+      "elapsed": 0.029882,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "a_view_can_turn_selection_off",
+      "status": "pass",
+      "elapsed": 0.029913,
+      "project": "view"
+    },
+    {
+      "suite": "Lod",
+      "case": "the_shadow_threshold_selects_a_coarser_level",
+      "status": "pass",
+      "elapsed": 0.029763,
+      "project": "view"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.011835,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_is_not_a_root",
+      "status": "pass",
+      "elapsed": 0.012304,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "template_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.012922,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "manual_root_aggregates",
+      "status": "pass",
+      "elapsed": 0.0121,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "empty_root_has_no_bounds",
+      "status": "pass",
+      "elapsed": 0.012442,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_children",
+      "status": "pass",
+      "elapsed": 0.012196,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_deep_hierarchy",
+      "status": "pass",
+      "elapsed": 0.013044,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_parent_storage",
+      "status": "pass",
+      "elapsed": 0.012204,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "own_bounds_are_included",
+      "status": "pass",
+      "elapsed": 0.012264,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_added_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.011494,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_removed_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.01228,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_moved_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.01188,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_out_of_root",
+      "status": "pass",
+      "elapsed": 0.011651,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_into_other_root",
+      "status": "pass",
+      "elapsed": 0.012093,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "nested_root_counts_once",
+      "status": "pass",
+      "elapsed": 0.011963,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "local_bounds_are_root_space",
+      "status": "pass",
+      "elapsed": 0.011893,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_move_transforms_local_bounds",
+      "status": "pass",
+      "elapsed": 0.011746,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_child_change_reaggregates",
+      "status": "pass",
+      "elapsed": 0.012252,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "non_rigid_root_reaggregates_on_move",
+      "status": "pass",
+      "elapsed": 0.012186,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "deleted_root_is_forgotten",
+      "status": "pass",
+      "elapsed": 0.011981,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_shape_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.031795,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "ico_sphere_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.031115,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_shape_derives_box",
+      "status": "pass",
+      "elapsed": 0.031323,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rounded_box_derives_box",
+      "status": "pass",
+      "elapsed": 0.031472,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_shape_derives_capsule",
+      "status": "pass",
+      "elapsed": 0.031604,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "other_shape_derives_aabb",
+      "status": "pass",
+      "elapsed": 0.03111,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "bounds_without_shape_give_aabb",
+      "status": "pass",
+      "elapsed": 0.012096,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "empty_bounds_give_no_collider",
+      "status": "pass",
+      "elapsed": 0.011306,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "no_collider_opts_out",
+      "status": "pass",
+      "elapsed": 0.011339,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "removing_no_collider_restores",
+      "status": "pass",
+      "elapsed": 0.010948,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "adding_no_collider_removes",
+      "status": "pass",
+      "elapsed": 0.012128,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.03174,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.031416,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.031411,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_sphere",
+      "status": "pass",
+      "elapsed": 0.011065,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_box",
+      "status": "pass",
+      "elapsed": 0.011226,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_capsule",
+      "status": "pass",
+      "elapsed": 0.011643,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rotation_turns_box_axes",
+      "status": "pass",
+      "elapsed": 0.012124,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "move_updates_collider",
+      "status": "pass",
+      "elapsed": 0.01159,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "shape_change_updates_collider",
+      "status": "pass",
+      "elapsed": 0.030673,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rendered_bounds_derive_aabb",
+      "status": "pass",
+      "elapsed": 0.031252,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_sphere",
+      "status": "pass",
+      "elapsed": 0.003914,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_sphere",
+      "status": "pass",
+      "elapsed": 0.004084,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_respects_max_distance",
+      "status": "pass",
+      "elapsed": 0.004072,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_box",
+      "status": "pass",
+      "elapsed": 0.004028,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_rotated_box",
+      "status": "pass",
+      "elapsed": 0.004094,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_box",
+      "status": "pass",
+      "elapsed": 0.004062,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_aabb",
+      "status": "pass",
+      "elapsed": 0.00398,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_side",
+      "status": "pass",
+      "elapsed": 0.004,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_cap",
+      "status": "pass",
+      "elapsed": 0.00406,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_capsule",
+      "status": "pass",
+      "elapsed": 0.003885,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.00399,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.003883,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_rotated_box",
+      "status": "pass",
+      "elapsed": 0.003813,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.003702,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.003647,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.003746,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.00353,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.003497,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.003723,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "bounds_of_collider",
+      "status": "pass",
+      "elapsed": 0.003699,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_finds_collider",
+      "status": "pass",
+      "elapsed": 0.011953,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_misses_far_collider",
+      "status": "pass",
+      "elapsed": 0.011644,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "aabb_finds_collider",
+      "status": "pass",
+      "elapsed": 0.01155,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_finds_nearest",
+      "status": "pass",
+      "elapsed": 0.011334,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_misses",
+      "status": "pass",
+      "elapsed": 0.011462,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "frustum_finds_inside",
+      "status": "pass",
+      "elapsed": 0.011386,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "insert_after_update",
+      "status": "pass",
+      "elapsed": 0.011164,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "remove_drops_from_index",
+      "status": "pass",
+      "elapsed": 0.010685,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "no_collider_not_in_index",
+      "status": "pass",
+      "elapsed": 0.012001,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "move_updates_index",
+      "status": "pass",
+      "elapsed": 0.012012,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "root_groups_children",
+      "status": "pass",
+      "elapsed": 0.01198,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "nested_root_found",
+      "status": "pass",
+      "elapsed": 0.011833,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_found",
+      "status": "pass",
+      "elapsed": 0.011761,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_moves_each_frame",
+      "status": "pass",
+      "elapsed": 0.011723,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "disabled_index_finds_nothing",
+      "status": "pass",
+      "elapsed": 0.011241,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_sphere_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.013553,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_aabb_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.014827,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_ray_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.015134,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_frustum_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.01488,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "many_inserts_and_removes",
+      "status": "pass",
+      "elapsed": 0.01604,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "off_emits_no_lines",
+      "status": "pass",
+      "elapsed": 0.028527,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "sphere_draws_three_circles",
+      "status": "pass",
+      "elapsed": 0.028047,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "box_draws_twelve_edges",
+      "status": "pass",
+      "elapsed": 0.028418,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "capsule_draws_two_circles_and_four_lines",
+      "status": "pass",
+      "elapsed": 0.028259,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "root_bounds_draw_a_box",
+      "status": "pass",
+      "elapsed": 0.029083,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "all_draws_colliders_and_bounds",
+      "status": "pass",
+      "elapsed": 0.028996,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "collider_outside_the_view_is_skipped",
+      "status": "pass",
+      "elapsed": 0.028627,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "lines_are_cleared_between_packets",
+      "status": "pass",
+      "elapsed": 0.028499,
+      "project": "collision"
+    },
+    {
+      "suite": "Ray",
+      "case": "center_of_the_default_camera_looks_forward",
+      "status": "pass",
+      "elapsed": 0.024457,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "without_a_camera_there_is_no_ray",
+      "status": "pass",
+      "elapsed": 0.024181,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "follows_the_cursor_to_the_right",
+      "status": "pass",
+      "elapsed": 0.024013,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "follows_the_cursor_up",
+      "status": "pass",
+      "elapsed": 0.024242,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "widens_with_the_aspect_of_the_surface",
+      "status": "pass",
+      "elapsed": 0.024213,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "camera_aspect_ratio_overrides_the_surface",
+      "status": "pass",
+      "elapsed": 0.024101,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "turns_with_the_camera",
+      "status": "pass",
+      "elapsed": 0.024059,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "of_an_orthographic_camera_is_parallel",
+      "status": "pass",
+      "elapsed": 0.023782,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "a_view_builds_its_ray_from_its_own_camera",
+      "status": "pass",
+      "elapsed": 0.025311,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "a_view_without_a_camera_has_no_ray",
+      "status": "pass",
+      "elapsed": 0.024368,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "aspect_of_a_render_target_comes_from_the_target",
+      "status": "pass",
+      "elapsed": 0.024745,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "finds_the_object_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.024793,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "misses_when_the_ray_points_away",
+      "status": "pass",
+      "elapsed": 0.024886,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "takes_the_nearest_of_two_objects",
+      "status": "pass",
+      "elapsed": 0.024816,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "hit_carries_the_normal_of_the_collider",
+      "status": "pass",
+      "elapsed": 0.024995,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "beyond_the_max_distance_is_a_miss",
+      "status": "pass",
+      "elapsed": 0.024318,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_prefab_root",
+      "status": "pass",
+      "elapsed": 0.025002,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_template_root",
+      "status": "pass",
+      "elapsed": 0.02522,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_descendant_is_the_target",
+      "status": "pass",
+      "elapsed": 0.024537,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_between_the_hit_and_the_root_is_the_target",
+      "status": "pass",
+      "elapsed": 0.024545,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "an_entity_outside_a_root_targets_itself",
+      "status": "pass",
+      "elapsed": 0.024193,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "the_view_with_the_highest_priority_picks_first",
+      "status": "pass",
+      "elapsed": 0.024323,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_disabled_view_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.024239,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_view_with_a_render_target_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.024034,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "matches_a_brute_force_pick_on_a_smaller_scene",
+      "status": "pass",
+      "elapsed": 0.076866,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "hover_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.02599,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_waiter_registered_while_already_hovered_resumes_on_the_next_update",
+      "status": "pass",
+      "elapsed": 0.030245,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "the_hovered_tag_follows_the_cursor",
+      "status": "pass",
+      "elapsed": 0.028249,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "press_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.026674,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "release_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.026687,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "click_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.025901,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "drag_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.025308,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_drag_does_not_raise_a_click",
+      "status": "pass",
+      "elapsed": 0.02887,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_receives_the_hit",
+      "status": "pass",
+      "elapsed": 0.024528,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "an_event_bubbles_to_the_parent",
+      "status": "pass",
+      "elapsed": 0.024452,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_child_handler_consumes_the_event",
+      "status": "pass",
+      "elapsed": 0.026249,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_still_cursor_runs_no_query",
+      "status": "pass",
+      "elapsed": 0.025024,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "every_view_costs_one_query",
+      "status": "pass",
+      "elapsed": 0.026868,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "disabled_picking_raises_nothing",
+      "status": "pass",
+      "elapsed": 0.0258,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_cancelled_task_drops_its_waiter",
+      "status": "pass",
+      "elapsed": 0.023266,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_fires_the_action_of_the_entity",
+      "status": "pass",
+      "elapsed": 0.023119,
+      "project": "picking"
+    },
+    {
+      "suite": "Flat",
+      "case": "quad",
+      "status": "pass",
+      "elapsed": 0.004591,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "triangle",
+      "status": "pass",
+      "elapsed": 0.004699,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "right_triangle",
+      "status": "pass",
+      "elapsed": 0.004361,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon_matches_triangle_at_three_sides",
+      "status": "pass",
+      "elapsed": 0.004663,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon_clamps_minimum",
+      "status": "pass",
+      "elapsed": 0.004749,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon",
+      "status": "pass",
+      "elapsed": 0.004549,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "box",
+      "status": "pass",
+      "elapsed": 0.004551,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box",
+      "status": "pass",
+      "elapsed": 0.004957,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box_clamps_radius",
+      "status": "pass",
+      "elapsed": 0.003846,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box_clamps_segments",
+      "status": "pass",
+      "elapsed": 0.004089,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "triangle_prism",
+      "status": "pass",
+      "elapsed": 0.004402,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "right_triangle_prism",
+      "status": "pass",
+      "elapsed": 0.003926,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "sphere_smooth",
+      "status": "pass",
+      "elapsed": 0.004047,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "sphere_flat",
+      "status": "pass",
+      "elapsed": 0.00395,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "hemisphere_smooth",
+      "status": "pass",
+      "elapsed": 0.00433,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "hemisphere_flat",
+      "status": "pass",
+      "elapsed": 0.00389,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_base_smooth",
+      "status": "pass",
+      "elapsed": 0.003879,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_base_flat",
+      "status": "pass",
+      "elapsed": 0.003558,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_subdivided",
+      "status": "pass",
+      "elapsed": 0.004001,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cone_smooth",
+      "status": "pass",
+      "elapsed": 0.003525,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cone_flat",
+      "status": "pass",
+      "elapsed": 0.003978,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cylinder_smooth",
+      "status": "pass",
+      "elapsed": 0.003504,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cylinder_flat",
+      "status": "pass",
+      "elapsed": 0.003878,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "frustum_smooth",
+      "status": "pass",
+      "elapsed": 0.003671,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "frustum_flat",
+      "status": "pass",
+      "elapsed": 0.003958,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "capsule_smooth",
+      "status": "pass",
+      "elapsed": 0.003945,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "capsule_flat",
+      "status": "pass",
+      "elapsed": 0.003784,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_smooth",
+      "status": "pass",
+      "elapsed": 0.003595,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_flat",
+      "status": "pass",
+      "elapsed": 0.003666,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_open_arc",
+      "status": "pass",
+      "elapsed": 0.003719,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "torus_smooth",
+      "status": "pass",
+      "elapsed": 0.00402,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "torus_flat",
+      "status": "pass",
+      "elapsed": 0.003751,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "upload",
+      "status": "pass",
+      "elapsed": 0.030519,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "bounds",
+      "status": "pass",
+      "elapsed": 0.030208,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "derives_normals",
+      "status": "pass",
+      "elapsed": 0.030211,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "keeps_given_normals",
+      "status": "pass",
+      "elapsed": 0.030366,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "without_indices_draws_in_order",
+      "status": "pass",
+      "elapsed": 0.029651,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "uvs_default_to_zero",
+      "status": "pass",
+      "elapsed": 0.030371,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "shared_between_entities",
+      "status": "pass",
+      "elapsed": 0.029868,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "prefab_instances_share",
+      "status": "pass",
+      "elapsed": 0.029263,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "replacing_the_data_uploads_again",
+      "status": "pass",
+      "elapsed": 0.030879,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "freed_with_the_last_user",
+      "status": "pass",
+      "elapsed": 0.0306,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "removing_the_component_removes_the_mesh",
+      "status": "pass",
+      "elapsed": 0.030683,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_an_index_out_of_range",
+      "status": "pass",
+      "elapsed": 0.030263,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_partial_triangle",
+      "status": "pass",
+      "elapsed": 0.030515,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_normal_count_mismatch",
+      "status": "pass",
+      "elapsed": 0.029782,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_color_count_mismatch",
+      "status": "pass",
+      "elapsed": 0.028877,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_an_empty_mesh",
+      "status": "pass",
+      "elapsed": 0.030235,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_are_accepted_and_uploaded",
+      "status": "pass",
+      "elapsed": 0.030645,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "differing_colors_upload_separately",
+      "status": "pass",
+      "elapsed": 0.029801,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_are_uploaded",
+      "status": "pass",
+      "elapsed": 0.030526,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_default_to_white",
+      "status": "pass",
+      "elapsed": 0.029815,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "alpha_of_128_halves_the_packed_alpha",
+      "status": "pass",
+      "elapsed": 0.030408,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "writes_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.030107,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "uploads_the_generated_mesh",
+      "status": "pass",
+      "elapsed": 0.030275,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "shares_the_mesh_of_one_key",
+      "status": "pass",
+      "elapsed": 0.030328,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "another_key_builds_another_mesh",
+      "status": "pass",
+      "elapsed": 0.031356,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "changing_a_parameter_changes_the_mesh",
+      "status": "pass",
+      "elapsed": 0.031355,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "changing_only_the_scale_keeps_the_mesh",
+      "status": "pass",
+      "elapsed": 0.031588,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "prefab_instances_share_the_shape",
+      "status": "pass",
+      "elapsed": 0.030774,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "unregistering_stops_the_observer",
+      "status": "pass",
+      "elapsed": 0.030511,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "deleting_the_registration_stops_the_observer",
+      "status": "pass",
+      "elapsed": 0.030865,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "registering_again_replaces_the_observer",
+      "status": "pass",
+      "elapsed": 0.030068,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "rejects_a_registration_without_a_component",
+      "status": "pass",
+      "elapsed": 0.03011,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "star_example_is_registered",
+      "status": "pass",
+      "elapsed": 0.032416,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shape",
+      "case": "star_shares_one_mesh_per_outline",
+      "status": "pass",
+      "elapsed": 0.032439,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "rect_builds_a_quad",
+      "status": "pass",
+      "elapsed": 0.032019,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_writes_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.032073,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_segments_follow_the_radius",
+      "status": "pass",
+      "elapsed": 0.031632,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_shares_the_mesh_of_an_ngon",
+      "status": "pass",
+      "elapsed": 0.031719,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_uses_a_given_segment_count",
+      "status": "pass",
+      "elapsed": 0.032043,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circles_of_one_size_share_a_mesh",
+      "status": "pass",
+      "elapsed": 0.031569,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_writes_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.03213,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_shares_one_mesh_per_outline",
+      "status": "pass",
+      "elapsed": 0.032153,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_uvs_run_along_the_segment",
+      "status": "pass",
+      "elapsed": 0.032079,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_adds_a_rect",
+      "status": "pass",
+      "elapsed": 0.032125,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_uvs_show_the_region",
+      "status": "pass",
+      "elapsed": 0.031705,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_cover_crops_the_region",
+      "status": "pass",
+      "elapsed": 0.031372,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_contain_widens_the_region",
+      "status": "pass",
+      "elapsed": 0.031469,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_fit_follows_the_texture_aspect",
+      "status": "pass",
+      "elapsed": 0.031468,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_rotation_turns_the_uvs",
+      "status": "pass",
+      "elapsed": 0.031602,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_adds_a_rect",
+      "status": "pass",
+      "elapsed": 0.030836,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_shorthand_fills_every_corner",
+      "status": "pass",
+      "elapsed": 0.031055,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_keeps_the_quad_mesh",
+      "status": "pass",
+      "elapsed": 0.030846,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "changing_a_radius_keeps_the_mesh",
+      "status": "pass",
+      "elapsed": 0.031238,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "removing_a_border_drops_the_shape",
+      "status": "pass",
+      "elapsed": 0.030807,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "center_is_inside",
+      "status": "pass",
+      "elapsed": 0.004346,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "edge_is_zero",
+      "status": "pass",
+      "elapsed": 0.004466,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "outside_is_positive",
+      "status": "pass",
+      "elapsed": 0.003998,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "a_radius_cuts_the_corner",
+      "status": "pass",
+      "elapsed": 0.003621,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "a_radius_is_clamped_to_the_short_side",
+      "status": "pass",
+      "elapsed": 0.004065,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "corners_are_resolved_apart",
+      "status": "pass",
+      "elapsed": 0.004096,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "is_one_inside",
+      "status": "pass",
+      "elapsed": 0.00386,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "is_zero_outside",
+      "status": "pass",
+      "elapsed": 0.003492,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "is_half_on_the_outline",
+      "status": "pass",
+      "elapsed": 0.003865,
+      "project": "geometry"
+    },
+    {
+      "suite": "Coverage",
+      "case": "a_hard_edge_has_no_fringe",
+      "status": "pass",
+      "elapsed": 0.003784,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_distant_sphere_drops_to_eight_segments",
+      "status": "pass",
+      "elapsed": 0.030653,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_near_sphere_keeps_the_authored_mesh",
+      "status": "pass",
+      "elapsed": 0.030902,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "instances_at_one_level_share_a_mesh",
+      "status": "pass",
+      "elapsed": 0.031253,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "the_authored_count_caps_the_level",
+      "status": "pass",
+      "elapsed": 0.031367,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_shape_at_its_floor_never_reduces",
+      "status": "pass",
+      "elapsed": 0.031432,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "settings_that_are_off_keep_the_authored_mesh",
+      "status": "pass",
+      "elapsed": 0.031476,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_world_without_settings_keeps_the_authored_mesh",
+      "status": "pass",
+      "elapsed": 0.030841,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_view_without_settings_holds_the_finest_level",
+      "status": "pass",
+      "elapsed": 0.031802,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_receding_camera_coarsens_the_level",
+      "status": "pass",
+      "elapsed": 0.03047,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "the_band_holds_a_level_over_a_frame",
+      "status": "pass",
+      "elapsed": 0.029915,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_level_change_moves_the_instance_to_its_batch",
+      "status": "pass",
+      "elapsed": 0.030253,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_cylinder_follows_the_metric",
+      "status": "pass",
+      "elapsed": 0.030788,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_cone_follows_the_metric",
+      "status": "pass",
+      "elapsed": 0.030416,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_torus_reduces_its_rings_with_its_segments",
+      "status": "pass",
+      "elapsed": 0.030196,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_capsule_follows_the_metric",
+      "status": "pass",
+      "elapsed": 0.030065,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "an_open_tube_is_measured_as_the_circle_it_sweeps",
+      "status": "pass",
+      "elapsed": 0.02929,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_rounded_box_reduces_its_corners",
+      "status": "pass",
+      "elapsed": 0.029777,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_hemisphere_and_a_frustum_reduce_too",
+      "status": "pass",
+      "elapsed": 0.030012,
+      "project": "geometry"
+    },
+    {
+      "suite": "Reduce",
+      "case": "a_box_never_carries_a_ladder",
+      "status": "pass",
+      "elapsed": 0.02785,
+      "project": "geometry"
+    }
+  ],
+  "projects": [
+    {
+      "project": "collision",
+      "pass": 89,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.163963
+    },
+    {
+      "project": "geometry",
+      "pass": 115,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.322093
+    },
+    {
+      "project": "lod",
+      "pass": 115,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.091082
+    },
+    {
+      "project": "picking",
+      "pass": 41,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.150419
+    },
+    {
+      "project": "render",
+      "pass": 373,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 6.796965
+    },
+    {
+      "project": "view",
+      "pass": 147,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.571897
+    }
+  ]
+}

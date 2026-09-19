@@ -701,6 +701,18 @@ static void box_view_fill(
     }
 }
 
+void box_render_view_probe(
+    ecs_world_t *world,
+    const box_view_src_t *src,
+    const box_packet_t *p,
+    box_view_t *out)
+{
+    memset(out, 0, sizeof(box_view_t));
+    box_view_target(world, src->entity, p, out);
+    box_view_camera(world, src->camera, out);
+    box_view_lod(world, src->entity, out);
+}
+
 ecs_entity_t box_render_collect_views(
     ecs_world_t *world,
     RenderState *state,

@@ -100,6 +100,15 @@ static void box_extract_static(
         goto done;
     }
 
+    if (inst->lod_hidden) {
+        if (has_slot) {
+            box_render_release_slot(world, state, e, inst);
+        }
+
+        box_render_update_aabb(world, e, mesh, transform);
+        goto done;
+    }
+
     box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)mesh->handle);
     if (!has_slot) {
         box_render_take_slot(world, batch, e, inst);
@@ -220,6 +229,8 @@ void box_render_extract_dynamic(
             batch->count ++;
         }
     }
+
+    box_render_lod_proxies(world, state, p);
 }
 
 ecs_entity_t box_render_active_camera(
@@ -253,6 +264,7 @@ void box_render_extract(
     RenderState *state = box_render_state(world);
     ecs_entity_t capture = box_render_collect_views(world, state, p);
     box_mesh_lod_select(world, (float)p->height);
+    box_render_lod_update(world, state, p);
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
     box_shader_extract(world, p);
@@ -317,7 +329,7 @@ void box_render_validate(
                     ecs_get_name(world, e));
             }
 
-            if (inst[i].dynamic || inst[i].transparent) {
+            if (inst[i].dynamic || inst[i].transparent || inst[i].lod_hidden) {
                 continue;
             }
 
@@ -428,6 +440,7 @@ void box_render_extract_init(
             { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
         }
     });
+    box_render_lod_roots(world, ecs_lookup(world, "box.collision.RootBounds"));
     state->emitters = ecs_query(world, {
         .terms = {
             { .id = ecs_id(Emissive), .inout = EcsIn },

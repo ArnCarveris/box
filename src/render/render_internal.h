@@ -18,6 +18,9 @@
 #include "../transform/transform_internal.h"
 #include "../transition/transition_internal.h"
 
+/** The LOD hierarchy the traversal owns, private to extract_lod.c */
+typedef struct box_lod_state_t box_lod_state_t;
+
 /** Contiguous run of the static slots of a mesh that share a layer mask */
 typedef struct box_slot_group_t {
     uint32_t mask;   /**< Layers the entities of the run belong to, 0 for every view */
@@ -43,6 +46,7 @@ typedef struct RenderInstance {
     bool dynamic;    /**< Instance is rebuilt every frame */
     bool dirty;      /**< Queued for extraction */
     bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
+    bool lod_hidden; /**< The LOD traversal replaced the entity by a proxy */
 } RenderInstance;
 
 /** Analytic 2D shape of an entity, written by the shape modules.
@@ -157,6 +161,8 @@ typedef struct RenderState {
     ecs_query_t *layer_query; /**< Entities holding a MaterialLayer registration */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
+    ecs_query_t *lod_roots;   /**< Collision roots the LOD hierarchy is built from */
+    box_lod_state_t *lod;     /**< The LOD hierarchy and what the last walk decided */
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
@@ -175,6 +181,69 @@ extern ECS_COMPONENT_DECLARE(RenderGroup);
  */
 RenderState* box_render_state(
     ecs_world_t *world);
+
+/** Create the state of the LOD traversal.
+ *
+ * @return The state
+ */
+box_lod_state_t* box_render_lod_new(void);
+
+/** Release the state of the LOD traversal.
+ *
+ * @param lod The state, NULL for none
+ */
+void box_render_lod_free(
+    box_lod_state_t *lod);
+
+/** Give the traversal the query it finds the roots of the hierarchy with.
+ *
+ * The component belongs to box.collision, which box.render does not import, so
+ * whichever of the two modules is registered last hands the query over.
+ *
+ * @param world The world
+ * @param root_bounds The RootBounds component, 0 when it is not registered
+ */
+void box_render_lod_roots(
+    ecs_world_t *world,
+    ecs_entity_t root_bounds);
+
+/** Walk the LOD hierarchy once per view and apply what the walks decided.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet of the frame
+ */
+void box_render_lod_update(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Append the proxies of the collapsed nodes as one dynamic batch.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet of the frame
+ */
+void box_render_lod_proxies(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Fill a scratch view with the target, the camera and the LOD settings it has.
+ *
+ * The extract builds the views of the packet after the LOD traversal has run,
+ * so the traversal asks for the same three parts of a view on its own.
+ *
+ * @param world The world
+ * @param src The view of the frame
+ * @param p The packet, for the size a view without a target draws at
+ * @param out Receives the view
+ */
+void box_render_view_probe(
+    ecs_world_t *world,
+    const box_view_src_t *src,
+    const box_packet_t *p,
+    box_view_t *out);
 
 /** Upload a mesh with the next packet and return its handle.
  *

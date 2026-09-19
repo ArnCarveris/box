@@ -21,6 +21,12 @@
 #include "types.h"
 #include "geometry.h"
 
+#ifdef BOX_LOD_IMPL
+#define ECS_META_IMPL IMPL
+#else
+#define ECS_META_IMPL EXTERN
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -464,6 +470,350 @@ float box_lod_chord_error(
 int32_t box_lod_reduce(
     const box_lod_reduce_desc_t *desc);
 
+/** Subtree that detail pruning never drops.
+ *
+ * The tag holds the node it sits on and every node below it in the traversal,
+ * so a sign, an antenna or any small part that must stay readable survives the
+ * contribution test whatever its projected size is.
+ */
+extern ECS_TAG_DECLARE(LodPin);
+
+/** What the traversal of one view did this frame, written on the view entity.
+ *
+ * The counts are the cost of the frame: visited is the nodes the walk looked
+ * at, which is what must not grow with the leaves of the scene, drawn is the
+ * leaves it resolved to an instance and proxies is the nodes it replaced by a
+ * cheaper representation instead of descending into them.
+ */
+ECS_STRUCT(LodStats, {
+    int32_t visited;  /**< Nodes the walk of this frame looked at */
+    int32_t drawn;    /**< Leaves the walk resolved to an instance */
+    int32_t proxies;  /**< Nodes the walk replaced by a proxy */
+    int32_t rejected; /**< Nodes the frustum stopped */
+    int32_t pruned;   /**< Nodes the contribution test dropped */
+    int32_t nodes;    /**< Nodes the hierarchy holds */
+});
+
+/** The node has no children and stands for one renderable instance */
+#define BOX_LOD_NODE_LEAF (1u)
+
+/** The node groups roots the traversal put together, not an authored entity */
+#define BOX_LOD_NODE_CLUSTER (2u)
+
+/** The node or an ancestor carries LodPin, so pruning never drops it */
+#define BOX_LOD_NODE_PIN (4u)
+
+/** The children of the node exist, so the walk may descend into it */
+#define BOX_LOD_NODE_OPEN (8u)
+
+/** The walk of this frame decided to descend into the node */
+#define BOX_LOD_VOTE_DESCEND (1u)
+
+/** The walk of this frame decided to replace the node by its proxy */
+#define BOX_LOD_VOTE_COLLAPSE (2u)
+
+/** The walk of this frame resolved the node to a drawn leaf */
+#define BOX_LOD_VOTE_DRAW (4u)
+
+/** The walk of this frame dropped the node because it contributes too little */
+#define BOX_LOD_VOTE_PRUNE (8u)
+
+/** Roots a tree keeps loose before it groups them into spatial clusters */
+#define BOX_LOD_CLUSTER_MIN (16)
+
+/** Roots one cluster node groups when the tree clusters loose roots */
+#define BOX_LOD_CLUSTER_SIZE (8)
+
+/** One node of the hierarchy the traversal walks.
+ *
+ * A node is a place in the tree, not an entity: its id names the entity it was
+ * built from, or zero for a cluster the traversal added itself. Children are a
+ * linked list, so a subtree is materialised and released without moving any
+ * other node. The bounds of an interior node cover its whole subtree and the
+ * error is the detail its proxy loses, in world units, which the screen space
+ * metric of the epic projects.
+ */
+typedef struct box_lod_node_t {
+    vec3 min;            /**< Minimum corner of the world bounds of the subtree */
+    vec3 max;            /**< Maximum corner of the world bounds of the subtree */
+    float error;         /**< Detail the proxy of the node loses, in world units */
+    float weight;        /**< Volume the subtree of the node fills */
+    float contribution;  /**< Size the node contributes against its parent, in world units */
+    float color[4];      /**< Linear albedo and opacity the subtree averages to */
+    float material[2];   /**< Metallic and roughness the subtree averages to */
+    uint64_t id;         /**< Entity the node was built from, 0 for a cluster */
+    int32_t parent;      /**< Parent node, negative for a root */
+    int32_t first_child; /**< First child node, negative for none */
+    int32_t next;        /**< Next sibling, negative for the last */
+    int32_t leaves;      /**< Leaves the subtree of the node holds */
+    int32_t level;       /**< Decision of the previous frame, 0 descends and 1 collapses */
+    uint32_t flags;      /**< BOX_LOD_NODE bits of the node */
+    uint32_t votes;      /**< BOX_LOD_VOTE bits the walks of this frame left */
+    uint32_t stamp;      /**< Walk the votes belong to, which is what clears them */
+} box_lod_node_t;
+
+/** The node hierarchy the traversal walks, owned by the renderer.
+ *
+ * Nodes live in one vector and are named by their index, so a released node
+ * returns to the free list and its index is handed out again. The roots are a
+ * linked list of their own, which is what lets a scene add and drop template
+ * instances without touching the rest of the tree.
+ */
+typedef struct box_lod_tree_t {
+    ecs_vec_t nodes; /**< box_lod_node_t of the tree, live and free */
+    ecs_vec_t free;  /**< int32_t indices of the nodes waiting for reuse */
+    ecs_vec_t stack; /**< int32_t the aggregation and the release descend with */
+    ecs_vec_t walk;  /**< int32_t the walk descends with, its own so a callback may build */
+    ecs_vec_t order; /**< int32_t roots the clustering sorts */
+    int32_t root;    /**< First root, negative for an empty tree */
+    int32_t count;   /**< Live nodes the tree holds */
+    uint32_t stamp;  /**< Walks the tree has run, which stamps the votes */
+} box_lod_tree_t;
+
+/** Culling of a view, which stops the walk at every node it rejects.
+ *
+ * @param ctx The context of the walk
+ * @param node The node the walk reached
+ * @return True when the view may see the node
+ */
+typedef bool (*box_lod_visible_t)(
+    void *ctx,
+    const box_lod_node_t *node);
+
+/** Materialises the children of a node the walk wants to descend into.
+ *
+ * @param ctx The context of the walk
+ * @param node Index of the node
+ * @return True when the node is open afterwards
+ */
+typedef bool (*box_lod_open_t)(
+    void *ctx,
+    int32_t node);
+
+/** Receives a node the walk resolved and the decision it took.
+ *
+ * @param ctx The context of the walk
+ * @param node Index of the node
+ * @param vote The BOX_LOD_VOTE bit the walk decided on
+ */
+typedef void (*box_lod_emit_t)(
+    void *ctx,
+    int32_t node,
+    uint32_t vote);
+
+/** What one walk of the tree measures and what it reports its result to.
+ *
+ * The visible callback is the culling of the view: it answers false for a node
+ * the frustum or the depth pyramid rejects, which stops the walk there and
+ * leaves the whole subtree unvisited. The emit callback receives every node the
+ * walk resolved, as a drawn leaf or as a proxy.
+ */
+typedef struct box_lod_walk_desc_t {
+    box_lod_camera_t camera;    /**< Camera of the view the walk measures in */
+    float viewport_px;          /**< Height of the viewport in pixels */
+    float threshold;            /**< Projected error in pixels a node may not exceed */
+    float hysteresis;           /**< Band around the threshold a switch has to cross */
+    float prune_px;             /**< Projected contribution a node is dropped under, 0 for none */
+    uint32_t stamp;             /**< Frame the votes belong to, 0 to count this walk as one */
+    box_lod_visible_t visible;  /**< Frustum of the view, NULL to accept every node */
+    box_lod_visible_t hidden;   /**< Depth test of the view, NULL to test no node */
+    box_lod_open_t open;        /**< Materialises the children of a node, NULL for none */
+    box_lod_emit_t emit;        /**< Receives a resolved node, NULL to only count */
+    void *ctx;                  /**< Passed to the callbacks */
+} box_lod_walk_desc_t;
+
+/** What one walk of the tree cost and what it resolved.
+ *
+ * The counts are what LodStats publishes: a walk that stops at a proxy never
+ * counts the leaves below it, which is what makes visited the cost of the
+ * frame instead of the size of the scene.
+ */
+typedef struct box_lod_walk_stats_t {
+    int32_t visited;  /**< Nodes the walk looked at */
+    int32_t drawn;    /**< Leaves the walk resolved to an instance */
+    int32_t proxies;  /**< Nodes the walk replaced by their proxy */
+    int32_t rejected; /**< Nodes the frustum of the view stopped */
+    int32_t occluded; /**< Nodes the depth test stopped at their proxy */
+    int32_t pruned;   /**< Nodes the contribution test dropped */
+} box_lod_walk_stats_t;
+
+/** Initialise an empty tree.
+ *
+ * @param tree The tree
+ */
+void box_lod_tree_init(
+    box_lod_tree_t *tree);
+
+/** Release the memory of a tree.
+ *
+ * @param tree The tree
+ */
+void box_lod_tree_fini(
+    box_lod_tree_t *tree);
+
+/** Drop every node of a tree, keeping its memory.
+ *
+ * @param tree The tree
+ */
+void box_lod_tree_clear(
+    box_lod_tree_t *tree);
+
+/** The node an index names.
+ *
+ * @param tree The tree
+ * @param node Index of the node, negative for none
+ * @return The node, NULL when the index names none
+ */
+box_lod_node_t* box_lod_tree_get(
+    const box_lod_tree_t *tree,
+    int32_t node);
+
+/** Add a node under a parent, or a root when the parent is negative.
+ *
+ * A new node is a leaf of zero size: a caller that gives it children turns it
+ * into an interior node and box_lod_tree_refresh aggregates its bounds.
+ *
+ * @param tree The tree
+ * @param parent Index of the parent, negative for a root
+ * @param id Entity the node stands for, 0 for a cluster
+ * @return Index of the new node
+ */
+int32_t box_lod_tree_add(
+    box_lod_tree_t *tree,
+    int32_t parent,
+    uint64_t id);
+
+/** Drop a node and every node below it.
+ *
+ * @param tree The tree
+ * @param node Index of the node
+ */
+void box_lod_tree_remove(
+    box_lod_tree_t *tree,
+    int32_t node);
+
+/** Drop the children of a node, keeping the node itself.
+ *
+ * This is how a collapsed subtree gives its nodes back: the node keeps its
+ * bounds, its leaf count and its decision, and the walk stops at it until the
+ * caller materialises its children again.
+ *
+ * @param tree The tree
+ * @param node Index of the node
+ */
+void box_lod_tree_close(
+    box_lod_tree_t *tree,
+    int32_t node);
+
+/** Give a leaf its world bounds and the detail it holds.
+ *
+ * @param tree The tree
+ * @param node Index of the node
+ * @param min Minimum corner of its world bounds
+ * @param max Maximum corner of its world bounds
+ * @param error Detail its proxy loses in world units, 0 for a leaf that loses none
+ */
+void box_lod_tree_set_bounds(
+    box_lod_tree_t *tree,
+    int32_t node,
+    vec3 min,
+    vec3 max,
+    float error);
+
+/** Give a leaf the look its proxy stands in for.
+ *
+ * The averages of an interior node are the averages of its leaves, weighted by
+ * the volume each of them fills, so the box that replaces a subtree carries the
+ * color the subtree had.
+ *
+ * @param tree The tree
+ * @param node Index of the node
+ * @param color Linear albedo and opacity of the leaf
+ * @param metallic Metallic value of the leaf
+ * @param roughness Roughness value of the leaf
+ * @param weight Volume the leaf fills, 0 for one
+ */
+void box_lod_tree_set_look(
+    box_lod_tree_t *tree,
+    int32_t node,
+    const float *color,
+    float metallic,
+    float roughness,
+    float weight);
+
+/** Thickness of the shell a box gets wrong against the volume it stands for.
+ *
+ * Replacing a subtree by its bounding box misses the volume between the box and
+ * what the subtree fills; spread over the surface of the box that volume is a
+ * length, which is how far the surface of the proxy sits from the surface of
+ * the subtree on average and what the screen space metric projects.
+ *
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ * @param filled Volume the subtree fills
+ * @return The thickness in world units, 0 for a box the subtree fills
+ */
+float box_lod_tree_shell(
+    vec3 min,
+    vec3 max,
+    float filled);
+
+/** Aggregate the bounds, the leaf count and the error of every interior node.
+ *
+ * A node that is not open keeps the bounds, the averages and the leaf count a
+ * caller gave it, so a root whose subtree was released still covers and still
+ * looks like what it stands for. A materialised subtree is aggregated on its
+ * own by naming its node, which is what keeps the cost of opening one node off
+ * the rest of the tree.
+ *
+ * @param tree The tree
+ * @param node Index of the node to aggregate, negative for the whole tree
+ */
+void box_lod_tree_refresh(
+    box_lod_tree_t *tree,
+    int32_t node);
+
+/** Drop every cluster node, giving its children back to the root list.
+ *
+ * @param tree The tree
+ * @return The number of clusters the tree dropped
+ */
+int32_t box_lod_tree_uncluster(
+    box_lod_tree_t *tree);
+
+/** Group loose roots into cluster nodes the walk can reject as one.
+ *
+ * The roots are sorted along the axis their centers spread over most and cut
+ * into groups of the given size, each of which becomes a cluster node with the
+ * roots as its children. Nothing about the entities changes: a cluster is a
+ * node of this tree and no entity gains a parent.
+ *
+ * @param tree The tree
+ * @param group Roots one cluster holds, 0 for BOX_LOD_CLUSTER_SIZE
+ * @return The number of clusters the tree gained
+ */
+int32_t box_lod_tree_cluster(
+    box_lod_tree_t *tree,
+    int32_t group);
+
+/** Walk the tree of one view and resolve every node it reaches.
+ *
+ * The walk starts at the roots and, at every node, rejects it by the frustum of
+ * the view, replaces it by its proxy when the depth pyramid hides it or when its
+ * projected error is under the threshold, or descends into its children. A
+ * rejected or replaced node leaves its subtree unvisited, which is what the cost
+ * of the walk is about. Nothing is dropped on the depth pyramid: a hidden node
+ * still leaves its proxy behind, which the culling of the renderer tests again.
+ *
+ * @param tree The tree
+ * @param desc The view, its threshold and its callbacks
+ * @param out Receives what the walk cost, NULL to drop it
+ */
+void box_lod_tree_walk(
+    box_lod_tree_t *tree,
+    const box_lod_walk_desc_t *desc,
+    box_lod_walk_stats_t *out);
+
 /** Register the box.lod module.
  *
  * @param world The world
@@ -474,5 +824,7 @@ void BoxLodImport(
 #ifdef __cplusplus
 }
 #endif
+
+#undef ECS_META_IMPL
 
 #endif

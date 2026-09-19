@@ -793,6 +793,8 @@ void box_frame_render(
     wgpuCommandBufferRelease(cmd);
     wgpuCommandEncoderRelease(encoder);
     box_cull_publish(r);
+    box_hiz_publish(r);
+    box_hiz_depth(r, p);
     box_timing_publish(r);
 
     if (p->capture_path[0]) {

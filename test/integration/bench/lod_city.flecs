@@ -1,0 +1,109 @@
+// About four million leaves under 50000 template roots: every tower is one
+// collision root, so the LOD traversal walks a hierarchy of clusters over those
+// roots instead of the leaves. The camera flies down an avenue, and the scene
+// only fits in the instance buffer because the traversal draws the distant
+// towers as one proxy box each.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.movement
+using box.script
+
+$ { ScriptSettings: {enabled: false} }
+
+$ { BakeSettings: {enabled: false} }
+
+$ { LodSettings: {enabled: true, quality: 1, error_px: 1, hysteresis: 0.25} }
+
+$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: false, hiz_levels: 0} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.85, -0.5, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+template Tower {
+  prop height: f32 = 20
+  prop tint: f32 = 0
+
+  base {
+    Position: {0, 0.8, 0}
+    Scale: {11, 1.6, 11}
+    Box: {1, 1, 1}
+    Rgb: {90, 92, 98}
+    PbrMaterial: {roughness: 0.8}
+  }
+
+  shaft {
+    Position: {0, height * 0.5 + 1.6, 0}
+    Scale: {9, height, 9}
+    Box: {1, 1, 1}
+    Rgb: {120 + tint, 128, 150 - tint}
+    PbrMaterial: {roughness: 0.6}
+  }
+
+  roof {
+    Position: {0, height + 2.2, 0}
+    Scale: {10, 1.2, 10}
+    Box: {1, 1, 1}
+    Rgb: {70, 74, 82}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  mast {
+    Position: {0, height + 4, 0}
+    Scale: {0.6, 3.2, 0.6}
+    Box: {1, 1, 1}
+    Rgb: {60, 62, 68}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  for i in 0..38 {
+    _ {
+      Position: {(i % 2) * 5 - 2.5, 3 + (i / 2) * (height / 21), 4.6}
+      Scale: {3.4, 1.2, 0.4}
+      Box: {1, 1, 1}
+      Rgb: {210, 200, 150}
+      PbrMaterial: {roughness: 0.3}
+    }
+  }
+
+  for i in 0..38 {
+    _ {
+      Position: {4.6, 3 + (i / 2) * (height / 21), (i % 2) * 5 - 2.5}
+      Scale: {0.4, 1.2, 3.4}
+      Box: {1, 1, 1}
+      Rgb: {210, 200, 150}
+      PbrMaterial: {roughness: 0.3}
+    }
+  }
+}
+
+ground {
+  Position: {3350, -0.5, 3350}
+  Scale: {7200, 1, 7200}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+city {
+  for i in 0..50000 {
+    _ {
+      Position: {(i % 224) * 30, 0, (i / 224) * 30}
+      Tower: {height: 14 + (i * 53) % 7 * 5, tint: (i * 29) % 40}
+    }
+  }
+}
+
+camera {
+  Position: {345, 6, 300}
+  LookAt: {345, 30, 1200}
+  Camera: {fov: 60, far_: 8000}
+  Velocity: {0, 0, 30}
+}

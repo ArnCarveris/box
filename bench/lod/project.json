@@ -40,6 +40,15 @@
                     "select_10k_still",
                     "select_10k_walk"
                 ]
+            },
+            {
+                "id": "Walk",
+                "benchcases": [
+                    "city_32k_leaves",
+                    "city_256k_leaves",
+                    "city_256k_leaves_close",
+                    "cluster_4k_roots"
+                ]
             }
         ]
     }

@@ -1,0 +1,95 @@
+// A box city of template instances, each of which the LOD traversal treats as a
+// root: the towers near the camera keep their parts and the distant ones are
+// drawn as one proxy box. lod_city_off.flecs is the same scene without LOD.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+$ { BakeSettings: {enabled: false} }
+
+$ { LodSettings: {enabled: true, quality: 1, error_px: 3, hysteresis: 0.25} }
+
+$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.85, -0.5, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+camera {
+  Position: {0, 4, -40}
+  LookAt: {0, 16, 400}
+  Camera: {fov: 60, far_: 4000}
+}
+
+ground {
+  Position: {0, -0.5, 400}
+  Scale: {1600, 1, 1800}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+template Tower {
+  prop height: f32 = 20
+  prop tint: f32 = 0
+
+  base {
+    Position: {0, 1, 0}
+    Scale: {11, 2, 11}
+    Box: {1, 1, 1}
+    Rgb: {90, 92, 98}
+    PbrMaterial: {roughness: 0.8}
+  }
+
+  shaft {
+    Position: {0, height * 0.5 + 2, 0}
+    Scale: {9, height, 9}
+    Box: {1, 1, 1}
+    Rgb: {120 + tint, 128, 150 - tint}
+    PbrMaterial: {roughness: 0.6}
+  }
+
+  roof {
+    Position: {0, height + 2.6, 0}
+    Scale: {10, 1.2, 10}
+    Box: {1, 1, 1}
+    Rgb: {70, 74, 82}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  for i in 0..6 {
+    _ {
+      Position: {0, 4 + i * (height / 7), 4.6}
+      Scale: {7.4, 1.4, 0.4}
+      Box: {1, 1, 1}
+      Rgb: {210, 200, 150}
+      PbrMaterial: {roughness: 0.3}
+      Emissive: {strength: 0.6, color: {210, 200, 150}}
+    }
+  }
+
+  for i in 0..6 {
+    _ {
+      Position: {4.6, 4 + i * (height / 7), 0}
+      Scale: {0.4, 1.4, 7.4}
+      Box: {1, 1, 1}
+      Rgb: {210, 200, 150}
+      PbrMaterial: {roughness: 0.3}
+    }
+  }
+}
+
+city {
+  for i in 0..400 {
+    _ {
+      Position: {(i % 20) * 34 - 323, 0, (i / 20) * 42 + 30}
+      Tower: {height: 14 + (i * 53) % 7 * 5, tint: (i * 29) % 40}
+    }
+  }
+}

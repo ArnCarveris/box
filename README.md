@@ -130,6 +130,18 @@ draws every shape at its authored count again. `test/integration/bench/lod_field
 is the same idea at scale: 20000 spheres and 2000 cylinders over 700 units of
 depth, where the ladder is what keeps the triangle count of the frame down.
 
+`test/integration/visual/lod_city.flecs` is the hierarchical LOD check: 400
+tower instances where the near ones keep their base, roof and window strips and
+the far ones are drawn as one proxy box each, next to `lod_city_off.flecs`,
+which draws every part of every tower. The traversal treats every template or
+prefab instance as a node, stacks renderer only clusters over those roots and
+walks the result once per view instead of visiting the renderables of the scene;
+`LodStats` on a view or as a singleton reports the nodes one walk visited, drew
+and replaced. `test/integration/bench/lod_city.flecs` is the same at scale: four
+million leaves under 50000 tower roots with a flying camera, which draws about
+36000 instances a frame and only fits in the instance buffer because the
+traversal replaces the distant towers.
+
 `test/integration/visual/occlusion.flecs` is the Hi-Z occlusion check: a wall in
 front of 2400 boxes whose capture is bit identical to `occlusion_off.flecs`,
 next to `occlusion_sweep.flecs`, which `python3 tools/occlusion_sweep.py` sweeps

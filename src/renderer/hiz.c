@@ -274,7 +274,8 @@ static void box_hiz_create(
     uint32_t levels)
 {
     WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+            WGPUTextureUsage_CopySrc,
         .dimension = WGPUTextureDimension_2D,
         .size = { box_hiz_half(r->v->width), box_hiz_half(r->v->height), 1 },
         .format = BOX_HIZ_FORMAT,
@@ -317,6 +318,7 @@ void box_hiz_prepare(
     box_renderer_t *r,
     const box_view_t *view)
 {
+    r->v->hiz_read_want = view->lod_enabled != 0;
     uint32_t levels = box_hiz_levels(box_hiz_half(r->v->width), box_hiz_half(r->v->height),
         view->hiz_levels);
     if (r->v->hiz[0] && r->v->hiz_levels == levels) {
@@ -428,6 +430,166 @@ static void box_hiz_level_pass(
     wgpuRenderPassEncoderRelease(pass);
 }
 
+/** Level of the pyramid of the current view that fits the grid of the traversal.
+ *
+ * @param r The renderer
+ * @return The level, the last one when no level is small enough
+ */
+static uint32_t box_hiz_read_level(
+    const box_renderer_t *r)
+{
+    uint32_t width = box_hiz_half(r->v->width);
+    uint32_t height = box_hiz_half(r->v->height);
+    uint32_t result = 0;
+    while (result + 1 < r->v->hiz_levels) {
+        if (box_hiz_extent(width, result) <= BOX_LOD_DEPTH_MAX &&
+            box_hiz_extent(height, result) <= BOX_LOD_DEPTH_MAX)
+        {
+            break;
+        }
+
+        result ++;
+    }
+
+    return result;
+}
+
+#ifndef BOX_PLATFORM_WEB
+/** Record the copy of one level of the pyramid into the readback buffer.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+static void box_hiz_capture(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder)
+{
+    if (r->v->hiz_read_busy || !r->v->hiz_read_want) {
+        goto done;
+    }
+
+    uint32_t level = box_hiz_read_level(r);
+    uint32_t w = box_hiz_extent(box_hiz_half(r->v->width), level);
+    uint32_t h = box_hiz_extent(box_hiz_half(r->v->height), level);
+    uint32_t row = ((w * 4u) + 255u) & ~255u;
+    uint32_t size = row * h;
+
+    if (w > BOX_LOD_DEPTH_MAX || h > BOX_LOD_DEPTH_MAX) {
+        goto done;
+    }
+
+    if (size > r->v->hiz_read_size) {
+        if (r->v->hiz_read) wgpuBufferRelease(r->v->hiz_read);
+        WGPUBufferDescriptor desc = {
+            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst, .size = size
+        };
+
+        r->v->hiz_read = wgpuDeviceCreateBuffer(r->device, &desc);
+        r->v->hiz_read_size = size;
+    }
+
+    WGPUTexelCopyTextureInfo src = {
+        .texture = r->v->hiz[r->v->hiz_slot], .mipLevel = level
+    };
+    WGPUTexelCopyBufferInfo dst = {
+        .buffer = r->v->hiz_read,
+        .layout = { .bytesPerRow = row, .rowsPerImage = h }
+    };
+    WGPUExtent3D extent = { .width = w, .height = h, .depthOrArrayLayers = 1 };
+
+    wgpuCommandEncoderCopyTextureToBuffer(encoder, &src, &dst, &extent);
+    memcpy(r->v->hiz_read_clip, r->v->hiz_clip, sizeof(r->v->hiz_read_clip));
+    r->v->hiz_read_level = level;
+    r->v->hiz_read_row = row;
+    r->v->hiz_depth.width = w;
+    r->v->hiz_depth.height = h;
+    r->v->hiz_read_busy = true;
+    r->v->hiz_read_ready = true;
+done:
+    return;
+}
+
+/** Copy the mapped readback of a view into the grid the packet carries.
+ *
+ * @param status Map outcome
+ * @param message Error text
+ * @param userdata1 The view
+ * @param userdata2 Unused
+ */
+static void box_hiz_mapped(
+    WGPUMapAsyncStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    (void)message;
+    (void)userdata2;
+    box_gpu_view_t *v = userdata1;
+    if (status != WGPUMapAsyncStatus_Success) {
+        goto done;
+    }
+
+    const uint8_t *bytes = wgpuBufferGetConstMappedRange(v->hiz_read, 0, v->hiz_read_size);
+    uint32_t y;
+    for (y = 0; bytes && y < v->hiz_depth.height; y ++) {
+        memcpy(&v->hiz_depth.values[y * v->hiz_depth.width],
+            bytes + (size_t)y * v->hiz_read_row, v->hiz_depth.width * sizeof(float));
+    }
+
+    if (bytes) {
+        memcpy(v->hiz_depth.clip, v->hiz_read_clip, sizeof(v->hiz_depth.clip));
+        v->hiz_depth.valid = 1;
+    }
+
+    wgpuBufferUnmap(v->hiz_read);
+done:
+    v->hiz_read_busy = false;
+}
+#endif
+
+void box_hiz_publish(
+    box_renderer_t *r)
+{
+#ifndef BOX_PLATFORM_WEB
+    uint32_t i;
+    for (i = 0; i < r->views.count; i ++) {
+        box_gpu_view_t *v = box_vec_at(&r->views, i);
+        if (!v->hiz_read_ready) {
+            continue;
+        }
+
+        WGPUBufferMapCallbackInfo info = {
+            .mode = WGPUCallbackMode_AllowProcessEvents,
+            .callback = box_hiz_mapped,
+            .userdata1 = v
+        };
+
+        v->hiz_read_ready = false;
+        wgpuBufferMapAsync(v->hiz_read, WGPUMapMode_Read, 0, v->hiz_read_size, info);
+    }
+#else
+    (void)r;
+#endif
+}
+
+void box_hiz_depth(
+    box_renderer_t *r,
+    box_packet_t *p)
+{
+    memset(&p->lod_depth, 0, sizeof(box_lod_depth_t));
+    if (!r->views.count) {
+        goto done;
+    }
+
+    const box_gpu_view_t *v = box_vec_at(&r->views, 0);
+    if (v->hiz_depth.valid) {
+        p->lod_depth = v->hiz_depth;
+    }
+
+done:
+    return;
+}
+
 void box_hiz_build(
     box_renderer_t *r,
     WGPUCommandEncoder encoder)
@@ -439,6 +601,9 @@ void box_hiz_build(
         box_hiz_level_pass(r, encoder, r->hiz_reduce, level);
     }
 
+#ifndef BOX_PLATFORM_WEB
+    box_hiz_capture(r, encoder);
+#endif
 }
 
 /** Build or reuse the bind group of the occlusion dispatches of one mesh.
@@ -525,6 +690,12 @@ void box_hiz_view_fini(
     for (i = 0; i < v->hiz_meshes.count; i ++) {
         box_hiz_mesh_t *entry = box_vec_at(&v->hiz_meshes, i);
         if (entry->group) wgpuBindGroupRelease(entry->group);
+    }
+
+    if (v->hiz_read) {
+        wgpuBufferRelease(v->hiz_read);
+        v->hiz_read = NULL;
+        v->hiz_read_size = 0;
     }
 
     box_vec_fini(&v->hiz_meshes);

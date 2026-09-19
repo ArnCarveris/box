@@ -5,6 +5,7 @@
 
 #define BOX_COLLISION_IMPL
 #include "collision_internal.h"
+#include "../render/render_internal.h"
 
 ECS_COMPONENT_DECLARE(CollisionState);
 ECS_TAG_DECLARE(NoCollider);
@@ -133,6 +134,8 @@ void BoxCollisionImport(
 
     box_collision_roots_init(world, state);
     box_collision_colliders_init(world, state);
+
+    box_render_lod_roots(world, ecs_id(RootBounds));
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxCollisionUpdate" }),
