@@ -265,9 +265,9 @@ static const box_effect_builtin_t box_effect_builtins[] = {
     { "ssr", "etc/shaders/ssr.wgsl", 650, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH |
         BOX_EFFECT_NORMALS },
     { "fog", "etc/shaders/fog.wgsl", 700, BOX_EFFECT_COLOR | BOX_EFFECT_DEPTH },
-    { "bloom", "etc/shaders/bloom.wgsl", 800, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID },
-    { "auto_exposure", "etc/shaders/auto_exposure.wgsl", 850,
+    { "auto_exposure", "etc/shaders/auto_exposure.wgsl", 800,
         BOX_EFFECT_COLOR | BOX_EFFECT_EXPOSURE },
+    { "bloom", "etc/shaders/bloom.wgsl", 850, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID },
     { "tonemap", "etc/shaders/tonemap.wgsl", 900, BOX_EFFECT_COLOR }
 };
 
@@ -333,8 +333,8 @@ static void box_effect_stack(
     ecs_add(world, created[1], Gtao);
     ecs_add(world, created[2], Ssr);
     ecs_add(world, created[3], Fog);
-    ecs_add(world, created[4], Bloom);
-    ecs_add(world, created[5], AutoExposure);
+    ecs_add(world, created[4], AutoExposure);
+    ecs_add(world, created[5], Bloom);
     ecs_add(world, created[6], ToneMapping);
 }
 
