@@ -1,0 +1,23 @@
+{
+    "id": "bench_lod",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the LOD proxy generator",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Proxy",
+                "benchcases": [
+                    "subtree_1000",
+                    "subtree_1000_materials",
+                    "subtree_1000_error_bound"
+                ]
+            }
+        ]
+    }
+}
