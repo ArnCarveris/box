@@ -1,0 +1,43 @@
+$ get scene.crate Position
+{x: 0, y: 0, z: 0}
+$ checkpoint base
+../../test/integration/out/checkpoint_restore/base
+$ set scene.crate Position "{3, 0, 0}"
+scene.crate
+$ rm scene.ball
+scene.ball
+$ touch extra
+extra
+$ set extra Position "{9, 0, 0}"
+extra
+$ get scene.crate Position
+{x: 3, y: 0, z: 0}
+$ ls scene
+crate
+
+$ restore base
+../../test/integration/out/checkpoint_restore/base
+not restored: extra
+
+$ get scene.crate Position
+{x: 0, y: 0, z: 0}
+$ ls scene
+ball
+crate
+
+$ get extra Position
+{x: 9, y: 0, z: 0}
+$ set scene.crate Position "{5, 0, 0}"
+scene.crate
+$ checkpoint moved
+../../test/integration/out/checkpoint_restore/moved
+not checkpointed: extra
+
+$ set scene.crate Position "{6, 0, 0}"
+scene.crate
+$ restore
+../../test/integration/out/checkpoint_restore/moved
+not restored: extra
+
+$ get scene.crate Position
+{x: 5, y: 0, z: 0}

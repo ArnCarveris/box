@@ -10,7 +10,7 @@
 - Impostors capture eight views around the Y axis of a subtree into one atlas through the offscreen composite the UI groups use, inserted at the head of the packet so the billboard is never a frame late; the billboard is one sorted draw picking the nearest tile, the last level before the box, selected only when its texel and parallax error fits and recaptured only on invalidation.
 
 ## Verification
-- TESTS_PLACEHOLDER
+- 1834 unit tests across 20 projects, all passing; `test/lod` is new with 151 tests over the `Cache`, `Cluster`, `Degenerate`, `Determinism`, `Error`, `Hierarchy`, `Hysteresis`, `Impostor`, `Material`, `Merge`, `Prune`, `Reduce`, `Screen`, `Shadow`, `Simplify`, `Tree`, `Walk` suites.
 - Scenes in `integration/`: `lod_spheres` (the segment ladder across distances), `lod_city` against `lod_city_off`, `lod_pruning` against `lod_pruning_off`, `lod_proxies` (generated primitive sets and merged meshes replacing subtrees) and `lod_impostors` (billboards at extreme distance); every earlier scene bit identical. `lod_city.json` records four million leaves under 50k template roots with a flying camera at 1.2 ms mean and 2.3 ms p99, no spikes.
 - Benchmarks in `bench/` against the monitoring epic: 100k error projections in 357 µs, a 1000 primitive proxy in 69 µs, a 100k triangle merge in 5.3 ms and simplify in 9.0 ms, level selection for 10k spheres in 179 µs taking 40M triangles to 1.3M, a walk visiting 72 nodes for 32k and 256k leaves alike, and pruning taking 27648 drawn instances to 3434.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.
