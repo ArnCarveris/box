@@ -57,6 +57,18 @@
  * text takes the same 2D shape path as every other element and the renderer
  * knows nothing about it. The helpers text.measure, text.wrap and text.label
  * offer the same measuring, wrapping and building to a script.
+ *
+ * A tree answers the pick of its view itself, because a UI element has no
+ * collider: the cursor is resolved against the Bounds of the nodes of the view
+ * and the node that is drawn over every other one that holds the point wins,
+ * which is the deepest node of the topmost subtree. The view of a tree is drawn
+ * over the scene, so an element under the cursor consumes the pick and the ray
+ * of the scene never runs. A hit raises what box.picking raises for a collider:
+ * on.hover, on.press, on.release, on.click and on.drag, bubbling up the tree
+ * until a handler consumes them, with Hovered on the element under the cursor
+ * and the Action of an element firing through the input action layer on a
+ * click. Every widget is written in script from those pieces; the module holds
+ * no widget of its own.
  */
 
 #ifndef BOX_UI_H
@@ -260,6 +272,26 @@ ECS_STRUCT(Bounds, {
 
 /** Pixels the target of a subtree that composites may span on one axis */
 #define BOX_UI_GROUP_MAX (4096)
+
+/** Element of a UI tree at a point in the plane the trees are laid out in.
+ *
+ * The point is in the logical pixels of the view of the tree, the units its
+ * Bounds are given in, and the node that is drawn over every other node holding
+ * it is the answer: the deepest node of the topmost subtree. A node without a
+ * rectangle holds nothing, and a node of a transparent subtree that is clipped
+ * away by the element that composites it is not hit.
+ *
+ * @param world The world
+ * @param view The view whose trees are tested, 0 for the trees of every view
+ * @param x X of the point
+ * @param y Y of the point
+ * @return The element under the point, 0 when no tree of the view covers it
+ */
+ecs_entity_t box_ui_hit(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    float x,
+    float y);
 
 /** Register the box.ui module.
  *

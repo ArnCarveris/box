@@ -3,7 +3,9 @@
  * @brief Raises the pick events of the frame as script events a task can await.
  *
  * A waiter holds the entity a handler listens on, so raising an event walks the
- * parent chain of the hit and stops at the first entity that has one.
+ * parent chain of the hit and stops at the first entity that has one. The
+ * action of a click walks that same chain, which is how a widget fires the
+ * action a key binding fires.
  */
 
 #include "picking_internal.h"
@@ -113,6 +115,28 @@ ecs_entity_t box_picking_raise(
         }
 
         e = ecs_get_parent(world, e);
+    }
+
+    return result;
+}
+
+ecs_entity_t box_picking_action(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    ecs_entity_t cur = e;
+    while (cur && ecs_is_alive(world, cur)) {
+        const Action *action = ecs_get(world, cur, Action);
+        if (action && action->action &&
+            ecs_has(world, action->action, InputAction))
+        {
+            box_input_emit(world, action->action, cur);
+            result = cur;
+            break;
+        }
+
+        cur = ecs_get_parent(world, cur);
     }
 
     return result;

@@ -148,6 +148,7 @@ static void box_pick_buttons(
 
         if (!state->dragging && state->hit.entity == state->press.entity) {
             box_picking_raise(it->stage, PickClick, &state->hit);
+            box_picking_action(it->stage, state->hit.entity);
         }
 
         memset(&state->press, 0, sizeof(PickHit));

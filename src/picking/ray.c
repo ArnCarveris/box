@@ -250,9 +250,15 @@ bool box_picking_pick(
 {
     vec3 origin, dir;
     bool result = false;
+    PickState *state = box_picking_state(world);
     memset(out, 0, sizeof(PickHit));
     out->cursor = cursor;
     out->view = view;
+    if (state && state->source && state->source(world, view, cursor, out)) {
+        result = true;
+        goto done;
+    }
+
     if (!box_picking_ray(world, view, cursor, &origin, &dir)) {
         goto done;
     }

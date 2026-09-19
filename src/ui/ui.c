@@ -88,6 +88,9 @@ static void box_ui_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].stack, UiVisit);
         ecs_vec_fini_t(NULL, &state[i].nodes, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].places, UiPlace);
+        if (state[i].hits) {
+            ecs_query_fini(state[i].hits);
+        }
     }
 }
 
@@ -249,6 +252,7 @@ void BoxUiImport(
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxMaterial);
     ECS_IMPORT(world, BoxTexture);
+    ECS_IMPORT(world, BoxPicking);
 
     ECS_META_COMPONENT(world, Align);
     ECS_META_COMPONENT(world, VAlign);
@@ -345,5 +349,6 @@ void BoxUiImport(
     box_ui_text_init(world);
     box_ui_shadow_init(world);
     box_ui_group_init(world);
+    box_ui_hit_init(world);
     box_ui_functions_init(world, ecs_id(BoxUi));
 }

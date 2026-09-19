@@ -80,6 +80,7 @@ typedef struct UiState {
     ecs_vec_t stack;    /**< UiVisit nodes a walk still has to visit */
     ecs_vec_t nodes;    /**< ecs_entity_t children of the node a walk visits */
     ecs_vec_t places;   /**< UiPlace of every node of the tree being walked */
+    ecs_query_t *hits;  /**< Nodes with a rectangle the cursor is resolved against */
     int32_t trees;      /**< Trees the world holds, zero skips the observers */
     int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
     int32_t shadows;    /**< Box shadows the world holds, zero skips the shadow pass */
@@ -459,6 +460,13 @@ void box_ui_group_release(
  * @param world The world
  */
 void box_ui_group_init(
+    ecs_world_t *world);
+
+/** Register the hit test query and install it as the source of a pick.
+ *
+ * @param world The world
+ */
+void box_ui_hit_init(
     ecs_world_t *world);
 
 /** Register the text.measure, text.wrap and text.label script functions.

@@ -28,6 +28,7 @@ typedef struct box_pick_view_t {
 typedef struct PickState {
     ecs_query_t *views;      /**< View entities the module picks against */
     ecs_query_t *cameras;    /**< Camera entities with a world transform */
+    box_picking_source_t source; /**< Answers the pick of a view without a ray, 0 for none */
     ecs_vec_t waiters;       /**< box_pick_waiter_t, one per pending await */
     PickHit hit;             /**< Hit of the last ray query */
     PickHit press;           /**< Hit the press of the held button landed on */
@@ -74,6 +75,16 @@ int32_t box_picking_views(
 vec3 box_picking_normal(
     const Collider *c,
     vec3 point);
+
+/** Fire the action of the entity a click resolved on, or of its nearest ancestor.
+ *
+ * @param world The world, the stage when this runs in a system
+ * @param e The entity the click resolved to
+ * @return The entity whose action fired, 0 when the chain carries none
+ */
+ecs_entity_t box_picking_action(
+    ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Register the waiters and the on.hover, press, release, click and drag functions.
  *

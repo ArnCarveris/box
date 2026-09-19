@@ -62,6 +62,25 @@ static void box_pick_state_dtor(
     }
 }
 
+void box_picking_set_source(
+    ecs_world_t *world,
+    box_picking_source_t source)
+{
+    PickState *state = box_picking_state(world);
+    if (state) {
+        state->source = source;
+    }
+}
+
+void box_picking_invalidate(
+    ecs_world_t *world)
+{
+    PickState *state = box_picking_state(world);
+    if (state) {
+        state->valid = false;
+    }
+}
+
 PickState* box_picking_state(
     const ecs_world_t *world)
 {
@@ -87,12 +106,14 @@ void BoxPickingImport(
     ECS_META_COMPONENT(world, PickSettings);
     ECS_META_COMPONENT(world, PickHit);
     ECS_META_COMPONENT(world, PickEvent);
+    ECS_META_COMPONENT(world, Action);
     ECS_TAG_DEFINE(world, Pickable);
     ECS_TAG_DEFINE(world, Hovered);
     ECS_COMPONENT_DEFINE(world, PickState);
 
     ecs_set_hooks(world, PickSettings, { .ctor = box_pick_settings_ctor });
     ecs_set_hooks(world, PickHit, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Action, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, PickState, {
         .ctor = flecs_default_ctor,
         .dtor = box_pick_state_dtor,

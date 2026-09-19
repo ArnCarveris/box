@@ -25,7 +25,14 @@
  *
  * An event starts at the entity the pick resolved to and bubbles up the parent
  * chain; the first entity with a handler consumes it, so a parent only hears
- * what its children leave alone.
+ * what its children leave alone. An entity that carries an Action fires it
+ * through the input action layer when a click resolves on it, so a widget and a
+ * key binding share one action.
+ *
+ * Not everything a view draws has a collider: a source may answer the pick of a
+ * view before its ray query runs, which is how box.ui resolves the cursor
+ * against the rectangles of its trees and consumes the pick of the frame before
+ * the scene under the UI ever sees it.
  */
 
 #ifndef BOX_PICKING_H
@@ -66,6 +73,16 @@ extern ECS_TAG_DECLARE(Pickable);
 /** The entity a pick of this frame resolved to, written by the engine */
 extern ECS_TAG_DECLARE(Hovered);
 
+/** Input action an entity fires when a click resolves on it.
+ *
+ * A click walks up from the entity it resolved to and the first Action it finds
+ * fires through the action layer with that entity as its source, so a button of
+ * a UI tree and a key binding share one action.
+ */
+ECS_STRUCT(Action, {
+    ecs_entity_t action; /**< The action entity, which must carry an InputAction */
+});
+
 /** What a pick found, the value a script handler receives */
 ECS_STRUCT(PickHit, {
     ecs_entity_t entity;   /**< Entity the pick resolved to, 0 when it hit nothing */
@@ -85,6 +102,35 @@ ECS_ENUM(PickEvent, {
     PickClick = 3,   /**< A press and its release landed on the same entity */
     PickDrag = 4     /**< The cursor moved while the entity was pressed */
 });
+
+/** Answer the pick of a view from something the ray query cannot see.
+ *
+ * A UI view draws elements that have no collider at all, so box.ui installs a
+ * source that resolves the cursor against the rectangles of its trees. The
+ * source is asked before the ray query of a view runs and one that answers
+ * consumes the pick, which is what puts a UI tree over the scene behind it. The
+ * hit it receives already carries the cursor and the view.
+ *
+ * @param world The world
+ * @param view The view being picked, 0 for the camera of a world without views
+ * @param cursor Normalized position in the image of the view
+ * @param out Receives the entity, the point and the normal of the hit
+ * @return true when the source answered the pick of this view
+ */
+typedef bool (*box_picking_source_t)(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    vec2 cursor,
+    PickHit *out);
+
+/** Install the source every pick asks before it runs the ray query of a view.
+ *
+ * @param world The world
+ * @param source The source, 0 to drop the one that was installed
+ */
+void box_picking_set_source(
+    ecs_world_t *world,
+    box_picking_source_t source);
 
 /** Build the world ray of a normalized position in a view.
  *
@@ -150,6 +196,18 @@ ecs_entity_t box_picking_raise(
     ecs_world_t *world,
     PickEvent event,
     const PickHit *hit);
+
+/** Drop the hit the last pick left behind so the next update picks again.
+ *
+ * A pick runs while the cursor moves and answers from its last hit while it
+ * stands still, so a world that changed under a still cursor has to say so: a
+ * UI tree that was laid out again invalidates the pick of its frame, which is
+ * what hovers an element that appeared or grew under the cursor.
+ *
+ * @param world The world
+ */
+void box_picking_invalidate(
+    ecs_world_t *world);
 
 /** Get the hit the last pick of the world left behind.
  *

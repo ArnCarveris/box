@@ -7,6 +7,10 @@
  * depth bias of its instance, which is what draws a child over its parent. The
  * walk leaves the nodes it found in the places of the registry, which the
  * layout pass reads instead of walking the tree a second time.
+ *
+ * A tree that was walked drops the cached hit of the picking module, because an
+ * element that appeared, moved or grew changes what a still cursor points at
+ * and a pick only runs again on its own while the cursor moves.
  */
 
 #include "ui_internal.h"
@@ -255,6 +259,7 @@ void box_ui_walk(
         impl->relayout = false;
     }
 
+    box_picking_invalidate(world);
 done:
     return;
 }
