@@ -468,6 +468,34 @@
         ],
         "setup": true,
         "teardown": true
+      },
+      {
+        "id": "Weather",
+        "testcases": [
+          "a_world_without_weather_draws_a_clear_sky",
+          "the_overcast_reaches_the_sky",
+          "a_half_overcast_sits_between_the_two",
+          "the_medium_stays_the_base_under_overcast",
+          "the_sun_keeps_moving_under_overcast",
+          "the_overcast_flattens_the_light_of_the_view",
+          "a_half_overcast_lights_between_the_two",
+          "the_overcast_filters_the_environment_again",
+          "a_sliver_of_overcast_keeps_the_environment",
+          "the_fog_raises_the_fog_density",
+          "a_half_fog_sits_between_the_two",
+          "the_fog_leaves_the_color_and_the_framing_alone",
+          "the_rain_wets_the_material_layer",
+          "a_world_without_weather_keeps_the_wetness_layer",
+          "the_first_frame_snaps_to_the_weather",
+          "a_new_target_is_eased_over_the_transition",
+          "a_shorter_transition_moves_further",
+          "the_transition_arrives_at_the_target",
+          "a_write_of_one_amount_keeps_the_others",
+          "an_amount_outside_the_range_is_held_inside_it",
+          "the_overcast_flattens_the_fog_color"
+        ],
+        "setup": true,
+        "teardown": true
       }
     ]
   }
