@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-09-18T08:28:26.124+00:00",
-  "start_time": null,
-  "end_time": null,
+  "start_time": "2026-09-19T17:14:57.423+00:00",
+  "end_time": "2026-09-19T17:14:57.423+00:00",
   "dependencies": [
     "lod/primitive_reduction",
     "lod/detail_pruning",

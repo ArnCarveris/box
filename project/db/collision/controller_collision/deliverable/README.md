@@ -25,3 +25,8 @@ a million nested colliders under 50k template roots, walks the controller at
 The renderer aborts above roughly 250k drawn instances, so the million objects of
 the bench scene are collider boxes under 50k drawn towers, and it walks the
 player with a `Velocity` because the benchmark app cannot hold a key down.
+
+Follow up after the task: with LOD the CPU mean of `first_person_1m.flecs` fell to 0.6 ms, so the
+one GPU bound frame at 4.9 ms in the render thread wait of `BoxSurfaceAcquire` (frame 270, the
+same frame the picking scene shows) crossed the 8 times mean budget; the spike factor is 12 like
+`picking_1m`, and `responsiveness/acquire_stall` tracks the frame itself.
