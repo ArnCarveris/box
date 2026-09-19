@@ -41,7 +41,7 @@ Two hard rules keep the concerns apart:
 | `box.controller` | `CameraController`, `FirstPersonController`, their default actions and the systems that move them |
 | `box.command` | terminal sessions, HTTP endpoints, script functions for commands |
 | `box.checkpoint` | script state capture and restore |
-| `box.monitor` | `CpuMonitor`, `EcsStats` and `SystemMonitor` singletons, sampled only while present |
+| `box.monitor` | `CpuMonitor`, `EcsStats`, `SystemMonitor` and `GpuTimings` singletons, sampled only while present |
 | `box.script` | scene loading, incremental template instantiation |
 | `box.collision` | root bounds, per shape colliders, a bounding volume hierarchy with ray, sphere, box and frustum queries |
 | `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events, the `Action` a click fires and the source a view without colliders answers its pick with |
@@ -84,6 +84,19 @@ A packet is not a copy of the scene. It carries:
 Packets come from a pool of three and reuse their vectors, so steady state does
 not allocate. Render handles (`uint32_t`) identify meshes, materials and
 instances on both sides; the game side allocates them from free lists.
+
+## GPU timings
+
+`src/renderer/timing.c` names every pass the renderer records and, while the
+world carries the `GpuTimings` singleton, writes a timestamp query around it.
+A frame resolves its query set into a buffer at the end of its command encoder
+and maps that buffer, which the renderer reads back one or two frames later; no
+other frame is recorded until those timestamps arrive, so one query set and one
+buffer serve the renderer. `box_timing_render` and `box_timing_compute` are how
+a pass is recorded, so a pass that is not timed begins exactly as it did
+before. `box_renderer_gpu_timings` hands the resolved passes to the monitor
+module, which publishes them per name on the component; a device without the
+`timestamp-query` feature creates nothing and reports no passes.
 
 ## Transitions
 

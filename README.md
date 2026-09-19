@@ -187,6 +187,19 @@ and machine CPU usage, the flecs statistics addon and the per system frame
 breakdown as components; a source is only sampled while its singleton exists,
 and the CPU budget of a headless run shares the CpuMonitor sampling.
 
+`GpuTimings` is the same for the GPU: while the singleton exists the renderer
+writes a timestamp query around every pass it records, resolves them into a
+buffer it reads back one or two frames later and the component lists the
+milliseconds per pass name (`shadow`, `depth`, `opaque`, `sorted`, `sky`,
+`glass`, `lines`, `overlay`, the compute passes and `effect.0` and up for the
+chain of a view), with `frame_ms` as their total and `frame` as the frame they
+were measured in. Passes that share a name, such as the cascades of a shadow
+map or the same pass of two views, report what they spent together. Nothing is
+created and no pass is timed while the component is absent, and a device
+without the `timestamp-query` feature reports `supported: false` and no passes
+instead of failing. `test/integration/command/gpu_timings.flecs` prints the
+table over the terminal with `get box.monitor.GpuTimings box.monitor.GpuTimings`.
+
 `Mesh3` holds script authored vertices, normals, uvs and indices and joins the instanced path
 through the same mesh cache as the primitives (`test/integration/visual/mesh3.flecs`), and a
 `Shape` registration lets a project add its own parametric shape with the same sharing; the
