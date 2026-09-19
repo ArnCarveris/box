@@ -1,0 +1,19 @@
+{
+    "id": "bench_ui",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the box.ui module",
+        "public": false,
+        "use": ["box"]
+    },
+    "bench": {
+        "benchsuites": [{
+            "id": "Extract",
+            "benchcases": [
+                "extract_10k_tree",
+                "walk_10k_tree",
+                "extract_10k_static_tree"
+            ]
+        }]
+    }
+}
