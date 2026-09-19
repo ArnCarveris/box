@@ -7,20 +7,18 @@
   "lights": 0,
   "light_churn": 0,
   "frames": 300,
-  "mean_ms": 0.587,
-  "p50_ms": 0.322,
-  "p99_ms": 2.352,
-  "max_ms": 4.921,
-  "fps": 1703.7,
-  "drawn": 1302,
-  "culled": 23915,
-  "occluded": 24795,
+  "mean_ms": 0.700,
+  "p50_ms": 0.502,
+  "p99_ms": 2.415,
+  "max_ms": 4.471,
+  "fps": 1429.5,
+  "drawn": 1308,
+  "culled": 23893,
+  "occluded": 24806,
   "shadow_static_rebuilds": 300,
-  "spike_factor": 8.00,
-  "spike_budget_ms": 4.696,
+  "spike_factor": 12.00,
+  "spike_budget_ms": 8.394,
   "attributed": true,
-  "spike_count": 1,
-  "spikes": [
-    {"frame": 270, "ms": 4.921, "system": "box.surface.BoxSurfaceAcquire", "system_ms": 4.821}
-  ]
+  "spike_count": 0,
+  "spikes": []
 }
