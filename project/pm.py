@@ -51,7 +51,7 @@ MICRO_FIELDS = ("median_ns", "ci_low_ns", "ci_high_ns", "mean_ns", "stddev_ns", 
 BENCH_PROJECTS = os.path.join(REPO, "bench")
 BENCH_EXEMPT_EPIC = "project_tool"
 BUILD_KINDS = ("debug", "release", "wasm")
-BUILD_STEP_KINDS = ("compile", "link", "bundle", "discovery", "generate", "etc", "other")
+BUILD_STEP_KINDS = ("compile", "link", "bundle", "discovery", "generate", "etc", "loc", "other")
 BUILD_SETUP = "(build)"
 TREND_POINTS = 12
 TEST_TREND = ("pass", "fail", "empty", "cases", "elapsed")
@@ -171,6 +171,11 @@ def build_files(totals):
     return sum(number(row.get("files")) for row in totals.values() if isinstance(row, dict))
 
 
+def loc_code(loc):
+    """Read the code line count out of a totals loc block, 0 when cloc left no counts."""
+    return number(loc.get("code")) if isinstance(loc, dict) else 0
+
+
 def summarize_build(path):
     """Summarize a build report for the deliverable listing of an item."""
     data = read_json(path)
@@ -188,6 +193,7 @@ def summarize_build(path):
         "files": build_files(totals.get("project") or {}),
         "compile_sec": number(kinds.get("compile")),
         "link_sec": number(kinds.get("link")),
+        "loc": loc_code(totals.get("loc")),
         "sha": (git.get("sha") or "")[:7],
         "timestamp": data.get("timestamp"),
         "steps": len(data.get("steps") or []),
@@ -790,13 +796,14 @@ def build_project_rows(data):
             "compile_sec": round(number(summary.get("compile_sec")), 6),
             "link_sec": round(number(summary.get("link_sec")), 6),
             "files": number(summary.get("files")),
+            "loc": loc_code(summary.get("loc")) if "loc" in summary else None,
             "ok": step.get("ok") is not False,
             "steps": build_step_nodes(step.get("children")),
         })
     if setup:
         setup.sort(key=lambda row: (-row["time"], row["name"]))
         rows.insert(0, {"project": BUILD_SETUP, "time": round(sum(row["time"] for row in setup), 6),
-                        "compile_sec": 0.0, "link_sec": 0.0, "files": 0,
+                        "compile_sec": 0.0, "link_sec": 0.0, "files": 0, "loc": None,
                         "ok": all(row["ok"] for row in setup), "steps": setup})
     return rows
 
@@ -810,6 +817,7 @@ def build_reports():
             continue
         totals = data.get("totals") or {}
         kinds = totals.get("kind") if isinstance(totals.get("kind"), dict) else {}
+        loc_totals = totals.get("loc") if isinstance(totals.get("loc"), dict) else {}
         git = data.get("git") if isinstance(data.get("git"), dict) else {}
         host = data.get("host") if isinstance(data.get("host"), dict) else {}
         projects = build_project_rows(data)
@@ -822,6 +830,8 @@ def build_reports():
             "files": build_files(totals.get("project") or {}),
             "compile_sec": round(number(kinds.get("compile")), 6),
             "link_sec": round(number(kinds.get("link")), 6),
+            "loc": loc_code(loc_totals),
+            "loc_note": loc_totals.get("note") if isinstance(loc_totals.get("note"), str) else None,
             "kinds": {key: round(number(kinds.get(key)), 6) for key in BUILD_STEP_KINDS if key in kinds},
             "sha": git.get("sha") or "", "short_sha": (git.get("sha") or "")[:7],
             "dirty": bool(git.get("dirty")), "branch": git.get("branch"),
@@ -840,13 +850,13 @@ def build_histories(reports):
         kinds.setdefault(report["kind"], []).append({
             "time": report["time"], "item": report["item"], "kind": report["kind"], "url": report["url"],
             "total_sec": report["total_sec"], "files": report["files"], "sha": report["short_sha"],
-            "compile_sec": report["compile_sec"], "link_sec": report["link_sec"],
+            "compile_sec": report["compile_sec"], "link_sec": report["link_sec"], "loc": report["loc"],
         })
         for row in report["projects"]:
             projects.setdefault(report["kind"] + "|" + row["project"], []).append({
                 "time": report["time"], "item": report["item"], "project": row["project"],
                 "total_sec": row["time"], "compile_sec": row["compile_sec"],
-                "link_sec": row["link_sec"], "files": row["files"],
+                "link_sec": row["link_sec"], "files": row["files"], "loc": row["loc"],
             })
     kinds = {key: rows[-TREND_POINTS:] for key, rows in kinds.items()}
     return kinds, {key: rows[-TREND_POINTS:] for key, rows in projects.items()}
@@ -863,6 +873,7 @@ def build_kind_rows(reports, history):
             "url": latest["url"], "file": latest["file"], "total_sec": latest["total_sec"],
             "files": latest["files"], "compile_sec": latest["compile_sec"], "link_sec": latest["link_sec"],
             "sha": latest["short_sha"], "ok": all(report["ok"] for report in own),
+            "loc": latest["loc"], "loc_delta": (latest["loc"] - own[-2]["loc"]) if len(own) > 1 else None,
             "trend": history.get(kind, []),
         })
     rows.sort(key=lambda row: (BUILD_KINDS.index(row["kind"]) if row["kind"] in BUILD_KINDS
@@ -884,6 +895,8 @@ def build_overall(reports, kinds):
         "sha": latest.get("short_sha", ""), "dirty": latest.get("dirty", False),
         "branch": latest.get("branch"), "latest": latest.get("time"),
         "ok": all(report["ok"] for report in reports) if reports else True,
+        "loc": latest.get("loc", 0),
+        "loc_delta": (reports[-1]["loc"] - reports[-2]["loc"]) if len(reports) > 1 else None,
         "trend": trend,
     }
 

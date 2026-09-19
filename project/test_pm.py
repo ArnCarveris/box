@@ -125,17 +125,18 @@ globalThis.BENCH = {
   ],
 };
 const buildPoint = (time, item, total) => ({ time, item, kind: "release", total_sec: total, files: 3,
-  compile_sec: 3, link_sec: 1, sha: "aaaaaaa" });
+  compile_sec: 3, link_sec: 1, sha: "aaaaaaa", loc: 100 });
 globalThis.BUILDS = {
   overall: { reports: 2, kinds: 2, projects: 2, steps: 18, files: 3, compile_sec: 3, link_sec: 1,
     total_sec: 8.5, sha: "bbbbbbb", dirty: true, branch: "main", latest: "2026-01-02T10:00:00Z", ok: true,
+    loc: 140, loc_delta: 40,
     trend: [buildPoint("2026-01-01T10:00:00Z", "e1", 2.5), buildPoint("2026-01-02T10:00:00Z", "e2", 6)] },
   kinds: [
     { kind: "release", reports: 1, latest: "2026-01-01T10:00:00Z", item: "e1", total_sec: 2.5, files: 3,
-      compile_sec: 3, link_sec: 1, sha: "aaaaaaa", ok: true,
+      compile_sec: 3, link_sec: 1, sha: "aaaaaaa", ok: true, loc: 100, loc_delta: null,
       trend: [buildPoint("2026-01-01T10:00:00Z", "e1", 2.5)] },
     { kind: "wasm", reports: 1, latest: "2026-01-02T10:00:00Z", item: "e2", total_sec: 6, files: 3,
-      compile_sec: 3, link_sec: 1, sha: "bbbbbbb", ok: true,
+      compile_sec: 3, link_sec: 1, sha: "bbbbbbb", ok: true, loc: 40, loc_delta: null,
       trend: [buildPoint("2026-01-02T10:00:00Z", "e2", 6)] },
   ],
   kind_history: {
@@ -143,20 +144,22 @@ globalThis.BUILDS = {
     wasm: [buildPoint("2026-01-02T10:00:00Z", "e2", 6)],
   },
   project_history: { "release|box": [{ time: "2026-01-01T10:00:00Z", item: "e1", project: "box",
-    total_sec: 1.2, compile_sec: 3, link_sec: 0.2, files: 2 }] },
+    total_sec: 1.2, compile_sec: 3, link_sec: 0.2, files: 2, loc: 100 }] },
   reports: [
     { item: "e1", file: "e1/deliverable/build_native.json", url: "/u/b1", kind: "release", cfg: "release",
       target: "arm64-Darwin", time: "2026-01-01T10:00:00Z", total_sec: 2.5, ok: true, files: 3,
-      compile_sec: 3, link_sec: 1, kinds: { compile: 3, link: 1 }, short_sha: "aaaaaaa", dirty: true, steps: 3,
-      projects: [{ project: "box", time: 1.2, compile_sec: 3, link_sec: 0.2, files: 2, ok: true, steps: [
+      compile_sec: 3, link_sec: 1, loc: 100, loc_note: null,
+      kinds: { compile: 3, link: 1 }, short_sha: "aaaaaaa", dirty: true, steps: 3,
+      projects: [{ project: "box", time: 1.2, compile_sec: 3, link_sec: 0.2, files: 2, loc: 100, ok: true, steps: [
         { name: "src/a.c", kind: "compile", time: 2, ok: true, object: "/obj/a.o", steps: [] },
         { name: "link", kind: "link", time: 0.2, ok: true, steps: [
           { name: "embed", kind: "link", time: 0.1, ok: true, steps: [] }] }] }] },
     { item: "e2", file: "e2/deliverable/build_wasm.json", url: "/u/b2", kind: "wasm", cfg: "release",
       target: "em", time: "2026-01-02T10:00:00Z", total_sec: 6, ok: true, files: 3, compile_sec: 3,
-      link_sec: 1, kinds: { compile: 3, link: 1 }, short_sha: "bbbbbbb", dirty: false, steps: 1,
-      projects: [{ project: "(build)", time: 0.5, compile_sec: 0, link_sec: 0, files: 0, ok: true, steps: [
-        { name: "flecs", kind: "bundle", time: 0.5, ok: true, steps: [] }] }] },
+      link_sec: 1, loc: 40, loc_note: null,
+      kinds: { compile: 3, link: 1 }, short_sha: "bbbbbbb", dirty: false, steps: 1,
+      projects: [{ project: "(build)", time: 0.5, compile_sec: 0, link_sec: 0, files: 0, loc: null, ok: true,
+        steps: [{ name: "flecs", kind: "bundle", time: 0.5, ok: true, steps: [] }] }] },
   ],
 };
 """
@@ -690,6 +693,58 @@ class PmTests(unittest.TestCase):
         self.assertEqual((status, ctype), (200, "application/json"))
         self.assertEqual(len(json.loads(body)["reports"]), 2)
 
+    def test_aggregate_builds_reads_a_report_without_lines_of_code_counts(self):
+        self.new("epic", "e1", "Epic")
+        self.write_report("e1/deliverable/build_native.json",
+                          self.build_json("release", "arm64-Darwin", "2026-01-01T10:00:00Z", 2.5, "a" * 40))
+        data = pm.aggregate_builds()
+
+        report = data["reports"][0]
+        self.assertEqual((report["loc"], report["loc_note"]), (0, None))
+        self.assertIsNone(report["projects"][1]["loc"])
+        self.assertEqual(data["kind_history"]["release"][0]["loc"], 0)
+        self.assertEqual((data["kinds"][0]["loc"], data["kinds"][0]["loc_delta"]), (0, None))
+        self.assertEqual((data["overall"]["loc"], data["overall"]["loc_delta"]), (0, None))
+
+    def test_aggregate_builds_reads_lines_of_code_counts(self):
+        self.new("epic", "e1", "Epic")
+        first = self.build_json("release", "arm64-Darwin", "2026-01-01T10:00:00Z", 2.5, "a" * 40)
+        first["totals"]["kind"]["loc"] = 0.05
+        first["totals"]["project"]["box"]["loc"] = {
+            "files": 2, "code": 100, "comment": 10, "blank": 20, "by_language": {"C": {"files": 2, "code": 100}}}
+        first["totals"]["loc"] = {
+            "files": 2, "code": 100, "comment": 10, "blank": 20, "by_language": {"C": {"files": 2, "code": 100}}}
+        self.write_report("e1/deliverable/build_native.json", first)
+
+        second = self.build_json("release", "arm64-Darwin", "2026-01-02T10:00:00Z", 2.6, "b" * 40)
+        second["totals"]["kind"]["loc"] = 0.06
+        second["totals"]["project"]["box"]["loc"] = {
+            "files": 2, "code": 140, "comment": 10, "blank": 20, "by_language": {"C": {"files": 2, "code": 140}}}
+        second["totals"]["loc"] = {
+            "files": 2, "code": 140, "comment": 10, "blank": 20, "by_language": {"C": {"files": 2, "code": 140}}}
+        self.write_report("e1/deliverable/build_native_2.json", second)
+        data = pm.aggregate_builds()
+
+        reports = data["reports"]
+        self.assertEqual([r["loc"] for r in reports], [100, 140])
+        box_row = next(p for p in reports[0]["projects"] if p["project"] == "box")
+        self.assertEqual(box_row["loc"], 100)
+        self.assertEqual([p["loc"] for p in data["kind_history"]["release"]], [100, 140])
+        self.assertEqual([p["loc"] for p in data["project_history"]["release|box"]], [100, 140])
+        kind_row = data["kinds"][0]
+        self.assertEqual((kind_row["loc"], kind_row["loc_delta"]), (140, 40))
+        self.assertEqual((data["overall"]["loc"], data["overall"]["loc_delta"]), (140, 40))
+
+    def test_aggregate_builds_reports_a_note_when_cloc_was_unavailable(self):
+        self.new("epic", "e1", "Epic")
+        report = self.build_json("release", "arm64-Darwin", "2026-01-01T10:00:00Z", 2.5, "a" * 40)
+        report["totals"]["loc"] = {"note": "cloc not found"}
+        self.write_report("e1/deliverable/build_native.json", report)
+        data = pm.aggregate_builds()
+
+        self.assertEqual((data["reports"][0]["loc"], data["reports"][0]["loc_note"]), (0, "cloc not found"))
+        self.assertIsNone(next(p for p in data["reports"][0]["projects"] if p["project"] == "box")["loc"])
+
     def test_deliverables_recognise_build_reports(self):
         self.new("epic", "e1", "Epic")
         self.write_report("e1/deliverable/build_wasm.json",
@@ -1169,19 +1224,20 @@ console.log(JSON.stringify({
   toolbar: treeToolbar("build", { search: "" }, 2, 8),
 }));
 """)
-        self.assertEqual(out["columns"], ["name", "kind", "files", "compile", "link", "time", "sha",
+        self.assertEqual(out["columns"], ["name", "kind", "files", "loc", "compile", "link", "time", "sha",
                                           "trend", "latest"])
         self.assertEqual(out["count"], 8)
         self.assertEqual(out["collapsed"], [["e1", "build", False], ["e2", "build", False]])
         self.assertEqual(out["open"], ["build:e1:0", "bproject:box:1", "bstep:src/a.c:2", "bstep:link:2",
                                        "build:e2:0"])
         self.assertEqual((out["rows"], out["reportRows"], out["projectRows"], out["stepRows"]), (5, 2, 1, 2))
-        self.assertEqual((out["details"], out["heads"]), (1, 9))
+        self.assertEqual((out["details"], out["heads"]), (1, 10))
         self.assertEqual(out["reportCells"],
-                         ["▾e1release · arm64-Darwin", "release", "3", "3.000", "1.000", "2.500",
+                         ["▾e1release · arm64-Darwin", "release", "3", "100", "3.000", "1.000", "2.500",
                           "aaaaaaa*", "", "e1 · when"])
-        self.assertEqual(out["projectCells"], ["▾box2 steps", "", "2", "3.000", "0.200", "1.200", "", "", ""])
-        self.assertEqual(out["stepCells"], ["src/a.c", "compile", "", "", "", "2.000", "", "—", ""])
+        self.assertEqual(out["projectCells"],
+                         ["▾box2 steps", "", "2", "100", "3.000", "0.200", "1.200", "", "", ""])
+        self.assertEqual(out["stepCells"], ["src/a.c", "compile", "", "", "", "", "2.000", "", "—", ""])
         self.assertIn("/obj/a.o", out["stepMeta"])
         self.assertIn("compile 3.000s · link 1.000s", out["reportMeta"])
         self.assertIn("release · 3 steps · aaaaaaa", out["reportMeta"])

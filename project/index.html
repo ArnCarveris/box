@@ -901,6 +901,7 @@ const TREE_COLS = {
     { key: "name", label: "Name", cls: "name" },
     { key: "kind", label: "Kind", cls: "c-mid" },
     { key: "files", label: "Files", cls: "num c-mid" },
+    { key: "loc", label: "Lines", cls: "num c-mid" },
     { key: "compile", label: "Compile (s)", cls: "num c-wide" },
     { key: "link", label: "Link (s)", cls: "num c-wide" },
     { key: "time", label: "Time (s)", cls: "num" },
@@ -920,6 +921,12 @@ function countText(value) {
   if (n >= 1e6) return +(n / 1e6).toFixed(1) + "M";
   if (n >= 1e4) return Math.round(n / 1e3) + "k";
   return String(n);
+}
+
+function locDeltaNote(delta) {
+  if (delta == null) return "latest";
+  if (!delta) return "no change since last report";
+  return (delta > 0 ? "+" : "−") + countText(Math.abs(delta)) + " since last report";
 }
 
 function testTreeNodes(d) {
@@ -997,14 +1004,14 @@ function buildTreeNodes(d) {
   const kinds = d.kind_history || {}, hist = d.project_history || {};
   return (d.reports || []).map((r, i) => ({
     key: "b:" + r.file, name: r.item || r.file, level: "build", color: SERIES[i % SERIES.length],
-    note: (r.cfg || "") + (r.target ? " · " + r.target : ""), kind: r.kind, files: r.files,
+    note: (r.cfg || "") + (r.target ? " · " + r.target : ""), kind: r.kind, files: r.files, loc: r.loc,
     compile: r.compile_sec, link: r.link_sec, time: r.total_sec, sha: r.short_sha, dirty: r.dirty,
     ok: r.ok, steps: r.steps, latest: r.time, item: r.item, url: r.url, file: r.file, buildKind: r.kind,
     trend: trendPoints(kinds[r.kind], "total_sec"), detail: true,
     children: (r.projects || []).map((p, j) => ({
       key: "b:" + r.file + "|" + p.project, name: p.project, level: "bproject",
-      color: SERIES[(i + j + 1) % SERIES.length], files: p.files, compile: p.compile_sec, link: p.link_sec,
-      time: p.time, ok: p.ok, item: r.item, buildKind: r.kind, project: p.project,
+      color: SERIES[(i + j + 1) % SERIES.length], files: p.files, loc: p.loc, compile: p.compile_sec,
+      link: p.link_sec, time: p.time, ok: p.ok, item: r.item, buildKind: r.kind, project: p.project,
       note: (p.steps || []).length + ((p.steps || []).length === 1 ? " step" : " steps"),
       trend: trendPoints(hist[r.kind + "|" + p.project], "total_sec"), detail: true,
       children: buildStepNodes(p.steps, "b:" + r.file + "|" + p.project, SERIES[(i + j + 1) % SERIES.length]),
@@ -1161,6 +1168,7 @@ function buildCell(row, col) {
     case "name": return treeName(row);
     case "kind": return n.kind ? `<span class="chip ${n.ok === false ? "fail" : "pending"}">${esc(n.kind)}</span>` : "";
     case "files": return n.files ? String(n.files) : "";
+    case "loc": return n.loc ? esc(countText(n.loc)) : "";
     case "compile": return n.level === "bstep" ? "" : sec(n.compile);
     case "link": return n.level === "bstep" ? "" : sec(n.link);
     case "time": return sec(n.time);
@@ -1570,6 +1578,11 @@ function buildDetail(row, d, width) {
     tip: `${h.item || "db"} · ${(+v).toFixed(3)}s`,
     sub: `${fmtDate(h.time)} · ${h.files || 0} file(s) · compile ${(+h.compile_sec).toFixed(2)}s · link ${(+h.link_sec).toFixed(2)}s`,
   });
+  const locPoint = h => ({
+    t: +new Date(h.time), v: h.loc || 0,
+    tip: `${h.item || "db"} · ${countText(h.loc || 0)} line(s)`,
+    sub: `${fmtDate(h.time)}`,
+  });
   if (n.level === "build") {
     const series = (n.children || []).map((p, i) => {
       const key = "build:" + n.buildKind + "|" + p.project;
@@ -1578,13 +1591,24 @@ function buildDetail(row, d, width) {
         points: (hist[n.buildKind + "|" + p.project] || []).map(h => point(h, h.total_sec)),
       };
     });
+    const locSeries = (n.children || []).map((p, i) => ({
+      key: "loc:" + n.buildKind + "|" + p.project, name: p.project, color: p.color, dash: seriesDash(i),
+      hidden: !!state.hidden["loc:" + n.buildKind + "|" + p.project],
+      points: (hist[n.buildKind + "|" + p.project] || []).map(locPoint),
+    }));
+    const hasLoc = locSeries.some(s => s.points.some(pt => pt.v));
     return `<div class="card-title"><h3>Time per project</h3>
       <span>${esc(n.buildKind)} builds, seconds per report · click a legend entry to hide a line</span></div>
       ${lineChart({ width: w, height: 200, label: n.name + " build time per project", yLabel: "seconds",
-        yFormat: v => v.toFixed(2), series })}${report}`;
+        yFormat: v => v.toFixed(2), series })}
+      ${hasLoc ? `<div class="card-title"><h3>Lines of code per project</h3>
+      <span>${esc(n.buildKind)} builds, code lines per report</span></div>
+      ${lineChart({ width: w, height: 200, label: n.name + " lines of code per project", yLabel: "lines",
+        yFormat: countText, series: locSeries })}` : ""}${report}`;
   }
   if (n.level === "bproject") {
     const rows = hist[n.buildKind + "|" + n.project] || [];
+    const hasLoc = rows.some(h => h.loc);
     return `<div class="card-title"><h3>Time over time</h3>
       <span>${esc(n.project)} in ${esc(n.buildKind)} builds · ${rows.length} report(s)</span></div>
       ${lineChart({ width: w, height: 180, label: n.project + " build time over time", yLabel: "seconds",
@@ -1592,7 +1616,11 @@ function buildDetail(row, d, width) {
           { name: "total", color: n.color, points: rows.map(h => point(h, h.total_sec)) },
           { name: "compile", color: "var(--s3)", dash: "5 4", points: rows.map(h => point(h, h.compile_sec)) },
           { name: "link", color: "var(--s4)", dash: "2 3", points: rows.map(h => point(h, h.link_sec)) },
-        ] })}`;
+        ] })}
+      ${hasLoc ? `<div class="card-title"><h3>Lines of code over time</h3>
+      <span>${esc(n.project)} in ${esc(n.buildKind)} builds</span></div>
+      ${lineChart({ width: w, height: 160, label: n.project + " lines of code over time", yLabel: "lines",
+        yFormat: countText, series: [{ name: "lines", color: n.color, points: rows.map(locPoint) }] })}` : ""}`;
   }
   return "";
 }
@@ -1606,6 +1634,7 @@ function buildSummary(d, ui, width) {
     points: (k.trend || []).map(h => ({ t: +new Date(h.time), v: h.total_sec })),
   }));
   tiles.push({ label: "Files", value: o.files, note: "latest" },
+    { label: "Lines", value: countText(o.loc || 0), note: locDeltaNote(o.loc_delta) },
     { label: "Link", value: (+o.link_sec || 0).toFixed(2) + "s" },
     { label: "Commit", value: (o.sha || "—") + (o.dirty ? "*" : "") },
     { label: "Reports", value: o.reports, note: o.steps + " steps" });
@@ -1615,6 +1644,16 @@ function buildSummary(d, ui, width) {
     sub: `${fmtDate(h.time)} · ${h.item || "db"} · ${h.files || 0} file(s)${h.sha ? " · " + h.sha : ""}`,
   });
   const stepKinds = ["compile", "link", "bundle", "etc"];
+  const locPoint = h => ({
+    t: +new Date(h.time), v: h.loc || 0,
+    tip: `${h.kind} · ${countText(h.loc || 0)} line(s)`,
+    sub: `${fmtDate(h.time)} · ${h.item || "db"}${h.sha ? " · " + h.sha : ""}`,
+  });
+  const locCharts = kinds.every(k => !(k.trend || []).some(h => h.loc)) ? "" : `
+    <div class="card-title"><h3>Lines of code over time</h3><span>one line per kind, one point per report</span></div>
+    ${lineChart({ width, label: "lines of code per kind over time", yLabel: "lines", yFormat: countText,
+      series: kinds.map((k, i) => ({ name: k.kind, color: SERIES[i % SERIES.length],
+        points: (k.trend || []).map(locPoint) })) })}`;
   const charts = !ui.charts ? "" : `
     <div class="card-title"><h3>Build time over time</h3><span>one line per kind, one point per report</span></div>
     ${lineChart({ width, label: "build time per kind over time", yLabel: "seconds", yFormat: v => v.toFixed(2),
@@ -1625,7 +1664,8 @@ function buildSummary(d, ui, width) {
       series: stepKinds.map((kind, i) => ({ name: kind, color: SERIES[(i + 2) % SERIES.length],
         points: (d.reports || []).filter(r => r.kinds && r.kinds[kind] != null)
           .map(r => ({ t: +new Date(r.time), v: r.kinds[kind], tip: `${kind} · ${(+r.kinds[kind]).toFixed(3)}s`,
-            sub: `${fmtDate(r.time)} · ${r.item || "db"} · ${r.kind}` })) })) })}`;
+            sub: `${fmtDate(r.time)} · ${r.item || "db"} · ${r.kind}` })) })) })}
+    ${locCharts}`;
   return `<div class="card">
     <div class="card-title"><h3>All builds</h3>
       <span>${caseChip(o.ok === false ? "fail" : "pass")} · ${o.projects} project(s) ·
