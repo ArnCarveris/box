@@ -332,6 +332,11 @@ typedef struct box_sky_t {
     float world_scale[4];   /**< Units per kilometer, its inverse, sea level y, ground km */
     float night[4];         /**< Radiance the sky keeps after sunset, w unused */
     float turbulence[4];    /**< Warp amount, spatial scale, speed and the time of the frame */
+    float moon_dir[4];      /**< Direction toward the moon, w the cosine of its disk */
+    float moon_color[4];    /**< Radiance of the moon over the medium, w its lit fraction */
+    float stars_color[4];   /**< Radiance of the star field, w the part daylight leaves */
+    float stars[4];         /**< Cells over a turn, star size, twinkle and the field time */
+    float stars_rot[12];    /**< World to star space rotation, three rows of four floats */
     uint32_t active;        /**< The world holds an atmosphere entity */
     uint32_t lut_dirty;     /**< The transmittance and multiple scattering tables must rerun */
     uint32_t view_dirty;    /**< The sky view table must rerun */

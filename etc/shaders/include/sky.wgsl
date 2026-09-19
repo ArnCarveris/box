@@ -30,6 +30,11 @@ struct Sky {
   world_scale: vec4<f32>,
   night: vec4<f32>,
   turbulence: vec4<f32>,
+  moon_dir: vec4<f32>,
+  moon_color: vec4<f32>,
+  stars_color: vec4<f32>,
+  stars: vec4<f32>,
+  stars_rot: mat3x3<f32>,
   flags: vec4<u32>,
 };
 

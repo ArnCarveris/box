@@ -56,6 +56,73 @@ fn sky_disk(dir: vec3<f32>, ro: vec3<f32>, r: f32, cosine: f32, width: f32) -> v
     smoothstep(edge - width, edge + width, cosine);
 }
 
+// Part of the lit side that the dark side of the moon keeps, which is the
+// light the planet itself sends back to it.
+const SKY_EARTHSHINE: f32 = 0.015;
+
+// Part of the cells of the star field that hold a star. The rest are empty,
+// which is what keeps one hash per pixel enough to draw the whole sky.
+const SKY_STAR_CUTOFF: f32 = 0.93;
+
+// Radiance of the moon, a sphere lit by the sun: the normal of a point of the
+// disk decides how much of the sun that point sees, so the phase follows the
+// two directions instead of being authored.
+fn sky_moon(dir: vec3<f32>, ro: vec3<f32>, r: f32, cosine: f32, width: f32) -> vec3<f32> {
+  let edge = sky.moon_dir.w;
+  if (edge >= 1.0 || cosine < edge - width || sky_hit(ro, dir, sky_bottom()) > 0.0) {
+    return vec3(0.0);
+  }
+
+  let m = sky.moon_dir.xyz;
+  let pole = select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), abs(m.y) > 0.99);
+  let radius = sqrt(max(1.0 - edge * edge, 1e-12));
+  let right = normalize(cross(pole, m));
+  let up = cross(m, right);
+  let x = dot(dir, right) / radius;
+  let y = dot(dir, up) / radius;
+  let z = sqrt(max(1.0 - x * x - y * y, 0.0));
+  let normal = right * x + up * y - m * z;
+  let lit = max(dot(normal, sky.sun_dir.xyz), 0.0) + SKY_EARTHSHINE;
+  return sky_transmittance(r, clamp(m.y, -1.0, 1.0)) * sky.moon_color.rgb * lit *
+    smoothstep(edge - width, edge + width, cosine);
+}
+
+fn sky_star_hash(p: vec3<f32>) -> vec3<f32> {
+  let q = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)),
+    dot(p, vec3(113.5, 271.9, 124.6)));
+  return fract(sin(q) * 43758.5453);
+}
+
+// Radiance of the star field, which is a grid of cells over the direction in
+// star space: the cell a ray lands in holds at most one star, placed away from
+// its walls so a pixel never has to look at a neighbor.
+fn sky_stars(dir: vec3<f32>) -> vec3<f32> {
+  let fade = sky.stars_color.w;
+  let density = sky.stars.x;
+  if (fade <= 0.0 || density <= 0.0) {
+    return vec3(0.0);
+  }
+
+  let rot = sky.stars_rot;
+  let local = vec3(dot(dir, rot[0]), dot(dir, rot[1]), dot(dir, rot[2]));
+  let p = local * density;
+  let cell = floor(p);
+  let hash = sky_star_hash(cell);
+  if (hash.z < SKY_STAR_CUTOFF) {
+    return vec3(0.0);
+  }
+
+  let magnitude = (hash.z - SKY_STAR_CUTOFF) / (1.0 - SKY_STAR_CUTOFF);
+  let jitter = fract(hash.x * 13.7 + hash.y * 7.3);
+  let center = cell + vec3(0.25) + 0.5 * vec3(hash.x, hash.y, jitter);
+  let angle = length(p - center) / density;
+  let size = sky.stars.y * (0.5 + 0.5 * magnitude);
+  let twinkle = 1.0 + sky.stars.z * sin(sky.stars.w * 5.0 + hash.x * 63.0);
+  let tint = mix(vec3(1.0), normalize(hash + vec3(0.6)) * 1.7, 0.35);
+  return sky.stars_color.rgb * tint * (0.08 + 0.92 * magnitude * magnitude) *
+    (1.0 - smoothstep(size * 0.2, size, angle)) * max(twinkle, 0.0) * fade;
+}
+
 @fragment fn fs_main(in: SkyOut) -> @location(0) vec4<f32> {
   let depth = sky_depth_at(in.uv);
   let world = sky_world_pos(in.uv, depth);
@@ -64,11 +131,15 @@ fn sky_disk(dir: vec3<f32>, ro: vec3<f32>, r: f32, cosine: f32, width: f32) -> v
   let warped = sky_warp(dir);
   let sun_cos = dot(warped, sky.sun_dir.xyz);
   let width = max(fwidth(sun_cos), 0.000001);
+  let moon_cos = dot(warped, sky.moon_dir.xyz);
+  let moon_width = max(fwidth(moon_cos), 0.000001);
   let r = sky_eye_radius();
   let ro = vec3(0.0, r, 0.0);
 
   if (depth <= 0.0) {
-    let radiance = sky_view_radiance(warped) + sky_disk(warped, ro, r, sun_cos, width);
+    let night = sky_stars(warped) * sky_transmittance(r, clamp(warped.y, -1.0, 1.0));
+    let radiance = sky_view_radiance(warped) + sky_disk(warped, ro, r, sun_cos, width) +
+      sky_moon(warped, ro, r, moon_cos, moon_width) + night;
     return vec4(sky_encode(radiance), 1.0);
   }
 

@@ -23,6 +23,18 @@ ECS_STRUCT(DirectionalLight, {
     float intensity; /**< Radiance scale */
 });
 
+/** Sun or moon light, the radiance it has before the atmosphere absorbs it
+ *
+ * A directional light with this component is a body over the medium: the sky
+ * attenuates its color and intensity with the transmittance of the air between
+ * the camera and the body, so a low sun lights the scene red of its own accord.
+ * The moon and the star field carry it for the same reason.
+ */
+ECS_STRUCT(CelestialLight, {
+    float toa_intensity; /**< Radiance over the atmosphere, 0 takes the DirectionalLight */
+    rgb toa_color;       /**< Color over the atmosphere, black takes white */
+});
+
 /** Omnidirectional light */
 ECS_STRUCT(PointLight, {
     float intensity; /**< Radiance scale */

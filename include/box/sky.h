@@ -44,19 +44,38 @@ ECS_STRUCT(AtmosphereMie, {
     rgb tint;               /**< Color of the aerosols, black takes white */
 });
 
+/** Star field drawn behind the sky, on an entity with a rotation
+ *
+ * The field is procedural: the direction of a pixel is turned into star space
+ * by the rotation of the entity, which is what makes the sky turn over the
+ * night, and the cell it lands in decides whether a star sits there. The
+ * `CelestialLight` of the same entity gives the field its radiance and color,
+ * and daylight fades it out between the two sun elevations.
+ */
+ECS_STRUCT(Stars, {
+    float density;    /**< Cells the field is cut into per radian, 0 takes 140 */
+    float size;       /**< Angular radius of a star in radians, 0 takes 0.0016 */
+    float twinkle;    /**< Amount the field flickers over time, 0 is steady */
+    float fade_start; /**< Sine of the sun elevation the fade starts at, 0 takes -0.18 */
+    float fade_end;   /**< Sine of the sun elevation the field is gone at, 0 takes 0.02 */
+});
+
 /** Planet and medium the sky of a world is rendered from
  *
- * The moon and the stars are the entities the celestial task of the sky epic
- * fills in; they are read by no pass while this task is the only one that
- * renders, which keeps a world that sets neither identical.
+ * The sun, the moon and the stars are entities: the two lights carry a
+ * `DirectionalLight` for their direction and a `CelestialLight` for the
+ * radiance they have over the medium, and the stars carry a `Stars` with a
+ * rotation. The sky attenuates all three with the transmittance of the air.
  */
 ECS_STRUCT(Atmosphere, {
     ecs_entity_t sun;   /**< Directional light the sky is lit by, 0 takes the first one */
-    ecs_entity_t moon;  /**< Reserved for the second light of the celestial task */
-    ecs_entity_t stars; /**< Reserved for the star field of the celestial task */
+    ecs_entity_t moon;  /**< Light of the moon disk, 0 draws no moon */
+    ecs_entity_t stars; /**< Entity holding the Stars field, 0 draws no stars */
 
     float sun_disk_intensity;      /**< Radiance of the disk itself, 0 draws no disk */
     float sun_disk_angular_radius; /**< Half angle of the disk in radians, 0 takes 0.00465 */
+
+    float moon_angular_radius; /**< Half angle of the moon disk in radians, 0 takes 0.00452 */
 
     float aerial_perspective_distance_km; /**< Distance the haze table reaches, 0 takes 32 */
     float aerial_perspective_intensity;   /**< Density of that haze, 0 takes 1, below 0 is none */
@@ -87,6 +106,21 @@ ECS_STRUCT(Atmosphere, {
 
 /** Default half angle of the sun disk in radians */
 #define BOX_SKY_DISK_RADIUS (0.00465f)
+
+/** Default half angle of the moon disk in radians */
+#define BOX_SKY_MOON_RADIUS (0.00452f)
+
+/** Default cells the star field is cut into per radian */
+#define BOX_SKY_STARS_DENSITY (140.0f)
+
+/** Default angular radius of a star in radians */
+#define BOX_SKY_STARS_SIZE (0.0016f)
+
+/** Default sine of the sun elevation the star field starts to fade at */
+#define BOX_SKY_STARS_FADE_START (-0.18f)
+
+/** Default sine of the sun elevation the star field has faded out at */
+#define BOX_SKY_STARS_FADE_END (0.02f)
 
 /** Default kilometers the aerial perspective table reaches */
 #define BOX_SKY_AERIAL_KM (32.0f)

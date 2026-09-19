@@ -30,26 +30,14 @@ static const float box_sky_strat[3] = { 0.001950f, 0.005643f, 0.000255f };
 /** Grey haze absorption of the aerosol layer per kilometer at scale one */
 #define BOX_SKY_HAZE (0.005f)
 
-/** Take a value or its default when it is not above zero.
- *
- * @param value The value
- * @param fallback The default
- * @return The value, or the default
- */
-static float box_sky_or(
+float box_sky_or(
     float value,
     float fallback)
 {
     return value > 0.0f ? value : fallback;
 }
 
-/** Convert a display encoded color to the linear color the medium scatters.
- *
- * @param color The color
- * @param fallback Channel every component takes when the color is black
- * @param out The three floats to fill
- */
-static void box_sky_color(
+void box_sky_color(
     rgb color,
     uint8_t fallback,
     float *out)
@@ -66,12 +54,7 @@ static void box_sky_color(
     out[2] = box_srgb_to_linear(used.b);
 }
 
-/** Write the planet, the layer heights and every coefficient of the medium.
- *
- * @param a The atmosphere
- * @param sky The parameter block to fill
- */
-static void box_sky_medium(
+void box_sky_medium(
     const Atmosphere *a,
     box_sky_t *sky)
 {
@@ -104,44 +87,28 @@ static void box_sky_medium(
 
 /** Write the sun direction and radiance the sky is lit by.
  *
- * The referenced light gives both; a world that names none keeps the sun of the
- * first view, which is the first directional light the frame found.
+ * The celestial pass that lit the views already resolved the body and its
+ * radiance over the medium, which is the radiance the sky scatters; a packet
+ * without views falls back to a sun straight overhead.
  *
  * @param world The world
- * @param a The atmosphere
- * @param p The packet
  * @param sky The parameter block to fill
  */
 static void box_sky_sun(
     ecs_world_t *world,
-    const Atmosphere *a,
-    const box_packet_t *p,
     box_sky_t *sky)
 {
-    const box_view_t *v = p->views.count ? box_vec_at(&p->views, 0) : NULL;
-    vec3 dir = v ? vec3_new(v->sun_dir[0], v->sun_dir[1], v->sun_dir[2]) :
-        vec3_new(0, -1, 0);
-    vec3 color = v ? vec3_new(v->sun_color[0] * v->sun_intensity,
-        v->sun_color[1] * v->sun_intensity, v->sun_color[2] * v->sun_intensity) :
-        vec3_new(1, 1, 1);
-
-    const WorldTransform *transform = a->sun ? ecs_get(world, a->sun, WorldTransform) : NULL;
-    if (transform) {
-        dir = vec3_normalize(mat4_transform_dir(&transform->m, vec3_new(0, 0, 1)));
-        const DirectionalLight *light = ecs_get(world, a->sun, DirectionalLight);
-        const Rgb *tint = ecs_get(world, a->sun, Rgb);
-        float intensity = light ? light->intensity : 1.0f;
-        color = vec3_new(intensity, intensity, intensity);
-        if (tint) {
-            color = vec3_new(box_srgb_to_linear(tint->r) * intensity,
-                box_srgb_to_linear(tint->g) * intensity,
-                box_srgb_to_linear(tint->b) * intensity);
-        }
+    const SkyState *state = ecs_singleton_get(world, SkyState);
+    vec3 dir = vec3_new(0, 1, 0);
+    vec3 color = vec3_new(1, 1, 1);
+    if (state && state->lit) {
+        dir = vec3_new(state->sun.dir[0], state->sun.dir[1], state->sun.dir[2]);
+        color = vec3_new(state->sun.toa[0], state->sun.toa[1], state->sun.toa[2]);
     }
 
-    sky->sun_dir[0] = -dir.x;
-    sky->sun_dir[1] = -dir.y;
-    sky->sun_dir[2] = -dir.z;
+    sky->sun_dir[0] = dir.x;
+    sky->sun_dir[1] = dir.y;
+    sky->sun_dir[2] = dir.z;
     sky->sun_color[0] = color.x;
     sky->sun_color[1] = color.y;
     sky->sun_color[2] = color.z;
@@ -305,8 +272,9 @@ void box_sky_extract(
 
     box_sky_t *sky = &p->sky;
     box_sky_medium(a, sky);
-    box_sky_sun(world, a, p, sky);
+    box_sky_sun(world, sky);
     box_sky_look(a, p, sky);
+    box_sky_bodies(world, a, p, sky);
     sky->active = 1;
 
     float altitude = box_sky_altitude(p, sky);

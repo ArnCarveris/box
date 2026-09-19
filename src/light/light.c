@@ -13,6 +13,7 @@ void BoxLightImport(
     ECS_IMPORT(world, BoxTransform);
 
     ECS_META_COMPONENT(world, DirectionalLight);
+    ECS_META_COMPONENT(world, CelestialLight);
     ECS_META_COMPONENT(world, PointLight);
     ECS_META_COMPONENT(world, SpotLight);
     ECS_META_COMPONENT(world, EnvironmentLight);
@@ -20,6 +21,7 @@ void BoxLightImport(
     ECS_META_COMPONENT(world, BakeSettings);
 
     ecs_add_pair(world, ecs_id(DirectionalLight), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(CelestialLight), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PointLight), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(SpotLight), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(DirectionalLight), EcsWith, ecs_id(WorldTransform));

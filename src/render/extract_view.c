@@ -282,6 +282,10 @@ static void box_view_camera(
 
 /** Fill the sun of a view from the first directional light, or a default one.
  *
+ * An atmosphere takes the choice over afterwards: it lights the view with the
+ * body that reaches the camera brightest and with the color the air leaves of
+ * it, which is why the sun of a view is resolved before its shadows are fit.
+ *
  * @param world The world
  * @param state The registry
  * @param v The view to fill
@@ -320,6 +324,7 @@ static bool box_view_sun(
     v->sun_color[0] = color.x;
     v->sun_color[1] = color.y;
     v->sun_color[2] = color.z;
+    result = box_sky_celestial(world, v) || result;
 
     return result;
 }

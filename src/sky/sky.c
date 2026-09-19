@@ -88,9 +88,12 @@ void BoxSkyImport(
     ECS_META_COMPONENT(world, AtmosphereRayleigh);
     ECS_META_COMPONENT(world, AtmosphereMie);
     ECS_META_COMPONENT(world, Atmosphere);
+    ECS_META_COMPONENT(world, Stars);
     ECS_COMPONENT_DEFINE(world, SkyState);
 
+    ecs_add_pair(world, ecs_id(Stars), EcsWith, ecs_id(WorldTransform));
     ecs_set_hooks(world, Atmosphere, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Stars, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, SkyState, { .ctor = flecs_default_ctor });
 
     ecs_query_t *query = ecs_query(world, {
