@@ -104,6 +104,53 @@ ECS_STRUCT(Atmosphere, {
     float turbulence_speed; /**< Speed of that warp, 0 takes 1 */
 });
 
+/** Simulated clock that drives the sun, the moon and the stars of a world
+ *
+ * The clock turns an hour, a date and a latitude into the direction of the two
+ * bodies and writes the `Rotation` of their entities, so a scene moves its sky
+ * by writing one number. A write from a script or the terminal lands in the
+ * same frame, which is what makes a capture at a given hour reproducible.
+ *
+ * The moon trails the sun by `moon_position_offset` hours along the ecliptic
+ * as well as around the planet, so twelve hours is a full moon opposite the
+ * sun and zero is a new moon in front of it, and the phase the sky draws
+ * follows from the two directions.
+ */
+ECS_STRUCT(TimeOfDay, {
+    ecs_entity_t light;      /**< Sun light, 0 takes the sun of the atmosphere */
+    ecs_entity_t moon_light; /**< Moon light, 0 takes the moon of the atmosphere */
+    ecs_entity_t atmosphere; /**< Atmosphere to read those from, 0 takes the one of the world */
+    ecs_entity_t stars;      /**< Star field, 0 takes the one of the atmosphere */
+
+    float hour;        /**< Local solar time from 0 to 24, wraps into the next day */
+    float day_of_year; /**< Day of the year from 1 to 365, 0 takes 172 */
+    float latitude;    /**< Latitude in degrees, north positive */
+    float north_offset; /**< Degrees the compass of the world is turned about its Y axis */
+
+    float time_scale;           /**< Simulated hours per real second, 0 holds the clock */
+    float moon_position_offset; /**< Hours the moon trails the sun, 12 is a full moon */
+
+    float daylight; /**< Written every frame: 0 in the dark, 1 with the sun up */
+});
+
+/** Day of the year a clock without one runs on, the summer solstice */
+#define BOX_TIME_DAY_OF_YEAR (172.0f)
+
+/** Axial tilt of the planet in degrees, which is what makes the seasons */
+#define BOX_TIME_TILT (23.44f)
+
+/** Days in the year the clock divides the ecliptic over */
+#define BOX_TIME_YEAR (365.0f)
+
+/** Degrees the planet turns in one hour */
+#define BOX_TIME_HOUR_ANGLE (15.0f)
+
+/** Sine of the sun elevation the daylight factor reaches one at */
+#define BOX_TIME_DAYLIGHT_HIGH (0.1045f)
+
+/** Sine of the sun elevation the daylight factor leaves zero at */
+#define BOX_TIME_DAYLIGHT_LOW (-0.1045f)
+
 /** Default half angle of the sun disk in radians */
 #define BOX_SKY_DISK_RADIUS (0.00465f)
 

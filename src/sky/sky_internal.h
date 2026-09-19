@@ -138,6 +138,13 @@ void box_sky_bodies(
     const box_packet_t *p,
     box_sky_t *sky);
 
+/** Register the system that advances the clock of a world.
+ *
+ * @param world The world
+ */
+void box_sky_time_init(
+    ecs_world_t *world);
+
 /** Copy the atmosphere of a world into a packet and mark what must be rendered.
  *
  * The views are already in the packet, so the sky view table follows the camera

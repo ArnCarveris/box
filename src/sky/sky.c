@@ -89,11 +89,13 @@ void BoxSkyImport(
     ECS_META_COMPONENT(world, AtmosphereMie);
     ECS_META_COMPONENT(world, Atmosphere);
     ECS_META_COMPONENT(world, Stars);
+    ECS_META_COMPONENT(world, TimeOfDay);
     ECS_COMPONENT_DEFINE(world, SkyState);
 
     ecs_add_pair(world, ecs_id(Stars), EcsWith, ecs_id(WorldTransform));
     ecs_set_hooks(world, Atmosphere, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Stars, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, TimeOfDay, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, SkyState, { .ctor = flecs_default_ctor });
 
     ecs_query_t *query = ecs_query(world, {
@@ -106,6 +108,8 @@ void BoxSkyImport(
     SkyState *state = ecs_singleton_ensure(world, SkyState);
     state->atmospheres = query;
     ecs_singleton_modified(world, SkyState);
+
+    box_sky_time_init(world);
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(Atmosphere) }},

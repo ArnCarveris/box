@@ -1,0 +1,101 @@
+// sky/time_of_day
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+using box.sky
+
+camera {
+  Position: {-40, 12, 40}
+  LookAt: {200, 45, -200}
+  Camera: {fov: 55}
+}
+
+sun {
+  DirectionalLight: {intensity: 1}
+  CelestialLight: {toa_intensity: 5, toa_color: {255, 248, 238}}
+}
+
+moon {
+  DirectionalLight: {intensity: 1}
+  CelestialLight: {toa_intensity: 0.8, toa_color: {214, 226, 245}}
+}
+
+stars {
+  Stars: {density: 150, size: 0.0024}
+  CelestialLight: {toa_intensity: 4, toa_color: {225, 235, 255}}
+}
+
+atmosphere {
+  Atmosphere: {
+    sun: sun
+    moon: moon
+    stars: stars
+    sun_disk_intensity: 30
+    moon_angular_radius: 0.05
+    world_units_per_km: 150
+    ground_albedo: {90, 95, 85}
+    night_tint: {40, 60, 120}
+    night_intensity: 0.02
+  }
+}
+
+clock {
+  TimeOfDay: {
+    atmosphere: atmosphere
+    hour: 7
+    day_of_year: 81
+    latitude: 40
+    moon_position_offset: 12
+  }
+}
+
+$ { EnvironmentLight: {intensity: 1, source: atmosphere} }
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {8000, 1, 8000}
+  Rgb: {96, 104, 86}
+  PbrMaterial: {roughness: 0.95}
+}
+
+tower {
+  Position: {45, 10, -2}
+  Box: {14, 20, 14}
+  Rgb: {186, 178, 160}
+  PbrMaterial: {roughness: 0.8}
+}
+
+sphere {
+  Position: {5, 4, 15}
+  Sphere: {segments: 32, smooth: true, radius: 4}
+  Rgb: {210, 210, 215}
+  PbrMaterial: {metallic: 0.1, roughness: 0.35}
+}
+
+crate {
+  Position: {-8, 4, -12}
+  Rotation: {0, 0.6, 0}
+  Box: {8, 8, 8}
+  Rgb: {190, 90, 70}
+  PbrMaterial: {roughness: 0.6}
+}
+
+ridge_far {
+  Position: {505, 80, -335}
+  Box: {320, 160, 140}
+  Rgb: {150, 155, 140}
+}
+
+ridge_near {
+  Position: {87, 20, -186}
+  Box: {100, 40, 80}
+  Rgb: {150, 155, 140}
+}
+
+box { effects { stack { tonemap {
+  Effect: {enabled: true}
+  ToneMapping: {white: 1.2, dither: false}
+} } } }

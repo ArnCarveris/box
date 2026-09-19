@@ -134,3 +134,43 @@ void Sky_extract_moon_and_stars(bench_t *b)
     box_packet_fini(&packet);
     ecs_fini(world);
 }
+
+void Sky_advance_the_clock(bench_t *b)
+{
+    // sky/time_of_day
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxSky);
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {0, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 3});
+    ecs_entity_t moon = ecs_new(world);
+    ecs_set(world, moon, Rotation, {0, 0, 0});
+    ecs_set(world, moon, DirectionalLight, {.intensity = 1});
+    ecs_entity_t stars = ecs_new(world);
+    ecs_set(world, stars, Rotation, {0, 0, 0});
+    ecs_set(world, stars, Stars, {0});
+    ecs_entity_t atmosphere = ecs_new(world);
+    ecs_set(world, atmosphere, Atmosphere, {
+        .sun = sun,
+        .moon = moon,
+        .stars = stars
+    });
+    ecs_entity_t clock = ecs_new(world);
+    ecs_set(world, clock, TimeOfDay, {
+        .atmosphere = atmosphere,
+        .hour = 9,
+        .day_of_year = 81,
+        .latitude = 40,
+        .time_scale = 0.5f,
+        .moon_position_offset = 12
+    });
+
+    bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        ecs_progress(world, 1.0f / 60.0f);
+        bench_keep(ecs_get(world, clock, TimeOfDay)->daylight);
+    }
+
+    ecs_fini(world);
+}
