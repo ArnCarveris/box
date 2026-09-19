@@ -1,0 +1,1935 @@
+{
+  "tool": "bake3",
+  "tool_version": "1.0.0",
+  "timestamp": "2026-09-19T12:12:20Z",
+  "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 16},
+  "cfg": "release",
+  "target": "arm64-Darwin",
+  "environment": "epicwt",
+  "git": {"sha": "5141101c4ff7f0c8d340cebb7c8d88d8130daf97", "dirty": true, "branch": "HEAD"},
+  "total_sec": 4.202477,
+  "ok": true,
+  "totals": {
+    "kind": {
+      "compile": 9.477969,
+      "link": 2.841142,
+      "bundle": 0.059322,
+      "discovery": 0.009236,
+      "generate": 0.000033,
+      "etc": 0.003942,
+      "other": 0.000000
+    },
+    "project": {
+      "box": {"total_sec": 1.363649, "compile_sec": 9.444943, "link_sec": 0.048941, "files": 174},
+      "box_app": {"total_sec": 2.829103, "compile_sec": 0.033025, "link_sec": 2.792200, "files": 1}
+    }
+  },
+  "steps": [
+    {
+      "name": "discovery",
+      "kind": "discovery",
+      "project": null,
+      "start_sec": 0.000005,
+      "duration_sec": 0.009240,
+      "ok": true,
+      "children": [
+        {
+          "name": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.000006,
+          "duration_sec": 0.009170,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "resolve dependencies",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.009176,
+          "duration_sec": 0.000066,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "flecs",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.009262,
+      "duration_sec": 0.055949,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "stb",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.065301,
+      "duration_sec": 0.000143,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "cgltf",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.065511,
+      "duration_sec": 0.000091,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "resvg",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.065677,
+      "duration_sec": 0.000228,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "glfw",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.065969,
+      "duration_sec": 0.001070,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "wgpu_native",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.067096,
+      "duration_sec": 0.001842,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "box",
+      "kind": "project",
+      "project": "box",
+      "start_sec": 0.069029,
+      "duration_sec": 1.304327,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box",
+          "start_sec": 0.069039,
+          "duration_sec": 0.000027,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/ui/group.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070618,
+          "duration_sec": 0.060307,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/group.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070634,
+          "duration_sec": 0.058191,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/layout.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070646,
+          "duration_sec": 0.061049,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/layout.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/hit.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070659,
+          "duration_sec": 0.059186,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/hit.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/functions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070669,
+          "duration_sec": 0.054053,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/functions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/font.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070683,
+          "duration_sec": 0.285423,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/font.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/text.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070706,
+          "duration_sec": 0.070057,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/text.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/ui.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.070773,
+          "duration_sec": 0.061169,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/ui.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.124756,
+          "duration_sec": 0.043422,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/ui/tree.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.128848,
+          "duration_sec": 0.055153,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/ui/tree.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transition/eval.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.129861,
+          "duration_sec": 0.040614,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transition/eval.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transition/types.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.130934,
+          "duration_sec": 0.037273,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transition/types.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transition/record.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.131708,
+          "duration_sec": 0.049766,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transition/record.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transition/transition.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.131958,
+          "duration_sec": 0.037818,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transition/transition.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/hiz.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.140777,
+          "duration_sec": 0.050455,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/hiz.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.168202,
+          "duration_sec": 0.097118,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bloom.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.168223,
+          "duration_sec": 0.047025,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/bloom.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/effect.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.169793,
+          "duration_sec": 0.051085,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/effect.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.170494,
+          "duration_sec": 0.050864,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.181492,
+          "duration_sec": 0.031883,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/sky.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.184014,
+          "duration_sec": 0.045515,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/sky.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/scene.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.191266,
+          "duration_sec": 0.053284,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/scene.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.213408,
+          "duration_sec": 0.037526,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.215260,
+          "duration_sec": 0.130288,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/image.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.220895,
+          "duration_sec": 0.151845,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/image.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/lines.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.221369,
+          "duration_sec": 0.037768,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/lines.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.229546,
+          "duration_sec": 0.039997,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/gtao.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.244570,
+          "duration_sec": 0.039513,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/gtao.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.250958,
+          "duration_sec": 0.047704,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/device.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.259156,
+          "duration_sec": 0.036716,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/device.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.265338,
+          "duration_sec": 0.038218,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/renderer.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.269564,
+          "duration_sec": 0.037734,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/renderer.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/frame.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.284107,
+          "duration_sec": 0.050440,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/frame.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/overlay.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.295893,
+          "duration_sec": 0.051474,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/overlay.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/transition.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.298679,
+          "duration_sec": 0.079908,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/transition.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/environment.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.303572,
+          "duration_sec": 0.047064,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/environment.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.307313,
+          "duration_sec": 0.038014,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.334571,
+          "duration_sec": 0.039593,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/exposure.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.345341,
+          "duration_sec": 0.036181,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/exposure.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/cull.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.345563,
+          "duration_sec": 0.087811,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/renderer/cull.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/monitor.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.347381,
+          "duration_sec": 0.038399,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/monitor.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/stats.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.350650,
+          "duration_sec": 0.038155,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/stats.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/fps.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.356118,
+          "duration_sec": 0.036073,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/fps.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/cpu_sample.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.372761,
+          "duration_sec": 0.037068,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/cpu_sample.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/systems.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.374182,
+          "duration_sec": 0.039642,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/systems.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/spike.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.378606,
+          "duration_sec": 0.038556,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/monitor/spike.c.o",
+          "children": []
+        },
+        {
+          "name": "src/types/types.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.381539,
+          "duration_sec": 0.034190,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/types/types.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.385797,
+          "duration_sec": 0.045078,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/weather.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.388821,
+          "duration_sec": 0.039070,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/weather.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/sky.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.392208,
+          "duration_sec": 0.039706,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/sky.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/time.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.409847,
+          "duration_sec": 0.047325,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/time.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/celestial.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.413839,
+          "duration_sec": 0.050793,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/celestial.c.o",
+          "children": []
+        },
+        {
+          "name": "src/sky/fog.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.415742,
+          "duration_sec": 0.039523,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/sky/fog.c.o",
+          "children": []
+        },
+        {
+          "name": "src/checkpoint/restore.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.417187,
+          "duration_sec": 0.042095,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/checkpoint/restore.c.o",
+          "children": []
+        },
+        {
+          "name": "src/checkpoint/checkpoint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.427910,
+          "duration_sec": 0.041383,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/checkpoint/checkpoint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/checkpoint/write.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.430889,
+          "duration_sec": 0.042040,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/checkpoint/write.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/args.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.431924,
+          "duration_sec": 0.035025,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/core/args.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/process.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.433387,
+          "duration_sec": 0.036896,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/core/process.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/cpu.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.455281,
+          "duration_sec": 0.050142,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/core/cpu.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/run.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.457186,
+          "duration_sec": 0.038119,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/core/run.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/core.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.459304,
+          "duration_sec": 0.036265,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/core/core.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/update.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.464653,
+          "duration_sec": 0.044225,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/update.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.466967,
+          "duration_sec": 0.036032,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/input.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.469305,
+          "duration_sec": 0.040391,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/input.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/keys.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.470294,
+          "duration_sec": 0.040211,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/keys.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.472942,
+          "duration_sec": 0.057768,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/events.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.495326,
+          "duration_sec": 0.042383,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/input/events.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/billboard.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.495582,
+          "duration_sec": 0.040787,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/camera/billboard.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.503019,
+          "duration_sec": 0.037867,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/camera/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/platform/platform_glfw.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.505443,
+          "duration_sec": 0.139090,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/platform/platform_glfw.c.o",
+          "children": []
+        },
+        {
+          "name": "src/platform/platform_web.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.508899,
+          "duration_sec": 0.018369,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/platform/platform_web.c.o",
+          "children": []
+        },
+        {
+          "name": "src/platform/platform_macos.m",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.509710,
+          "duration_sec": 0.253869,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/platform/platform_macos.m.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_transition.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.510522,
+          "duration_sec": 0.050490,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_transition.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.527286,
+          "duration_sec": 0.056238,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.530726,
+          "duration_sec": 0.054203,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.536383,
+          "duration_sec": 0.069278,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.537728,
+          "duration_sec": 0.043729,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/instance.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.540903,
+          "duration_sec": 0.058997,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/instance.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.561035,
+          "duration_sec": 0.042779,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.581482,
+          "duration_sec": 0.047582,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.583537,
+          "duration_sec": 0.069760,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.584951,
+          "duration_sec": 0.044062,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/batch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.599921,
+          "duration_sec": 0.042733,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/batch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.603835,
+          "duration_sec": 0.052047,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/extract_shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/view_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.605678,
+          "duration_sec": 0.042015,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/view_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/mesh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.629032,
+          "duration_sec": 0.046332,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/mesh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/tiling.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.629077,
+          "duration_sec": 0.046962,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/render/tiling.c.o",
+          "children": []
+        },
+        {
+          "name": "src/surface/surface.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.642679,
+          "duration_sec": 0.046707,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/surface/surface.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/cgltf_impl.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.644550,
+          "duration_sec": 0.544284,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/gltf/cgltf_impl.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/gltf.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.647710,
+          "duration_sec": 0.037138,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/gltf/gltf.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/material.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.653315,
+          "duration_sec": 0.044530,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/gltf/material.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/load.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.655899,
+          "duration_sec": 0.044210,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/gltf/load.c.o",
+          "children": []
+        },
+        {
+          "name": "src/gltf/mesh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.675384,
+          "duration_sec": 0.043364,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/gltf/mesh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/picking/ray.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.676050,
+          "duration_sec": 0.045678,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/picking/ray.c.o",
+          "children": []
+        },
+        {
+          "name": "src/picking/pick.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.684871,
+          "duration_sec": 0.039876,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/picking/pick.c.o",
+          "children": []
+        },
+        {
+          "name": "src/picking/picking.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.689403,
+          "duration_sec": 0.038337,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/picking/picking.c.o",
+          "children": []
+        },
+        {
+          "name": "src/picking/events.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.697864,
+          "duration_sec": 0.038756,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/picking/events.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.700127,
+          "duration_sec": 0.036731,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/script/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/pending.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.718767,
+          "duration_sec": 0.051762,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/script/pending.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/controller.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.721743,
+          "duration_sec": 0.034768,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/controller.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/look.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.724767,
+          "duration_sec": 0.036670,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/look.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/collide.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.727762,
+          "duration_sec": 0.032948,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/collide.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/person.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.736642,
+          "duration_sec": 0.041193,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/person.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.736872,
+          "duration_sec": 0.036516,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.756530,
+          "duration_sec": 0.038257,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/controller/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/movement/movement.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.760724,
+          "duration_sec": 0.038445,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/movement/movement.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/eval.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.761447,
+          "duration_sec": 0.043335,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/eval.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/follow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.763589,
+          "duration_sec": 0.037829,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/follow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/table.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.770550,
+          "duration_sec": 0.037911,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/table.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/functions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.773401,
+          "duration_sec": 0.036809,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/functions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/spline.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.777848,
+          "duration_sec": 0.045318,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/spline.c.o",
+          "children": []
+        },
+        {
+          "name": "src/spline/mesh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.794808,
+          "duration_sec": 0.056527,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/spline/mesh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/pool.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.799187,
+          "duration_sec": 0.051081,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/job/pool.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.801444,
+          "duration_sec": 0.038581,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/job/job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/view/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.804798,
+          "duration_sec": 0.038659,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/view/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg_job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.808476,
+          "duration_sec": 0.047227,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/texture/svg_job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.810227,
+          "duration_sec": 0.044887,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/texture/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/refs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.823185,
+          "duration_sec": 0.044067,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/texture/refs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/load.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.840051,
+          "duration_sec": 0.473366,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/texture/load.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.843474,
+          "duration_sec": 0.052017,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/texture/svg.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.850289,
+          "duration_sec": 0.039073,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/shader/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/preprocess.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.851354,
+          "duration_sec": 0.056273,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/shader/preprocess.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.855132,
+          "duration_sec": 0.043332,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/shader/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.855715,
+          "duration_sec": 0.042766,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/shader/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/light/light.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.867266,
+          "duration_sec": 0.037220,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/light/light.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/dispatch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.889385,
+          "duration_sec": 0.045317,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/dispatch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/patch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.895512,
+          "duration_sec": 0.040299,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/patch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/terminal.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.898479,
+          "duration_sec": 0.042292,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/terminal.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command_script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.898503,
+          "duration_sec": 0.042279,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/command_script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.904500,
+          "duration_sec": 0.040140,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/command.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.907643,
+          "duration_sec": 0.051396,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/search.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.934728,
+          "duration_sec": 0.052695,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/search.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/shell.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.935830,
+          "duration_sec": 0.049062,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/shell.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/checkpoint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.940790,
+          "duration_sec": 0.035858,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/checkpoint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/endpoint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.940802,
+          "duration_sec": 0.039999,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/endpoint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.944659,
+          "duration_sec": 0.039106,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/fps.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.959056,
+          "duration_sec": 0.038438,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/fps.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.976668,
+          "duration_sec": 0.038546,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/base64.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.980817,
+          "duration_sec": 0.036161,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/base64.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/http.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.983783,
+          "duration_sec": 0.040065,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/http.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/builtin.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.984907,
+          "duration_sec": 0.037222,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/builtin.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.987439,
+          "duration_sec": 0.039365,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/wasm.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.997512,
+          "duration_sec": 0.034981,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/wasm.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/logs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.015234,
+          "duration_sec": 0.040487,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/logs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/input_cmd.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.016997,
+          "duration_sec": 0.052035,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/command/input_cmd.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_box.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.022148,
+          "duration_sec": 0.038690,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_box.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_axis.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.023866,
+          "duration_sec": 0.035177,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_axis.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh3.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.026822,
+          "duration_sec": 0.061285,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh3.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/shape_example.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.032511,
+          "duration_sec": 0.034769,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/shape_example.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/shape2d.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.055740,
+          "duration_sec": 0.047927,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/shape2d.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_round.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.059059,
+          "duration_sec": 0.037579,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_round.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/geometry.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.060856,
+          "duration_sec": 0.050096,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/geometry.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_cache.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.067305,
+          "duration_sec": 0.040904,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_cache.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_flat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.069045,
+          "duration_sec": 0.036877,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_gen_flat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_data.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.088125,
+          "duration_sec": 0.054847,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/mesh_data.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/shape.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.096656,
+          "duration_sec": 0.039230,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/geometry/shape.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.103683,
+          "duration_sec": 0.050073,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/effects/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/effects.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.105932,
+          "duration_sec": 0.049611,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/effects/effects.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/static.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.108228,
+          "duration_sec": 0.038684,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transform/static.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/transform.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.110967,
+          "duration_sec": 0.041944,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transform/transform.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/lookat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.135906,
+          "duration_sec": 0.037985,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transform/lookat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/hierarchy.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.142993,
+          "duration_sec": 0.035866,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transform/hierarchy.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/dynamic.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.146930,
+          "duration_sec": 0.037828,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/transform/dynamic.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/tint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.152934,
+          "duration_sec": 0.040948,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/material/tint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.153768,
+          "duration_sec": 0.035096,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/material/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/material.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.155560,
+          "duration_sec": 0.041089,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/material/material.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/bvh.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.173913,
+          "duration_sec": 0.050684,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/bvh.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/roots.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.178877,
+          "duration_sec": 0.051848,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/roots.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/colliders.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.184784,
+          "duration_sec": 0.045551,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/colliders.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/sweep.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.188848,
+          "duration_sec": 0.048924,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/sweep.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/shapes.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.188885,
+          "duration_sec": 0.054211,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/shapes.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/debug.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.193897,
+          "duration_sec": 0.061161,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/debug.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/index.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.196664,
+          "duration_sec": 0.042085,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/index.c.o",
+          "children": []
+        },
+        {
+          "name": "src/collision/collision.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.224619,
+          "duration_sec": 0.039538,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-release/obj/src/collision/collision.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box",
+          "start_sec": 1.313454,
+          "duration_sec": 0.048941,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "etc",
+          "kind": "etc",
+          "project": "box",
+          "start_sec": 1.362522,
+          "duration_sec": 0.002442,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "box_app",
+      "kind": "project",
+      "project": "box_app",
+      "start_sec": 1.373370,
+      "duration_sec": 2.829103,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box_app",
+          "start_sec": 1.373385,
+          "duration_sec": 0.000006,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/main.c",
+          "kind": "compile",
+          "project": "box_app",
+          "start_sec": 1.374827,
+          "duration_sec": 0.033025,
+          "ok": true,
+          "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box_app/arm64-Darwin-release/obj/src/main.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box_app",
+          "start_sec": 1.407871,
+          "duration_sec": 2.792200,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "etc",
+          "kind": "etc",
+          "project": "box_app",
+          "start_sec": 4.200533,
+          "duration_sec": 0.001501,
+          "ok": true,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

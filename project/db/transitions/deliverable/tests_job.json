@@ -1,0 +1,31 @@
+{
+  "project": "job",
+  "timestamp": "2026-09-19T12:12:31Z",
+  "pass": 20,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.523473,
+  "tests": [
+    {"suite": "Job", "case": "submit_and_complete", "status": "pass", "elapsed": 0.016688},
+    {"suite": "Job", "case": "run_happens_on_a_worker", "status": "pass", "elapsed": 0.016675},
+    {"suite": "Job", "case": "completion_runs_on_the_main_thread", "status": "pass", "elapsed": 0.016819},
+    {"suite": "Job", "case": "completion_runs_in_preupdate", "status": "pass", "elapsed": 0.016639},
+    {"suite": "Job", "case": "main_thread_fallback_runs_jobs_inline", "status": "pass", "elapsed": 0.016282},
+    {"suite": "Job", "case": "cancel_a_queued_job", "status": "pass", "elapsed": 0.016535},
+    {"suite": "Job", "case": "cancel_an_unknown_job", "status": "pass", "elapsed": 0.016171},
+    {"suite": "Job", "case": "supersede_a_group", "status": "pass", "elapsed": 0.016631},
+    {"suite": "Job", "case": "budget_defers_completions", "status": "pass", "elapsed": 0.035025},
+    {"suite": "Job", "case": "stats_report_the_queue", "status": "pass", "elapsed": 0.019974},
+    {"suite": "Job", "case": "stats_report_completions", "status": "pass", "elapsed": 0.020227},
+    {"suite": "Job", "case": "flush_runs_every_job", "status": "pass", "elapsed": 0.012899},
+    {"suite": "Job", "case": "shutdown_with_jobs_in_flight", "status": "pass", "elapsed": 0.019260},
+    {"suite": "Job", "case": "shutdown_runs_completions_when_flagged", "status": "pass", "elapsed": 0.027524},
+    {"suite": "Job", "case": "stress_100k_jobs", "status": "pass", "elapsed": 0.506443},
+    {"suite": "Priority", "case": "higher_priority_runs_first", "status": "pass", "elapsed": 0.012108},
+    {"suite": "Priority", "case": "near_the_eye_runs_first", "status": "pass", "elapsed": 0.011678},
+    {"suite": "Priority", "case": "eye_is_taken_at_submit_time", "status": "pass", "elapsed": 0.011388},
+    {"suite": "Priority", "case": "prioritize_near_off_keeps_submit_order", "status": "pass", "elapsed": 0.010541},
+    {"suite": "Priority", "case": "single_worker_runs_in_priority_order", "status": "pass", "elapsed": 0.010594}
+  ]
+}

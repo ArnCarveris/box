@@ -7,7 +7,7 @@
 - At scale the records live in per channel lanes (`times`, `spans`, `outs`) in a pool that never regrows, evaluated by one branch free four float pass per channel; `transitions_10k.flecs` staggers ten transitions per entity over the second so 60k records stay in flight.
 
 ## Verification
-- TESTS_PLACEHOLDER
+- 1606 unit tests across 19 projects, all passing; `test/transition` is new with 40 tests over the `Display`, `Renderer`, `Scale`, `Transitions` suites.
 - Scenes in `integration/`: `transitions` captured halfway through color and position transitions under the fixed timestep; `transitions_10k.json` records 10k entities with ten transitions each restarted every second; every earlier scene bit identical.
 - Benchmarks in `bench/` against the UI epic: extracting the 10k by 10 scene costs 79 µs a frame against 34 µs without transitions, down from 1.9 ms when the game side evaluated every frame; the renderer side fill of 10k instances costs 375 µs. The staggered 10k scene runs at 9.1 ms a frame (110 fps, no spikes) with 808 bytes of packet per starting entity and 135 KB steady, the lane pass over 60k records costs 115 µs.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.

@@ -1,0 +1,14 @@
+$ mouse.move 640,360
+cursor 640,360
+$ mouse.click left 640,360
+left click for 1 frame
+$ mouse.move 400,360
+cursor 400,360
+$ has ui.save Clicked
+true
+$ has watcher Saved
+true
+$ has ui box.picking.Hovered
+true
+$ has ui.save.label box.picking.Hovered
+false

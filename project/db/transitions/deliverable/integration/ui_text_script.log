@@ -1,0 +1,9 @@
+$ ls panel.button
+caption
+
+$ get panel.button.caption box.ui.Text
+{value: "Save changes", line_height: 0, align: Left}
+$ get panel.paragraph.body box.ui.Text
+{value: "the helpers wrap a paragraph and\nbuild a label from script", line_height: 0, align: Left}
+$ get measured box.geometry.Rect
+{width: 94.0740661621, height: 18}
