@@ -1,0 +1,67 @@
+{
+    "id": "ui",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.ui module, its trees and its view",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Tree",
+                "testcases": [
+                    "root_gets_a_view_a_camera_and_a_layer",
+                    "root_without_children_is_one_node",
+                    "descendants_join_the_tree",
+                    "node_added_later_joins_the_tree",
+                    "node_that_leaves_the_tree_is_dropped",
+                    "nested_root_starts_its_own_tree",
+                    "entity_outside_a_tree_has_no_node",
+                    "two_trees_get_their_own_view_and_layer",
+                    "authored_view_is_bound_instead_of_a_new_one",
+                    "removing_ui_deletes_the_view_it_created",
+                    "view_and_camera_are_not_nodes_of_the_tree"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Order",
+                "testcases": [
+                    "child_is_in_front_of_its_parent",
+                    "nested_children_are_numbered_depth_first",
+                    "later_sibling_is_in_front_of_the_earlier_one",
+                    "reordered_children_swap_their_depth",
+                    "node_added_later_is_in_front_of_its_siblings",
+                    "depth_reaches_the_instance_of_the_packet",
+                    "depth_orders_the_sorted_draws_of_the_view",
+                    "tree_of_a_thousand_nodes_stays_in_front_of_the_near_plane",
+                    "dropped_node_loses_its_depth"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "UiView",
+                "testcases": [
+                    "camera_is_orthographic_in_logical_pixels",
+                    "view_follows_a_new_height",
+                    "view_follows_the_points_of_the_surface",
+                    "scale_divides_the_height_of_the_surface",
+                    "view_renders_after_the_view_of_the_scene",
+                    "scene_view_is_synthesized_next_to_a_ui_view",
+                    "scene_view_hides_the_tree",
+                    "ui_view_draws_the_tree_only",
+                    "ui_view_has_no_sun_no_lights_and_a_flat_environment",
+                    "two_trees_reach_their_own_view",
+                    "existing_scene_view_is_not_synthesized_twice"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}
