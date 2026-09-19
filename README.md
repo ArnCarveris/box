@@ -195,6 +195,14 @@ sun, moon and stars by hour, date and latitude (`time_of_day_morning.flecs` and 
 and loop) that rebuilds an arc length table on every set, evaluates position, tangent and normal by
 parameter or distance, exposes `spline.position/tangent/normal/length` to scripts and moves any
 entity along a path with `FollowPath {spline, speed, offset, mode, orient}` (loop, ping pong, once).
+`SplineMesh {spline, profile, segments, width, height, closed, smooth}` sweeps a cross section
+along a curve and writes the result as a `Mesh3`, so a road is drawn, lit, shadowed, textured and
+shared by the mesh cache like any other mesh and the entity stays a static instance; the mesh is
+rebuilt when the curve or the sweep changes, never per frame. The profile is a polyline in the
+plane of the cross section (x across the curve, y up) that faces a quarter turn counter clockwise
+from the direction it runs, which makes a road out of a flat strip and a pipe or a cable out of a
+closed one, and the sweep follows the curve of its own entity when it names none
+(`test/integration/visual/spline_road.flecs`).
 
 `box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and

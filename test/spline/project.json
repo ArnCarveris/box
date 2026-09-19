@@ -73,6 +73,30 @@
                 ]
             },
             {
+                "id": "Mesh",
+                "testcases": [
+                    "strip_without_a_profile",
+                    "slices_follow_the_segment_count",
+                    "default_slices_per_curve_segment",
+                    "profile_is_swept_across_the_curve",
+                    "normals_face_up_for_a_flat_strip",
+                    "uvs_run_along_the_curve",
+                    "a_loop_closes_the_sweep",
+                    "closed_profile_sweeps_a_ring",
+                    "smooth_shares_the_columns",
+                    "the_mesh_follows_the_curve",
+                    "the_mesh_follows_the_profile",
+                    "bounds_come_from_the_curve",
+                    "the_sweep_uses_the_curve_of_the_entity",
+                    "a_sweep_without_a_curve_builds_nothing",
+                    "removing_the_sweep_removes_the_mesh",
+                    "deleting_the_curve_removes_the_mesh",
+                    "the_entity_stays_a_static_instance",
+                    "two_sweeps_share_one_mesh",
+                    "a_sweep_from_a_script"
+                ]
+            },
+            {
                 "id": "Follow",
                 "testcases": [
                     "moves_by_speed_over_time",

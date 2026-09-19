@@ -147,6 +147,32 @@ float box_spline_length(
 void box_spline_follow_init(
     ecs_world_t *world);
 
+/** Register the observers that keep the mesh of a sweep up to date.
+ *
+ * @param world The world
+ */
+void box_spline_mesh_init(
+    ecs_world_t *world);
+
+/** Rebuild the mesh of every sweep that is bound to a curve.
+ *
+ * The curve and its table are handed in because the caller has just built them
+ * and a set through the stage is not visible to a lookup yet. Both are NULL
+ * when the curve is gone, which takes the mesh of its sweeps with it.
+ *
+ * @param world The world
+ * @param stage The stage the mesh of a sweep is written through
+ * @param spline The curve entity the sweeps name
+ * @param curve The curve, NULL when the entity no longer holds one
+ * @param table The arc length table of the curve, NULL with the curve
+ */
+void box_spline_mesh_invalidate(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t spline,
+    const Spline *curve,
+    const SplineTable *table);
+
 /** Register the script functions of the module.
  *
  * @param world The world

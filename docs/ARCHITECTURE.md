@@ -45,7 +45,8 @@ Two hard rules keep the concerns apart:
 | `box.script` | scene loading, incremental template instantiation |
 | `box.collision` | root bounds, per shape colliders, a bounding volume hierarchy with ray, sphere, box and frustum queries |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
-| later | `box.ui`, `box.particles`, `box.transition`, `box.spline`, `box.lod`, `box.atmosphere` |
+| `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
+| later | `box.ui`, `box.particles`, `box.transition`, `box.lod`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
 `Box<Module>Import` function, and `src/<module>/` with one file per concern

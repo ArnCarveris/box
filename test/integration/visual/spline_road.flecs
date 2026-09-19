@@ -1,0 +1,94 @@
+using box
+using box.spline
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ {
+  EnvironmentLight: {sky_color: {125, 145, 180}, ground_color: {72, 70, 62}, intensity: 0.75}
+}
+
+camera {
+  Position: {0, 13, -27}
+  LookAt: {0, 0.5, 1}
+  Camera: {fov: 52}
+}
+
+sun {
+  Rotation: {0.95, -0.5, 0}
+  DirectionalLight: {intensity: 1.6}
+}
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {60, 0.5, 60}
+  Rgb: {96, 112, 84}
+  PbrMaterial: {roughness: 0.95}
+}
+
+track {
+  Spline: {
+    points: [
+      {-12, 0, -8}, {0, 0, -13}, {12, 0, -8},
+      {14, 0, 4}, {0, 0, 12}, {-14, 0, 4}
+    ],
+    loop: true
+  }
+}
+
+road {
+  Position: {0, 0, 0}
+  SplineMesh: {
+    spline: track
+    closed: true
+    profile: [{-4, 0}, {-4, 0.3}, {4, 0.3}, {4, 0}]
+  }
+  Rgb: {58, 58, 64}
+  PbrMaterial: {roughness: 0.88}
+}
+
+center_line {
+  Position: {0, 0, 0}
+  SplineMesh: {
+    spline: track
+    profile: [{-0.35, 0.32}, {0.35, 0.32}]
+  }
+  Rgb: {235, 230, 210}
+  PbrMaterial: {roughness: 0.7}
+}
+
+cables {
+  Spline: {
+    points: [
+      {-18, 3.4, 15}, {-6, 5.2, 11}, {6, 5.2, 11}, {18, 3.4, 15}
+    ]
+  }
+}
+
+pipe {
+  Position: {0, 0, 0}
+  SplineMesh: {
+    spline: cables
+    closed: true
+    smooth: true
+    profile: [
+      {0.5, 0}, {0.25, -0.43}, {-0.25, -0.43},
+      {-0.5, 0}, {-0.25, 0.43}, {0.25, 0.43}
+    ]
+  }
+  Rgb: {190, 120, 70}
+  PbrMaterial: {metallic: 0.7, roughness: 0.4}
+}
+
+posts {
+  for i in 0..4 {
+    _ {
+      Position: {-18 + i * 12, 1.7, 15 - i % 2 * 4}
+      Box: {0.4, 3.4, 0.4}
+      Rgb: {140, 140, 148}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+}

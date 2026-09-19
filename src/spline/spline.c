@@ -56,6 +56,102 @@ static void box_follow_ctor(
     }
 }
 
+/** SplineMesh constructor: a sweep of the cross section at its own size.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spline_mesh_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    SplineMesh *mesh = ptr;
+    int32_t i;
+
+    memset(ptr, 0, (size_t)count * sizeof(SplineMesh));
+    for (i = 0; i < count; i ++) {
+        mesh[i].width = 1.0f;
+        mesh[i].height = 1.0f;
+    }
+}
+
+/** Release the cross section of a SplineMesh.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spline_mesh_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    SplineMesh *mesh = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_vec_fini_t(NULL, &mesh[i].profile, vec2);
+    }
+}
+
+/** Deep copy the cross section of a SplineMesh.
+ *
+ * @param dst_ptr The components to overwrite
+ * @param src_ptr The components to copy
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spline_mesh_copy(
+    void *dst_ptr,
+    const void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    SplineMesh *dst = dst_ptr;
+    SplineMesh *src = ECS_CONST_CAST(SplineMesh*, src_ptr);
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        int32_t points = ecs_vec_count(&src[i].profile);
+
+        ecs_vec_fini_t(NULL, &dst[i].profile, vec2);
+        ecs_vec_init_t(NULL, &dst[i].profile, vec2, points);
+        ecs_vec_set_count_t(NULL, &dst[i].profile, vec2, points);
+        if (points) {
+            memcpy(ecs_vec_first(&dst[i].profile), ecs_vec_first(&src[i].profile),
+                (size_t)points * sizeof(vec2));
+        }
+
+        dst[i].spline = src[i].spline;
+        dst[i].segments = src[i].segments;
+        dst[i].width = src[i].width;
+        dst[i].height = src[i].height;
+        dst[i].closed = src[i].closed;
+        dst[i].smooth = src[i].smooth;
+    }
+}
+
+/** Hand the cross section of a SplineMesh over, leaving the source empty.
+ *
+ * @param dst_ptr The components to overwrite
+ * @param src_ptr The components to empty
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spline_mesh_move(
+    void *dst_ptr,
+    void *src_ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    box_spline_mesh_dtor(dst_ptr, count, ti);
+    memcpy(dst_ptr, src_ptr, (size_t)count * sizeof(SplineMesh));
+    memset(src_ptr, 0, (size_t)count * sizeof(SplineMesh));
+}
+
 /** Release the control points of a Spline.
  *
  * @param ptr The components
@@ -213,22 +309,25 @@ static void box_spline_update(
     const Spline *spline)
 {
     SplineTable *cached = ecs_get_mut(it->world, e, SplineTable);
+    SplineTable table = {0};
     SplineInfo info = {0};
     if (cached) {
         box_spline_table_build(spline, cached);
-        info.length = cached->length;
-        info.segments = cached->segments;
     } else {
-        SplineTable table = {0};
-
         box_spline_table_build(spline, &table);
-        info.length = table.length;
-        info.segments = table.segments;
         ecs_set_ptr(it->stage, e, SplineTable, &table);
-        box_spline_table_fini(&table);
     }
 
+    const SplineTable *current = cached ? cached : &table;
+
+    info.length = current->length;
+    info.segments = current->segments;
     ecs_set_ptr(it->stage, e, SplineInfo, &info);
+    box_spline_mesh_invalidate(it->world, it->stage, e, spline, current);
+
+    if (!cached) {
+        box_spline_table_fini(&table);
+    }
 }
 
 /** Spline observer: the curve changed, so its table and info follow.
@@ -253,8 +352,9 @@ static void box_spline_on_set(
 static void box_spline_on_remove(
     ecs_iter_t *it)
 {
+    bool closing = ecs_is_fini(it->world) || ecs_should_quit(it->world);
     bool deleting = !it->other_table || !ecs_table_get_type(it->other_table)->count ||
-        ecs_is_fini(it->world) || ecs_should_quit(it->world);
+        closing;
     int32_t i;
     for (i = 0; !deleting && i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
@@ -264,6 +364,10 @@ static void box_spline_on_remove(
             ecs_remove(it->stage, e, SplineInfo);
         }
     }
+
+    for (i = 0; !closing && i < it->count; i ++) {
+        box_spline_mesh_invalidate(it->world, it->stage, it->entities[i], NULL, NULL);
+    }
 }
 
 void BoxSplineImport(
@@ -272,10 +376,12 @@ void BoxSplineImport(
     ECS_MODULE(world, BoxSpline);
     ECS_IMPORT(world, BoxTypes);
     ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxGeometry);
 
     ECS_META_COMPONENT(world, SplineType);
     ECS_META_COMPONENT(world, Spline);
     ECS_META_COMPONENT(world, SplineInfo);
+    ECS_META_COMPONENT(world, SplineMesh);
     ECS_META_COMPONENT(world, PathMode);
     ECS_META_COMPONENT(world, FollowPath);
     ECS_COMPONENT_DEFINE(world, SplineTable);
@@ -294,11 +400,19 @@ void BoxSplineImport(
         .move = box_spline_table_move
     });
 
+    ecs_set_hooks(world, SplineMesh, {
+        .ctor = box_spline_mesh_ctor,
+        .dtor = box_spline_mesh_dtor,
+        .copy = box_spline_mesh_copy,
+        .move = box_spline_mesh_move
+    });
+
     ecs_set_hooks(world, SplineInfo, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, FollowPath, { .ctor = box_follow_ctor });
 
     ecs_add_pair(world, ecs_id(SplineTable), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(SplineInfo), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(SplineMesh), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(FollowPath), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(FollowPath), EcsWith, ecs_id(Rotation));
     ecs_add_pair(world, ecs_id(FollowPath), EcsWith, DynamicTransform);
@@ -315,6 +429,7 @@ void BoxSplineImport(
         .callback = box_spline_on_remove
     });
 
+    box_spline_mesh_init(world);
     box_spline_follow_init(world);
     box_spline_functions_init(world, ecs_id(BoxSpline));
 }

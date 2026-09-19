@@ -54,6 +54,31 @@ ECS_STRUCT(SplineInfo, {
     int32_t segments; /**< Number of segments the control points describe */
 });
 
+/** Cross section swept along a Spline, rebuilt as a Mesh3 when either changes.
+ *
+ * The profile is a polyline in the plane of the cross section, x across the
+ * curve and y up, that the engine copies along the curve at even arc length and
+ * stitches into a quad strip per profile edge. A strip faces a quarter turn
+ * counter clockwise from the direction the profile runs, so a profile listed
+ * from left to right is a road that faces up and a closed profile listed
+ * clockwise is a pipe that faces outward; a road, a fence, a cable and a pipe
+ * are the same sweep with another profile.
+ *
+ * The result is an ordinary Mesh3, so the sweep is drawn, lit, shadowed,
+ * textured and collided with as any other mesh and is shared by the mesh cache
+ * with every sweep that comes out the same. The entity stays a static instance:
+ * the mesh is rebuilt when the component or its curve changes, never per frame.
+ */
+ECS_STRUCT(SplineMesh, {
+    ecs_entity_t spline;   /**< Curve to sweep along, 0 for the curve of the entity */
+    ecs_vec(vec2) profile; /**< Cross section, x across and y up, empty for a flat strip */
+    int32_t segments;      /**< Slices along the curve, 0 for eight per curve segment */
+    float width;           /**< Scale of the cross section across the curve */
+    float height;          /**< Scale of the cross section up */
+    bool closed;           /**< Sweep the cross section as a ring, last point to first */
+    bool smooth;           /**< Share the normals of neighbouring cross section points */
+});
+
 /** What a follower does when it reaches the end of its path */
 ECS_ENUM(PathMode, {
     PathLoop = 0,     /**< Start over at the beginning of the curve */

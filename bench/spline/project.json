@@ -27,6 +27,13 @@
                 ]
             },
             {
+                "id": "Mesh",
+                "benchcases": [
+                    "road_1000_points",
+                    "road_1000_points_curve_edit"
+                ]
+            },
+            {
                 "id": "Follow",
                 "benchcases": [
                     "followers_10k",
