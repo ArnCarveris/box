@@ -20,6 +20,7 @@
 #include "include/tiling.wgsl"
 #include "include/pbr.wgsl"
 #include "include/cluster.wgsl"
+#include "include/shape2d.wgsl"
 #include "include/surface.wgsl"
 
 fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {
@@ -55,6 +56,7 @@ struct VertexIn {
   @location(11) uv_mode: u32,
   @location(12) bounds_pos: vec4<f32>,
   @location(13) vertex_color: vec4<f32>,
+  @location(14) shape: vec4<u32>,
 };
 
 struct VertexOut {
@@ -65,13 +67,13 @@ struct VertexOut {
   @location(3) color: vec4<f32>,
   @location(4) emissive: vec4<f32>,
   @location(5) params: vec4<f32>,
-  @location(6) @interpolate(flat) slot: u32,
+  @location(6) @interpolate(flat) shape: vec4<u32>,
   @location(7) local: vec3<f32>,
   @location(8) @interpolate(flat) textures: vec2<u32>,
   @location(9) local_pos: vec3<f32>,
   @location(10) local_normal: vec3<f32>,
   @location(11) @interpolate(flat) uv_xform: vec4<f32>,
-  @location(12) @interpolate(flat) uv_mode: u32,
+  @location(12) @interpolate(flat) uv_mode: vec2<u32>,
   @location(13) bounds_pos: vec3<f32>,
   @location(14) vertex_color: vec4<f32>,
 };
@@ -92,14 +94,14 @@ struct VertexOut {
   out.emissive = in.emissive;
   out.textures = in.textures;
   out.params = in.params;
-  out.slot = u32(in.params.w);
+  out.shape = in.shape;
   out.local_pos = in.pos * vec3(
     length(vec3(in.row0.x, in.row1.x, in.row2.x)),
     length(vec3(in.row0.y, in.row1.y, in.row2.y)),
     length(vec3(in.row0.z, in.row1.z, in.row2.z)));
   out.local_normal = in.normal;
   out.uv_xform = in.uv_xform;
-  out.uv_mode = in.uv_mode;
+  out.uv_mode = vec2(in.uv_mode, u32(in.params.w));
   out.bounds_pos = in.bounds_pos.xyz;
   out.vertex_color = in.vertex_color;
   out.local = vec3<f32>(0.0);
@@ -177,20 +179,21 @@ const MESH_LUMA: vec3<f32> = vec3(0.2126, 0.7152, 0.0722);
 
 fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     out_indirect: ptr<function, vec3<f32>>) -> vec4<f32> {
-  let projected = tile_uv(in.uv_mode, in.uv_xform, in.uv, in.local_pos, in.local_normal);
-  let uv = wrap_uv(in.uv_mode, projected);
+  let projected = tile_uv(in.uv_mode.x, in.uv_xform, in.uv, in.local_pos, in.local_normal);
+  let uv = wrap_uv(in.uv_mode.x, projected);
   let dp1 = dpdx(in.world_pos);
   let dp2 = dpdy(in.world_pos);
+  let shape_fw = fwidth(in.bounds_pos.xy);
   var ddx = dpdx(projected);
   var ddy = dpdy(projected);
-  if ((in.uv_mode & 0xFu) >= 2u) {
+  if ((in.uv_mode.x & 0xFu) >= 2u) {
     let step = max(length(dp1), length(dp2));
     let lim = step * max(abs(in.uv_xform.x), abs(in.uv_xform.y)) * 4.0 + 1e-8;
     ddx = clamp(ddx, vec2(-lim), vec2(lim));
     ddy = clamp(ddy, vec2(-lim), vec2(lim));
   }
-  let blend = (in.uv_mode >> 8u) & 0xFu;
-  let plain = !front && ((in.uv_mode >> 12u) & 0x3u) == 1u;
+  let blend = (in.uv_mode.x >> 8u) & 0xFu;
+  let plain = !front && ((in.uv_mode.x >> 12u) & 0x3u) == 1u;
   var gn = normalize(in.normal);
   if (!front) {
     gn = -gn;
@@ -232,6 +235,15 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     let ts = tex_sample(slot_normal, uv, ddx, ddy).xyz * 2.0 - vec3(1.0);
     n = perturb(n, dp1, dp2, ddx, ddy, ts);
   }
+  if ((in.uv_mode.x & SHAPE2D_BIT) != 0u) {
+    let shape = shape2d_eval(in.shape, in.bounds_pos.xy, shape_fw);
+    let border = unpack4x8unorm(in.shape.z);
+    albedo = mix(albedo, srgb_to_linear(border.rgb), shape.y);
+    alpha = alpha * shape.x * mix(1.0, border.a, shape.y);
+    if (blend == 0u && shape.x < 0.5) {
+      discard;
+    }
+  }
   var s: Surface;
   s.albedo = albedo;
   s.alpha = alpha;
@@ -242,7 +254,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   s.geo_normal = gn;
   s.world_pos = in.world_pos;
   s.local = in.bounds_pos;
-  var mask = in.uv_mode >> u32(MODE_LAYER_SHIFT);
+  var mask = in.uv_mode.x >> u32(MODE_LAYER_SHIFT);
   if (u.layers_enabled == 0u) {
     mask = 0u;
   }
@@ -266,7 +278,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);
   var indirect = parts.diffuse;
   if (is_baked) {
-    let probe = baked(in.slot, in.local, sn, s.albedo, metallic);
+    let probe = baked(in.uv_mode.y, in.local, sn, s.albedo, metallic);
     color = color + probe;
     indirect = indirect + probe;
   }

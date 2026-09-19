@@ -8,6 +8,7 @@
 
 ECS_COMPONENT_DECLARE(RenderInstance);
 ECS_COMPONENT_DECLARE(RenderState);
+ECS_COMPONENT_DECLARE(RenderShape2D);
 
 /** Registry destructor releasing batches, pending meshes and queries.
  *
@@ -92,16 +93,19 @@ void BoxRenderImport(
     ECS_META_COMPONENT(world, RenderTexture);
     ECS_COMPONENT_DEFINE(world, RenderInstance);
     ECS_COMPONENT_DEFINE(world, RenderState);
+    ECS_COMPONENT_DEFINE(world, RenderShape2D);
 
     ecs_set_hooks(world, RenderState, {
         .ctor = flecs_default_ctor,
         .dtor = box_render_state_dtor
     });
     ecs_set_hooks(world, RenderInstance, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, RenderShape2D, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderTexture, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(RenderInstance), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderTexture), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(RenderShape2D), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(RenderInstance));
 

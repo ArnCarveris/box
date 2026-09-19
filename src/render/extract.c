@@ -105,7 +105,8 @@ static void box_extract_static(
     update->mesh = mesh->handle;
     update->slot = inst->slot;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
-        state->textured, state->tiled, state->layered ? state : NULL, &update->data);
+        state->textured, state->tiled, state->shaped, state->layered ? state : NULL,
+        &update->data);
     if (state->shadowless && !box_render_casts_shadow(world, e)) {
         box_instance_set_caster(&update->data, false);
     }
@@ -149,6 +150,7 @@ void box_render_extract_dynamic(
     bool masked = caster_mask != BOX_VIEW_LAYER_ALL || strict;
     bool textured = state->textured;
     bool tiled = state->tiled;
+    bool shaped = state->shaped;
     const RenderState *layers = state->layered ? state : NULL;
     ecs_iter_t it = ecs_query_iter(world, state->dynamic);
     while (ecs_query_next(&it)) {
@@ -183,7 +185,7 @@ void box_render_extract_dynamic(
 
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
             box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false,
-                textured, tiled, layers, data);
+                textured, tiled, shaped, layers, data);
             if (masked || shadowless) {
                 bool caster = !masked ||
                     box_layer_shown(inst[i].layer_mask, caster_mask, strict);

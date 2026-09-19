@@ -279,7 +279,7 @@ void box_render_extract_transparent(
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
         box_render_fill_instance(world, e, mesh, transform, false, state->textured,
-            state->tiled, state->layered ? state : NULL, &entry->data);
+            state->tiled, state->shaped, state->layered ? state : NULL, &entry->data);
         if (masked) {
             const RenderInstance *record = ecs_get(world, e, RenderInstance);
             if (record && !box_view_casts(v, record->layer_mask)) {

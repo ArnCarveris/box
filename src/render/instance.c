@@ -152,6 +152,19 @@ static void box_render_on_shadowless(
     }
 }
 
+/** A 2D shape exists, so extract resolves the shape words of changed entities.
+ *
+ * @param it Iterator over the entities that gained the component
+ */
+static void box_render_on_shaped(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->shaped = true;
+    }
+}
+
 /** An opacity exists, so extract resolves the alpha of changed entities.
  *
  * @param it Iterator over the entities that gained the component
@@ -294,6 +307,76 @@ done:
     return;
 }
 
+/** Write the packed 2D shape parameters of an entity into instance data.
+ *
+ * The radii and widths of the shape are lengths in the local space of the
+ * rectangle, which the fragment stage never sees; it reads them as ratios of
+ * the smaller half extent of the instance, the same length the rounded corner
+ * of the shape is bound by. The half extents themselves travel as ratios of the
+ * larger one, which is all the fragment stage needs to keep a corner round.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param mesh Its render mesh
+ * @param m Its instance matrix, the world transform times the shape scale
+ * @param out The instance to fill
+ */
+static void box_render_fill_shape(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const RenderMesh *mesh,
+    const mat4 *m,
+    box_instance_t *out)
+{
+    const RenderShape2D *shape = ecs_get(world, e, RenderShape2D);
+    if (!shape) {
+        goto done;
+    }
+
+    vec3 extent = vec3_sub(mesh->bounds_max, mesh->bounds_min);
+    float span[2] = { extent.x, extent.y };
+    float half[2];
+    int32_t axis;
+    for (axis = 0; axis < 2; axis ++) {
+        vec3 col = vec3_new(m->v[axis * 4], m->v[axis * 4 + 1], m->v[axis * 4 + 2]);
+
+        half[axis] = vec3_length(col) * span[axis] * 0.5f;
+    }
+
+    float small = half[0] < half[1] ? half[0] : half[1];
+    float large = half[0] > half[1] ? half[0] : half[1];
+    if (small <= 0.0f || large <= 0.0f) {
+        goto done;
+    }
+
+    float radii[4];
+    float widths[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        radii[i] = shape->radii[i] / small;
+        widths[i] = shape->widths[i] / small;
+    }
+
+    rgba color = shape->color;
+    if (!color.a) {
+        const Rgb *base = ecs_get(world, e, Rgb);
+
+        color.r = base ? base->r : 255;
+        color.g = base ? base->g : 255;
+        color.b = base ? base->b : 255;
+        color.a = 255;
+    }
+
+    out->shape[0] = box_shape_pack4(radii);
+    out->shape[1] = box_shape_pack4(widths);
+    out->shape[2] = (uint32_t)color.r | ((uint32_t)color.g << 8) |
+        ((uint32_t)color.b << 16) | ((uint32_t)color.a << 24);
+    out->shape[3] = box_shape_pack2(half[0] / large, half[1] / large);
+    box_instance_set_shape(out, true);
+done:
+    return;
+}
+
 void box_render_instance_bounds(
     const RenderMesh *mesh,
     const mat4 *m,
@@ -330,6 +413,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
+    bool shaped,
     const RenderState *layers,
     box_instance_t *out)
 {
@@ -366,6 +450,11 @@ void box_render_fill_instance(
     }
 
     box_render_fill_uv(world, e, mesh, &m, tiled, out);
+    memset(out->shape, 0, sizeof(out->shape));
+    if (shaped) {
+        box_render_fill_shape(world, e, mesh, &m, out);
+    }
+
     if (layers) {
         box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
     }
@@ -389,6 +478,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(TextureTransform));
     box_render_watch(world, ecs_id(TextureTiling));
     box_render_watch(world, ecs_id(TextureWrap));
+    box_render_watch(world, ecs_id(RenderShape2D));
     box_render_watch_tiling(world, ecs_id(TextureTransform));
     box_render_watch_tiling(world, ecs_id(TextureTiling));
     box_render_watch_tiling(world, ecs_id(TextureWrap));
@@ -396,6 +486,7 @@ void box_render_instance_init(
     box_render_watch_flag(world, ecs_id(BackFaceMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
     box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
+    box_render_watch_flag(world, ecs_id(RenderShape2D), box_render_on_shaped);
 
     ecs_observer(world, {
         .query.terms = {{ .id = NoShadow }},

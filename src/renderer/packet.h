@@ -259,8 +259,20 @@
 /** Bit that keeps an instance out of the shadow map of a view */
 #define BOX_MODE_NOCAST_SHIFT (14)
 
+/** Bit that says the shape words of an instance hold a 2D shape */
+#define BOX_MODE_SHAPE_SHIFT (15)
+
 /** Bit the material layer mask of an instance starts at in its mode word */
 #define BOX_MODE_LAYER_SHIFT (16)
+
+/** Words the packed 2D shape parameters of an instance take.
+ *
+ * The first holds the four corner radii, the second the four edge widths, the
+ * third the border color and the fourth the two half extents of the rectangle
+ * the radii and widths are measured against. They sit behind the bounding
+ * sphere the culling passes read, so every word before them keeps its offset.
+ */
+#define BOX_SHAPE_WORDS (4)
 
 /** Highest layer a texture handle names, every page of the pager filled */
 #define BOX_TEXTURE_LAYER_MAX (BOX_TEXTURE_PAGES * BOX_TEXTURE_PAGE_LAYERS - 1)
@@ -280,16 +292,20 @@ typedef struct box_instance_t {
     float uv_transform[4]; /**< Uv scale x, scale y, offset x and offset y */
     uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
     float bounds[4];       /**< World space bounding sphere: center xyz and radius */
+    uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
 } box_instance_t;
 
 /** 32 bit words one instance takes in a GPU instance buffer */
-#define BOX_INSTANCE_WORDS (35)
+#define BOX_INSTANCE_WORDS (39)
 
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
 
 /** Word the tiling, blend, back face, caster and layer modes of an instance sit in */
 #define BOX_INSTANCE_MODE (30)
+
+/** Word the packed 2D shape parameters of an instance start at */
+#define BOX_INSTANCE_SHAPE (35)
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
 typedef struct box_light_t {
@@ -842,6 +858,68 @@ static inline uint32_t box_instance_layers(
     const box_instance_t *inst)
 {
     return inst->uv_mode >> BOX_MODE_LAYER_SHIFT;
+}
+
+/** Mark whether the shape words of an instance hold a 2D shape.
+ *
+ * The bit keeps the analytic rounded rectangle of the fragment stage out of
+ * every draw that is not a 2D shape, so a scene without one is unchanged.
+ *
+ * @param inst The instance
+ * @param on The shape words are filled
+ */
+static inline void box_instance_set_shape(
+    box_instance_t *inst,
+    bool on)
+{
+    inst->uv_mode &= ~(1u << BOX_MODE_SHAPE_SHIFT);
+    inst->uv_mode |= on ? (1u << BOX_MODE_SHAPE_SHIFT) : 0u;
+}
+
+/** Check whether the shape words of an instance hold a 2D shape.
+ *
+ * @param inst The instance
+ * @return True when the fragment stage evaluates the shape
+ */
+static inline bool box_instance_shape(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode & (1u << BOX_MODE_SHAPE_SHIFT)) != 0;
+}
+
+/** Pack four ratios in 0..1 into one word of four bytes.
+ *
+ * @param values Four ratios, the first landing in the low byte
+ * @return The packed word, which unpack4x8unorm reverses
+ */
+static inline uint32_t box_shape_pack4(
+    const float *values)
+{
+    uint32_t result = 0;
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        float v = values[i] < 0.0f ? 0.0f : (values[i] > 1.0f ? 1.0f : values[i]);
+
+        result |= (uint32_t)(v * 255.0f + 0.5f) << (i * 8);
+    }
+
+    return result;
+}
+
+/** Pack two ratios in 0..1 into one word of two halves.
+ *
+ * @param x The first ratio, which lands in the low half
+ * @param y The second ratio
+ * @return The packed word, which unpack2x16unorm reverses
+ */
+static inline uint32_t box_shape_pack2(
+    float x,
+    float y)
+{
+    float a = x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
+    float b = y < 0.0f ? 0.0f : (y > 1.0f ? 1.0f : y);
+
+    return (uint32_t)(a * 65535.0f + 0.5f) | ((uint32_t)(b * 65535.0f + 0.5f) << 16);
 }
 
 /** Blend mode the mode word of an instance holds.

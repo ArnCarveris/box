@@ -43,6 +43,18 @@ typedef struct RenderInstance {
     bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
 } RenderInstance;
 
+/** Analytic 2D shape of an entity, written by the shape modules.
+ *
+ * The radii and widths are lengths in the local space of the rectangle the
+ * entity draws; extract turns them into the ratios the fragment stage reads,
+ * because only extract knows the world size of the instance.
+ */
+typedef struct RenderShape2D {
+    float radii[4];  /**< Corner radii, top left, top right, bottom right, bottom left */
+    float widths[4]; /**< Edge widths, top, right, bottom and left */
+    rgba color;      /**< Border color, a zero alpha takes the Rgb of the entity */
+} RenderShape2D;
+
 /** One registered material layer, kept in the order the layers are applied in */
 typedef struct box_layer_t {
     ecs_entity_t entity; /**< The layer entity */
@@ -92,6 +104,7 @@ typedef struct RenderState {
     bool translucent;         /**< An opacity exists, so instances resolve their alpha */
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
+    bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
@@ -128,6 +141,7 @@ typedef struct RenderState {
 
 extern ECS_COMPONENT_DECLARE(RenderInstance);
 extern ECS_COMPONENT_DECLARE(RenderState);
+extern ECS_COMPONENT_DECLARE(RenderShape2D);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
  *
@@ -434,6 +448,7 @@ void box_render_instance_bounds(
  * @param baked The instance reads a baked probe instead of the static lights
  * @param textured The world holds textures, so the PBR slots are resolved
  * @param tiled The world holds tiling components, so the uv transform is derived
+ * @param shaped The world holds 2D shapes, so the shape words are derived
  * @param layers The registry when a material enables a layer, NULL when none does
  * @param out The instance to fill
  */
@@ -445,6 +460,7 @@ void box_render_fill_instance(
     bool baked,
     bool textured,
     bool tiled,
+    bool shaped,
     const RenderState *layers,
     box_instance_t *out);
 
