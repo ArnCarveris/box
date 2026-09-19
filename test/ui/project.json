@@ -61,6 +61,48 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Layout",
+                "testcases": [
+                    "every_node_gets_bounds",
+                    "row_places_children_left_to_right",
+                    "column_places_children_top_to_bottom",
+                    "padding_insets_the_children",
+                    "spacing_separates_the_children",
+                    "row_grows_to_fit_its_children",
+                    "column_grows_to_fit_its_children",
+                    "layout_resizes_the_rect_of_its_element",
+                    "rect_gives_the_size_when_the_layout_has_none",
+                    "row_aligns_its_children_on_both_axes",
+                    "column_aligns_its_children_on_both_axes",
+                    "nested_rows_and_columns",
+                    "direction_none_keeps_the_authored_position",
+                    "root_position_offsets_the_tree",
+                    "changed_child_lays_out_the_tree_again",
+                    "changed_layout_lays_out_the_tree_again",
+                    "node_added_later_is_laid_out",
+                    "tree_that_did_not_change_is_not_laid_out",
+                    "node_that_leaves_the_tree_loses_its_bounds"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Anchor",
+                "testcases": [
+                    "pins_to_the_edges_of_the_parent",
+                    "offset_moves_toward_the_inside",
+                    "offset_in_the_centre_follows_the_axes",
+                    "uses_the_padding_of_the_parent",
+                    "anchored_child_takes_no_room_in_a_row",
+                    "anchored_child_does_not_size_its_parent",
+                    "anchor_of_a_nested_element_follows_its_parent",
+                    "changed_anchor_lays_out_the_tree_again",
+                    "removed_anchor_returns_the_child_to_the_row"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
