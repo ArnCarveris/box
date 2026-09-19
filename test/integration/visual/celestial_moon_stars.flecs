@@ -1,0 +1,81 @@
+// ore_engine/moon_behind_stars
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+using box.sky
+
+camera {
+  Position: {0, 10, -40}
+  LookAt: {0, 46, 300}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {2.7876, 2.9777, 0}
+  DirectionalLight: {intensity: 1}
+  CelestialLight: {toa_intensity: 3, toa_color: {255, 248, 238}}
+}
+
+moon {
+  Rotation: {-0.354, -2.9777, 0}
+  DirectionalLight: {intensity: 1}
+  CelestialLight: {toa_intensity: 0.8, toa_color: {214, 226, 245}}
+}
+
+stars {
+  Rotation: {-0.354, -2.9777, 0}
+  Stars: {density: 700, size: 0.004}
+  CelestialLight: {toa_intensity: 4, toa_color: {225, 235, 255}}
+}
+
+atmosphere {
+  Atmosphere: {
+    sun: sun
+    moon: moon
+    stars: stars
+    sun_disk_intensity: 20
+    moon_angular_radius: 0.08
+    world_units_per_km: 150
+    ground_albedo: {90, 95, 85}
+    night_tint: {40, 60, 120}
+    night_intensity: 0.02
+  }
+}
+
+$ { EnvironmentLight: {intensity: 1, source: atmosphere} }
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {8000, 1, 8000}
+  Rgb: {96, 104, 86}
+  PbrMaterial: {roughness: 0.95}
+}
+
+near_sphere {
+  Position: {-9, 4, 12}
+  Sphere: {segments: 32, smooth: true, radius: 4}
+  Rgb: {210, 210, 215}
+  PbrMaterial: {metallic: 0.1, roughness: 0.35}
+}
+
+near_box {
+  Position: {10, 5, 18}
+  Rotation: {0, 0.5, 0}
+  Box: {10, 10, 10}
+  Rgb: {190, 90, 70}
+  PbrMaterial: {roughness: 0.6}
+}
+
+ridge_c {
+  Position: {-160, 60, 700}
+  Box: {280, 120, 90}
+  Rgb: {150, 155, 140}
+}
+
+box { effects { stack { tonemap {
+  Effect: {enabled: true}
+  ToneMapping: {white: 1.2, dither: false}
+} } } }

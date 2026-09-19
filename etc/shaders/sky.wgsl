@@ -91,6 +91,18 @@ fn sky_moon(dir: vec3<f32>, ro: vec3<f32>, r: f32, cosine: f32, width: f32) -> v
     smoothstep(edge - width, edge + width, cosine);
 }
 
+// Fraction of the moon disk that covers a direction, using the same edge
+// width as sky_moon so the rim the stars stop at matches the rim the moon
+// disk fades over.
+fn sky_moon_mask(dir: vec3<f32>, ro: vec3<f32>, r: f32, cosine: f32, width: f32) -> f32 {
+  let edge = sky.moon_dir.w;
+  if (edge >= 1.0 || cosine < edge - width || sky_hit(ro, dir, sky_bottom()) > 0.0) {
+    return 0.0;
+  }
+
+  return smoothstep(edge - width, edge + width, cosine);
+}
+
 fn sky_star_hash(p: vec3<f32>) -> vec3<f32> {
   let q = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)),
     dot(p, vec3(113.5, 271.9, 124.6)));
@@ -142,7 +154,9 @@ fn sky_stars(dir: vec3<f32>) -> vec3<f32> {
 
   let overcast = sky_overcast();
   if (depth <= 0.0) {
-    let night = sky_stars(warped) * sky_transmittance(r, clamp(warped.y, -1.0, 1.0));
+    let moon_mask = sky_moon_mask(warped, ro, r, moon_cos, moon_width);
+    let night = sky_stars(warped) * (1.0 - moon_mask) *
+      sky_transmittance(r, clamp(warped.y, -1.0, 1.0));
     let bodies = sky_disk(warped, ro, r, sun_cos, width) +
       sky_moon(warped, ro, r, moon_cos, moon_width) + night;
     let radiance = sky_view_radiance(warped) + bodies * (1.0 - overcast);
