@@ -41,6 +41,11 @@ static void box_pick_query(
 
 /** Move the Hovered tag to the entity the cursor points at.
  *
+ * A raise that finds no waiter leaves the hover missed for this entity, so a
+ * waiter that registers later in the same hover resolves on its next update
+ * instead of waiting for a hit that will never change again. One delivery
+ * clears the miss, so a handler that awaits hover again keeps single shot.
+ *
  * @param it Iterator of the system, whose stage carries the change
  * @param state The module state
  * @param entity The entity the cursor points at, 0 for none
@@ -51,6 +56,12 @@ static void box_pick_hover(
     ecs_entity_t entity)
 {
     if (state->hovered == entity) {
+        if (state->hover_missed &&
+            box_picking_raise(it->stage, PickHover, &state->hit))
+        {
+            state->hover_missed = false;
+        }
+
         goto done;
     }
 
@@ -59,9 +70,11 @@ static void box_pick_hover(
     }
 
     state->hovered = entity;
+    state->hover_missed = false;
     if (entity) {
         ecs_add_id(it->stage, entity, Hovered);
-        box_picking_raise(it->stage, PickHover, &state->hit);
+        state->hover_missed =
+            box_picking_raise(it->stage, PickHover, &state->hit) == 0;
     }
 
 done:

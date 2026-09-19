@@ -32,6 +32,7 @@ typedef struct PickState {
     PickHit hit;             /**< Hit of the last ray query */
     PickHit press;           /**< Hit the press of the held button landed on */
     ecs_entity_t hovered;    /**< Entity that carries Hovered */
+    bool hover_missed;       /**< The hover of the entity above raised to no waiter yet */
     vec2 cursor;             /**< Normalized cursor of the last ray query */
     vec2 press_window;       /**< Cursor in window points when the button went down */
     bool valid;              /**< The cached hit answers for the cursor of this frame */
