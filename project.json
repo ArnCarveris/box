@@ -63,6 +63,11 @@
             "commit": "28d546d5eb77d4585506a20480f4de2e706dff4c",
             "header-only": true
         },
+        "cgltf": {
+            "repository": "https://github.com/jkuhlmann/cgltf.git",
+            "commit": "85cd62382dfea638278962690cf515023f33ed00",
+            "header-only": true
+        },
         "resvg": {
             "repository": "https://github.com/linebender/resvg.git",
             "tag": "v0.47.0",
