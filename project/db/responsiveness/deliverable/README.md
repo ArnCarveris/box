@@ -17,6 +17,9 @@
 - flecs' scheduled template updates give incremental loading without a second script pass; the order refresh on camera movement is the only cost.
 - A spike budget relative to the mean plus per frame system attribution turns a p99 number into a named offender.
 
+## Follow up
+- `responsiveness/script_eval_perf` (closed after the checkpoints epic): the script evaluator compared each component statement with every earlier one to find its owner, so a scene load was quadratic in the statement count. Flecs commit `e1b0775d9` indexes owners by a hash of the entity path they name; a 10k statement scene loads in 42 ms instead of 755 ms and a 50k one in 216 ms instead of 18.8 s, recorded in the `bench/script` `Load` suite.
+
 ## Not in this epic
 - The combined stress scene's tail frames attribute to the surface acquire, the wait on the GPU, at 15% headroom under the budget; a triple buffered acquire or an earlier submit is the follow up.
 - Light baking still uses its own per frame budget rather than the job pool.
