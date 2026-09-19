@@ -314,7 +314,9 @@ between two passes are RGBA16F, so what an earlier pass pushes past white reache
 the tone map. `height_fog.flecs`, `bloom.flecs`, `auto_exposure.flecs` and
 `tonemap.flecs` under `test/integration/visual` show one effect each, and
 `gtao.flecs` shows a room corner with the occlusion on next to `gtao_off.flecs`
-and `ssr.flecs` a glossy floor reflecting colored boxes next to `ssr_off.flecs`.
+and `ssr.flecs` a glossy floor reflecting colored boxes next to `ssr_off.flecs`;
+`python3 tools/ssr_check.py` renders that scene and fails when the floor keeps
+more than a handful of isolated pixels where a ray missed.
 
 ## Benchmarks
 

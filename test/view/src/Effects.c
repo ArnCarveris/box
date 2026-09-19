@@ -815,10 +815,18 @@ void Effects_ssr_march_hits_a_floor(void)
     // effects/ssr
     float scene[6] = { 12.0f, 11.0f, 10.0f, 9.0f, 8.4f, 8.0f };
     float ray[6] = { 11.0f, 10.5f, 10.0f, 9.2f, 8.5f, 8.2f };
-    test_int(box_ssr_march(scene, ray, 6, 0.4f), 3);
-    test_bool(box_ssr_behind(9.2f, 9.0f, 0.4f), true);
-    test_bool(box_ssr_behind(8.9f, 9.0f, 0.4f), false);
-    test_bool(box_ssr_behind(20.0f, 9.0f, 0.4f), false);
+    test_int(box_ssr_march(scene, ray, 6), 3);
+    test_bool(box_ssr_behind(9.2f, 9.0f), true);
+    test_bool(box_ssr_behind(8.9f, 9.0f), false);
+    test_bool(box_ssr_behind(9.2f, 0.0f), false);
+
+    float steep[4] = { 12.0f, 11.0f, 6.0f, 5.0f };
+    float over[4] = { 11.0f, 10.5f, 10.0f, 9.5f };
+    test_int(box_ssr_march(steep, over, 4), 2);
+    test_flt(box_ssr_confidence(0.2f, 0.5f), 1.0f);
+    test_flt(box_ssr_confidence(1.0f, 0.5f), 0.0f);
+    float partial = box_ssr_confidence(0.75f, 0.5f);
+    test_assert(partial > 0.0f && partial < 1.0f);
 }
 
 void Effects_ssr_march_misses_off_screen(void)
@@ -826,10 +834,14 @@ void Effects_ssr_march_misses_off_screen(void)
     // effects/ssr
     float empty[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     float ray[4] = { 4.0f, 8.0f, 12.0f, 16.0f };
-    test_int(box_ssr_march(empty, ray, 4, 0.4f), -1);
+    test_int(box_ssr_march(empty, ray, 4), -1);
 
     float behind[4] = { 20.0f, 20.0f, 20.0f, 20.0f };
-    test_int(box_ssr_march(behind, ray, 4, 0.4f), -1);
+    test_int(box_ssr_march(behind, ray, 4), -1);
+
+    float started[3] = { 3.0f, 0.0f, 0.0f };
+    float inside[3] = { 4.0f, 8.0f, 12.0f };
+    test_int(box_ssr_march(started, inside, 3), 0);
 }
 
 void Effects_ssr_weight_falls_with_the_roughness(void)
@@ -843,10 +855,13 @@ void Effects_ssr_weight_falls_with_the_roughness(void)
     test_assert(middle > 0.0f && middle < 1.0f);
     test_assert(box_ssr_roughness_weight(0.5f, 0.6f) < middle);
 
-    test_flt(box_ssr_edge_fade(0.5f, 0.5f, 0.12f), 1.0f);
-    test_flt(box_ssr_edge_fade(0.0f, 0.5f, 0.12f), 0.0f);
-    test_flt(box_ssr_edge_fade(0.5f, 1.0f, 0.12f), 0.0f);
-    float near_edge = box_ssr_edge_fade(0.06f, 0.5f, 0.12f);
+    test_flt(box_ssr_border(0.5f, 0.5f), 0.5f);
+    test_flt(box_ssr_border(0.06f, 0.5f), 0.06f);
+    test_flt(box_ssr_border(0.5f, 1.0f), 0.0f);
+    test_flt(box_ssr_edge_fade(box_ssr_border(0.5f, 0.5f), 0.12f), 1.0f);
+    test_flt(box_ssr_edge_fade(box_ssr_border(0.0f, 0.5f), 0.12f), 0.0f);
+    test_flt(box_ssr_edge_fade(box_ssr_border(0.5f, 1.0f), 0.12f), 0.0f);
+    float near_edge = box_ssr_edge_fade(box_ssr_border(0.06f, 0.5f), 0.12f);
     test_assert(near_edge > 0.0f && near_edge < 1.0f);
 }
 

@@ -1,9 +1,9 @@
 {
   "kind": "bug",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-09-18T23:56:24.196+00:00",
-  "start_time": null,
-  "end_time": null,
+  "start_time": "2026-09-18T23:57:49.792+00:00",
+  "end_time": "2026-09-19T00:05:18.799+00:00",
   "dependencies": [
     "effects/ssr"
   ]
