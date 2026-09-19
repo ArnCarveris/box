@@ -1114,6 +1114,24 @@ typedef struct box_dynamic_batch_t {
 /** Collider of the table that is the axis aligned box of its half extents */
 #define BOX_PARTICLE_COLLIDER_BOX (1.0f)
 
+/** The particles of the emitter are added to the image instead of blended over it */
+#define BOX_PARTICLE_ADDITIVE (8u)
+
+/** The particles of the emitter fade out against the geometry behind them */
+#define BOX_PARTICLE_SOFT (16u)
+
+/** The particles of the emitter are drawn as a soft round sprite */
+#define BOX_PARTICLE_DRAW_CIRCLE (0)
+
+/** The particles of the emitter are drawn as a frame of their texture */
+#define BOX_PARTICLE_DRAW_SPRITE (1)
+
+/** The particles of the emitter are drawn as the mesh of the emitter */
+#define BOX_PARTICLE_DRAW_BILLBOARD (2)
+
+/** Keys one curve of an emitter holds, evenly spread over the life of a particle */
+#define BOX_PARTICLE_KEYS (4)
+
 /** One entry of the table of an emitter, a spawn point or a collider.
  *
  * The spawn points of the shape come first, in the space of the transform of
@@ -1144,6 +1162,11 @@ typedef struct box_particle_emitter_t {
     float collision[4];     /**< Height of the ground, the bounce and the friction, w unused */
     float direction[4];     /**< Emission direction in emitter space, w its spread cosine */
     float extents[4];       /**< Half extents of the box shape, w the radius of the others */
+    float size_curve[4];    /**< Keys of the size multiplier over the normalised age */
+    float opacity_curve[4]; /**< Keys of the opacity multiplier over the normalised age */
+    float turn_curve[4];    /**< Keys of the turns added to the rotation over the age */
+    float gradient[BOX_PARTICLE_KEYS][4]; /**< Linear colors the particle passes through */
+    float sheet[4];         /**< Sheet columns and rows, its frames per second and the softness */
     float speed[2];         /**< Lowest and highest initial speed */
     float lifetime[2];      /**< Lowest and highest lifetime in seconds */
     float size[2];          /**< Lowest and highest initial size */
@@ -1159,8 +1182,14 @@ typedef struct box_particle_emitter_t {
     uint32_t point_count;   /**< Points of its shape table, 0 for a shape without one */
     uint32_t flags;         /**< BOX_PARTICLE_RESET and the playback bits above it */
     uint32_t collider_count; /**< Colliders of its table, which follow its shape points */
+    uint32_t appearance;    /**< One of the BOX_PARTICLE_DRAW constants */
+    uint32_t texture;       /**< Packed texture slot of a sprite, 0 for none */
+    uint32_t pad2;          /**< Padding to the 16 byte GPU stride */
+    uint32_t pad3;          /**< Padding to the 16 byte GPU stride */
     uint32_t id;            /**< Pool of the emitter, the low word of its entity */
     uint32_t point_first;   /**< First point of its shape table in the packet */
+    uint32_t mesh;          /**< Mesh handle a billboard is drawn as, 0 for a quad */
+    float origin[3];        /**< World position of the emitter, which sorts its pool */
 } box_particle_emitter_t;
 
 /** Bytes of an emitter that the uniform buffer of its pool holds */

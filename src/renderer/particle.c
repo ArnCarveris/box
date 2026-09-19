@@ -7,8 +7,15 @@
  * moves the live particles and pushes the slots that expire onto the dead list,
  * the spawn pass pops as many slots as the packet asked for and fills them from
  * a hash of the emitter seed and the spawn index, and the sprite pass expands
- * every slot into a camera facing quad. A pool lives as long as its emitter
- * keeps appearing in the packets.
+ * every slot into a camera facing quad or into the mesh of its emitter. A pool
+ * lives as long as its emitter keeps appearing in the packets.
+ *
+ * The sprite pass reads the block of the emitter next to its channels, so the
+ * curves over the life of a particle are evaluated there, and it samples the
+ * depth of the view a second time for the soft fade, which is why it takes the
+ * depth as a read only attachment. A pool is drawn with the blended or the
+ * additive pipeline of the target format, and the blended ones are drawn back
+ * to front because their order is what their result depends on.
  */
 
 #include "renderer_internal.h"
@@ -147,17 +154,33 @@ static void box_particle_layouts(
     r->particles.sim_layout = wgpuDeviceCreateBindGroupLayout(r->device, &sim_desc);
 
     WGPUBindGroupLayoutEntry draw[BOX_PARTICLE_DRAW_BINDINGS] = {0};
-    for (i = 0; i < BOX_PARTICLE_DRAW_BINDINGS; i ++) {
+    for (i = 0; i < BOX_PARTICLE_DRAW_BINDINGS - 1; i ++) {
         draw[i].binding = i;
         draw[i].visibility = WGPUShaderStage_Vertex;
         draw[i].buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
     }
+
+    draw[i].binding = i;
+    draw[i].visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
+    draw[i].buffer.type = WGPUBufferBindingType_Uniform;
+    draw[i].buffer.minBindingSize = BOX_PARTICLE_UNIFORM_SIZE;
 
     WGPUBindGroupLayoutDescriptor draw_desc = {
         .entryCount = BOX_PARTICLE_DRAW_BINDINGS,
         .entries = draw
     };
     r->particles.draw_layout = wgpuDeviceCreateBindGroupLayout(r->device, &draw_desc);
+
+    WGPUBindGroupLayoutEntry depth = {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Fragment,
+        .texture = {
+            .sampleType = WGPUTextureSampleType_Depth,
+            .viewDimension = WGPUTextureViewDimension_2D
+        }
+    };
+    WGPUBindGroupLayoutDescriptor depth_desc = { .entryCount = 1, .entries = &depth };
+    r->particles.depth_layout = wgpuDeviceCreateBindGroupLayout(r->device, &depth_desc);
 }
 
 /** Release the pipelines the particle shaders built.
@@ -167,13 +190,20 @@ static void box_particle_layouts(
 static void box_particle_pipelines_fini(
     box_renderer_t *r)
 {
-    uint32_t i;
+    uint32_t i, blend;
     for (i = 0; i < BOX_PARTICLE_FORMATS; i ++) {
-        if (r->particles.pipeline[i]) {
-            wgpuRenderPipelineRelease(r->particles.pipeline[i]);
-        }
+        for (blend = 0; blend < BOX_PARTICLE_BLENDS; blend ++) {
+            if (r->particles.pipeline[i][blend]) {
+                wgpuRenderPipelineRelease(r->particles.pipeline[i][blend]);
+            }
 
-        r->particles.pipeline[i] = NULL;
+            if (r->particles.mesh[i][blend]) {
+                wgpuRenderPipelineRelease(r->particles.mesh[i][blend]);
+            }
+
+            r->particles.pipeline[i][blend] = NULL;
+            r->particles.mesh[i][blend] = NULL;
+        }
     }
 
     if (r->particles.spawn) wgpuComputePipelineRelease(r->particles.spawn);
@@ -223,19 +253,28 @@ done:
     return;
 }
 
-/** Build the point sprite pipeline of one target format.
+/** Build one sprite pipeline: a target format, a blend and a vertex source.
+ *
+ * The blended pipeline composites a particle over the image by its opacity and
+ * the additive one adds it, which is what fire, sparks and magic are drawn
+ * with. The mesh variant reads the vertices of the mesh of an emitter instead
+ * of generating a quad, so it takes the vertex layout of the scene.
  *
  * @param r The renderer
  * @param module Module of the sprite shader
  * @param layout Pipeline layout of the pass
  * @param hdr The pass writes the float scene target
+ * @param additive The pass adds a particle to the image instead of blending it
+ * @param mesh The pass draws the mesh of the emitter
  * @return The pipeline
  */
 static WGPURenderPipeline box_particle_build_draw(
     box_renderer_t *r,
     WGPUShaderModule module,
     WGPUPipelineLayout layout,
-    bool hdr)
+    bool hdr,
+    bool additive,
+    bool mesh)
 {
     WGPUBlendState blend = {
         .color = { WGPUBlendOperation_Add, WGPUBlendFactor_SrcAlpha,
@@ -243,6 +282,12 @@ static WGPURenderPipeline box_particle_build_draw(
         .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_One,
             WGPUBlendFactor_OneMinusSrcAlpha }
     };
+    if (additive) {
+        blend.color.dstFactor = WGPUBlendFactor_One;
+        blend.alpha.srcFactor = WGPUBlendFactor_Zero;
+        blend.alpha.dstFactor = WGPUBlendFactor_One;
+    }
+
     WGPUColorTargetState target = {
         .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
         .blend = &blend,
@@ -263,11 +308,23 @@ static WGPURenderPipeline box_particle_build_draw(
         .stencilReadMask = 0xFFFFFFFF,
         .stencilWriteMask = 0xFFFFFFFF
     };
+    WGPUVertexAttribute attributes[2] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 1 }
+    };
+    WGPUVertexBufferLayout vertices = {
+        .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
+        .stepMode = WGPUVertexStepMode_Vertex,
+        .attributeCount = 2,
+        .attributes = attributes
+    };
     WGPURenderPipelineDescriptor desc = {
         .layout = layout,
         .vertex = {
             .module = module,
-            .entryPoint = { .data = "vs_main", .length = WGPU_STRLEN }
+            .entryPoint = { .data = mesh ? "vs_mesh" : "vs_main", .length = WGPU_STRLEN },
+            .bufferCount = mesh ? 1 : 0,
+            .buffers = mesh ? &vertices : NULL
         },
         .fragment = &fragment,
         .depthStencil = &depth,
@@ -309,17 +366,22 @@ static bool box_particle_ensure(
 
         WGPUShaderModule module = box_shader_module(r, p->particle_draw_shader);
         if (module) {
-            WGPUBindGroupLayout groups[2] = { r->view_layout, r->particles.draw_layout };
+            WGPUBindGroupLayout groups[4] = { r->view_layout, r->particles.draw_layout,
+                r->env_layout, r->particles.depth_layout };
             WGPUPipelineLayoutDescriptor layout_desc = {
-                .bindGroupLayoutCount = 2,
+                .bindGroupLayoutCount = 4,
                 .bindGroupLayouts = groups
             };
             WGPUPipelineLayout layout =
                 wgpuDeviceCreatePipelineLayout(r->device, &layout_desc);
-            uint32_t i;
+            uint32_t i, blend;
             for (i = 0; i < BOX_PARTICLE_FORMATS; i ++) {
-                r->particles.pipeline[i] =
-                    box_particle_build_draw(r, module, layout, i != 0);
+                for (blend = 0; blend < BOX_PARTICLE_BLENDS; blend ++) {
+                    r->particles.pipeline[i][blend] = box_particle_build_draw(
+                        r, module, layout, i != 0, blend != 0, false);
+                    r->particles.mesh[i][blend] = box_particle_build_draw(
+                        r, module, layout, i != 0, blend != 0, true);
+                }
             }
 
             wgpuPipelineLayoutRelease(layout);
@@ -328,7 +390,8 @@ static bool box_particle_ensure(
     }
 
     result = r->particles.spawn && r->particles.integrate &&
-        r->particles.pipeline[0] && r->particles.pipeline[1];
+        r->particles.pipeline[0][0] && r->particles.pipeline[1][1] &&
+        r->particles.mesh[0][0] && r->particles.mesh[1][1];
     if (!result && !r->particles.failed) {
         fprintf(stderr, "box: the particle shaders do not compile, no particles are drawn\n");
         r->particles.failed = true;
@@ -454,7 +517,8 @@ static void box_particle_groups(
             { .binding = 1, .buffer = pool->velocity, .size = vectors },
             { .binding = 2, .buffer = pool->force, .size = vectors },
             { .binding = 3, .buffer = pool->color, .size = vectors },
-            { .binding = 4, .buffer = pool->size, .size = scalars }
+            { .binding = 4, .buffer = pool->size, .size = scalars },
+            { .binding = 5, .buffer = pool->uniform, .size = BOX_PARTICLE_UNIFORM_SIZE }
         };
         WGPUBindGroupDescriptor desc = {
             .layout = r->particles.draw_layout,
@@ -522,6 +586,12 @@ void box_particle_simulate(
 
             box_gpu_emitter_t *pool = box_particle_pool(r, e);
             pool->seen = true;
+            pool->appearance = e->appearance;
+            pool->mesh = e->mesh;
+            pool->additive = (e->flags & BOX_PARTICLE_ADDITIVE) != 0;
+            pool->origin[0] = e->origin[0];
+            pool->origin[1] = e->origin[1];
+            pool->origin[2] = e->origin[2];
             if (e->flags & BOX_PARTICLE_RESET) {
                 box_particle_free_list(r, pool);
                 wgpuCommandEncoderClearBuffer(encoder, pool->velocity, 0,
@@ -556,8 +626,124 @@ done:
     return;
 }
 
+/** Depth group of the view being recorded, built again when its target changed.
+ *
+ * @param r The renderer
+ * @return The bind group, NULL when the view has no sampled depth
+ */
+static WGPUBindGroup box_particle_depth_group(
+    box_renderer_t *r)
+{
+    if (!r->v->depth_sample) {
+        goto done;
+    }
+
+    if (r->particles.depth_for != r->v->depth_sample) {
+        if (r->particles.depth_group) {
+            wgpuBindGroupRelease(r->particles.depth_group);
+        }
+
+        WGPUBindGroupEntry entry = { .binding = 0, .textureView = r->v->depth_sample };
+        WGPUBindGroupDescriptor desc = {
+            .layout = r->particles.depth_layout,
+            .entryCount = 1,
+            .entries = &entry
+        };
+        r->particles.depth_group = wgpuDeviceCreateBindGroup(r->device, &desc);
+        r->particles.depth_for = r->v->depth_sample;
+    }
+
+done:
+    return r->particles.depth_group;
+}
+
+/** Order the pools of a view: the blended ones back to front, the added ones last.
+ *
+ * Blending is not commutative, so a pool that sits behind another has to be
+ * drawn first; adding is, so the additive pools follow in any order and never
+ * have to be mixed into the sorted run.
+ *
+ * @param r The renderer
+ * @param view The view being recorded
+ */
+static void box_particle_sort(
+    box_renderer_t *r,
+    const box_view_t *view)
+{
+    if (!r->particles.order.size) {
+        box_vec_init(&r->particles.order, sizeof(box_particle_order_t));
+    }
+
+    box_vec_clear(&r->particles.order);
+    uint32_t i;
+    for (i = 0; i < r->particles.pools.count; i ++) {
+        box_gpu_emitter_t *pool = box_vec_at(&r->particles.pools, i);
+        if (!pool->draw_group) {
+            continue;
+        }
+
+        float dx = pool->origin[0] - view->eye[0];
+        float dy = pool->origin[1] - view->eye[1];
+        float dz = pool->origin[2] - view->eye[2];
+        box_particle_order_t *entry = box_vec_push(&r->particles.order);
+        entry->pool = i;
+        entry->distance = pool->additive ? -1.0f : dx * dx + dy * dy + dz * dz;
+    }
+
+    for (i = 1; i < r->particles.order.count; i ++) {
+        box_particle_order_t entry = *(box_particle_order_t*)
+            box_vec_at(&r->particles.order, i);
+        uint32_t j = i;
+        while (j > 0) {
+            box_particle_order_t *before = box_vec_at(&r->particles.order, j - 1);
+            if (before->distance >= entry.distance) {
+                break;
+            }
+
+            *(box_particle_order_t*)box_vec_at(&r->particles.order, j) = *before;
+            j --;
+        }
+
+        *(box_particle_order_t*)box_vec_at(&r->particles.order, j) = entry;
+    }
+}
+
+/** Draw one pool, as a quad per particle or as the mesh of its emitter.
+ *
+ * @param r The renderer
+ * @param pool The pool
+ * @param pass The render pass
+ * @param hdr The pass writes the float scene target
+ */
+static void box_particle_draw(
+    box_renderer_t *r,
+    box_gpu_emitter_t *pool,
+    WGPURenderPassEncoder pass,
+    bool hdr)
+{
+    uint32_t format = hdr ? 1 : 0;
+    uint32_t blend = pool->additive ? 1 : 0;
+    box_gpu_mesh_t *mesh = NULL;
+    if (pool->appearance == BOX_PARTICLE_DRAW_BILLBOARD && pool->mesh) {
+        mesh = box_scene_mesh(r, pool->mesh);
+    }
+
+    wgpuRenderPassEncoderSetBindGroup(pass, 1, pool->draw_group, 0, NULL);
+    if (mesh && mesh->index_count && mesh->vertices && mesh->indices) {
+        wgpuRenderPassEncoderSetPipeline(pass, r->particles.mesh[format][blend]);
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, mesh->vertices, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderSetIndexBuffer(pass, mesh->indices,
+            WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderDrawIndexed(pass, mesh->index_count, pool->capacity, 0, 0, 0);
+    } else {
+        wgpuRenderPassEncoderSetPipeline(pass, r->particles.pipeline[format][blend]);
+        wgpuRenderPassEncoderDraw(pass, BOX_PARTICLE_VERTICES, pool->capacity, 0, 0);
+    }
+}
+
 void box_particle_record(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPUCommandEncoder encoder,
     WGPUTextureView attachment,
@@ -567,8 +753,8 @@ void box_particle_record(
         goto done;
     }
 
-    WGPURenderPipeline pipeline = r->particles.pipeline[hdr ? 1 : 0];
-    if (!pipeline) {
+    WGPUBindGroup depth_group = box_particle_depth_group(r);
+    if (!r->particles.pipeline[hdr ? 1 : 0][0] || !r->v->env_group || !depth_group) {
         goto done;
     }
 
@@ -580,8 +766,7 @@ void box_particle_record(
     };
     WGPURenderPassDepthStencilAttachment depth = {
         .view = r->v->depth_view,
-        .depthLoadOp = WGPULoadOp_Load,
-        .depthStoreOp = WGPUStoreOp_Store
+        .depthReadOnly = true
     };
     WGPURenderPassDescriptor desc = {
         .colorAttachmentCount = 1,
@@ -589,17 +774,14 @@ void box_particle_record(
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "particles");
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, depth_group, 0, NULL);
+    box_particle_sort(r, view);
     uint32_t i;
-    for (i = 0; i < r->particles.pools.count; i ++) {
-        box_gpu_emitter_t *pool = box_vec_at(&r->particles.pools, i);
-        if (!pool->draw_group) {
-            continue;
-        }
-
-        wgpuRenderPassEncoderSetBindGroup(pass, 1, pool->draw_group, 0, NULL);
-        wgpuRenderPassEncoderDraw(pass, BOX_PARTICLE_VERTICES, pool->capacity, 0, 0);
+    for (i = 0; i < r->particles.order.count; i ++) {
+        box_particle_order_t *entry = box_vec_at(&r->particles.order, i);
+        box_particle_draw(r, box_vec_at(&r->particles.pools, entry->pool), pass, hdr);
     }
 
     wgpuRenderPassEncoderEnd(pass);
@@ -629,11 +811,17 @@ void box_particle_fini(
     }
 
     box_vec_fini(&r->particles.pools);
+    box_vec_fini(&r->particles.order);
     box_particle_pipelines_fini(r);
+    if (r->particles.depth_group) wgpuBindGroupRelease(r->particles.depth_group);
     if (r->particles.sim_layout) wgpuBindGroupLayoutRelease(r->particles.sim_layout);
     if (r->particles.draw_layout) wgpuBindGroupLayoutRelease(r->particles.draw_layout);
+    if (r->particles.depth_layout) wgpuBindGroupLayoutRelease(r->particles.depth_layout);
+    r->particles.depth_group = NULL;
+    r->particles.depth_for = NULL;
     r->particles.sim_layout = NULL;
     r->particles.draw_layout = NULL;
+    r->particles.depth_layout = NULL;
     r->particles.sim_shader = BOX_SHADER_NONE;
     r->particles.draw_shader = BOX_SHADER_NONE;
     r->particles.failed = false;

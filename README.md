@@ -581,10 +581,40 @@ Every property a particle starts with is drawn from a range: the direction from 
 of `spread`, the speed, the lifetime, the size, the rotation, the opacity and the color,
 which is drawn between `color` minus and `color` plus `color_variance` per channel.
 
+`ParticleCurves` changes a particle over its life. Every curve has four keys, at the
+start, a third in, two thirds in and at the end, and the value between two keys is the
+line between them. The size and the opacity curves multiply what the particle was spawned
+with, the rotation curve adds turns and the gradient multiplies its color, so an emitter
+that names no curve is left alone. The curves are read by the sprite pass from the age and
+the lifetime the buffers already hold, so they cost no per particle state.
+
+`ParticleAppearance` says how a particle is drawn: a soft `ParticleCircle`, a
+`ParticleSprite` of a texture, which `columns` and `rows` split into a sheet of frames
+that `fps` plays at or that plays once over the life, or a `ParticleBillboard` of the mesh
+of an entity, kept facing the camera. The texture is a texture entity, an entity with an
+`Image` or one with `PbrTextures`, whose albedo is taken. `blend` is `ParticleAlpha` for
+smoke and debris or `ParticleAdditive` for fire, sparks and magic; the blended pools are
+drawn back to front after the glass pass and the added ones follow them. A `softness`
+fades a particle out over that many world units as it approaches the geometry behind it,
+which is what keeps a puff of smoke from cutting a line into a wall.
+
+```
+smoke {
+  ParticleEmitter: {max: 20000, rate: 4000, speed: {min: 1, max: 2}, seed: 8}
+  ParticleCurves: {
+    size: {start: 0.4, early: 1.2, late: 1.9, end: 2.4}
+    opacity: {start: 0, early: 1, late: 0.7, end: 0}
+  }
+  ParticleAppearance: {shape: ParticleSprite, texture: puff, softness: 0.6}
+}
+```
+
 `test/integration/visual/particles_shapes.flecs` shows a stream from each of the six
 shapes, `test/integration/visual/particles_forces.flecs` a jet splashing off a plate, a
-plume blown over by wind and a burst of sparks, and
-`test/integration/bench/particles_1m.flecs` runs a million of them.
+plume blown over by wind and a burst of sparks,
+`test/integration/visual/particles_appearance.flecs` smoke, fire, sparks, a sprite sheet
+and mesh billboards, and `test/integration/bench/particles_1m.flecs` runs a million of
+them.
 
 ## Tests
 

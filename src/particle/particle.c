@@ -95,6 +95,71 @@ static void box_particle_forces_ctor(
     }
 }
 
+/** Fill a curve with one value in every key.
+ *
+ * @param c The curve
+ * @param value The value
+ */
+static void box_particle_flat(
+    ParticleCurve *c,
+    float value)
+{
+    c->start = value;
+    c->early = value;
+    c->late = value;
+    c->end = value;
+}
+
+/** Curves constructor: constants that leave a particle as it was spawned.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_curves_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleCurves *c = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        memset(&c[i], 0, sizeof(ParticleCurves));
+        box_particle_flat(&c[i].size, 1.0f);
+        box_particle_flat(&c[i].opacity, 1.0f);
+        box_particle_flat(&c[i].rotation, 0.0f);
+        rgb white = { 255, 255, 255 };
+        c[i].color.start = white;
+        c[i].color.early = white;
+        c[i].color.late = white;
+        c[i].color.end = white;
+    }
+}
+
+/** Appearance constructor: soft blended circles without a sheet.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_appearance_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleAppearance *a = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        memset(&a[i], 0, sizeof(ParticleAppearance));
+        a[i].shape = ParticleCircle;
+        a[i].blend = ParticleAlpha;
+        a[i].columns = 1;
+        a[i].rows = 1;
+    }
+}
+
 /** Collision constructor: a bouncy ground plane at the origin.
  *
  * @param ptr The components
@@ -183,12 +248,20 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleEmitter);
     ECS_META_COMPONENT(world, ParticleForces);
     ECS_META_COMPONENT(world, ParticleCollision);
+    ECS_META_COMPONENT(world, ParticleCurve);
+    ECS_META_COMPONENT(world, ParticleGradient);
+    ECS_META_COMPONENT(world, ParticleCurves);
+    ECS_META_COMPONENT(world, ParticleShape);
+    ECS_META_COMPONENT(world, ParticleBlend);
+    ECS_META_COMPONENT(world, ParticleAppearance);
     ECS_COMPONENT_DEFINE(world, ParticleEmitterImpl);
     ECS_COMPONENT_DEFINE(world, ParticleState);
 
     ecs_set_hooks(world, ParticleEmitter, { .ctor = box_particle_emitter_ctor });
     ecs_set_hooks(world, ParticleForces, { .ctor = box_particle_forces_ctor });
     ecs_set_hooks(world, ParticleCollision, { .ctor = box_particle_collision_ctor });
+    ecs_set_hooks(world, ParticleCurves, { .ctor = box_particle_curves_ctor });
+    ecs_set_hooks(world, ParticleAppearance, { .ctor = box_particle_appearance_ctor });
     ecs_set_hooks(world, ParticleEmitterImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ParticleState, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(ParticleEmitter), EcsWith, ecs_id(WorldTransform));
@@ -203,7 +276,9 @@ void BoxParticleImport(
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = ecs_id(ParticleEmitterImpl), .inout = EcsInOut },
             { .id = ecs_id(ParticleForces), .oper = EcsOptional, .inout = EcsIn },
-            { .id = ecs_id(ParticleCollision), .oper = EcsOptional, .inout = EcsIn }
+            { .id = ecs_id(ParticleCollision), .oper = EcsOptional, .inout = EcsIn },
+            { .id = ecs_id(ParticleCurves), .oper = EcsOptional, .inout = EcsIn },
+            { .id = ecs_id(ParticleAppearance), .oper = EcsOptional, .inout = EcsIn }
         },
         .cache_kind = EcsQueryCacheAuto
     });

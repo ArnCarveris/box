@@ -1,0 +1,175 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+using box.particle
+
+camera {
+  Position: {0, 1.9, -8.2}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.4}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, intensity: 0.6} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {105, 108, 112}
+  PbrMaterial: {roughness: 0.9}
+}
+
+wall {
+  Position: {-6, 1, 0.5}
+  Box: {2.6, 2, 0.4}
+  Rgb: {150, 148, 156}
+  PbrMaterial: {roughness: 0.7}
+}
+
+puff {
+  Svg: {
+    data: "<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><defs><radialGradient id='g'><stop offset='30%' stop-color='white' stop-opacity='1'/><stop offset='100%' stop-color='white' stop-opacity='0'/></radialGradient></defs><circle cx='32' cy='32' r='32' fill='url(#g)'/></svg>"
+    width: 128
+    height: 128
+  }
+}
+
+sheet {
+  Svg: {
+    data: "<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><g fill='none' stroke='white' stroke-width='6'><circle cx='32' cy='32' r='10'/><circle cx='96' cy='32' r='18'/><circle cx='32' cy='96' r='26'/><rect x='82' y='82' width='28' height='28'/></g></svg>"
+    width: 256
+    height: 256
+  }
+}
+
+star {
+  Position: {6, 1.6, 0}
+  Mesh3: {
+    vertices: [
+      {-0.5, 0, 0}, {0, 0.5, 0}, {0.18, 0.18, 0},
+      {0, 0.5, 0}, {0.5, 0, 0}, {0.18, -0.18, 0},
+      {0.5, 0, 0}, {0, -0.5, 0}, {-0.18, -0.18, 0},
+      {0, -0.5, 0}, {-0.5, 0, 0}, {-0.18, 0.18, 0}
+    ]
+  }
+  Rgb: {180, 180, 190}
+  PbrMaterial: {roughness: 0.6}
+}
+
+smoke {
+  Position: {-6, 0.4, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 30000, shape: EmitterDisc, radius: 0.2,
+    direction: {0, 1, 0}, spread: 14,
+    speed: {min: 14, max: 22},
+    lifetime: {min: 0.022, max: 0.05},
+    size: {min: 0.3, max: 0.45},
+    opacity: {min: 0.45, max: 0.6},
+    color: {205, 205, 215},
+    seed: 41
+  }
+  ParticleCurves: {
+    size: {start: 0.4, early: 1.2, late: 1.9, end: 2.4}
+    opacity: {start: 0, early: 1, late: 0.7, end: 0}
+  }
+  ParticleAppearance: {
+    shape: ParticleSprite, blend: ParticleAlpha, texture: puff, softness: 0.6
+  }
+}
+
+fire {
+  Position: {-3, 0.35, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 24000, shape: EmitterDisc, radius: 0.24,
+    direction: {0, 1, 0}, spread: 12,
+    speed: {min: 10, max: 22},
+    lifetime: {min: 0.022, max: 0.05},
+    size: {min: 0.3, max: 0.46},
+    opacity: {min: 0.16, max: 0.26},
+    color: {255, 255, 255},
+    seed: 42
+  }
+  ParticleCurves: {
+    size: {start: 1.1, early: 0.9, late: 0.6, end: 0.25}
+    opacity: {start: 0.8, early: 1, late: 0.6, end: 0}
+    color: {
+      start: {255, 245, 210}, early: {255, 175, 60},
+      late: {225, 70, 25}, end: {60, 18, 10}
+    }
+  }
+  ParticleAppearance: { shape: ParticleCircle, blend: ParticleAdditive }
+}
+
+sparks {
+  Position: {0, 0.45, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 12000, shape: EmitterSphere, radius: 0.06,
+    direction: {0, 0, 0}, spread: 180,
+    speed: {min: 6, max: 34},
+    lifetime: {min: 0.02, max: 0.05},
+    size: {min: 0.08, max: 0.14},
+    opacity: {min: 0.5, max: 0.7},
+    color: {255, 200, 120},
+    color_variance: {0, 50, 60},
+    seed: 43
+  }
+  ParticleCurves: {
+    size: {start: 1, early: 0.8, late: 0.5, end: 0.2}
+    opacity: {start: 1, early: 1, late: 0.6, end: 0}
+  }
+  ParticleAppearance: { shape: ParticleCircle, blend: ParticleAdditive }
+}
+
+magic {
+  Position: {3, 0.9, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 2000, shape: EmitterSphere, radius: 0.45,
+    direction: {0, 1, 0}, spread: 40,
+    speed: {min: 2, max: 7},
+    lifetime: {min: 0.02, max: 0.05},
+    size: {min: 0.4, max: 0.55},
+    opacity: {min: 0.22, max: 0.3},
+    color: {150, 200, 255},
+    seed: 44
+  }
+  ParticleCurves: {
+    rotation: {start: 0, early: 0.1, late: 0.2, end: 0.3}
+    color: {
+      start: {255, 255, 255}, early: {170, 200, 255},
+      late: {200, 160, 255}, end: {120, 90, 200}
+    }
+  }
+  ParticleAppearance: {
+    shape: ParticleSprite, blend: ParticleAdditive, texture: sheet,
+    columns: 2, rows: 2
+  }
+}
+
+debris {
+  Position: {6, 0.45, 0}
+  ParticleEmitter: {
+    max: 4000, rate: 480, shape: EmitterDisc, radius: 0.35,
+    direction: {0, 1, 0}, spread: 50,
+    speed: {min: 7, max: 20},
+    lifetime: {min: 0.02, max: 0.05},
+    size: {min: 0.3, max: 0.5},
+    rotation: {min: 0, max: 180},
+    opacity: {min: 0.45, max: 0.6},
+    color: {235, 190, 120},
+    seed: 45
+  }
+  ParticleCurves: {
+    rotation: {start: 0, early: 0.2, late: 0.4, end: 0.6}
+    size: {start: 0.6, early: 1, late: 1, end: 0.6}
+  }
+  ParticleAppearance: {
+    shape: ParticleBillboard, blend: ParticleAlpha, mesh: star
+  }
+}

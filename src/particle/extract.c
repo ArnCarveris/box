@@ -311,6 +311,149 @@ done:
     return;
 }
 
+/** Write the four keys of a curve into the block.
+ *
+ * @param c The curve, NULL for a constant
+ * @param value The constant of an emitter without the component
+ * @param out Receives the four keys
+ */
+static void box_particle_keys(
+    const ParticleCurve *c,
+    float value,
+    float *out)
+{
+    out[0] = c ? c->start : value;
+    out[1] = c ? c->early : value;
+    out[2] = c ? c->late : value;
+    out[3] = c ? c->end : value;
+}
+
+/** Write one key of the gradient of an emitter as a linear color.
+ *
+ * @param color The key, NULL for white
+ * @param out Receives the linear color
+ */
+static void box_particle_key_color(
+    const rgb *color,
+    float *out)
+{
+    out[0] = color ? box_srgb_to_linear(color->r) : 1.0f;
+    out[1] = color ? box_srgb_to_linear(color->g) : 1.0f;
+    out[2] = color ? box_srgb_to_linear(color->b) : 1.0f;
+    out[3] = 1.0f;
+}
+
+/** Write the curves an emitter changes its particles over their life with.
+ *
+ * An emitter without the component writes the constants that leave a particle
+ * as it was spawned, so the pass evaluates one expression either way.
+ *
+ * @param curves The curves, NULL when the emitter has none
+ * @param out The block of the packet
+ */
+static void box_particle_curves(
+    const ParticleCurves *curves,
+    box_particle_emitter_t *out)
+{
+    box_particle_keys(curves ? &curves->size : NULL, 1.0f, out->size_curve);
+    box_particle_keys(curves ? &curves->opacity : NULL, 1.0f, out->opacity_curve);
+    box_particle_keys(curves ? &curves->rotation : NULL, 0.0f, out->turn_curve);
+    box_particle_key_color(curves ? &curves->color.start : NULL, out->gradient[0]);
+    box_particle_key_color(curves ? &curves->color.early : NULL, out->gradient[1]);
+    box_particle_key_color(curves ? &curves->color.late : NULL, out->gradient[2]);
+    box_particle_key_color(curves ? &curves->color.end : NULL, out->gradient[3]);
+}
+
+/** Texture handle an entity binds, through its own texture, an Image or PbrTextures.
+ *
+ * @param world The world
+ * @param e The entity the appearance names, 0 for none
+ * @return The texture handle, 0 when the entity binds none
+ */
+static uint32_t box_particle_texture(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    uint32_t result = 0;
+    if (!e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    const RenderTexture *texture = ecs_get(world, e, RenderTexture);
+    if (texture) {
+        result = texture->handle;
+        goto done;
+    }
+
+    const Image *image = ecs_get(world, e, Image);
+    if (image && image->texture) {
+        result = box_particle_texture(world, image->texture);
+        goto done;
+    }
+
+    const PbrTextures *pbr = ecs_get(world, e, PbrTextures);
+    if (pbr) {
+        result = box_particle_texture(world, pbr->albedo);
+    }
+
+done:
+    return result;
+}
+
+/** Write how the particles of an emitter are drawn.
+ *
+ * An emitter without the component draws soft blended circles, which is what
+ * every emitter of the module did before there was an appearance.
+ *
+ * @param world The world
+ * @param appearance The appearance, NULL when the emitter has none
+ * @param out The block of the packet
+ */
+static void box_particle_appearance(
+    ecs_world_t *world,
+    const ParticleAppearance *appearance,
+    box_particle_emitter_t *out)
+{
+    out->sheet[0] = 1.0f;
+    out->sheet[1] = 1.0f;
+    if (!appearance) {
+        goto done;
+    }
+
+    if (appearance->shape == ParticleSprite) {
+        out->appearance = BOX_PARTICLE_DRAW_SPRITE;
+    } else if (appearance->shape == ParticleBillboard) {
+        out->appearance = BOX_PARTICLE_DRAW_BILLBOARD;
+    }
+
+    if (appearance->blend == ParticleAdditive) {
+        out->flags |= BOX_PARTICLE_ADDITIVE;
+    }
+
+    if (appearance->columns > 1) {
+        out->sheet[0] = (float)appearance->columns;
+    }
+
+    if (appearance->rows > 1) {
+        out->sheet[1] = (float)appearance->rows;
+    }
+
+    out->sheet[2] = appearance->fps > 0.0f ? appearance->fps : 0.0f;
+    out->sheet[3] = appearance->softness > 0.0f ? appearance->softness : 0.0f;
+    if (out->sheet[3] > 0.0f) {
+        out->flags |= BOX_PARTICLE_SOFT;
+    }
+
+    out->texture = box_particle_texture(world, appearance->texture);
+    if (appearance->mesh && ecs_is_alive(world, appearance->mesh)) {
+        const RenderMesh *mesh = ecs_get(world, appearance->mesh, RenderMesh);
+        out->mesh = mesh ? mesh->handle : 0;
+    }
+
+done:
+    return;
+}
+
 /** Write the ranges, the color and the shape parameters of an emitter.
  *
  * @param emitter The emitter
@@ -430,6 +573,10 @@ void box_particle_extract(
             ecs_field(&it, ParticleForces, 3) : NULL;
         const ParticleCollision *collision = ecs_field_is_set(&it, 4) ?
             ecs_field(&it, ParticleCollision, 4) : NULL;
+        const ParticleCurves *curves = ecs_field_is_set(&it, 5) ?
+            ecs_field(&it, ParticleCurves, 5) : NULL;
+        const ParticleAppearance *look = ecs_field_is_set(&it, 6) ?
+            ecs_field(&it, ParticleAppearance, 6) : NULL;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             uint32_t max = box_particle_max(&emitter[i]);
@@ -443,10 +590,15 @@ void box_particle_extract(
             box_particle_transform(&transform[i].m, out->transform);
             box_particle_params(&emitter[i], out);
             box_particle_forces(world, &emitter[i], forces ? &forces[i] : NULL, out);
+            box_particle_curves(curves ? &curves[i] : NULL, out);
+            box_particle_appearance(world, look ? &look[i] : NULL, out);
             box_particle_table(&impl[i], p, out);
+            out->origin[0] = out->transform[3];
+            out->origin[1] = out->transform[7];
+            out->origin[2] = out->transform[11];
             box_particle_collision(world, it.entities[i],
                 collision ? &collision[i] : NULL,
-                vec3_new(out->transform[3], out->transform[7], out->transform[11]),
+                vec3_new(out->origin[0], out->origin[1], out->origin[2]),
                 p, &hits, out);
             out->id = impl[i].id;
             out->max = max;

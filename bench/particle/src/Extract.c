@@ -188,3 +188,47 @@ void Extract_collider_table(bench_t *b)
     box_packet_fini(&packet);
     ecs_fini(world);
 }
+
+void Extract_curves_and_appearance(bench_t *b)
+{
+    // particles/appearance
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    ecs_entity_t texture = ecs_new(world);
+    ecs_set(world, texture, RenderTexture, {.handle = 3, .width = 64, .height = 64});
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, ParticleEmitter, {
+        .max = 100000, .rate = 20000, .seed = 6
+    });
+    ecs_set(world, e, ParticleCurves, {
+        .size = {0.4f, 1.2f, 1.9f, 2.4f},
+        .opacity = {0, 1, 0.7f, 0},
+        .rotation = {0, 0.2f, 0.4f, 0.6f},
+        .color = {
+            .start = {255, 245, 210}, .early = {255, 175, 60},
+            .late = {225, 70, 25}, .end = {60, 18, 10}
+        }
+    });
+    ecs_set(world, e, ParticleAppearance, {
+        .shape = ParticleSprite, .blend = ParticleAdditive, .texture = texture,
+        .columns = 4, .rows = 4, .fps = 24, .softness = 0.5f
+    });
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}

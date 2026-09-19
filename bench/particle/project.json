@@ -17,7 +17,8 @@
                     "emitters_1k",
                     "mesh_shape_table",
                     "three_forces",
-                    "collider_table"
+                    "collider_table",
+                    "curves_and_appearance"
                 ]
             },
             {

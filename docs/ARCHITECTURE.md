@@ -50,7 +50,7 @@ Two hard rules keep the concerns apart:
 | `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene; the `TextInput` line with its caret, history and completion, and the `Console` singleton that binds the grave key, loads `etc/ui/console.flecs` on demand, holds the keyboard while it is open and runs its lines on `terminals.console` |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
 | `box.lod` | the proxy generator `box_lod_proxy_build`: a reusable builder clusters the primitives of a subtree by material key and proximity and emits a few `Box`, `Sphere` or `Capsule` primitives with the volume the proxy misses as an error in world units; the screen space metric `box_lod_error_px`, which projects such an error at the nearest point of the bounds of a node for a perspective or an orthographic camera, and `box_lod_select`, which holds a node at its level until the projected error leaves the band around the threshold of the view; `box_lod_merge` collapses the meshes of a subtree into one world space mesh with an index range per material key, welding the vertices that share a position, and `box_lod_simplify` collapses that mesh per group with meshoptimizer under an error bound, reporting the error it cost in world units; `box_lod_ladder` turns the authored segment count of a parametric shape into the levels it reduces through, `box_lod_chord_error` is the error one level costs at a radius and `box_lod_reduce` projects those errors and picks the level of the frame; the node hierarchy `box_lod_tree_t`, which the renderer builds from the authored tree and walks once per view: a node the frustum rejects or the depth grid hides stops its descendants, a node whose projected error is under the threshold of the view is drawn as one proxy box and its subtree is released and hidden, and `box_lod_tree_cluster` stacks renderer only clusters over loose roots without touching `Parent` or `ChildOf`; `LodPin` marks a subtree pruning keeps and `LodStats` reports what a walk visited, drew and replaced |
-| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces` and `ParticleCollision`; the spawn clock, the shape tables and the colliders the packet carries, while the particles themselves live in renderer buffers |
+| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces`, `ParticleCollision`, `ParticleCurves` and `ParticleAppearance`; the spawn clock, the shape tables and the colliders the packet carries, while the particles themselves live in renderer buffers |
 | later | `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
@@ -204,10 +204,20 @@ back onto it and keeps the bounce of the speed it had into it and loses the
 friction of the speed it had along it, or is killed and handed back to the dead
 list.
 
-Each view then draws every pool with one instanced point sprite pass after its
-sorted draws: a slot becomes a camera facing quad turned by its rotation and
-sized by its size, and a slot whose lifetime is zero is pushed outside the depth
-range. The pass reads the depth of the scene without writing it.
+Each view then draws every pool with one instanced sprite pass after its sorted
+draws: a slot becomes a camera facing quad turned by its rotation and sized by
+its size, or the mesh of its emitter laid over the camera axes, and a slot whose
+lifetime is zero is pushed outside the depth range. The pass binds the block of
+the emitter next to the channels, so the curves over the normalised age of a
+particle are evaluated there instead of being written into the buffers: the age
+and the lifetime are already in the channels, so a size, opacity, rotation or
+color that changes over the life costs no state and leaves the spawn values
+intact. The pass reads the depth of the scene without writing it, and reads it a
+second time as a sampled texture when an emitter asks for a soft fade, which is
+why it takes the depth as a read only attachment. The pools are drawn with the
+blended or the additive pipeline of the target format, blended first and back to
+front because blending is the only one of the two whose result depends on the
+order.
 
 ## Static and dynamic content
 

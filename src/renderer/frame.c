@@ -702,7 +702,7 @@ static void box_frame_view(
         box_frame_sorted(r, view, p, encoder, target, attachment);
     }
 
-    box_particle_record(r, p, encoder, attachment, hdr);
+    box_particle_record(r, view, p, encoder, attachment, hdr);
     box_lines_record(r, encoder, attachment, hdr);
     if (passes) {
         box_effect_motion(r, view, index, encoder);

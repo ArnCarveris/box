@@ -97,6 +97,34 @@
                     "a_particle_inside_a_sphere_leaves_along_its_normal",
                     "a_particle_leaves_a_box_over_its_nearest_face"
                 ]
+            },
+            {
+                "id": "Appearance",
+                "testcases": [
+                    "an_emitter_without_curves_writes_constants",
+                    "the_size_and_opacity_curves_reach_the_block",
+                    "the_gradient_reaches_the_block_as_linear",
+                    "authored_curves_keep_the_other_defaults",
+                    "an_emitter_without_an_appearance_draws_circles",
+                    "an_additive_sprite_reaches_the_block",
+                    "a_sheet_and_its_frame_rate_reach_the_block",
+                    "a_softness_sets_its_flag",
+                    "a_texture_entity_binds_its_handle",
+                    "a_texture_through_pbr_textures_binds_its_handle",
+                    "a_texture_through_an_image_binds_its_handle",
+                    "a_billboard_binds_the_mesh_of_its_entity",
+                    "the_origin_of_an_emitter_sorts_its_pool",
+                    "a_curve_hands_out_its_keys",
+                    "a_curve_is_the_line_between_two_keys",
+                    "a_curve_is_held_inside_its_range",
+                    "a_flat_curve_is_a_constant",
+                    "a_sheet_plays_once_over_the_life",
+                    "a_frame_rate_plays_the_sheet_at_that_rate",
+                    "a_sheet_of_one_frame_never_leaves_it",
+                    "a_particle_without_softness_is_left_alone",
+                    "a_particle_at_the_surface_is_gone",
+                    "a_particle_fades_in_over_the_softness"
+                ]
             }
         ]
     }

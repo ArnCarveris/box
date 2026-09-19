@@ -27,38 +27,7 @@
 // the emitter after them, because this pass already binds the eight storage
 // buffers a device guarantees.
 
-struct Emitter {
-  row0: vec4<f32>,
-  row1: vec4<f32>,
-  row2: vec4<f32>,
-  color: vec4<f32>,
-  color_max: vec4<f32>,
-  acceleration: vec4<f32>,
-  wind: vec4<f32>,
-  collision: vec4<f32>,
-  direction: vec4<f32>,
-  extents: vec4<f32>,
-  speed: vec2<f32>,
-  lifetime: vec2<f32>,
-  size: vec2<f32>,
-  rotation: vec2<f32>,
-  opacity: vec2<f32>,
-  delta: f32,
-  pad: f32,
-  count: u32,
-  spawn: u32,
-  first: u32,
-  shape: u32,
-  seed: u32,
-  points: u32,
-  flags: u32,
-  colliders: u32,
-};
-
-struct Point {
-  position: vec4<f32>,
-  normal: vec4<f32>,
-};
+#include "include/particle.wgsl"
 
 @group(0) @binding(0) var<uniform> e: Emitter;
 @group(0) @binding(1) var<storage, read_write> position: array<vec4<f32>>;
@@ -79,9 +48,6 @@ const SHAPE_SPLINE: u32 = 5u;
 
 const FREE: u32 = 0u;
 const LIVE: u32 = 1u;
-
-const GROUND: u32 = 2u;
-const DIE: u32 = 4u;
 
 const COLLIDER_SPHERE: f32 = 0.0;
 

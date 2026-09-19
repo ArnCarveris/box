@@ -4,11 +4,12 @@
  *
  * The particles live in renderer buffers and are moved by a compute pass, so
  * nothing here runs in a frame. The functions below are the C twin of the ones
- * the shader is built from: the hash the random draws come from, the range a
+ * the shaders are built from: the hash the random draws come from, the range a
  * property is drawn between, the cone a particle leaves in, the step the
- * integrate pass takes and the answer of a particle that hits a surface. A
- * change to one of them is a change to both places, and the tests check these
- * against the motion they are supposed to produce.
+ * integrate pass takes, the answer of a particle that hits a surface, and the
+ * curve, sheet frame and soft fade the sprite pass reads. A change to one of
+ * them is a change to both places, and the tests check these against the motion
+ * and the appearance they are supposed to produce.
  *
  * The step is a semi implicit Euler step with the drag solved exactly: forces
  * are added to the velocity, the drag pulls that velocity towards the wind over
@@ -35,6 +36,9 @@
 
 /** Emitters the turbulence field is offset apart by, so two of them do not share it */
 #define BOX_PARTICLE_TURBULENCE_SEEDS (1024)
+
+/** Keys one curve of an emitter holds, spread evenly over the life of a particle */
+#define BOX_PARTICLE_CURVE_KEYS (4)
 
 /** Forces one step of the simulation moves a particle by */
 typedef struct box_particle_forces_t {
@@ -338,6 +342,103 @@ static inline bool box_particle_box(
         if (out_z < hit->depth) {
             hit->normal = vec3_new(0, 0, d.z < 0.0f ? -1.0f : 1.0f);
             hit->depth = out_z;
+        }
+    }
+
+    return result;
+}
+
+/** Value of a four key curve at a normalised age.
+ *
+ * The keys sit at the start, a third in, two thirds in and at the end, and the
+ * value between two of them is the line between the two.
+ *
+ * @param keys The four keys
+ * @param t The normalised age, held inside 0 to 1
+ * @return The value of the curve
+ */
+static inline float box_particle_curve(
+    const float *keys,
+    float t)
+{
+    float x = t;
+    if (x < 0.0f) {
+        x = 0.0f;
+    }
+
+    if (x > 1.0f) {
+        x = 1.0f;
+    }
+
+    x = x * (float)(BOX_PARTICLE_CURVE_KEYS - 1);
+    int32_t i = (int32_t)x;
+    if (i > BOX_PARTICLE_CURVE_KEYS - 2) {
+        i = BOX_PARTICLE_CURVE_KEYS - 2;
+    }
+
+    float f = x - (float)i;
+
+    return keys[i] * (1.0f - f) + keys[i + 1] * f;
+}
+
+/** Frame of a sheet a particle of an age shows.
+ *
+ * A sheet without a frame rate plays once over the life of the particle, and
+ * one with a frame rate plays at that rate and wraps around.
+ *
+ * @param columns Frames across the sheet
+ * @param rows Frames down the sheet
+ * @param fps Frames per second, 0 to play once over the life
+ * @param t The normalised age
+ * @param life Seconds the particle lives
+ * @return The frame, counted across the sheet
+ */
+static inline uint32_t box_particle_frame(
+    float columns,
+    float rows,
+    float fps,
+    float t,
+    float life)
+{
+    float frames = fmaxf(columns, 1.0f) * fmaxf(rows, 1.0f);
+    float x = t;
+    if (x < 0.0f) {
+        x = 0.0f;
+    }
+
+    if (x > 0.999f) {
+        x = 0.999f;
+    }
+
+    float frame = floorf(x * frames);
+    if (fps > 0.0f) {
+        frame = fmodf(floorf(t * life * fps), frames);
+    }
+
+    return (uint32_t)frame;
+}
+
+/** How much of a particle is left where it approaches the geometry behind it.
+ *
+ * @param scene_z View depth of what is drawn behind the particle
+ * @param particle_z View depth of the particle
+ * @param softness World units the particle fades out over, 0 for a hard edge
+ * @return The fraction of the particle that is left, from 0 to 1
+ */
+static inline float box_particle_soft(
+    float scene_z,
+    float particle_z,
+    float softness)
+{
+    float result = 1.0f;
+    if (softness > 0.0f) {
+        result = (scene_z - particle_z) / softness;
+        if (result < 0.0f) {
+            result = 0.0f;
+        }
+
+        if (result > 1.0f) {
+            result = 1.0f;
         }
     }
 

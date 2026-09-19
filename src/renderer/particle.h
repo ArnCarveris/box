@@ -27,8 +27,11 @@
 /** Storage buffers the two compute passes bind, the channels plus the bookkeeping */
 #define BOX_PARTICLE_SIM_BINDINGS (8)
 
-/** Storage buffers the point sprite pass binds, the channels it reads */
-#define BOX_PARTICLE_DRAW_BINDINGS (5)
+/** Bindings the point sprite pass takes: the five channels and the emitter block */
+#define BOX_PARTICLE_DRAW_BINDINGS (6)
+
+/** Ways a pool is composited, blended over the image and added to it */
+#define BOX_PARTICLE_BLENDS (2)
 
 /** Particle pool of one emitter, owned by the renderer.
  *
@@ -42,6 +45,10 @@ typedef struct box_gpu_emitter_t {
     uint32_t id;              /**< Emitter of the packet the pool belongs to */
     uint32_t capacity;        /**< Particles the buffers hold */
     uint32_t points;          /**< Entries the table buffer holds, points and colliders */
+    uint32_t appearance;      /**< One of the BOX_PARTICLE_DRAW constants */
+    uint32_t mesh;            /**< Mesh handle a billboard is drawn as, 0 for a quad */
+    bool additive;            /**< The pool is added to the image instead of blended over it */
+    float origin[3];          /**< World position of its emitter, which sorts the pool */
     bool seen;                /**< The packet of this frame carries its emitter */
     WGPUBuffer position;      /**< Position xyz and age w of every particle */
     WGPUBuffer velocity;      /**< Velocity xyz and lifetime w, zero for a free slot */
@@ -56,16 +63,27 @@ typedef struct box_gpu_emitter_t {
     WGPUBindGroup draw_group; /**< Buffers the point sprite pass reads */
 } box_gpu_emitter_t;
 
+/** One pool of a view, with the distance that sorts it back to front */
+typedef struct box_particle_order_t {
+    uint32_t pool;  /**< Index of the pool in the pools of the renderer */
+    float distance; /**< Distance of its emitter to the camera of the view */
+} box_particle_order_t;
+
 /** Pools, pipelines and layouts the particle passes of a renderer share */
 typedef struct box_particle_gpu_t {
     box_vec_t pools;          /**< box_gpu_emitter_t, one per emitter the renderer saw */
     uint32_t sim_shader;      /**< Shader handle the compute pipelines were built from */
     uint32_t draw_shader;     /**< Shader handle the sprite pipeline was built from */
     WGPUBindGroupLayout sim_layout;  /**< Uniform and channels of the compute passes */
-    WGPUBindGroupLayout draw_layout; /**< Channels the point sprite pass reads */
+    WGPUBindGroupLayout draw_layout; /**< Channels and block the point sprite pass reads */
+    WGPUBindGroupLayout depth_layout; /**< Depth target the soft fade of a particle reads */
+    WGPUBindGroup depth_group;       /**< Depth group of the view being recorded */
+    WGPUTextureView depth_for;       /**< Depth view that group was built for */
+    box_vec_t order;                 /**< box_particle_order_t of the pools of one view */
     WGPUComputePipeline spawn;     /**< Pass that fills the slots the frame spawns into */
     WGPUComputePipeline integrate; /**< Pass that ages and moves every live particle */
-    WGPURenderPipeline pipeline[BOX_PARTICLE_FORMATS]; /**< Sprite pass per target format */
+    WGPURenderPipeline pipeline[BOX_PARTICLE_FORMATS][BOX_PARTICLE_BLENDS]; /**< Quad pass */
+    WGPURenderPipeline mesh[BOX_PARTICLE_FORMATS][BOX_PARTICLE_BLENDS]; /**< Billboard pass */
     bool failed;              /**< The particle shaders were reported as broken once */
 } box_particle_gpu_t;
 
@@ -97,10 +115,13 @@ void box_particle_simulate(
 /** Draw the particles of every pool over the image of a view.
  *
  * The pass runs after the sorted draws, expands every slot of a pool into a
- * camera facing quad and drops the slots that hold no live particle, reading
- * the depth the scene left behind without writing it.
+ * camera facing quad or into the mesh of its emitter and drops the slots that
+ * hold no live particle, reading the depth the scene left behind without
+ * writing it. The blended pools are drawn back to front and the additive ones,
+ * which do not care about the order, follow them.
  *
  * @param r The renderer
+ * @param view The view being recorded
  * @param p The packet
  * @param encoder The command encoder
  * @param attachment The render target view the view draws into
@@ -108,6 +129,7 @@ void box_particle_simulate(
  */
 void box_particle_record(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_packet_t *p,
     WGPUCommandEncoder encoder,
     WGPUTextureView attachment,

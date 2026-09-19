@@ -126,6 +126,82 @@ ECS_STRUCT(ParticleCollision, {
     bool die;       /**< A particle that hits dies instead of bouncing */
 });
 
+/** Four keys of a curve over the normalised age of a particle.
+ *
+ * The keys sit at the start, a third in, two thirds in and at the end of the
+ * life, and the value between two of them is the line between the two, so a
+ * curve that names one value four times is a constant.
+ */
+ECS_STRUCT(ParticleCurve, {
+    float start; /**< Value a particle is born with */
+    float early; /**< Value a third of the way through its life */
+    float late;  /**< Value two thirds of the way through its life */
+    float end;   /**< Value it dies with */
+});
+
+/** Four colors a particle passes through over its life.
+ *
+ * The colors multiply the one the particle was drawn with, so a white particle
+ * takes the gradient as it is and a colored one is tinted by it.
+ */
+ECS_STRUCT(ParticleGradient, {
+    rgb start; /**< Color a particle is born with */
+    rgb early; /**< Color a third of the way through its life */
+    rgb late;  /**< Color two thirds of the way through its life */
+    rgb end;   /**< Color it dies with */
+});
+
+/** What a particle of an emitter turns into over its life.
+ *
+ * Every curve multiplies what the particle was spawned with, except the
+ * rotation, which adds turns, so the constructor hands out ones and zeros and
+ * `ParticleCurves: {}` changes nothing. A smoke puff that grows and fades is
+ * `size: {start: 1, early: 1.6, late: 2.2, end: 2.6}` with
+ * `opacity: {start: 0, early: 1, late: 0.7, end: 0}`.
+ */
+ECS_STRUCT(ParticleCurves, {
+    ParticleCurve size;     /**< Multiplies the size the particle was spawned with */
+    ParticleCurve opacity;  /**< Multiplies the opacity it was spawned with */
+    ParticleCurve rotation; /**< Turns added to the rotation it was spawned with */
+    ParticleGradient color; /**< Multiplies the color it was spawned with */
+});
+
+/** Shape a particle is drawn as */
+ECS_ENUM(ParticleShape, {
+    ParticleCircle = 0,   /**< Soft round sprite, the appearance of an emitter without one */
+    ParticleSprite = 1,   /**< The texture of the appearance, over a sheet of frames */
+    ParticleBillboard = 2 /**< The mesh of the appearance, kept facing the camera */
+});
+
+/** How a particle is composited over what is already drawn */
+ECS_ENUM(ParticleBlend, {
+    ParticleAlpha = 0,   /**< Blended over the image by its opacity, for smoke and debris */
+    ParticleAdditive = 1 /**< Added to the image, for fire, sparks and magic */
+});
+
+/** How the particles of an emitter are drawn.
+ *
+ * A sprite reads `texture`, which is a texture entity, an entity with an Image
+ * or an entity with PbrTextures whose albedo is taken; `columns` and `rows`
+ * split it into a sheet of frames, which `fps` plays at, or once over the life
+ * of the particle when it is zero. A billboard draws the Mesh3 of `mesh` at the
+ * place, size and rotation of the particle instead of a quad.
+ *
+ * `softness` fades a particle out as it approaches the geometry behind it, over
+ * that many world units, which is what stops a smoke puff from cutting a hard
+ * line into a wall.
+ */
+ECS_STRUCT(ParticleAppearance, {
+    ParticleShape shape;  /**< Circle, sprite or billboard */
+    ParticleBlend blend;  /**< Alpha or additive */
+    ecs_entity_t texture; /**< Texture of the sprite, or the entity that names one */
+    ecs_entity_t mesh;    /**< Entity whose mesh a billboard is drawn as */
+    int32_t columns;      /**< Frames across the sheet, 0 and 1 are the whole texture */
+    int32_t rows;         /**< Frames down the sheet, 0 and 1 are the whole texture */
+    float fps;            /**< Frames per second, 0 plays the sheet once over the life */
+    float softness;       /**< World units a particle fades out over near geometry */
+});
+
 /** Register the box.particle module.
  *
  * @param world The world
