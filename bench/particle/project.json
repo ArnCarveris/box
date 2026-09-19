@@ -1,0 +1,30 @@
+{
+    "id": "bench_particle",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the emitter block of the frame packet and the shape sampling",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Extract",
+                "benchcases": [
+                    "one_emitter",
+                    "emitters_1k",
+                    "mesh_shape_table"
+                ]
+            },
+            {
+                "id": "Shape",
+                "benchcases": [
+                    "resample_mesh_1k_triangles",
+                    "resample_spline"
+                ]
+            }
+        ]
+    }
+}
