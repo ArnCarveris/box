@@ -16,6 +16,10 @@
  * and shadows with the settings of the singleton, and a world without either
  * uses the defaults.
  *
+ * LodSettings follows it too and holds the screen space error thresholds the
+ * LOD selection of the view measures against, with a more aggressive threshold
+ * for its shadow passes.
+ *
  * A layer is any entity an entity or a light joins with the pair (Layer, layer).
  * A view lists the layers it shows and the layers that cast its shadows; both
  * lists hold at most BOX_VIEW_LAYER_MAX entries, end at the first zero and show
@@ -133,6 +137,37 @@ ECS_STRUCT(CullSettings, {
 
 /** Levels of the depth pyramid of a view, zero being the whole chain down to one texel */
 #define BOX_CULL_HIZ_LEVELS (0)
+
+/** Screen space error settings of a view, with the singleton as its default.
+ *
+ * A level of a node may not project an error larger than error_px, which
+ * quality scales: a view of quality 2 allows half of it and a view of quality
+ * 0.5 twice as much. Shadow passes measure against shadow_error_px, which is
+ * larger because a coarser caster hardly shows in a shadow. hysteresis is the
+ * fraction of the threshold the band around it is wide, so a node keeps its
+ * level until its error leaves that band. A value of zero takes the default of
+ * every field, and the flag is true through the constructor, so a view that
+ * needs one field adds the component and writes that field.
+ */
+ECS_STRUCT(LodSettings, {
+    bool enabled;          /**< The view selects levels by projected error, default true */
+    float quality;         /**< Scales the thresholds of the view, default 1 */
+    float error_px;        /**< Projected error in pixels a level may not exceed, default 2 */
+    float shadow_error_px; /**< The same threshold for its shadow passes, default 6 */
+    float hysteresis;      /**< Band around the threshold as a fraction, default 0.25 */
+});
+
+/** Quality a view scales its LOD error thresholds with */
+#define BOX_VIEW_LOD_QUALITY (1.0f)
+
+/** Projected error in pixels a level of a node may not exceed */
+#define BOX_VIEW_LOD_ERROR (2.0f)
+
+/** Projected error in pixels a level may not exceed in a shadow pass */
+#define BOX_VIEW_LOD_SHADOW_ERROR (6.0f)
+
+/** Fraction of the threshold the band a level switch has to cross is wide */
+#define BOX_VIEW_LOD_HYSTERESIS (0.25f)
 
 /** Red channel of the clear color a view starts out with */
 #define BOX_VIEW_CLEAR_R (39)

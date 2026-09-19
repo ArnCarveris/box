@@ -198,6 +198,20 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Lod",
+                "testcases": [
+                    "defaults_of_new_settings",
+                    "a_view_without_settings_takes_the_defaults",
+                    "settings_of_a_view_override_the_singleton",
+                    "settings_fall_back_to_the_singleton",
+                    "quality_scales_both_thresholds",
+                    "a_view_can_turn_selection_off",
+                    "the_shadow_threshold_selects_a_coarser_level"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

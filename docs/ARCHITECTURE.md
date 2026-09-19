@@ -33,7 +33,7 @@ Two hard rules keep the concerns apart:
 | `box.transform` | `Position/Rotation/Scale/WorldTransform`, static vs dynamic propagation, AABB |
 | `box.geometry` | primitive shape components, mesh cache, shape registry |
 | `box.material` | `Rgb`, `PbrMaterial`, `Emissive`, `Tint`, textures, material layers |
-| `box.camera`, `box.light`, `box.view` | cameras, lights, views and layers |
+| `box.camera`, `box.light`, `box.view` | cameras, lights, views and layers; `LodSettings` holds the LOD quality, the error threshold in pixels, the more aggressive shadow threshold and the hysteresis band of a view, with the singleton as its default |
 | `box.render` | Extract system, frame packets, handoff queue to the renderer thread |
 | `box.shader` | `Shader` component, WGSL preprocessor, builtin shaders under `box.shader.builtin` |
 | `box.effects` | `Effect` entities, the per view post process chain and its parameters |
@@ -49,7 +49,7 @@ Two hard rules keep the concerns apart:
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
 | `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene; the `TextInput` line with its caret, history and completion, and the `Console` singleton that binds the grave key, loads `etc/ui/console.flecs` on demand, holds the keyboard while it is open and runs its lines on `terminals.console` |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
-| `box.lod` | the proxy generator `box_lod_proxy_build`: a reusable builder clusters the primitives of a subtree by material key and proximity and emits a few `Box`, `Sphere` or `Capsule` primitives with the volume the proxy misses as an error in world units |
+| `box.lod` | the proxy generator `box_lod_proxy_build`: a reusable builder clusters the primitives of a subtree by material key and proximity and emits a few `Box`, `Sphere` or `Capsule` primitives with the volume the proxy misses as an error in world units; the screen space metric `box_lod_error_px`, which projects such an error at the nearest point of the bounds of a node for a perspective or an orthographic camera, and `box_lod_select`, which holds a node at its level until the projected error leaves the band around the threshold of the view |
 | later | `box.particles`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single

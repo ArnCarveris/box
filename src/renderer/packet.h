@@ -460,6 +460,10 @@ typedef struct box_view_t {
     float overlay_opacity;  /**< Opacity of the panel background, one for opaque */
     uint32_t sky;           /**< The view draws the atmosphere behind its geometry */
     uint32_t sky_env;       /**< Its environment is prefiltered from the atmosphere */
+    uint32_t lod_enabled;   /**< The view selects LOD levels by their projected error */
+    float lod_error_px;     /**< Projected error in pixels a level may not exceed */
+    float lod_shadow_error_px; /**< The same threshold for the shadow passes of the view */
+    float lod_hysteresis;   /**< Band around those thresholds a level switch has to cross */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */

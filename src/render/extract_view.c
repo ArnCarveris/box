@@ -537,6 +537,32 @@ static void box_view_cull(
     v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
+/** Copy the LOD settings of a view into it, the view first and the singleton after.
+ *
+ * Quality scales both thresholds, so a view of quality two allows half the
+ * error its settings name, and the shadow threshold stays the more aggressive
+ * of the two because a coarser caster hardly shows in a shadow.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
+ */
+static void box_view_lod(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_view_t *v)
+{
+    const LodSettings *s = box_render_view_setting(world, e, ecs_id(LodSettings));
+    float quality = s && s->quality > 0.0f ? s->quality : BOX_VIEW_LOD_QUALITY;
+    float error = s && s->error_px > 0.0f ? s->error_px : BOX_VIEW_LOD_ERROR;
+    float shadow = s && s->shadow_error_px > 0.0f ?
+        s->shadow_error_px : BOX_VIEW_LOD_SHADOW_ERROR;
+    v->lod_enabled = !s || s->enabled ? 1u : 0u;
+    v->lod_error_px = error / quality;
+    v->lod_shadow_error_px = shadow / quality;
+    v->lod_hysteresis = s && s->hysteresis > 0.0f ? s->hysteresis : BOX_VIEW_LOD_HYSTERESIS;
+}
+
 /** Copy the frame rate overlay of a view into it, the view first and the singleton after.
  *
  * The component belongs to box.monitor, which a world that never imports the
@@ -627,6 +653,7 @@ static void box_view_fill(
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
     box_view_cull(world, src->entity, v);
+    box_view_lod(world, src->entity, v);
     if (!ui) {
         box_view_overlay(world, src->entity, v);
     }
