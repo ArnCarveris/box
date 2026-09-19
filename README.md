@@ -187,6 +187,11 @@ environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmo
 draws the sun disk, a phase correct moon and a star field (`celestial.flecs`), attenuates the sun
 light by the atmosphere, drives fog from the same tables (`sky_fog.flecs`), and `TimeOfDay` moves the
 sun, moon and stars by hour, date and latitude (`time_of_day_morning.flecs` and siblings).
+`box.spline` stores a `Spline` (a vector of points, catmull rom, linear or bezier, with tension
+and loop) that rebuilds an arc length table on every set, evaluates position, tangent and normal by
+parameter or distance, exposes `spline.position/tangent/normal/length` to scripts and moves any
+entity along a path with `FollowPath {spline, speed, offset, mode, orient}` (loop, ping pong, once).
+
 `box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and
 answers ray, sphere, box and frustum queries from a bounding volume hierarchy in microseconds over
