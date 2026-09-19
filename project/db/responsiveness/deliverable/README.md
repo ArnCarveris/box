@@ -22,6 +22,5 @@
 - `responsiveness/acquire_stall` (closed after the LOD epic): the one 4.8 ms frame in the 50k root bench scenes was the probe bake sorting its entire dirty set by camera distance on the frame incremental template loading finished, 49k jobs for one frame. The take now orders only as far as the probe budget reaches, with a quickselect for the nearest run; both scenes are back at the standard spike budget with maxima of 2.2 and 2.4 ms.
 
 ## Not in this epic
-## Not in this epic
 - The combined stress scene's tail frames attribute to the surface acquire, the wait on the GPU, at 15% headroom under the budget; a triple buffered acquire or an earlier submit is the follow up.
 - Light baking still uses its own per frame budget rather than the job pool.
