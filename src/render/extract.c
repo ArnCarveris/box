@@ -78,13 +78,17 @@ static void box_extract_static(
     RenderInstance *inst = ecs_get_mut(world, e, RenderInstance);
     ecs_assert(inst != NULL, ECS_INTERNAL_ERROR, NULL);
     inst->dirty = false;
+    inst->hidden = state->hide_used &&
+        box_hierarchy_ancestor_has(world, e, Hidden);
     inst->layer_mask = state->layer_used ?
         box_render_entity_layers(world, state, e) : 0;
     bool dynamic = box_render_is_dynamic(world, e);
-    bool transparent = box_render_is_transparent(world, state, e);
+    bool transparent = !inst->hidden && box_render_is_transparent(world, state, e);
     bool has_slot = box_render_has_slot(state, e, inst);
 
-    if (has_slot && (dynamic || transparent || inst->mesh != mesh->handle)) {
+    if (has_slot &&
+        (dynamic || transparent || inst->hidden || inst->mesh != mesh->handle))
+    {
         box_render_release_slot(world, state, e, inst);
         has_slot = false;
     }
@@ -92,7 +96,7 @@ static void box_extract_static(
     box_render_set_transparent(world, state, e, inst, transparent);
     inst->dynamic = dynamic;
     inst->mesh = mesh->handle;
-    if (dynamic) {
+    if (dynamic || inst->hidden) {
         goto done;
     }
 
@@ -193,7 +197,7 @@ void box_render_extract_dynamic(
                 continue;
             }
 
-            if (inst[i].transparent) {
+            if (inst[i].transparent || inst[i].hidden) {
                 continue;
             }
 
@@ -333,7 +337,9 @@ void box_render_validate(
                     ecs_get_name(world, e));
             }
 
-            if (inst[i].dynamic || inst[i].transparent || inst[i].lod_hidden) {
+            if (inst[i].dynamic || inst[i].transparent || inst[i].lod_hidden ||
+                inst[i].hidden)
+            {
                 continue;
             }
 

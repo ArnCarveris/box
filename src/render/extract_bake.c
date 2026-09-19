@@ -136,6 +136,12 @@ void box_render_extract_emitters(
 
         int32_t i;
         for (i = 0; i < it.count; i ++) {
+            if (state->hide_used &&
+                box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
+            {
+                continue;
+            }
+
             box_extract_emitter(&it, i, p);
         }
     }

@@ -5,7 +5,9 @@
  * Static lights are marked so baked instances skip them, and are carried
  * unculled in a second array that the bake accumulates into its probes. Layer
  * membership is read once per table, because the relationship fragments, and a
- * light the view does not show is still handed to the shared bake.
+ * light the view does not show is still handed to the shared bake. A light a
+ * Hidden switch takes out of the frame leaves both arrays, so a pooled effect
+ * that is waiting lights nothing.
  */
 
 #include "render_internal.h"
@@ -195,6 +197,12 @@ void box_render_extract_lights(
 
         int32_t i;
         for (i = 0; i < it.count && p->lights.count < BOX_LIGHT_MAX; i ++) {
+            if (state->hide_used &&
+                box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
+            {
+                continue;
+            }
+
             box_light_extract(&it, i, &frustum, is_static, visible, bake, state, p);
         }
     }

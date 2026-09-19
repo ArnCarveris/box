@@ -125,6 +125,13 @@
                     "extract_10k_plain_sun",
                     "extract_10k_modulated_sun"
                 ]
+            },
+            {
+                "id": "Hidden",
+                "benchcases": [
+                    "toggle_1000_of_10k",
+                    "extract_10k_with_a_hidden_tenth"
+                ]
             }
         ]
     }

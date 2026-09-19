@@ -356,6 +356,12 @@ void box_index_movers(
     while (ecs_query_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
+            if (state->hide_used &&
+                box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
+            {
+                continue;
+            }
+
             Collider c = {0};
             if (!box_collider_resolve(world, it.entities[i], &c)) {
                 continue;
@@ -395,6 +401,7 @@ void box_collision_update(
 
     box_collision_roots_promote(raw, state);
     box_collision_shapes_init(raw, state);
+    box_collision_hidden_init(raw, state);
     box_collision_colliders_flush(raw, state);
     box_collision_roots_flush(raw, state);
     box_index_movers(raw, state);

@@ -128,6 +128,21 @@ resolves into its children and grandchildren next to an untinted white box.
 boxes and spheres around the camera with a row behind it, which `CullSettings`
 on a view or as a singleton switches off for a bit identical comparison.
 
+`test/integration/visual/hidden.flecs` is the visibility check: half the columns
+of a grid carry `box.render.Hidden`, one group of spheres is hidden through its
+parent, one sphere of a second group is hidden on its own, and one of two lamps
+is hidden so its post stays unlit. `Hidden` takes an entity and everything below
+it out of every view, every shadow, every pick and every collision query while
+it stays in the world with its components and its children, which is how a pool
+of ghosts, a pooled effect or a panel is shown and hidden instead of created and
+destroyed. The tag is inherited two ways: a hidden prefab hands it to its
+instances and a hidden entity hides its subtree. A renderable that is hidden
+gives its static slot back and takes one again when it is shown, a light leaves
+the packet and the bake, a directional light hands the sun of the view to the
+next one, a collider leaves the spatial index and the bounds of its root shrink
+around what is left. A particle emitter keeps running: `box.particle` does not
+read the switch yet, so a hidden emitter still spawns and still draws.
+
 `test/integration/visual/lod_spheres.flecs` is the primitive reduction check:
 four rows of spheres authored at 32 flat shaded segments, which the level
 ladder draws at 32, 16, 8 and 4 segments as their projected size falls. A scene

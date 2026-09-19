@@ -83,7 +83,7 @@ static void box_render_on_change(
     }
 }
 
-/** A dynamic tag was added or removed: re-evaluate the subtree.
+/** An inherited switch was added or removed: re-evaluate the subtree.
  *
  * @param it Iterator over the changed entities
  */
@@ -151,6 +151,19 @@ static void box_render_on_shadowless(
     RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
     if (state) {
         state->shadowless = true;
+    }
+}
+
+/** A Hidden tag exists, so extract resolves the visibility of changed entities.
+ *
+ * @param it Iterator over the entities that gained the tag
+ */
+static void box_render_on_hidden(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->hide_used = true;
     }
 }
 
@@ -421,6 +434,17 @@ bool box_render_casts_shadow(
     return !box_hierarchy_ancestor_has(world, e, NoShadow);
 }
 
+bool box_render_is_hidden(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const RenderState *state = ecs_id(RenderState) ?
+        ecs_singleton_get(world, RenderState) : NULL;
+
+    return state != NULL && state->hide_used &&
+        box_hierarchy_ancestor_has(world, e, Hidden);
+}
+
 void box_render_set_depth(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -642,10 +666,17 @@ void box_render_instance_init(
     box_render_watch_flag(world, ecs_id(BackFaceMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
     box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
+    box_render_watch_flag(world, Hidden, box_render_on_hidden);
     box_render_watch_flag(world, ecs_id(RenderShape2D), box_render_on_shaped);
 
     ecs_observer(world, {
         .query.terms = {{ .id = NoShadow }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_render_on_dynamic
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = Hidden }},
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = box_render_on_dynamic
     });

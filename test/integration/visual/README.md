@@ -54,6 +54,7 @@ Rules for adding one:
 | Views and render targets | `two_views` | The world from a front camera and from a 3/4 camera into a texture target. |
 | Render layers | `layers_views` | Two views showing only their own layer, lights and the shared object. |
 | Frustum culling | `culling` | Identical with culling on and off; the bench reports culled counts. |
+| The Hidden switch | `hidden` | Half the columns of a grid gone, a hidden sphere group and a hidden sphere inside a group gone, the post of the hidden lamp unlit. |
 | Cascaded shadows | `shadows`, `shadows_low_sun`, `shadows_dynamic` | Shadows attached to casters, sharp near and softer far, no acne, no seams, moving casters. |
 | Parent and ChildOf hierarchies | `parent_tree` | A spinning Parent tree carrying arms and hands, a mixed tower. |
 | Tint composition | `tint` | Primary tints on single objects and on every hierarchy flavor, parent color plus child darkening on the grandchild. |

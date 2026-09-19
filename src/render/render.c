@@ -11,6 +11,7 @@ ECS_COMPONENT_DECLARE(RenderState);
 ECS_COMPONENT_DECLARE(RenderShape2D);
 ECS_COMPONENT_DECLARE(RenderGroup);
 ECS_TAG_DECLARE(RenderSoftShape);
+ECS_TAG_DECLARE(Hidden);
 
 /** Registry destructor releasing batches, pending meshes and queries.
  *
@@ -105,6 +106,7 @@ void BoxRenderImport(
     ECS_COMPONENT_DEFINE(world, RenderShape2D);
     ECS_COMPONENT_DEFINE(world, RenderGroup);
     ECS_TAG_DEFINE(world, RenderSoftShape);
+    ECS_TAG_DEFINE(world, Hidden);
 
     ecs_set_hooks(world, RenderState, {
         .ctor = flecs_default_ctor,
@@ -120,6 +122,7 @@ void BoxRenderImport(
     ecs_add_pair(world, ecs_id(RenderShape2D), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderGroup), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, RenderSoftShape, EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, Hidden, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(RenderMesh), EcsWith, ecs_id(RenderInstance));
 

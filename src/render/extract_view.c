@@ -307,6 +307,37 @@ static void box_view_camera(
     v->cluster.far_ = far;
 }
 
+/** Find the directional light the sun of a view is taken from.
+ *
+ * @param world The world
+ * @param state The registry
+ * @return The first directional light no Hidden switch takes out, 0 for none
+ */
+static ecs_entity_t box_render_sun_entity(
+    ecs_world_t *world,
+    RenderState *state)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_query_iter(world, state->suns);
+    while (!result && ecs_query_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (!state->hide_used ||
+                !box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
+            {
+                result = it.entities[i];
+                break;
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
 /** Fill the sun of a view from the first directional light, or a default one.
  *
  * An atmosphere takes the choice over afterwards: it lights the view with the
@@ -329,21 +360,18 @@ bool box_render_view_sun(
     bool result = false;
     ecs_entity_t sun = 0;
 
-    ecs_iter_t it = ecs_query_iter(world, state->suns);
-    if (ecs_query_next(&it)) {
+    sun = box_render_sun_entity(world, state);
+    if (sun) {
         result = true;
-        sun = it.entities[0];
-        DirectionalLight *light = ecs_field(&it, DirectionalLight, 0);
-        WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
+        const DirectionalLight *light = ecs_get(world, sun, DirectionalLight);
+        const WorldTransform *transform = ecs_get(world, sun, WorldTransform);
         dir = vec3_normalize(mat4_transform_dir(&transform->m, vec3_new(0, 0, 1)));
         intensity = light->intensity;
-        const Rgb *rgb = ecs_get(world, it.entities[0], Rgb);
+        const Rgb *rgb = ecs_get(world, sun, Rgb);
         if (rgb) {
             color = vec3_new(box_srgb_to_linear(rgb->r), box_srgb_to_linear(rgb->g),
                 box_srgb_to_linear(rgb->b));
         }
-
-        ecs_iter_fini(&it);
     }
 
     v->sun_dir[0] = dir.x;

@@ -1,0 +1,113 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.render
+
+$ {
+  EnvironmentLight: {sky_color: {120, 145, 190}, ground_color: {75, 66, 58}, intensity: 0.7}
+}
+
+camera {
+  Position: {0, 13, -22}
+  LookAt: {0, 1.0, 1}
+  Camera: {fov: 58}
+}
+
+sun {
+  Rotation: {0.75, -0.35, 0}
+  DirectionalLight: {intensity: 2.2}
+}
+
+floor {
+  Position: {0, -0.5, 2}
+  Box: {40, 0.2, 26}
+  Rgb: {110, 110, 118}
+  PbrMaterial: {roughness: 0.85}
+}
+
+shown_columns {
+  for i in 0..12 {
+    _ {
+      Position: {(i % 4) * 8 - 13, 1, (i / 4) * 3 + 2}
+      Box: {2, 2, 2}
+      Rgb: {214, 160, 92}
+      PbrMaterial: {metallic: 0.1, roughness: 0.65}
+    }
+  }
+}
+
+hidden_columns {
+  for i in 0..12 {
+    _ {
+      Position: {(i % 4) * 8 - 9, 1, (i / 4) * 3 + 2}
+      Box: {2, 2, 2}
+      Rgb: {214, 160, 92}
+      PbrMaterial: {metallic: 0.1, roughness: 0.65}
+      Hidden
+    }
+  }
+}
+
+prefabs {
+  Ball : Prefab {
+    Sphere: {segments: 32, smooth: true, radius: 0.8}
+    Rgb: {96, 168, 232}
+    PbrMaterial: {metallic: 0.2, roughness: 0.4}
+  }
+}
+
+shown_group {
+  Position: {-12, 0.8, -4}
+  left : prefabs.Ball { Position: {-2, 0, 0} }
+  middle : prefabs.Ball { Position: {0, 0, 0} }
+  right : prefabs.Ball { Position: {2, 0, 0} }
+}
+
+hidden_group {
+  Position: {-5, 0.8, -4}
+  Hidden
+  left : prefabs.Ball { Position: {-2, 0, 0} }
+  middle : prefabs.Ball { Position: {0, 0, 0} }
+  right : prefabs.Ball { Position: {2, 0, 0} }
+}
+
+part_hidden_group {
+  Position: {2, 0.8, -4}
+  left : prefabs.Ball { Position: {-2, 0, 0} }
+  middle : prefabs.Ball {
+    Position: {0, 0, 0}
+    Hidden
+  }
+  right : prefabs.Ball { Position: {2, 0, 0} }
+}
+
+lamps {
+  shown_post {
+    Position: {9, 0.7, -4}
+    Box: {0.6, 1.6, 0.6}
+    Rgb: {220, 220, 225}
+    PbrMaterial: {roughness: 0.5}
+  }
+
+  shown_lamp {
+    Position: {9, 2.2, -4}
+    PointLight: {intensity: 40, range: 7}
+    Rgb: {255, 140, 80}
+  }
+
+  hidden_post {
+    Position: {14, 0.7, -4}
+    Box: {0.6, 1.6, 0.6}
+    Rgb: {220, 220, 225}
+    PbrMaterial: {roughness: 0.5}
+  }
+
+  hidden_lamp {
+    Position: {14, 2.2, -4}
+    PointLight: {intensity: 40, range: 7}
+    Rgb: {255, 140, 80}
+    Hidden
+  }
+}

@@ -50,6 +50,7 @@ typedef struct RenderInstance {
     bool dirty;      /**< Queued for extraction */
     bool transparent; /**< Instance is drawn by the sorted pass, not by a batch */
     bool lod_hidden; /**< The LOD traversal replaced the entity by a proxy */
+    bool hidden;     /**< The entity or an ancestor carries Hidden */
 } RenderInstance;
 
 /** Analytic 2D shape of an entity, written by the shape modules.
@@ -139,6 +140,7 @@ typedef struct RenderState {
     bool translucent;         /**< An opacity exists, so instances resolve their alpha */
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
+    bool hide_used;           /**< A Hidden tag exists, so instances resolve their visibility */
     bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
     bool transitioned;        /**< A transition exists, so instances resolve displayed values */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
@@ -744,6 +746,19 @@ bool box_render_is_ui_layer(
  */
 bool box_render_casts_shadow(
     ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Check whether an entity is hidden by a Hidden tag on itself or an ancestor.
+ *
+ * A world that never added the tag answers false without walking anything,
+ * which is what keeps the switch free for a scene that does not use it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return True when the entity or an ancestor carries Hidden
+ */
+bool box_render_is_hidden(
+    const ecs_world_t *world,
     ecs_entity_t e);
 
 /** Fill the uv transform and mode of an instance from its material components.

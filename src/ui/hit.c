@@ -16,6 +16,9 @@
  *
  * A system writes the answer of the frame into the UiCapture singleton, which is
  * how a script and box_ui_mouse_captured learn that the pointer is on a panel.
+ *
+ * A node a Hidden switch takes out of the frame is not under the cursor either,
+ * so a panel that is hidden hands the pointer back to the scene behind it.
  */
 
 #include "ui_internal.h"
@@ -205,6 +208,10 @@ static void box_ui_hit_probe(
         if (probe->groups &&
             box_ui_hit_clipped(world, it->entities[i], probe->x, probe->y))
         {
+            continue;
+        }
+
+        if (box_render_is_hidden(world, it->entities[i])) {
             continue;
         }
 

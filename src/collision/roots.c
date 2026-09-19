@@ -6,6 +6,10 @@
  * next flush, which is late enough for its subtree to exist. From then on the
  * observers on AABB and on the two parent storages mark the root a change
  * belongs to, and a flush walks only the marked roots.
+ *
+ * A Hidden switch is a change like any other: the walk of a root skips the
+ * subtree it sits on and a hidden root itself comes out empty, which takes both
+ * out of the index and out of every query that reads it.
  */
 
 #include "collision_internal.h"
@@ -75,6 +79,10 @@ static void box_root_visit(
 {
     box_root_agg_t *agg = ctx;
     if (ecs_has_id(world, e, EcsPrefab)) {
+        goto done;
+    }
+
+    if (agg->state->hide_used && ecs_has_id(world, e, Hidden)) {
         goto done;
     }
 
@@ -187,6 +195,25 @@ done:
     return;
 }
 
+/** Give a hidden root empty bounds and drop the colliders it used to cover.
+ *
+ * @param state The state
+ * @param root The root
+ * @param out The bounds, emptied in place
+ */
+static void box_root_clear(
+    box_collision_state_t *state,
+    ecs_entity_t root,
+    RootBounds *out)
+{
+    ecs_vec_clear(box_index_list(&state->index, root));
+    out->count = 0;
+    out->min = vec3_new(0, 0, 0);
+    out->max = out->min;
+    out->local_min = out->min;
+    out->local_max = out->min;
+}
+
 /** Give a root the world bounds its cached local bounds have now.
  *
  * @param world The world
@@ -233,7 +260,11 @@ static void box_root_update(
 
     RootBounds next = cur[0];
     bool rigid = ecs_has_id(world, root, RigidSubtree);
-    if (next.count && rigid && (flags & BOX_ROOT_MOVED)) {
+    bool hidden = state->hide_used &&
+        box_hierarchy_ancestor_has(world, root, Hidden);
+    if (hidden) {
+        box_root_clear(state, root, &next);
+    } else if (next.count && rigid && (flags & BOX_ROOT_MOVED)) {
         box_root_move(world, root, &next);
     } else {
         box_root_aggregate(world, state, root, &next);
@@ -291,6 +322,49 @@ static void box_collision_mark_of(
     ecs_entity_t root = box_collision_root_of(world, e);
     if (root) {
         box_collision_mark(state, root, BOX_ROOT_FULL);
+    }
+}
+
+/** Mark every root below an entity and queue every other entity for a collider.
+ *
+ * A collider that is not below a root has a leaf of its own, so the switch
+ * reaches it through the collider pass instead of through the aggregate of a
+ * root; a nested root keeps its own leaf and is marked so its own pass empties
+ * it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param ctx The state
+ */
+static void box_collision_hide_below(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    void *ctx)
+{
+    box_collision_state_t *state = ctx;
+    if (ecs_has(world, e, RootBounds)) {
+        box_collision_mark(state, e, BOX_ROOT_FULL);
+    } else {
+        box_collision_touch(state, e);
+    }
+
+    box_hierarchy_children(world, e, box_collision_hide_below, state);
+}
+
+/** A Hidden tag appeared or went away: redo the roots and colliders below it.
+ *
+ * @param it Iterator over the entities
+ */
+static void BoxCollisionOnHidden(
+    ecs_iter_t *it)
+{
+    box_collision_state_t *state = it->ctx;
+    ecs_world_t *world = it->world;
+    state->hide_used = true;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_collision_mark_of(world, state, it->entities[i]);
+        box_collision_hide_below(world, it->entities[i], state);
     }
 }
 
@@ -425,6 +499,27 @@ void box_collision_roots_flush(
     for (i = 0; i < count; i ++) {
         box_root_update(world, state, pass[i]);
     }
+}
+
+void box_collision_hidden_init(
+    ecs_world_t *world,
+    box_collision_state_t *state)
+{
+    if (state->hide_wired || !Hidden) {
+        goto done;
+    }
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = Hidden }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxCollisionOnHidden,
+        .ctx = state,
+        .yield_existing = true
+    });
+
+    state->hide_wired = true;
+done:
+    return;
 }
 
 void box_collision_roots_init(

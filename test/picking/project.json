@@ -71,6 +71,21 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Hidden",
+                "testcases": [
+                    "an_entity_is_not_picked",
+                    "a_subtree_is_not_picked",
+                    "the_nearest_visible_object_is_picked",
+                    "a_root_leaves_the_index_with_empty_bounds",
+                    "a_part_of_a_root_shrinks_its_bounds",
+                    "a_ray_query_misses_it",
+                    "a_sphere_query_skips_it",
+                    "a_mover_leaves_the_dynamic_index"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

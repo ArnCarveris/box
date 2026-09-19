@@ -548,6 +548,23 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Hidden",
+                "testcases": [
+                    "an_entity_leaves_the_batch",
+                    "showing_it_again_takes_a_slot_back",
+                    "the_subtree_leaves_with_its_parent",
+                    "a_child_alone_leaves_its_parent_drawn",
+                    "a_dynamic_entity_leaves_the_frame",
+                    "a_transparent_entity_leaves_the_sorted_list",
+                    "a_point_light_leaves_the_packet",
+                    "a_sun_leaves_the_view",
+                    "an_instance_of_a_hidden_prefab_is_hidden",
+                    "a_world_without_the_tag_resolves_nothing"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

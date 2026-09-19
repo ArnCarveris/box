@@ -102,6 +102,8 @@ typedef struct box_collision_state_t {
     box_index_t index;   /**< The spatial index of the world */
     ecs_vec_t debug_hits; /**< ecs_entity_t the debug drawing collected, reused per frame */
     bool shapes;         /**< The shape observers of box.geometry exist */
+    bool hide_wired;     /**< The Hidden observer exists, so box.render was imported */
+    bool hide_used;      /**< A Hidden tag was used, so the index resolves visibility */
 } box_collision_state_t;
 
 /** Private singleton that owns the state of a world */
@@ -212,6 +214,19 @@ void box_collision_colliders_init(
  * @param state The state
  */
 void box_collision_shapes_init(
+    ecs_world_t *world,
+    box_collision_state_t *state);
+
+/** Register the observer on the Hidden tag once box.render exists.
+ *
+ * The module does not import box.render, so the tag only has an id once that
+ * module registered it; the per frame update wires the observer the first time
+ * it is there, the way the shape observers are wired.
+ *
+ * @param world The world
+ * @param state The state
+ */
+void box_collision_hidden_init(
     ecs_world_t *world,
     box_collision_state_t *state);
 

@@ -33,6 +33,15 @@ ECS_STRUCT(RenderTexture, {
     int32_t height;   /**< Height in pixels of the uploaded texture */
 });
 
+/** Takes an entity and everything below it out of every view, pick and query.
+ *
+ * The tag is a switch, not a change of the scene: the entity keeps its
+ * components, its place in the hierarchy and its children, and only stops
+ * being drawn, picked and collided with. The subtree of a hidden entity is
+ * hidden with it, and a hidden prefab hands the tag to its instances.
+ */
+extern ECS_TAG_DECLARE(Hidden);
+
 /** Register the box.render module.
  *
  * @param world The world

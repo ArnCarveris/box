@@ -305,7 +305,9 @@ static void box_collision_apply(
         goto done;
     }
 
-    if (has && !box_hierarchy_ancestor_has(world, e, DynamicTransform)) {
+    bool hidden = state->hide_used &&
+        box_hierarchy_ancestor_has(world, e, Hidden);
+    if (has && !hidden && !box_hierarchy_ancestor_has(world, e, DynamicTransform)) {
         vec3 min, max;
         box_collider_bounds(&c, &min, &max);
         box_index_set(&state->index, e, min, max);

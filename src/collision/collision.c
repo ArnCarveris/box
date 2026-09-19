@@ -79,6 +79,7 @@ static void BoxCollisionUpdate(
 
     box_collision_roots_promote(world, state);
     box_collision_shapes_init(world, state);
+    box_collision_hidden_init(world, state);
     box_collision_colliders_flush(world, state);
     box_collision_roots_flush(world, state);
     box_index_movers(world, state);
