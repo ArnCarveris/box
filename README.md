@@ -308,6 +308,19 @@ instead of dropping it silently, which covers entities created by a command, by 
 `for` loop of a script. `test/integration/command/checkpoint.flecs` checkpoints a scene, moves
 a crate, checkpoints again and adds an entity that no script owns.
 
+The `restore [name]` command puts an instance back, the last checkpoint when no name is given.
+It reloads every script whose file the folder holds from the text of that file, so the entities
+a script owns are deleted and created again: their handles change and anything that holds one
+has to look it up by name again, while renderer slots, colliders and collision roots are
+rebuilt by the observers that watch the new entities. Entities that no script owns survive a
+restore untouched and the command lists them as `not restored: <path>`, and the script that
+declares the session running the command is left alone so a restore never deletes the terminal
+under it. Every file of the folder is read and parsed before the first script is reloaded, so a
+checkpoint that does not parse leaves the world as it was; a file that parses but fails to
+evaluate stops the restore at that file, which the output names after `restore failed: `.
+`test/integration/command/checkpoint_restore.flecs` checkpoints a scene, moves a crate, deletes
+an entity, adds one that no script owns and restores.
+
 ## Tests
 
 ```sh

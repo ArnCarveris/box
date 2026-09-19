@@ -27,6 +27,12 @@ extern "C" {
 /** Line the report starts with for an entity that a checkpoint cannot write */
 #define BOX_CHECKPOINT_SKIPPED "not checkpointed: "
 
+/** Line the report of a restore starts with for an entity it left alone */
+#define BOX_CHECKPOINT_KEPT "not restored: "
+
+/** Line a failed restore starts with, followed by the file that failed */
+#define BOX_CHECKPOINT_FAILED "restore failed: "
+
 /** Marks a component whose value the engine derives, which a checkpoint skips.
  *
  * The tag is added to the component, not to the entities that carry it. The
@@ -76,6 +82,33 @@ char* box_checkpoint_dir(
 char* box_checkpoint_write(
     ecs_world_t *world,
     const char *name,
+    char **report);
+
+/** Reload every script of a checkpoint folder.
+ *
+ * Every managed script whose file the folder holds is reloaded from that file,
+ * which deletes the entities the script owns and creates them again from the
+ * text of the checkpoint, so entity handles do not survive a restore. Entities
+ * that no script owns are left alone and reported.
+ *
+ * The files are all read and parsed before the first script is reloaded, so a
+ * checkpoint that does not parse leaves the world untouched; a file that fails
+ * to evaluate leaves the scripts before it reloaded and names the file that
+ * failed in the report.
+ *
+ * @param world The world
+ * @param name Name of the checkpoint folder, NULL for the last checkpoint
+ * @param keep Entity whose script is left loaded, 0 for none. A restore from a
+ *   terminal session passes the session, which keeps the script that declares
+ *   it from deleting it while it runs the command
+ * @param report Receives the entities that were left alone, one per line, or
+ *   the reason the restore failed, NULL to ignore
+ * @return The checkpoint folder, the caller frees it, NULL when it failed
+ */
+char* box_checkpoint_restore(
+    ecs_world_t *world,
+    const char *name,
+    ecs_entity_t keep,
     char **report);
 
 #ifdef __cplusplus

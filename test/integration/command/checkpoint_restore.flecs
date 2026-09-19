@@ -1,0 +1,11 @@
+using box.command
+using box.checkpoint
+
+$ { Checkpoint: {dir: "../../test/integration/out/checkpoint_restore"} }
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/checkpoint_restore.cmd"}
+  }
+}

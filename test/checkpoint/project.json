@@ -35,6 +35,36 @@
                 ]
             },
             {
+                "id": "Restore",
+                "testcases": [
+                    "last_checkpoint_is_restored",
+                    "named_checkpoint_is_restored",
+                    "every_script_is_restored",
+                    "entity_added_after_the_checkpoint_is_removed",
+                    "entity_deleted_after_the_checkpoint_is_back",
+                    "unowned_entity_is_left_alone_and_reported",
+                    "entity_handles_change",
+                    "kept_entity_keeps_its_script",
+                    "counters_survive_a_restore",
+                    "restore_without_a_checkpoint_fails",
+                    "unknown_name_fails",
+                    "corrupt_checkpoint_keeps_the_world",
+                    "corrupt_checkpoint_names_the_file",
+                    "command_restores_the_last_checkpoint",
+                    "command_takes_a_name",
+                    "command_reports_an_unknown_name"
+                ]
+            },
+            {
+                "id": "Survive",
+                "testcases": [
+                    "render_slots_are_rebuilt",
+                    "collider_is_rebuilt",
+                    "root_bounds_are_rebuilt",
+                    "controller_keeps_driving_the_entity"
+                ]
+            },
+            {
                 "id": "Report",
                 "testcases": [
                     "unowned_entity_is_reported",

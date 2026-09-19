@@ -82,12 +82,7 @@ static int box_checkpoint_cmp(
     return ecs_os_strcmp(*(char* const*)a, *(char* const*)b);
 }
 
-/** Turn the entities a write skipped into the lines of its report.
- *
- * @param ctx The state of the write
- * @return The report, empty when nothing was skipped, the caller frees it
- */
-static char* box_checkpoint_report(
+char* box_checkpoint_report(
     box_checkpoint_ctx_t *ctx)
 {
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
@@ -96,11 +91,11 @@ static char* box_checkpoint_report(
     qsort(paths, (size_t)count, sizeof(char*), box_checkpoint_cmp);
 
     for (i = 0; i < count && i < BOX_CHECKPOINT_REPORT_MAX; i ++) {
-        ecs_strbuf_append(&buf, BOX_CHECKPOINT_SKIPPED "%s\n", paths[i]);
+        ecs_strbuf_append(&buf, "%s%s\n", ctx->prefix, paths[i]);
     }
 
     if (count > BOX_CHECKPOINT_REPORT_MAX) {
-        ecs_strbuf_append(&buf, BOX_CHECKPOINT_SKIPPED "%d more entities\n",
+        ecs_strbuf_append(&buf, "%s%d more entities\n", ctx->prefix,
             count - BOX_CHECKPOINT_REPORT_MAX);
     }
 
@@ -115,11 +110,22 @@ static char* box_checkpoint_report(
     return result ? result : ecs_os_strdup("");
 }
 
-/** Free the vectors and the map of a write.
- *
- * @param ctx The state of the write
- */
-static void box_checkpoint_ctx_fini(
+void box_checkpoint_ctx_init(
+    box_checkpoint_ctx_t *ctx,
+    ecs_world_t *world,
+    const char *folder,
+    const char *prefix)
+{
+    ctx->world = world;
+    ctx->folder = folder;
+    ctx->prefix = prefix;
+    ctx->templates = 0;
+    ecs_map_init(&ctx->ids, NULL);
+    ecs_vec_init_t(NULL, &ctx->skipped, char*, 0);
+    ecs_vec_init_t(NULL, &ctx->names, char*, 0);
+}
+
+void box_checkpoint_ctx_fini(
     box_checkpoint_ctx_t *ctx)
 {
     int32_t i, count = ecs_vec_count(&ctx->skipped);
@@ -170,6 +176,57 @@ int box_checkpoint_mkdir(
     return result;
 }
 
+void box_checkpoint_managed(
+    ecs_world_t *world,
+    ecs_vec_t *scripts)
+{
+    ecs_iter_t it = ecs_each(world, EcsScript);
+    while (ecs_each_next(&it)) {
+        const EcsScript *code = ecs_field(&it, EcsScript, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (code[i].script && !code[i].template_) {
+                ecs_vec_append_t(NULL, scripts, ecs_entity_t)[0] =
+                    it.entities[i];
+            }
+        }
+    }
+}
+
+const char* box_checkpoint_name(
+    ecs_vec_t *names,
+    ecs_world_t *world,
+    ecs_entity_t script)
+{
+    const EcsScript *code = ecs_get(world, script, EcsScript);
+    const char *file = code->filename;
+    char *name = NULL;
+    if (file) {
+        const char *slash = strrchr(file, '/');
+        name = ecs_os_strdup(slash ? slash + 1 : file);
+    } else {
+        char *path = ecs_get_path(world, script);
+        name = flecs_asprintf("%s.flecs", path);
+        ecs_os_free(path);
+    }
+
+    int32_t i, count = ecs_vec_count(names);
+    char **array = ecs_vec_first_t(names, char*);
+    for (i = 0; i < count; i ++) {
+        if (!ecs_os_strcmp(array[i], name)) {
+            char *unique = flecs_asprintf("%d_%s", count, name);
+            ecs_os_free(name);
+            name = unique;
+            break;
+        }
+    }
+
+    char **elem = ecs_vec_append_t(NULL, names, char*);
+    elem[0] = name;
+
+    return name;
+}
+
 char* box_checkpoint_dir(
     ecs_world_t *world)
 {
@@ -213,10 +270,8 @@ char* box_checkpoint_write(
         goto done;
     }
 
-    box_checkpoint_ctx_t ctx = { .world = world, .folder = result };
-    ecs_map_init(&ctx.ids, NULL);
-    ecs_vec_init_t(NULL, &ctx.skipped, char*, 0);
-    ecs_vec_init_t(NULL, &ctx.names, char*, 0);
+    box_checkpoint_ctx_t ctx;
+    box_checkpoint_ctx_init(&ctx, world, result, BOX_CHECKPOINT_SKIPPED);
 
     box_checkpoint_scripts(&ctx);
     box_checkpoint_unowned(&ctx);

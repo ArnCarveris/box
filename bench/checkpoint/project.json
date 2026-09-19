@@ -16,6 +16,12 @@
                     "scene_5000",
                     "report_5000"
                 ]
+            },
+            {
+                "id": "Restore",
+                "benchcases": [
+                    "scene_500"
+                ]
             }
         ]
     }

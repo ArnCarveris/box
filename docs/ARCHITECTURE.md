@@ -133,6 +133,22 @@ by C code, by a command or inside a `for` loop have no source location, so they
 are reported as `not checkpointed: <path>` instead of being dropped. Entities of
 a template body are shared by every instance and are counted, not written.
 
+The `restore` command reads that folder back. It looks up the file of every
+managed script, reads and parses them all and only then hands each one to
+`ecs_script_reload`, because a script that parses but fails to evaluate empties
+itself: parsing first means a corrupt checkpoint leaves the world as it was, and
+a file that fails later stops the restore and is named in the output. A reload
+deletes the entities of a script and creates them again, so entity handles do
+not survive a restore and derived state is rebuilt by the observers that watch
+the new entities; anything that caches a handle across a restore, such as a
+camera target, has to resolve it by name again. Entities that no script owns are
+not part of any reload and are reported as `not restored: <path>`, and the
+script that declares the session running the command is kept, which is what
+stops a restore from deleting the terminal that asked for it. The `Checkpoint`
+singleton is instance state rather than scene state, so the folder and the count
+are put back after the reloads, which a `$` statement of a restored script would
+otherwise reset.
+
 ## Headless and agents
 
 Every process creates `/tmp/box/<pid>` and removes it on exit. `--headless`

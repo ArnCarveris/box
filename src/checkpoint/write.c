@@ -99,51 +99,6 @@ static void box_checkpoint_entity(
     }
 }
 
-/** Build the name of the file a script is written to.
- *
- * The name is the file the script was loaded from without its folders, or the
- * name of the script entity. A name that another script of the same checkpoint
- * already took gets the position of the script appended to it.
- *
- * @param ctx The state of the write
- * @param world The world
- * @param script The script entity
- * @return The file name, the state of the write owns it
- */
-static const char* box_checkpoint_name(
-    box_checkpoint_ctx_t *ctx,
-    ecs_world_t *world,
-    ecs_entity_t script)
-{
-    const EcsScript *code = ecs_get(world, script, EcsScript);
-    const char *file = code->filename;
-    char *name = NULL;
-    if (file) {
-        const char *slash = strrchr(file, '/');
-        name = ecs_os_strdup(slash ? slash + 1 : file);
-    } else {
-        char *path = ecs_get_path(world, script);
-        name = flecs_asprintf("%s.flecs", path);
-        ecs_os_free(path);
-    }
-
-    int32_t i, count = ecs_vec_count(&ctx->names);
-    char **names = ecs_vec_first_t(&ctx->names, char*);
-    for (i = 0; i < count; i ++) {
-        if (!ecs_os_strcmp(names[i], name)) {
-            char *unique = flecs_asprintf("%d_%s", count, name);
-            ecs_os_free(name);
-            name = unique;
-            break;
-        }
-    }
-
-    char **elem = ecs_vec_append_t(NULL, &ctx->names, char*);
-    elem[0] = name;
-
-    return name;
-}
-
 /** Write the source of one script with the values of its entities to a file.
  *
  * @param ctx The state of the write
@@ -180,7 +135,8 @@ static int box_checkpoint_script(
     }
 
     char *path = flecs_asprintf(
-        "%s/%s", ctx->folder, box_checkpoint_name(ctx, world, script));
+        "%s/%s", ctx->folder,
+        box_checkpoint_name(&ctx->names, world, script));
     FILE *file = fopen(path, "w");
     if (file) {
         fputs(text, file);
@@ -200,21 +156,9 @@ done:
 int32_t box_checkpoint_scripts(
     box_checkpoint_ctx_t *ctx)
 {
-    ecs_world_t *world = ctx->world;
     ecs_vec_t scripts;
     ecs_vec_init_t(NULL, &scripts, ecs_entity_t, 0);
-
-    ecs_iter_t it = ecs_each(world, EcsScript);
-    while (ecs_each_next(&it)) {
-        const EcsScript *code = ecs_field(&it, EcsScript, 0);
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            if (code[i].script && !code[i].template_) {
-                ecs_vec_append_t(NULL, &scripts, ecs_entity_t)[0] =
-                    it.entities[i];
-            }
-        }
-    }
+    box_checkpoint_managed(ctx->world, &scripts);
 
     int32_t i, count = ecs_vec_count(&scripts), result = 0;
     ecs_entity_t *array = ecs_vec_first_t(&scripts, ecs_entity_t);
