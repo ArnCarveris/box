@@ -42,7 +42,8 @@
           "instance_color_is_the_composed_tint",
           "tinted_opaque_entity_stays_static",
           "primitive_vertices_are_white",
-          "vertex_color_is_kept_beside_the_instance_color"
+          "vertex_color_is_kept_beside_the_instance_color",
+          "vertex_alpha_reaches_the_upload"
         ],
         "setup": true,
         "teardown": true
