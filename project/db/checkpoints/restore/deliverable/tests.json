@@ -1,0 +1,1769 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T08:35:44Z",
+  "pass": 249,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.641656,
+  "tests": [
+    {
+      "suite": "Write",
+      "case": "writes_a_file_per_script",
+      "status": "pass",
+      "elapsed": 0.012015,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "values_are_updated",
+      "status": "pass",
+      "elapsed": 0.013394,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "layout_and_comments_are_preserved",
+      "status": "pass",
+      "elapsed": 0.011842,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "derived_components_are_left_out",
+      "status": "pass",
+      "elapsed": 0.012648,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "component_added_at_runtime_is_written",
+      "status": "pass",
+      "elapsed": 0.012496,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "script_without_a_file_uses_its_name",
+      "status": "pass",
+      "elapsed": 0.011873,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "entity_without_a_statement_is_reported",
+      "status": "pass",
+      "elapsed": 0.011585,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "template_body_entities_are_reported",
+      "status": "pass",
+      "elapsed": 0.012811,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Write",
+      "case": "checkpoint_reloads_into_the_same_state",
+      "status": "pass",
+      "elapsed": 0.011986,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Folder",
+      "case": "folder_is_under_the_process_folder",
+      "status": "pass",
+      "elapsed": 0.010465,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Folder",
+      "case": "folder_is_removed_when_the_instance_stops",
+      "status": "pass",
+      "elapsed": 0.011463,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Folder",
+      "case": "repeated_checkpoints_get_their_own_folder",
+      "status": "pass",
+      "elapsed": 0.012372,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Folder",
+      "case": "named_checkpoint_uses_the_name",
+      "status": "pass",
+      "elapsed": 0.010332,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Folder",
+      "case": "dir_overrides_the_process_folder",
+      "status": "pass",
+      "elapsed": 0.011986,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "last_checkpoint_is_restored",
+      "status": "pass",
+      "elapsed": 0.011696,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "named_checkpoint_is_restored",
+      "status": "pass",
+      "elapsed": 0.011783,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "every_script_is_restored",
+      "status": "pass",
+      "elapsed": 0.012041,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "entity_added_after_the_checkpoint_is_removed",
+      "status": "pass",
+      "elapsed": 0.011189,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "entity_deleted_after_the_checkpoint_is_back",
+      "status": "pass",
+      "elapsed": 0.011036,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "unowned_entity_is_left_alone_and_reported",
+      "status": "pass",
+      "elapsed": 0.009944,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "entity_handles_change",
+      "status": "pass",
+      "elapsed": 0.010486,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "kept_entity_keeps_its_script",
+      "status": "pass",
+      "elapsed": 0.01119,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "counters_survive_a_restore",
+      "status": "pass",
+      "elapsed": 0.010773,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "restore_without_a_checkpoint_fails",
+      "status": "pass",
+      "elapsed": 0.010197,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "unknown_name_fails",
+      "status": "pass",
+      "elapsed": 0.011459,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "corrupt_checkpoint_keeps_the_world",
+      "status": "pass",
+      "elapsed": 0.011415,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "corrupt_checkpoint_names_the_file",
+      "status": "pass",
+      "elapsed": 0.011356,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "command_restores_the_last_checkpoint",
+      "status": "pass",
+      "elapsed": 0.020314,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "command_takes_a_name",
+      "status": "pass",
+      "elapsed": 0.023156,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Restore",
+      "case": "command_reports_an_unknown_name",
+      "status": "pass",
+      "elapsed": 0.02018,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Survive",
+      "case": "render_slots_are_rebuilt",
+      "status": "pass",
+      "elapsed": 0.02711,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Survive",
+      "case": "collider_is_rebuilt",
+      "status": "pass",
+      "elapsed": 0.027918,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Survive",
+      "case": "root_bounds_are_rebuilt",
+      "status": "pass",
+      "elapsed": 0.027611,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Survive",
+      "case": "controller_keeps_driving_the_entity",
+      "status": "pass",
+      "elapsed": 0.021605,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "unowned_entity_is_reported",
+      "status": "pass",
+      "elapsed": 0.011485,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "owned_entity_is_not_reported",
+      "status": "pass",
+      "elapsed": 0.011153,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "entity_without_a_value_is_not_reported",
+      "status": "pass",
+      "elapsed": 0.010119,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "command_returns_the_folder",
+      "status": "pass",
+      "elapsed": 0.019391,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "command_reports_an_unowned_entity",
+      "status": "pass",
+      "elapsed": 0.019156,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Report",
+      "case": "command_takes_a_name",
+      "status": "pass",
+      "elapsed": 0.01883,
+      "project": "checkpoint"
+    },
+    {
+      "suite": "Terminal",
+      "case": "folder_created_and_removed",
+      "status": "pass",
+      "elapsed": 0.019021,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "resources_subfolder",
+      "status": "pass",
+      "elapsed": 0.020702,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "session_dir_under_process_dir",
+      "status": "pass",
+      "elapsed": 0.020749,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "session_dir_kept_after_set",
+      "status": "pass",
+      "elapsed": 0.020759,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "log_contains_line_and_result",
+      "status": "pass",
+      "elapsed": 0.020014,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "commands_lists_last_lines",
+      "status": "pass",
+      "elapsed": 0.019062,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "commands_defaults_to_all_lines",
+      "status": "pass",
+      "elapsed": 0.021295,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "output_written_on_input",
+      "status": "pass",
+      "elapsed": 0.020967,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "script_session_runs_command",
+      "status": "pass",
+      "elapsed": 0.022509,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "prints_the_window_of_the_last_second",
+      "status": "pass",
+      "elapsed": 0.020756,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "worst_frame_is_the_slowest_of_the_window",
+      "status": "pass",
+      "elapsed": 0.021508,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "on_enables_the_overlay",
+      "status": "pass",
+      "elapsed": 0.019072,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "off_disables_the_overlay",
+      "status": "pass",
+      "elapsed": 0.019436,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "switching_keeps_the_panel_settings",
+      "status": "pass",
+      "elapsed": 0.02053,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "first_call_starts_the_window_without_the_panel",
+      "status": "pass",
+      "elapsed": 0.021144,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_falls_back_to_the_current_frame",
+      "status": "pass",
+      "elapsed": 0.020952,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_follows_the_first_call",
+      "status": "pass",
+      "elapsed": 0.020415,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "unknown_state_is_an_error",
+      "status": "pass",
+      "elapsed": 0.020324,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "help_lists_the_command",
+      "status": "pass",
+      "elapsed": 0.020663,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "command_with_arguments",
+      "status": "pass",
+      "elapsed": 0.019624,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "quoted_argument",
+      "status": "pass",
+      "elapsed": 0.019636,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "bracketed_argument",
+      "status": "pass",
+      "elapsed": 0.017961,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "unknown_command",
+      "status": "pass",
+      "elapsed": 0.019132,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "too_many_arguments",
+      "status": "pass",
+      "elapsed": 0.019183,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "missing_argument",
+      "status": "pass",
+      "elapsed": 0.0201,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "invalid_i32_argument",
+      "status": "pass",
+      "elapsed": 0.020962,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "f64_argument",
+      "status": "pass",
+      "elapsed": 0.021005,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "entity_argument",
+      "status": "pass",
+      "elapsed": 0.019691,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "entity_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.01959,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "unknown_entity_argument",
+      "status": "pass",
+      "elapsed": 0.020101,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "optional_argument_omitted",
+      "status": "pass",
+      "elapsed": 0.019921,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "help_lists_commands",
+      "status": "pass",
+      "elapsed": 0.020033,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "read_source",
+      "status": "pass",
+      "elapsed": 0.019065,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "read_by_basename",
+      "status": "pass",
+      "elapsed": 0.019788,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "unknown_file",
+      "status": "pass",
+      "elapsed": 0.020031,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "write_changes_world",
+      "status": "pass",
+      "elapsed": 0.02011,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "write_parse_error_keeps_state",
+      "status": "pass",
+      "elapsed": 0.019119,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "grep_lines",
+      "status": "pass",
+      "elapsed": 0.019858,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_changes_world",
+      "status": "pass",
+      "elapsed": 0.02,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_compounds",
+      "status": "pass",
+      "elapsed": 0.020026,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_hunk_mismatch",
+      "status": "pass",
+      "elapsed": 0.019826,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "single_hunk",
+      "status": "pass",
+      "elapsed": 0.004174,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "multiple_hunks",
+      "status": "pass",
+      "elapsed": 0.004387,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "addition_at_end",
+      "status": "pass",
+      "elapsed": 0.00413,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "deletion",
+      "status": "pass",
+      "elapsed": 0.003844,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "diff_headers_ignored",
+      "status": "pass",
+      "elapsed": 0.003855,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "context_mismatch",
+      "status": "pass",
+      "elapsed": 0.00401,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "no_hunks",
+      "status": "pass",
+      "elapsed": 0.003843,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "filter_by_level",
+      "status": "pass",
+      "elapsed": 0.018155,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "numeric_level",
+      "status": "pass",
+      "elapsed": 0.020594,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "oldest_first",
+      "status": "pass",
+      "elapsed": 0.01885,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "count_cap",
+      "status": "pass",
+      "elapsed": 0.020418,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "wrap_around",
+      "status": "pass",
+      "elapsed": 0.023908,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "log_file_in_process_dir",
+      "status": "pass",
+      "elapsed": 0.019598,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "default_arguments",
+      "status": "pass",
+      "elapsed": 0.019979,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "invalid_level_name",
+      "status": "pass",
+      "elapsed": 0.018874,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "new_returns_session",
+      "status": "pass",
+      "elapsed": 0.019362,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "new_names_are_unique",
+      "status": "pass",
+      "elapsed": 0.01987,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "close_deletes_session",
+      "status": "pass",
+      "elapsed": 0.020343,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "close_unknown_session",
+      "status": "pass",
+      "elapsed": 0.0201,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_returns_output",
+      "status": "pass",
+      "elapsed": 0.019949,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_url_encoded_cmd",
+      "status": "pass",
+      "elapsed": 0.020163,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_post_body",
+      "status": "pass",
+      "elapsed": 0.019929,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_unknown_session",
+      "status": "pass",
+      "elapsed": 0.019162,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_error_gives_400",
+      "status": "pass",
+      "elapsed": 0.020552,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_without_cmd",
+      "status": "pass",
+      "elapsed": 0.020023,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_returns_file",
+      "status": "pass",
+      "elapsed": 0.021079,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_png_content_type",
+      "status": "pass",
+      "elapsed": 0.021056,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_traversal_refused",
+      "status": "pass",
+      "elapsed": 0.020997,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_missing_gives_404",
+      "status": "pass",
+      "elapsed": 0.020828,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "unknown_endpoint_gives_404",
+      "status": "pass",
+      "elapsed": 0.020342,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "dequeue_system_runs",
+      "status": "pass",
+      "elapsed": 0.020549,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "app_port_starts_server",
+      "status": "pass",
+      "elapsed": 0.019709,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "port_zero_stops_server",
+      "status": "pass",
+      "elapsed": 0.019365,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_changes_cwd",
+      "status": "pass",
+      "elapsed": 0.020144,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_parent",
+      "status": "pass",
+      "elapsed": 0.020138,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_root",
+      "status": "pass",
+      "elapsed": 0.01962,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_unknown_entity",
+      "status": "pass",
+      "elapsed": 0.019898,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_lists_children",
+      "status": "pass",
+      "elapsed": 0.019018,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_hides_components",
+      "status": "pass",
+      "elapsed": 0.018566,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cat_shows_components",
+      "status": "pass",
+      "elapsed": 0.019066,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cat_missing_entity",
+      "status": "pass",
+      "elapsed": 0.018353,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pwd_root",
+      "status": "pass",
+      "elapsed": 0.019448,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pwd_after_cd",
+      "status": "pass",
+      "elapsed": 0.019183,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.019014,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_creates_entity",
+      "status": "pass",
+      "elapsed": 0.018475,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_nested_path",
+      "status": "pass",
+      "elapsed": 0.017892,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "rm_deletes_entity",
+      "status": "pass",
+      "elapsed": 0.018854,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_renames_entity",
+      "status": "pass",
+      "elapsed": 0.018574,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_reparents_entity",
+      "status": "pass",
+      "elapsed": 0.017971,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_existing_target",
+      "status": "pass",
+      "elapsed": 0.019951,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_component",
+      "status": "pass",
+      "elapsed": 0.019366,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_pair",
+      "status": "pass",
+      "elapsed": 0.019666,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_unknown_component",
+      "status": "pass",
+      "elapsed": 0.019305,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "remove_component",
+      "status": "pass",
+      "elapsed": 0.018981,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_raw_id",
+      "status": "pass",
+      "elapsed": 0.018104,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_escaped_dot",
+      "status": "pass",
+      "elapsed": 0.018032,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_child_of_dotted_name",
+      "status": "pass",
+      "elapsed": 0.01822,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_escapes_dots",
+      "status": "pass",
+      "elapsed": 0.020386,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "component_by_symbol",
+      "status": "pass",
+      "elapsed": 0.020117,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pair_by_symbol",
+      "status": "pass",
+      "elapsed": 0.019968,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "unknown_symbol_is_error",
+      "status": "pass",
+      "elapsed": 0.019929,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "set_component_value",
+      "status": "pass",
+      "elapsed": 0.019485,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "set_invalid_value",
+      "status": "pass",
+      "elapsed": 0.018623,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_component_value",
+      "status": "pass",
+      "elapsed": 0.018611,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_all_components",
+      "status": "pass",
+      "elapsed": 0.018374,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_missing_component",
+      "status": "pass",
+      "elapsed": 0.020221,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "clear_removes_components",
+      "status": "pass",
+      "elapsed": 0.018833,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_component",
+      "status": "pass",
+      "elapsed": 0.019956,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_query_expression",
+      "status": "pass",
+      "elapsed": 0.020135,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_invalid_query",
+      "status": "pass",
+      "elapsed": 0.019815,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_prints_doc",
+      "status": "pass",
+      "elapsed": 0.017955,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_command_brief",
+      "status": "pass",
+      "elapsed": 0.019177,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_unknown_entity",
+      "status": "pass",
+      "elapsed": 0.018729,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "unknown_entity_argument",
+      "status": "pass",
+      "elapsed": 0.019229,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.018945,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "absolute_path",
+      "status": "pass",
+      "elapsed": 0.019401,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "root_is_not_an_entity",
+      "status": "pass",
+      "elapsed": 0.018849,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_lists_parent_children",
+      "status": "pass",
+      "elapsed": 0.019276,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_into_parent_child",
+      "status": "pass",
+      "elapsed": 0.017328,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_parent_child_keeps_storage",
+      "status": "pass",
+      "elapsed": 0.019331,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_parent_child_to_root",
+      "status": "pass",
+      "elapsed": 0.01933,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_under_parent_child",
+      "status": "pass",
+      "elapsed": 0.018984,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_creates_query",
+      "status": "pass",
+      "elapsed": 0.019371,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_replaces_query",
+      "status": "pass",
+      "elapsed": 0.018655,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_invalid_expression",
+      "status": "pass",
+      "elapsed": 0.018878,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "iter_and_next_in_chunks",
+      "status": "pass",
+      "elapsed": 0.01915,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "next_past_the_end",
+      "status": "pass",
+      "elapsed": 0.018504,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "next_without_iter",
+      "status": "pass",
+      "elapsed": 0.018854,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "done_finishes_iterator",
+      "status": "pass",
+      "elapsed": 0.018244,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "other_command_exits_iteration",
+      "status": "pass",
+      "elapsed": 0.019762,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_names",
+      "status": "pass",
+      "elapsed": 0.019227,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_component_names",
+      "status": "pass",
+      "elapsed": 0.01836,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_values",
+      "status": "pass",
+      "elapsed": 0.019433,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_with_component_filter",
+      "status": "pass",
+      "elapsed": 0.019049,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_unknown_component",
+      "status": "pass",
+      "elapsed": 0.018605,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_recur_nested_children",
+      "status": "pass",
+      "elapsed": 0.020209,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "output_capped_at_limit",
+      "status": "pass",
+      "elapsed": 0.020455,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "delete_session_while_iterating",
+      "status": "pass",
+      "elapsed": 0.019862,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "prints_path_of_the_active_camera",
+      "status": "pass",
+      "elapsed": 0.029697,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "path_uses_the_frame_number",
+      "status": "pass",
+      "elapsed": 0.031303,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "named_camera",
+      "status": "pass",
+      "elapsed": 0.02907,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "multiple_cameras",
+      "status": "pass",
+      "elapsed": 0.028961,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "camera_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.029074,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "unknown_camera",
+      "status": "pass",
+      "elapsed": 0.027819,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "entity_without_camera",
+      "status": "pass",
+      "elapsed": 0.027451,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "without_active_camera",
+      "status": "pass",
+      "elapsed": 0.028241,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "second_request_replaces_the_first",
+      "status": "pass",
+      "elapsed": 0.03173,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "headless_run_writes_the_png",
+      "status": "pass",
+      "elapsed": 0.071957,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "prints_the_image_path",
+      "status": "pass",
+      "elapsed": 0.029977,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "numbers_the_images_per_session",
+      "status": "pass",
+      "elapsed": 0.029369,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "unknown_subject",
+      "status": "pass",
+      "elapsed": 0.028297,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "without_a_subject",
+      "status": "pass",
+      "elapsed": 0.030838,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "subject_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.029128,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "frames_the_camera_on_the_bounds",
+      "status": "pass",
+      "elapsed": 0.028869,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "instantiates_a_prefab",
+      "status": "pass",
+      "elapsed": 0.02989,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "instantiates_a_template",
+      "status": "pass",
+      "elapsed": 0.030229,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "cleans_up_when_the_image_appears",
+      "status": "pass",
+      "elapsed": 0.030356,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "live_entity_joins_and_leaves_the_layer",
+      "status": "pass",
+      "elapsed": 0.028926,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "live_subject_is_rendered_alone",
+      "status": "pass",
+      "elapsed": 0.029283,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "headless_run_writes_the_png",
+      "status": "pass",
+      "elapsed": 0.108503,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "unknown_session_gives_404",
+      "status": "pass",
+      "elapsed": 0.028609,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "unknown_camera_gives_400",
+      "status": "pass",
+      "elapsed": 0.031077,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "without_camera_gives_400",
+      "status": "pass",
+      "elapsed": 0.030385,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "first_request_sets_capture",
+      "status": "pass",
+      "elapsed": 0.030228,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "second_request_keeps_the_capture",
+      "status": "pass",
+      "elapsed": 0.030019,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "named_camera",
+      "status": "pass",
+      "elapsed": 0.029333,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "reply_allows_any_origin",
+      "status": "pass",
+      "elapsed": 0.029678,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "preflight_lists_methods",
+      "status": "pass",
+      "elapsed": 0.029755,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "headless_run_returns_the_png",
+      "status": "pass",
+      "elapsed": 0.077344,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "help_round_trip",
+      "status": "pass",
+      "elapsed": 0.021377,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "unknown_path_gives_404",
+      "status": "pass",
+      "elapsed": 0.0212,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "bad_command_gives_error_status",
+      "status": "pass",
+      "elapsed": 0.021186,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "png_reply_is_base64",
+      "status": "pass",
+      "elapsed": 0.019787,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "empty",
+      "status": "pass",
+      "elapsed": 0.004324,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "one_byte",
+      "status": "pass",
+      "elapsed": 0.004228,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "two_bytes",
+      "status": "pass",
+      "elapsed": 0.004039,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "three_bytes",
+      "status": "pass",
+      "elapsed": 0.004027,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "longer_text",
+      "status": "pass",
+      "elapsed": 0.003691,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "binary_bytes",
+      "status": "pass",
+      "elapsed": 0.0039,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "runs_lines_in_order",
+      "status": "pass",
+      "elapsed": 0.019051,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "skips_comments_and_blanks",
+      "status": "pass",
+      "elapsed": 0.01913,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "missing_file_is_error",
+      "status": "pass",
+      "elapsed": 0.018194,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "quoted_argument_spans_lines",
+      "status": "pass",
+      "elapsed": 0.018104,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "log_copied_to_file",
+      "status": "pass",
+      "elapsed": 0.018605,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_press_queues_a_tap",
+      "status": "pass",
+      "elapsed": 0.017804,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_press_takes_a_duration",
+      "status": "pass",
+      "elapsed": 0.02056,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_down_and_up_hold_the_key",
+      "status": "pass",
+      "elapsed": 0.020218,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_unknown_key_is_an_error",
+      "status": "pass",
+      "elapsed": 0.019937,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_type_presses_one_key_per_character",
+      "status": "pass",
+      "elapsed": 0.019626,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_move_pins_the_cursor",
+      "status": "pass",
+      "elapsed": 0.019906,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_move_takes_normalized_coordinates",
+      "status": "pass",
+      "elapsed": 0.019552,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_invalid_position_is_an_error",
+      "status": "pass",
+      "elapsed": 0.019488,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_sweep_spreads_over_frames",
+      "status": "pass",
+      "elapsed": 0.02035,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_sweep_defaults_to_eight_steps",
+      "status": "pass",
+      "elapsed": 0.020349,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_click_presses_the_button",
+      "status": "pass",
+      "elapsed": 0.020352,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_drag_holds_the_button_over_the_sweep",
+      "status": "pass",
+      "elapsed": 0.019847,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_scroll_queues_the_offset",
+      "status": "pass",
+      "elapsed": 0.020314,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_reset_empties_the_queue",
+      "status": "pass",
+      "elapsed": 0.019862,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_focus_changes_the_flag",
+      "status": "pass",
+      "elapsed": 0.020481,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_wait_reports_the_pending_events",
+      "status": "pass",
+      "elapsed": 0.019866,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_press_holds_the_action_for_a_frame",
+      "status": "pass",
+      "elapsed": 0.019605,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_down_and_up_hold_the_action",
+      "status": "pass",
+      "elapsed": 0.019552,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_up_without_a_hold_is_an_error",
+      "status": "pass",
+      "elapsed": 0.019838,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_action_command_needs_an_action",
+      "status": "pass",
+      "elapsed": 0.019846,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_drag_holds_the_action_while_the_cursor_sweeps",
+      "status": "pass",
+      "elapsed": 0.018678,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_list_shows_the_bindings",
+      "status": "pass",
+      "elapsed": 0.018667,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "the_help_listing_includes_the_input_commands",
+      "status": "pass",
+      "elapsed": 0.01994,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_unknown_input_command_is_an_error",
+      "status": "pass",
+      "elapsed": 0.019764,
+      "project": "command"
+    }
+  ],
+  "projects": [
+    {
+      "project": "checkpoint",
+      "pass": 40,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.081528
+    },
+    {
+      "project": "command",
+      "pass": 209,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.560128
+    }
+  ]
+}
