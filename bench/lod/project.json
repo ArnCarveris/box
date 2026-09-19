@@ -17,6 +17,14 @@
                     "subtree_1000_materials",
                     "subtree_1000_error_bound"
                 ]
+            },
+            {
+                "id": "Metric",
+                "benchcases": [
+                    "error_100k_perspective",
+                    "error_100k_orthographic",
+                    "select_100k"
+                ]
             }
         ]
     }
