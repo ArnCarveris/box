@@ -13,6 +13,9 @@
  * rotation and scale come for free. The node with the highest place in the walk
  * of its tree wins, which is the node drawn over every other one that holds the
  * point: the deepest node of the topmost subtree.
+ *
+ * A system writes the answer of the frame into the UiCapture singleton, which is
+ * how a script and box_ui_mouse_captured learn that the pointer is on a panel.
  */
 
 #include "ui_internal.h"
@@ -290,6 +293,60 @@ done:
     return result;
 }
 
+/** Node of a tree the pick of this frame left the Hovered tag on.
+ *
+ * The tag sits on at most one entity of the world, so the answer costs a walk
+ * over a single table and needs no state of its own; the pick keeps it current
+ * for a still cursor as well, because a tree that changed drops its cached hit.
+ *
+ * @param world The world
+ * @return The node under the cursor, or 0 when the cursor is beside every tree
+ */
+static ecs_entity_t box_ui_hit_hovered(
+    const ecs_world_t *world)
+{
+    ecs_entity_t result = 0;
+    ecs_iter_t it = ecs_each_id(world, Hovered);
+    while (!result && ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_has(it.world, it.entities[i], UiNode)) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+/** Write what the hit test of this frame left the UI holding of the pointer.
+ *
+ * @param it Iterator of the system, which has no terms
+ */
+static void BoxUiCapture(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    UiCapture *capture = ecs_get_mut(world, ecs_id(UiCapture), UiCapture);
+    ecs_entity_t element = box_ui_hit_hovered(world);
+    capture->element = element;
+    capture->mouse = element != 0;
+}
+
+bool box_ui_mouse_captured(
+    const ecs_world_t *world)
+{
+    const UiCapture *capture = ecs_id(UiCapture)
+        ? ecs_singleton_get(world, UiCapture)
+        : NULL;
+
+    return capture != NULL && capture->mouse;
+}
+
 void box_ui_hit_init(
     ecs_world_t *world)
 {
@@ -302,6 +359,28 @@ void box_ui_hit_init(
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = UiQuad, .oper = EcsNot }
         }
+    });
+
+    ECS_COMPONENT_DEFINE(world, UiCapture);
+
+    ecs_struct(world, {
+        .entity = ecs_id(UiCapture),
+        .members = {
+            { .name = "mouse", .type = ecs_id(ecs_bool_t) },
+            { .name = "element", .type = ecs_id(ecs_entity_t) }
+        }
+    });
+
+    ecs_set_hooks(world, UiCapture, { .ctor = flecs_default_ctor });
+    ecs_singleton_ensure(world, UiCapture);
+    ecs_singleton_modified(world, UiCapture);
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxUiCapture" }),
+        .phase = EcsPostLoad,
+        .query.terms = {{ .id = ecs_id(UiCapture) }},
+        .callback = BoxUiCapture,
+        .immediate = true
     });
 
     box_picking_set_source(world, box_ui_hit_pick);

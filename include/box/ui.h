@@ -365,6 +365,25 @@ ECS_STRUCT(ConsoleLog, {
 /** Lines one text input keeps in its history */
 #define BOX_UI_HISTORY_MAX (64)
 
+/** What the UI holds of the pointer this frame, written by the hit test.
+ *
+ * A singleton every frame carries the answer of the hit test of that frame, so a
+ * script reads it as data and a game that steers its world with the cursor knows
+ * to stand back while the pointer is on a panel.
+ */
+ECS_STRUCT(UiCapture, {
+    bool mouse;           /**< The cursor is over an element of a tree */
+    ecs_entity_t element; /**< Element the cursor is over, 0 when there is none */
+});
+
+/** Whether the UI holds the pointer this frame.
+ *
+ * @param world The world
+ * @return Whether the cursor is over an element of a tree
+ */
+bool box_ui_mouse_captured(
+    const ecs_world_t *world);
+
 /** Element of a UI tree at a point in the plane the trees are laid out in.
  *
  * The point is in the logical pixels of the view of the tree, the units its

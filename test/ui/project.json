@@ -198,6 +198,19 @@
                 "teardown": true
             },
             {
+                "id": "Capture",
+                "testcases": [
+                    "a_world_without_a_tree_captures_nothing",
+                    "the_cursor_over_an_element_captures_the_mouse",
+                    "the_capture_names_the_element_under_the_cursor",
+                    "the_cursor_beside_the_tree_captures_nothing",
+                    "a_collider_of_the_scene_does_not_capture",
+                    "an_element_that_leaves_the_tree_releases_the_capture"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Hit",
                 "testcases": [
                     "element_under_the_point_is_found",
