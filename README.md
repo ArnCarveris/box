@@ -507,6 +507,47 @@ evaluate stops the restore at that file, which the output names after `restore f
 `test/integration/command/checkpoint_restore.flecs` checkpoints a scene, moves a crate, deletes
 an entity, adds one that no script owns and restores.
 
+`box.particle` adds particles as a component and nothing else: a `ParticleEmitter`
+holds the maximum number of particles alive at once, the emission rate, the spawn
+shape with its parameters, the ranges a particle starts between and a seed, and the
+transform of the emitter entity places and orients the spawn volume like it places a
+mesh. No particle ever reaches the ECS. Extract writes one block per emitter into the
+frame packet and the renderer keeps the buffers: a spawn and an integrate compute pass
+run over them once per frame and a point sprite pass draws them over the image of every
+view, so a million particles cost the main thread one block.
+
+```
+using box.particle
+
+fountain {
+  Position: {0, 0.5, 0}
+  ParticleEmitter: {
+    max: 20000, rate: 4000, shape: EmitterDisc, radius: 2,
+    direction: {0, 1, 0}, spread: 20,
+    speed: {min: 3, max: 9}, lifetime: {min: 1, max: 2},
+    size: {min: 0.1, max: 0.2}, opacity: {min: 0.6, max: 1},
+    acceleration: {0, -2, 0}, color: {235, 180, 120}, seed: 3
+  }
+}
+```
+
+The shape is `EmitterPoint`, `EmitterSphere`, `EmitterBox`, `EmitterDisc`,
+`EmitterMesh` or `EmitterSpline`; the last two draw their spawn points from the
+`Mesh3` surface or the `Spline` of the `source` entity, which the module samples into
+a table of 64 points and resamples when the shape, the source or the seed changes. A
+particle leaves along `direction` inside the cone of `spread`; an emitter that names no
+direction sends it outward, which is the surface normal of a mesh, the radius of a
+sphere or a disc and the normal of a curve. Every random draw is a hash of the seed and
+the index of the particle in the stream of the emitter, so a fixed timestep produces the
+same particles on every run and on every device, and the rate is accumulated on that
+clock, so a rate that is not a multiple of the frame rate still spawns its particles per
+second. The pool of the renderer is the maximum: a spawn takes a slot from the dead list
+that the integrate pass pushes the expired particles onto, and an emitter that asks for
+more particles than it has slots simply does not fill them.
+
+`test/integration/visual/particles_shapes.flecs` shows a stream from each of the six
+shapes and `test/integration/bench/particles_1m.flecs` runs a million of them.
+
 ## Tests
 
 ```sh
@@ -514,7 +555,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script, transition, lod
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, particle, command, checkpoint, job, input, controller, script, transition, lod
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
