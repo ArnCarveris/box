@@ -2,11 +2,19 @@
   "tool": "bake3",
   "tool_version": "1.0.0",
   "timestamp": "2026-09-19T06:36:25Z",
-  "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 16},
+  "host": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "cpu_count": 16
+  },
   "cfg": "debug",
   "target": "arm64-Darwin",
   "environment": "epicwt",
-  "git": {"sha": "8770eb9ae8ff6dabf9231a06ee6f8cf2e8ecba7b", "dirty": true, "branch": "HEAD"},
+  "git": {
+    "sha": "8770eb9ae8ff6dabf9231a06ee6f8cf2e8ecba7b",
+    "dirty": true,
+    "branch": "HEAD"
+  },
   "total_sec": 1.079745,
   "ok": true,
   "totals": {
@@ -15,13 +23,92 @@
       "link": 0.111073,
       "bundle": 0.063013,
       "discovery": 0.011016,
-      "generate": 0.000300,
+      "generate": 0.0003,
       "etc": 0.019367,
-      "other": 0.000000
+      "other": 0.0
     },
     "project": {
-      "box": {"total_sec": 0.939817, "compile_sec": 6.187800, "link_sec": 0.029712, "files": 141},
-      "box_app": {"total_sec": 0.128420, "compile_sec": 0.036996, "link_sec": 0.081362, "files": 1}
+      "box": {
+        "total_sec": 0.939817,
+        "compile_sec": 6.1878,
+        "link_sec": 0.029712,
+        "files": 141,
+        "loc": {
+          "files": 224,
+          "code": 39060,
+          "comment": 13325,
+          "blank": 6403,
+          "by_language": {
+            "C": {
+              "files": 149,
+              "code": 31664,
+              "comment": 7465,
+              "blank": 4590
+            },
+            "C/C++ Header": {
+              "files": 74,
+              "code": 7381,
+              "comment": 5851,
+              "blank": 1808
+            },
+            "Objective-C": {
+              "files": 1,
+              "code": 15,
+              "comment": 9,
+              "blank": 5
+            }
+          },
+          "dirty": true
+        }
+      },
+      "box_app": {
+        "total_sec": 0.12842,
+        "compile_sec": 0.036996,
+        "link_sec": 0.081362,
+        "files": 1,
+        "loc": {
+          "files": 1,
+          "code": 53,
+          "comment": 14,
+          "blank": 9,
+          "by_language": {
+            "C": {
+              "files": 1,
+              "code": 53,
+              "comment": 14,
+              "blank": 9
+            }
+          },
+          "dirty": true
+        }
+      }
+    },
+    "loc": {
+      "files": 225,
+      "code": 39113,
+      "comment": 13339,
+      "blank": 6412,
+      "by_language": {
+        "C": {
+          "files": 150,
+          "code": 31717,
+          "comment": 7479,
+          "blank": 4599
+        },
+        "C/C++ Header": {
+          "files": 74,
+          "code": 7381,
+          "comment": 5851,
+          "blank": 1808
+        },
+        "Objective-C": {
+          "files": 1,
+          "code": 15,
+          "comment": 9,
+          "blank": 5
+        }
+      },
+      "dirty": true
     }
   },
   "steps": [
@@ -29,7 +116,7 @@
       "name": "discovery",
       "kind": "discovery",
       "project": null,
-      "start_sec": 0.000006,
+      "start_sec": 6e-06,
       "duration_sec": 0.011021,
       "ok": true,
       "children": [
@@ -37,7 +124,7 @@
           "name": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt",
           "kind": "discovery",
           "project": null,
-          "start_sec": 0.000008,
+          "start_sec": 8e-06,
           "duration_sec": 0.010922,
           "ok": true,
           "children": []
@@ -46,8 +133,8 @@
           "name": "resolve dependencies",
           "kind": "discovery",
           "project": null,
-          "start_sec": 0.010930,
-          "duration_sec": 0.000094,
+          "start_sec": 0.01093,
+          "duration_sec": 9.4e-05,
           "ok": true,
           "children": []
         }
@@ -76,7 +163,7 @@
       "kind": "bundle",
       "project": "box",
       "start_sec": 0.070934,
-      "duration_sec": 0.000085,
+      "duration_sec": 8.5e-05,
       "ok": true,
       "children": []
     },
@@ -119,7 +206,7 @@
           "name": "bake_config.h",
           "kind": "generate",
           "project": "box",
-          "start_sec": 0.074500,
+          "start_sec": 0.0745,
           "duration_sec": 0.000293,
           "ok": true,
           "children": []
@@ -129,7 +216,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.111464,
-          "duration_sec": 0.057050,
+          "duration_sec": 0.05705,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/hiz.c.o",
           "children": []
@@ -168,7 +255,7 @@
           "name": "src/renderer/texture.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.111530,
+          "start_sec": 0.11153,
           "duration_sec": 0.055509,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/texture.c.o",
@@ -209,7 +296,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.163317,
-          "duration_sec": 0.034050,
+          "duration_sec": 0.03405,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/queue.c.o",
           "children": []
@@ -288,7 +375,7 @@
           "name": "src/renderer/shader.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.197390,
+          "start_sec": 0.19739,
           "duration_sec": 0.039771,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/shader.c.o",
@@ -359,7 +446,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.219074,
-          "duration_sec": 0.036390,
+          "duration_sec": 0.03639,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/exposure.c.o",
           "children": []
@@ -369,7 +456,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.237187,
-          "duration_sec": 0.045560,
+          "duration_sec": 0.04556,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/renderer/cull.c.o",
           "children": []
@@ -379,7 +466,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.242429,
-          "duration_sec": 0.041390,
+          "duration_sec": 0.04139,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/monitor/monitor.c.o",
           "children": []
@@ -408,7 +495,7 @@
           "name": "src/monitor/cpu_sample.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.251820,
+          "start_sec": 0.25182,
           "duration_sec": 0.038193,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/monitor/cpu_sample.c.o",
@@ -419,7 +506,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.252403,
-          "duration_sec": 0.037930,
+          "duration_sec": 0.03793,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/monitor/systems.c.o",
           "children": []
@@ -489,7 +576,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.290031,
-          "duration_sec": 0.047660,
+          "duration_sec": 0.04766,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/sky/celestial.c.o",
           "children": []
@@ -499,7 +586,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.290354,
-          "duration_sec": 0.041240,
+          "duration_sec": 0.04124,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/sky/fog.c.o",
           "children": []
@@ -609,7 +696,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.372388,
-          "duration_sec": 0.041900,
+          "duration_sec": 0.0419,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/input/events.c.o",
           "children": []
@@ -628,7 +715,7 @@
           "name": "src/camera/camera.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.372460,
+          "start_sec": 0.37246,
           "duration_sec": 0.040866,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/camera/camera.c.o",
@@ -699,7 +786,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.414313,
-          "duration_sec": 0.043780,
+          "duration_sec": 0.04378,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/render/extract_layers.c.o",
           "children": []
@@ -798,7 +885,7 @@
           "name": "src/gltf/material.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.464800,
+          "start_sec": 0.4648,
           "duration_sec": 0.043626,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/gltf/material.c.o",
@@ -838,7 +925,7 @@
           "name": "src/script/pending.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.473450,
+          "start_sec": 0.47345,
           "duration_sec": 0.041532,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/script/pending.c.o",
@@ -879,7 +966,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.506823,
-          "duration_sec": 0.040930,
+          "duration_sec": 0.04093,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/controller/person.c.o",
           "children": []
@@ -978,7 +1065,7 @@
           "name": "src/job/pool.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.546890,
+          "start_sec": 0.54689,
           "duration_sec": 0.045547,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/job/pool.c.o",
@@ -998,7 +1085,7 @@
           "name": "src/view/view.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.554730,
+          "start_sec": 0.55473,
           "duration_sec": 0.038735,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/view/view.c.o",
@@ -1019,7 +1106,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.584552,
-          "duration_sec": 0.046540,
+          "duration_sec": 0.04654,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/texture/texture.c.o",
           "children": []
@@ -1098,7 +1185,7 @@
           "name": "src/light/light.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.631110,
+          "start_sec": 0.63111,
           "duration_sec": 0.039446,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/light/light.c.o",
@@ -1148,7 +1235,7 @@
           "name": "src/command/command.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.638070,
+          "start_sec": 0.63807,
           "duration_sec": 0.041177,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/command/command.c.o",
@@ -1199,7 +1286,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.676878,
-          "duration_sec": 0.040570,
+          "duration_sec": 0.04057,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/command/capture.c.o",
           "children": []
@@ -1298,7 +1385,7 @@
           "name": "src/geometry/mesh3.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.718470,
+          "start_sec": 0.71847,
           "duration_sec": 0.048365,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/geometry/mesh3.c.o",
@@ -1308,7 +1395,7 @@
           "name": "src/geometry/shape_example.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.721080,
+          "start_sec": 0.72108,
           "duration_sec": 0.040217,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/geometry/shape_example.c.o",
@@ -1338,7 +1425,7 @@
           "name": "src/geometry/mesh_cache.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.761230,
+          "start_sec": 0.76123,
           "duration_sec": 0.046248,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/geometry/mesh_cache.c.o",
@@ -1388,7 +1475,7 @@
           "name": "src/transform/transform.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.767840,
+          "start_sec": 0.76784,
           "duration_sec": 0.040475,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/transform/transform.c.o",
@@ -1399,7 +1486,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.804685,
-          "duration_sec": 0.044190,
+          "duration_sec": 0.04419,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/transform/lookat.c.o",
           "children": []
@@ -1479,7 +1566,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.847467,
-          "duration_sec": 0.047470,
+          "duration_sec": 0.04747,
           "ok": true,
           "object": "/private/tmp/claude-501/-Users-sandermertens-GitHub-SanderMertens-flecs-projects-box/248d4a33-fc6d-42ff-84b1-6eee628bd5de/scratchpad/epicwt/.bake/local_env/epicwt/build/box/arm64-Darwin-debug/obj/src/collision/colliders.c.o",
           "children": []
@@ -1559,15 +1646,15 @@
       "kind": "project",
       "project": "box_app",
       "start_sec": 0.951321,
-      "duration_sec": 0.128420,
+      "duration_sec": 0.12842,
       "ok": true,
       "children": [
         {
           "name": "bake_config.h",
           "kind": "generate",
           "project": "box_app",
-          "start_sec": 0.951340,
-          "duration_sec": 0.000007,
+          "start_sec": 0.95134,
+          "duration_sec": 7e-06,
           "ok": true,
           "children": []
         },

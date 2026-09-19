@@ -2,11 +2,19 @@
   "tool": "bake3",
   "tool_version": "1.0.0",
   "timestamp": "2026-09-19T00:43:28Z",
-  "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 16},
+  "host": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "cpu_count": 16
+  },
   "cfg": "release",
   "target": "em",
   "environment": "next",
-  "git": {"sha": "d4f1c6a0613408f2e4edec194170fd2690973db8", "dirty": true, "branch": "main"},
+  "git": {
+    "sha": "d4f1c6a0613408f2e4edec194170fd2690973db8",
+    "dirty": true,
+    "branch": "main"
+  },
   "total_sec": 8.029013,
   "ok": true,
   "totals": {
@@ -15,13 +23,92 @@
       "link": 0.066845,
       "bundle": 0.057842,
       "discovery": 0.006355,
-      "generate": 0.000035,
-      "etc": 0.003490,
-      "other": 0.000000
+      "generate": 3.5e-05,
+      "etc": 0.00349,
+      "other": 0.0
     },
     "project": {
-      "box": {"total_sec": 1.826949, "compile_sec": 13.216337, "link_sec": 0.066845, "files": 112},
-      "box_app": {"total_sec": 6.195355, "compile_sec": 0.091205, "link_sec": 6.096544, "files": 1}
+      "box": {
+        "total_sec": 1.826949,
+        "compile_sec": 13.216337,
+        "link_sec": 0.066845,
+        "files": 112,
+        "loc": {
+          "files": 177,
+          "code": 29939,
+          "comment": 9760,
+          "blank": 4797,
+          "by_language": {
+            "C": {
+              "files": 112,
+              "code": 23819,
+              "comment": 5292,
+              "blank": 3354
+            },
+            "C/C++ Header": {
+              "files": 64,
+              "code": 6105,
+              "comment": 4459,
+              "blank": 1438
+            },
+            "Objective-C": {
+              "files": 1,
+              "code": 15,
+              "comment": 9,
+              "blank": 5
+            }
+          },
+          "dirty": true
+        }
+      },
+      "box_app": {
+        "total_sec": 6.195355,
+        "compile_sec": 0.091205,
+        "link_sec": 6.096544,
+        "files": 1,
+        "loc": {
+          "files": 1,
+          "code": 50,
+          "comment": 14,
+          "blank": 9,
+          "by_language": {
+            "C": {
+              "files": 1,
+              "code": 50,
+              "comment": 14,
+              "blank": 9
+            }
+          },
+          "dirty": true
+        }
+      }
+    },
+    "loc": {
+      "files": 178,
+      "code": 29989,
+      "comment": 9774,
+      "blank": 4806,
+      "by_language": {
+        "C": {
+          "files": 113,
+          "code": 23869,
+          "comment": 5306,
+          "blank": 3363
+        },
+        "C/C++ Header": {
+          "files": 64,
+          "code": 6105,
+          "comment": 4459,
+          "blank": 1438
+        },
+        "Objective-C": {
+          "files": 1,
+          "code": 15,
+          "comment": 9,
+          "blank": 5
+        }
+      },
+      "dirty": true
     }
   },
   "steps": [
@@ -29,15 +116,15 @@
       "name": "discovery",
       "kind": "discovery",
       "project": null,
-      "start_sec": 0.000006,
-      "duration_sec": 0.006360,
+      "start_sec": 6e-06,
+      "duration_sec": 0.00636,
       "ok": true,
       "children": [
         {
           "name": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box",
           "kind": "discovery",
           "project": null,
-          "start_sec": 0.000009,
+          "start_sec": 9e-06,
           "duration_sec": 0.006284,
           "ok": true,
           "children": []
@@ -47,7 +134,7 @@
           "kind": "discovery",
           "project": null,
           "start_sec": 0.006293,
-          "duration_sec": 0.000071,
+          "duration_sec": 7.1e-05,
           "ok": true,
           "children": []
         }
@@ -67,7 +154,7 @@
       "kind": "bundle",
       "project": "box",
       "start_sec": 0.063898,
-      "duration_sec": 0.000130,
+      "duration_sec": 0.00013,
       "ok": true,
       "children": []
     },
@@ -93,7 +180,7 @@
           "kind": "generate",
           "project": "box",
           "start_sec": 0.064545,
-          "duration_sec": 0.000029,
+          "duration_sec": 2.9e-05,
           "ok": true,
           "children": []
         },
@@ -121,8 +208,8 @@
           "name": "src/renderer/bloom.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.065610,
-          "duration_sec": 0.268790,
+          "start_sec": 0.06561,
+          "duration_sec": 0.26879,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/bloom.c.o",
           "children": []
@@ -131,7 +218,7 @@
           "name": "src/renderer/scene.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.065620,
+          "start_sec": 0.06562,
           "duration_sec": 0.273761,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/scene.c.o",
@@ -301,7 +388,7 @@
           "name": "src/renderer/exposure.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.442480,
+          "start_sec": 0.44248,
           "duration_sec": 0.091307,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/exposure.c.o",
@@ -332,7 +419,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.529955,
-          "duration_sec": 0.098370,
+          "duration_sec": 0.09837,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/monitor/stats.c.o",
           "children": []
@@ -381,7 +468,7 @@
           "name": "src/core/process.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.539790,
+          "start_sec": 0.53979,
           "duration_sec": 0.100634,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/process.c.o",
@@ -451,7 +538,7 @@
           "name": "src/input/keys.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.633510,
+          "start_sec": 0.63351,
           "duration_sec": 0.102427,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/keys.c.o",
@@ -492,7 +579,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.714454,
-          "duration_sec": 0.097900,
+          "duration_sec": 0.0979,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/camera/camera.c.o",
           "children": []
@@ -581,7 +668,7 @@
           "name": "src/render/extract_layers.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.815350,
+          "start_sec": 0.81535,
           "duration_sec": 0.101919,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_layers.c.o",
@@ -662,7 +749,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.925587,
-          "duration_sec": 0.093280,
+          "duration_sec": 0.09328,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/script/script.c.o",
           "children": []
@@ -671,7 +758,7 @@
           "name": "src/script/pending.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 0.944040,
+          "start_sec": 0.94404,
           "duration_sec": 0.113107,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/script/pending.c.o",
@@ -682,7 +769,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 0.949873,
-          "duration_sec": 0.092530,
+          "duration_sec": 0.09253,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/controller.c.o",
           "children": []
@@ -712,7 +799,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 1.004312,
-          "duration_sec": 0.095520,
+          "duration_sec": 0.09552,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/actions.c.o",
           "children": []
@@ -752,7 +839,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 1.042415,
-          "duration_sec": 0.095590,
+          "duration_sec": 0.09559,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/job/job.c.o",
           "children": []
@@ -862,7 +949,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 1.204688,
-          "duration_sec": 0.092130,
+          "duration_sec": 0.09213,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/light/light.c.o",
           "children": []
@@ -891,7 +978,7 @@
           "name": "src/command/terminal.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 1.221880,
+          "start_sec": 1.22188,
           "duration_sec": 0.095177,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/terminal.c.o",
@@ -952,7 +1039,7 @@
           "kind": "compile",
           "project": "box",
           "start_sec": 1.317042,
-          "duration_sec": 0.095490,
+          "duration_sec": 0.09549,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/endpoint.c.o",
           "children": []
@@ -1031,7 +1118,7 @@
           "name": "src/command/logs.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 1.413080,
+          "start_sec": 1.41308,
           "duration_sec": 0.100529,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/logs.c.o",
@@ -1091,7 +1178,7 @@
           "name": "src/geometry/mesh_cache.c",
           "kind": "compile",
           "project": "box",
-          "start_sec": 1.507380,
+          "start_sec": 1.50738,
           "duration_sec": 0.095873,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_cache.c.o",
@@ -1221,7 +1308,7 @@
           "name": "link",
           "kind": "link",
           "project": "box",
-          "start_sec": 1.761860,
+          "start_sec": 1.76186,
           "duration_sec": 0.066845,
           "ok": true,
           "children": []
@@ -1241,7 +1328,7 @@
           "kind": "generate",
           "project": "box_app",
           "start_sec": 1.833662,
-          "duration_sec": 0.000006,
+          "duration_sec": 6e-06,
           "ok": true,
           "children": []
         },
@@ -1249,7 +1336,7 @@
           "name": "src/main.c",
           "kind": "compile",
           "project": "box_app",
-          "start_sec": 1.835140,
+          "start_sec": 1.83514,
           "duration_sec": 0.091205,
           "ok": true,
           "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box_app/wasm32-Emscripten-release/obj/src/main.c.o",
@@ -1268,7 +1355,7 @@
               "kind": "other",
               "project": "box_app",
               "start_sec": 1.926385,
-              "duration_sec": 0.000000,
+              "duration_sec": 0.0,
               "ok": true,
               "children": []
             }
@@ -1279,7 +1366,7 @@
           "kind": "etc",
           "project": "box_app",
           "start_sec": 8.023271,
-          "duration_sec": 0.003490,
+          "duration_sec": 0.00349,
           "ok": true,
           "children": []
         }
