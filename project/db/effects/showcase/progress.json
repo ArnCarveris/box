@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T23:54:28.914+00:00",
   "start_time": "2026-09-19T00:06:02.358+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T00:33:22.214+00:00",
   "dependencies": [
     "effects/gtao",
     "effects/ssr",
