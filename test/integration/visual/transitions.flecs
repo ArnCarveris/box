@@ -1,0 +1,78 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.transition
+
+camera {
+  Position: {0, 5, -15}
+  LookAt: {0, 2, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.6}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, intensity: 0.6} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {120, 120, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+moving {
+  Position: {-6, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {210, 210, 210}
+  Transition: [Position: {duration: 0.1, timing_function: Linear}]
+}
+
+coloring {
+  Position: {-2, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {230, 60, 40}
+  Transition: [Rgb: {duration: 0.1, timing_function: Linear}]
+}
+
+scaling {
+  Position: {2, 1.5, 0}
+  Scale: {1, 1, 1}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {90, 160, 230}
+  Transition: [Scale: {duration: 0.1, timing_function: EaseInOut}]
+}
+
+glowing {
+  Position: {6, 1, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {40, 40, 40}
+  Emissive: {strength: 0, color: {255, 180, 60}}
+  Transition: [Emissive: {duration: 0.1, timing_function: Linear}]
+}
+
+reference {
+  Position: {0, 4.5, 6}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {210, 210, 210}
+}
+
+moving {
+  Position: {-6, 4, 0}
+}
+
+coloring {
+  Rgb: {40, 90, 230}
+}
+
+scaling {
+  Scale: {2.2, 2.2, 2.2}
+}
+
+glowing {
+  Emissive: {strength: 8, color: {255, 180, 60}}
+}
