@@ -5,6 +5,7 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "ore_ui/widgets"
+    "ore_ui/widgets",
+    "ore_engine/ui_canonical"
   ]
 }
