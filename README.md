@@ -195,7 +195,14 @@ python3 tools/integration.py visual            # writes test/integration/out/<sc
 python3 tools/integration.py bench             # writes test/integration/out/<scene>.json
 python3 tools/integration.py command           # writes test/integration/out/<scene>.log
 bake3 run box_bench --local-env --cfg release -- ../../test/integration/bench/static_100k.flecs --churn 1-1000
+bake3 run box_bench --local-env --cfg release -- ../../test/integration/bench/spikes.flecs --spike 4 --fps 60 --attribute
 ```
+The bench app reports mean, p50, p99 and max frame times, fps, drawn, culled and occluded counts
+and shadow rebuilds. `--spike <factor>` fails the run when a frame exceeds that multiple of the
+mean (4 by default, 0 disables), `--attribute` names the slowest system of every spike through
+the system monitor, `--fps` fixes the step, and `--light-churn <n>` moves static lights per
+frame. A `<scene>.args` file next to a bench scene holds extra options the runner passes along.
+
 
 A command scene holds a terminal named `terminals.agent0` with a `CommandScript`
 that points at the `<scene>.cmd` next to it. The runner sets `Terminal.log` from a
