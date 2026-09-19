@@ -339,6 +339,36 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Sky",
+                "testcases": [
+                    "world_without_an_atmosphere_has_no_sky",
+                    "world_without_an_atmosphere_registers_no_shader",
+                    "atmosphere_draws_the_sky_of_every_view",
+                    "atmosphere_registers_the_shaders_that_compile",
+                    "sun_direction_comes_from_the_referenced_light",
+                    "sun_falls_back_to_the_first_directional_light",
+                    "sun_color_is_the_linear_light_color_times_its_intensity",
+                    "zero_values_take_the_defaults_of_the_medium",
+                    "rayleigh_scale_multiplies_the_scattering",
+                    "black_ground_albedo_takes_its_default",
+                    "negative_aerial_perspective_turns_the_haze_off",
+                    "tables_are_dirty_on_the_first_frame",
+                    "tables_stay_clean_when_nothing_changes",
+                    "changing_the_medium_makes_the_tables_dirty",
+                    "changing_the_disk_leaves_the_tables_alone",
+                    "a_sun_that_hardly_moves_keeps_the_sky_view",
+                    "a_sun_that_moves_renders_the_sky_view_again",
+                    "small_steps_of_the_sun_add_up_to_a_new_sky_view",
+                    "a_camera_that_rises_renders_the_sky_view_again",
+                    "environment_source_marks_the_view",
+                    "environment_generation_follows_the_sky_view",
+                    "environment_of_a_gradient_view_is_untouched",
+                    "removing_the_atmosphere_clears_the_sky"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

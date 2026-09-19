@@ -1,0 +1,90 @@
+// sky/atmosphere
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+using box.sky
+
+camera {
+  Position: {0, 14, -60}
+  LookAt: {0, 60, 400}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.12, -0.4, 0}
+  DirectionalLight: {intensity: 3}
+  Rgb: {255, 248, 238}
+}
+
+atmosphere {
+  Atmosphere: {
+    sun: sun
+    sun_disk_intensity: 25
+    world_units_per_km: 150
+    ground_albedo: {90, 95, 85}
+    night_tint: {40, 60, 120}
+    night_intensity: 0.004
+  }
+}
+
+$ { EnvironmentLight: {intensity: 1, source: atmosphere} }
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {8000, 1, 8000}
+  Rgb: {96, 104, 86}
+  PbrMaterial: {roughness: 0.95}
+}
+
+near_sphere {
+  Position: {-8, 4, 10}
+  Sphere: {segments: 32, smooth: true, radius: 4}
+  Rgb: {210, 210, 215}
+  PbrMaterial: {metallic: 0.1, roughness: 0.35}
+}
+
+near_box {
+  Position: {9, 5, 16}
+  Rotation: {0, 0.5, 0}
+  Box: {10, 10, 10}
+  Rgb: {190, 90, 70}
+  PbrMaterial: {roughness: 0.6}
+}
+
+ridge_a {
+  Position: {-60, 20, 120}
+  Box: {70, 40, 40}
+  Rgb: {150, 155, 140}
+}
+
+ridge_b {
+  Position: {70, 30, 260}
+  Box: {120, 60, 60}
+  Rgb: {150, 155, 140}
+}
+
+ridge_c {
+  Position: {-140, 55, 600}
+  Box: {260, 110, 90}
+  Rgb: {150, 155, 140}
+}
+
+ridge_d {
+  Position: {180, 90, 1300}
+  Box: {420, 180, 140}
+  Rgb: {150, 155, 140}
+}
+
+ridge_e {
+  Position: {-80, 140, 2600}
+  Box: {700, 280, 200}
+  Rgb: {150, 155, 140}
+}
+
+box { effects { stack { tonemap {
+  Effect: {enabled: true}
+  ToneMapping: {white: 1.2, dither: false}
+} } } }

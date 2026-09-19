@@ -108,6 +108,13 @@
                 "benchcases": [
                     "extract_chain"
                 ]
+            },
+            {
+                "id": "Sky",
+                "benchcases": [
+                    "extract_steady",
+                    "extract_moving_sun"
+                ]
             }
         ]
     }
