@@ -61,6 +61,46 @@
                     "a_flat_primitive_keeps_its_plane",
                     "reversed_bounds_are_normalized"
                 ]
+            },
+            {
+                "id": "Screen",
+                "testcases": [
+                    "an_error_projects_at_the_nearest_point",
+                    "twice_the_distance_halves_the_error",
+                    "the_nearest_point_is_not_the_center",
+                    "a_camera_inside_the_bounds_stays_finite",
+                    "a_wider_fov_lowers_the_error",
+                    "a_taller_viewport_raises_the_error",
+                    "an_orthographic_error_ignores_the_distance",
+                    "an_orthographic_error_follows_the_height",
+                    "the_scale_is_the_error_of_one_unit",
+                    "a_representation_without_error_is_free",
+                    "zero_fields_take_the_camera_defaults",
+                    "reversed_bounds_measure_the_same"
+                ]
+            },
+            {
+                "id": "Hysteresis",
+                "testcases": [
+                    "without_a_current_level_the_threshold_decides",
+                    "a_level_holds_inside_the_band",
+                    "an_error_above_the_band_goes_finer",
+                    "an_error_below_the_band_goes_coarser",
+                    "the_band_only_widens_the_threshold",
+                    "without_a_band_the_switch_is_at_the_threshold",
+                    "the_finest_level_is_the_floor",
+                    "a_level_out_of_range_is_ignored",
+                    "a_single_level_is_always_selected",
+                    "a_coarser_threshold_selects_a_coarser_level"
+                ]
+            },
+            {
+                "id": "Walk",
+                "testcases": [
+                    "a_walk_towards_and_away_never_oscillates",
+                    "a_hovering_camera_holds_its_level",
+                    "an_orthographic_zoom_never_oscillates"
+                ]
             }
         ]
     }

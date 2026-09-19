@@ -7,6 +7,12 @@
  * capsules that stand in for the whole, together with the approximation error in
  * world units that the screen space metric later turns into pixels. A builder
  * holds the working memory, so a subtree that is rebuilt does not allocate.
+ *
+ * The module also owns the screen space metric that turns such an error into
+ * pixels: box_lod_error_px projects it at the nearest point of the bounds of a
+ * node for a perspective or an orthographic camera, and box_lod_select turns the
+ * projected errors of the levels of a node into the level of this frame, keeping
+ * the current one until the error leaves the band around the threshold.
  */
 
 #ifndef BOX_LOD_H
@@ -136,6 +142,99 @@ bool box_lod_proxy_build(
     box_lod_builder_t *builder,
     const box_lod_proxy_desc_t *desc,
     box_lod_proxy_t *out);
+
+/** Default vertical field of view the metric projects a camera with, in degrees */
+#define BOX_LOD_FOV (60.0f)
+
+/** Default visible height in world units of an orthographic camera */
+#define BOX_LOD_ORTHO_HEIGHT (10.0f)
+
+/** Distance the perspective metric clamps to, so a camera in the bounds stays finite */
+#define BOX_LOD_MIN_DISTANCE (0.001f)
+
+/** World bounds of a node, which the screen space metric projects.
+ *
+ * The corners may come in either order: the metric normalizes them, so the
+ * bounds of an empty subtree are harmless.
+ */
+typedef struct box_lod_bounds_t {
+    vec3 min; /**< One corner of the bounds in world space */
+    vec3 max; /**< The opposite corner of the bounds in world space */
+} box_lod_bounds_t;
+
+/** The camera a screen space error is measured in.
+ *
+ * A perspective camera projects with its vertical field of view and the
+ * distance to the bounds, so its error falls off with distance; an orthographic
+ * camera projects with its visible height alone and its error does not.
+ */
+typedef struct box_lod_camera_t {
+    vec3 position;      /**< Camera position in world space */
+    float fov;          /**< Vertical field of view in degrees, 0 for BOX_LOD_FOV */
+    float ortho_height; /**< Visible height in world units, 0 for BOX_LOD_ORTHO_HEIGHT */
+    bool orthographic;  /**< The camera projects orthographically */
+} box_lod_camera_t;
+
+/** The levels of a node and the band the switch between them needs.
+ *
+ * The levels run from the most detailed to the cheapest, so their projected
+ * error rises with the level. The band is a fraction of the threshold: a
+ * hysteresis of 0.25 lets a node keep its level until its error leaves
+ * [threshold * 0.75, threshold * 1.25], which is what keeps a camera hovering
+ * at a boundary from switching every frame.
+ */
+typedef struct box_lod_select_desc_t {
+    const float *error_px; /**< Projected error in pixels of every level */
+    int32_t count;         /**< Number of levels */
+    int32_t current;       /**< Level of the previous frame, negative for none */
+    float threshold;       /**< Projected error in pixels a level may not exceed */
+    float hysteresis;      /**< Band around the threshold, 0 switches at it, at most 1 */
+} box_lod_select_desc_t;
+
+/** Pixels one world unit covers at the nearest point of bounds.
+ *
+ * The projected error of a level is this scale times the error of its
+ * representation, so a caller with more than one level computes the scale once.
+ *
+ * @param bounds World bounds of the node
+ * @param camera The camera the error is measured in
+ * @param viewport_px Height of the viewport in pixels
+ * @return The pixels one world unit covers, 0 for an empty viewport
+ */
+float box_lod_error_scale(
+    const box_lod_bounds_t *bounds,
+    const box_lod_camera_t *camera,
+    float viewport_px);
+
+/** Projected error of a representation in pixels.
+ *
+ * The error of the representation is a length in world units, which the metric
+ * projects at the nearest point of the bounds, the point where it shows most.
+ *
+ * @param bounds World bounds of the node
+ * @param error Error of the representation in world units
+ * @param camera The camera the error is measured in
+ * @param viewport_px Height of the viewport in pixels
+ * @return The error in pixels, 0 for a representation without error
+ */
+float box_lod_error_px(
+    const box_lod_bounds_t *bounds,
+    float error,
+    const box_lod_camera_t *camera,
+    float viewport_px);
+
+/** Pick the level of a node, keeping the current one inside the band.
+ *
+ * The node moves to a coarser level only when that level stays under the
+ * narrowed threshold, and to a finer one only when its current level passes the
+ * widened threshold. Level zero is the floor: a node whose finest level already
+ * exceeds the threshold keeps it.
+ *
+ * @param desc The levels, the current level and the band
+ * @return The level of this frame
+ */
+int32_t box_lod_select(
+    const box_lod_select_desc_t *desc);
 
 /** Register the box.lod module.
  *
