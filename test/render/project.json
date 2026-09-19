@@ -439,6 +439,33 @@
         ],
         "setup": true,
         "teardown": true
+      },
+      {
+        "id": "Ibl",
+        "testcases": [
+          "the_fog_of_the_view_is_the_first_pass",
+          "the_fog_color_comes_from_the_sky",
+          "a_low_sun_makes_the_fog_red",
+          "a_night_fog_keeps_the_night_tint",
+          "the_fog_density_follows_the_world_scale",
+          "the_fog_intensity_scales_the_density",
+          "the_fog_falloff_follows_the_aerosol_layer",
+          "the_fog_sits_at_the_sea_level_of_the_sky",
+          "a_camera_over_the_haze_sees_thinner_fog",
+          "a_negative_fog_intensity_keeps_the_authored_fog",
+          "a_world_without_an_atmosphere_keeps_the_authored_fog",
+          "the_sky_leaves_the_framing_of_the_fog_alone",
+          "the_environment_is_filtered_on_the_first_frame",
+          "a_changed_medium_filters_the_environment_again",
+          "a_small_step_of_the_sun_keeps_the_environment",
+          "a_large_step_of_the_sun_filters_the_environment_again",
+          "a_moving_sun_filters_the_environment_less_often",
+          "a_camera_that_rises_a_little_keeps_the_environment",
+          "a_camera_that_climbs_filters_the_environment_again",
+          "a_gradient_environment_is_not_touched_by_the_sky"
+        ],
+        "setup": true,
+        "teardown": true
       }
     ]
   }

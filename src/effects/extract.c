@@ -9,6 +9,7 @@
  */
 
 #include "effects_internal.h"
+#include "../sky/sky_internal.h"
 
 /** Order two effects by their order and then by their entity.
  *
@@ -260,6 +261,10 @@ static void box_effect_append(
     pass->inputs |= fx->exposure ? BOX_EFFECT_EXPOSURE : 0u;
     pass->inputs |= fx->occlusion ? BOX_EFFECT_OCCLUSION : 0u;
     box_effect_params(world, state, e, pass->params);
+    if (ecs_has(world, e, Fog)) {
+        box_sky_fog(world, v, pass->params);
+    }
+
     v->effect_inputs |= pass->inputs;
     v->effect_count ++;
 done:

@@ -174,3 +174,45 @@ void Sky_advance_the_clock(bench_t *b)
 
     ecs_fini(world);
 }
+
+void Sky_extract_sky_fog(bench_t *b)
+{
+    // sky/sky_ibl
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_packet_t packet;
+    box_packet_init(&packet);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 2, -10});
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {1.0f, 0, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 3});
+    ecs_entity_t atmosphere = ecs_new(world);
+    ecs_set(world, atmosphere, Atmosphere, {.sun = sun, .fog_intensity = 4});
+    ecs_singleton_set(world, EnvironmentLight, {
+        .intensity = 1,
+        .source = atmosphere
+    });
+    ecs_entity_t fog = ecs_lookup(world, "box.effects.stack.fog");
+    ecs_get_mut(world, fog, Effect)->enabled = true;
+    ecs_modified(world, fog, Effect);
+
+    float angle = 1.0f;
+    bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        packet.width = 1920;
+        packet.height = 1080;
+        angle += BOX_SKY_SUN_EPSILON * 2.0f;
+        ecs_set(world, sun, Rotation, {angle, 0, 0});
+        bench_resume(b);
+        box_render_extract(world, &packet);
+        bench_keep(packet.view.env_generation);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}

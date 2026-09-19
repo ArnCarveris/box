@@ -32,12 +32,15 @@ typedef struct SkyState {
     ecs_entity_t lut_shader;  /**< Shader entity of the table passes */
     ecs_entity_t sky_shader;  /**< Shader entity of the sky and haze pass */
     box_sky_t last;           /**< Parameter block the sky view table was rendered from */
+    box_sky_t env_last;       /**< Parameter block the environment was filtered from */
     box_body_t sun;           /**< Sun of the frame, resolved while the views are filled */
     box_body_t moon;          /**< Moon of the frame, resolved with it */
     float phase;              /**< Lit fraction of the moon disk, from the two directions */
     float fade;               /**< Part of the star field the daylight leaves */
     float altitude;           /**< Altitude in kilometers that table was rendered for */
+    float env_altitude;       /**< Altitude the environment of a view was filtered for */
     uint32_t generation;      /**< Rises every time that table is rendered again */
+    uint32_t env_generation;  /**< Rises every time the environment is filtered again */
     bool lit;                 /**< The bodies of the frame were resolved */
     bool valid;               /**< A packet with an atmosphere was produced before */
 } SkyState;
@@ -144,6 +147,23 @@ void box_sky_bodies(
  */
 void box_sky_time_init(
     ecs_world_t *world);
+
+/** Write the fog the atmosphere of a world drives into a parameter block.
+ *
+ * The color is the single scattering of a horizontal ray through the medium at
+ * the camera, lit by the body that lights the view, and the density is the
+ * extinction of that medium per world unit, falling off with the scale height
+ * of its aerosol layer, so the fog, the aerial perspective and the sky agree.
+ *
+ * @param world The world
+ * @param v The view the fog is seen from
+ * @param out The parameters of the fog pass, color first and density after
+ * @return true when an atmosphere drives the fog of this world
+ */
+bool box_sky_fog(
+    ecs_world_t *world,
+    const box_view_t *v,
+    float *out);
 
 /** Copy the atmosphere of a world into a packet and mark what must be rendered.
  *

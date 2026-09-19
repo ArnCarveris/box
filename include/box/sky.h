@@ -80,6 +80,8 @@ ECS_STRUCT(Atmosphere, {
     float aerial_perspective_distance_km; /**< Distance the haze table reaches, 0 takes 32 */
     float aerial_perspective_intensity;   /**< Density of that haze, 0 takes 1, below 0 is none */
 
+    float fog_intensity; /**< Fog the sky drives, 0 takes 1, below 0 leaves it authored */
+
     float sea_level_y;        /**< World height the ground altitude is measured from */
     float world_units_per_km; /**< World units in one kilometer, 0 takes 1000 */
     float ground_altitude_km; /**< Altitude of the sea level plane over the planet */
@@ -198,6 +200,26 @@ ECS_STRUCT(TimeOfDay, {
 
 /** Ground albedo channel of an atmosphere that names none */
 #define BOX_SKY_GROUND_ALBEDO (77)
+
+/** Part of the sunlight a medium scatters that reaches the camera as fog
+ *
+ * The estimate is the single scattering of a horizontal ray, which the sky
+ * itself gathers over many bounces, so the fog is scaled by what the rest of
+ * them add.
+ */
+#define BOX_SKY_FOG_GAIN (3.0f)
+
+/** Rayleigh phase function at a right angle to the sun, three over sixteen pi */
+#define BOX_SKY_FOG_RAYLEIGH_PHASE (0.0597f)
+
+/** Aerosol phase function at that angle for the default anisotropy */
+#define BOX_SKY_FOG_MIE_PHASE (0.0136f)
+
+/** Radians the sun may move before the environment of a view is filtered again */
+#define BOX_SKY_ENV_EPSILON (0.015f)
+
+/** Kilometers the camera may rise before that environment is filtered again */
+#define BOX_SKY_ENV_ALTITUDE (0.2f)
 
 /** Radians the sun may move before the sky view table is rendered again */
 #define BOX_SKY_SUN_EPSILON (0.002f)

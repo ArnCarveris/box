@@ -202,25 +202,32 @@ static bool box_sky_medium_equal(
  *
  * @param a The first block
  * @param b The second block
- * @return true when the sky view table of the first is the table of the second
+ * @param epsilon Radians the sun may have moved between the two
+ * @return true when the sky of the first block is the sky of the second
  */
 static bool box_sky_view_equal(
     const box_sky_t *a,
-    const box_sky_t *b)
+    const box_sky_t *b,
+    float epsilon)
 {
     vec3 moved = vec3_sub(vec3_new(a->sun_dir[0], a->sun_dir[1], a->sun_dir[2]),
         vec3_new(b->sun_dir[0], b->sun_dir[1], b->sun_dir[2]));
 
-    return vec3_length(moved) <= BOX_SKY_SUN_EPSILON &&
+    return vec3_length(moved) <= epsilon &&
         memcmp(a->sun_color, b->sun_color, sizeof(float) * 3) == 0 &&
         memcmp(a->night, b->night, sizeof(float) * 3) == 0 &&
         a->mie_params[0] == b->mie_params[0];
 }
 
-/** Mix the sky view generation into the environment of the views that use it.
+/** Mix the environment generation of the sky into the views that use it.
+ *
+ * That generation is its own: the sky view table follows the sun within a
+ * fraction of a degree because the sky is looked at directly, while filtering
+ * the environment again costs a cubemap and a prefilter, which a tenth of a
+ * degree of a sun does not change.
  *
  * @param p The packet
- * @param generation The generation of the sky view table
+ * @param generation The generation of the environment of the atmosphere
  */
 static void box_sky_environments(
     box_packet_t *p,
@@ -279,12 +286,21 @@ void box_sky_extract(
 
     float altitude = box_sky_altitude(p, sky);
     bool lut = !state->valid || !box_sky_medium_equal(sky, &state->last);
-    bool view = lut || !box_sky_view_equal(sky, &state->last) ||
+    bool view = lut || !box_sky_view_equal(sky, &state->last, BOX_SKY_SUN_EPSILON) ||
         fabsf(altitude - state->altitude) > BOX_SKY_ALTITUDE_EPSILON;
     if (view) {
         state->generation ++;
         state->altitude = altitude;
         state->last = *sky;
+    }
+
+    bool env = !state->valid || !box_sky_medium_equal(sky, &state->env_last) ||
+        !box_sky_view_equal(sky, &state->env_last, BOX_SKY_ENV_EPSILON) ||
+        fabsf(altitude - state->env_altitude) > BOX_SKY_ENV_ALTITUDE;
+    if (env) {
+        state->env_generation ++;
+        state->env_altitude = altitude;
+        state->env_last = *sky;
     }
 
     state->valid = true;
@@ -293,7 +309,7 @@ void box_sky_extract(
     sky->generation = state->generation;
     p->sky_lut_shader = box_sky_handle(world, state->lut_shader);
     p->sky_shader = box_sky_handle(world, state->sky_shader);
-    box_sky_environments(p, state->generation);
+    box_sky_environments(p, state->env_generation);
 done:
     return;
 }

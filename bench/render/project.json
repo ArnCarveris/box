@@ -115,7 +115,8 @@
           "extract_steady",
           "extract_moving_sun",
           "extract_moon_and_stars",
-          "advance_the_clock"
+          "advance_the_clock",
+          "extract_sky_fog"
         ]
       }
     ]
