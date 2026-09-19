@@ -39,6 +39,7 @@ int main(
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxMaterial);
+    ECS_IMPORT(world, BoxTransition);
     ECS_IMPORT(world, BoxRender);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxGltf);
