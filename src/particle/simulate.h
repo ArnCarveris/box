@@ -40,6 +40,9 @@
 /** Keys one curve of an emitter holds, spread evenly over the life of a particle */
 #define BOX_PARTICLE_CURVE_KEYS (4)
 
+/** Speed on the screen under which a streak keeps the axes of the camera */
+#define BOX_PARTICLE_STREAK_EPSILON (1.0e-5f)
+
 /** Forces one step of the simulation moves a particle by */
 typedef struct box_particle_forces_t {
     vec3 acceleration; /**< Constant acceleration of the emitter and its gravity */
@@ -416,6 +419,41 @@ static inline uint32_t box_particle_frame(
     }
 
     return (uint32_t)frame;
+}
+
+/** Offsets of one corner of a streak along the right and the up axis of a view.
+ *
+ * A streak is the sprite of a particle laid over the direction it moves in on
+ * the screen instead of over the axes of the camera: it keeps the size of the
+ * particle across that direction and grows along it with the speed of the
+ * particle, so the quad is the line the particle travels over. A particle that
+ * stands still on the screen keeps the axes it had.
+ *
+ * @param corner The corner of the quad, both components between -1 and 1
+ * @param screen Velocity of the particle along the right and the up axis
+ * @param speed Speed of the particle in world units per second
+ * @param half Half the size of the particle
+ * @param stretch World units the sprite grows per unit of speed
+ * @param out Receives the offset along the right axis and along the up axis
+ */
+static inline void box_particle_streak(
+    const float *corner,
+    const float *screen,
+    float speed,
+    float half,
+    float stretch,
+    float *out)
+{
+    float along[2] = { 0.0f, 1.0f };
+    float len = sqrtf(screen[0] * screen[0] + screen[1] * screen[1]);
+    if (len > BOX_PARTICLE_STREAK_EPSILON) {
+        along[0] = screen[0] / len;
+        along[1] = screen[1] / len;
+    }
+
+    float half_len = half + stretch * speed * 0.5f;
+    out[0] = along[1] * corner[0] * half + along[0] * corner[1] * half_len;
+    out[1] = -along[0] * corner[0] * half + along[1] * corner[1] * half_len;
 }
 
 /** How much of a particle is left where it approaches the geometry behind it.

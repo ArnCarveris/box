@@ -46,6 +46,8 @@ extern ECS_COMPONENT_DECLARE(WeatherBlend);
 typedef struct SkyState {
     ecs_query_t *atmospheres; /**< Entities holding an Atmosphere component */
     ecs_query_t *weathers;    /**< Entities holding a Weather component */
+    ecs_query_t *cameras;     /**< Entities holding a Camera, whose first one the rain follows */
+    ecs_entity_t rain;        /**< Emitter of the rain, created the first time a world rains */
     ecs_entity_t lut_shader;  /**< Shader entity of the table passes */
     ecs_entity_t sky_shader;  /**< Shader entity of the sky and haze pass */
     box_sky_t last;           /**< Parameter block the sky view table was rendered from */
@@ -87,6 +89,13 @@ bool box_sky_weather(
  * @param world The world
  */
 void box_sky_weather_init(
+    ecs_world_t *world);
+
+/** Register the system that drives the rain emitter of a world.
+ *
+ * @param world The world
+ */
+void box_sky_rain_init(
     ecs_world_t *world);
 
 /** Take a value or its default when it is not above zero.

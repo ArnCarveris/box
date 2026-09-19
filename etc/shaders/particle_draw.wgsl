@@ -11,6 +11,12 @@
 // quad, with the local x and y of every vertex laid over the camera axes, so
 // the mesh keeps facing the camera.
 //
+// A stretch lays the quad over the direction the particle moves in on the
+// screen instead of over the axes of the camera and grows it along that
+// direction with the speed of the particle, which is what draws a rain drop or
+// a spark as the line it travels; the sprite of a particle that is standing
+// still keeps the axes it had.
+//
 // The curves of the emitter are read here rather than written into the
 // channels: the age and the lifetime of a particle are already in the buffers,
 // so a size, opacity, rotation or color that changes over the life costs no
@@ -82,6 +88,17 @@ fn sheet_at(corner: vec2<f32>, t: f32, life: f32) -> vec2<f32> {
   return (cell + corner * 0.5 + 0.5) / vec2(cols, rows);
 }
 
+// Direction a streak is laid along, which is where the particle moves on the
+// screen, or the up axis of the view when it is standing still.
+fn streak_axis(screen: vec2<f32>) -> vec2<f32> {
+  let len = length(screen);
+  if (len < 1.0e-5) {
+    return vec2(0.0, 1.0);
+  }
+
+  return screen / len;
+}
+
 // Place one particle of the pool, with the local offset of its corner already
 // laid over the camera axes, and read the curves of the emitter at its age.
 fn place(instance: u32, local: vec3<f32>, turn: bool) -> ParticleOut {
@@ -114,8 +131,17 @@ fn place(instance: u32, local: vec3<f32>, turn: bool) -> ParticleOut {
   let up = vec3(u.view[0].y, u.view[1].y, u.view[2].y);
   let ahead = vec3(u.view[0].z, u.view[1].z, u.view[2].z);
   let half_size = max(attr.y * curve_at(e.size_curve, t), 0.0) * 0.5;
-  let world = position[i].xyz +
+  var world = position[i].xyz +
     (right * offset.x + up * offset.y + ahead * offset.z) * half_size;
+  if (e.stretch > 0.0) {
+    let screen = vec2(dot(velocity[i].xyz, right), dot(velocity[i].xyz, up));
+    let along = streak_axis(screen);
+    let side = vec2(along.y, -along.x);
+    let half_len = half_size + e.stretch * length(velocity[i].xyz) * 0.5;
+    world = position[i].xyz + ahead * offset.z * half_size +
+      right * (side.x * offset.x * half_size + along.x * offset.y * half_len) +
+      up * (side.y * offset.x * half_size + along.y * offset.y * half_len);
+  }
   out.color = vec4(tint.rgb * gradient_at(t),
     tint.a * curve_at(e.opacity_curve, t));
   out.sheet = sheet_at(local.xy, t, life);

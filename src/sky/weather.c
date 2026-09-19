@@ -8,6 +8,11 @@
  * frames, and hands the rain to the wetness material layer. The sky, the light
  * of the view and the fog read the blended amounts while they are extracted,
  * which is what keeps the atmosphere itself the base of all three.
+ *
+ * The amounts those three read are not quite the amounts of the weather: a rain
+ * greys the sky and thickens the air it falls through, so it is added to the
+ * overcast and the fog of the world on the way out. `Weather.current` keeps the
+ * three amounts as they were asked for, which is what a scene reads back.
  */
 
 #include "sky_internal.h"
@@ -87,6 +92,19 @@ done:
     w->current = b->amounts;
 }
 
+/** Add what a rain raises an amount by, without passing a full one.
+ *
+ * @param amount The amount of the weather itself
+ * @param raise Part of the rain that is added to it
+ * @return The amount the frame is drawn with
+ */
+static float box_weather_raise(
+    float amount,
+    float raise)
+{
+    return box_weather_clamp(amount + raise);
+}
+
 /** Hand the rain of a world to the wetness material layer.
  *
  * The layer is a registration of the material module, so a world that never
@@ -143,6 +161,9 @@ bool box_sky_weather(
         const Weather *w = ecs_field(&it, Weather, 0);
         if (it.count) {
             *out = w[0].current;
+            out->overcast = box_weather_raise(out->overcast,
+                out->rain * BOX_WEATHER_RAIN_OVERCAST);
+            out->fog = box_weather_raise(out->fog, out->rain * BOX_WEATHER_RAIN_FOG);
             result = true;
         }
 

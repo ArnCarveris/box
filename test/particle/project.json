@@ -123,7 +123,11 @@
                     "a_sheet_of_one_frame_never_leaves_it",
                     "a_particle_without_softness_is_left_alone",
                     "a_particle_at_the_surface_is_gone",
-                    "a_particle_fades_in_over_the_softness"
+                    "a_particle_fades_in_over_the_softness",
+                    "the_stretch_of_a_streak_reaches_the_block",
+                    "an_emitter_without_a_stretch_writes_none",
+                    "a_streak_is_laid_along_the_velocity",
+                    "a_streak_that_stands_still_keeps_the_camera_axes"
                 ]
             },
             {
@@ -184,6 +188,28 @@
                     "a_reset_puts_the_span_back",
                     "the_stats_count_the_emitters_and_their_bytes",
                     "the_stats_count_a_culled_emitter"
+                ]
+            },
+            {
+                "id": "Rain",
+                "testcases": [
+                    "a_world_without_rain_keeps_its_emitter_unmade",
+                    "a_world_without_a_camera_keeps_its_emitter_unmade",
+                    "the_rain_makes_an_emitter_over_the_camera",
+                    "the_emitter_follows_the_camera",
+                    "the_rate_follows_the_intensity",
+                    "the_drop_size_follows_the_intensity",
+                    "the_wind_follows_the_intensity",
+                    "the_drops_die_on_the_ground",
+                    "the_drops_are_drawn_as_streaks",
+                    "the_column_takes_the_shape_of_the_rain",
+                    "a_rain_that_clears_stops_the_emitter",
+                    "the_first_frame_of_a_rain_fills_the_column",
+                    "the_rain_raises_the_overcast_of_the_sky",
+                    "the_rain_raises_the_fog_of_the_air",
+                    "the_rain_wets_the_material_layers",
+                    "the_weather_keeps_the_amounts_it_was_asked_for",
+                    "a_world_without_the_particle_module_still_wets_and_greys"
                 ]
             }
         ]

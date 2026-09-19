@@ -27,7 +27,7 @@ struct Emitter {
   rotation: vec2<f32>,
   opacity: vec2<f32>,
   delta: f32,
-  pad: f32,
+  stretch: f32,
   count: u32,
   spawn: u32,
   first: u32,

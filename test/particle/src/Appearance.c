@@ -422,3 +422,73 @@ void Appearance_a_particle_fades_in_over_the_softness(void)
     test_flt(box_particle_soft(10.5f, 10, 0.5f), 1);
     test_flt(box_particle_soft(40, 10, 0.5f), 1);
 }
+
+void Appearance_the_stretch_of_a_streak_reaches_the_block(void)
+{
+    // particles/rain
+    ecs_world_t *w = ecs_init();
+    ECS_IMPORT(w, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, ParticleEmitter, {.max = 100});
+    ecs_set(w, e, ParticleAppearance, {.shape = ParticleCircle, .stretch = 0.3f});
+
+    box_particle_extract(w, &packet);
+    box_particle_emitter_t *block = box_vec_at(&packet.particles, 0);
+    test_flt(block->stretch, 0.3f);
+
+    box_packet_fini(&packet);
+    ecs_fini(w);
+}
+
+void Appearance_an_emitter_without_a_stretch_writes_none(void)
+{
+    // particles/rain
+    ecs_world_t *w = ecs_init();
+    ECS_IMPORT(w, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, ParticleEmitter, {.max = 100});
+    ecs_set(w, e, ParticleAppearance, {.shape = ParticleSprite});
+
+    box_particle_extract(w, &packet);
+    box_particle_emitter_t *block = box_vec_at(&packet.particles, 0);
+    test_flt(block->stretch, 0);
+
+    box_packet_fini(&packet);
+    ecs_fini(w);
+}
+
+void Appearance_a_streak_is_laid_along_the_velocity(void)
+{
+    // particles/rain
+    float corner[2] = { 1.0f, 1.0f };
+    float down[2] = { 0.0f, -1.0f };
+    float across[2] = { 1.0f, 0.0f };
+    float out[2];
+
+    box_particle_streak(corner, down, 10.0f, 0.05f, 0.2f, out);
+    test_flt(out[0], -0.05f);
+    test_flt(out[1], -1.05f);
+
+    box_particle_streak(corner, across, 10.0f, 0.05f, 0.2f, out);
+    test_flt(out[0], 1.05f);
+    test_flt(out[1], -0.05f);
+}
+
+void Appearance_a_streak_that_stands_still_keeps_the_camera_axes(void)
+{
+    // particles/rain
+    float corner[2] = { 1.0f, -1.0f };
+    float still[2] = { 0.0f, 0.0f };
+    float out[2];
+
+    box_particle_streak(corner, still, 0.0f, 0.4f, 0.0f, out);
+
+    test_flt(out[0], 0.4f);
+    test_flt(out[1], -0.4f);
+}

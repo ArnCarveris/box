@@ -1215,7 +1215,7 @@ typedef struct box_particle_emitter_t {
     float rotation[2];      /**< Lowest and highest initial rotation in radians */
     float opacity[2];       /**< Lowest and highest initial opacity */
     float delta;            /**< Seconds the simulation advances this frame */
-    float pad;              /**< Padding to the 16 byte GPU stride */
+    float stretch;          /**< World units a sprite grows along its velocity per unit of speed */
     uint32_t max;           /**< Particles the pool holds */
     uint32_t spawn;         /**< Particles the frame spawns, already clamped to the pool */
     uint32_t first;         /**< Particles the emitter spawned before this frame */

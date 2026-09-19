@@ -61,6 +61,7 @@ Rules for adding one:
 | Occlusion culling | `occlusion`, `occlusion_off`, `occlusion_sweep` | Identical pictures with Hi-Z on and off; the sweep shows a camera passing occluders. |
 | Sky and atmosphere | `atmosphere_noon`, `atmosphere_sunrise`, `atmosphere_sunset`, `time_of_day_morning`, `time_of_day_noon`, `time_of_day_night`, `celestial`, `celestial_moon`, `sky_fog` | Hillaire sky at three sun heights, the day cycle, sun and moon discs, aerial fog. |
 | Weather | `weather_fog`, `weather_overcast` | Ground fog and an overcast sky over the same scene. |
+| Rain | `weather_rain`, `weather_rain_heavy` | The same scene under a light and a full rain: slanted streaks filling the column around the camera, thicker, larger and more windblown at full rain, with the sky greyer, the air thicker and the ground, post and sphere wetter. |
 | SVG features | `svg_text`, `svg_gradient`, `svg_mask`, `svg_clip`, `svg_filter` | One resvg feature per scene, rasterized crisp at its size. |
 | Custom meshes and glTF | `mesh3`, `custom_shape`, `gltf` | Script authored meshes with vertex alpha, three stars and an ngon from the shape registry, an authored crate and the Khronos vertex colored box. |
 | 2D shapes | `shapes_2d` | Discs, lines, borders with radii and fitted images on one sheet. |

@@ -82,6 +82,7 @@ void BoxSkyImport(
 {
     ECS_MODULE(world, BoxSky);
     ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxShader);
 
@@ -92,6 +93,7 @@ void BoxSkyImport(
     ECS_META_COMPONENT(world, TimeOfDay);
     ECS_META_COMPONENT(world, WeatherAmounts);
     ECS_META_COMPONENT(world, Weather);
+    ECS_META_COMPONENT(world, Rain);
     ECS_COMPONENT_DEFINE(world, WeatherBlend);
     ECS_COMPONENT_DEFINE(world, SkyState);
 
@@ -101,6 +103,7 @@ void BoxSkyImport(
     ecs_set_hooks(world, Stars, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, TimeOfDay, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Weather, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Rain, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, WeatherBlend, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, SkyState, { .ctor = flecs_default_ctor });
 
@@ -124,6 +127,7 @@ void BoxSkyImport(
 
     box_sky_time_init(world);
     box_sky_weather_init(world);
+    box_sky_rain_init(world);
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(Atmosphere) }},

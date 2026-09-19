@@ -15,7 +15,9 @@
  * image based lighting from the sky instead of from its two colors.
  *
  * A `Weather` blends overcast, fog and rain on top of that atmosphere without
- * replacing it, so the sun of a world keeps moving behind an overcast sky.
+ * replacing it, so the sun of a world keeps moving behind an overcast sky. The
+ * rain of that weather greys and thickens the air with it and drives a column
+ * of drops that follows the camera, which a `Rain` gives the shape of.
  */
 
 #ifndef BOX_SKY_H
@@ -160,8 +162,11 @@ ECS_STRUCT(WeatherAmounts, {
  *
  * Overcast blends the sky and the light of the body that lights the view
  * toward a flat grey, fog raises the density of the fog the sky drives and
- * rain drives the amount of the wetness material layer. The atmosphere stays
- * the base under all three, so the sun keeps moving behind the clouds.
+ * rain falls as a column of drops around the camera, drives the amount of the
+ * wetness material layer and adds to the overcast and the fog of the world, so
+ * a rain that arrives greys and thickens the air it falls through. The
+ * atmosphere stays the base under all three, so the sun keeps moving behind
+ * the clouds.
  */
 ECS_STRUCT(Weather, {
     float overcast;   /**< Cloud deck the sky is blended toward, 0 to 1 */
@@ -170,6 +175,34 @@ ECS_STRUCT(Weather, {
     float transition; /**< Seconds an amount eases over, 0 takes four */
 
     WeatherAmounts current; /**< Written every frame: the amounts of this frame */
+});
+
+/** Rain column the weather of a world drives, as a singleton
+ *
+ * The rain itself is `Weather.rain`; this is the shape of the column it falls
+ * in. The emitter is created the first time a world rains and follows the
+ * camera of the first view from then on: a box that reaches `height` around it
+ * and `area` to every side, filled with drops that fall at `speed`, are bent by
+ * `wind` and die on the ground at `ground`.
+ *
+ * The rain of the weather drives the rate, the size of a drop and the wind, so
+ * a light rain is thinner, finer and straighter than a downpour and a change of
+ * weather arrives over the transition of that weather. A world without the
+ * component rains with the defaults below, which fall straight down.
+ */
+ECS_STRUCT(Rain, {
+    int32_t max;   /**< Drops alive at once, 0 takes twenty thousand */
+    float rate;    /**< Drops spawned per second at a full rain, 0 takes eight thousand */
+    float area;    /**< Half extent of the column around the camera, 0 takes 24 */
+    float height;  /**< World units the column reaches around the camera, 0 takes 24 */
+    float ground;  /**< Height in world units a drop dies at */
+    float speed;   /**< Speed a drop falls at once it is up to speed, 0 takes 14 */
+    float size;    /**< World units across a drop is at a full rain, 0 takes 0.04 */
+    float stretch; /**< World units a drop stretches per unit of its speed, 0 takes 0.03 */
+    float drag;    /**< Fraction of the difference with the wind a drop loses per second */
+    float opacity; /**< Opacity a drop is drawn with, 0 takes 0.35 */
+    vec3 wind;     /**< Wind at a full rain, in world units per second */
+    rgb color;     /**< Color of a drop, black takes a pale grey */
 });
 
 /** Day of the year a clock without one runs on, the summer solstice */
@@ -201,6 +234,57 @@ ECS_STRUCT(Weather, {
 
 /** Density the sky driven fog is multiplied by at full fog */
 #define BOX_WEATHER_FOG_GAIN (14.0f)
+
+/** Overcast a full rain adds to the sky of a world on top of its own */
+#define BOX_WEATHER_RAIN_OVERCAST (0.6f)
+
+/** Fog a full rain adds to the air of a world on top of its own */
+#define BOX_WEATHER_RAIN_FOG (0.35f)
+
+/** Rain under which a world keeps no emitter at all */
+#define BOX_RAIN_EPSILON (0.001f)
+
+/** Drops a full rain spawns per second when the Rain names no rate */
+#define BOX_RAIN_RATE (8000.0f)
+
+/** Drops the pool of a rain holds when the Rain names no maximum */
+#define BOX_RAIN_MAX (20000)
+
+/** Half extent of the column around the camera when the Rain names none */
+#define BOX_RAIN_AREA (24.0f)
+
+/** World units the column reaches around the camera when the Rain names none */
+#define BOX_RAIN_HEIGHT (24.0f)
+
+/** Part of the height of the column that sits over the camera */
+#define BOX_RAIN_LIFT (0.25f)
+
+/** Speed in world units per second a drop falls at by default */
+#define BOX_RAIN_SPEED (14.0f)
+
+/** World units across a drop is at a full rain by default */
+#define BOX_RAIN_SIZE (0.04f)
+
+/** World units a drop stretches per unit of the speed it falls at, by default */
+#define BOX_RAIN_STRETCH (0.03f)
+
+/** Fraction of the difference with the wind a drop loses per second by default */
+#define BOX_RAIN_DRAG (0.6f)
+
+/** Opacity a drop is drawn with by default */
+#define BOX_RAIN_OPACITY (0.35f)
+
+/** Part of the size of a drop that is left where the rain is at its lightest */
+#define BOX_RAIN_SIZE_LOW (0.55f)
+
+/** Part of its fall a drop is given on top of it before its life runs out */
+#define BOX_RAIN_LIFE_MARGIN (1.5f)
+
+/** Channel a drop of a rain that names no color is drawn with */
+#define BOX_RAIN_COLOR (210)
+
+/** Seed the drops of a rain are drawn with, which keeps a capture reproducible */
+#define BOX_RAIN_SEED (17)
 
 /** Default half angle of the sun disk in radians */
 #define BOX_SKY_DISK_RADIUS (0.00465f)

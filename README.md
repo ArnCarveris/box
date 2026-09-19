@@ -325,8 +325,26 @@ through the `mouse.*` commands and keeps the log.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
 rebuilds no mesh), see `shapes_2d.flecs`.
-`Weather` blends overcast and fog amounts over the atmosphere with smooth transitions
-(`weather_overcast.flecs`, `weather_fog.flecs`); rain drives the wetness layer until the particles epic adds the emitter.
+`Weather` blends overcast, fog and rain amounts over the atmosphere with smooth transitions
+(`weather_overcast.flecs`, `weather_fog.flecs`, `weather_rain.flecs`, `weather_rain_heavy.flecs`).
+Rain is the state that reaches the most: it drives the amount of the wetness material layer, it is
+added to the overcast and the fog the sky and the air are drawn with, and it creates one particle
+emitter that follows the camera, a column of streaked drops that fall at their terminal speed,
+lean with the wind and die on the ground. `Rain` is the shape of that column, and every member has
+a default, so `Weather: {rain: 1}` already rains:
+
+```
+using box.sky
+
+$ { Weather: {rain: 0.6, transition: 3} }
+$ { Rain: {area: 20, height: 26, rate: 14000, wind: {10, 0, 10}} }
+```
+
+The rate, the size of a drop and the wind follow the blended rain, so a weather written from a
+script or a command arrives over its transition instead of between two frames, and a rain that
+starts fills its column at once instead of letting the first drops fall in from the top. A world
+that never imported `box.particle` keeps the wet surfaces and the grey sky and misses only the
+drops.
 
 `box.ui` roots a retained UI tree with a `Ui` component: the entity and everything below it is
 drawn by a view with an orthographic camera in logical pixels, composited over the views of the
@@ -596,7 +614,10 @@ of an entity, kept facing the camera. The texture is a texture entity, an entity
 smoke and debris or `ParticleAdditive` for fire, sparks and magic; the blended pools are
 drawn back to front after the glass pass and the added ones follow them. A `softness`
 fades a particle out over that many world units as it approaches the geometry behind it,
-which is what keeps a puff of smoke from cutting a line into a wall.
+which is what keeps a puff of smoke from cutting a line into a wall. `stretch` lays the
+sprite over the direction the particle moves in on the screen and grows it along that direction
+by that many world units per unit of speed, which draws a rain drop, a spark or a piece of debris
+as the line it travels.
 
 ```
 smoke {

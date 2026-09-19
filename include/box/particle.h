@@ -195,6 +195,12 @@ ECS_ENUM(ParticleBlend, {
  * `softness` fades a particle out as it approaches the geometry behind it, over
  * that many world units, which is what stops a smoke puff from cutting a hard
  * line into a wall.
+ *
+ * `stretch` turns the sprite into a streak: it is laid over the direction the
+ * particle moves in on the screen and grown along it by that many world units
+ * per unit of speed, so a rain drop, a spark or a piece of debris is drawn as
+ * the line it travels instead of as a dot. A sprite without a stretch keeps
+ * facing the camera squarely and is turned by its own rotation.
  */
 ECS_STRUCT(ParticleAppearance, {
     ParticleShape shape;  /**< Circle, sprite or billboard */
@@ -205,6 +211,7 @@ ECS_STRUCT(ParticleAppearance, {
     int32_t rows;         /**< Frames down the sheet, 0 and 1 are the whole texture */
     float fps;            /**< Frames per second, 0 plays the sheet once over the life */
     float softness;       /**< World units a particle fades out over near geometry */
+    float stretch;        /**< World units the sprite grows along its velocity per unit of speed */
 });
 
 /** State the playback of an emitter is in */

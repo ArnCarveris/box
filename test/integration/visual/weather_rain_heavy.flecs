@@ -1,0 +1,115 @@
+// particles/rain
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.effects
+using box.sky
+
+camera {
+  Position: {-40, 14, 40}
+  LookAt: {200, 40, -200}
+  Camera: {fov: 55}
+}
+
+sun {
+  DirectionalLight: {intensity: 1}
+  CelestialLight: {toa_intensity: 8, toa_color: {255, 248, 238}}
+}
+
+atmosphere {
+  Atmosphere: {
+    sun: sun
+    sun_disk_intensity: 30
+    fog_intensity: 2
+    world_units_per_km: 150
+    ground_albedo: {90, 95, 85}
+    night_tint: {40, 60, 120}
+    night_intensity: 0.004
+  }
+}
+
+clock {
+  TimeOfDay: {
+    atmosphere: atmosphere
+    hour: 9.5
+    day_of_year: 81
+    latitude: 40
+  }
+}
+
+$ { Weather: {rain: 1} }
+
+$ { Rain: {
+  area: 20
+  height: 26
+  rate: 14000
+  wind: {12, 0, 12}
+  color: {205, 216, 230}
+} }
+
+$ { EnvironmentLight: {intensity: 1, source: atmosphere} }
+
+box { effects { stack {
+  fog { Effect: {enabled: true} }
+  tonemap {
+    Effect: {enabled: true}
+    ToneMapping: {white: 1.2, dither: false}
+  }
+} } }
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {8000, 1, 8000}
+  Rgb: {96, 104, 86}
+  PbrMaterial: {roughness: 0.95}
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+mirror {
+  Position: {2, 5, 10}
+  Sphere: {segments: 40, smooth: true, radius: 5}
+  Rgb: {230, 230, 235}
+  PbrMaterial: {metallic: 1, roughness: 0.08}
+}
+
+satin {
+  Position: {-16, 4, -10}
+  Sphere: {segments: 40, smooth: true, radius: 4}
+  Rgb: {220, 215, 205}
+  PbrMaterial: {metallic: 1, roughness: 0.3}
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+post {
+  Position: {36, 8, -6}
+  Box: {6, 16, 6}
+  Rgb: {186, 178, 160}
+  PbrMaterial: {roughness: 0.8}
+  (MaterialLayerOn, box.material.layers.wetness)
+}
+
+hill_a {
+  Position: {70, 18, -150}
+  Box: {110, 36, 90}
+  Rgb: {104, 112, 98}
+}
+
+hill_b {
+  Position: {150, 34, -290}
+  Box: {180, 68, 140}
+  Rgb: {104, 112, 98}
+}
+
+hill_c {
+  Position: {290, 60, -520}
+  Box: {280, 120, 200}
+  Rgb: {104, 112, 98}
+}
+
+hill_d {
+  Position: {520, 110, -900}
+  Box: {520, 220, 320}
+  Rgb: {104, 112, 98}
+}

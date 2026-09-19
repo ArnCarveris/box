@@ -266,6 +266,18 @@ blended or the additive pipeline of the target format, blended first and back to
 front because blending is the only one of the two whose result depends on the
 order.
 
+An emitter with a `stretch` is drawn as a streak instead: the quad is laid over
+the direction the velocity of the particle points in on the screen and grown
+along it with the speed of the particle, so a rain drop or a spark is the line it
+travels rather than a dot. The stretch is a field of the emitter block, so it
+costs nothing when it is zero and the quad of every other pool is placed by the
+expression it was placed by before. `box.sky` is what drives it for rain: the
+rain amount of a `Weather` creates one emitter under the sky module, a box volume
+that follows the camera of the first view, and drives its rate, drop size, wind
+and playback from the blended amount every frame, while the same amount is added
+to the overcast and the fog the sky is extracted with and to the amount of the
+wetness material layer.
+
 ## Static and dynamic content
 
 Entities without `DynamicTransform` are static: their world transform is computed

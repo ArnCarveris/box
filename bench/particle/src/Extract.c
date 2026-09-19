@@ -19,6 +19,12 @@
 /** Burst schedules the playback case hangs under its emitter */
 #define BENCH_BURST_COUNT (4)
 
+/** Drops the pool of the rain column case holds */
+#define BENCH_RAIN_MAX (20000)
+
+/** Drops the rain column case spawns per second */
+#define BENCH_RAIN_RATE (14000.0f)
+
 void Extract_one_emitter(bench_t *b)
 {
     // particles/emitter
@@ -381,6 +387,42 @@ void Extract_cull_1k(bench_t *b)
         memcpy(view->view, look.v, sizeof(look.v));
         memcpy(view->proj, proj.v, sizeof(proj.v));
         view->eye[2] = -60;
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}
+
+void Extract_rain_column(bench_t *b)
+{
+    // particles/rain
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {0, 8, 0});
+    ecs_set(world, e, ParticleEmitter, {
+        .max = BENCH_RAIN_MAX, .rate = BENCH_RAIN_RATE, .shape = EmitterBox,
+        .extents = {20, 13, 20}, .direction = {0, -1, 0},
+        .speed = {14, 14}, .lifetime = {3, 3}, .size = {0.04f, 0.04f},
+        .opacity = {0.35f, 0.35f}, .seed = 17
+    });
+    ecs_set(world, e, ParticleForces, {.gravity = {0, -8.4f, 0},
+        .wind = {8, 0, 8}, .drag = 0.6f});
+    ecs_set(world, e, ParticleCollision, {.ground = true, .die = true});
+    ecs_set(world, e, ParticleAppearance, {.shape = ParticleCircle, .stretch = 0.03f});
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
         bench_resume(b);
         box_particle_extract(world, &packet);
         bench_keep(packet.particles.count);

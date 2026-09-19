@@ -461,6 +461,8 @@ static void box_particle_appearance(
         out->flags |= BOX_PARTICLE_SOFT;
     }
 
+    out->stretch = appearance->stretch > 0.0f ? appearance->stretch : 0.0f;
+
     out->texture = box_particle_texture(world, appearance->texture);
     if (appearance->mesh && ecs_is_alive(world, appearance->mesh)) {
         const RenderMesh *mesh = ecs_get(world, appearance->mesh, RenderMesh);
