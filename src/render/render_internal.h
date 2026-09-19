@@ -135,6 +135,7 @@ typedef struct RenderState {
     bool layer_used;          /**< An entity or a light joined a render layer */
     bool layer_full;          /**< The render layer limit was already logged */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
+    ecs_vec_t transition_slow; /**< ecs_entity_t whose transitions the game side must resolve */
     ecs_vec_t transparent;    /**< ecs_entity_t drawn by the sorted pass, extracted per frame */
     ecs_vec_t sort;           /**< box_sort_key_t of the sorted pass, reused every frame */
     ecs_vec_t sort_tmp;       /**< Scratch of the radix sort, reused every frame */
@@ -156,7 +157,6 @@ typedef struct RenderState {
     ecs_query_t *layer_query; /**< Entities holding a MaterialLayer registration */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
-    ecs_query_t *transitions; /**< Instances whose displayed value a transition moves */
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
@@ -507,16 +507,39 @@ const TransitionState* box_render_transition(
     const RenderState *state,
     ecs_entity_t e);
 
-/** Queue every entity a transition still moves for extraction.
+/** Write the transitions of a static instance onto the packet.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param mesh Its render mesh
+ * @param slot Its static instance slot
+ * @param transition Its transitions
+ * @param time The time of the frame
+ * @param depth Offset along the world z axis of the instance
+ * @param p The packet
+ * @return The command, BOX_UPDATE_STILL when none is needed and BOX_UPDATE_SLOW
+ *   when the renderer cannot evaluate the transitions of the instance
+ */
+uint32_t box_render_extract_transition(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const RenderMesh *mesh,
+    uint32_t slot,
+    const TransitionState *transition,
+    double time,
+    float depth,
+    box_packet_t *p);
+
+/** Clear the bookkeeping of the transitions the renderer reported as finished.
  *
  * @param world The world
  * @param state The registry
- * @param time The time of the frame
+ * @param p The packet the renderer wrote the report into
  */
-void box_render_extract_transitions(
+void box_render_extract_finished(
     ecs_world_t *world,
     RenderState *state,
-    double time);
+    box_packet_t *p);
 
 /** Give the instance of an entity an offset along the world z axis.
  *

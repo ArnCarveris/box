@@ -444,28 +444,6 @@ const TransitionState* box_render_transition(
     return state->transitioned ? ecs_get(world, e, TransitionState) : NULL;
 }
 
-void box_render_extract_transitions(
-    ecs_world_t *world,
-    RenderState *state,
-    double time)
-{
-    ecs_iter_t it = ecs_query_iter(world, state->transitions);
-    while (ecs_query_next(&it)) {
-        TransitionState *transition = ecs_field(&it, TransitionState, 0);
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            if (!transition[i].dirty) {
-                continue;
-            }
-
-            box_render_mark_dirty(world, it.entities[i]);
-            if (time >= transition[i].until) {
-                transition[i].dirty = false;
-            }
-        }
-    }
-}
-
 /** Read a component value, replaced by the value a transition displays.
  *
  * @param transition The transitions of the entity, NULL when it has none

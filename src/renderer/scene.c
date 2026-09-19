@@ -23,13 +23,7 @@ static WGPUBuffer box_scene_buffer(
     return wgpuDeviceCreateBuffer(r->device, &desc);
 }
 
-/** Get the mesh entry for a handle, growing the table as needed.
- *
- * @param r The renderer
- * @param handle Mesh handle
- * @return The mesh entry
- */
-static box_gpu_mesh_t* box_scene_mesh(
+box_gpu_mesh_t* box_scene_mesh(
     box_renderer_t *r,
     uint32_t handle)
 {
@@ -38,7 +32,10 @@ static box_gpu_mesh_t* box_scene_mesh(
         memset(m, 0, sizeof(box_gpu_mesh_t));
         box_vec_init(&m->groups, sizeof(box_static_group_t));
         box_vec_init(&m->mirror, sizeof(box_instance_t));
+        box_vec_init(&m->transition_index, sizeof(uint32_t));
+        box_vec_init(&m->transition_slots, sizeof(uint32_t));
         m->mirror_valid = true;
+        m->transition_sorted = true;
     }
 
     return box_vec_at(&r->meshes, handle);
@@ -46,21 +43,29 @@ static box_gpu_mesh_t* box_scene_mesh(
 
 /** Release the buffers of a mesh entry.
  *
+ * @param r The renderer
  * @param m The mesh entry
  */
 static void box_scene_mesh_release(
+    box_renderer_t *r,
     box_gpu_mesh_t *m)
 {
     box_bake_mesh_release(m);
+    box_transition_clear(r, m);
     if (m->vertices) wgpuBufferRelease(m->vertices);
     if (m->indices) wgpuBufferRelease(m->indices);
     if (m->statics) wgpuBufferRelease(m->statics);
     box_vec_fini(&m->groups);
     box_vec_fini(&m->mirror);
+    box_vec_fini(&m->transition_index);
+    box_vec_fini(&m->transition_slots);
     memset(m, 0, sizeof(box_gpu_mesh_t));
     box_vec_init(&m->groups, sizeof(box_static_group_t));
     box_vec_init(&m->mirror, sizeof(box_instance_t));
+    box_vec_init(&m->transition_index, sizeof(uint32_t));
+    box_vec_init(&m->transition_slots, sizeof(uint32_t));
     m->mirror_valid = true;
+    m->transition_sorted = true;
 }
 
 /** Upload a mesh from a create command and free the command's arrays.
@@ -73,7 +78,7 @@ static void box_scene_mesh_create(
     box_mesh_cmd_t *cmd)
 {
     box_gpu_mesh_t *m = box_scene_mesh(r, cmd->handle);
-    box_scene_mesh_release(m);
+    box_scene_mesh_release(r, m);
 
     uint64_t vertex_size = (uint64_t)cmd->vertex_count * BOX_VERTEX_FLOATS * sizeof(float);
     uint64_t index_size = (uint64_t)cmd->index_count * sizeof(uint32_t);
@@ -133,16 +138,7 @@ done:
     return;
 }
 
-/** Keep the CPU mirror of a static buffer in step with an instance update.
- *
- * The mirror feeds the CPU culling of small batches. A batch that grows past
- * the mirror limit drops it and is culled by the compute pass from then on.
- *
- * @param m The mesh entry
- * @param slot The instance slot
- * @param data The new instance data
- */
-static void box_scene_mirror(
+void box_scene_mirror(
     box_gpu_mesh_t *m,
     uint32_t slot,
     const box_instance_t *data)
@@ -201,13 +197,7 @@ done:
     return;
 }
 
-/** Write the staged run of static instances to its mesh buffer and clear it.
- *
- * @param r The renderer
- * @param mesh The mesh the run belongs to
- * @param first The slot the run starts at
- */
-static void box_scene_flush_statics(
+void box_scene_flush_statics(
     box_renderer_t *r,
     uint32_t mesh,
     uint32_t first)
@@ -235,7 +225,7 @@ done:
  */
 static void box_scene_write_statics(
     box_renderer_t *r,
-    const box_packet_t *p)
+    box_packet_t *p)
 {
     uint32_t mesh = 0xFFFFFFFFu;
     uint32_t first = 0;
@@ -260,6 +250,13 @@ static void box_scene_write_statics(
 
         *(box_instance_t*)box_vec_push(&r->static_staging) = u->data;
         box_scene_mirror(m, u->slot, &u->data);
+        if (!u->transition || u->transition > p->transitions.count) {
+            box_transition_stop(r, m, u->slot);
+        } else {
+            box_transition_start(r, m, p, box_vec_at(&p->transitions, u->transition - 1),
+                &u->data);
+        }
+
         if (r->static_staging.count >= BOX_SCENE_UPLOAD_RUN) {
             box_scene_flush_statics(r, mesh, first);
             first += BOX_SCENE_UPLOAD_RUN;
@@ -271,12 +268,12 @@ static void box_scene_write_statics(
 
 void box_scene_apply(
     box_renderer_t *r,
-    const box_packet_t *p)
+    box_packet_t *p)
 {
     uint32_t i;
     for (i = 0; i < p->mesh_destroy.count; i ++) {
         uint32_t handle = *(uint32_t*)box_vec_at(&p->mesh_destroy, i);
-        box_scene_mesh_release(box_scene_mesh(r, handle));
+        box_scene_mesh_release(r, box_scene_mesh(r, handle));
     }
 
     for (i = 0; i < p->mesh_create.count; i ++) {
@@ -291,6 +288,11 @@ void box_scene_apply(
         }
 
         m->static_count = c->count > m->static_capacity ? m->static_capacity : c->count;
+        while (m->transition_index.count > m->static_count) {
+            box_transition_stop(r, m, m->transition_index.count - 1);
+            m->transition_index.count --;
+        }
+
         if (c->count > BOX_CULL_MIRROR_MAX && m->mirror_valid) {
             box_vec_clear(&m->mirror);
             m->mirror_valid = false;
@@ -312,6 +314,7 @@ void box_scene_apply(
     }
 
     box_scene_write_statics(r, p);
+    box_transition_frame(r, p);
 
     if (!box_cull_packet(p)) {
         box_scene_upload_dynamics(r, p);
@@ -421,11 +424,12 @@ void box_scene_fini(
 {
     uint32_t i;
     for (i = 0; i < r->meshes.count; i ++) {
-        box_scene_mesh_release(box_vec_at(&r->meshes, i));
+        box_scene_mesh_release(r, box_vec_at(&r->meshes, i));
     }
 
     box_vec_fini(&r->meshes);
     box_vec_fini(&r->static_staging);
+    box_vec_fini(&r->transitions);
     if (r->dynamics) wgpuBufferRelease(r->dynamics);
     r->dynamics = NULL;
     r->dynamic_capacity = 0;

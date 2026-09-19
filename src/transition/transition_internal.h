@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include <string.h>
+#include "../renderer/transition.h"
 
 /** Number of member entities of a component a Transition may key */
 #define BOX_TRANSITION_MEMBER_MAX (8)
@@ -70,20 +71,10 @@ typedef struct {
 
 extern ECS_COMPONENT_DECLARE(TransitionState);
 
-/** Progress of a timing function.
- *
- * @param timing The timing function
- * @param t Linear progress from 0 to 1
- * @return Eased progress from 0 to 1
- */
-float box_transition_curve(
-    TimingFunction timing,
-    float t);
-
 /** Interpolate one record at a time.
  *
- * This is the whole of the per frame work of a transition and touches nothing
- * but the record, so the renderer thread can run it over its own copies.
+ * The interpolation itself lives in the renderer header, because the renderer
+ * thread runs it over the records the packet carries.
  *
  * @param record The record
  * @param time The time to evaluate at

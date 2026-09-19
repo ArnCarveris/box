@@ -49,6 +49,7 @@ static void box_render_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].layers, box_layer_t);
         ecs_vec_fini_t(NULL, &state[i].view_layers, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].dirty, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &state[i].transition_slow, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].transparent, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].sort, box_sort_key_t);
         ecs_vec_fini_t(NULL, &state[i].sort_tmp, box_sort_key_t);
@@ -67,7 +68,6 @@ static void box_render_state_dtor(
         if (state[i].layer_query) ecs_query_fini(state[i].layer_query);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);
-        if (state[i].transitions) ecs_query_fini(state[i].transitions);
     }
 }
 
@@ -131,6 +131,7 @@ void BoxRenderImport(
     ecs_vec_init_t(NULL, &state->layers, box_layer_t, 0);
     ecs_vec_init_t(NULL, &state->view_layers, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->dirty, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->transition_slow, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->transparent, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->sort, box_sort_key_t, 0);
     ecs_vec_init_t(NULL, &state->sort_tmp, box_sort_key_t, 0);

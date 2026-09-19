@@ -367,6 +367,9 @@ typedef struct box_gpu_mesh_t {
     WGPUBindGroup grid_group;        /**< Probe descriptors of the occupancy pass */
     box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
     bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
+    box_vec_t transition_index;      /**< uint32_t entry per slot, BOX_TRANSITION_NONE for none */
+    box_vec_t transition_slots;      /**< uint32_t slots of the mesh that carry a transition */
+    bool transition_sorted;          /**< The slots are in ascending order, so uploads coalesce */
     uint32_t desc_capacity;          /**< Descriptors the descriptor buffer can hold */
     uint32_t probe_capacity;         /**< Probes the probe buffer can hold */
     uint32_t job_capacity;           /**< Jobs the job buffer can hold */
@@ -537,6 +540,7 @@ struct box_renderer_t {
     box_sky_gpu_t sky;               /**< Tables and pipelines of the atmosphere */
     uint32_t env_clock;              /**< Counts the environments bound, to pick an entry */
     box_vec_t static_staging;        /**< box_instance_t run a static upload coalesces into */
+    box_vec_t transitions;           /**< box_transition_entry_t of the instances still moving */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
     WGPUComputePipeline cluster_pipeline; /**< Cluster assignment pass */
@@ -807,7 +811,7 @@ WGPURenderPipeline box_frame_pipeline(
  */
 void box_frame_render(
     box_renderer_t *r,
-    const box_packet_t *p);
+    box_packet_t *p);
 
 /** Apply the resource and instance changes of a packet to GPU buffers.
  *
@@ -816,7 +820,96 @@ void box_frame_render(
  */
 void box_scene_apply(
     box_renderer_t *r,
-    const box_packet_t *p);
+    box_packet_t *p);
+
+/** Get the mesh entry for a handle, growing the table as needed.
+ *
+ * @param r The renderer
+ * @param handle Mesh handle
+ * @return The mesh entry
+ */
+box_gpu_mesh_t* box_scene_mesh(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Write the staged run of static instances to its mesh buffer and clear it.
+ *
+ * @param r The renderer
+ * @param mesh The mesh the run belongs to
+ * @param first The slot the run starts at
+ */
+void box_scene_flush_statics(
+    box_renderer_t *r,
+    uint32_t mesh,
+    uint32_t first);
+
+/** Keep the CPU mirror of a static buffer in step with an instance update.
+ *
+ * The mirror feeds the CPU culling of small batches. A batch that grows past
+ * the mirror limit drops it and is culled by the compute pass from then on.
+ *
+ * @param m The mesh entry
+ * @param slot The instance slot
+ * @param data The new instance data
+ */
+void box_scene_mirror(
+    box_gpu_mesh_t *m,
+    uint32_t slot,
+    const box_instance_t *data);
+
+/** Entry index of a slot that carries no transition */
+#define BOX_TRANSITION_NONE (0xFFFFFFFFu)
+
+/** Transitions of one static instance, kept next to its slot by the renderer */
+typedef struct box_transition_entry_t {
+    box_transition_cmd_t cmd;    /**< The command that started them */
+    box_instance_t base;         /**< Instance data the records are composed into */
+    box_transition_rec_t records[BOX_DISPLAY_CHANNELS]; /**< One record per channel */
+} box_transition_entry_t;
+
+/** Start or replace the transitions of a static instance slot.
+ *
+ * @param r The renderer
+ * @param m The mesh entry the slot belongs to
+ * @param p The packet holding the command and its records
+ * @param cmd The command
+ * @param data The instance data the records move
+ */
+void box_transition_start(
+    box_renderer_t *r,
+    box_gpu_mesh_t *m,
+    const box_packet_t *p,
+    const box_transition_cmd_t *cmd,
+    const box_instance_t *data);
+
+/** Forget the transitions of a static instance slot.
+ *
+ * @param r The renderer
+ * @param m The mesh entry the slot belongs to
+ * @param slot The instance slot
+ */
+void box_transition_stop(
+    box_renderer_t *r,
+    box_gpu_mesh_t *m,
+    uint32_t slot);
+
+/** Forget every transition of a mesh.
+ *
+ * @param r The renderer
+ * @param m The mesh entry
+ */
+void box_transition_clear(
+    box_renderer_t *r,
+    box_gpu_mesh_t *m);
+
+/** Evaluate the transitions the renderer holds and upload what they changed.
+ *
+ * @param r The renderer
+ * @param p The packet, which receives the instances that finished
+ */
+void box_transition_frame(
+    box_renderer_t *r,
+    box_packet_t *p);
 
 /** Record draw calls for every mesh with instances the view shows.
  *

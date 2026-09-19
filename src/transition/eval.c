@@ -4,54 +4,19 @@
  *
  * Nothing here reads the world. A record carries the value it started from,
  * the value that was assigned, the time it started and the parameters, which
- * is everything the interpolation needs, so the same code runs on the game
- * side today and next to the instance on the renderer thread later.
+ * is everything the interpolation needs, so the game side and the renderer
+ * thread run the same interpolation over their own copies of a record.
  */
 
 #include "transition_internal.h"
-
-float box_transition_curve(
-    TimingFunction timing,
-    float t)
-{
-    float result = t;
-    float inv = 1.0f - t;
-    if (timing == EaseIn) {
-        result = t * t;
-    } else if (timing == EaseOut) {
-        result = 1.0f - inv * inv;
-    } else if (timing == EaseInOut) {
-        result = t < 0.5f ? 2.0f * t * t : 1.0f - 2.0f * inv * inv;
-    } else if (timing == Ease) {
-        result = t * t * (3.0f - 2.0f * t);
-    }
-
-    return result;
-}
 
 bool box_transition_eval(
     const box_transition_t *record,
     double time,
     float *out)
 {
-    double elapsed = time - record->start - (double)record->delay;
-    double duration = (double)record->duration;
-    bool running = elapsed < duration;
-    float t;
-    if (!running) {
-        t = 1.0f;
-    } else if (elapsed <= 0.0) {
-        t = 0.0f;
-    } else {
-        t = box_transition_curve(record->timing, (float)(elapsed / duration));
-    }
-
-    int32_t i;
-    for (i = 0; i < record->count; i ++) {
-        out[i] = record->from[i] + (record->to[i] - record->from[i]) * t;
-    }
-
-    return running;
+    return box_transition_lerp(record->start, record->delay, record->duration,
+        (uint32_t)record->timing, record->from, record->to, record->count, time, out);
 }
 
 void box_transition_read(

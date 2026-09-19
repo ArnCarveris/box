@@ -162,6 +162,7 @@ void box_frame_resources(
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
     box_vec_init(&r->static_staging, sizeof(box_instance_t));
+    box_vec_init(&r->transitions, sizeof(box_transition_entry_t));
     box_vec_init(&r->views, sizeof(box_gpu_view_t));
     box_vec_init(&r->targets, sizeof(box_gpu_target_t));
 }
@@ -746,7 +747,7 @@ static WGPUTexture box_frame_capture_target(
 
 void box_frame_render(
     box_renderer_t *r,
-    const box_packet_t *p)
+    box_packet_t *p)
 {
     box_overlay_frame(r, p);
     box_device_resize(r, p->width, p->height);

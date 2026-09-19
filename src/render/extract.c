@@ -106,12 +106,24 @@ static void box_extract_static(
         box_render_regroup_slot(world, state, batch, e, inst);
     }
 
+    const TransitionState *transition = box_render_transition(world, state, e);
     box_static_update_t *update = box_vec_push(&p->static_updates);
     update->mesh = mesh->handle;
     update->slot = inst->slot;
+    update->transition = BOX_UPDATE_STILL;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
         state->textured, state->tiled, state->shaped, state->layered ? state : NULL,
-        box_render_transition(world, state, e), time, inst->depth, &update->data);
+        transition, time, inst->depth, &update->data);
+    if (transition) {
+        update->transition = box_render_extract_transition(world, e, mesh, inst->slot,
+            transition, time, inst->depth, p);
+    }
+
+    if (update->transition == BOX_UPDATE_SLOW) {
+        update->transition = BOX_UPDATE_STILL;
+        ecs_vec_append_t(NULL, &state->transition_slow, ecs_entity_t)[0] = e;
+    }
+
     if (state->shadowless && !box_render_casts_shadow(world, e)) {
         box_instance_set_caster(&update->data, false);
     }
@@ -246,11 +258,20 @@ void box_render_extract(
     box_render_extract_textures(state, p);
 
     double time = ecs_get_world_info(world)->world_time_total;
-    if (state->transitioned) {
-        box_render_extract_transitions(world, state, time);
+    int32_t i;
+    if (p->transitions_done.count) {
+        box_render_extract_finished(world, state, p);
     }
 
-    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->transition_slow); i ++) {
+        ecs_entity_t slow = ecs_vec_get_t(&state->transition_slow, ecs_entity_t, i)[0];
+        if (ecs_is_alive(world, slow) && ecs_has(world, slow, RenderMesh)) {
+            box_render_mark_dirty(world, slow);
+        }
+    }
+
+    ecs_vec_clear(&state->transition_slow);
+
     for (i = 0; i < ecs_vec_count(&state->dirty); i ++) {
         ecs_entity_t e = ecs_vec_get_t(&state->dirty, ecs_entity_t, i)[0];
         if (ecs_is_alive(world, e) && ecs_has(world, e, RenderMesh)) {
@@ -404,13 +425,6 @@ void box_render_extract_init(
             { .id = ecs_id(RenderInstance), .inout = EcsInOut },
             { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
         }
-    });
-    state->transitions = ecs_query(world, {
-        .terms = {
-            { .id = ecs_id(TransitionState), .inout = EcsInOut },
-            { .id = ecs_id(RenderInstance), .inout = EcsInOutNone }
-        },
-        .cache_kind = EcsQueryCacheAuto
     });
     state->emitters = ecs_query(world, {
         .terms = {

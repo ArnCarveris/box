@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "vec.h"
+#include "transition.h"
 
 /** View index that names no view, the capture then reads the surface */
 #define BOX_VIEW_NONE (0xFFFFFFFFu)
@@ -983,8 +984,19 @@ static inline uint32_t box_instance_back(
 typedef struct box_static_update_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t slot;          /**< Instance slot */
+    uint32_t transition;    /**< Transition the slot starts, BOX_UPDATE_STILL for none */
     box_instance_t data;    /**< New instance data */
 } box_static_update_t;
+
+/** Transition of an instance update that starts none.
+ *
+ * An update names its command as the index of the command plus one, so an
+ * update that was only zeroed starts no transition.
+ */
+#define BOX_UPDATE_STILL (0)
+
+/** Transition of an instance update the renderer cannot evaluate on its own */
+#define BOX_UPDATE_SLOW (0xFFFFFFFFu)
 
 /** Contiguous run of static instance slots of a mesh that share a layer mask.
  *
@@ -1066,6 +1078,9 @@ typedef struct box_packet_t {
     box_vec_t dynamic_batches;               /**< box_dynamic_batch_t */
     box_vec_t dynamic_instances;             /**< box_instance_t */
     box_vec_t transparent;                   /**< box_transparent_t, sorted back to front */
+    box_vec_t transitions;                   /**< box_transition_cmd_t of the frame */
+    box_vec_t transition_records;            /**< box_transition_rec_t the commands point into */
+    box_vec_t transitions_done;              /**< box_transition_done_t the renderer wrote back */
     box_vec_t effects;                       /**< box_effect_t of the chain of every view */
     box_vec_t lights;                        /**< box_light_t inside the view frustum */
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
@@ -1101,6 +1116,9 @@ static inline void box_packet_init(
     box_vec_init(&p->dynamic_batches, sizeof(box_dynamic_batch_t));
     box_vec_init(&p->dynamic_instances, sizeof(box_instance_t));
     box_vec_init(&p->transparent, sizeof(box_transparent_t));
+    box_vec_init(&p->transitions, sizeof(box_transition_cmd_t));
+    box_vec_init(&p->transition_records, sizeof(box_transition_rec_t));
+    box_vec_init(&p->transitions_done, sizeof(box_transition_done_t));
     box_vec_init(&p->effects, sizeof(box_effect_t));
     box_vec_init(&p->lights, sizeof(box_light_t));
     box_vec_init(&p->bake_lights, sizeof(box_light_t));
@@ -1109,6 +1127,9 @@ static inline void box_packet_init(
 }
 
 /** Reset per frame fields while keeping vector storage.
+ *
+ * The transitions the renderer reported as finished survive the reset, because
+ * a producer reads them from the packet it just acquired.
  *
  * @param p The packet
  */
@@ -1141,6 +1162,8 @@ static inline void box_packet_reset(
     box_vec_clear(&p->dynamic_batches);
     box_vec_clear(&p->dynamic_instances);
     box_vec_clear(&p->transparent);
+    box_vec_clear(&p->transitions);
+    box_vec_clear(&p->transition_records);
     box_vec_clear(&p->effects);
     box_vec_clear(&p->lights);
     box_vec_clear(&p->bake_lights);
@@ -1169,6 +1192,9 @@ static inline void box_packet_fini(
     box_vec_fini(&p->dynamic_batches);
     box_vec_fini(&p->dynamic_instances);
     box_vec_fini(&p->transparent);
+    box_vec_fini(&p->transitions);
+    box_vec_fini(&p->transition_records);
+    box_vec_fini(&p->transitions_done);
     box_vec_fini(&p->effects);
     box_vec_fini(&p->lights);
     box_vec_fini(&p->bake_lights);
