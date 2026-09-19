@@ -3,6 +3,7 @@
  * @brief Tests for the frame time ring, the panel it builds and the FpsOverlay component.
  */
 
+#include <stdlib.h>
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/renderer/overlay.h"
@@ -131,48 +132,6 @@ void Fps_every_class_has_its_own_color(void)
     test_assert(red[0] > red[1] && red[0] > red[2]);
 }
 
-void Fps_digit_segments_follow_the_table(void)
-{
-    // monitoring/fps_overlay
-    test_int((int32_t)box_fps_digit_mask(8), 0x7F);
-    test_int((int32_t)box_fps_digit_mask(1), 0x06);
-    test_int((int32_t)box_fps_digit_mask(0), 0x3F);
-    test_int((int32_t)box_fps_digit_mask(7), 0x07);
-    test_int((int32_t)box_fps_digit_mask(-1), 0);
-    test_int((int32_t)box_fps_digit_mask(10), 0);
-}
-
-void Fps_every_digit_lights_at_least_two_segments(void)
-{
-    // monitoring/fps_overlay
-    int32_t digit;
-    for (digit = 0; digit <= 9; digit ++) {
-        uint32_t mask = box_fps_digit_mask(digit);
-        int32_t lit = 0;
-        int32_t segment;
-        for (segment = 0; segment < BOX_FPS_SEGMENTS; segment ++) {
-            lit += (mask & (1u << segment)) ? 1 : 0;
-        }
-
-        test_assert(lit >= 2);
-        test_assert(mask < (1u << BOX_FPS_SEGMENTS));
-    }
-}
-
-void Fps_segments_stay_inside_the_digit_cell(void)
-{
-    // monitoring/fps_overlay
-    int32_t segment;
-    for (segment = 0; segment < BOX_FPS_SEGMENTS; segment ++) {
-        float rect[4];
-        box_fps_segment_rect(segment, rect);
-        test_assert(rect[2] > 0.0f && rect[3] > 0.0f);
-        test_assert(rect[0] >= 0.0f && rect[1] >= 0.0f);
-        test_assert(rect[0] + rect[2] <= 1.0f);
-        test_assert(rect[1] + rect[3] <= 1.0f);
-    }
-}
-
 void Fps_panel_is_pinned_to_its_corner(void)
 {
     // monitoring/fps_overlay
@@ -227,14 +186,7 @@ void Fps_panel_draws_one_bar_per_frame(void)
         .corner = BOX_OVERLAY_TOP_RIGHT
     };
     int32_t count = box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX);
-    int32_t expected = 3 + 20;
-    int32_t segment;
-    for (segment = 0; segment < BOX_FPS_SEGMENTS; segment ++) {
-        expected += (int32_t)((box_fps_digit_mask(3) >> segment) & 1u);
-        expected += (int32_t)((box_fps_digit_mask(6) >> segment) & 1u);
-    }
-
-    test_int(count, expected);
+    test_int(count, 3 + 20);
     float green[3];
     box_fps_class_color(BOX_FPS_GREEN, green);
     test_flt(rects[3].color[0], green[0]);
@@ -290,6 +242,37 @@ void Fps_window_is_published_on_the_component(void)
     test_assert(o->fps > 45.0 && o->fps < 55.0);
     test_assert(o->mean_ms > 19.0 && o->mean_ms < 21.0);
     test_assert(o->worst_ms > 19.0 && o->worst_ms < 21.0);
+    ecs_fini(world);
+}
+
+void Fps_overlay_publishes_its_text(void)
+{
+    // ore_engine/fps_text
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxMonitor);
+    ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f,
+        .corner = FpsBottomLeft});
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0.02f);
+    }
+
+    ecs_iter_t it = ecs_each(world, Text);
+    test_bool(ecs_each_next(&it), true);
+    test_int(it.count, 1);
+    const Text *text = ecs_get(world, it.entities[0], Text);
+    test_assert(text->value != NULL);
+    test_assert(atoi(text->value) > 45 && atoi(text->value) < 55);
+
+    const Rgb *rgb = ecs_get(world, it.entities[0], Rgb);
+    test_assert(rgb->r > 0 || rgb->g > 0 || rgb->b > 0);
+
+    const Bounds *bounds = ecs_get(world, it.entities[0], Bounds);
+    float view_left = -960.0f / 2.0f;
+    float view_bottom = -540.0f / 2.0f;
+    test_assert(bounds->x > view_left && bounds->x < view_left + BOX_OVERLAY_WIDTH);
+    test_assert(bounds->y > view_bottom && bounds->y < view_bottom + BOX_OVERLAY_HEIGHT);
+    ecs_iter_fini(&it);
     ecs_fini(world);
 }
 

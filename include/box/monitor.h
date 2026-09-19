@@ -139,12 +139,14 @@ ECS_ENUM(FpsCorner, {
 
 /** Frame rate panel drawn on a view, or on every view as a singleton.
  *
- * The panel shows the frame rate as seven segment digits and the last second of
- * frame times as one bar each, green while the frame stayed above sixty frames
- * per second, yellow above thirty and red below. It is drawn after the effect
- * chain of the view and before its capture, so a headless run sees it, and a
- * view without the component pays for nothing. The last three fields are
- * written by the engine from the same window the bars cover.
+ * The panel background, its two reference lines and the last second of frame
+ * times as one bar each, green while the frame stayed above sixty frames per
+ * second, yellow above thirty and red below, are drawn after the effect chain
+ * of the view and before its capture, so a headless run sees them, and a view
+ * without the component pays for nothing. The frame rate itself is drawn as
+ * regular UI text, in the corner the panel is pinned to, through a UI element
+ * box.monitor owns. The last three fields are written by the engine from the
+ * same window the bars and the text cover.
  */
 ECS_STRUCT(FpsOverlay, {
     bool enabled;      /**< Draw the panel, default true */

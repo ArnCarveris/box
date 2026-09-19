@@ -2,10 +2,11 @@
  * @file renderer/overlay.h
  * @brief Frame time ring, the color class of a frame and the panel it is drawn as.
  *
- * The overlay needs no font: the frame rate is drawn as seven segment digits
- * and the last second of frame times as one bar each, so every part of the
- * panel is a rectangle. The ring and the thresholds live here because the bars,
- * the digits and the command that prints the same numbers share them, and
+ * The panel itself is a background rectangle and the last second of frame
+ * times as one bar each plus two reference lines, so every part of it the
+ * renderer draws is a rectangle. The frame rate is drawn separately, as regular
+ * UI text box.monitor owns. The ring and the thresholds live here because the
+ * bars, the published numbers and the command that prints them share them, and
  * because neither side of the frame packet may include the other.
  */
 
@@ -47,9 +48,6 @@
 /** Class of a frame that fell below thirty frames per second */
 #define BOX_FPS_RED (2)
 
-/** Segments of one seven segment digit */
-#define BOX_FPS_SEGMENTS (7)
-
 /** Frame times of the most recent frames, oldest overwritten first */
 typedef struct box_fps_ring_t {
     float times_ms[BOX_FPS_HISTORY]; /**< Frame times in the order they arrived */
@@ -80,11 +78,8 @@ typedef struct box_fps_stats_t {
 /** Bars the chart of a panel draws at most, the newest frame on the right */
 #define BOX_OVERLAY_BARS (120)
 
-/** Digits the panel shows of the frame rate */
-#define BOX_OVERLAY_DIGITS (3)
-
-/** Rectangles a panel holds: its background, its two lines, its bars and its digits */
-#define BOX_OVERLAY_RECT_MAX (BOX_OVERLAY_BARS + BOX_OVERLAY_DIGITS * BOX_FPS_SEGMENTS + 3)
+/** Rectangles a panel holds: its background, its two reference lines and its bars */
+#define BOX_OVERLAY_RECT_MAX (BOX_OVERLAY_BARS + 3)
 
 /** Pixels between the panel and the edges of its view, before the scale */
 #define BOX_OVERLAY_MARGIN (8.0f)
@@ -98,20 +93,14 @@ typedef struct box_fps_stats_t {
 /** Height of the chart in pixels, before the scale */
 #define BOX_OVERLAY_CHART_H (32.0f)
 
-/** Width of one digit cell in pixels, before the scale */
-#define BOX_OVERLAY_DIGIT_W (10.0f)
-
-/** Height of one digit cell in pixels, before the scale */
-#define BOX_OVERLAY_DIGIT_H (16.0f)
-
-/** Pixels between two digit cells, before the scale */
-#define BOX_OVERLAY_DIGIT_GAP (3.0f)
+/** Height of the row the frame rate label takes above the chart, before the scale */
+#define BOX_OVERLAY_LABEL_H (16.0f)
 
 /** Width of the panel in pixels, before the scale */
 #define BOX_OVERLAY_WIDTH (BOX_OVERLAY_BARS * BOX_OVERLAY_BAR_W + 2.0f * BOX_OVERLAY_PAD)
 
 /** Height of the panel in pixels, before the scale */
-#define BOX_OVERLAY_HEIGHT (BOX_OVERLAY_DIGIT_H + BOX_OVERLAY_CHART_H + 3.0f * BOX_OVERLAY_PAD)
+#define BOX_OVERLAY_HEIGHT (BOX_OVERLAY_LABEL_H + BOX_OVERLAY_CHART_H + 3.0f * BOX_OVERLAY_PAD)
 
 /** One rectangle of a panel, in pixels of its view */
 typedef struct box_overlay_rect_t {
@@ -191,26 +180,9 @@ void box_fps_class_color(
     int32_t cls,
     float *out);
 
-/** Segments a decimal digit lights, bit zero being the top bar and bit six the middle one.
- *
- * @param digit The digit, zero to nine
- * @return The segment mask, zero for a digit outside that range
- */
-uint32_t box_fps_digit_mask(
-    int32_t digit);
-
-/** Rectangle of one segment inside the unit square of a digit cell.
- *
- * @param segment The segment, zero to six
- * @param out Receives the left, top, width and height of the segment, zero to one
- */
-void box_fps_segment_rect(
-    int32_t segment,
-    float *out);
-
 /** Build the rectangles of a panel from the frames of a ring.
  *
- * @param ring The ring the bars and the frame rate come from
+ * @param ring The ring the bars come from
  * @param layout Size and corner of the panel
  * @param out Receives the rectangles, background first
  * @param max Rectangles the output holds

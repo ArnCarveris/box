@@ -5,9 +5,10 @@
  * The ring is fed with the interval between the packets the renderer processes,
  * so the bars show the pacing the frame actually had. A panel is a handful of
  * rectangles in the pixels of its view, which one instanced draw turns into the
- * background, the two reference lines, the bars and the seven segment digits.
- * The pass runs after the effect chain and before the capture, so it appears in
- * a screenshot the same way it appears on screen.
+ * background, the two reference lines and the bars. The frame rate itself is
+ * published as regular UI text by box.monitor, not drawn here. The pass runs
+ * after the effect chain and before the capture, so it appears in a screenshot
+ * the same way it appears on screen.
  */
 
 #include "renderer_internal.h"
@@ -17,22 +18,6 @@ static const float box_fps_colors[3][3] = {
     { 0.29f, 0.84f, 0.38f },
     { 0.95f, 0.78f, 0.25f },
     { 0.91f, 0.28f, 0.26f }
-};
-
-/** Segments every decimal digit lights, the top bar in bit zero */
-static const uint32_t box_fps_digits[10] = {
-    0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
-};
-
-/** Left, top, width and height of every segment inside the unit digit cell */
-static const float box_fps_segments[BOX_FPS_SEGMENTS][4] = {
-    { 0.2f, 0.0000f, 0.6f, 0.1250f },
-    { 0.8f, 0.1250f, 0.2f, 0.3125f },
-    { 0.8f, 0.5625f, 0.2f, 0.3125f },
-    { 0.2f, 0.8750f, 0.6f, 0.1250f },
-    { 0.0f, 0.5625f, 0.2f, 0.3125f },
-    { 0.0f, 0.1250f, 0.2f, 0.3125f },
-    { 0.2f, 0.4375f, 0.6f, 0.1250f }
 };
 
 /** Color the panel background is filled with, before its opacity */
@@ -140,32 +125,6 @@ void box_fps_class_color(
     out[2] = box_fps_colors[slot][2];
 }
 
-uint32_t box_fps_digit_mask(
-    int32_t digit)
-{
-    uint32_t result = 0;
-    if (digit >= 0 && digit <= 9) {
-        result = box_fps_digits[digit];
-    }
-
-    return result;
-}
-
-void box_fps_segment_rect(
-    int32_t segment,
-    float *out)
-{
-    int32_t slot = segment;
-    if (slot < 0 || slot >= BOX_FPS_SEGMENTS) {
-        slot = 0;
-    }
-
-    out[0] = box_fps_segments[slot][0];
-    out[1] = box_fps_segments[slot][1];
-    out[2] = box_fps_segments[slot][2];
-    out[3] = box_fps_segments[slot][3];
-}
-
 /** Append one rectangle of a panel when the output still has room.
  *
  * @param out The output array
@@ -270,56 +229,6 @@ static int32_t box_overlay_bars(
     return count;
 }
 
-/** Append the seven segment digits of a frame rate, right aligned in the panel.
- *
- * @param stats Frame rate and frame times of the window
- * @param cell Left, top, width and height of the rightmost digit cell in pixels
- * @param out The output array
- * @param count Rectangles already written
- * @param max Rectangles the output holds
- * @return The number of rectangles after the digits
- */
-static int32_t box_overlay_digits(
-    const box_fps_stats_t *stats,
-    const float *cell,
-    box_overlay_rect_t *out,
-    int32_t count,
-    int32_t max)
-{
-    int32_t value = (int32_t)(stats->fps + 0.5f);
-    if (value > 999) {
-        value = 999;
-    }
-
-    float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    box_fps_class_color(box_fps_class(stats->mean_ms), color);
-    float step = cell[2] + BOX_OVERLAY_DIGIT_GAP * cell[2] / BOX_OVERLAY_DIGIT_W;
-    int32_t place;
-    for (place = 0; place < BOX_OVERLAY_DIGITS; place ++) {
-        int32_t digit = value % 10;
-        value /= 10;
-        uint32_t mask = box_fps_digit_mask(digit);
-        int32_t segment;
-        for (segment = 0; segment < BOX_FPS_SEGMENTS; segment ++) {
-            if (!(mask & (1u << segment))) {
-                continue;
-            }
-
-            float unit[4];
-            box_fps_segment_rect(segment, unit);
-            float rect[4] = { cell[0] - (float)place * step + unit[0] * cell[2],
-                cell[1] + unit[1] * cell[3], unit[2] * cell[2], unit[3] * cell[3] };
-            count = box_overlay_push(out, count, max, rect, color);
-        }
-
-        if (!value) {
-            break;
-        }
-    }
-
-    return count;
-}
-
 int32_t box_overlay_build(
     const box_fps_ring_t *ring,
     const box_overlay_layout_t *layout,
@@ -344,15 +253,10 @@ int32_t box_overlay_build(
     }
 
     float chart[4] = { panel[0] + pad,
-        panel[1] + pad + BOX_OVERLAY_DIGIT_H * scale + pad,
+        panel[1] + pad + BOX_OVERLAY_LABEL_H * scale + pad,
         BOX_OVERLAY_BARS * BOX_OVERLAY_BAR_W * scale, BOX_OVERLAY_CHART_H * scale };
-    float cell[4] = { panel[0] + panel[2] - pad - BOX_OVERLAY_DIGIT_W * scale,
-        panel[1] + pad, BOX_OVERLAY_DIGIT_W * scale, BOX_OVERLAY_DIGIT_H * scale };
-    box_fps_stats_t stats;
-    box_fps_ring_stats(ring, BOX_FPS_WINDOW_MS, &stats);
     int32_t count = box_overlay_panel(layout, panel, chart, out, max);
     count = box_overlay_bars(ring, chart, out, count, max);
-    count = box_overlay_digits(&stats, cell, out, count, max);
 
     return count;
 }

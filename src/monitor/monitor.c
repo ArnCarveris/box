@@ -80,6 +80,7 @@ void BoxMonitorImport(
 {
     ECS_MODULE(world, BoxMonitor);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxUi);
 
     ECS_META_COMPONENT(world, SystemTime);
     ECS_META_COMPONENT(world, PhaseTime);
