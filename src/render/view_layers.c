@@ -104,6 +104,25 @@ uint32_t box_render_view_layers(
     return i ? result : BOX_VIEW_LAYER_ALL;
 }
 
+void box_render_add_ui_layer(
+    ecs_world_t *world,
+    ecs_entity_t layer)
+{
+    RenderState *state = box_render_state(world);
+
+    state->ui_mask |= box_render_layer_bit(state, layer);
+    state->layer_used = true;
+}
+
+bool box_render_is_ui_layer(
+    ecs_world_t *world,
+    ecs_entity_t layer)
+{
+    const RenderState *state = box_render_state(world);
+
+    return (box_view_layer_lookup(state, layer) & state->ui_mask) != 0;
+}
+
 /** An entity or a light joined or left a layer, so its instances resolve a new mask.
  *
  * A prefab hands its layers to every instance, which the pair does not report,

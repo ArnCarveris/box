@@ -227,7 +227,14 @@ static void box_render_sort_keys(
 
         const WorldTransform *transform = ecs_get(world, entities[i], WorldTransform);
         ecs_assert(transform != NULL, ECS_INTERNAL_ERROR, NULL);
-        vec3 origin = mat4_transform_point(&view, mat4_get_translation(&transform->m));
+        vec3 center = mat4_get_translation(&transform->m);
+        if (state->depth_used) {
+            const RenderInstance *inst = ecs_get(world, entities[i], RenderInstance);
+
+            center.z += inst ? inst->depth : 0.0f;
+        }
+
+        vec3 origin = mat4_transform_point(&view, center);
         keys[count].depth = origin.z;
         keys[count].key = box_render_sort_bits(origin.z);
         keys[count].index = (uint32_t)i;
@@ -265,21 +272,23 @@ void box_render_extract_transparent(
     for (i = 0; i < ecs_vec_count(&state->sort); i ++) {
         ecs_entity_t e = entities[keys[i].index];
         if (v->layer_mask != BOX_VIEW_LAYER_ALL || v->strict_layers) {
-            const RenderInstance *inst = ecs_get(world, e, RenderInstance);
-            if (inst && !box_view_shows(v, inst->layer_mask)) {
+            const RenderInstance *record = ecs_get(world, e, RenderInstance);
+            if (record && !box_view_shows(v, record->layer_mask)) {
                 continue;
             }
         }
 
         const RenderMesh *mesh = ecs_get(world, e, RenderMesh);
         const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+        const RenderInstance *inst = ecs_get(world, e, RenderInstance);
         ecs_assert(mesh != NULL, ECS_INTERNAL_ERROR, NULL);
 
         box_transparent_t *entry = box_vec_push(&p->transparent);
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
         box_render_fill_instance(world, e, mesh, transform, false, state->textured,
-            state->tiled, state->shaped, state->layered ? state : NULL, &entry->data);
+            state->tiled, state->shaped, state->layered ? state : NULL,
+            inst ? inst->depth : 0.0f, &entry->data);
         if (masked) {
             const RenderInstance *record = ecs_get(world, e, RenderInstance);
             if (record && !box_view_casts(v, record->layer_mask)) {

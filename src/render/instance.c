@@ -405,6 +405,23 @@ bool box_render_casts_shadow(
     return !box_hierarchy_ancestor_has(world, e, NoShadow);
 }
 
+void box_render_set_depth(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float depth)
+{
+    RenderInstance *inst = ecs_get_mut(world, e, RenderInstance);
+    if (!inst || inst->depth == depth) {
+        goto done;
+    }
+
+    inst->depth = depth;
+    box_render_state(world)->depth_used = true;
+    box_render_mark_dirty(world, e);
+done:
+    return;
+}
+
 void box_render_fill_instance(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -415,10 +432,13 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     const RenderState *layers,
+    float depth,
     box_instance_t *out)
 {
     mat4 scale = mat4_scaling(mesh->scale);
     mat4 m = mat4_mul(&transform->m, &scale);
+    m.v[14] += depth;
+
     int row;
     for (row = 0; row < 3; row ++) {
         out->transform[row * 4 + 0] = m.v[0 + row];

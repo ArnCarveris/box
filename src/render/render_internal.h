@@ -35,6 +35,7 @@ typedef struct box_batch_t {
 /** Where an entity's instance lives */
 typedef struct RenderInstance {
     uint32_t mesh;   /**< Mesh handle */
+    float depth;     /**< Offset along the world z axis, from the UI draw order */
     uint32_t slot;   /**< Static slot, unused when dynamic or sorted */
     uint32_t sorted; /**< Index in the sorted draw list, unused when it is not in it */
     uint32_t layer_mask; /**< Layers the entity belongs to, 0 when it is in none */
@@ -109,6 +110,8 @@ typedef struct RenderState {
     bool layers_reported;     /**< The layer limit was already logged */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
     ecs_vec_t view_layers;    /**< ecs_entity_t per render layer, the index being its bit */
+    uint32_t ui_mask;         /**< Layer bits of the UI trees, hidden by every other view */
+    bool depth_used;          /**< An instance carries a depth offset, so extract adds it */
     bool layer_used;          /**< An entity or a light joined a render layer */
     bool layer_full;          /**< The render layer limit was already logged */
     ecs_vec_t dirty;          /**< ecs_entity_t queued for static extraction */
@@ -450,6 +453,7 @@ void box_render_instance_bounds(
  * @param tiled The world holds tiling components, so the uv transform is derived
  * @param shaped The world holds 2D shapes, so the shape words are derived
  * @param layers The registry when a material enables a layer, NULL when none does
+ * @param depth Offset along the world z axis, zero outside a UI tree
  * @param out The instance to fill
  */
 void box_render_fill_instance(
@@ -462,7 +466,45 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     const RenderState *layers,
+    float depth,
     box_instance_t *out);
+
+/** Give the instance of an entity an offset along the world z axis.
+ *
+ * The offset is what draws a UI node in front of its parent: it moves the
+ * instance toward the camera of its view without changing the transform the
+ * rest of the engine reads, and it re-extracts the entity when it changes.
+ *
+ * @param world The world
+ * @param e The entity, an entity without an instance is ignored
+ * @param depth The offset, negative values move toward a UI camera
+ */
+void box_render_set_depth(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float depth);
+
+/** Register a layer as the layer of a UI tree.
+ *
+ * Every view that does not list the layer hides its members, which is what
+ * keeps a UI tree out of the views of the 3D scene.
+ *
+ * @param world The world
+ * @param layer The layer entity
+ */
+void box_render_add_ui_layer(
+    ecs_world_t *world,
+    ecs_entity_t layer);
+
+/** Check whether a layer is the layer of a UI tree.
+ *
+ * @param world The world
+ * @param layer The layer entity
+ * @return True when the layer was registered as a UI layer
+ */
+bool box_render_is_ui_layer(
+    ecs_world_t *world,
+    ecs_entity_t layer);
 
 /** Check whether an entity and its ancestors let it cast a shadow.
  *

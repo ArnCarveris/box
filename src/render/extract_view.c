@@ -43,6 +43,33 @@ const void* box_render_view_setting(
     return result;
 }
 
+/** Check whether a view draws a UI tree, which it does by listing its layer.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The View entity, 0 for the view a world without views gets
+ * @return True when the view lists the layer of a UI tree
+ */
+static bool box_view_is_ui(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e)
+{
+    bool result = false;
+    if (!state->ui_mask || !e) {
+        goto done;
+    }
+
+    const View *view = ecs_get(world, e, View);
+    if (!view || !view->layers[0]) {
+        goto done;
+    }
+
+    result = (box_render_view_layers(state, view->layers) & state->ui_mask) != 0;
+done:
+    return result;
+}
+
 /** Order two views by priority, then by entity so the order never wobbles.
  *
  * @param a The first view
@@ -405,10 +432,14 @@ done:
 
 /** Copy the environment of a view into it, the view first and the singleton after.
  *
+ * A UI view lights its tree with a flat white environment instead, so a node
+ * shows the color it was given whatever the scene around it is lit with.
+ *
  * @param world The world
  * @param state The registry
  * @param e The View entity, 0 for the view a world without views gets
  * @param index Index of the view in the packet
+ * @param ui The view draws a UI tree
  * @param v The view to fill
  */
 static void box_view_environment(
@@ -416,6 +447,7 @@ static void box_view_environment(
     RenderState *state,
     ecs_entity_t e,
     int32_t index,
+    bool ui,
     box_view_t *v)
 {
     EnvironmentLight env = {
@@ -424,7 +456,14 @@ static void box_view_environment(
         .intensity = BOX_ENV_INTENSITY
     };
 
-    const EnvironmentLight *set = box_render_view_setting(world, e, ecs_id(EnvironmentLight));
+    const EnvironmentLight *set = ui ?
+        NULL : box_render_view_setting(world, e, ecs_id(EnvironmentLight));
+    if (ui) {
+        env.sky_color = (rgb){ 255, 255, 255 };
+        env.ground_color = (rgb){ 255, 255, 255 };
+        env.intensity = 1.0f;
+    }
+
     if (set) {
         env = *set;
         env.intensity = env.intensity > 0 ? env.intensity : 1.0f;
@@ -443,15 +482,20 @@ static void box_view_environment(
  * A world that uses no layer skips the lists, so every view shows everything.
  * A strict view only restricts what it draws while it lists layers of its own.
  *
+ * A view that does not draw a UI tree hides the layers of every tree, which is
+ * what keeps the trees of a world out of the views of its scene.
+ *
  * @param world The world
  * @param state The registry
  * @param e The View entity, 0 for the view a world without views gets
+ * @param ui The view draws a UI tree
  * @param v The view to fill
  */
 static void box_view_layers(
     ecs_world_t *world,
     RenderState *state,
     ecs_entity_t e,
+    bool ui,
     box_view_t *v)
 {
     v->layer_mask = BOX_VIEW_LAYER_ALL;
@@ -466,6 +510,11 @@ static void box_view_layers(
     v->caster_mask = box_render_view_layers(state, view->shadow_layers);
     v->strict_layers = view->strict_layers && v->layer_mask != BOX_VIEW_LAYER_ALL ? 1u : 0u;
 done:
+    if (!ui) {
+        v->layer_mask &= ~state->ui_mask;
+        v->caster_mask &= ~state->ui_mask;
+    }
+
     return;
 }
 
@@ -570,20 +619,32 @@ static void box_view_fill(
     box_packet_t *p)
 {
     box_view_t *v = box_vec_push(&p->views);
+    bool ui = box_view_is_ui(world, state, src->entity);
     memset(v, 0, sizeof(box_view_t));
     v->shadows = 1;
     v->effects = 1;
-    box_view_layers(world, state, src->entity, v);
+    box_view_layers(world, state, src->entity, ui, v);
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
     box_view_cull(world, src->entity, v);
-    box_view_overlay(world, src->entity, v);
-    bool sun = box_view_sun(world, state, v);
+    if (!ui) {
+        box_view_overlay(world, src->entity, v);
+    }
+
+    bool sun = box_view_sun(world, state, v) && !ui;
+    if (ui) {
+        v->sun_intensity = 0;
+    }
+
     box_render_extract_shadows(world, src->entity, sun, v);
-    box_view_environment(world, state, src->entity, index, v);
+    box_view_environment(world, state, src->entity, index, ui, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
+    if (ui) {
+        v->light_count = 0;
+    }
+
     box_render_extract_transparent(world, state, p, v);
-    v->sky = box_sky_entity(world) ? 1u : 0u;
+    v->sky = !ui && box_sky_entity(world) ? 1u : 0u;
     box_effects_extract(world, src->entity, p, v);
     if (v->effect_count || v->sky) {
         box_view_motion(state, index, v);
@@ -641,6 +702,67 @@ ecs_entity_t box_render_primary_view(
     return result;
 }
 
+/** Check whether a view of the frame draws something other than a UI tree.
+ *
+ * @param world The world
+ * @param state The registry
+ * @return True when a collected view draws the scene
+ */
+static bool box_view_has_scene(
+    ecs_world_t *world,
+    RenderState *state)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->view_list) && !result; i ++) {
+        const box_view_src_t *src = ecs_vec_get_t(&state->view_list, box_view_src_t, i);
+
+        result = !box_view_is_ui(world, state, src->entity);
+    }
+
+    return result;
+}
+
+/** Camera the synthesized view of the frame renders, never one of a UI view.
+ *
+ * @param world The world
+ * @param state The registry
+ * @return The camera, 0 when the world holds none
+ */
+static ecs_entity_t box_view_scene_camera(
+    ecs_world_t *world,
+    RenderState *state)
+{
+    ecs_entity_t result = 0;
+    if (!state->ui_mask) {
+        result = box_render_active_camera(world);
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_query_iter(world, state->cameras);
+    while (ecs_query_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            bool used = false;
+            int32_t v;
+            for (v = 0; v < ecs_vec_count(&state->view_list) && !used; v ++) {
+                const box_view_src_t *src =
+                    ecs_vec_get_t(&state->view_list, box_view_src_t, v);
+
+                used = src->camera == it.entities[i] &&
+                    box_view_is_ui(world, state, src->entity);
+            }
+
+            if (!used && !result) {
+                result = it.entities[i];
+            }
+        }
+    }
+
+done:
+    return result;
+}
+
 void box_render_extract_views(
     ecs_world_t *world,
     RenderState *state,
@@ -650,24 +772,23 @@ void box_render_extract_views(
     box_vec_clear(&p->views);
     p->capture_view = BOX_VIEW_NONE;
     int32_t count = ecs_vec_count(&state->view_list);
-    if (!count) {
+    int32_t index = 0;
+    if (!box_view_has_scene(world, state)) {
         box_view_src_t src = {0};
-        src.camera = capture ? capture : box_render_active_camera(world);
-        box_view_fill(world, state, &src, 0, p);
-        goto done;
+        src.camera = capture ? capture : box_view_scene_camera(world, state);
+        box_view_fill(world, state, &src, index ++, p);
     }
 
     int32_t i;
     for (i = 0; i < count; i ++) {
         const box_view_src_t *src = ecs_vec_get_t(&state->view_list, box_view_src_t, i);
         if (capture && src->camera == capture) {
-            p->capture_view = (uint32_t)i;
+            p->capture_view = (uint32_t)index;
         }
 
-        box_view_fill(world, state, src, i, p);
+        box_view_fill(world, state, src, index ++, p);
     }
 
-done:
     p->has_view = p->views.count != 0;
     if (p->has_view) {
         p->view = *(box_view_t*)box_vec_at(&p->views, 0);
