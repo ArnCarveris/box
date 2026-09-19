@@ -31,6 +31,15 @@
                     "mesh_100k",
                     "share_100k"
                 ]
+            },
+            {
+                "id": "Shapes2D",
+                "benchcases": [
+                    "generate_circle",
+                    "generate_line",
+                    "coverage_sweep",
+                    "extract_1000_borders"
+                ]
             }
         ]
     }

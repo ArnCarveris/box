@@ -1,0 +1,180 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.texture
+
+$ {
+  EnvironmentLight: {sky_color: {150, 160, 180}, ground_color: {90, 90, 95}, intensity: 0.9}
+}
+
+textures {
+  checker {
+    Texture: {path: "etc/textures/checker.png"}
+  }
+}
+
+camera {
+  Position: {0, 0, -11}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.35, 0, 0}
+  DirectionalLight: {intensity: 1.1}
+}
+
+backdrop {
+  Position: {0, 0, 0.6}
+  Rect: {18, 10}
+  Rgb: {48, 50, 58}
+  PbrMaterial: {roughness: 0.9}
+}
+
+radius_0 {
+  Position: {-6, 3, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0}
+  Rgb: {235, 240, 245}
+  PbrMaterial: {roughness: 0.6}
+}
+
+radius_2 {
+  Position: {-3, 3, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.2}
+  Rgb: {235, 240, 245}
+  PbrMaterial: {roughness: 0.6}
+}
+
+radius_4 {
+  Position: {0, 3, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.45}
+  Rgb: {235, 240, 245}
+  PbrMaterial: {roughness: 0.6}
+}
+
+radius_8 {
+  Position: {3, 3, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.8}
+  Rgb: {235, 240, 245}
+  PbrMaterial: {roughness: 0.6}
+}
+
+radius_full {
+  Position: {6, 3, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 4}
+  Rgb: {235, 240, 245}
+  PbrMaterial: {roughness: 0.6}
+}
+
+border_even {
+  Position: {-6, 0.6, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.3, width: 0.16, color: {240, 90, 70, 255}}
+  Rgb: {70, 80, 100}
+  PbrMaterial: {roughness: 0.6}
+}
+
+border_edges {
+  Position: {-3, 0.6, 0}
+  Rect: {2.2, 1.6}
+  Border: {
+    radius: 0.3, top_width: 0.3, bottom_width: 0.06,
+    left_width: 0.24, right_width: 0.06, color: {90, 200, 130, 255}
+  }
+  Rgb: {70, 80, 100}
+  PbrMaterial: {roughness: 0.6}
+}
+
+border_corners {
+  Position: {0, 0.6, 0}
+  Rect: {2.2, 1.6}
+  Border: {
+    radius_top_left: 0.75, radius_bottom_right: 0.75, radius: 0.04,
+    width: 0.12, color: {90, 150, 245, 255}
+  }
+  Rgb: {70, 80, 100}
+  PbrMaterial: {roughness: 0.6}
+}
+
+border_thick {
+  Position: {3, 0.6, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.3, width: 0.28, color: {70, 45, 10, 255}}
+  Rgb: {245, 190, 60}
+  PbrMaterial: {roughness: 0.6}
+}
+
+border_blended {
+  Position: {6, 0.6, 0}
+  Rect: {2.2, 1.6}
+  Border: {radius: 0.5, width: 0.14, color: {255, 255, 255, 255}}
+  Rgb: {200, 80, 220}
+  Opacity: {0.55}
+  BlendMode: {AlphaBlend}
+  PbrMaterial: {roughness: 0.4}
+}
+
+circle_small {
+  Position: {-6.6, -2.2, 0}
+  Circle: {radius: 0.4}
+  Rgb: {250, 120, 90}
+}
+
+circle_mid {
+  Position: {-5.2, -2.2, 0}
+  Circle: {radius: 0.7}
+  Rgb: {120, 200, 250}
+}
+
+circle_large {
+  Position: {-3.2, -2.2, 0}
+  Circle: {radius: 1.1}
+  Rgb: {160, 240, 160}
+}
+
+circle_coarse {
+  Position: {-1.2, -2.2, 0}
+  Circle: {radius: 0.7, segments: 6}
+  Rgb: {250, 220, 120}
+}
+
+line_flat {
+  Position: {0.4, -3.4, 0}
+  Line: {x1: 0, y1: 0, x2: 2.6, y2: 0, thickness: 0.12}
+  Rgb: {250, 250, 250}
+}
+
+line_slope {
+  Position: {0.4, -3.4, 0}
+  Line: {x1: 0, y1: 0, x2: 2.2, y2: 1.5, thickness: 0.08}
+  Rgb: {250, 160, 60}
+}
+
+line_steep {
+  Position: {0.4, -3.4, 0}
+  Line: {x1: 0, y1: 0, x2: 0.7, y2: 2.2, thickness: 0.2}
+  Rgb: {120, 160, 250}
+}
+
+image_full {
+  Position: {4.2, -2.2, 0}
+  Rect: {2, 2}
+  Image: {u1: 1, v1: 1}
+  PbrTextures: {albedo: textures.checker}
+  PbrMaterial: {roughness: 0.7}
+}
+
+image_region {
+  Position: {6.8, -2.2, 0}
+  Rect: {2, 2}
+  Image: {u0: 0.25, v0: 0.25, u1: 0.75, v1: 0.75, rotation: 30}
+  PbrTextures: {albedo: textures.checker}
+  PbrMaterial: {roughness: 0.7}
+}
