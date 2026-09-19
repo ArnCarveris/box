@@ -198,6 +198,34 @@ done:
     return;
 }
 
+void box_texture_set_memory(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const uint8_t *data,
+    int32_t size)
+{
+    if (!ecs_has(world, e, Texture)) {
+        ecs_set(world, e, Texture, { .path = ecs_os_strdup("") });
+    }
+
+    if (!box_texture_claim(world, e, ecs_id(Texture))) {
+        goto done;
+    }
+
+    uint32_t cap;
+    bool keep;
+    box_texture_settings(world, &cap, &keep);
+
+    box_image_t img;
+    if (box_texture_load_memory(data, size, 0, cap, &img)) {
+        goto done;
+    }
+
+    box_texture_publish(world, e, &img, keep);
+done:
+    return;
+}
+
 /** Texture was set: load the image file and upload it.
  *
  * @param it Iterator over the changed textures

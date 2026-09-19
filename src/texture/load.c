@@ -192,6 +192,28 @@ void box_texture_image(
     box_texture_chain(out->pixels, size);
 }
 
+int box_texture_load_memory(
+    const uint8_t *data,
+    int32_t size,
+    int32_t request,
+    uint32_t cap,
+    box_image_t *out)
+{
+    int result = -1;
+    int width = 0, height = 0, channels = 0;
+    stbi_uc *source = stbi_load_from_memory(data, size, &width, &height, &channels, 4);
+    if (!source) {
+        ecs_err("texture: cannot decode embedded image: %s", stbi_failure_reason());
+        goto done;
+    }
+
+    box_texture_image(source, width, height, request, cap, out);
+    stbi_image_free(source);
+    result = 0;
+done:
+    return result;
+}
+
 int box_texture_load(
     const char *path,
     int32_t request,

@@ -72,6 +72,38 @@ int box_texture_load(
     uint32_t cap,
     box_image_t *out);
 
+/** Load an image held in memory and scale it to the size class it belongs to.
+ *
+ * @param data The bytes of an image file, such as the PNG a glTF file embeds
+ * @param size Number of bytes
+ * @param request Requested edge length in pixels, 0 keeps the source size
+ * @param cap Largest edge length the surface allows
+ * @param out The image to fill, its pixels are owned by the caller
+ * @return 0 on success, nonzero when the bytes could not be decoded
+ */
+int box_texture_load_memory(
+    const uint8_t *data,
+    int32_t size,
+    int32_t request,
+    uint32_t cap,
+    box_image_t *out);
+
+/** Give a texture entity the image an asset embedded in its own file.
+ *
+ * The entity gets a Texture with an empty path, so it is released and unbound
+ * through the same path as a texture that was loaded from a file.
+ *
+ * @param world The world
+ * @param e The texture entity
+ * @param data The bytes of an image file
+ * @param size Number of bytes
+ */
+void box_texture_set_memory(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const uint8_t *data,
+    int32_t size);
+
 /** Read the texture settings of the surface, or the engine defaults.
  *
  * @param world The world
