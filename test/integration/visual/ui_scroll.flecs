@@ -1,0 +1,227 @@
+// The overflow modes of box.ui side by side, one column each. Every column
+// holds the same list under its label: Visible lets the list run past the box
+// that shows it, Hidden clips it there, Scroll clips it and shows it moved by
+// the offset of the element, and the two Auto columns show the same offset
+// taken by a list that is larger than its box and dropped by one that fits.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.ui
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 55}
+}
+
+ui {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Layout: {direction: Row, width: 940, height: 500, padding: 20, spacing: 12,
+           h: Center, v: Middle}
+  Border: {radius: 20, width: 3, color: {120, 140, 190, 255}}
+  Rgb: {30, 34, 46}
+  Font: {size: 15}
+
+  visible {
+    Layout: {direction: Column, width: 168, height: 360, spacing: 10,
+             h: Center}
+
+    visible_label {
+      Text: {value: "Visible"}
+      Rgb: {235, 240, 255}
+    }
+
+    visible_box {
+      Layout: {direction: Column, width: 168, height: 300, padding: 10,
+               spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+      Scroll: {x: Visible, y: Visible}
+      visible_0 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {235, 120, 95}
+      }
+      visible_1 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {215, 140, 95}
+      }
+      visible_2 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {195, 160, 95}
+      }
+      visible_3 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {175, 180, 95}
+      }
+      visible_4 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {150, 195, 110}
+      }
+    }
+  }
+
+  hidden {
+    Layout: {direction: Column, width: 168, height: 360, spacing: 10,
+             h: Center}
+
+    hidden_label {
+      Text: {value: "Hidden"}
+      Rgb: {235, 240, 255}
+    }
+
+    hidden_box {
+      Layout: {direction: Column, width: 168, height: 300, padding: 10,
+               spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+      Scroll: {y: Hidden}
+      hidden_0 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {120, 215, 170}
+      }
+      hidden_1 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {110, 200, 185}
+      }
+      hidden_2 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {100, 185, 200}
+      }
+      hidden_3 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {90, 170, 215}
+      }
+      hidden_4 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {85, 155, 225}
+      }
+    }
+  }
+
+  scrolled {
+    Layout: {direction: Column, width: 168, height: 360, spacing: 10,
+             h: Center}
+
+    scrolled_label {
+      Text: {value: "Scroll"}
+      Rgb: {235, 240, 255}
+    }
+
+    scrolled_box {
+      Layout: {direction: Column, width: 168, height: 300, padding: 10,
+               spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+      Scroll: {y: Scroll, offset: {0, 100}}
+      scrolled_0 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {150, 170, 235}
+      }
+      scrolled_1 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {132, 104, 172}
+      }
+      scrolled_2 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {170, 140, 210}
+      }
+      scrolled_3 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {200, 150, 225}
+      }
+      scrolled_4 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {215, 165, 235}
+      }
+    }
+  }
+
+  auto_long {
+    Layout: {direction: Column, width: 168, height: 360, spacing: 10,
+             h: Center}
+
+    auto_long_label {
+      Text: {value: "Auto, larger"}
+      Rgb: {235, 240, 255}
+    }
+
+    auto_long_box {
+      Layout: {direction: Column, width: 168, height: 300, padding: 10,
+               spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+      Scroll: {y: Auto, offset: {0, 50}}
+      auto_long_0 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {245, 205, 95}
+      }
+      auto_long_1 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {230, 190, 90}
+      }
+      auto_long_2 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {215, 175, 85}
+      }
+      auto_long_3 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {200, 160, 80}
+      }
+      auto_long_4 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {185, 145, 75}
+      }
+    }
+  }
+
+  auto_short {
+    Layout: {direction: Column, width: 168, height: 360, spacing: 10,
+             h: Center}
+
+    auto_short_label {
+      Text: {value: "Auto, fits"}
+      Rgb: {235, 240, 255}
+    }
+
+    auto_short_box {
+      Layout: {direction: Column, width: 168, height: 300, padding: 10,
+               spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {44, 52, 70}
+      Scroll: {y: Auto, offset: {0, 50}}
+      auto_short_0 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {235, 240, 255}
+      }
+      auto_short_1 {
+        Rect: {132, 62}
+        Border: {radius: 8}
+        Rgb: {190, 205, 240}
+      }
+    }
+  }
+}

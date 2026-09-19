@@ -23,7 +23,9 @@
                 "benchcases": [
                     "layout_10k_tree",
                     "layout_10k_unchanged",
-                    "layout_one_moved_of_10k"
+                    "layout_one_moved_of_10k",
+                    "layout_10k_scrolled_tree",
+                    "layout_10k_scrolled_offset"
                 ]
             },
             {

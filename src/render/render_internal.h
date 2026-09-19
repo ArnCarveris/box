@@ -65,6 +65,18 @@ typedef struct RenderShape2D {
     rgba color;      /**< Border color, a zero alpha takes the Rgb of the entity */
 } RenderShape2D;
 
+/** World space rectangle the fragments of an entity are clipped to.
+ *
+ * The rectangle is axis aligned in the plane a UI tree is laid out in and
+ * travels with the instance of the entity, so the fragment stage drops what
+ * falls outside it on every draw the entity takes part in. An entity without
+ * the component is not clipped at all.
+ */
+typedef struct RenderClip {
+    float min[2]; /**< Left and bottom edge of the rectangle */
+    float max[2]; /**< Right and top edge of the rectangle */
+} RenderClip;
+
 /** Draws the 2D shape of an entity as the soft fill its edge widths inset.
  *
  * The tag lives beside RenderShape2D instead of in it because the modules that
@@ -144,6 +156,7 @@ typedef struct RenderState {
     bool hide_used;           /**< A Hidden tag exists, so instances resolve their visibility */
     bool worn;                /**< A Wear exists, so instances pack their layer amounts */
     bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
+    bool clipped;             /**< A clip rectangle exists, so instances resolve their clip */
     bool transitioned;        /**< A transition exists, so instances resolve displayed values */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
@@ -200,6 +213,7 @@ typedef struct RenderState {
 extern ECS_COMPONENT_DECLARE(RenderInstance);
 extern ECS_COMPONENT_DECLARE(RenderState);
 extern ECS_COMPONENT_DECLARE(RenderShape2D);
+extern ECS_COMPONENT_DECLARE(RenderClip);
 extern ECS_COMPONENT_DECLARE(RenderGroup);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
@@ -644,6 +658,7 @@ void box_render_instance_bounds(
  * @param textured The world holds textures, so the PBR slots are resolved
  * @param tiled The world holds tiling components, so the uv transform is derived
  * @param shaped The world holds 2D shapes, so the shape words are derived
+ * @param clipped The world holds clip rectangles, so the clip words are derived
  * @param worn The world holds a Wear, so the per entity layer amounts are packed
  * @param layers The registry when a material enables a layer, NULL when none does
  * @param transition The transitions of the entity, NULL when it has none
@@ -661,11 +676,34 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     bool worn,
+    bool clipped,
     const RenderState *layers,
     const TransitionState *transition,
     double time,
     float depth,
     box_instance_t *out);
+
+/** Give an entity the world space rectangle its fragments are clipped to.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param min Left and bottom edge of the rectangle
+ * @param max Right and top edge of the rectangle
+ */
+void box_render_set_clip(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const float *min,
+    const float *max);
+
+/** Drop the clip rectangle of an entity, which is drawn whole again.
+ *
+ * @param world The world
+ * @param e The entity
+ */
+void box_render_clear_clip(
+    ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Get the transitions of an entity when the world has any.
  *

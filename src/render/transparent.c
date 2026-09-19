@@ -304,7 +304,8 @@ void box_render_extract_transparent(
         entry->mesh = mesh->handle;
         entry->depth = keys[i].depth;
         box_render_fill_instance(world, e, mesh, transform, false, state->textured,
-            state->tiled, state->shaped, state->worn, state->layered ? state : NULL,
+            state->tiled, state->shaped, state->worn, state->clipped,
+            state->layered ? state : NULL,
             box_render_transition(world, state, e), time,
             inst ? inst->depth : 0.0f, &entry->data);
         if (masked) {

@@ -85,7 +85,7 @@ WGPURenderPipeline box_frame_pipeline(
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
             .shaderLocation = 13 }
     };
-    WGPUVertexAttribute instance_attrs[11] = {
+    WGPUVertexAttribute instance_attrs[12] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 0, .shaderLocation = 3 },
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 16, .shaderLocation = 4 },
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 32, .shaderLocation = 5 },
@@ -98,7 +98,9 @@ WGPURenderPipeline box_frame_pipeline(
         { .format = WGPUVertexFormat_Uint32x4,
             .offset = offset + BOX_INSTANCE_SHAPE * sizeof(uint32_t), .shaderLocation = 14 },
         { .format = WGPUVertexFormat_Uint32x2,
-            .offset = offset + BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 }
+            .offset = offset + BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 },
+        { .format = WGPUVertexFormat_Float32x4,
+            .offset = offset + BOX_INSTANCE_CLIP * sizeof(uint32_t), .shaderLocation = 16 }
     };
     WGPUVertexBufferLayout layouts[2] = {
         {
@@ -109,7 +111,7 @@ WGPURenderPipeline box_frame_pipeline(
         }, {
             .arrayStride = stride,
             .stepMode = WGPUVertexStepMode_Instance,
-            .attributeCount = 11,
+            .attributeCount = 12,
             .attributes = instance_attrs
         }
     };
@@ -235,7 +237,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
             .shaderLocation = 13 }
     };
-    WGPUVertexAttribute instance_attrs[11] = {
+    WGPUVertexAttribute instance_attrs[12] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
         { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
@@ -248,7 +250,9 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         { .format = WGPUVertexFormat_Uint32x4,
             .offset = BOX_INSTANCE_SHAPE * sizeof(uint32_t), .shaderLocation = 14 },
         { .format = WGPUVertexFormat_Uint32x2,
-            .offset = BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 }
+            .offset = BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 },
+        { .format = WGPUVertexFormat_Float32x4,
+            .offset = BOX_INSTANCE_CLIP * sizeof(uint32_t), .shaderLocation = 16 }
     };
     WGPUVertexBufferLayout layouts[2] = {
         {
@@ -259,7 +263,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         }, {
             .arrayStride = sizeof(box_instance_t),
             .stepMode = WGPUVertexStepMode_Instance,
-            .attributeCount = 11,
+            .attributeCount = 12,
             .attributes = instance_attrs
         }
     };

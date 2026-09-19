@@ -153,6 +153,9 @@ static void box_ui_resolve_fill(
 
 /** Give the sides of a box that are still zero the size of its content.
  *
+ * The size the content asks for is kept whether the box took it or not, so an
+ * element that clips what it holds knows how much of it does not fit.
+ *
  * @param p The place of the node
  */
 static void box_ui_fit(
@@ -165,14 +168,52 @@ static void box_ui_fit(
     const Layout *l = &p->layout;
     float pad = l->padding * 2;
     float gap = p->flow > 1 ? l->spacing * (float)(p->flow - 1) : 0;
+    float width = pad + (l->direction == DirectionRow ?
+        p->sum_width + gap : p->max_width);
+    float height = pad + (l->direction == DirectionColumn ?
+        p->sum_height + gap : p->max_height);
+    if (width > p->content_width) {
+        p->content_width = width;
+    }
+
+    if (height > p->content_height) {
+        p->content_height = height;
+    }
+
     if (p->width == 0) {
-        p->width = pad + (l->direction == DirectionRow ?
-            p->sum_width + gap : p->max_width);
+        p->width = width;
     }
 
     if (p->height == 0) {
-        p->height = pad + (l->direction == DirectionColumn ?
-            p->sum_height + gap : p->max_height);
+        p->height = height;
+    }
+
+done:
+    return;
+}
+
+/** Move a child of a scrolled element by the offset of that element.
+ *
+ * An anchored child is pinned to the box of its parent and is not part of what
+ * the parent scrolls, so it stays where the pin put it.
+ *
+ * @param parent The place of the parent
+ * @param child The place of the child
+ */
+static void box_ui_scrolled(
+    const UiPlace *parent,
+    UiPlace *child)
+{
+    if (!parent->has_scroll || child->has_anchor) {
+        goto done;
+    }
+
+    if (parent->scroll.x != OverflowVisible) {
+        child->x -= parent->scroll.offset.x;
+    }
+
+    if (parent->scroll.y != OverflowVisible) {
+        child->y += parent->scroll.offset.y;
     }
 
 done:
@@ -442,6 +483,7 @@ static void box_ui_measure(
     int32_t i;
     bool texts = state->texts != 0;
     bool shadows = state->shadows != 0;
+    bool scrolls = state->scrolls != 0;
     for (i = ecs_vec_count(&state->places) - 1; i >= 0; i --) {
         UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
         if (p->aux) {
@@ -454,6 +496,10 @@ static void box_ui_measure(
         }
 
         box_ui_fit(p);
+        if (scrolls) {
+            box_ui_scroll_resolve(world, p);
+        }
+
         if (p->parent >= 0 && !p->has_anchor) {
             box_ui_add(ecs_vec_get_t(&state->places, UiPlace, p->parent), p);
         }
@@ -480,7 +526,6 @@ static void box_ui_arrange(
         UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
         UiPlace *parent = p->parent >= 0 ?
             ecs_vec_get_t(&state->places, UiPlace, p->parent) : NULL;
-        bool placed = false;
         if (p->aux) {
             continue;
         }
@@ -495,18 +540,17 @@ static void box_ui_arrange(
             p->y = p->local_y;
         } else if (p->has_anchor) {
             box_ui_pin(world, root, parent, p);
-            placed = true;
         } else if (parent->has_layout &&
             parent->layout.direction != DirectionNone)
         {
             box_ui_flow(parent, p);
-            placed = true;
         } else {
             p->x = parent->x + p->local_x;
             p->y = parent->y + p->local_y;
         }
 
-        if (placed) {
+        if (parent) {
+            box_ui_scrolled(parent, p);
             box_ui_move(world, p->e, p->x - parent->x, p->y - parent->y);
         } else {
             box_ui_move(world, p->e, p->local_x, p->local_y);
@@ -533,4 +577,8 @@ void box_ui_layout(
     box_ui_text_build(world);
     box_ui_shadow_build(world);
     box_ui_group_build(world, root);
+    UiState *state = box_ui_state(world);
+    if (state->scrolls || state->unclip) {
+        box_ui_scroll_clip(world);
+    }
 }

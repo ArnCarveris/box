@@ -193,6 +193,19 @@ static void box_render_on_shaped(
     }
 }
 
+/** A clip rectangle exists, so extract resolves the clip words of instances.
+ *
+ * @param it Iterator over the entities that gained a clip rectangle
+ */
+static void box_render_on_clipped(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->clipped = true;
+    }
+}
+
 /** A transition exists, so extract resolves the displayed values of instances.
  *
  * @param it Iterator over the entities that gained the state
@@ -419,6 +432,67 @@ done:
     return;
 }
 
+/** Write the world space clip rectangle of an entity into instance data.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param out The instance to fill
+ */
+static void box_render_fill_clip(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_instance_t *out)
+{
+    const RenderClip *clip = ecs_get(world, e, RenderClip);
+    if (!clip) {
+        goto done;
+    }
+
+    box_instance_set_clip(out, clip->min[0], clip->min[1],
+        clip->max[0], clip->max[1]);
+done:
+    return;
+}
+
+void box_render_set_clip(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const float *min,
+    const float *max)
+{
+    RenderClip *clip = ecs_get_mut(world, e, RenderClip);
+    if (!clip) {
+        ecs_set(world, e, RenderClip, {
+            .min = { min[0], min[1] }, .max = { max[0], max[1] }
+        });
+        goto done;
+    }
+
+    if (clip->min[0] == min[0] && clip->min[1] == min[1] &&
+        clip->max[0] == max[0] && clip->max[1] == max[1])
+    {
+        goto done;
+    }
+
+    clip->min[0] = min[0];
+    clip->min[1] = min[1];
+    clip->max[0] = max[0];
+    clip->max[1] = max[1];
+    ecs_modified(world, e, RenderClip);
+done:
+    return;
+}
+
+void box_render_clear_clip(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    if (ecs_has(world, e, RenderClip)) {
+        ecs_remove(world, e, RenderClip);
+        box_render_mark_dirty(world, e);
+    }
+}
+
 void box_render_instance_bounds(
     const RenderMesh *mesh,
     const mat4 *m,
@@ -636,6 +710,7 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     bool worn,
+    bool clipped,
     const RenderState *layers,
     const TransitionState *transition,
     double time,
@@ -704,6 +779,11 @@ void box_render_fill_instance(
         box_render_fill_wear(world, e, transition, time, out);
     }
 
+    memset(out->clip, 0, sizeof(out->clip));
+    if (clipped) {
+        box_render_fill_clip(world, e, out);
+    }
+
     if (layers) {
         box_instance_set_layers(out, box_render_layer_mask(world, layers, e));
     }
@@ -728,6 +808,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(TextureTiling));
     box_render_watch(world, ecs_id(TextureWrap));
     box_render_watch(world, ecs_id(RenderShape2D));
+    box_render_watch(world, ecs_id(RenderClip));
     box_render_watch(world, ecs_id(Wear));
     box_render_watch(world, ecs_id(WearDetail));
     box_render_watch_flag(world, ecs_id(TransitionState), box_render_on_transitioned);
@@ -740,6 +821,7 @@ void box_render_instance_init(
     box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
     box_render_watch_flag(world, Hidden, box_render_on_hidden);
     box_render_watch_flag(world, ecs_id(RenderShape2D), box_render_on_shaped);
+    box_render_watch_flag(world, ecs_id(RenderClip), box_render_on_clipped);
     box_render_watch_flag(world, ecs_id(Wear), box_render_on_worn);
     box_render_watch_flag(world, ecs_id(WearDetail), box_render_on_worn);
 

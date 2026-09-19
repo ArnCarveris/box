@@ -294,6 +294,37 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Scroll",
+                "testcases": [
+                    "visible_axis_does_not_clip",
+                    "visible_axis_keeps_the_offset_at_zero",
+                    "hidden_clips_the_children_to_the_box",
+                    "hidden_takes_no_wheel",
+                    "scroll_clips_and_takes_the_wheel",
+                    "auto_scrolls_when_the_content_is_larger",
+                    "auto_does_not_scroll_when_the_content_fits",
+                    "offset_is_clamped_to_the_content",
+                    "offset_below_zero_is_clamped_away",
+                    "offset_moves_the_children_up",
+                    "offset_moves_the_children_left",
+                    "anchored_child_is_not_moved_by_the_offset",
+                    "nested_clips_intersect",
+                    "wheel_moves_the_hovered_element",
+                    "wheel_leaves_an_unhovered_element_alone",
+                    "wheel_moves_the_innermost_scrollable_ancestor",
+                    "wheel_passes_through_an_element_that_cannot_scroll",
+                    "clip_reaches_the_instance_of_the_packet",
+                    "removing_scroll_drops_the_clip",
+                    "glyphs_of_a_scrolled_text_are_clipped",
+                    "offset_moves_the_glyphs_of_a_text",
+                    "log_that_grows_stays_at_the_end",
+                    "log_that_grows_stays_put_after_a_scroll_up",
+                    "hit_test_skips_a_clipped_node"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

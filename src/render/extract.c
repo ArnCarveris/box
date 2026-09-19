@@ -127,7 +127,7 @@ static void box_extract_static(
     update->slot = inst->slot;
     update->transition = BOX_UPDATE_STILL;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
-        state->textured, state->tiled, state->shaped, state->worn,
+        state->textured, state->tiled, state->shaped, state->worn, state->clipped,
         state->layered ? state : NULL, transition, time, inst->depth, &update->data);
     if (transition) {
         update->transition = box_render_extract_transition(world, e, mesh, inst->slot,
@@ -184,6 +184,7 @@ void box_render_extract_dynamic(
     bool tiled = state->tiled;
     bool shaped = state->shaped;
     bool worn = state->worn;
+    bool clipped = state->clipped;
     const RenderState *layers = state->layered ? state : NULL;
     double time = ecs_get_world_info(world)->world_time_total;
     ecs_iter_t it = ecs_query_iter(world, state->dynamic);
@@ -219,7 +220,7 @@ void box_render_extract_dynamic(
 
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
             box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false,
-                textured, tiled, shaped, worn, layers,
+                textured, tiled, shaped, worn, clipped, layers,
                 box_render_transition(world, state, it.entities[i]), time,
                 inst[i].depth, data);
             if (masked || shadowless) {

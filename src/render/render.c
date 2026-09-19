@@ -9,6 +9,7 @@
 ECS_COMPONENT_DECLARE(RenderInstance);
 ECS_COMPONENT_DECLARE(RenderState);
 ECS_COMPONENT_DECLARE(RenderShape2D);
+ECS_COMPONENT_DECLARE(RenderClip);
 ECS_COMPONENT_DECLARE(RenderGroup);
 ECS_TAG_DECLARE(RenderSoftShape);
 ECS_TAG_DECLARE(Hidden);
@@ -134,6 +135,7 @@ void BoxRenderImport(
     ECS_COMPONENT_DEFINE(world, RenderInstance);
     ECS_COMPONENT_DEFINE(world, RenderState);
     ECS_COMPONENT_DEFINE(world, RenderShape2D);
+    ECS_COMPONENT_DEFINE(world, RenderClip);
     ECS_COMPONENT_DEFINE(world, RenderGroup);
     ECS_TAG_DEFINE(world, RenderSoftShape);
     ECS_TAG_DEFINE(world, Hidden);
@@ -144,12 +146,14 @@ void BoxRenderImport(
     });
     ecs_set_hooks(world, RenderInstance, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderShape2D, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, RenderClip, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderGroup, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, RenderTexture, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(RenderInstance), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderMesh), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderTexture), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderShape2D), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(RenderClip), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(RenderGroup), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, RenderSoftShape, EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, Hidden, EcsOnInstantiate, EcsInherit);

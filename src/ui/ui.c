@@ -241,6 +241,7 @@ void box_ui_update(
 static void BoxUiUpdate(
     ecs_iter_t *it)
 {
+    box_ui_scroll_update(it->world);
     box_ui_console_update(it->world);
     box_ui_text_input_update(it->world);
     box_ui_console_sync(it->world);
@@ -268,6 +269,8 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Layout);
     ECS_META_COMPONENT(world, Anchor);
     ECS_META_COMPONENT(world, Fill);
+    ECS_META_COMPONENT(world, Overflow);
+    ECS_META_COMPONENT(world, Scroll);
     ECS_META_COMPONENT(world, Bounds);
     ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Font);
@@ -293,6 +296,7 @@ void BoxUiImport(
     ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Fill, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Scroll, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Bounds, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, BoxShadow, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ShadowImpl, { .ctor = flecs_default_ctor });
@@ -366,6 +370,7 @@ void BoxUiImport(
     box_ui_text_init(world);
     box_ui_shadow_init(world);
     box_ui_group_init(world);
+    box_ui_scroll_init(world);
     box_ui_hit_init(world);
     box_ui_text_input_init(world);
     box_ui_console_init(world);

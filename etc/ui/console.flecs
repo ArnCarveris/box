@@ -23,7 +23,8 @@ console {
 
     scrollback {
       Layout: {}
-      Fill: {width: 1}
+      Fill: {width: 1, height: 0.9}
+      Scroll: {y: Auto}
       ConsoleLog: {lines: 12}
       Text: {value: "", align: Left}
       Rgb: {170, 192, 225}

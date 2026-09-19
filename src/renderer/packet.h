@@ -287,6 +287,9 @@
 /** Bit that says the wear words of an instance hold per entity layer amounts */
 #define BOX_MODE_WEAR_SHIFT (5)
 
+/** Bit that says the clip words of an instance hold a clip rectangle */
+#define BOX_MODE_CLIP_SHIFT (6)
+
 /** Words the per entity material layer amounts of an instance take.
  *
  * The first holds the dust, grime, edge and wetness amounts as unsigned bytes,
@@ -332,10 +335,11 @@ typedef struct box_instance_t {
     float bounds[4];       /**< World space bounding sphere: center xyz and radius */
     uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
     uint32_t wear[BOX_WEAR_WORDS];   /**< Packed per entity layer amounts, zero without them */
+    float clip[4];                   /**< World space clip rectangle: min x, min y, max x, max y */
 } box_instance_t;
 
 /** 32 bit words one instance takes in a GPU instance buffer */
-#define BOX_INSTANCE_WORDS (41)
+#define BOX_INSTANCE_WORDS (45)
 
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
@@ -348,6 +352,9 @@ typedef struct box_instance_t {
 
 /** Word the packed per entity layer amounts of an instance start at */
 #define BOX_INSTANCE_WEAR (39)
+
+/** Word the clip rectangle of an instance starts at */
+#define BOX_INSTANCE_CLIP (41)
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
 typedef struct box_light_t {
@@ -1064,6 +1071,43 @@ static inline bool box_instance_soft(
     const box_instance_t *inst)
 {
     return (inst->uv_mode & (1u << BOX_MODE_SOFT_SHIFT)) != 0;
+}
+
+/** Give an instance the world space rectangle its fragments are clipped to.
+ *
+ * The rectangle is axis aligned in the plane the UI trees are laid out in, and
+ * the fragment stage drops every fragment outside it, so a subtree is cut off
+ * by the box of the element that clips it on every draw it takes part in.
+ *
+ * @param inst The instance
+ * @param min_x Left edge of the rectangle
+ * @param min_y Bottom edge of the rectangle
+ * @param max_x Right edge of the rectangle
+ * @param max_y Top edge of the rectangle
+ */
+static inline void box_instance_set_clip(
+    box_instance_t *inst,
+    float min_x,
+    float min_y,
+    float max_x,
+    float max_y)
+{
+    inst->clip[0] = min_x;
+    inst->clip[1] = min_y;
+    inst->clip[2] = max_x;
+    inst->clip[3] = max_y;
+    inst->uv_mode |= 1u << BOX_MODE_CLIP_SHIFT;
+}
+
+/** Check whether the clip words of an instance hold a clip rectangle.
+ *
+ * @param inst The instance
+ * @return True when the fragment stage clips it
+ */
+static inline bool box_instance_clipped(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode & (1u << BOX_MODE_CLIP_SHIFT)) != 0;
 }
 
 /** Pack four ratios in 0..1 into one word of four bytes.

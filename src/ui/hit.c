@@ -110,6 +110,30 @@ static bool box_ui_hit_clipped(
     return result;
 }
 
+/** Whether the clip rectangle of a node leaves the point of a probe out.
+ *
+ * The rectangle is the one the elements that clip above the node left on it, in
+ * the plane of the tree, so a child that a scrolled element cut off is not hit
+ * either.
+ *
+ * @param world The world
+ * @param e The node
+ * @param x X of the point in the plane of the tree
+ * @param y Y of the point in the plane of the tree
+ * @return true when the clip of the node leaves the point out
+ */
+static bool box_ui_hit_clipped_out(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    float x,
+    float y)
+{
+    const RenderClip *clip = ecs_get(world, e, RenderClip);
+
+    return clip != NULL && (x < clip->min[0] || x > clip->max[0] ||
+        y < clip->min[1] || y > clip->max[1]);
+}
+
 /** Whether the tree of a root is drawn by the view a pick asks about.
  *
  * @param world The world
@@ -169,6 +193,7 @@ typedef struct box_ui_probe_t {
     int32_t order;       /**< Place of that node in the walk of its tree */
     bool in_view;        /**< The tree of that root is drawn by the view */
     bool groups;         /**< The world holds subtrees that composite and clip */
+    bool clips;          /**< The world holds elements that clip what they hold */
 } box_ui_probe_t;
 
 /** Test the nodes of one table against the point of a probe.
@@ -211,6 +236,12 @@ static void box_ui_hit_probe(
             continue;
         }
 
+        if (probe->clips &&
+            box_ui_hit_clipped_out(world, it->entities[i], probe->x, probe->y))
+        {
+            continue;
+        }
+
         if (box_render_is_hidden(world, it->entities[i])) {
             continue;
         }
@@ -237,6 +268,7 @@ ecs_entity_t box_ui_hit(
     }
 
     probe.groups = state->groups != 0;
+    probe.clips = state->scrolls != 0;
     ecs_iter_t it = ecs_query_iter(world, state->hits);
     while (ecs_query_next(&it)) {
         box_ui_hit_probe(world, &probe, &it);

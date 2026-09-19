@@ -67,6 +67,7 @@ struct VertexIn {
   @location(13) vertex_color: vec4<f32>,
   @location(14) shape: vec4<u32>,
   @location(15) wear: vec2<u32>,
+  @location(16) clip_rect: vec4<f32>,
 };
 
 struct VertexOut {
@@ -86,7 +87,25 @@ struct VertexOut {
   @location(12) @interpolate(flat) uv_mode: vec4<u32>,
   @location(13) bounds_pos: vec3<f32>,
   @location(14) vertex_color: vec4<f32>,
+  @location(15) @interpolate(flat) clip_rect: vec4<f32>,
 };
+
+// Bit of the mode word that says the instance carries a clip rectangle, which
+// is BOX_MODE_CLIP_SHIFT of the packet.
+const MESH_CLIP_BIT: u32 = 0x40u;
+
+// Drop a fragment the clip rectangle of its instance leaves out. The rectangle
+// is axis aligned in the plane a UI tree is laid out in, so the test is the
+// world position of the fragment against its four edges and an instance without
+// one pays a single bit test.
+fn clip_fragment(in: VertexOut) {
+  if ((in.uv_mode.x & MESH_CLIP_BIT) != 0u) {
+    if (in.world_pos.x < in.clip_rect.x || in.world_pos.x > in.clip_rect.z ||
+        in.world_pos.y < in.clip_rect.y || in.world_pos.y > in.clip_rect.w) {
+      discard;
+    }
+  }
+}
 
 @vertex fn vs_main(in: VertexIn) -> VertexOut {
   let m = mat4x4<f32>(
@@ -114,6 +133,7 @@ struct VertexOut {
   out.uv_mode = vec4(in.uv_mode, u32(in.params.w), in.wear.x, in.wear.y);
   out.bounds_pos = in.bounds_pos.xyz;
   out.vertex_color = in.vertex_color;
+  out.clip_rect = in.clip_rect;
   out.local = vec3<f32>(0.0);
   if (in.params.z > 0.5) {
     out.local = probe_coord(u32(in.params.w), world.xyz);
@@ -193,6 +213,7 @@ const MESH_LUMA: vec3<f32> = vec3(0.2126, 0.7152, 0.0722);
 
 fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     out_indirect: ptr<function, vec3<f32>>) -> vec4<f32> {
+  clip_fragment(in);
   let projected = tile_uv(in.uv_mode.x, in.uv_xform, in.uv, in.local_pos, in.local_normal);
   let uv = wrap_uv(in.uv_mode.x, projected);
   let dp1 = dpdx(in.world_pos);
@@ -330,6 +351,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
 // model reads the scene copy from, which is why this stage needs no binding of
 // its own.
 fn group_composite(in: VertexOut) -> vec4<f32> {
+  clip_fragment(in);
   let uv = vec2(in.bounds_pos.x, 1.0 - in.bounds_pos.y);
   return textureSampleLevel(scene_tex, scene_samp, uv, 0.0) * in.color.a;
 }

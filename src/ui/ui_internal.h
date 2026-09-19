@@ -87,6 +87,13 @@ typedef struct UiPlace {
     int32_t flow;     /**< Children the layout places */
     float fill_width;  /**< Width a Fill resolved for the node, 0 when none did */
     float fill_height; /**< Height a Fill resolved for the node, 0 when none did */
+    float content_width;  /**< Width the content of the node takes, its box ignored */
+    float content_height; /**< Height the content of the node takes, its box ignored */
+    Scroll scroll;     /**< Scroll of the node with its clamped offset, zeroed when it has none */
+    bool has_scroll;   /**< The node clips what it holds and moves it by an offset */
+    float clip_min[2]; /**< Left and bottom edge the node itself is clipped to */
+    float clip_max[2]; /**< Right and top edge the node itself is clipped to */
+    bool clipped;      /**< An element above the node clips it */
 } UiPlace;
 
 /** Module wide registry of box.ui, stored as a singleton */
@@ -102,11 +109,13 @@ typedef struct UiState {
     int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
     int32_t shadows;    /**< Box shadows the world holds, zero skips the shadow pass */
     int32_t groups;     /**< Subtrees that composite, zero skips their bookkeeping */
+    int32_t scrolls;    /**< Elements that clip and scroll, zero skips the scroll pass */
     int32_t opacities;  /**< Opacity components the world holds, zero skips the group pass */
     ecs_entity_t shadow_prefab; /**< Prefab the shadow quads take their material from */
     bool busy;          /**< An update runs, the observers mark no tree */
     bool instanced;     /**< A node gained a shape, its depth bias is missing */
     bool respawn;       /**< A pass made or dropped quads, collect the tree again */
+    bool unclip;        /**< A Scroll was removed, the clips it left must be dropped */
 } UiState;
 
 /** One glyph of a font, rasterized into the atlas of that font */
@@ -199,6 +208,21 @@ typedef struct GroupImpl {
     int32_t height;      /**< Height of the target in pixels */
 } GroupImpl;
 
+/** Content size and offset range of a scrolled element, added with Scroll.
+ *
+ * The layout writes what the element holds and how far its offset may travel,
+ * which is what the wheel reads to find the innermost scrollable ancestor of
+ * the cursor and what keeps an element whose offset sat at the end of its
+ * content there while the content grows.
+ */
+typedef struct ScrollImpl {
+    float content_width;  /**< Width the content of the element takes */
+    float content_height; /**< Height the content of the element takes */
+    float max_x;          /**< Largest offset the x axis takes, 0 when it does not scroll */
+    float max_y;          /**< Largest offset the y axis takes, 0 when it does not scroll */
+    bool measured;        /**< The layout measured the element at least once */
+} ScrollImpl;
+
 /** Caret and history of a text input, added with TextInput */
 typedef struct TextInputImpl {
     ecs_vec_t history;  /**< char* of the lines the input submitted, oldest first */
@@ -237,6 +261,7 @@ extern ECS_TAG_DECLARE(UiComposite);
 extern ECS_TAG_DECLARE(UiQuad);
 extern ECS_COMPONENT_DECLARE(ShadowImpl);
 extern ECS_COMPONENT_DECLARE(GroupImpl);
+extern ECS_COMPONENT_DECLARE(ScrollImpl);
 extern ECS_COMPONENT_DECLARE(TextImpl);
 extern ECS_COMPONENT_DECLARE(TextInputImpl);
 extern ECS_COMPONENT_DECLARE(ConsoleImpl);
@@ -521,6 +546,40 @@ void box_ui_group_release(
  * @param world The world
  */
 void box_ui_group_init(
+    ecs_world_t *world);
+
+/** Clamp the offset of a scrolled node and read it into its place.
+ *
+ * The pass runs while the node is measured, after its box and the size of its
+ * content are known and before its children are placed, so the offset the
+ * children are moved by is the one the frame ends with.
+ *
+ * @param world The world
+ * @param p The place of the node
+ */
+void box_ui_scroll_resolve(
+    ecs_world_t *world,
+    UiPlace *p);
+
+/** Give every collected node the clip rectangle the elements above it leave.
+ *
+ * @param world The world
+ */
+void box_ui_scroll_clip(
+    ecs_world_t *world);
+
+/** Move the innermost scrollable element under the cursor by the wheel.
+ *
+ * @param world The world
+ */
+void box_ui_scroll_update(
+    ecs_world_t *world);
+
+/** Register the components, the hooks and the observers of the scroll pass.
+ *
+ * @param world The world
+ */
+void box_ui_scroll_init(
     ecs_world_t *world);
 
 /** Register the hit test query and install it as the source of a pick.

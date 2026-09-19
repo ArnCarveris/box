@@ -58,6 +58,13 @@
  * knows nothing about it. The helpers text.measure, text.wrap and text.label
  * offer the same measuring, wrapping and building to a script.
  *
+ * A node with a Scroll clips what it holds to its own rectangle and moves it
+ * by an offset the wheel, a script or a drag writes, so a list that is longer
+ * than its box shows a window on itself instead of running into the scene. The
+ * clip is a rectangle on the node that travels with its instance and is applied
+ * on every draw, which is what keeps a glyph of a scrolled element out of the
+ * frame without the element compositing a subtree of its own.
+ *
  * A tree answers the pick of its view itself, because a UI element has no
  * collider: the cursor is resolved against the Bounds of the nodes of the view
  * and the node that is drawn over every other one that holds the point wins,
@@ -171,6 +178,42 @@ ECS_STRUCT(Anchor, {
 ECS_STRUCT(Fill, {
     float width;  /**< Fraction of the width of the parent, 0 leaves it alone */
     float height; /**< Fraction of the height of the parent, 0 leaves it alone */
+});
+
+/** What an element does with the content that does not fit its box */
+ECS_ENUM(Overflow, {
+    OverflowVisible = 0, /**< The content sticks out of the box and is drawn */
+    OverflowHidden = 1,  /**< The content is clipped, the wheel does not move it */
+    OverflowScroll = 2,  /**< The content is clipped and the wheel always moves it */
+    OverflowAuto = 3     /**< The content is clipped and the wheel moves it when it is larger */
+});
+
+/** Clips the content of an element to its box and moves it by an offset.
+ *
+ * An axis that is not Visible clips the subtree of the element to its Bounds on
+ * that axis, on every draw and not only when the element composites, and the
+ * offset moves the content the element holds: the children a Layout places and
+ * the glyphs of a Text, never a child with an Anchor, which stays pinned to the
+ * box it is clipped by. The offset is in logical pixels, x counting to the
+ * right and y downward like the scroll position of a document, so an offset of
+ * zero shows the start of the content and the largest offset its end.
+ *
+ * The framework clamps the offset to the content: an axis whose content is not
+ * larger than the box holds it at zero and every other axis at the difference
+ * between the two, which is what the wheel, a drag and a script all write
+ * through. An element whose offset sat at the end of its content when the
+ * content grew keeps it at the new end, so a log that is appended to stays on
+ * its last line until the user scrolls up.
+ *
+ * The wheel moves the innermost scrollable ancestor of the element under the
+ * cursor, which is an axis that is Scroll, or Auto with content larger than the
+ * box; an axis that is Hidden clips without ever taking the wheel, though a
+ * script may still move its offset.
+ */
+ECS_STRUCT(Scroll, {
+    Overflow x;   /**< What the element does with content wider than its box */
+    Overflow y;   /**< What the element does with content taller than its box */
+    vec2 offset;  /**< Logical pixels the content is moved by, right and down */
 });
 
 /** Font a text element rasterizes its glyphs with, inherited by its subtree.
@@ -375,6 +418,9 @@ ECS_STRUCT(ConsoleLog, {
 
 /** Width of the caret of a text input in logical pixels */
 #define BOX_UI_CARET_WIDTH (2.0f)
+
+/** Logical pixels one unit of wheel movement scrolls a scrollable element by */
+#define BOX_UI_SCROLL_STEP (24.0f)
 
 /** Lines one text input keeps in its history */
 #define BOX_UI_HISTORY_MAX (64)

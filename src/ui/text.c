@@ -317,6 +317,8 @@ void box_ui_text_measure(
         impl->height = extent.height;
     }
 
+    p->content_width = extent.width;
+    p->content_height = extent.height;
     if (p->fill_width <= 0 && (!p->has_layout || p->layout.width <= 0)) {
         p->width = extent.width;
     }
@@ -352,6 +354,7 @@ static uint64_t box_ui_text_print(
     hash = box_ui_hash(hash, &atlas, (int32_t)sizeof(box_ui_atlas_t*));
     hash = box_ui_hash(hash, &atlas->epoch, (int32_t)sizeof(uint32_t));
     hash = box_ui_hash(hash, box, (int32_t)sizeof(box));
+    hash = box_ui_hash(hash, &p->scroll, (int32_t)sizeof(Scroll));
     hash = box_ui_hash(hash, &color, (int32_t)sizeof(Rgb));
 
     return hash;
@@ -395,8 +398,14 @@ static void box_ui_text_quad(
     float device = atlas->device > 0 ? atlas->device : 1.0f;
     float width = (float)glyph->width / device;
     float height = (float)glyph->height / device;
-    float left = box_ui_text_snap(p->x - p->width * 0.5f + quad->x, device);
-    float top = box_ui_text_snap(p->y + p->height * 0.5f - quad->y, device);
+    float scroll_x = p->has_scroll && p->scroll.x != OverflowVisible ?
+        p->scroll.offset.x : 0;
+    float scroll_y = p->has_scroll && p->scroll.y != OverflowVisible ?
+        p->scroll.offset.y : 0;
+    float left = box_ui_text_snap(
+        p->x - p->width * 0.5f + quad->x - scroll_x, device);
+    float top = box_ui_text_snap(
+        p->y + p->height * 0.5f - quad->y + scroll_y, device);
     float x = left + width * 0.5f;
     float y = top - height * 0.5f;
     Image region = {
