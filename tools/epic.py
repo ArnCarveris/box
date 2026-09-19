@@ -12,7 +12,8 @@ The steps in order, each writing into the deliverable folder of the epic:
   tests          bake3 run test/<project> --json for every project under test/,
                  into tests_<project>.json and the merged tests.json
   visual         tools/integration.py visual into integration/
-  bench_scenes   tools/integration.py bench into integration/
+  bench_scenes   tools/integration.py bench into integration/, which fails when a
+                 frame of a scene exceeded its spike budget
   command        tools/integration.py command into integration/
   bench          tools/bench.py into bench/, compared with the bench folder of the
                  baseline epic (the last completed epic that has one)
@@ -132,6 +133,22 @@ def tests_step(out, env, jobs):
     return step("tests", not broken, detail, time.time() - start)
 
 
+def scene_spikes(results):
+    """Collect the frames the bench scenes reported above their spike budget."""
+    spikes = []
+    for row in results:
+        if not isinstance(row, dict) or not pm.number(row.get("spike_count")):
+            continue
+
+        worst = (row.get("spikes") or [{}])[0]
+        spikes.append("%s %d spike(s), frame %s at %.2f ms in %s" % (
+            os.path.basename(str(row.get("scene"))), int(pm.number(row.get("spike_count"))),
+            worst.get("frame"), pm.number(worst.get("ms")),
+            worst.get("system") or "unattributed"))
+
+    return spikes
+
+
 def integration_step(name, out, env):
     """Run one kind of integration scene into the integration folder of the deliverable."""
     kind = INTEGRATION_KINDS[name]
@@ -148,7 +165,11 @@ def integration_step(name, out, env):
     if failed:
         detail += ": " + ", ".join(os.path.basename(str(s)) for s in failed)
 
-    return step(name, code == 0 and not failed, detail, seconds)
+    spikes = scene_spikes(results)
+    if spikes:
+        detail += "; " + "; ".join(spikes)
+
+    return step(name, code == 0 and not failed and not spikes, detail, seconds)
 
 
 def epic_progress(name):

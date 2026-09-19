@@ -7,7 +7,12 @@ Usage:
   Visual scenes are compared with test/integration/visual/baseline/<scene>.png and fail only when the
   largest channel delta exceeds 24 and more than 200 pixels differ by more than 16 (GPU speckle passes);
   a missing baseline is created, --update-baseline replaces the baselines of the scenes given.
-  integration.py bench   [--out dir] [--env name] [--frames n] [scene.flecs ...]
+  integration.py bench   [--out dir] [--env name] [--frames n] [--spike factor]
+                         [--no-attribute] [--fps n] [scene.flecs ...]
+  Bench scenes run under a fixed step and fail when a frame exceeded the spike budget, which is
+  a multiple of the mean frame time of the run; the report names the offending frames and the
+  system each of them spent the most time in. A <scene>.args next to a scene holds the extra
+  box_bench arguments of that scene, one per line.
   integration.py command [--out dir] [--env name] [--frames n] [scene.flecs ...]
 
 A command scene holds a terminal named terminals.agent0 with a CommandScript that
@@ -163,20 +168,53 @@ def run_visual(scenes, out, env, frames, width, height, update=False):
     return results
 
 
+def bench_args(scene):
+    """Read the extra box_bench arguments of a scene from the <scene>.args next to it."""
+    path = os.path.splitext(scene)[0] + ".args"
+    if not os.path.isfile(path):
+        return []
+    return open(path).read().split()
+
+
+def bench_spike_line(spike):
+    """Format one frame that exceeded the spike budget."""
+    return "  SPIKE frame %s at %.2f ms, top system %s (%.2f ms)" % (
+        spike.get("frame"), spike.get("ms", 0), spike.get("system") or "unattributed",
+        spike.get("system_ms", 0))
+
+
+def bench_summary(data):
+    """Format the frame distribution and the spike verdict of a bench report."""
+    spikes = data.get("spikes") or []
+    worst = ", worst in %s" % (spikes[0].get("system") or "unattributed") if spikes else ""
+    return ("mean %.2f ms, p99 %.2f ms, max %.2f ms, %.0f fps, budget %.2f ms, %d spike(s)%s" % (
+        data.get("mean_ms", 0), data.get("p99_ms", 0), data.get("max_ms", 0), data.get("fps", 0),
+        data.get("spike_budget_ms", 0), data.get("spike_count", 0), worst))
+
+
 def run_bench(scenes, out, env, frames, extra):
     os.makedirs(out, exist_ok=True)
     results = []
     for scene in scenes:
         name = os.path.splitext(os.path.basename(scene))[0]
         report = os.path.abspath(os.path.join(out, name + ".json"))
+        if os.path.isfile(report):
+            os.unlink(report)
         proc = bake(["run", "box_bench", env_flag(env), "--cfg", "release", "--",
-                     os.path.abspath(scene), "--frames", str(frames), "--report", report, *extra])
-        ok = proc.returncode == 0 and os.path.isfile(report)
-        data = json.load(open(report)) if ok else {}
-        results.append({"scene": os.path.relpath(scene, ROOT), "status": "pass" if ok else "fail", **data})
-        summary = f"mean {data.get('mean_ms', 0):.2f} ms, p99 {data.get('p99_ms', 0):.2f} ms, {data.get('fps', 0):.0f} fps" if ok else ""
-        print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)} {summary}")
-        if not ok:
+                     os.path.abspath(scene), "--frames", str(frames), "--report", report,
+                     *extra, *bench_args(scene)])
+        data = json.load(open(report)) if os.path.isfile(report) else {}
+        spikes = int(data.get("spike_count") or 0)
+        ok = bool(data) and proc.returncode == 0 and not spikes
+        row = dict(data)
+        row["scene"] = os.path.relpath(scene, ROOT)
+        row["status"] = "pass" if ok else "fail"
+        results.append(row)
+        print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)} "
+              f"{bench_summary(data) if data else ''}")
+        for spike in data.get("spikes") or []:
+            print(bench_spike_line(spike))
+        if not data:
             print(proc.stdout[-2000:], proc.stderr[-2000:])
     return results
 
@@ -271,6 +309,10 @@ def main():
     parser.add_argument("--size", default="960x540")
     parser.add_argument("--churn", default="1-1000")
     parser.add_argument("--churn-color", action="store_true")
+    parser.add_argument("--spike", default="4", help="spike budget as a multiple of the mean")
+    parser.add_argument("--no-attribute", action="store_true",
+                        help="do not attribute a frame to its slowest system")
+    parser.add_argument("--fps", default="60", help="fixed step of a bench run, 0 measures it")
     parser.add_argument("--update-baseline", action="store_true")
     args = parser.parse_args()
 
@@ -286,7 +328,9 @@ def main():
                               args.frames or 24)
     else:
         scenes = args.scenes or sorted(glob.glob(os.path.join(BENCH_DIR, "*.flecs")))
-        extra = ["--churn", args.churn] + (["--churn-color"] if args.churn_color else [])
+        extra = ["--churn", args.churn, "--spike", args.spike, "--fps", args.fps]
+        extra += ["--churn-color"] if args.churn_color else []
+        extra += [] if args.no_attribute else ["--attribute"]
         results = run_bench(scenes, args.out or os.path.join(ROOT, "test", "integration", "out"), args.env,
                             args.frames or 300, extra)
 

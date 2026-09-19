@@ -1,0 +1,108 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+using box.texture
+using box.view
+using box.script
+
+$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
+
+$ { BakeSettings: {enabled: true, probe_spacing: 4, probe_max: 2} }
+
+$ { ScriptSettings: {enabled: true, templates_per_frame: 256, budget_ms: 1, nearest_first: true} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+camera {
+  Position: {0, 14, -420}
+  LookAt: {0, 6, 2000}
+  Velocity: {0, 0, 24}
+  Camera: {fov: 60}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {1200, 0.2, 1200}
+  Rgb: {80, 90, 85}
+  PbrMaterial: {roughness: 0.95}
+}
+
+template Prop {
+  prop tint: f32 = 0
+
+  base {
+    Position: {0, 0.5, 0}
+    Box: {1, 1, 1}
+    Rgb: {110 + tint, 130, 190 - tint}
+    PbrMaterial: {roughness: 0.8}
+  }
+
+  top {
+    Position: {0, 1.4, 0}
+    Sphere: {segments: 8, smooth: true, radius: 0.4}
+    Rgb: {230, 180 - tint, 90 + tint}
+  }
+}
+
+template Icon {
+  prop tint: f32 = 0
+
+  art {
+    Svg: {data: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#ff8800'/><stop offset='1' stop-color='#0088ff'/></linearGradient></defs><rect width='64' height='64' rx='8' fill='url(#g)'/><circle cx='32' cy='32' r='18' fill='none' stroke='#ffffff' stroke-width='4'/><path d='M12 52 L32 12 L52 52 Z' fill='#ffffff' fill-opacity='0.35'/><path d='M4 32 Q32 4 60 32 Q32 60 4 32 Z' fill='none' stroke='#203040' stroke-width='2'/></svg>", width: 256, height: 256}
+  }
+
+  panel {
+    Position: {0, 2.6, 0}
+    Quad: {3, 3}
+    Rgb: {255, 255, 255}
+    PbrMaterial: {roughness: 1}
+    PbrTextures: {albedo: art}
+  }
+}
+
+lights {
+  for i in 0..48 {
+    _ {
+      Position: {(i % 8) * 120 - 420, 12, (i / 8) * 130 - 390}
+      PointLight: {intensity: 1.5, range: 60}
+      Rgb: {255, 210, 160}
+    }
+  }
+}
+
+blocks {
+  for i in 0..40000 {
+    _ {
+      Position: {(i % 200) * 4 - 398, 1 + (i * 37) % 5, (i / 200) * 4 - 398}
+      Box: {2, 2 + (i * 37) % 5, 2}
+      Rgb: {(i * 37) % 60 + 120, (i * 17) % 60 + 120, (i * 91) % 60 + 130}
+      PbrMaterial: {roughness: 0.7}
+    }
+  }
+}
+
+props {
+  for i in 0..30000 {
+    _ {
+      Position: {(i % 150) * 6 - 447, 0, (i / 150) * 6 - 400}
+      Prop: {tint: (i * 17) % 80}
+    }
+  }
+}
+
+icons {
+  for i in 0..400 {
+    _ {
+      Position: {(i % 20) * 10 - 95, 0, (i / 20) * 12 - 400}
+      Icon: {tint: (i * 13) % 60}
+    }
+  }
+}
