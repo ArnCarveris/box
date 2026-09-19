@@ -103,6 +103,58 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Text",
+                "testcases": [
+                    "element_is_as_wide_as_its_string",
+                    "longer_string_is_wider",
+                    "empty_string_has_no_glyphs",
+                    "one_glyph_per_visible_character",
+                    "glyph_shows_a_region_of_the_atlas",
+                    "glyph_binds_the_atlas_texture",
+                    "glyph_is_drawn_over_its_element",
+                    "newline_starts_a_second_line",
+                    "line_height_sets_the_distance_between_lines",
+                    "layout_width_wraps_the_string",
+                    "wrapped_lines_stay_inside_the_width",
+                    "align_center_centres_the_lines",
+                    "align_right_puts_the_lines_against_the_edge",
+                    "changed_value_rebuilds_the_glyphs",
+                    "shorter_string_drops_the_glyphs_it_lost",
+                    "unchanged_text_keeps_its_glyphs",
+                    "removed_text_drops_its_glyphs",
+                    "text_sizes_the_row_that_holds_it",
+                    "layout_height_overrides_the_measured_height",
+                    "glyphs_take_the_color_of_the_element",
+                    "glyphs_composite_over_what_is_behind_them",
+                    "rect_of_the_element_wraps_the_string",
+                    "content_sized_row_wraps_around_its_label"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Font",
+                "testcases": [
+                    "default_font_is_the_one_the_engine_ships",
+                    "one_atlas_per_file_and_size",
+                    "missing_font_file_fails_once",
+                    "missing_font_draws_nothing",
+                    "size_scales_the_measurement",
+                    "font_of_an_ancestor_is_used",
+                    "own_font_wins_from_the_one_above_it",
+                    "another_font_rebuilds_the_glyphs",
+                    "atlas_grows_when_the_glyphs_do_not_fit",
+                    "grown_atlas_keeps_every_glyph",
+                    "grown_atlas_uploads_at_its_new_size",
+                    "measure_function_returns_the_size",
+                    "wrap_function_breaks_at_the_width",
+                    "label_function_creates_a_text_element",
+                    "label_function_reuses_the_element_it_made"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
