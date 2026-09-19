@@ -1,0 +1,29 @@
+{
+  "id": "bench_transition",
+  "type": "application",
+  "value": {
+    "description": "Benchmarks for extracting a scene that transitions its values",
+    "public": false,
+    "use": [
+      "box"
+    ]
+  },
+  "bench": {
+    "benchsuites": [
+      {
+        "id": "Extract",
+        "benchcases": [
+          "transitions_10k_x_10",
+          "no_transitions_10k",
+          "start_10k_transitions"
+        ]
+      },
+      {
+        "id": "Eval",
+        "benchcases": [
+          "eval_100k_records"
+        ]
+      }
+    ]
+  }
+}

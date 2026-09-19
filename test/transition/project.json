@@ -1,0 +1,54 @@
+{
+  "id": "transition",
+  "type": "application",
+  "value": {
+    "description": "Unit tests for the box.transition module and its displayed values",
+    "public": false,
+    "use": [
+      "box"
+    ]
+  },
+  "test": {
+    "testsuites": [
+      {
+        "id": "Transitions",
+        "testcases": [
+          "map_gives_an_entity_the_private_state",
+          "entity_without_a_map_has_no_state",
+          "first_assignment_does_not_move",
+          "assignment_starts_a_transition",
+          "transition_reaches_the_target",
+          "delay_holds_the_start_value",
+          "assignment_replaces_the_transition_in_flight",
+          "assigned_twice_in_a_frame_starts_from_the_displayed_value",
+          "linear_is_half_way_at_half_time",
+          "ease_in_lags_at_half_time",
+          "ease_out_leads_at_half_time",
+          "ease_in_out_is_symmetric",
+          "ease_is_half_way_at_half_time",
+          "prefab_map_is_inherited_by_an_instance",
+          "component_without_a_key_is_not_transitioned",
+          "unsupported_component_has_no_layout",
+          "color_bytes_are_interpolated",
+          "transition_value_pair_is_published",
+          "removing_the_map_removes_the_state"
+        ]
+      },
+      {
+        "id": "Display",
+        "testcases": [
+          "transitioning_color_reaches_the_instance",
+          "transitioning_position_moves_the_instance",
+          "transitioning_child_keeps_the_parent_transform",
+          "emissive_transitions_the_instance",
+          "tint_transitions_through_the_composed_tint",
+          "transitioning_entity_is_extracted_every_frame",
+          "finished_transition_stops_reextracting",
+          "entity_without_a_transition_is_not_reextracted"
+        ],
+        "setup": true,
+        "teardown": true
+      }
+    ]
+  }
+}
