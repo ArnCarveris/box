@@ -245,6 +245,21 @@ rebuilds no mesh), see `shapes_2d.flecs`.
 `Weather` blends overcast and fog amounts over the atmosphere with smooth transitions
 (`weather_overcast.flecs`, `weather_fog.flecs`); rain drives the wetness layer until the particles epic adds the emitter.
 
+`box.ui` roots a retained UI tree with a `Ui` component: the entity and everything below it is
+drawn by a view with an orthographic camera in logical pixels, composited over the views of the
+scene, with the origin in the middle of the view, x to the right and y up. `Ui.height` is the
+logical height the view shows and a height of zero follows the points of the surface divided by
+`Ui.scale`, so a tree keeps its size when the window is resized or moves to another resolution
+scale. A tree reuses `Position`, `Rotation`, `Scale` and the 2D shapes: depth comes from the walk
+of the tree instead of from positions, so a node is drawn over its parent and over the subtrees of
+its earlier siblings without an authored z and without z fighting, and reordering children with
+`ecs_set_child_order` reorders the draw once the tree is marked by setting `Ui` again. Every node
+joins the layer of its tree, which every other view hides, so a tree never shows up in the scene
+and the scene never shows up in the tree; a world whose only views are UI views still draws its
+active camera. `Ui.view` binds a view that the scene authored instead of creating one. See
+`test/integration/visual/ui_panels.flecs` and `ui_panels_small.flecs`, the same tree at two
+logical sizes.
+
 ## Tests
 
 ```sh
