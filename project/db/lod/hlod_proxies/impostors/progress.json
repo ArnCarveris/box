@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:26.224+00:00",
   "start_time": "2026-09-19T15:11:23.846+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T17:03:25.427+00:00",
   "dependencies": [
     "lod/hlod_proxies/merged_meshes"
   ]
