@@ -1,0 +1,23 @@
+{
+  "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/apps/box_app/etc/scenes/svg_storm.flecs",
+  "entities": 1001,
+  "static": 1,
+  "dynamic": 1000,
+  "churn": [0, 0],
+  "light_churn": 0,
+  "frames": 300,
+  "mean_ms": 0.171,
+  "p50_ms": 0.164,
+  "p99_ms": 0.303,
+  "max_ms": 0.418,
+  "fps": 5837.4,
+  "drawn": 1001,
+  "culled": 0,
+  "occluded": 0,
+  "shadow_static_rebuilds": 0,
+  "spike_factor": 4.00,
+  "spike_budget_ms": 0.685,
+  "attributed": false,
+  "spike_count": 0,
+  "spikes": []
+}
