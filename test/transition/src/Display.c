@@ -170,9 +170,9 @@ void Display_tint_transitions_through_the_composed_tint(void)
     test_flt(update->data.color[2], 1.0f - 100.0f / 255.0f);
 }
 
-void Display_transitioning_entity_is_extracted_every_frame(void)
+void Display_transitioning_entity_is_extracted_once(void)
 {
-    // transitions/transition_params
+    // transitions/renderer_eval
     test_int(ecs_script_run(w, "test",
         "using box.geometry\n"
         "using box.transform\n"
@@ -191,13 +191,18 @@ void Display_transitioning_entity_is_extracted_every_frame(void)
     box_packet_reset(&packet);
 
     ecs_set(w, e, Position, {100, 0, 0});
+    ecs_progress(w, 0.25);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 1);
+    test_int(packet.transitions.count, 1);
 
     int32_t frame;
     for (frame = 0; frame < 3; frame ++) {
+        box_packet_reset(&packet);
         ecs_progress(w, 0.25);
         box_render_extract(w, &packet);
-        test_int(packet.static_updates.count, 1);
-        box_packet_reset(&packet);
+        test_int(packet.static_updates.count, 0);
+        test_int(packet.transitions.count, 0);
     }
 }
 

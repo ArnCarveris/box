@@ -42,9 +42,24 @@
           "transitioning_child_keeps_the_parent_transform",
           "emissive_transitions_the_instance",
           "tint_transitions_through_the_composed_tint",
-          "transitioning_entity_is_extracted_every_frame",
+          "transitioning_entity_is_extracted_once",
           "finished_transition_stops_reextracting",
           "entity_without_a_transition_is_not_reextracted"
+        ],
+        "setup": true,
+        "teardown": true
+      },
+      {
+        "id": "Renderer",
+        "testcases": [
+          "static_entity_sends_a_transition_command",
+          "entity_without_a_transition_sends_none",
+          "computes_the_position_at_a_time",
+          "computes_the_color_at_a_time",
+          "keeps_the_final_value_when_it_ends",
+          "completion_report_clears_the_bookkeeping",
+          "member_transition_moves_one_float",
+          "split_channel_stays_on_the_game_side"
         ],
         "setup": true,
         "teardown": true
