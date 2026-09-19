@@ -1,0 +1,21 @@
+{
+  "project": "lod",
+  "timestamp": "2026-09-19T13:08:57Z",
+  "pass": 10,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.008199,
+  "tests": [
+    {"suite": "Hysteresis", "case": "without_a_current_level_the_threshold_decides", "status": "pass", "elapsed": 0.004453},
+    {"suite": "Hysteresis", "case": "a_level_holds_inside_the_band", "status": "pass", "elapsed": 0.005046},
+    {"suite": "Hysteresis", "case": "an_error_above_the_band_goes_finer", "status": "pass", "elapsed": 0.004439},
+    {"suite": "Hysteresis", "case": "an_error_below_the_band_goes_coarser", "status": "pass", "elapsed": 0.005300},
+    {"suite": "Hysteresis", "case": "the_band_only_widens_the_threshold", "status": "pass", "elapsed": 0.005006},
+    {"suite": "Hysteresis", "case": "without_a_band_the_switch_is_at_the_threshold", "status": "pass", "elapsed": 0.005129},
+    {"suite": "Hysteresis", "case": "the_finest_level_is_the_floor", "status": "pass", "elapsed": 0.005048},
+    {"suite": "Hysteresis", "case": "a_level_out_of_range_is_ignored", "status": "pass", "elapsed": 0.004869},
+    {"suite": "Hysteresis", "case": "a_single_level_is_always_selected", "status": "pass", "elapsed": 0.003644},
+    {"suite": "Hysteresis", "case": "a_coarser_threshold_selects_a_coarser_level", "status": "pass", "elapsed": 0.003654}
+  ]
+}

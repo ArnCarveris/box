@@ -1,0 +1,23 @@
+{
+  "project": "lod",
+  "timestamp": "2026-09-19T13:08:56Z",
+  "pass": 12,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.009589,
+  "tests": [
+    {"suite": "Screen", "case": "an_error_projects_at_the_nearest_point", "status": "pass", "elapsed": 0.004851},
+    {"suite": "Screen", "case": "twice_the_distance_halves_the_error", "status": "pass", "elapsed": 0.004766},
+    {"suite": "Screen", "case": "the_nearest_point_is_not_the_center", "status": "pass", "elapsed": 0.005810},
+    {"suite": "Screen", "case": "a_camera_inside_the_bounds_stays_finite", "status": "pass", "elapsed": 0.005370},
+    {"suite": "Screen", "case": "a_wider_fov_lowers_the_error", "status": "pass", "elapsed": 0.006298},
+    {"suite": "Screen", "case": "a_taller_viewport_raises_the_error", "status": "pass", "elapsed": 0.005555},
+    {"suite": "Screen", "case": "an_orthographic_error_ignores_the_distance", "status": "pass", "elapsed": 0.005346},
+    {"suite": "Screen", "case": "an_orthographic_error_follows_the_height", "status": "pass", "elapsed": 0.006345},
+    {"suite": "Screen", "case": "the_scale_is_the_error_of_one_unit", "status": "pass", "elapsed": 0.004654},
+    {"suite": "Screen", "case": "a_representation_without_error_is_free", "status": "pass", "elapsed": 0.004601},
+    {"suite": "Screen", "case": "zero_fields_take_the_camera_defaults", "status": "pass", "elapsed": 0.003896},
+    {"suite": "Screen", "case": "reversed_bounds_measure_the_same", "status": "pass", "elapsed": 0.003956}
+  ]
+}

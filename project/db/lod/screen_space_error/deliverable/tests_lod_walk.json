@@ -1,0 +1,14 @@
+{
+  "project": "lod",
+  "timestamp": "2026-09-19T13:08:57Z",
+  "pass": 3,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.003616,
+  "tests": [
+    {"suite": "Walk", "case": "a_walk_towards_and_away_never_oscillates", "status": "pass", "elapsed": 0.003517},
+    {"suite": "Walk", "case": "a_hovering_camera_holds_its_level", "status": "pass", "elapsed": 0.003562},
+    {"suite": "Walk", "case": "an_orthographic_zoom_never_oscillates", "status": "pass", "elapsed": 0.003456}
+  ]
+}
