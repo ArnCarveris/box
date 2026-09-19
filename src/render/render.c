@@ -67,6 +67,7 @@ static void box_render_state_dtor(
         if (state[i].layer_query) ecs_query_fini(state[i].layer_query);
         if (state[i].surfaces) ecs_query_fini(state[i].surfaces);
         if (state[i].instances) ecs_query_fini(state[i].instances);
+        if (state[i].transitions) ecs_query_fini(state[i].transitions);
     }
 }
 
@@ -90,6 +91,7 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxLight);
     ECS_IMPORT(world, BoxMaterial);
+    ECS_IMPORT(world, BoxTransition);
 
     ECS_META_COMPONENT(world, RenderMesh);
     ECS_META_COMPONENT(world, RenderTexture);

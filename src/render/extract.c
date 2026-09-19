@@ -61,12 +61,14 @@ static void box_render_update_aabb(
  * @param world The world
  * @param state The registry
  * @param e The entity
+ * @param time The time the transitions of the entity are displayed at
  * @param p The packet
  */
 static void box_extract_static(
     ecs_world_t *world,
     RenderState *state,
     ecs_entity_t e,
+    double time,
     box_packet_t *p)
 {
     const RenderMesh *mesh = ecs_get(world, e, RenderMesh);
@@ -109,7 +111,7 @@ static void box_extract_static(
     update->slot = inst->slot;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
         state->textured, state->tiled, state->shaped, state->layered ? state : NULL,
-        inst->depth, &update->data);
+        box_render_transition(world, state, e), time, inst->depth, &update->data);
     if (state->shadowless && !box_render_casts_shadow(world, e)) {
         box_instance_set_caster(&update->data, false);
     }
@@ -155,6 +157,7 @@ void box_render_extract_dynamic(
     bool tiled = state->tiled;
     bool shaped = state->shaped;
     const RenderState *layers = state->layered ? state : NULL;
+    double time = ecs_get_world_info(world)->world_time_total;
     ecs_iter_t it = ecs_query_iter(world, state->dynamic);
     while (ecs_query_next(&it)) {
         RenderMesh *mesh = ecs_field(&it, RenderMesh, 0);
@@ -188,7 +191,9 @@ void box_render_extract_dynamic(
 
             box_instance_t *data = box_vec_push(&p->dynamic_instances);
             box_render_fill_instance(world, it.entities[i], &mesh[i], &transform[i], false,
-                textured, tiled, shaped, layers, inst[i].depth, data);
+                textured, tiled, shaped, layers,
+                box_render_transition(world, state, it.entities[i]), time,
+                inst[i].depth, data);
             if (masked || shadowless) {
                 bool caster = !masked ||
                     box_layer_shown(inst[i].layer_mask, caster_mask, strict);
@@ -240,11 +245,16 @@ void box_render_extract(
     box_render_extract_meshes(state, p);
     box_render_extract_textures(state, p);
 
+    double time = ecs_get_world_info(world)->world_time_total;
+    if (state->transitioned) {
+        box_render_extract_transitions(world, state, time);
+    }
+
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->dirty); i ++) {
         ecs_entity_t e = ecs_vec_get_t(&state->dirty, ecs_entity_t, i)[0];
         if (ecs_is_alive(world, e) && ecs_has(world, e, RenderMesh)) {
-            box_extract_static(world, state, e, p);
+            box_extract_static(world, state, e, time, p);
         }
     }
 
@@ -394,6 +404,13 @@ void box_render_extract_init(
             { .id = ecs_id(RenderInstance), .inout = EcsInOut },
             { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
         }
+    });
+    state->transitions = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(TransitionState), .inout = EcsInOut },
+            { .id = ecs_id(RenderInstance), .inout = EcsInOutNone }
+        },
+        .cache_kind = EcsQueryCacheAuto
     });
     state->emitters = ecs_query(world, {
         .terms = {

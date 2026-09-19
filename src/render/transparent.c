@@ -279,6 +279,7 @@ void box_render_extract_transparent(
     }
 
     box_render_sort_keys(world, state, v);
+    double time = ecs_get_world_info(world)->world_time_total;
     box_sort_key_t *keys = ecs_vec_first_t(&state->sort, box_sort_key_t);
     ecs_entity_t *entities = ecs_vec_first_t(&state->transparent, ecs_entity_t);
     bool masked = v->caster_mask != BOX_VIEW_LAYER_ALL || v->strict_layers;
@@ -303,6 +304,7 @@ void box_render_extract_transparent(
         entry->depth = keys[i].depth;
         box_render_fill_instance(world, e, mesh, transform, false, state->textured,
             state->tiled, state->shaped, state->layered ? state : NULL,
+            box_render_transition(world, state, e), time,
             inst ? inst->depth : 0.0f, &entry->data);
         if (masked) {
             const RenderInstance *record = ecs_get(world, e, RenderInstance);

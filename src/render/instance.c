@@ -165,6 +165,19 @@ static void box_render_on_shaped(
     }
 }
 
+/** A transition exists, so extract resolves the displayed values of instances.
+ *
+ * @param it Iterator over the entities that gained the state
+ */
+static void box_render_on_transitioned(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (state) {
+        state->transitioned = true;
+    }
+}
+
 /** An opacity exists, so extract resolves the alpha of changed entities.
  *
  * @param it Iterator over the entities that gained the component
@@ -423,6 +436,128 @@ done:
     return;
 }
 
+const TransitionState* box_render_transition(
+    const ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e)
+{
+    return state->transitioned ? ecs_get(world, e, TransitionState) : NULL;
+}
+
+void box_render_extract_transitions(
+    ecs_world_t *world,
+    RenderState *state,
+    double time)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->transitions);
+    while (ecs_query_next(&it)) {
+        TransitionState *transition = ecs_field(&it, TransitionState, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (!transition[i].dirty) {
+                continue;
+            }
+
+            box_render_mark_dirty(world, it.entities[i]);
+            if (time >= transition[i].until) {
+                transition[i].dirty = false;
+            }
+        }
+    }
+}
+
+/** Read a component value, replaced by the value a transition displays.
+ *
+ * @param transition The transitions of the entity, NULL when it has none
+ * @param component The component
+ * @param time The time the transitions are displayed at
+ * @param value The authored value, NULL when the entity has no such component
+ * @param buffer Scratch of the size of the component
+ * @param size Size of the component
+ * @return The value to read, which is the buffer while a transition moves it
+ */
+static const void* box_render_displayed(
+    const TransitionState *transition,
+    ecs_entity_t component,
+    double time,
+    const void *value,
+    void *buffer,
+    size_t size)
+{
+    const void *result = value;
+    if (!transition || !value) {
+        goto done;
+    }
+
+    memcpy(buffer, value, size);
+    if (box_transition_display(transition, component, time, buffer)) {
+        result = buffer;
+    }
+
+done:
+    return result;
+}
+
+/** Compose the world transform an entity displays from its transitioned pose.
+ *
+ * The pose components keep the values the author assigned, so the matrix the
+ * transform module wrote is not the one a view shows while a transition moves
+ * one of them: the local pose is composed again from what is displayed and put
+ * back under the world transform of the parent.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param transition The transitions of the entity
+ * @param time The time the transitions are displayed at
+ * @param out Receives the displayed world transform
+ * @return true when a transition moves the pose of the entity
+ */
+static bool box_render_display_transform(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const TransitionState *transition,
+    double time,
+    WorldTransform *out)
+{
+    bool result = false;
+    if (ecs_has_id(world, e, ManualTransform)) {
+        goto done;
+    }
+
+    Position position;
+    Rotation rotation;
+    Scale scale;
+    const Position *p = ecs_get(world, e, Position);
+    const Rotation *r = ecs_get(world, e, Rotation);
+    const Scale *s = ecs_get(world, e, Scale);
+    const Orientation *o = ecs_get(world, e, Orientation);
+
+    p = box_render_displayed(transition, ecs_id(Position), time, p,
+        &position, sizeof(Position));
+    r = box_render_displayed(transition, ecs_id(Rotation), time, r,
+        &rotation, sizeof(Rotation));
+    s = box_render_displayed(transition, ecs_id(Scale), time, s,
+        &scale, sizeof(Scale));
+    result = p == &position || r == &rotation || s == &scale;
+    if (!result) {
+        goto done;
+    }
+
+    mat4 parent = mat4_identity();
+    ecs_entity_t ancestor = box_hierarchy_parent(world, e);
+    const WorldTransform *above = ancestor ?
+        ecs_get(world, ancestor, WorldTransform) : NULL;
+    if (above) {
+        parent = above->m;
+    }
+
+    mat4 local = box_transform_compose(p, r, s, o);
+
+    out->m = mat4_mul(&parent, &local);
+done:
+    return result;
+}
+
 void box_render_fill_instance(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -433,9 +568,18 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     const RenderState *layers,
+    const TransitionState *transition,
+    double time,
     float depth,
     box_instance_t *out)
 {
+    WorldTransform displayed;
+    if (transition && box_render_display_transform(
+        world, e, transition, time, &displayed))
+    {
+        transform = &displayed;
+    }
+
     mat4 scale = mat4_scaling(mesh->scale);
     mat4 m = mat4_mul(&transform->m, &scale);
     m.v[14] += depth;
@@ -448,11 +592,21 @@ void box_render_fill_instance(
         out->transform[row * 4 + 3] = m.v[12 + row];
     }
 
-    const Opacity *opacity = ecs_get(world, e, Opacity);
-    box_render_color(ecs_get(world, e, Rgb), ecs_get(world, e, ActualTint),
-        opacity ? opacity->value : 1.0f, out->color);
+    Opacity opacity_value;
+    Rgb rgb_value;
+    ActualTint tint_value;
+    Emissive emissive_value;
+    const Opacity *opacity = box_render_displayed(transition, ecs_id(Opacity),
+        time, ecs_get(world, e, Opacity), &opacity_value, sizeof(Opacity));
+    const Rgb *rgb = box_render_displayed(transition, ecs_id(Rgb),
+        time, ecs_get(world, e, Rgb), &rgb_value, sizeof(Rgb));
+    const ActualTint *tint = box_render_displayed(transition, ecs_id(ActualTint),
+        time, ecs_get(world, e, ActualTint), &tint_value, sizeof(ActualTint));
 
-    const Emissive *emissive = ecs_get(world, e, Emissive);
+    box_render_color(rgb, tint, opacity ? opacity->value : 1.0f, out->color);
+
+    const Emissive *emissive = box_render_displayed(transition, ecs_id(Emissive),
+        time, ecs_get(world, e, Emissive), &emissive_value, sizeof(Emissive));
     float strength = emissive ? emissive->strength : 0.0f;
     out->emissive[0] = emissive ? box_srgb_to_linear(emissive->color.r) * strength : 0.0f;
     out->emissive[1] = emissive ? box_srgb_to_linear(emissive->color.g) * strength : 0.0f;
@@ -500,6 +654,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(TextureTiling));
     box_render_watch(world, ecs_id(TextureWrap));
     box_render_watch(world, ecs_id(RenderShape2D));
+    box_render_watch_flag(world, ecs_id(TransitionState), box_render_on_transitioned);
     box_render_watch_tiling(world, ecs_id(TextureTransform));
     box_render_watch_tiling(world, ecs_id(TextureTiling));
     box_render_watch_tiling(world, ecs_id(TextureWrap));

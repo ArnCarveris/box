@@ -16,6 +16,7 @@
 #include "../geometry/mesh_gen.h"
 #include "../view/view_internal.h"
 #include "../transform/transform_internal.h"
+#include "../transition/transition_internal.h"
 
 /** Contiguous run of the static slots of a mesh that share a layer mask */
 typedef struct box_slot_group_t {
@@ -124,6 +125,7 @@ typedef struct RenderState {
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
     bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
+    bool transitioned;        /**< A transition exists, so instances resolve displayed values */
     bool layers_dirty;        /**< The registration list changed and must be sent again */
     bool layers_reported;     /**< The layer limit was already logged */
     ecs_vec_t layers;         /**< box_layer_t in application order, index is the layer bit */
@@ -154,6 +156,7 @@ typedef struct RenderState {
     ecs_query_t *layer_query; /**< Entities holding a MaterialLayer registration */
     ecs_query_t *surfaces;    /**< Surfaces with a renderer */
     ecs_query_t *instances;   /**< All instances, used by the debug validation */
+    ecs_query_t *transitions; /**< Instances whose displayed value a transition moves */
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
@@ -472,6 +475,8 @@ void box_render_instance_bounds(
  * @param tiled The world holds tiling components, so the uv transform is derived
  * @param shaped The world holds 2D shapes, so the shape words are derived
  * @param layers The registry when a material enables a layer, NULL when none does
+ * @param transition The transitions of the entity, NULL when it has none
+ * @param time The time the transitions are displayed at
  * @param depth Offset along the world z axis, zero outside a UI tree
  * @param out The instance to fill
  */
@@ -485,8 +490,33 @@ void box_render_fill_instance(
     bool tiled,
     bool shaped,
     const RenderState *layers,
+    const TransitionState *transition,
+    double time,
     float depth,
     box_instance_t *out);
+
+/** Get the transitions of an entity when the world has any.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The entity
+ * @return The transitions of the entity, NULL when it has none
+ */
+const TransitionState* box_render_transition(
+    const ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e);
+
+/** Queue every entity a transition still moves for extraction.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param time The time of the frame
+ */
+void box_render_extract_transitions(
+    ecs_world_t *world,
+    RenderState *state,
+    double time);
 
 /** Give the instance of an entity an offset along the world z axis.
  *
