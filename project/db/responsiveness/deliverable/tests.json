@@ -1,0 +1,6662 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T01:54:56Z",
+  "pass": 938,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 4.2349,
+  "tests": [
+    {
+      "suite": "Terminal",
+      "case": "folder_created_and_removed",
+      "status": "pass",
+      "elapsed": 0.021078,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "resources_subfolder",
+      "status": "pass",
+      "elapsed": 0.020811,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "session_dir_under_process_dir",
+      "status": "pass",
+      "elapsed": 0.021063,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "session_dir_kept_after_set",
+      "status": "pass",
+      "elapsed": 0.020244,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "log_contains_line_and_result",
+      "status": "pass",
+      "elapsed": 0.021169,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "commands_lists_last_lines",
+      "status": "pass",
+      "elapsed": 0.021408,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "commands_defaults_to_all_lines",
+      "status": "pass",
+      "elapsed": 0.021185,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "output_written_on_input",
+      "status": "pass",
+      "elapsed": 0.021153,
+      "project": "command"
+    },
+    {
+      "suite": "Terminal",
+      "case": "script_session_runs_command",
+      "status": "pass",
+      "elapsed": 0.021071,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "prints_the_window_of_the_last_second",
+      "status": "pass",
+      "elapsed": 0.02026,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "worst_frame_is_the_slowest_of_the_window",
+      "status": "pass",
+      "elapsed": 0.019801,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "on_enables_the_overlay",
+      "status": "pass",
+      "elapsed": 0.019969,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "off_disables_the_overlay",
+      "status": "pass",
+      "elapsed": 0.019964,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "switching_keeps_the_panel_settings",
+      "status": "pass",
+      "elapsed": 0.019432,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "first_call_starts_the_window_without_the_panel",
+      "status": "pass",
+      "elapsed": 0.019967,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_falls_back_to_the_current_frame",
+      "status": "pass",
+      "elapsed": 0.018559,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_follows_the_first_call",
+      "status": "pass",
+      "elapsed": 0.020823,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "unknown_state_is_an_error",
+      "status": "pass",
+      "elapsed": 0.020596,
+      "project": "command"
+    },
+    {
+      "suite": "Fps",
+      "case": "help_lists_the_command",
+      "status": "pass",
+      "elapsed": 0.020361,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "command_with_arguments",
+      "status": "pass",
+      "elapsed": 0.0202,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "quoted_argument",
+      "status": "pass",
+      "elapsed": 0.019993,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "bracketed_argument",
+      "status": "pass",
+      "elapsed": 0.020171,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "unknown_command",
+      "status": "pass",
+      "elapsed": 0.01987,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "too_many_arguments",
+      "status": "pass",
+      "elapsed": 0.019713,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "missing_argument",
+      "status": "pass",
+      "elapsed": 0.019891,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "invalid_i32_argument",
+      "status": "pass",
+      "elapsed": 0.023303,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "f64_argument",
+      "status": "pass",
+      "elapsed": 0.0198,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "entity_argument",
+      "status": "pass",
+      "elapsed": 0.02056,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "entity_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.01961,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "unknown_entity_argument",
+      "status": "pass",
+      "elapsed": 0.019721,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "optional_argument_omitted",
+      "status": "pass",
+      "elapsed": 0.019239,
+      "project": "command"
+    },
+    {
+      "suite": "Dispatch",
+      "case": "help_lists_commands",
+      "status": "pass",
+      "elapsed": 0.0195,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "read_source",
+      "status": "pass",
+      "elapsed": 0.025143,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "read_by_basename",
+      "status": "pass",
+      "elapsed": 0.019975,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "unknown_file",
+      "status": "pass",
+      "elapsed": 0.019896,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "write_changes_world",
+      "status": "pass",
+      "elapsed": 0.019824,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "write_parse_error_keeps_state",
+      "status": "pass",
+      "elapsed": 0.02087,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "grep_lines",
+      "status": "pass",
+      "elapsed": 0.019415,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_changes_world",
+      "status": "pass",
+      "elapsed": 0.019077,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_compounds",
+      "status": "pass",
+      "elapsed": 0.01897,
+      "project": "command"
+    },
+    {
+      "suite": "Script",
+      "case": "patch_hunk_mismatch",
+      "status": "pass",
+      "elapsed": 0.019306,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "single_hunk",
+      "status": "pass",
+      "elapsed": 0.004856,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "multiple_hunks",
+      "status": "pass",
+      "elapsed": 0.004696,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "addition_at_end",
+      "status": "pass",
+      "elapsed": 0.004602,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "deletion",
+      "status": "pass",
+      "elapsed": 0.004507,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "diff_headers_ignored",
+      "status": "pass",
+      "elapsed": 0.004495,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "context_mismatch",
+      "status": "pass",
+      "elapsed": 0.004174,
+      "project": "command"
+    },
+    {
+      "suite": "Patch",
+      "case": "no_hunks",
+      "status": "pass",
+      "elapsed": 0.004198,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "filter_by_level",
+      "status": "pass",
+      "elapsed": 0.018363,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "numeric_level",
+      "status": "pass",
+      "elapsed": 0.017881,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "oldest_first",
+      "status": "pass",
+      "elapsed": 0.021232,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "count_cap",
+      "status": "pass",
+      "elapsed": 0.018689,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "wrap_around",
+      "status": "pass",
+      "elapsed": 0.022941,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "log_file_in_process_dir",
+      "status": "pass",
+      "elapsed": 0.018634,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "default_arguments",
+      "status": "pass",
+      "elapsed": 0.018199,
+      "project": "command"
+    },
+    {
+      "suite": "Logs",
+      "case": "invalid_level_name",
+      "status": "pass",
+      "elapsed": 0.019769,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "new_returns_session",
+      "status": "pass",
+      "elapsed": 0.019985,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "new_names_are_unique",
+      "status": "pass",
+      "elapsed": 0.021089,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "close_deletes_session",
+      "status": "pass",
+      "elapsed": 0.019602,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "close_unknown_session",
+      "status": "pass",
+      "elapsed": 0.021868,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_returns_output",
+      "status": "pass",
+      "elapsed": 0.018697,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_url_encoded_cmd",
+      "status": "pass",
+      "elapsed": 0.019924,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_post_body",
+      "status": "pass",
+      "elapsed": 0.020051,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_unknown_session",
+      "status": "pass",
+      "elapsed": 0.020076,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_error_gives_400",
+      "status": "pass",
+      "elapsed": 0.02076,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "exec_without_cmd",
+      "status": "pass",
+      "elapsed": 0.018472,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_returns_file",
+      "status": "pass",
+      "elapsed": 0.020485,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_png_content_type",
+      "status": "pass",
+      "elapsed": 0.019445,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_traversal_refused",
+      "status": "pass",
+      "elapsed": 0.01921,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "resource_missing_gives_404",
+      "status": "pass",
+      "elapsed": 0.020228,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "unknown_endpoint_gives_404",
+      "status": "pass",
+      "elapsed": 0.018923,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "dequeue_system_runs",
+      "status": "pass",
+      "elapsed": 0.021071,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "app_port_starts_server",
+      "status": "pass",
+      "elapsed": 0.019844,
+      "project": "command"
+    },
+    {
+      "suite": "Http",
+      "case": "port_zero_stops_server",
+      "status": "pass",
+      "elapsed": 0.020899,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_changes_cwd",
+      "status": "pass",
+      "elapsed": 0.019344,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_parent",
+      "status": "pass",
+      "elapsed": 0.018294,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_root",
+      "status": "pass",
+      "elapsed": 0.018976,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_unknown_entity",
+      "status": "pass",
+      "elapsed": 0.018325,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_lists_children",
+      "status": "pass",
+      "elapsed": 0.019424,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_hides_components",
+      "status": "pass",
+      "elapsed": 0.018881,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cat_shows_components",
+      "status": "pass",
+      "elapsed": 0.019734,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cat_missing_entity",
+      "status": "pass",
+      "elapsed": 0.018369,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pwd_root",
+      "status": "pass",
+      "elapsed": 0.022458,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pwd_after_cd",
+      "status": "pass",
+      "elapsed": 0.018592,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.018869,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_creates_entity",
+      "status": "pass",
+      "elapsed": 0.018471,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_nested_path",
+      "status": "pass",
+      "elapsed": 0.01836,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "rm_deletes_entity",
+      "status": "pass",
+      "elapsed": 0.019744,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_renames_entity",
+      "status": "pass",
+      "elapsed": 0.019488,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_reparents_entity",
+      "status": "pass",
+      "elapsed": 0.019505,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_existing_target",
+      "status": "pass",
+      "elapsed": 0.018595,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_component",
+      "status": "pass",
+      "elapsed": 0.019961,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_pair",
+      "status": "pass",
+      "elapsed": 0.018868,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "add_unknown_component",
+      "status": "pass",
+      "elapsed": 0.020771,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "remove_component",
+      "status": "pass",
+      "elapsed": 0.018386,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_raw_id",
+      "status": "pass",
+      "elapsed": 0.020437,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_escaped_dot",
+      "status": "pass",
+      "elapsed": 0.018218,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "path_child_of_dotted_name",
+      "status": "pass",
+      "elapsed": 0.018358,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_escapes_dots",
+      "status": "pass",
+      "elapsed": 0.019631,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "component_by_symbol",
+      "status": "pass",
+      "elapsed": 0.020532,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "pair_by_symbol",
+      "status": "pass",
+      "elapsed": 0.019632,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "unknown_symbol_is_error",
+      "status": "pass",
+      "elapsed": 0.018521,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "set_component_value",
+      "status": "pass",
+      "elapsed": 0.01937,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "set_invalid_value",
+      "status": "pass",
+      "elapsed": 0.019913,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_component_value",
+      "status": "pass",
+      "elapsed": 0.025062,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_all_components",
+      "status": "pass",
+      "elapsed": 0.01969,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "get_missing_component",
+      "status": "pass",
+      "elapsed": 0.022457,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "clear_removes_components",
+      "status": "pass",
+      "elapsed": 0.018607,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_component",
+      "status": "pass",
+      "elapsed": 0.019112,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_query_expression",
+      "status": "pass",
+      "elapsed": 0.019479,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "has_invalid_query",
+      "status": "pass",
+      "elapsed": 0.019301,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_prints_doc",
+      "status": "pass",
+      "elapsed": 0.024909,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_command_brief",
+      "status": "pass",
+      "elapsed": 0.025709,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "man_unknown_entity",
+      "status": "pass",
+      "elapsed": 0.02727,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "unknown_entity_argument",
+      "status": "pass",
+      "elapsed": 0.028914,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.028324,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "absolute_path",
+      "status": "pass",
+      "elapsed": 0.028719,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "root_is_not_an_entity",
+      "status": "pass",
+      "elapsed": 0.033001,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "ls_lists_parent_children",
+      "status": "pass",
+      "elapsed": 0.033637,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "cd_into_parent_child",
+      "status": "pass",
+      "elapsed": 0.019316,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_parent_child_keeps_storage",
+      "status": "pass",
+      "elapsed": 0.020347,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "mv_parent_child_to_root",
+      "status": "pass",
+      "elapsed": 0.018023,
+      "project": "command"
+    },
+    {
+      "suite": "Shell",
+      "case": "touch_under_parent_child",
+      "status": "pass",
+      "elapsed": 0.018832,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_creates_query",
+      "status": "pass",
+      "elapsed": 0.018135,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_replaces_query",
+      "status": "pass",
+      "elapsed": 0.018882,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "query_invalid_expression",
+      "status": "pass",
+      "elapsed": 0.018694,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "iter_and_next_in_chunks",
+      "status": "pass",
+      "elapsed": 0.019958,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "next_past_the_end",
+      "status": "pass",
+      "elapsed": 0.018412,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "next_without_iter",
+      "status": "pass",
+      "elapsed": 0.019176,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "done_finishes_iterator",
+      "status": "pass",
+      "elapsed": 0.019785,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "other_command_exits_iteration",
+      "status": "pass",
+      "elapsed": 0.018331,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_names",
+      "status": "pass",
+      "elapsed": 0.017972,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_component_names",
+      "status": "pass",
+      "elapsed": 0.018615,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_matches_values",
+      "status": "pass",
+      "elapsed": 0.01915,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_with_component_filter",
+      "status": "pass",
+      "elapsed": 0.019544,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_unknown_component",
+      "status": "pass",
+      "elapsed": 0.018051,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "grep_recur_nested_children",
+      "status": "pass",
+      "elapsed": 0.018055,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "output_capped_at_limit",
+      "status": "pass",
+      "elapsed": 0.020208,
+      "project": "command"
+    },
+    {
+      "suite": "Search",
+      "case": "delete_session_while_iterating",
+      "status": "pass",
+      "elapsed": 0.018818,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "prints_path_of_the_active_camera",
+      "status": "pass",
+      "elapsed": 0.026924,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "path_uses_the_frame_number",
+      "status": "pass",
+      "elapsed": 0.026408,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "named_camera",
+      "status": "pass",
+      "elapsed": 0.02802,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "multiple_cameras",
+      "status": "pass",
+      "elapsed": 0.026251,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "camera_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.027042,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "unknown_camera",
+      "status": "pass",
+      "elapsed": 0.0259,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "entity_without_camera",
+      "status": "pass",
+      "elapsed": 0.028447,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "without_active_camera",
+      "status": "pass",
+      "elapsed": 0.028678,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "second_request_replaces_the_first",
+      "status": "pass",
+      "elapsed": 0.028563,
+      "project": "command"
+    },
+    {
+      "suite": "Capture",
+      "case": "headless_run_writes_the_png",
+      "status": "pass",
+      "elapsed": 0.36236,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "prints_the_image_path",
+      "status": "pass",
+      "elapsed": 0.026242,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "numbers_the_images_per_session",
+      "status": "pass",
+      "elapsed": 0.027701,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "unknown_subject",
+      "status": "pass",
+      "elapsed": 0.027225,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "without_a_subject",
+      "status": "pass",
+      "elapsed": 0.027069,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "subject_relative_to_cwd",
+      "status": "pass",
+      "elapsed": 0.027891,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "frames_the_camera_on_the_bounds",
+      "status": "pass",
+      "elapsed": 0.027215,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "instantiates_a_prefab",
+      "status": "pass",
+      "elapsed": 0.029722,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "instantiates_a_template",
+      "status": "pass",
+      "elapsed": 0.026691,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "cleans_up_when_the_image_appears",
+      "status": "pass",
+      "elapsed": 0.027359,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "live_entity_joins_and_leaves_the_layer",
+      "status": "pass",
+      "elapsed": 0.027461,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "live_subject_is_rendered_alone",
+      "status": "pass",
+      "elapsed": 0.027339,
+      "project": "command"
+    },
+    {
+      "suite": "Render",
+      "case": "headless_run_writes_the_png",
+      "status": "pass",
+      "elapsed": 0.383335,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "unknown_session_gives_404",
+      "status": "pass",
+      "elapsed": 0.027873,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "unknown_camera_gives_400",
+      "status": "pass",
+      "elapsed": 0.026119,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "without_camera_gives_400",
+      "status": "pass",
+      "elapsed": 0.027624,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "first_request_sets_capture",
+      "status": "pass",
+      "elapsed": 0.026666,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "second_request_keeps_the_capture",
+      "status": "pass",
+      "elapsed": 0.030888,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "named_camera",
+      "status": "pass",
+      "elapsed": 0.031669,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "reply_allows_any_origin",
+      "status": "pass",
+      "elapsed": 0.027248,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "preflight_lists_methods",
+      "status": "pass",
+      "elapsed": 0.027523,
+      "project": "command"
+    },
+    {
+      "suite": "CaptureEndpoint",
+      "case": "headless_run_returns_the_png",
+      "status": "pass",
+      "elapsed": 0.370175,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "help_round_trip",
+      "status": "pass",
+      "elapsed": 0.019974,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "unknown_path_gives_404",
+      "status": "pass",
+      "elapsed": 0.017956,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "bad_command_gives_error_status",
+      "status": "pass",
+      "elapsed": 0.018886,
+      "project": "command"
+    },
+    {
+      "suite": "WasmRequest",
+      "case": "png_reply_is_base64",
+      "status": "pass",
+      "elapsed": 0.018887,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "empty",
+      "status": "pass",
+      "elapsed": 0.004183,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "one_byte",
+      "status": "pass",
+      "elapsed": 0.004163,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "two_bytes",
+      "status": "pass",
+      "elapsed": 0.004087,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "three_bytes",
+      "status": "pass",
+      "elapsed": 0.004367,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "longer_text",
+      "status": "pass",
+      "elapsed": 0.003802,
+      "project": "command"
+    },
+    {
+      "suite": "Base64",
+      "case": "binary_bytes",
+      "status": "pass",
+      "elapsed": 0.004129,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "runs_lines_in_order",
+      "status": "pass",
+      "elapsed": 0.020332,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "skips_comments_and_blanks",
+      "status": "pass",
+      "elapsed": 0.018343,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "missing_file_is_error",
+      "status": "pass",
+      "elapsed": 0.018361,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "quoted_argument_spans_lines",
+      "status": "pass",
+      "elapsed": 0.019013,
+      "project": "command"
+    },
+    {
+      "suite": "CommandScript",
+      "case": "log_copied_to_file",
+      "status": "pass",
+      "elapsed": 0.018694,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_press_queues_a_tap",
+      "status": "pass",
+      "elapsed": 0.030117,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_press_takes_a_duration",
+      "status": "pass",
+      "elapsed": 0.029317,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_down_and_up_hold_the_key",
+      "status": "pass",
+      "elapsed": 0.028243,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_unknown_key_is_an_error",
+      "status": "pass",
+      "elapsed": 0.026595,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "key_type_presses_one_key_per_character",
+      "status": "pass",
+      "elapsed": 0.026763,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_move_pins_the_cursor",
+      "status": "pass",
+      "elapsed": 0.018988,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_move_takes_normalized_coordinates",
+      "status": "pass",
+      "elapsed": 0.019018,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_invalid_position_is_an_error",
+      "status": "pass",
+      "elapsed": 0.018886,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_sweep_spreads_over_frames",
+      "status": "pass",
+      "elapsed": 0.018713,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_sweep_defaults_to_eight_steps",
+      "status": "pass",
+      "elapsed": 0.018707,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_click_presses_the_button",
+      "status": "pass",
+      "elapsed": 0.019825,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_drag_holds_the_button_over_the_sweep",
+      "status": "pass",
+      "elapsed": 0.019561,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "mouse_scroll_queues_the_offset",
+      "status": "pass",
+      "elapsed": 0.019753,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_reset_empties_the_queue",
+      "status": "pass",
+      "elapsed": 0.019978,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_focus_changes_the_flag",
+      "status": "pass",
+      "elapsed": 0.019737,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "input_wait_reports_the_pending_events",
+      "status": "pass",
+      "elapsed": 0.019173,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_press_holds_the_action_for_a_frame",
+      "status": "pass",
+      "elapsed": 0.018566,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_down_and_up_hold_the_action",
+      "status": "pass",
+      "elapsed": 0.018857,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_up_without_a_hold_is_an_error",
+      "status": "pass",
+      "elapsed": 0.018754,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_action_command_needs_an_action",
+      "status": "pass",
+      "elapsed": 0.018772,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_drag_holds_the_action_while_the_cursor_sweeps",
+      "status": "pass",
+      "elapsed": 0.019472,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "action_list_shows_the_bindings",
+      "status": "pass",
+      "elapsed": 0.018937,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "the_help_listing_includes_the_input_commands",
+      "status": "pass",
+      "elapsed": 0.018955,
+      "project": "command"
+    },
+    {
+      "suite": "InputCommands",
+      "case": "an_unknown_input_command_is_an_error",
+      "status": "pass",
+      "elapsed": 0.01884,
+      "project": "command"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_module_binds_the_movement_actions",
+      "status": "pass",
+      "elapsed": 0.01998,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "forward_moves_along_the_view",
+      "status": "pass",
+      "elapsed": 0.020248,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "back_moves_against_the_view",
+      "status": "pass",
+      "elapsed": 0.020215,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "strafing_moves_sideways",
+      "status": "pass",
+      "elapsed": 0.020124,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "up_and_down_move_the_height",
+      "status": "pass",
+      "elapsed": 0.019955,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_fast_modifier_multiplies_the_speed",
+      "status": "pass",
+      "elapsed": 0.020329,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_mouse_turns_the_camera_while_captured",
+      "status": "pass",
+      "elapsed": 0.01994,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_mouse_is_ignored_without_capture",
+      "status": "pass",
+      "elapsed": 0.019945,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_look_action_turns_without_capture",
+      "status": "pass",
+      "elapsed": 0.020645,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "sensitivity_scales_the_turn",
+      "status": "pass",
+      "elapsed": 0.020644,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "pitch_stops_short_of_straight_down",
+      "status": "pass",
+      "elapsed": 0.020639,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "yaw_turns_the_movement_with_the_view",
+      "status": "pass",
+      "elapsed": 0.020628,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "clearance_keeps_the_camera_above_the_terrain",
+      "status": "pass",
+      "elapsed": 0.020455,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "a_scene_rebinds_an_action",
+      "status": "pass",
+      "elapsed": 0.020399,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_controller_writes_orientation_and_lookat",
+      "status": "pass",
+      "elapsed": 0.020232,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_module_binds_the_character_actions",
+      "status": "pass",
+      "elapsed": 0.020386,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_character_stands_at_eye_height",
+      "status": "pass",
+      "elapsed": 0.018781,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "gravity_pulls_the_character_down",
+      "status": "pass",
+      "elapsed": 0.019715,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "walking_moves_in_the_view_plane",
+      "status": "pass",
+      "elapsed": 0.019249,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "running_is_faster_than_walking",
+      "status": "pass",
+      "elapsed": 0.019547,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_jump_rises_and_lands",
+      "status": "pass",
+      "elapsed": 0.018881,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_jump_needs_the_ground",
+      "status": "pass",
+      "elapsed": 0.018686,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "crouching_lowers_the_eye",
+      "status": "pass",
+      "elapsed": 0.018671,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_fly_toggle_switches_to_free_flight",
+      "status": "pass",
+      "elapsed": 0.019933,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_terrain_sets_the_ground",
+      "status": "pass",
+      "elapsed": 0.017443,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_ground_height_holds_the_character",
+      "status": "pass",
+      "elapsed": 0.017095,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_controller_writes_orientation_and_lookat",
+      "status": "pass",
+      "elapsed": 0.017203,
+      "project": "controller"
+    },
+    {
+      "suite": "Args",
+      "case": "no_args_defaults",
+      "status": "pass",
+      "elapsed": 0.010311,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "headless_requires_stop_condition",
+      "status": "pass",
+      "elapsed": 0.010432,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "headless_with_frames",
+      "status": "pass",
+      "elapsed": 0.010432,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "timeout_seconds",
+      "status": "pass",
+      "elapsed": 0.010239,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "timeout_infinite",
+      "status": "pass",
+      "elapsed": 0.010415,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "cpu_budget",
+      "status": "pass",
+      "elapsed": 0.010485,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "fps",
+      "status": "pass",
+      "elapsed": 0.010196,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "unknown_option_fails",
+      "status": "pass",
+      "elapsed": 0.010384,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "scene_file_loads",
+      "status": "pass",
+      "elapsed": 0.010115,
+      "project": "core"
+    },
+    {
+      "suite": "Args",
+      "case": "missing_scene_fails",
+      "status": "pass",
+      "elapsed": 0.009395,
+      "project": "core"
+    },
+    {
+      "suite": "App",
+      "case": "stops_after_frames",
+      "status": "pass",
+      "elapsed": 0.009157,
+      "project": "core"
+    },
+    {
+      "suite": "App",
+      "case": "stops_after_timeout",
+      "status": "pass",
+      "elapsed": 0.20919,
+      "project": "core"
+    },
+    {
+      "suite": "App",
+      "case": "stops_on_quit",
+      "status": "pass",
+      "elapsed": 0.009672,
+      "project": "core"
+    },
+    {
+      "suite": "App",
+      "case": "process_dir_created_and_removed",
+      "status": "pass",
+      "elapsed": 0.009368,
+      "project": "core"
+    },
+    {
+      "suite": "App",
+      "case": "cpu_budget_slows_loop",
+      "status": "pass",
+      "elapsed": 0.030319,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "init_all_free",
+      "status": "pass",
+      "elapsed": 0.004273,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "acquire_submit_wait_release",
+      "status": "pass",
+      "elapsed": 0.003722,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "poll_returns_null_when_empty",
+      "status": "pass",
+      "elapsed": 0.004046,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "fifo_order",
+      "status": "pass",
+      "elapsed": 0.004044,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "acquire_returns_null_after_stop",
+      "status": "pass",
+      "elapsed": 0.003875,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "acquire_blocks_until_release",
+      "status": "pass",
+      "elapsed": 0.060681,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "wait_blocks_until_submit",
+      "status": "pass",
+      "elapsed": 0.063622,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "web_startup_keeps_packet_until_ready",
+      "status": "pass",
+      "elapsed": 0.018816,
+      "project": "core"
+    },
+    {
+      "suite": "Queue",
+      "case": "web_startup_full_pool_recovers",
+      "status": "pass",
+      "elapsed": 0.016348,
+      "project": "core"
+    },
+    {
+      "suite": "Surface",
+      "case": "headless_surface_reports_size",
+      "status": "pass",
+      "elapsed": 0.31303,
+      "project": "core"
+    },
+    {
+      "suite": "Surface",
+      "case": "headless_surface_writes_png",
+      "status": "pass",
+      "elapsed": 0.315682,
+      "project": "core"
+    },
+    {
+      "suite": "Surface",
+      "case": "write_nth_adds_frame_suffix",
+      "status": "pass",
+      "elapsed": 0.309482,
+      "project": "core"
+    },
+    {
+      "suite": "Flat",
+      "case": "quad",
+      "status": "pass",
+      "elapsed": 0.004418,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "triangle",
+      "status": "pass",
+      "elapsed": 0.00475,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "right_triangle",
+      "status": "pass",
+      "elapsed": 0.004624,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon_matches_triangle_at_three_sides",
+      "status": "pass",
+      "elapsed": 0.004614,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon_clamps_minimum",
+      "status": "pass",
+      "elapsed": 0.004383,
+      "project": "geometry"
+    },
+    {
+      "suite": "Flat",
+      "case": "ngon",
+      "status": "pass",
+      "elapsed": 0.005163,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "box",
+      "status": "pass",
+      "elapsed": 0.005205,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box",
+      "status": "pass",
+      "elapsed": 0.004663,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box_clamps_radius",
+      "status": "pass",
+      "elapsed": 0.003804,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "rounded_box_clamps_segments",
+      "status": "pass",
+      "elapsed": 0.003972,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "triangle_prism",
+      "status": "pass",
+      "elapsed": 0.00372,
+      "project": "geometry"
+    },
+    {
+      "suite": "Box",
+      "case": "right_triangle_prism",
+      "status": "pass",
+      "elapsed": 0.003812,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "sphere_smooth",
+      "status": "pass",
+      "elapsed": 0.00447,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "sphere_flat",
+      "status": "pass",
+      "elapsed": 0.004409,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "hemisphere_smooth",
+      "status": "pass",
+      "elapsed": 0.003894,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "hemisphere_flat",
+      "status": "pass",
+      "elapsed": 0.003762,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_base_smooth",
+      "status": "pass",
+      "elapsed": 0.004211,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_base_flat",
+      "status": "pass",
+      "elapsed": 0.003938,
+      "project": "geometry"
+    },
+    {
+      "suite": "Round",
+      "case": "icosphere_subdivided",
+      "status": "pass",
+      "elapsed": 0.005031,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cone_smooth",
+      "status": "pass",
+      "elapsed": 0.003937,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cone_flat",
+      "status": "pass",
+      "elapsed": 0.004183,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cylinder_smooth",
+      "status": "pass",
+      "elapsed": 0.004072,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "cylinder_flat",
+      "status": "pass",
+      "elapsed": 0.004756,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "frustum_smooth",
+      "status": "pass",
+      "elapsed": 0.003814,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "frustum_flat",
+      "status": "pass",
+      "elapsed": 0.004555,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "capsule_smooth",
+      "status": "pass",
+      "elapsed": 0.004324,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "capsule_flat",
+      "status": "pass",
+      "elapsed": 0.004138,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_smooth",
+      "status": "pass",
+      "elapsed": 0.004524,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_flat",
+      "status": "pass",
+      "elapsed": 0.004477,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "tube_open_arc",
+      "status": "pass",
+      "elapsed": 0.003966,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "torus_smooth",
+      "status": "pass",
+      "elapsed": 0.004655,
+      "project": "geometry"
+    },
+    {
+      "suite": "Axis",
+      "case": "torus_flat",
+      "status": "pass",
+      "elapsed": 0.003877,
+      "project": "geometry"
+    },
+    {
+      "suite": "Input",
+      "case": "defaults_of_the_singleton",
+      "status": "pass",
+      "elapsed": 0.018417,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_is_set_for_one_frame",
+      "status": "pass",
+      "elapsed": 0.018082,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "held_key_keeps_its_state",
+      "status": "pass",
+      "elapsed": 0.018054,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "release_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.017964,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_and_release_in_one_frame_keeps_the_press",
+      "status": "pass",
+      "elapsed": 0.018137,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_buttons_use_their_own_slots",
+      "status": "pass",
+      "elapsed": 0.018056,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_holds_the_characters_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.018061,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_encodes_utf8",
+      "status": "pass",
+      "elapsed": 0.018204,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_stops_at_its_size",
+      "status": "pass",
+      "elapsed": 0.016702,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "scroll_accumulates_over_frames",
+      "status": "pass",
+      "elapsed": 0.016641,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_window_position_follows_the_events",
+      "status": "pass",
+      "elapsed": 0.017027,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_delta_is_the_movement_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.017135,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_view_and_normalized_come_from_the_surface",
+      "status": "pass",
+      "elapsed": 0.017095,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_center_is_the_origin_of_the_view",
+      "status": "pass",
+      "elapsed": 0.016493,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "a_new_world_is_focused",
+      "status": "pass",
+      "elapsed": 0.017029,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "focus_loss_clears_the_key_state",
+      "status": "pass",
+      "elapsed": 0.016843,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_presses_nothing",
+      "status": "pass",
+      "elapsed": 0.017713,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_does_not_jump_the_cursor",
+      "status": "pass",
+      "elapsed": 0.017345,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.017409,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_minimized",
+      "status": "pass",
+      "elapsed": 0.016904,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "injected_keys_are_applied_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.017032,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "minimize_event_sets_and_clears_the_flag",
+      "status": "pass",
+      "elapsed": 0.016891,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_of_one_frame_releases_the_next_frame",
+      "status": "pass",
+      "elapsed": 0.016718,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_with_a_duration_holds_the_key",
+      "status": "pass",
+      "elapsed": 0.016805,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_down_without_a_duration_stays_down",
+      "status": "pass",
+      "elapsed": 0.017251,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "delay_postpones_the_event",
+      "status": "pass",
+      "elapsed": 0.017277,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "platform_events_are_applied_before_injected",
+      "status": "pass",
+      "elapsed": 0.016985,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "events_of_one_frame_keep_their_order",
+      "status": "pass",
+      "elapsed": 0.01701,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_sweep_walks_the_cursor_over_frames",
+      "status": "pass",
+      "elapsed": 0.01715,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "pending_counts_the_queued_events",
+      "status": "pass",
+      "elapsed": 0.017139,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "reset_empties_the_queue_and_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.016808,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "printable_keys_are_ascii",
+      "status": "pass",
+      "elapsed": 0.016876,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "mouse_buttons_are_128_and_129",
+      "status": "pass",
+      "elapsed": 0.017127,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "spare_codes_are_unique_and_fit_the_table",
+      "status": "pass",
+      "elapsed": 0.017026,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "keys_are_exported_as_script_constants",
+      "status": "pass",
+      "elapsed": 0.016901,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "family_modifiers_are_reserved_above_the_slots",
+      "status": "pass",
+      "elapsed": 0.016882,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_printable_keys_map_to_themselves",
+      "status": "pass",
+      "elapsed": 0.016945,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_named_keys_map_to_spare_codes",
+      "status": "pass",
+      "elapsed": 0.016928,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_unknown_keys_map_to_none",
+      "status": "pass",
+      "elapsed": 0.016906,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "reflection_describes_the_singleton",
+      "status": "pass",
+      "elapsed": 0.016959,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_binding_presses_holds_and_releases",
+      "status": "pass",
+      "elapsed": 0.01711,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_modifier_binding_matches_its_side",
+      "status": "pass",
+      "elapsed": 0.017295,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_family_modifier_matches_either_side",
+      "status": "pass",
+      "elapsed": 0.017265,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_more_specific_binding_wins",
+      "status": "pass",
+      "elapsed": 0.016877,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_pure_modifier_binding_fires_while_it_is_held",
+      "status": "pass",
+      "elapsed": 0.017091,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_binding_claims_the_modifier_of_a_pure_binding",
+      "status": "pass",
+      "elapsed": 0.016951,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_actions_share_one_mask",
+      "status": "pass",
+      "elapsed": 0.016952,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_masks_share_one_action",
+      "status": "pass",
+      "elapsed": 0.016924,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "rebinding_moves_the_action_to_another_key",
+      "status": "pass",
+      "elapsed": 0.016933,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "unbinding_releases_the_action",
+      "status": "pass",
+      "elapsed": 0.016657,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_disabled_map_stops_its_bindings",
+      "status": "pass",
+      "elapsed": 0.016273,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_pair_on_a_map_binds_an_action",
+      "status": "pass",
+      "elapsed": 0.016502,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "emitting_fires_an_action_without_a_key",
+      "status": "pass",
+      "elapsed": 0.016661,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_event_list_holds_the_phases_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.016789,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_script_authors_the_map",
+      "status": "pass",
+      "elapsed": 0.016981,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_scene_map_binds_its_actions",
+      "status": "pass",
+      "elapsed": 0.017061,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "a_script_resumes_on_the_pressed_frame",
+      "status": "pass",
+      "elapsed": 0.017308,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_down_resumes_while_the_action_is_held",
+      "status": "pass",
+      "elapsed": 0.017403,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_up_resumes_when_the_action_is_released",
+      "status": "pass",
+      "elapsed": 0.016961,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "several_waiters_resume_on_one_action",
+      "status": "pass",
+      "elapsed": 0.016976,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "an_emitted_action_resumes_a_waiter",
+      "status": "pass",
+      "elapsed": 0.016801,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "the_wait_carries_the_source",
+      "status": "pass",
+      "elapsed": 0.016781,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "deleting_the_entity_of_a_task_cancels_the_wait",
+      "status": "pass",
+      "elapsed": 0.01645,
+      "project": "input"
+    },
+    {
+      "suite": "Job",
+      "case": "submit_and_complete",
+      "status": "pass",
+      "elapsed": 0.01049,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "run_happens_on_a_worker",
+      "status": "pass",
+      "elapsed": 0.010603,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "completion_runs_on_the_main_thread",
+      "status": "pass",
+      "elapsed": 0.010598,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "completion_runs_in_preupdate",
+      "status": "pass",
+      "elapsed": 0.010381,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "main_thread_fallback_runs_jobs_inline",
+      "status": "pass",
+      "elapsed": 0.01166,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "cancel_a_queued_job",
+      "status": "pass",
+      "elapsed": 0.010262,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "cancel_an_unknown_job",
+      "status": "pass",
+      "elapsed": 0.010203,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "supersede_a_group",
+      "status": "pass",
+      "elapsed": 0.01119,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "budget_defers_completions",
+      "status": "pass",
+      "elapsed": 0.032166,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "stats_report_the_queue",
+      "status": "pass",
+      "elapsed": 0.017032,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "stats_report_completions",
+      "status": "pass",
+      "elapsed": 0.017193,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "flush_runs_every_job",
+      "status": "pass",
+      "elapsed": 0.009475,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "shutdown_with_jobs_in_flight",
+      "status": "pass",
+      "elapsed": 0.017794,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "shutdown_runs_completions_when_flagged",
+      "status": "pass",
+      "elapsed": 0.023489,
+      "project": "job"
+    },
+    {
+      "suite": "Job",
+      "case": "stress_100k_jobs",
+      "status": "pass",
+      "elapsed": 0.526483,
+      "project": "job"
+    },
+    {
+      "suite": "Priority",
+      "case": "higher_priority_runs_first",
+      "status": "pass",
+      "elapsed": 0.009892,
+      "project": "job"
+    },
+    {
+      "suite": "Priority",
+      "case": "near_the_eye_runs_first",
+      "status": "pass",
+      "elapsed": 0.008931,
+      "project": "job"
+    },
+    {
+      "suite": "Priority",
+      "case": "eye_is_taken_at_submit_time",
+      "status": "pass",
+      "elapsed": 0.009042,
+      "project": "job"
+    },
+    {
+      "suite": "Priority",
+      "case": "prioritize_near_off_keeps_submit_order",
+      "status": "pass",
+      "elapsed": 0.009445,
+      "project": "job"
+    },
+    {
+      "suite": "Priority",
+      "case": "single_worker_runs_in_priority_order",
+      "status": "pass",
+      "elapsed": 0.008928,
+      "project": "job"
+    },
+    {
+      "suite": "Cpu",
+      "case": "absent_monitor_is_not_sampled",
+      "status": "pass",
+      "elapsed": 0.010577,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "sample_reports_the_cores",
+      "status": "pass",
+      "elapsed": 0.010576,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "busy_loop_raises_the_process_percent",
+      "status": "pass",
+      "elapsed": 0.392196,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "system_percent_stays_in_range",
+      "status": "pass",
+      "elapsed": 0.071006,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "short_window_follows_the_load",
+      "status": "pass",
+      "elapsed": 0.101044,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "long_window_lags_the_load",
+      "status": "pass",
+      "elapsed": 0.102105,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "removing_the_monitor_stops_sampling",
+      "status": "pass",
+      "elapsed": 0.131653,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "budget_sleep_is_published",
+      "status": "pass",
+      "elapsed": 0.729482,
+      "project": "monitor"
+    },
+    {
+      "suite": "Cpu",
+      "case": "budget_slows_a_synthetic_load",
+      "status": "pass",
+      "elapsed": 0.804547,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "setting_the_component_imports_the_addon",
+      "status": "pass",
+      "elapsed": 0.01187,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "collects_after_the_period",
+      "status": "pass",
+      "elapsed": 0.011404,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "period_holds_back_the_collection",
+      "status": "pass",
+      "elapsed": 0.011512,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "entity_count_follows_the_world",
+      "status": "pass",
+      "elapsed": 0.011391,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "frame_time_window_is_averaged",
+      "status": "pass",
+      "elapsed": 0.03171,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "slowest_systems_are_listed",
+      "status": "pass",
+      "elapsed": 0.092721,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "removing_the_component_stops_collection",
+      "status": "pass",
+      "elapsed": 0.012618,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "off_by_default",
+      "status": "pass",
+      "elapsed": 0.018502,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "disabled_monitor_collects_nothing",
+      "status": "pass",
+      "elapsed": 0.036771,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "slow_system_is_attributed_to_itself",
+      "status": "pass",
+      "elapsed": 0.0472,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "frame_total_covers_the_systems",
+      "status": "pass",
+      "elapsed": 0.05815,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "phase_totals_are_kept_per_phase",
+      "status": "pass",
+      "elapsed": 0.050987,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "disabling_stops_collection",
+      "status": "pass",
+      "elapsed": 0.048995,
+      "project": "monitor"
+    },
+    {
+      "suite": "Systems",
+      "case": "removing_the_monitor_stops_measurement",
+      "status": "pass",
+      "elapsed": 0.049096,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "empty_ring_reports_nothing",
+      "status": "pass",
+      "elapsed": 0.003739,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "ring_keeps_the_newest_frame_first",
+      "status": "pass",
+      "elapsed": 0.003438,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "ring_wraps_past_its_size",
+      "status": "pass",
+      "elapsed": 0.003727,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "ring_ignores_a_negative_frame",
+      "status": "pass",
+      "elapsed": 0.003461,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_covers_one_second_of_frames",
+      "status": "pass",
+      "elapsed": 0.003403,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "stats_summarize_the_window",
+      "status": "pass",
+      "elapsed": 0.003335,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "sixty_frames_a_second_is_green",
+      "status": "pass",
+      "elapsed": 0.003655,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "above_thirty_frames_a_second_is_yellow",
+      "status": "pass",
+      "elapsed": 0.003818,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "below_thirty_frames_a_second_is_red",
+      "status": "pass",
+      "elapsed": 0.003542,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "every_class_has_its_own_color",
+      "status": "pass",
+      "elapsed": 0.003655,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "digit_segments_follow_the_table",
+      "status": "pass",
+      "elapsed": 0.003758,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "every_digit_lights_at_least_two_segments",
+      "status": "pass",
+      "elapsed": 0.003518,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "segments_stay_inside_the_digit_cell",
+      "status": "pass",
+      "elapsed": 0.003686,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "panel_is_pinned_to_its_corner",
+      "status": "pass",
+      "elapsed": 0.003463,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "panel_grows_with_its_scale",
+      "status": "pass",
+      "elapsed": 0.003555,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "panel_draws_one_bar_per_frame",
+      "status": "pass",
+      "elapsed": 0.003404,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "a_slow_frame_turns_its_bar_red",
+      "status": "pass",
+      "elapsed": 0.003685,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "overlay_defaults_are_enabled_in_a_corner",
+      "status": "pass",
+      "elapsed": 0.008599,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "window_is_published_on_the_component",
+      "status": "pass",
+      "elapsed": 0.008792,
+      "project": "monitor"
+    },
+    {
+      "suite": "Fps",
+      "case": "absent_overlay_publishes_nothing",
+      "status": "pass",
+      "elapsed": 0.008621,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "empty_run_reports_nothing",
+      "status": "pass",
+      "elapsed": 0.003435,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "run_reports_mean_and_percentiles",
+      "status": "pass",
+      "elapsed": 0.003601,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "flat_run_has_no_spike",
+      "status": "pass",
+      "elapsed": 0.003492,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "frame_over_the_budget_is_a_spike",
+      "status": "pass",
+      "elapsed": 0.003569,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "budget_follows_the_factor",
+      "status": "pass",
+      "elapsed": 0.003827,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "zero_factor_disables_the_budget",
+      "status": "pass",
+      "elapsed": 0.003653,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "spike_keeps_the_slowest_system",
+      "status": "pass",
+      "elapsed": 0.00382,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "spikes_are_listed_worst_first",
+      "status": "pass",
+      "elapsed": 0.004297,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "report_keeps_the_worst_of_many_spikes",
+      "status": "pass",
+      "elapsed": 0.003688,
+      "project": "monitor"
+    },
+    {
+      "suite": "Spikes",
+      "case": "collector_grows_past_its_capacity",
+      "status": "pass",
+      "elapsed": 0.003483,
+      "project": "monitor"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.0249,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.029341,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.026772,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.02827,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.02541,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.02591,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract",
+      "status": "pass",
+      "elapsed": 0.02587,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract_empty_batch",
+      "status": "pass",
+      "elapsed": 0.025504,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.03296,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.041006,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.038634,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.04569,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.036462,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.048936,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_written_in_the_delta",
+      "status": "pass",
+      "elapsed": 0.038311,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_cover_a_rotated_instance",
+      "status": "pass",
+      "elapsed": 0.035486,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.028179,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.022699,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.021778,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.022295,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.021508,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "parent_tree_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.022629,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_parent_node_children_dynamic",
+      "status": "pass",
+      "elapsed": 0.0232,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mixed_tree_only_dynamic_reuploaded",
+      "status": "pass",
+      "elapsed": 0.022218,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "reparent_between_storages_requeues_subtree",
+      "status": "pass",
+      "elapsed": 0.022333,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_parent_node_frees_slots",
+      "status": "pass",
+      "elapsed": 0.022547,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_color_is_the_composed_tint",
+      "status": "pass",
+      "elapsed": 0.022192,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "tinted_opaque_entity_stays_static",
+      "status": "pass",
+      "elapsed": 0.021639,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_extracted",
+      "status": "pass",
+      "elapsed": 0.022112,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_color_is_linear",
+      "status": "pass",
+      "elapsed": 0.021585,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "spot_light_direction_and_cone",
+      "status": "pass",
+      "elapsed": 0.021177,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_is_not_a_spot_cone",
+      "status": "pass",
+      "elapsed": 0.022252,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_behind_camera_culled",
+      "status": "pass",
+      "elapsed": 0.022155,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_far_to_the_side_culled",
+      "status": "pass",
+      "elapsed": 0.021684,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_beyond_far_plane_culled",
+      "status": "pass",
+      "elapsed": 0.023388,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_inside_frustum_kept",
+      "status": "pass",
+      "elapsed": 0.021406,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "range_reaches_into_the_frustum",
+      "status": "pass",
+      "elapsed": 0.021555,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "directional_light_stays_the_sun",
+      "status": "pass",
+      "elapsed": 0.021831,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.022728,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_override_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.021118,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "camera_range_is_the_cluster_depth",
+      "status": "pass",
+      "elapsed": 0.0244,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_of_view_center",
+      "status": "pass",
+      "elapsed": 0.022124,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_follows_screen_position",
+      "status": "pass",
+      "elapsed": 0.02163,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_slices_grow_with_depth",
+      "status": "pass",
+      "elapsed": 0.02183,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "lights_land_in_expected_clusters",
+      "status": "pass",
+      "elapsed": 0.020935,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "moved_light_is_reextracted",
+      "status": "pass",
+      "elapsed": 0.024022,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "defaults_without_component",
+      "status": "pass",
+      "elapsed": 0.021021,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "colors_are_linear",
+      "status": "pass",
+      "elapsed": 0.021875,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "intensity_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.022085,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "zero_intensity_is_one",
+      "status": "pass",
+      "elapsed": 0.021528,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_stable_without_change",
+      "status": "pass",
+      "elapsed": 0.022423,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_changes_on_change",
+      "status": "pass",
+      "elapsed": 0.021842,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "removed_component_restores_defaults",
+      "status": "pass",
+      "elapsed": 0.021399,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "source_is_reserved",
+      "status": "pass",
+      "elapsed": 0.022542,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_light_is_static",
+      "status": "pass",
+      "elapsed": 0.021908,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_is_not_static",
+      "status": "pass",
+      "elapsed": 0.02064,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "light_under_dynamic_parent_is_dynamic",
+      "status": "pass",
+      "elapsed": 0.021857,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_lights_are_listed_unculled",
+      "status": "pass",
+      "elapsed": 0.021613,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_not_in_bake_lights",
+      "status": "pass",
+      "elapsed": 0.022331,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "bake_lights_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.021446,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_defaults",
+      "status": "pass",
+      "elapsed": 0.021426,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_override",
+      "status": "pass",
+      "elapsed": 0.021991,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_static_is_an_emitter",
+      "status": "pass",
+      "elapsed": 0.022235,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_dynamic_is_not_an_emitter",
+      "status": "pass",
+      "elapsed": 0.02532,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitters_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.02186,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_instance_is_flagged_baked",
+      "status": "pass",
+      "elapsed": 0.021871,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "toggle_requeues_every_instance",
+      "status": "pass",
+      "elapsed": 0.021457,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "sh_reconstructs_the_light_direction",
+      "status": "pass",
+      "elapsed": 0.021036,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "voxel_grid_marks_static_geometry",
+      "status": "pass",
+      "elapsed": 0.021075,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_behind_a_wall_is_darker",
+      "status": "pass",
+      "elapsed": 0.020499,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_is_not_occluded_by_its_own_bounds",
+      "status": "pass",
+      "elapsed": 0.021002,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitter_lights_a_probe",
+      "status": "pass",
+      "elapsed": 0.020731,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_its_probe",
+      "status": "pass",
+      "elapsed": 0.022132,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_only_its_neighbourhood",
+      "status": "pass",
+      "elapsed": 0.024786,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_light_marks_the_probes_in_range",
+      "status": "pass",
+      "elapsed": 0.022048,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "budget_limits_the_probes_per_frame",
+      "status": "pass",
+      "elapsed": 0.021451,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "nearest_probes_are_baked_first",
+      "status": "pass",
+      "elapsed": 0.021333,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "disabled_settings_drop_the_probes",
+      "status": "pass",
+      "elapsed": 0.02059,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "baking_is_enabled_by_default",
+      "status": "pass",
+      "elapsed": 0.021145,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_from_bounds_and_spacing",
+      "status": "pass",
+      "elapsed": 0.020717,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_clamped_to_the_maximum",
+      "status": "pass",
+      "elapsed": 0.021578,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "large_instance_gets_a_probe_grid",
+      "status": "pass",
+      "elapsed": 0.021645,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "pool_reuses_the_probes_of_a_removed_instance",
+      "status": "pass",
+      "elapsed": 0.021565,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_sits_on_the_bounds",
+      "status": "pass",
+      "elapsed": 0.021289,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_follows_the_instance_scale",
+      "status": "pass",
+      "elapsed": 0.021607,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_corners",
+      "status": "pass",
+      "elapsed": 0.020149,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_center",
+      "status": "pass",
+      "elapsed": 0.020643,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_sample_mixes_the_corners",
+      "status": "pass",
+      "elapsed": 0.020731,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_without_static_light_marks_only_itself",
+      "status": "pass",
+      "elapsed": 0.022286,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_near_static_light_marks_neighbours",
+      "status": "pass",
+      "elapsed": 0.021471,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_invalidates_the_old_and_the_new_position",
+      "status": "pass",
+      "elapsed": 0.021558,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_keeps_the_pool_layout",
+      "status": "pass",
+      "elapsed": 0.021746,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "unlit_move_defers_the_descriptor_upload",
+      "status": "pass",
+      "elapsed": 0.021425,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "new_light_flushes_the_deferred_descriptors",
+      "status": "pass",
+      "elapsed": 0.020894,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "component_consumed_by_extract",
+      "status": "pass",
+      "elapsed": 0.020581,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "camera_becomes_the_view",
+      "status": "pass",
+      "elapsed": 0.02053,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "two_cameras_over_two_frames",
+      "status": "pass",
+      "elapsed": 0.022132,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "overrides_write_to_file",
+      "status": "pass",
+      "elapsed": 0.022118,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "write_to_file_kept_without_component",
+      "status": "pass",
+      "elapsed": 0.021733,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_is_the_first_camera",
+      "status": "pass",
+      "elapsed": 0.02174,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_without_camera_entity",
+      "status": "pass",
+      "elapsed": 0.021466,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "removed_after_a_deferred_extract",
+      "status": "pass",
+      "elapsed": 0.020918,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_to_children",
+      "status": "pass",
+      "elapsed": 0.02018,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.020846,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_to_parent",
+      "status": "pass",
+      "elapsed": 0.022932,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.022633,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "instance_color_uses_tint_and_opacity",
+      "status": "pass",
+      "elapsed": 0.022397,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "emissive_scaled_by_strength",
+      "status": "pass",
+      "elapsed": 0.022571,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "pbr_defaults",
+      "status": "pass",
+      "elapsed": 0.022282,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_parent_component",
+      "status": "pass",
+      "elapsed": 0.022275,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_change_propagates_through_parent",
+      "status": "pass",
+      "elapsed": 0.021236,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "parent_child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.021184,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_parent_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.022952,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_mixed_tree",
+      "status": "pass",
+      "elapsed": 0.022797,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_through_parent",
+      "status": "pass",
+      "elapsed": 0.022715,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_follows_reparent_between_storages",
+      "status": "pass",
+      "elapsed": 0.022521,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_zero_keeps_the_color",
+      "status": "pass",
+      "elapsed": 0.022401,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_half_blends_the_color",
+      "status": "pass",
+      "elapsed": 0.022223,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_full_replaces_the_color",
+      "status": "pass",
+      "elapsed": 0.021366,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_two_levels",
+      "status": "pass",
+      "elapsed": 0.020327,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_three_levels",
+      "status": "pass",
+      "elapsed": 0.023041,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_over_an_untinted_parent",
+      "status": "pass",
+      "elapsed": 0.023415,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "root_tint_change_recomposes_the_subtree",
+      "status": "pass",
+      "elapsed": 0.023132,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "middle_tint_change_recomposes_below_it",
+      "status": "pass",
+      "elapsed": 0.022793,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_restores_the_ancestor_result",
+      "status": "pass",
+      "elapsed": 0.023011,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_childof_chain",
+      "status": "pass",
+      "elapsed": 0.022986,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_parent_chain",
+      "status": "pass",
+      "elapsed": 0.023027,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_childof_under_parent",
+      "status": "pass",
+      "elapsed": 0.021267,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_parent_under_childof",
+      "status": "pass",
+      "elapsed": 0.023723,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composition_survives_a_reparent",
+      "status": "pass",
+      "elapsed": 0.023236,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "png_loads_into_a_create_command",
+      "status": "pass",
+      "elapsed": 0.092503,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "requested_size_selects_the_class",
+      "status": "pass",
+      "elapsed": 0.107737,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "source_size_picks_the_nearest_class",
+      "status": "pass",
+      "elapsed": 0.095711,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "quality_caps_the_class",
+      "status": "pass",
+      "elapsed": 0.095153,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "new_path_updates_the_same_handle",
+      "status": "pass",
+      "elapsed": 0.093716,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.09091,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "albedo_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.06934,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "every_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.072256,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "prefab_slots_are_inherited",
+      "status": "pass",
+      "elapsed": 0.047383,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "reload_reextracts_dependents",
+      "status": "pass",
+      "elapsed": 0.048252,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "deleting_a_texture_unbinds_and_warns",
+      "status": "pass",
+      "elapsed": 0.047177,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "missing_file_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.043843,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "kept_source_pixels_survive_the_upload",
+      "status": "pass",
+      "elapsed": 0.044728,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "row_zero_is_the_bottom_of_the_file",
+      "status": "pass",
+      "elapsed": 0.043062,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_spreads_a_class_over_pages",
+      "status": "pass",
+      "elapsed": 0.041995,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_reuses_a_released_layer",
+      "status": "pass",
+      "elapsed": 0.032053,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_out_of_pages_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.046865,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "inline_data_rasterizes",
+      "status": "pass",
+      "elapsed": 0.048039,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "file_rasterizes",
+      "status": "pass",
+      "elapsed": 0.049062,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "zero_height_follows_the_width",
+      "status": "pass",
+      "elapsed": 0.070358,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "resize_rerasterizes",
+      "status": "pass",
+      "elapsed": 0.071643,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.046473,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "handle_reaches_a_pbr_slot",
+      "status": "pass",
+      "elapsed": 0.047106,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "texture_and_svg_is_an_error",
+      "status": "pass",
+      "elapsed": 0.04503,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "row_zero_is_the_bottom_of_the_image",
+      "status": "pass",
+      "elapsed": 0.043888,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "text_rasterizes",
+      "status": "pass",
+      "elapsed": 0.043199,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "mask_hides_half",
+      "status": "pass",
+      "elapsed": 0.044126,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "clip_path_keeps_the_clipped_half",
+      "status": "pass",
+      "elapsed": 0.043446,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "queues_a_job_instead_of_rasterizing",
+      "status": "pass",
+      "elapsed": 0.042171,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "previous_image_stays_while_resizing",
+      "status": "pass",
+      "elapsed": 0.048585,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "completion_uploads_on_the_main_thread",
+      "status": "pass",
+      "elapsed": 0.237097,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "new_set_supersedes_the_queued_job",
+      "status": "pass",
+      "elapsed": 0.041803,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "deleting_the_entity_cancels_the_job",
+      "status": "pass",
+      "elapsed": 0.037101,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "bands_split_a_large_image",
+      "status": "pass",
+      "elapsed": 0.064143,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "nearest_texture_rasterizes_first",
+      "status": "pass",
+      "elapsed": 0.040174,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "component_defaults",
+      "status": "pass",
+      "elapsed": 0.021836,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "untiled_instance_is_the_identity",
+      "status": "pass",
+      "elapsed": 0.021475,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "transform_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.021894,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "box_projection_tiles_every_face",
+      "status": "pass",
+      "elapsed": 0.022957,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "cylinder_projection_tiles_the_circumference",
+      "status": "pass",
+      "elapsed": 0.022434,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "radial_projection_tiles_radius_and_arc",
+      "status": "pass",
+      "elapsed": 0.021144,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "meters_projection_stretches_the_mesh_uv",
+      "status": "pass",
+      "elapsed": 0.021576,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "fit_rounds_the_tile_count",
+      "status": "pass",
+      "elapsed": 0.020995,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "partial_tiles_keep_the_fraction",
+      "status": "pass",
+      "elapsed": 0.02069,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "min_tiles_raises_the_count",
+      "status": "pass",
+      "elapsed": 0.021149,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "wrap_mode_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.021005,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "mirror_wrap_folds_the_uv",
+      "status": "pass",
+      "elapsed": 0.021054,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "clamp_wrap_holds_the_range",
+      "status": "pass",
+      "elapsed": 0.020765,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.02108,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "scale_change_updates_the_tiling",
+      "status": "pass",
+      "elapsed": 0.02058,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_of_a_camera_facing_surface",
+      "status": "pass",
+      "elapsed": 0.004054,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_with_screen_y_up",
+      "status": "pass",
+      "elapsed": 0.004216,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_for_a_flipped_normal",
+      "status": "pass",
+      "elapsed": 0.004188,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_follows_swapped_uv_axes",
+      "status": "pass",
+      "elapsed": 0.003943,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "flat_sample_keeps_the_normal",
+      "status": "pass",
+      "elapsed": 0.003952,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_u_tangent",
+      "status": "pass",
+      "elapsed": 0.004124,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_v_tangent",
+      "status": "pass",
+      "elapsed": 0.004203,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "degenerate_derivatives_keep_the_normal",
+      "status": "pass",
+      "elapsed": 0.003946,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_integrates_position",
+      "status": "pass",
+      "elapsed": 0.009263,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "angular_velocity_integrates_rotation",
+      "status": "pass",
+      "elapsed": 0.009296,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_marks_dynamic",
+      "status": "pass",
+      "elapsed": 0.009332,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "built_in_layers_are_registered",
+      "status": "pass",
+      "elapsed": 0.021392,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "registration_produces_the_ordered_command",
+      "status": "pass",
+      "elapsed": 0.022641,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "command_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.02183,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "order_sorts_the_command",
+      "status": "pass",
+      "elapsed": 0.021895,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "unregistration_renumbers_and_resends",
+      "status": "pass",
+      "elapsed": 0.02304,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "material_pair_sets_the_layer_bit",
+      "status": "pass",
+      "elapsed": 0.022114,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "two_layers_set_two_bits",
+      "status": "pass",
+      "elapsed": 0.02174,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "removing_the_pair_clears_the_bit",
+      "status": "pass",
+      "elapsed": 0.02224,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.021881,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "dynamic_instance_gets_the_bit",
+      "status": "pass",
+      "elapsed": 0.02157,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "transparent_instance_keeps_the_bit",
+      "status": "pass",
+      "elapsed": 0.021873,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.022366,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_update_on_change",
+      "status": "pass",
+      "elapsed": 0.021819,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "settings_flag_reaches_the_view",
+      "status": "pass",
+      "elapsed": 0.021444,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "project_layer_gets_a_bit",
+      "status": "pass",
+      "elapsed": 0.022199,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "limit_is_an_error_logged_once",
+      "status": "pass",
+      "elapsed": 0.023362,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "scene_without_layers_keeps_the_flag_off",
+      "status": "pass",
+      "elapsed": 0.020151,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_entity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.020903,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blend_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.020821,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opacity_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.021321,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "full_opacity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.020813,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "tint_alpha_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.021317,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_opaque_mode_blends_as_alpha",
+      "status": "pass",
+      "elapsed": 0.021305,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.020723,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_modes_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.020935,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "every_blend_mode_reaches_the_packet",
+      "status": "pass",
+      "elapsed": 0.020386,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_back_to_front",
+      "status": "pass",
+      "elapsed": 0.02078,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "static_entity_leaves_and_regains_its_slot",
+      "status": "pass",
+      "elapsed": 0.021082,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.022084,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "dynamic_transparent_leaves_the_dynamic_batches",
+      "status": "pass",
+      "elapsed": 0.020626,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "deleted_entity_leaves_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.020867,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "prefab_blend_mode_is_inherited",
+      "status": "pass",
+      "elapsed": 0.020596,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_scene_packet_is_unchanged",
+      "status": "pass",
+      "elapsed": 0.021104,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_zero_roughness_is_the_first_level",
+      "status": "pass",
+      "elapsed": 0.020918,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_full_roughness_is_the_last_level",
+      "status": "pass",
+      "elapsed": 0.020734,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_grows_with_roughness",
+      "status": "pass",
+      "elapsed": 0.021306,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_a_quarter_roughness_is_half_the_chain",
+      "status": "pass",
+      "elapsed": 0.021553,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_half_roughness_follows_the_curve",
+      "status": "pass",
+      "elapsed": 0.020595,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_clamps_roughness_to_the_chain",
+      "status": "pass",
+      "elapsed": 0.021159,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_chain_keeps_its_coarsest_level_large",
+      "status": "pass",
+      "elapsed": 0.020097,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_view_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.020313,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "alpha_blended_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.020626,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "premultiplied_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.020834,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "additive_instance_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.021458,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_count_covers_the_alpha_blended_instances",
+      "status": "pass",
+      "elapsed": 0.021282,
+      "project": "render"
+    },
+    {
+      "suite": "Incremental",
+      "case": "templates_are_marked_manual",
+      "status": "pass",
+      "elapsed": 0.011742,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instances_are_pending",
+      "status": "pass",
+      "elapsed": 0.010875,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "non_template_entities_appear_immediately",
+      "status": "pass",
+      "elapsed": 0.011971,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "count_budget_per_frame",
+      "status": "pass",
+      "elapsed": 0.012768,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "time_budget_stops_a_frame",
+      "status": "pass",
+      "elapsed": 0.012098,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instance_is_complete_when_it_appears",
+      "status": "pass",
+      "elapsed": 0.01091,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "every_instance_is_expanded_eventually",
+      "status": "pass",
+      "elapsed": 0.011257,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_everything_at_once",
+      "status": "pass",
+      "elapsed": 0.016186,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_nested_templates",
+      "status": "pass",
+      "elapsed": 0.010656,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_queue",
+      "status": "pass",
+      "elapsed": 0.010495,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_worst_frame",
+      "status": "pass",
+      "elapsed": 0.010509,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "template_declared_before_import_is_marked",
+      "status": "pass",
+      "elapsed": 0.009703,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_to_the_camera_first",
+      "status": "pass",
+      "elapsed": 0.021145,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "reorder_when_the_camera_moves",
+      "status": "pass",
+      "elapsed": 0.020997,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_first_off_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.021154,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "no_camera_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.012427,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "instance_without_position_goes_first",
+      "status": "pass",
+      "elapsed": 0.020506,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "world_position_orders_a_child_instance",
+      "status": "pass",
+      "elapsed": 0.020738,
+      "project": "script"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "include_is_resolved_next_to_its_file",
+      "status": "pass",
+      "elapsed": 0.024151,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "nested_includes_are_expanded",
+      "status": "pass",
+      "elapsed": 0.024516,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "cyclic_include_reports_the_file_and_line",
+      "status": "pass",
+      "elapsed": 0.024312,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "pragma_once_includes_a_file_once",
+      "status": "pass",
+      "elapsed": 0.02427,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "macro_is_defined_and_substituted",
+      "status": "pass",
+      "elapsed": 0.024255,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "conditional_block_picks_a_branch",
+      "status": "pass",
+      "elapsed": 0.024253,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "ifdef_follows_a_definition",
+      "status": "pass",
+      "elapsed": 0.024243,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "undefined_macro_is_zero_in_a_condition",
+      "status": "pass",
+      "elapsed": 0.024162,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "missing_include_reports_the_file_and_line",
+      "status": "pass",
+      "elapsed": 0.02331,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "error_line_counts_inside_the_include",
+      "status": "pass",
+      "elapsed": 0.023275,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "engine_constants_are_predefined",
+      "status": "pass",
+      "elapsed": 0.023113,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "component_macro_overrides_a_file_define",
+      "status": "pass",
+      "elapsed": 0.023111,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "generated_layers_include_is_empty_without_layers",
+      "status": "pass",
+      "elapsed": 0.023395,
+      "project": "shader"
+    },
+    {
+      "suite": "Preprocess",
+      "case": "missing_file_is_an_error",
+      "status": "pass",
+      "elapsed": 0.022923,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "bake_home_holds_the_engine_shaders",
+      "status": "pass",
+      "elapsed": 0.008822,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "source_tree_answers_when_the_bake_home_is_empty",
+      "status": "pass",
+      "elapsed": 0.008727,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "global_bake_home_is_used_without_the_variable",
+      "status": "pass",
+      "elapsed": 0.008479,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "working_directory_is_searched_before_the_bake_home",
+      "status": "pass",
+      "elapsed": 0.008399,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "app_file_overrides_an_engine_include",
+      "status": "pass",
+      "elapsed": 0.009079,
+      "project": "shader"
+    },
+    {
+      "suite": "Path",
+      "case": "engine_include_is_used_when_the_app_has_none",
+      "status": "pass",
+      "elapsed": 0.009113,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "builtin_shaders_are_entities_under_builtin",
+      "status": "pass",
+      "elapsed": 0.022077,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "builtin_mesh_shader_reaches_the_packet",
+      "status": "pass",
+      "elapsed": 0.022166,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "setting_a_shader_sends_a_command",
+      "status": "pass",
+      "elapsed": 0.022047,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "changing_the_path_sends_the_new_source",
+      "status": "pass",
+      "elapsed": 0.022492,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "unchanged_shader_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.022037,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "failing_file_keeps_the_previous_shader",
+      "status": "pass",
+      "elapsed": 0.021982,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "status_holds_the_error_with_file_and_line",
+      "status": "pass",
+      "elapsed": 0.02155,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "macros_of_the_component_reach_the_source",
+      "status": "pass",
+      "elapsed": 0.02064,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "mesh_shader_carries_the_material_layers",
+      "status": "pass",
+      "elapsed": 0.022489,
+      "project": "shader"
+    },
+    {
+      "suite": "Shader",
+      "case": "macro_change_reloads_the_mesh_shader",
+      "status": "pass",
+      "elapsed": 0.022001,
+      "project": "shader"
+    },
+    {
+      "suite": "Math",
+      "case": "identity_is_neutral",
+      "status": "pass",
+      "elapsed": 0.004202,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "translation_matrix",
+      "status": "pass",
+      "elapsed": 0.004764,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "scale_matrix",
+      "status": "pass",
+      "elapsed": 0.004519,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "rotation_x_hand_computed",
+      "status": "pass",
+      "elapsed": 0.004473,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "rotation_xyz_hand_computed",
+      "status": "pass",
+      "elapsed": 0.004641,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "rotation_yxz_hand_computed",
+      "status": "pass",
+      "elapsed": 0.004733,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "trs_composition",
+      "status": "pass",
+      "elapsed": 0.004419,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "parent_child_multiplication",
+      "status": "pass",
+      "elapsed": 0.004331,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "facing_z_axis_matches_direction",
+      "status": "pass",
+      "elapsed": 0.003809,
+      "project": "transform"
+    },
+    {
+      "suite": "Math",
+      "case": "facing_euler_round_trip",
+      "status": "pass",
+      "elapsed": 0.003913,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "position_only",
+      "status": "pass",
+      "elapsed": 0.009695,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "scale_defaults_to_one",
+      "status": "pass",
+      "elapsed": 0.009626,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "rotation_composition",
+      "status": "pass",
+      "elapsed": 0.009674,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "rotation_and_scale_composition",
+      "status": "pass",
+      "elapsed": 0.010275,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "orientation_wins_over_rotation",
+      "status": "pass",
+      "elapsed": 0.009454,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "child_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.009514,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "grandchild_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.008624,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "scale_inherited_three_levels",
+      "status": "pass",
+      "elapsed": 0.008629,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "child_set_does_not_move_parent",
+      "status": "pass",
+      "elapsed": 0.009291,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "reparent_to_new_parent",
+      "status": "pass",
+      "elapsed": 0.009446,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "remove_parent_makes_root",
+      "status": "pass",
+      "elapsed": 0.009273,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "manual_transform_not_written",
+      "status": "pass",
+      "elapsed": 0.009423,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "manual_transform_parent_propagates",
+      "status": "pass",
+      "elapsed": 0.009351,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "one_on_set_per_entity",
+      "status": "pass",
+      "elapsed": 0.011625,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "one_on_set_for_new_child",
+      "status": "pass",
+      "elapsed": 0.009018,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "delete_parent_deletes_subtree",
+      "status": "pass",
+      "elapsed": 0.009015,
+      "project": "transform"
+    },
+    {
+      "suite": "Static",
+      "case": "deep_chain",
+      "status": "pass",
+      "elapsed": 0.011378,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "dynamic_root_updates_each_frame",
+      "status": "pass",
+      "elapsed": 0.009051,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "dynamic_parent_static_child",
+      "status": "pass",
+      "elapsed": 0.009161,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "dynamic_grandparent_static_chain",
+      "status": "pass",
+      "elapsed": 0.009113,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "dynamic_scale_inherited",
+      "status": "pass",
+      "elapsed": 0.009193,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "orientation_in_dynamic",
+      "status": "pass",
+      "elapsed": 0.00865,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "dynamic_emits_no_events",
+      "status": "pass",
+      "elapsed": 0.008826,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "add_then_remove_dynamic",
+      "status": "pass",
+      "elapsed": 0.008904,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "manual_transform_not_written",
+      "status": "pass",
+      "elapsed": 0.009256,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "deep_chain_cascade_order",
+      "status": "pass",
+      "elapsed": 0.012562,
+      "project": "transform"
+    },
+    {
+      "suite": "Dynamic",
+      "case": "static_sibling_not_updated_by_system",
+      "status": "pass",
+      "elapsed": 0.008921,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "child_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.00874,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "set_component_parents_entity",
+      "status": "pass",
+      "elapsed": 0.00871,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "grandchild_of_moved_parent",
+      "status": "pass",
+      "elapsed": 0.008873,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "scale_inherited_three_levels",
+      "status": "pass",
+      "elapsed": 0.008808,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "child_set_does_not_move_parent",
+      "status": "pass",
+      "elapsed": 0.008738,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "reparent_to_new_parent",
+      "status": "pass",
+      "elapsed": 0.009103,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "remove_parent_makes_root",
+      "status": "pass",
+      "elapsed": 0.009125,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "manual_transform_parent_propagates",
+      "status": "pass",
+      "elapsed": 0.009143,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "one_on_set_for_new_child",
+      "status": "pass",
+      "elapsed": 0.00881,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "only_changed_subtree_written",
+      "status": "pass",
+      "elapsed": 0.008937,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "delete_parent_deletes_subtree",
+      "status": "pass",
+      "elapsed": 0.008755,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "deep_chain",
+      "status": "pass",
+      "elapsed": 0.008823,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "dynamic_parent_static_child",
+      "status": "pass",
+      "elapsed": 0.008826,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "static_parent_dynamic_child",
+      "status": "pass",
+      "elapsed": 0.009054,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "dynamic_subtree_under_static_root",
+      "status": "pass",
+      "elapsed": 0.009104,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "dynamic_node_between_static_levels",
+      "status": "pass",
+      "elapsed": 0.009084,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "dynamic_emits_no_events",
+      "status": "pass",
+      "elapsed": 0.008885,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "add_then_remove_dynamic",
+      "status": "pass",
+      "elapsed": 0.008676,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "prefab_tree_instantiation",
+      "status": "pass",
+      "elapsed": 0.008782,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "lookat_under_parent",
+      "status": "pass",
+      "elapsed": 0.008548,
+      "project": "transform"
+    },
+    {
+      "suite": "Parent",
+      "case": "name_lookup_through_parent",
+      "status": "pass",
+      "elapsed": 0.008621,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "childof_child_under_parent_node",
+      "status": "pass",
+      "elapsed": 0.009028,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "parent_child_under_childof_node",
+      "status": "pass",
+      "elapsed": 0.009075,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "deep_chain_alternating",
+      "status": "pass",
+      "elapsed": 0.008945,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "scale_inherited_alternating",
+      "status": "pass",
+      "elapsed": 0.008952,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "reparent_childof_to_parent",
+      "status": "pass",
+      "elapsed": 0.008607,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "reparent_parent_to_childof",
+      "status": "pass",
+      "elapsed": 0.008575,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "reparent_back_and_forth",
+      "status": "pass",
+      "elapsed": 0.008602,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "reparent_subtree_keeps_descendants",
+      "status": "pass",
+      "elapsed": 0.008712,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "reparent_dynamic_node",
+      "status": "pass",
+      "elapsed": 0.00933,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "dynamic_parent_root_childof_child",
+      "status": "pass",
+      "elapsed": 0.009292,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "dynamic_childof_node_under_parent_root",
+      "status": "pass",
+      "elapsed": 0.009153,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "dynamic_cascade_order_alternating",
+      "status": "pass",
+      "elapsed": 0.008924,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "dynamic_node_between_static_levels",
+      "status": "pass",
+      "elapsed": 0.009402,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "delete_parent_node_with_children",
+      "status": "pass",
+      "elapsed": 0.009281,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "only_changed_subtree_written",
+      "status": "pass",
+      "elapsed": 0.008825,
+      "project": "transform"
+    },
+    {
+      "suite": "Mixed",
+      "case": "manual_transform_between_storages",
+      "status": "pass",
+      "elapsed": 0.009233,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "target_in_front",
+      "status": "pass",
+      "elapsed": 0.009407,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "target_behind",
+      "status": "pass",
+      "elapsed": 0.009274,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "target_below",
+      "status": "pass",
+      "elapsed": 0.009347,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "target_above",
+      "status": "pass",
+      "elapsed": 0.008954,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "target_to_the_side",
+      "status": "pass",
+      "elapsed": 0.008737,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "rotation_round_trips",
+      "status": "pass",
+      "elapsed": 0.008752,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "follows_moving_entity",
+      "status": "pass",
+      "elapsed": 0.008523,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "child_of_translated_parent",
+      "status": "pass",
+      "elapsed": 0.008469,
+      "project": "transform"
+    },
+    {
+      "suite": "LookAt",
+      "case": "dynamic_entity",
+      "status": "pass",
+      "elapsed": 0.0086,
+      "project": "transform"
+    },
+    {
+      "suite": "View",
+      "case": "defaults_of_a_new_view",
+      "status": "pass",
+      "elapsed": 0.023567,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "camera_fills_the_view",
+      "status": "pass",
+      "elapsed": 0.023194,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "views_render_in_priority_order",
+      "status": "pass",
+      "elapsed": 0.023293,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "synthesized_view_matches_an_explicit_one",
+      "status": "pass",
+      "elapsed": 0.023165,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "disabled_view_is_skipped",
+      "status": "pass",
+      "elapsed": 0.023548,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "view_without_camera_is_skipped",
+      "status": "pass",
+      "elapsed": 0.023644,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "view_with_a_dead_camera_is_skipped",
+      "status": "pass",
+      "elapsed": 0.023431,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "impl_holds_the_view_index",
+      "status": "pass",
+      "elapsed": 0.023522,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "environment_of_a_view_overrides_the_singleton",
+      "status": "pass",
+      "elapsed": 0.023173,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "environment_falls_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.023499,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "equal_environments_share_a_generation",
+      "status": "pass",
+      "elapsed": 0.02291,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "cluster_settings_of_a_view_override_the_singleton",
+      "status": "pass",
+      "elapsed": 0.022328,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "cluster_settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.023034,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "material_layers_toggle_reaches_the_view",
+      "status": "pass",
+      "elapsed": 0.022593,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "clear_color_of_a_view_is_linear",
+      "status": "pass",
+      "elapsed": 0.022743,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "lights_are_culled_per_view",
+      "status": "pass",
+      "elapsed": 0.022624,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "sorted_draws_are_sorted_per_view",
+      "status": "pass",
+      "elapsed": 0.023652,
+      "project": "view"
+    },
+    {
+      "suite": "View",
+      "case": "depth_precision_at_100k",
+      "status": "pass",
+      "elapsed": 0.023101,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "surface_view_has_no_target",
+      "status": "pass",
+      "elapsed": 0.023362,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "target_reaches_the_packet_as_a_create_command",
+      "status": "pass",
+      "elapsed": 0.023266,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "view_names_the_target_handle_and_size",
+      "status": "pass",
+      "elapsed": 0.023452,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "resize_resends_the_create_command",
+      "status": "pass",
+      "elapsed": 0.023214,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "unchanged_target_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.022932,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "deleted_target_is_destroyed",
+      "status": "pass",
+      "elapsed": 0.022787,
+      "project": "view"
+    },
+    {
+      "suite": "Target",
+      "case": "two_targets_get_two_handles",
+      "status": "pass",
+      "elapsed": 0.023586,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "membership_assigns_a_bit",
+      "status": "pass",
+      "elapsed": 0.023112,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "entity_in_two_layers_has_both_bits",
+      "status": "pass",
+      "elapsed": 0.022594,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "entity_without_a_layer_has_no_bits",
+      "status": "pass",
+      "elapsed": 0.022996,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "empty_view_list_shows_everything",
+      "status": "pass",
+      "elapsed": 0.022569,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "view_list_restricts_the_mask",
+      "status": "pass",
+      "elapsed": 0.022813,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "static_slots_are_grouped_by_mask",
+      "status": "pass",
+      "elapsed": 0.023027,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "leaving_a_layer_regroups_the_slots",
+      "status": "pass",
+      "elapsed": 0.022928,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "dynamic_instances_are_filtered_per_view",
+      "status": "pass",
+      "elapsed": 0.023759,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "transparent_entries_are_filtered_per_view",
+      "status": "pass",
+      "elapsed": 0.023613,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "lights_are_restricted_to_a_layer",
+      "status": "pass",
+      "elapsed": 0.023186,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "two_views_show_their_own_layer",
+      "status": "pass",
+      "elapsed": 0.022919,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "view_list_holds_eight_entries",
+      "status": "pass",
+      "elapsed": 0.022994,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "past_the_bit_limit_get_no_bit",
+      "status": "pass",
+      "elapsed": 0.023945,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "prefab_layer_is_inherited",
+      "status": "pass",
+      "elapsed": 0.023245,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "caster_mask_comes_from_shadow_layers",
+      "status": "pass",
+      "elapsed": 0.022697,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "scene_without_layers_keeps_its_packet",
+      "status": "pass",
+      "elapsed": 0.02312,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_defaults_to_off",
+      "status": "pass",
+      "elapsed": 0.024121,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_static_runs",
+      "status": "pass",
+      "elapsed": 0.022768,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_dynamic",
+      "status": "pass",
+      "elapsed": 0.024282,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_transparent",
+      "status": "pass",
+      "elapsed": 0.022694,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_hides_unlayered_lights",
+      "status": "pass",
+      "elapsed": 0.022501,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "strict_view_without_layers_shows_everything",
+      "status": "pass",
+      "elapsed": 0.022654,
+      "project": "view"
+    },
+    {
+      "suite": "Layers",
+      "case": "parent_subtree_requeued_on_change",
+      "status": "pass",
+      "elapsed": 0.022588,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "splits_are_uniform_at_lambda_zero",
+      "status": "pass",
+      "elapsed": 0.024911,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "splits_are_logarithmic_at_lambda_one",
+      "status": "pass",
+      "elapsed": 0.023488,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "default_splits_blend_both",
+      "status": "pass",
+      "elapsed": 0.02335,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "cascades_cover_the_camera_range",
+      "status": "pass",
+      "elapsed": 0.023165,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "cascade_holds_the_slice_corners",
+      "status": "pass",
+      "elapsed": 0.02316,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "texel_snapping_keeps_the_matrix",
+      "status": "pass",
+      "elapsed": 0.02235,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_exclude_no_shadow",
+      "status": "pass",
+      "elapsed": 0.030172,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_exclude_transparent",
+      "status": "pass",
+      "elapsed": 0.02234,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "casters_respect_shadow_layers",
+      "status": "pass",
+      "elapsed": 0.023213,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.023203,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "settings_are_clamped",
+      "status": "pass",
+      "elapsed": 0.025916,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "view_without_shadows_has_no_cascades",
+      "status": "pass",
+      "elapsed": 0.02315,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "world_without_a_sun_has_no_cascades",
+      "status": "pass",
+      "elapsed": 0.023868,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "static_delta_inside_a_cascade_marks_it_dirty",
+      "status": "pass",
+      "elapsed": 0.022719,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "static_delta_outside_a_cascade_keeps_it",
+      "status": "pass",
+      "elapsed": 0.022062,
+      "project": "view"
+    },
+    {
+      "suite": "Shadows",
+      "case": "camera_rotation_marks_every_cascade",
+      "status": "pass",
+      "elapsed": 0.021858,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "planes_of_a_known_projection",
+      "status": "pass",
+      "elapsed": 0.022381,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "infinite_far_keeps_a_distant_point",
+      "status": "pass",
+      "elapsed": 0.022317,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "sphere_at_the_boundary",
+      "status": "pass",
+      "elapsed": 0.022292,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "aabb_at_the_boundary",
+      "status": "pass",
+      "elapsed": 0.022283,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "static_instance_carries_its_bounds",
+      "status": "pass",
+      "elapsed": 0.028623,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "dynamic_instance_carries_its_bounds",
+      "status": "pass",
+      "elapsed": 0.021616,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "bounds_refresh_when_the_entity_changes",
+      "status": "pass",
+      "elapsed": 0.020669,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.020999,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "settings_of_a_view_override_the_singleton",
+      "status": "pass",
+      "elapsed": 0.023084,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "view_without_settings_culls_by_default",
+      "status": "pass",
+      "elapsed": 0.023005,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "sorted_draws_behind_the_camera_are_culled",
+      "status": "pass",
+      "elapsed": 0.02599,
+      "project": "view"
+    },
+    {
+      "suite": "Frustum",
+      "case": "disabled_culling_keeps_every_sorted_draw",
+      "status": "pass",
+      "elapsed": 0.026141,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "levels_of_a_view",
+      "status": "pass",
+      "elapsed": 0.02243,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "reduction_of_a_four_by_four_block",
+      "status": "pass",
+      "elapsed": 0.022071,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "reduction_covers_an_odd_edge",
+      "status": "pass",
+      "elapsed": 0.023117,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_on_the_axis_projects_to_the_center",
+      "status": "pass",
+      "elapsed": 0.021709,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_off_the_axis_projects_beside_it",
+      "status": "pass",
+      "elapsed": 0.021915,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "sphere_across_the_near_plane_takes_the_view",
+      "status": "pass",
+      "elapsed": 0.028999,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "mip_holds_the_rectangle_in_two_texels",
+      "status": "pass",
+      "elapsed": 0.023137,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_hides_a_sphere_behind_a_wall",
+      "status": "pass",
+      "elapsed": 0.021234,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_keeps_a_sphere_in_front_of_a_wall",
+      "status": "pass",
+      "elapsed": 0.021598,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "pyramid_keeps_a_sphere_that_straddles_a_wall",
+      "status": "pass",
+      "elapsed": 0.022176,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "a_clamped_rectangle_is_never_hidden",
+      "status": "pass",
+      "elapsed": 0.021739,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "settings_fall_back_to_the_singleton",
+      "status": "pass",
+      "elapsed": 0.022296,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "view_without_settings_occludes_by_default",
+      "status": "pass",
+      "elapsed": 0.022129,
+      "project": "view"
+    },
+    {
+      "suite": "HiZ",
+      "case": "disabled_culling_disables_occlusion",
+      "status": "pass",
+      "elapsed": 0.023123,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_grade_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.024588,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_runs_in_order",
+      "status": "pass",
+      "elapsed": 0.021675,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "disabled_effect_is_skipped",
+      "status": "pass",
+      "elapsed": 0.022101,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "enabling_an_effect_rebuilds_the_chain",
+      "status": "pass",
+      "elapsed": 0.021703,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "effect_without_a_shader_is_skipped",
+      "status": "pass",
+      "elapsed": 0.021777,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_list_overrides_the_stack",
+      "status": "pass",
+      "elapsed": 0.022606,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_without_a_list_runs_the_stack",
+      "status": "pass",
+      "elapsed": 0.028061,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "view_toggle_skips_the_chain",
+      "status": "pass",
+      "elapsed": 0.026542,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "inputs_are_the_union_of_the_passes",
+      "status": "pass",
+      "elapsed": 0.025353,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "disabled_pass_does_not_ask_for_its_inputs",
+      "status": "pass",
+      "elapsed": 0.032352,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "parameters_come_from_the_parameter_component",
+      "status": "pass",
+      "elapsed": 0.023913,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "two_passes_of_one_scale_share_a_target_size",
+      "status": "pass",
+      "elapsed": 0.023109,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "half_scale_pass_asks_for_half_the_target",
+      "status": "pass",
+      "elapsed": 0.022239,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "two_views_keep_their_own_range",
+      "status": "pass",
+      "elapsed": 0.023606,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "histogram_bins_map_the_log_range",
+      "status": "pass",
+      "elapsed": 0.03049,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "histogram_average_skips_the_black_bin",
+      "status": "pass",
+      "elapsed": 0.037143,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_adapts_at_the_speed_of_its_direction",
+      "status": "pass",
+      "elapsed": 0.029883,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_stays_inside_its_range",
+      "status": "pass",
+      "elapsed": 0.033693,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "pinned_exposure_keeps_its_value",
+      "status": "pass",
+      "elapsed": 0.030461,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_exposure_and_tonemap_are_off",
+      "status": "pass",
+      "elapsed": 0.026169,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "tonemap_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.03692,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "exposure_pass_declares_its_input",
+      "status": "pass",
+      "elapsed": 0.027242,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_pyramid_stops_above_the_minimum",
+      "status": "pass",
+      "elapsed": 0.026325,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_levels_follow_the_radius",
+      "status": "pass",
+      "elapsed": 0.022668,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "karis_weight_falls_with_the_luminance",
+      "status": "pass",
+      "elapsed": 0.02608,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_bloom_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.027156,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_stack_orders_exposure_before_bloom_before_tonemap",
+      "status": "pass",
+      "elapsed": 0.024235,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "bloom_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.026093,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_integrates_a_level_ray",
+      "status": "pass",
+      "elapsed": 0.028167,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_integral_matches_a_numeric_one",
+      "status": "pass",
+      "elapsed": 0.022425,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_thins_as_the_ray_climbs",
+      "status": "pass",
+      "elapsed": 0.021984,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_factor_is_capped",
+      "status": "pass",
+      "elapsed": 0.021238,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_fog_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.020408,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "fog_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.021001,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_gives_the_view_a_float_target",
+      "status": "pass",
+      "elapsed": 0.021628,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "float_target_moves_the_gamma_encode",
+      "status": "pass",
+      "elapsed": 0.021757,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "chain_encodes_once_at_the_end",
+      "status": "pass",
+      "elapsed": 0.021711,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_horizon_of_a_flat_plane",
+      "status": "pass",
+      "elapsed": 0.022387,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_horizon_of_a_corner",
+      "status": "pass",
+      "elapsed": 0.022119,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_runs_at_half_resolution",
+      "status": "pass",
+      "elapsed": 0.021256,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_gtao_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.021732,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "gtao_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.020425,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_march_hits_a_floor",
+      "status": "pass",
+      "elapsed": 0.021922,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_march_misses_off_screen",
+      "status": "pass",
+      "elapsed": 0.021529,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_weight_falls_with_the_roughness",
+      "status": "pass",
+      "elapsed": 0.020289,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "builtin_ssr_is_off_by_default",
+      "status": "pass",
+      "elapsed": 0.023603,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ssr_parameters_reach_the_pass",
+      "status": "pass",
+      "elapsed": 0.021536,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "ambient_scale_darkens_the_indirect_fraction",
+      "status": "pass",
+      "elapsed": 0.020998,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "coverage_leaves_the_surface_behind_it",
+      "status": "pass",
+      "elapsed": 0.021277,
+      "project": "view"
+    },
+    {
+      "suite": "Effects",
+      "case": "covered_pixel_keeps_its_color",
+      "status": "pass",
+      "elapsed": 0.020811,
+      "project": "view"
+    }
+  ],
+  "projects": [
+    {
+      "project": "command",
+      "pass": 209,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.815568
+    },
+    {
+      "project": "controller",
+      "pass": 27,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.076953
+    },
+    {
+      "project": "core",
+      "pass": 27,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.348888
+    },
+    {
+      "project": "geometry",
+      "pass": 32,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.018352
+    },
+    {
+      "project": "input",
+      "pass": 63,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.137381
+    },
+    {
+      "project": "job",
+      "pass": 20,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.537797
+    },
+    {
+      "project": "monitor",
+      "pass": 53,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.81528
+    },
+    {
+      "project": "render",
+      "pass": 236,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.830238
+    },
+    {
+      "project": "script",
+      "pass": 18,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.042378
+    },
+    {
+      "project": "shader",
+      "pass": 30,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.091895
+    },
+    {
+      "project": "transform",
+      "pass": 83,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.096321
+    },
+    {
+      "project": "view",
+      "pass": 140,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.423849
+    }
+  ]
+}
