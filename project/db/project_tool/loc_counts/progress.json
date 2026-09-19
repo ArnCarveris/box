@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "in progress",
+  "created": "2026-09-19T18:09:52.175+00:00",
+  "start_time": "2026-09-19T18:09:52.219+00:00",
+  "end_time": null,
+  "dependencies": [
+    "project_tool/build_report",
+    "project_tool/build_page"
+  ]
+}
