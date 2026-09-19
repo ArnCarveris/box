@@ -634,6 +634,68 @@ static inline mat4 mat4_orthographic(
     return m;
 }
 
+/** Intersect a ray with an infinite plane.
+ *
+ * The plane is the set of points whose dot product with the normal equals the
+ * distance, so a normal of (0, 1, 0) and a distance of 2 is the horizontal
+ * plane two units up. A ray parallel to the plane and a plane behind the
+ * origin of the ray both miss.
+ *
+ * @param origin Origin of the ray in world space
+ * @param dir Direction of the ray, which need not be normalized
+ * @param normal Normal of the plane, which need not be normalized
+ * @param distance Signed distance of the plane along its normal
+ * @param point Receives the intersection in world space, NULL to only test
+ * @return true when the ray meets the plane at or in front of its origin
+ */
+static inline bool box_ray_plane(
+    vec3 origin,
+    vec3 dir,
+    vec3 normal,
+    float distance,
+    vec3 *point)
+{
+    float denom = vec3_dot(normal, dir);
+    bool hit = false;
+    float t = 0;
+    if (fabsf(denom) > 1e-6f) {
+        t = (distance - vec3_dot(normal, origin)) / denom;
+        hit = t >= 0;
+    }
+
+    if (hit && point) {
+        *point = vec3_add(origin, vec3_scale(dir, t));
+    }
+
+    return hit;
+}
+
+/** Intersect a ray with the horizontal plane at a height.
+ *
+ * This is the ground plane query a picking ray answers: the camera ray of a
+ * cursor position meets the world at the height the scene is built on, which
+ * is what maps a cursor to a cell of a grid.
+ *
+ * @param origin Origin of the ray in world space
+ * @param dir Direction of the ray, which need not be normalized
+ * @param y Height of the plane over the origin of the world
+ * @param point Receives the intersection in world space, NULL to only test
+ * @return true when the ray meets the plane at or in front of its origin
+ */
+static inline bool box_ray_plane_y(
+    vec3 origin,
+    vec3 dir,
+    float y,
+    vec3 *point)
+{
+    bool hit = box_ray_plane(origin, dir, vec3_new(0, 1, 0), y, point);
+    if (hit && point) {
+        point->y = y;
+    }
+
+    return hit;
+}
+
 #ifdef __cplusplus
 }
 #endif

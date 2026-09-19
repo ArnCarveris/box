@@ -50,6 +50,17 @@
                 "headless_surface_writes_png",
                 "write_nth_adds_frame_suffix"
             ]
+        }, {
+            "id": "Math",
+            "testcases": [
+                "ray_plane_y_hits_ground",
+                "ray_plane_y_at_height",
+                "ray_plane_y_parallel_misses",
+                "ray_plane_y_behind_origin_misses",
+                "ray_plane_y_tests_without_point",
+                "ray_plane_arbitrary_normal",
+                "ray_plane_unnormalized_direction"
+            ]
         }]
     }
 }
