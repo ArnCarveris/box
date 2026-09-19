@@ -11,6 +11,13 @@
  * A tree that was walked drops the cached hit of the picking module, because an
  * element that appeared, moved or grew changes what a still cursor points at
  * and a pick only runs again on its own while the cursor moves.
+ *
+ * A change that only asks for a new layout is marked on the node it was made
+ * on. The walk resolves such a mark to the nearest ancestor whose box the
+ * change cannot resize and lays out that subtree alone, so one moved node of a
+ * large tree costs its own branch instead of everything the root holds. A
+ * change of the structure of a tree still walks and numbers all of it, because
+ * the place of every node after the new one moves with it.
  */
 
 #include "ui_internal.h"
@@ -62,12 +69,169 @@ void box_ui_mark_layout(
     }
 
     UiImpl *impl = ecs_get_mut(world, root, UiImpl);
-    if (impl) {
-        impl->relayout = true;
+    if (!impl) {
+        goto done;
+    }
+
+    impl->relayout = true;
+    UiMark *mark = ecs_vec_append_t(NULL, &box_ui_state(world)->marks, UiMark);
+    mark->root = root;
+    mark->node = node ? e : root;
+    mark->order = 0;
+done:
+    return;
+}
+
+/** True when the box of a node is worked out from the boxes of its children.
+ *
+ * Such a node changes size when a node below it does, which moves it and its
+ * siblings in the layout of its parent, so a change below it is laid out from
+ * that parent on.
+ *
+ * @param world The world
+ * @param e The node
+ * @return True when a side of the box of the node comes from its content
+ */
+static bool box_ui_content_sized(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const Layout *l = ecs_get(world, e, Layout);
+    bool result = false;
+    if (l) {
+        const Rect *r = ecs_get(world, e, Rect);
+        float width = l->width != 0 ? l->width : (r ? r->width : 0);
+        float height = l->height != 0 ? l->height : (r ? r->height : 0);
+
+        result = width == 0 || height == 0;
+    }
+
+    return result;
+}
+
+/** Node the layout of a change has to start at.
+ *
+ * The change can resize the node it was made on, which moves the children of
+ * the node that places them, so the pass starts at the parent of the changed
+ * node. It walks further up while that parent is sized by its content, because
+ * its own box changes with it, and stops at the first ancestor with a box of
+ * its own. The root of the tree ends the walk and is laid out as a whole.
+ *
+ * @param world The world
+ * @param e The changed node
+ * @param root The root of the tree that holds it
+ * @return The node the layout starts at, the root when the walk reached it
+ */
+static ecs_entity_t box_ui_subtree(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t root)
+{
+    ecs_entity_t cur = e != root ? box_hierarchy_parent(world, e) : root;
+    while (cur && cur != root && box_ui_content_sized(world, cur)) {
+        cur = box_hierarchy_parent(world, cur);
+    }
+
+    return cur ? cur : root;
+}
+
+/** True when a subtree is already in the list the layout of a tree visits.
+ *
+ * @param state The registry
+ * @param node The root of the subtree
+ * @return True when the list holds the node
+ */
+static bool box_ui_selected(
+    const UiState *state,
+    ecs_entity_t node)
+{
+    bool result = false;
+    int32_t i, count = ecs_vec_count(&state->subtrees);
+    for (i = 0; i < count && !result; i ++) {
+        result = ecs_vec_get_t(&state->subtrees, UiMark, i)->node == node;
+    }
+
+    return result;
+}
+
+/** Put the subtrees the layout visits in tree order, which is place order.
+ *
+ * @param state The registry
+ */
+static void box_ui_sort(
+    UiState *state)
+{
+    UiMark *marks = ecs_vec_first_t(&state->subtrees, UiMark);
+    int32_t i, count = ecs_vec_count(&state->subtrees);
+    for (i = 1; i < count; i ++) {
+        UiMark mark = marks[i];
+        int32_t j = i;
+        while (j > 0 && marks[j - 1].order > mark.order) {
+            marks[j] = marks[j - 1];
+            j --;
+        }
+
+        marks[j] = mark;
+    }
+}
+
+/** Resolve the marks of a tree into the subtrees its layout has to visit.
+ *
+ * The tree is laid out as a whole when a change reached its root, when a mark
+ * names a node the last walk did not place, and when the changes are so many
+ * that resolving them costs more than the pass they save.
+ *
+ * @param world The world
+ * @param root The root of the tree
+ * @return True when every change of the tree resolved to a subtree below it
+ */
+static bool box_ui_select(
+    ecs_world_t *world,
+    ecs_entity_t root)
+{
+    UiState *state = box_ui_state(world);
+    bool result = false, whole = false;
+    int32_t i, count = ecs_vec_count(&state->marks);
+
+    ecs_vec_clear(&state->subtrees);
+    if (count > BOX_UI_MARK_MAX) {
+        goto done;
+    }
+
+    for (i = 0; i < count && !whole; i ++) {
+        UiMark mark = ecs_vec_get_t(&state->marks, UiMark, i)[0];
+        if (mark.root != root) {
+            continue;
+        }
+
+        ecs_entity_t node = ecs_is_alive(world, mark.node) ?
+            box_ui_subtree(world, mark.node, root) : root;
+        const UiNode *place = node != root ? ecs_get(world, node, UiNode) : NULL;
+        result = true;
+        if (!place || place->root != root || !ecs_has(world, node, Bounds)) {
+            whole = true;
+            continue;
+        }
+
+        if (!box_ui_selected(state, node)) {
+            UiMark *sub = ecs_vec_append_t(NULL, &state->subtrees, UiMark);
+
+            sub->root = root;
+            sub->node = node;
+            sub->order = place->order;
+        }
+    }
+
+    if (whole || ecs_vec_count(&state->subtrees) > BOX_UI_SUBTREE_MAX) {
+        result = false;
+    }
+
+    if (result) {
+        box_ui_sort(state);
     }
 
 done:
-    return;
+    return result;
 }
 
 /** Give one node its place in the tree, its layer and its depth bias.
@@ -118,12 +282,12 @@ done:
     box_render_set_depth(world, e, depth);
 }
 
-/** Collect the nodes of a tree into the places of the registry, in pre-order.
+/** Collect the nodes below a node into the places of the registry, in pre-order.
  *
  * @param world The world
- * @param e The root of the tree
- * @param tree The private state of the root
- * @return The nodes the tree holds
+ * @param e The root of the tree, or the root of one subtree of it
+ * @param tree The private state of the root of the tree
+ * @return The nodes the walk found, the node it started at included
  */
 static int32_t box_ui_collect(
     ecs_world_t *world,
@@ -224,6 +388,40 @@ static void box_ui_number_places(
     }
 }
 
+/** Lay out the subtrees the marks of a tree selected, in tree order.
+ *
+ * A subtree an earlier pass already covered is skipped: the places of a walk
+ * are contiguous, so a node whose place falls in the range the earlier subtree
+ * spans was laid out with it.
+ *
+ * @param world The world
+ * @param root The root of the tree
+ * @param tree The private state of the root
+ * @return True when a pass made or dropped nodes, which asks for a whole walk
+ */
+static bool box_ui_walk_subtrees(
+    ecs_world_t *world,
+    ecs_entity_t root,
+    const UiImpl *tree)
+{
+    UiState *state = box_ui_state(world);
+    int32_t i, count = ecs_vec_count(&state->subtrees), end = -1;
+    for (i = 0; i < count; i ++) {
+        UiMark mark = ecs_vec_get_t(
+            &box_ui_state(world)->subtrees, UiMark, i)[0];
+        if (mark.order < end) {
+            continue;
+        }
+
+        end = mark.order + box_ui_collect(world, mark.node, tree);
+        box_ui_layout(world, root);
+    }
+
+    state = box_ui_state(world);
+
+    return state->respawn || state->instanced;
+}
+
 void box_ui_walk(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -237,19 +435,29 @@ void box_ui_walk(
     UiState *state = box_ui_state(world);
     state->instanced = false;
     state->respawn = false;
-    int32_t count = box_ui_collect(world, e, &tree);
-    if (tree.relayout) {
-        box_ui_layout(world, e);
+    int32_t count = tree.count;
+    bool number = tree.dirty;
+    bool whole = tree.dirty || !tree.relayout || !box_ui_select(world, e);
+    if (!whole && box_ui_walk_subtrees(world, e, &tree)) {
+        tree.relayout = false;
+        number = true;
+        whole = true;
     }
 
-    state = box_ui_state(world);
-    if (state->respawn) {
+    if (whole) {
         count = box_ui_collect(world, e, &tree);
-    }
+        if (tree.relayout) {
+            box_ui_layout(world, e);
+            state = box_ui_state(world);
+            number = number || state->instanced || state->respawn;
+            if (state->respawn) {
+                count = box_ui_collect(world, e, &tree);
+            }
+        }
 
-    state = box_ui_state(world);
-    if (tree.dirty || state->instanced || state->respawn) {
-        box_ui_number_places(world, e, &tree);
+        if (number) {
+            box_ui_number_places(world, e, &tree);
+        }
     }
 
     UiImpl *impl = ecs_get_mut(world, e, UiImpl);

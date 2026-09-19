@@ -441,3 +441,29 @@ void Events_an_element_that_appears_under_a_still_cursor_is_hovered(void)
 
     test_bool(ecs_has_id(w, button, Hovered), true);
 }
+
+void Events_an_element_that_moves_under_a_still_cursor_is_hovered(void)
+{
+    // ui/layout_subtree
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_get_mut(w, root, Ui)->height = 540;
+    ecs_modified(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Rect, {300, 200});
+    ecs_entity_t button = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, button, Rect, {40, 20});
+    ecs_set(w, button, Position, {-100, 0, 0});
+    ecs_progress(w, 0);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {480, 270} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, button, Hovered), false);
+
+    ecs_set(w, button, Position, {0, 0, 0});
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, button, Hovered), true);
+}

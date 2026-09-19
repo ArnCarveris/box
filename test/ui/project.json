@@ -85,7 +85,11 @@
                     "changed_layout_lays_out_the_tree_again",
                     "node_added_later_is_laid_out",
                     "tree_that_did_not_change_is_not_laid_out",
-                    "node_that_leaves_the_tree_loses_its_bounds"
+                    "node_that_leaves_the_tree_loses_its_bounds",
+                    "moved_leaf_lays_out_its_subtree_only",
+                    "content_sized_ancestors_are_laid_out_again",
+                    "changed_leaf_keeps_the_places_of_the_tree",
+                    "structural_change_numbers_the_tree_again"
                 ],
                 "setup": true,
                 "teardown": true
@@ -227,7 +231,8 @@
                     "a_click_emits_the_action_of_the_element",
                     "the_action_of_an_ancestor_fires",
                     "a_handler_receives_the_point_in_logical_pixels",
-                    "an_element_that_appears_under_a_still_cursor_is_hovered"
+                    "an_element_that_appears_under_a_still_cursor_is_hovered",
+                    "an_element_that_moves_under_a_still_cursor_is_hovered"
                 ],
                 "setup": true,
                 "teardown": true

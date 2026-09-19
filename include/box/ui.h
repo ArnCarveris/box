@@ -273,6 +273,12 @@ ECS_STRUCT(Bounds, {
 /** Pixels the target of a subtree that composites may span on one axis */
 #define BOX_UI_GROUP_MAX (4096)
 
+/** Changes one update may leave in a tree before it is laid out as a whole */
+#define BOX_UI_MARK_MAX (256)
+
+/** Subtrees one update may lay out before the tree is laid out as a whole */
+#define BOX_UI_SUBTREE_MAX (64)
+
 /** Element of a UI tree at a point in the plane the trees are laid out in.
  *
  * The point is in the logical pixels of the view of the tree, the units its

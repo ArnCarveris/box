@@ -421,3 +421,115 @@ void Layout_node_that_leaves_the_tree_loses_its_bounds(void)
 
     test_assert(!ecs_has(w, a, Bounds));
 }
+
+void Layout_moved_leaf_lays_out_its_subtree_only(void)
+{
+    // ui/layout_subtree
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow,
+        .width = 400, .height = 200});
+    ecs_entity_t left = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, left, Layout, {.direction = DirectionColumn,
+        .width = 100, .height = 100, .v = VAlignTop});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, left);
+    ecs_set(w, a, Rect, {40, 20});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, left);
+    ecs_set(w, b, Rect, {40, 20});
+    ecs_entity_t right = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, right, Layout, {.direction = DirectionColumn,
+        .width = 100, .height = 100, .v = VAlignTop});
+    ecs_entity_t c = ecs_new_w_pair(w, EcsChildOf, right);
+    ecs_set(w, c, Rect, {40, 20});
+    box_ui_update(w);
+
+    float y = ecs_get(w, b, Bounds)->y;
+    ecs_get_mut(w, c, Bounds)->x = 1234;
+    ecs_set(w, a, Rect, {40, 40});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, b, Bounds)->y, y - 20);
+    test_flt(ecs_get(w, left, Bounds)->height, 100);
+    test_flt(ecs_get(w, c, Bounds)->x, 1234);
+}
+
+void Layout_content_sized_ancestors_are_laid_out_again(void)
+{
+    // ui/layout_subtree
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn,
+        .width = 400, .height = 200, .h = AlignCenter});
+    ecs_entity_t outer = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, outer, Layout, {.direction = DirectionColumn});
+    ecs_entity_t inner = ecs_new_w_pair(w, EcsChildOf, outer);
+    ecs_set(w, inner, Layout, {.direction = DirectionColumn});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, inner);
+    ecs_set(w, leaf, Rect, {40, 20});
+    ecs_entity_t other = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, other, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, inner, Bounds)->height, 20);
+    ecs_get_mut(w, other, Bounds)->x = 1234;
+    ecs_set(w, leaf, Rect, {40, 60});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, inner, Bounds)->height, 60);
+    test_flt(ecs_get(w, outer, Bounds)->height, 60);
+    test_flt(ecs_get(w, root, Bounds)->height, 200);
+    test_flt(ecs_get(w, other, Bounds)->x, 0);
+}
+
+void Layout_changed_leaf_keeps_the_places_of_the_tree(void)
+{
+    // ui/layout_subtree
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Rect, {400, 200});
+    ecs_entity_t first = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, first, Rect, {100, 100});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, first);
+    ecs_set(w, leaf, Rect, {40, 20});
+    ecs_entity_t second = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, second, Rect, {100, 100});
+    ecs_entity_t last = ecs_new_w_pair(w, EcsChildOf, second);
+    ecs_set(w, last, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_int(ecs_get(w, last, UiNode)->order, 4);
+    ecs_get_mut(w, last, RenderInstance)->depth = 5;
+    ecs_set(w, leaf, Rect, {60, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, leaf, Bounds)->width, 60);
+    test_int(ecs_get(w, last, UiNode)->order, 4);
+    test_flt(ecs_get(w, last, RenderInstance)->depth, 5);
+}
+
+void Layout_structural_change_numbers_the_tree_again(void)
+{
+    // ui/layout_subtree
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Rect, {400, 200});
+    ecs_entity_t first = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, first, Layout, {.direction = DirectionNone});
+    ecs_set(w, first, Rect, {100, 100});
+    ecs_entity_t leaf = ecs_new_w_pair(w, EcsChildOf, first);
+    ecs_set(w, leaf, Rect, {40, 20});
+    ecs_entity_t second = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, second, Rect, {100, 100});
+    ecs_entity_t last = ecs_new_w_pair(w, EcsChildOf, second);
+    ecs_set(w, last, Rect, {40, 20});
+    box_ui_update(w);
+
+    ecs_get_mut(w, last, RenderInstance)->depth = 5;
+    ecs_entity_t added = ecs_new_w_pair(w, EcsChildOf, first);
+    ecs_set(w, added, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_int(ecs_get(w, added, UiNode)->order, 3);
+    test_int(ecs_get(w, last, UiNode)->order, 5);
+    test_flt(ecs_get(w, last, RenderInstance)->depth, -5 * BOX_UI_STEP);
+}

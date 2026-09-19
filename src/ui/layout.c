@@ -9,6 +9,11 @@
  * it. Everything is worked out in the pixels of the view, and a node that the
  * layout placed gets the Position that difference asks for, which is what the
  * transform of the frame and the extract after it read.
+ *
+ * The places the pass runs over are those of a whole tree or those of one
+ * subtree of it, which a change that cannot resize the box of that subtree
+ * asks for. The node the walk started at keeps the box and the place the pass
+ * that laid out its parent gave it, so the rest of the tree stays where it is.
  */
 
 #include "ui_internal.h"
@@ -349,10 +354,17 @@ static void box_ui_measure(
 
 /** Place every collected node, a node before the nodes below it.
  *
+ * The node without a parent is the one the collect started at. It is the root
+ * of the tree when the whole tree is laid out, which sits where its own
+ * Position puts it, and the root of a subtree otherwise, which keeps the place
+ * in the tree that the pass that laid out its parent gave it.
+ *
  * @param world The world
+ * @param root The root of the tree being walked
  */
 static void box_ui_arrange(
-    ecs_world_t *world)
+    ecs_world_t *world,
+    ecs_entity_t root)
 {
     UiState *state = box_ui_state(world);
     int32_t i, count = ecs_vec_count(&state->places);
@@ -365,7 +377,12 @@ static void box_ui_arrange(
             continue;
         }
 
-        if (!parent) {
+        const Bounds *b = !parent && p->e != root ?
+            ecs_get(world, p->e, Bounds) : NULL;
+        if (b) {
+            p->x = b->x;
+            p->y = b->y;
+        } else if (!parent) {
             p->x = p->local_x;
             p->y = p->local_y;
         } else if (p->has_anchor) {
@@ -403,7 +420,7 @@ void box_ui_layout(
     ecs_entity_t root)
 {
     box_ui_measure(world);
-    box_ui_arrange(world);
+    box_ui_arrange(world, root);
     box_ui_text_build(world);
     box_ui_shadow_build(world);
     box_ui_group_build(world, root);

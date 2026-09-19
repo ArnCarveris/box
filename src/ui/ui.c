@@ -88,6 +88,8 @@ static void box_ui_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].stack, UiVisit);
         ecs_vec_fini_t(NULL, &state[i].nodes, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].places, UiPlace);
+        ecs_vec_fini_t(NULL, &state[i].marks, UiMark);
+        ecs_vec_fini_t(NULL, &state[i].subtrees, UiMark);
         if (state[i].hits) {
             ecs_query_fini(state[i].hits);
         }
@@ -168,7 +170,7 @@ static void box_ui_on_remove(
     }
 }
 
-/** Mark every tree of the world, which an atlas that grew asks for.
+/** Mark every tree of the world as a whole, which an atlas that grew asks for.
  *
  * Growing an atlas moves every uv of the font it holds, so the elements that
  * drew with it have to build their quads again. Their fingerprint carries the
@@ -228,6 +230,7 @@ void box_ui_update(
     }
 
     state = box_ui_state(world);
+    ecs_vec_clear(&state->marks);
     state->busy = false;
 }
 
@@ -314,6 +317,8 @@ void BoxUiImport(
     ecs_vec_init_t(NULL, &state->stack, UiVisit, 0);
     ecs_vec_init_t(NULL, &state->nodes, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->places, UiPlace, 0);
+    ecs_vec_init_t(NULL, &state->marks, UiMark, 0);
+    ecs_vec_init_t(NULL, &state->subtrees, UiMark, 0);
 
     UiFonts *fonts = ecs_singleton_ensure(world, UiFonts);
     ecs_vec_init_t(NULL, &fonts->atlases, box_ui_atlas_t*, 0);

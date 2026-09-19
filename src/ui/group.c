@@ -218,14 +218,38 @@ done:
     return result;
 }
 
+/** Groups between a node and the root of its tree, the node itself included.
+ *
+ * @param world The world
+ * @param e The node
+ * @param root The root of the tree
+ * @return The groups on the path, which is the depth of the node
+ */
+static int32_t box_ui_group_depth(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t root)
+{
+    int32_t result = 0;
+    ecs_entity_t cur = e;
+    while (cur && cur != root) {
+        result += ecs_has(world, cur, GroupImpl) ? 1 : 0;
+        cur = box_hierarchy_parent(world, cur);
+    }
+
+    return result;
+}
+
 /** Order the view of every group so an inner subtree renders before an outer one.
  *
  * @param world The world
  * @param base Order of the view of the tree in the frame
+ * @param depth Groups above the node the collect started at
  */
 static void box_ui_group_order(
     ecs_world_t *world,
-    int32_t base)
+    int32_t base,
+    int32_t depth)
 {
     int32_t i, count = ecs_vec_count(&box_ui_state(world)->places);
     for (i = 0; i < count; i ++) {
@@ -239,7 +263,7 @@ static void box_ui_group_order(
 
         const GroupImpl *group = ecs_get(world, place->e, GroupImpl);
 
-        place->depth = parent ? parent->depth + (group ? 1 : 0) : 0;
+        place->depth = parent ? parent->depth + (group ? 1 : 0) : depth;
         if (!group) {
             continue;
         }
@@ -266,6 +290,8 @@ void box_ui_group_build(
     int32_t base = ui ? ui->priority : BOX_UI_PRIORITY;
     float scale = box_ui_group_scale(world, root);
     int32_t i, count = ecs_vec_count(&state->places);
+    ecs_entity_t first = count ?
+        ecs_vec_get_t(&state->places, UiPlace, 0)->e : root;
     for (i = count - 1; i >= 0; i --) {
         UiPlace *place = ecs_vec_get_t(&box_ui_state(world)->places, UiPlace, i);
         int32_t parent = place->parent;
@@ -278,7 +304,7 @@ void box_ui_group_build(
         }
     }
 
-    box_ui_group_order(world, base);
+    box_ui_group_order(world, base, box_ui_group_depth(world, first, root));
 done:
     return;
 }

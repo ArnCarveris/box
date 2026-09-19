@@ -29,6 +29,18 @@ typedef struct UiNode {
     int32_t order;      /**< Index of the node in the walk of its tree */
 } UiNode;
 
+/** Subtree the next layout of a tree has to visit again.
+ *
+ * A change leaves a mark that names the node it was made on, and the layout
+ * resolves that node to the nearest ancestor whose box the change cannot
+ * resize, which is the node its pass starts at.
+ */
+typedef struct UiMark {
+    ecs_entity_t root; /**< Root of the tree the node belongs to */
+    ecs_entity_t node; /**< Node the change was made on, or the resolved subtree */
+    int32_t order;     /**< Place the last walk gave the node, once it is resolved */
+} UiMark;
+
 /** Node a walk still has to visit, with the place the walk gave its parent */
 typedef struct UiVisit {
     ecs_entity_t e;  /**< The node */
@@ -80,6 +92,8 @@ typedef struct UiState {
     ecs_vec_t stack;    /**< UiVisit nodes a walk still has to visit */
     ecs_vec_t nodes;    /**< ecs_entity_t children of the node a walk visits */
     ecs_vec_t places;   /**< UiPlace of every node of the tree being walked */
+    ecs_vec_t marks;    /**< UiMark of every node changed since the last update */
+    ecs_vec_t subtrees; /**< UiMark the layout of one tree visits, in tree order */
     ecs_query_t *hits;  /**< Nodes with a rectangle the cursor is resolved against */
     int32_t trees;      /**< Trees the world holds, zero skips the observers */
     int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
@@ -224,7 +238,10 @@ void box_ui_mark(
     ecs_world_t *world,
     ecs_entity_t e);
 
-/** Mark the tree of an entity so the next update lays it out again.
+/** Mark the tree of an entity so the next update lays the entity out again.
+ *
+ * The mark names the entity, not its tree, so the update lays out the subtree
+ * around it instead of everything the root holds.
  *
  * @param world The world
  * @param e An entity of the tree, the root or one of its descendants
@@ -297,6 +314,11 @@ void box_ui_drop(
  * runs before the numbering because a node the layout gives a rectangle gains
  * its instance there, and a bias set before that instance exists is lost.
  *
+ * A tree that only has to be laid out again collects and lays out the subtrees
+ * its marks resolved to instead of everything the root holds, and numbers
+ * nothing, because their places did not move. A pass that made or dropped a
+ * node falls back to the walk of the whole tree, which numbers it again.
+ *
  * @param world The world
  * @param e The root of the tree
  */
@@ -308,7 +330,10 @@ void box_ui_walk(
  *
  * The pass sizes every node, then places the children of a layout along its
  * axis and the anchored nodes against the edges of their parent, which writes
- * the Position of those nodes and the Rect of a node a layout sized.
+ * the Position of those nodes and the Rect of a node a layout sized. The first
+ * place is the node the collect started at: the root of the tree, which sits
+ * where its own Position puts it, or the root of a subtree, which keeps the
+ * Bounds the pass that placed it left behind.
  *
  * @param world The world
  * @param root The root of the tree being walked
