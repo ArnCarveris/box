@@ -245,3 +245,34 @@ void Events_deleting_the_entity_of_a_task_cancels_the_wait(void)
     ecs_progress(w, 0);
     test_assert(ecs_lookup(w, "waiter") == 0);
 }
+
+void Events_a_waiter_registered_at_scene_load_catches_the_press(void)
+{
+    // input/pressed_at_load
+    ecs_entity_t forward = ecs_entity(w, {
+        .name = "Forward", .parent = ecs_lookup(w, "actions") });
+    ecs_add(w, forward, InputAction);
+    ecs_set(w, ecs_new(w), Binding, { .mask = BoxKeyW, .action = forward });
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.input\n"
+        "template Waiter {\n"
+        "  mut hits = 0\n"
+        "  async {\n"
+        "    await on.pressed(actions.Forward)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "Waiter waiter\n" });
+    test_assert(s != 0);
+
+    ecs_entity_t waiter = ecs_lookup(w, "waiter");
+    test_assert(waiter != 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, waiter, fired_tag), true);
+}

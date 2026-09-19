@@ -110,7 +110,8 @@
                     "several_waiters_resume_on_one_action",
                     "an_emitted_action_resumes_a_waiter",
                     "the_wait_carries_the_source",
-                    "deleting_the_entity_of_a_task_cancels_the_wait"
+                    "deleting_the_entity_of_a_task_cancels_the_wait",
+                    "a_waiter_registered_at_scene_load_catches_the_press"
                 ],
                 "setup": true,
                 "teardown": true
