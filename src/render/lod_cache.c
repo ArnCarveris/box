@@ -45,6 +45,8 @@ typedef struct box_lod_gen_t {
     float shape_error;               /**< Error of the primitive set in world units */
     box_mesh_data_t mesh;            /**< Merged and simplified mesh, empty for none */
     float mesh_error;                /**< Error of that mesh in world units */
+    vec3 local_min;                  /**< Minimum corner of the subtree in node space */
+    vec3 local_max;                  /**< Maximum corner of the subtree in node space */
     uint64_t hash;                   /**< Content hash of that mesh */
     float metallic;                  /**< Metallic value the merged mesh is drawn with */
     uint64_t job;                    /**< Handle of the job */
@@ -429,6 +431,8 @@ static void box_lod_gen_run(
         gen->shape_count = proxy.count;
         gen->shapes = ecs_os_malloc_n(box_lod_shape_t, proxy.count);
         gen->shape_error = box_lod_gen_shell(proxy.error, proxy.min, proxy.max);
+        gen->local_min = proxy.min;
+        gen->local_max = proxy.max;
         memcpy(gen->shapes, proxy.shapes, (size_t)proxy.count * sizeof(box_lod_shape_t));
     }
 
@@ -475,6 +479,9 @@ static void box_lod_gen_shapes(
 
     entry->shape_error = gen->shape_error;
     entry->shape_count = gen->shape_count;
+    entry->local_min = gen->local_min;
+    entry->local_max = gen->local_max;
+    entry->impostor_error = box_lod_impostor_error(gen->local_min, gen->local_max);
 }
 
 /** Give an entry the merged mesh a job produced, sharing an identical one.
@@ -603,6 +610,8 @@ static void box_lod_entry_clear(
     if (entry->mesh && world) {
         box_mesh_cache_release(world, entry->mesh);
     }
+
+    entry->captured = false;
 
     ecs_vec_clear(&entry->parts);
     entry->mesh = 0;
@@ -735,6 +744,7 @@ void box_lod_cache_drop(
     }
 
     box_lod_cache_orphan(world, cache, entry);
+    box_lod_impostor_drop(world, cache, entry);
     box_lod_entry_clear(world, entry);
     ecs_vec_fini_t(NULL, &entry->parts, box_lod_part_t);
     ecs_map_remove(&cache->entries, id);

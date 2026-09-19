@@ -708,9 +708,12 @@ static bool box_lod_walk_collapse(
 
     int32_t level = box_lod_select(&select);
     bool result = level > 0;
-    bool finer = (n->votes & BOX_LOD_VOTE_COLLAPSE) && n->level > 0 && n->level < level;
+    bool voted = (n->votes & BOX_LOD_VOTE_COLLAPSE) != 0;
+    bool finer = voted && n->level > 0 && n->level < level;
 
-    if (!result) {
+    if (voted && desc->secondary) {
+        result = true;
+    } else if (!result) {
         n->level = 0;
     } else if (!(n->votes & BOX_LOD_VOTE_DESCEND)) {
         n->level = finer ? n->level : level;

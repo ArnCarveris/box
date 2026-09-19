@@ -310,6 +310,7 @@ void box_render_extract(
     }
 
     box_render_extract_emitters(world, state, p);
+    box_render_lod_capture(world, state, p);
     box_render_validate(world);
 }
 

@@ -1,0 +1,101 @@
+// Four masts yards, fanning away from the camera. The near one keeps its masts,
+// the two behind it are too sparse for the box over their bounds and too far
+// for a generated proxy to be worth its draws: they are drawn as a billboard of
+// the eight views the renderer captured of them into an atlas, the last resort
+// an impostor is. The farthest one is small enough for its box again. The job
+// system runs the generation on the main thread here, so the frame a proxy and
+// its capture arrive in is the same on every machine.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.job
+
+$ { BakeSettings: {enabled: false} }
+
+$ { JobSettings: {workers: -1, budget_ms: 0} }
+
+$ { LodSettings: {enabled: true, quality: 1, error_px: 4, hysteresis: 0.25} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.8, -0.55, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+camera {
+  Position: {0, 20, -40}
+  LookAt: {0, 12, 300}
+  Camera: {fov: 55, far_: 6000}
+}
+
+ground {
+  Position: {0, -0.5, 600}
+  Scale: {4000, 1, 4000}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+template Yard {
+  for i in 0..4 {
+    _ {
+      Position: {i * 8.6 - 12.9, 13, -13}
+      Scale: {0.6, 26, 0.6}
+      Box: {1, 1, 1}
+      Rgb: {206, 138, 84}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+
+  for i in 0..4 {
+    _ {
+      Position: {i * 8.6 - 12.9, 13, 13}
+      Scale: {0.6, 26, 0.6}
+      Box: {1, 1, 1}
+      Rgb: {206, 138, 84}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+
+  hut {
+    Position: {0, 2.5, 0}
+    Scale: {6, 5, 6}
+    Box: {1, 1, 1}
+    Rgb: {110, 190, 230}
+    PbrMaterial: {roughness: 0.4}
+  }
+
+  banner {
+    Position: {0, 20, -13}
+    Scale: {26, 6, 0.4}
+    Box: {1, 1, 1}
+    Rgb: {232, 90, 70}
+    PbrMaterial: {roughness: 0.5}
+  }
+}
+
+yards {
+  _ {
+    Position: {-60, 0, 170}
+    Yard: {}
+  }
+
+  _ {
+    Position: {95, 0, 430}
+    Yard: {}
+  }
+
+  _ {
+    Position: {-230, 0, 600}
+    Yard: {}
+  }
+
+  _ {
+    Position: {330, 0, 1000}
+    Yard: {}
+  }
+}

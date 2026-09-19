@@ -231,6 +231,20 @@
                     "a_small_shadow_threshold_keeps_the_caster_detailed",
                     "a_world_without_a_sun_walks_the_view_alone"
                 ]
+            },
+            {
+                "id": "Impostor",
+                "testcases": [
+                    "the_error_falls_with_the_size_of_the_subtree",
+                    "the_billboard_picks_the_tile_the_eye_stands_at",
+                    "a_turned_node_picks_the_tile_of_its_own_axis",
+                    "a_sparse_subtree_is_given_an_atlas",
+                    "the_capture_renders_every_tile_before_the_frame",
+                    "the_billboard_is_one_sorted_draw_of_the_atlas",
+                    "a_changed_descendant_captures_the_atlas_again",
+                    "destroying_a_root_frees_its_atlas",
+                    "a_near_subtree_keeps_its_parts"
+                ]
             }
         ]
     }

@@ -69,6 +69,9 @@ struct box_lod_state_t {
     ecs_vec_t results;     /**< int32_t nodes the walks of this frame resolved */
     ecs_vec_t proxies;     /**< box_instance_t the collapsed nodes are drawn as */
     ecs_vec_t parts;       /**< box_lod_draw_t of the generated proxies of this frame */
+    ecs_vec_t billboards;  /**< box_lod_billboard_t of the impostors of this frame */
+    uint64_t captures[BOX_LOD_IMPOSTOR_CAPTURES]; /**< Nodes whose atlas must be captured */
+    int32_t capture_count; /**< Nodes waiting for a capture this frame */
     ecs_vec_t order;       /**< int32_t parts, grouped by the mesh they are drawn with */
     ecs_vec_t groups;      /**< box_dynamic_batch_t one run of that order becomes */
     box_lod_want_t wants[BOX_LOD_CACHE_STARTS]; /**< Largest nodes waiting for a proxy */
@@ -76,6 +79,7 @@ struct box_lod_state_t {
     ecs_vec_t touched;     /**< ecs_entity_t whose change invalidates the proxies above it */
     ecs_vec_t inputs;      /**< box_lod_primitive_t of the subtree being collected */
     box_lod_cache_t cache; /**< Generated proxies, keyed by the identity of a node */
+    box_packet_t *packet;  /**< Packet of the frame, which an atlas is created on */
     box_lod_collect_t collect; /**< The collection the inputs belong to */
     mat4 collect_base;     /**< World to local of the node being collected */
     int32_t counts[BOX_LOD_LEVEL_MAX]; /**< Proxies drawn per representation */
@@ -113,6 +117,7 @@ box_lod_state_t* box_render_lod_new(void)
     ecs_vec_init_t(NULL, &result->results, int32_t, 0);
     ecs_vec_init_t(NULL, &result->proxies, box_instance_t, 0);
     ecs_vec_init_t(NULL, &result->parts, box_lod_draw_t, 0);
+    ecs_vec_init_t(NULL, &result->billboards, box_lod_billboard_t, 0);
     ecs_vec_init_t(NULL, &result->order, int32_t, 0);
     ecs_vec_init_t(NULL, &result->groups, box_dynamic_batch_t, 0);
     ecs_vec_init_t(NULL, &result->stats, box_lod_walk_stats_t, 0);
@@ -140,6 +145,7 @@ void box_render_lod_free(
     ecs_vec_fini_t(NULL, &lod->results, int32_t);
     ecs_vec_fini_t(NULL, &lod->proxies, box_instance_t);
     ecs_vec_fini_t(NULL, &lod->parts, box_lod_draw_t);
+    ecs_vec_fini_t(NULL, &lod->billboards, box_lod_billboard_t);
     ecs_vec_fini_t(NULL, &lod->order, int32_t);
     ecs_vec_fini_t(NULL, &lod->groups, box_dynamic_batch_t);
     ecs_vec_fini_t(NULL, &lod->stats, box_lod_walk_stats_t);
@@ -723,11 +729,12 @@ static float box_render_lod_need(
 
 /** The projected error ladder of a node, the finest representation first.
  *
- * The ladder is always the same three levels, so a representation the cache
+ * The ladder is always the same four levels, so a representation the cache
  * does not hold takes the error of the level under it and the walk falls back
  * to the box of the node without ever picking something it cannot draw. The
  * cheapest level that stays under the threshold wins, which is why a node the
- * box already stands in for never spends a generated proxy on itself.
+ * box already stands in for never spends a generated proxy on itself and why
+ * the impostor, one billboard, is the last thing tried before that box.
  *
  * @param ctx The state
  * @param node Index of the node
@@ -744,8 +751,10 @@ static int32_t box_render_lod_ladder(
     const box_lod_entry_t *entry = box_lod_cache_find(&lod->cache, n->id);
     bool usable = entry && entry->ready &&
         box_render_lod_small(lod, n, box_render_lod_scale(lod, n));
+    bool drawable = usable && (entry->mesh || ecs_vec_count(&entry->parts));
     float shape = n->error;
     float mesh = n->error;
+    float impostor = n->error;
 
     if (usable && entry->shape_count > 0 && entry->shape_count <= BOX_LOD_CACHE_SHAPES &&
         ecs_vec_count(&entry->parts) && entry->shape_error < shape)
@@ -758,11 +767,87 @@ static int32_t box_render_lod_ladder(
         mesh = entry->mesh_error;
     }
 
+    if (drawable && entry->impostor_error < impostor) {
+        impostor = entry->impostor_error < shape ? shape : entry->impostor_error;
+    }
+
     error[BOX_LOD_LEVEL_MESH - 1] = mesh;
     error[BOX_LOD_LEVEL_SHAPES - 1] = shape;
+    error[BOX_LOD_LEVEL_IMPOSTOR - 1] = impostor;
     error[BOX_LOD_LEVEL_BOX - 1] = n->error;
 
     return BOX_LOD_LEVEL_MAX;
+}
+
+/** Remember the billboard of a node that shows its impostor atlas.
+ *
+ * @param lod The state
+ * @param n The node
+ * @param entry The entry of the node
+ */
+static void box_render_lod_impostor(
+    box_lod_state_t *lod,
+    const box_lod_node_t *n,
+    box_lod_entry_t *entry)
+{
+    mat4 base = box_render_lod_base(lod, n);
+    vec3 axis = mat4_transform_dir(&base, vec3_new(0, 0, -1));
+    vec3 size = vec3_sub(n->max, n->min);
+    box_lod_billboard_t *bb =
+        ecs_vec_append_t(NULL, &lod->billboards, box_lod_billboard_t);
+
+    bb->center = vec3_scale(vec3_add(n->min, n->max), 0.5f);
+    bb->axis = vec3_length(axis) > 0.0f ? vec3_normalize(axis) : vec3_new(0, 0, -1);
+    bb->radius = vec3_length(size) * 0.5f;
+    bb->atlas = entry->atlas;
+    box_lod_impostor_size(n->min, n->max, bb->size);
+    bb->color[0] = 1.0f;
+    bb->color[1] = 1.0f;
+    bb->color[2] = 1.0f;
+    bb->color[3] = 1.0f;
+}
+
+/** Give a node an atlas and ask for it to be captured at the end of this frame.
+ *
+ * The atlas is created here and rendered at the end of the same frame, before
+ * the views of that frame draw, so a node that takes its impostor draws it
+ * right away instead of standing in a box for a frame.
+ *
+ * @param lod The state
+ * @param n The node
+ * @param entry The entry of the node
+ * @return True when the node holds an atlas the frame will capture
+ */
+static bool box_render_lod_schedule(
+    box_lod_state_t *lod,
+    const box_lod_node_t *n,
+    box_lod_entry_t *entry)
+{
+    bool result = false;
+    int32_t i;
+    if (!lod->packet || !entry->ready) {
+        goto done;
+    }
+
+    if (lod->capture_count >= BOX_LOD_IMPOSTOR_CAPTURES) {
+        goto done;
+    }
+
+    for (i = 0; i < lod->capture_count; i ++) {
+        if (lod->captures[i] == n->id) {
+            goto done;
+        }
+    }
+
+    if (!box_lod_impostor_atlas(lod->world, &lod->cache, lod->packet, entry)) {
+        goto done;
+    }
+
+    lod->captures[lod->capture_count ++] = n->id;
+    entry->captured = true;
+    result = true;
+done:
+    return result;
 }
 
 /** Draw the representation of a node the walks replaced.
@@ -774,7 +859,7 @@ static void box_render_lod_proxy(
     box_lod_state_t *lod,
     const box_lod_node_t *n)
 {
-    const box_lod_entry_t *entry = box_lod_cache_find(&lod->cache, n->id);
+    box_lod_entry_t *entry = box_lod_cache_find(&lod->cache, n->id);
     int32_t level = n->level;
     if (!lod->proxy_ready) {
         goto done;
@@ -784,6 +869,17 @@ static void box_render_lod_proxy(
         !entry->ready)
     {
         level = BOX_LOD_LEVEL_BOX;
+    }
+
+    if (level == BOX_LOD_LEVEL_IMPOSTOR && !entry->captured) {
+        level = box_render_lod_schedule(lod, n, entry) ?
+            level : BOX_LOD_LEVEL_BOX;
+    }
+
+    if (level == BOX_LOD_LEVEL_IMPOSTOR) {
+        lod->counts[level - 1] ++;
+            box_render_lod_impostor(lod, n, entry);
+        goto done;
     }
 
     if (level == BOX_LOD_LEVEL_MESH && !entry->mesh) {
@@ -1003,6 +1099,98 @@ static void box_render_lod_parts(
 
     ecs_os_free(cursor);
     ecs_map_fini(&index);
+done:
+    return;
+}
+
+/** Move the views a capture added to the head of the packet.
+ *
+ * A capture is recorded at the end of the frame, when the batches it draws are
+ * known, but it has to run before the views that show its billboard, so the
+ * views it added are rotated to the front of the packet.
+ *
+ * @param p The packet
+ * @param base Views the packet held before the captures
+ */
+static void box_render_lod_rotate(
+    box_packet_t *p,
+    uint32_t base)
+{
+    uint32_t added = p->views.count - base;
+    size_t size = sizeof(box_view_t);
+    box_view_t *head = ecs_os_malloc_n(box_view_t, added);
+    char *data = box_vec_at(&p->views, 0);
+
+    memcpy(head, data + (size_t)base * size, (size_t)added * size);
+    memmove(data + (size_t)added * size, data, (size_t)base * size);
+    memcpy(data, head, (size_t)added * size);
+    ecs_os_free(head);
+    if (p->capture_view != BOX_VIEW_NONE) {
+        p->capture_view += added;
+    }
+}
+
+void box_render_lod_capture(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p)
+{
+    box_lod_state_t *lod = state->lod;
+    uint32_t base = p->views.count;
+    int32_t i;
+    (void)world;
+    if (!lod || !lod->capture_count || !base) {
+        goto done;
+    }
+
+    box_view_t lit = *(box_view_t*)box_vec_at(&p->views, 0);
+    for (i = 0; i < lod->capture_count; i ++) {
+        box_lod_entry_t *entry = box_lod_cache_find(&lod->cache, lod->captures[i]);
+        if (!entry || !entry->ready || !entry->atlas) {
+            continue;
+        }
+
+        box_lod_impostor_capture(p, entry, &lit);
+        lod->cache.captures ++;
+    }
+
+    lod->capture_count = 0;
+    if (p->views.count > base) {
+        box_render_lod_rotate(p, base);
+    }
+
+done:
+    return;
+}
+
+void box_render_lod_billboards(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p,
+    const box_view_t *v)
+{
+    box_lod_state_t *lod = state->lod;
+    int32_t i, count = lod ? ecs_vec_count(&lod->billboards) : 0;
+    vec3 eye = vec3_new(v->eye[0], v->eye[1], v->eye[2]);
+    if (!count || v->target) {
+        goto done;
+    }
+
+    for (i = 0; i < count; i ++) {
+        const box_lod_billboard_t *bb =
+            ecs_vec_get_t(&lod->billboards, box_lod_billboard_t, i);
+        int32_t tile = box_lod_impostor_pick(bb, eye);
+        uint32_t mesh = box_lod_impostor_tile(world, &lod->cache, tile);
+        if (!mesh || !bb->atlas) {
+            continue;
+        }
+
+        box_transparent_t *entry = box_vec_push(&p->transparent);
+
+        box_lod_impostor_billboard(bb, mesh, tile, eye, entry);
+        entry->depth = vec3_length(vec3_sub(bb->center, eye));
+    }
+
 done:
     return;
 }
@@ -1667,6 +1855,7 @@ static void box_render_lod_publish(
         .meshes = lod->counts[BOX_LOD_LEVEL_MESH - 1],
         .shapes = lod->counts[BOX_LOD_LEVEL_SHAPES - 1],
         .boxes = lod->counts[BOX_LOD_LEVEL_BOX - 1],
+        .impostors = lod->counts[BOX_LOD_LEVEL_IMPOSTOR - 1],
         .queued = lod->cache.queued,
         .cached = ecs_map_count(&lod->cache.entries)
     };
@@ -1702,6 +1891,7 @@ static void box_render_lod_mesh(
     lod->proxy.bounds_min = min;
     lod->proxy.bounds_max = max;
     lod->proxy_ready = true;
+    box_lod_impostor_tile(world, &lod->cache, 0);
 done:
     return;
 }
@@ -1728,7 +1918,9 @@ static void box_render_lod_stop(
     ecs_map_clear(&lod->roots);
     ecs_vec_clear(&lod->proxies);
     ecs_vec_clear(&lod->parts);
+    ecs_vec_clear(&lod->billboards);
     ecs_vec_clear(&lod->touched);
+    lod->capture_count = 0;
     lod->touch_all = false;
     lod->structure = false;
     lod->active = false;
@@ -1742,6 +1934,7 @@ void box_render_lod_update(
     box_lod_state_t *lod = state->lod;
     lod->world = world;
     lod->render = state;
+    lod->packet = p;
     if (!box_render_lod_views(world, state, p, lod)) {
         if (lod->active) {
             box_render_lod_stop(lod);
@@ -1760,8 +1953,10 @@ void box_render_lod_update(
     ecs_vec_clear(&lod->results);
     ecs_vec_clear(&lod->proxies);
     ecs_vec_clear(&lod->parts);
+    ecs_vec_clear(&lod->billboards);
     ecs_vec_clear(&lod->stats);
     memset(lod->counts, 0, sizeof(lod->counts));
+    lod->capture_count = 0;
     box_render_lod_clear_wants(lod);
 
     int32_t i, count = ecs_vec_count(&lod->views);
@@ -1775,7 +1970,7 @@ void box_render_lod_update(
             .visible = box_render_lod_visible,
             .hidden = (i || view->shadow) ? NULL : box_render_lod_occluded,
             .open = box_render_lod_open, .emit = box_render_lod_emit,
-            .levels = box_render_lod_ladder, .ctx = lod
+            .levels = box_render_lod_ladder, .secondary = view->shadow, .ctx = lod
         };
 
         lod->view = view;

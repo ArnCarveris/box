@@ -274,6 +274,7 @@ void box_render_extract_transparent(
     v->transparent_first = p->transparent.count;
     v->transparent_count = 0;
     v->translucent_count = 0;
+    box_render_lod_billboards(world, state, p, v);
     if (!ecs_vec_count(&state->transparent)) {
         goto done;
     }
@@ -337,7 +338,8 @@ void box_render_extract_transparent(
         box_instance_set_shading(&entry->data, entry->blend, entry->back);
     }
 
-    v->transparent_count = p->transparent.count - v->transparent_first;
 done:
+    v->transparent_count = p->transparent.count - v->transparent_first;
+
     return;
 }

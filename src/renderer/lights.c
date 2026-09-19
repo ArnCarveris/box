@@ -259,6 +259,10 @@ void box_lights_dispatch(
     const box_view_t *view,
     WGPUCommandEncoder encoder)
 {
+    if (!r->v->cluster_group) {
+        goto done;
+    }
+
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
     wgpuComputePassEncoderSetPipeline(pass, r->cluster_pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, r->v->cluster_group, 0, NULL);
@@ -268,6 +272,8 @@ void box_lights_dispatch(
         (view->cluster.z + BOX_CLUSTER_GROUP - 1) / BOX_CLUSTER_GROUP);
     wgpuComputePassEncoderEnd(pass);
     wgpuComputePassEncoderRelease(pass);
+done:
+    return;
 }
 
 void box_lights_fini(

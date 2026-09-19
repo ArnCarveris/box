@@ -495,6 +495,7 @@ ECS_STRUCT(LodStats, {
     int32_t meshes;   /**< Proxies drawn as a merged and simplified mesh */
     int32_t shapes;   /**< Proxies drawn as a generated set of primitives */
     int32_t boxes;    /**< Proxies still drawn as the box over their bounds */
+    int32_t impostors; /**< Proxies drawn as a billboard of their impostor atlas */
     int32_t queued;   /**< Proxies waiting for the generator */
     int32_t cached;   /**< Proxies the cache of the renderer holds */
 });
@@ -610,7 +611,7 @@ typedef void (*box_lod_emit_t)(
     uint32_t vote);
 
 /** Representations one node can be replaced by, the node itself excluded */
-#define BOX_LOD_LEVEL_MAX (3)
+#define BOX_LOD_LEVEL_MAX (4)
 
 /** Fills the error ladder of a node the walk is about to replace.
  *
@@ -648,6 +649,7 @@ typedef struct box_lod_walk_desc_t {
     box_lod_open_t open;        /**< Materialises the children of a node, NULL for none */
     box_lod_emit_t emit;        /**< Receives a resolved node, NULL to only count */
     box_lod_levels_t levels;    /**< Error ladder of a node, NULL for its own error */
+    bool secondary;             /**< A pass beside the view, which never refines its choice */
     void *ctx;                  /**< Passed to the callbacks */
 } box_lod_walk_desc_t;
 

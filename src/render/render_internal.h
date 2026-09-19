@@ -240,6 +240,34 @@ void box_render_lod_proxies(
 box_lod_cache_t* box_render_lod_cache(
     RenderState *state);
 
+/** Render the views of the impostors the frame asked for into their atlases.
+ *
+ * The capture views are added at the end of the frame, so the billboard of an
+ * impostor shows what the previous frame captured and the node keeps its box
+ * until then; nothing of the capture is on the path of the frame it belongs to.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet of the frame
+ */
+void box_render_lod_capture(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p);
+
+/** Append the billboards of the impostors to the sorted list of a view.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param p The packet of the frame
+ * @param v The view the billboards are drawn in
+ */
+void box_render_lod_billboards(
+    ecs_world_t *world,
+    RenderState *state,
+    box_packet_t *p,
+    const box_view_t *v);
+
 /** Tell the traversal that the look or the place of an entity changed.
  *
  * Every generated proxy that holds the entity is thrown away, which is the

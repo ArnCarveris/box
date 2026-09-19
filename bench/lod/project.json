@@ -64,6 +64,12 @@
                     "proxy_mesh_512",
                     "content_hash_512"
                 ]
+            },
+            {
+                "id": "Impostor",
+                "benchcases": [
+                    "billboard_10k"
+                ]
             }
         ]
     }
