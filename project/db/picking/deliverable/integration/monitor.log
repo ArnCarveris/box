@@ -1,0 +1,24 @@
+$ ls box.monitor
+BoxCollectStats
+BoxCollectSystems
+BoxPublishFps
+BoxSampleCpu
+BoxStatsOnSet
+BoxSystemMonitorOnRemove
+BoxSystemMonitorOnSet
+CpuMonitor
+EcsStats
+FpsCorner
+FpsOverlay
+PhaseTime
+SystemMonitor
+SystemTime
+
+$ has box.monitor.CpuMonitor box.monitor.CpuMonitor
+true
+$ has box.monitor.EcsStats box.monitor.EcsStats
+true
+$ has box.monitor.SystemMonitor box.monitor.SystemMonitor
+true
+$ has box.monitor.CpuMonitor box.monitor.SystemMonitor
+false

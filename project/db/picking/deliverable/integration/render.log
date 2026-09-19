@@ -1,0 +1,11 @@
+$ render scene.crate
+render_0_0.png
+
+$ render Ball
+render_0_1.png
+
+$ render Tower
+render_0_2.png
+
+$ render nope
+unknown entity 'nope'
