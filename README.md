@@ -222,6 +222,15 @@ stands on any collider (`foot` reports the ground). `test/integration/visual/fir
 stands it in a small level and `controller_collision.flecs` walks it into walls and steps;
 `test/integration/bench/first_person_1m.flecs` walks it through a million colliders.
 
+`FollowCamera` is the third person one: it writes `Position` and `LookAt` every frame from the
+`Position` of its `target` plus an offset, gliding toward that place at `glide` per second so
+it lags behind a target that runs, and it travels there through the scene the way the fly
+camera does. `levels` holds up to four zoom presets, each an offset and a look offset, and the
+`ZoomIn` and `ZoomOut` actions the module binds to `=` and `-` step `level` through them
+together with the wheel, which stops at the presets that are authored and is ignored while
+`UiCapture.mouse` says the cursor is on a UI element.
+`test/integration/visual/follow_camera.flecs` follows a moving box at two presets.
+
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
 rasterization and light baking stay off the frame; `JobStats` reports the queue.

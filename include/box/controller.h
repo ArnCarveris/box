@@ -75,6 +75,45 @@ ECS_STRUCT(FirstPersonController, {
     bool flying;          /**< Free flight, toggled by the Fly action */
 });
 
+/** Zoom presets a follow camera steps through, which the ECS_STRUCT spells out */
+#define BOX_FOLLOW_LEVEL_MAX (4)
+
+/** One zoom preset of a follow camera, as an offset from its target.
+ *
+ * A preset whose offset is the zero vector is not authored, so the presets in
+ * use are the ones before the first empty entry.
+ */
+ECS_STRUCT(FollowLevel, {
+    vec3 offset;      /**< Offset from the target the camera sits at */
+    vec3 look_offset; /**< Offset from the target of the point it looks at */
+});
+
+/** Third person controller of a camera that follows a target at an offset.
+ *
+ * The system writes Position and LookAt every frame: the camera glides toward
+ * the position of the target plus the offset and looks at the target plus the
+ * look offset, so it lags behind a target that moves and settles when it stops.
+ * It is placed without a glide the first frame it runs. The ZoomIn and ZoomOut
+ * actions and the wheel step level through the presets the scene authored,
+ * unless the cursor is on a UI element; a camera without presets keeps the
+ * offset of the controller. A sphere of the radius slides along the colliders
+ * of the scene, which keeps the camera out of geometry, and the terrain entity
+ * is the floor it stays above. A member that is zero or less takes its default.
+ */
+ECS_STRUCT(FollowCamera, {
+    ecs_entity_t target;  /**< Entity the camera follows, 0 keeps it where it is */
+    vec3 offset;          /**< Offset it sits at while no preset is authored */
+    vec3 look_offset;     /**< Offset of the point it looks at, without a preset */
+    float glide;          /**< How fast it follows its place per second, 6 by default */
+    FollowLevel levels[4];/**< Zoom presets, nearest first, none to use the offset */
+    int32_t level;        /**< Preset in use, stepped by the zoom actions and the wheel */
+    ecs_entity_t terrain; /**< Entity the camera stays above, 0 for none */
+    float clearance;      /**< Units kept above the bounds of the terrain */
+    float radius;         /**< Radius it keeps free of scene geometry, 0.5 by default */
+    bool no_collision;    /**< Follow through the scene instead of colliding with it */
+    bool placed;          /**< The camera was placed once, written by the engine */
+});
+
 /** Register the box.controller module.
  *
  * @param world The world

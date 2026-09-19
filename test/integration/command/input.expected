@@ -36,6 +36,8 @@ actions.Look	MouseRight	Turn with the cursor while held
 actions.Right	D	Strafe right
 actions.Run	Shift	Walk at the run speed while held
 actions.Up	E	Move up
+actions.ZoomIn	Equal	Step the follow camera one preset closer
+actions.ZoomOut	Minus	Step the follow camera one preset further
 
 $ input.wait
 20 events pending

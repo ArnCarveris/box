@@ -37,6 +37,15 @@ ecs_entity_t box_controller_action(
     return action;
 }
 
+bool box_controller_pressed(
+    ecs_world_t *world,
+    ecs_entity_t action)
+{
+    const InputAction *ptr = action ? ecs_get(world, action, InputAction) : NULL;
+
+    return ptr && ptr->pressed;
+}
+
 bool box_controller_held(
     ecs_world_t *world,
     ecs_entity_t action)
@@ -82,10 +91,12 @@ void box_controller_actions_init(
         {"Jump", "Jump from the ground", BoxKeySpace},
         {"Crouch", "Lower the eye while held", BoxKeyCtrl},
         {"Run", "Walk at the run speed while held", BoxKeyShift},
-        {"Fly", "Toggle free flight", BoxKeyF}
+        {"Fly", "Toggle free flight", BoxKeyF},
+        {"ZoomIn", "Step the follow camera one preset closer", BoxKeyEqual},
+        {"ZoomOut", "Step the follow camera one preset further", BoxKeyMinus}
     };
 
-    ecs_entity_t created[12];
+    ecs_entity_t created[14];
     int32_t i, count = (int32_t)(sizeof(binds) / sizeof(binds[0]));
     for (i = 0; i < count; i ++) {
         created[i] = box_controller_action(
@@ -105,5 +116,7 @@ void box_controller_actions_init(
     actions->crouch = created[9];
     actions->run = created[10];
     actions->fly = created[11];
+    actions->zoom_in = created[12];
+    actions->zoom_out = created[13];
     ecs_singleton_modified(world, ControllerActions);
 }

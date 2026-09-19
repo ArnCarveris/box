@@ -69,6 +69,7 @@ Rules for adding one:
 | 2D shapes | `shapes_2d` | Discs, lines, borders with radii and fitted images on one sheet. |
 | Splines | `spline_path`, `spline_road` | Boxes at even arc length with followers and a light on a loop; a road loop with a centre line and a smooth pipe. |
 | Controllers | `first_person`, `controller_collision` | The first person controller in a small level; the same controller walked into walls and up steps. |
+| Follow camera | `follow_camera` | A third person camera behind a moving box at its far preset, with a second camera at the near preset rendering the same target into a texture. |
 | Collision debug | `collision_debug` | Collider wireframes per shape kind and root bounds in white, the cone in its bounds box. |
 | Picking | `picking_hover` | The middle of five boxes tinted by its `on.hover` handler after the cursor sweeps onto it. |
 | FPS overlay | `fps_overlay` | The frame rate panel with its bar chart in a corner of the view. |

@@ -1,0 +1,99 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.movement
+using box.controller
+
+sun {
+  Rotation: {0.9, -0.5, 0}
+  DirectionalLight: {intensity: 1.1}
+}
+
+$ { EnvironmentLight: {sky_color: {95, 120, 160}, ground_color: {45, 42, 38}, intensity: 1} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {60, 0.5, 60}
+  Rgb: {70, 74, 82}
+  PbrMaterial: {roughness: 0.9}
+}
+
+markers {
+  post_left {
+    Position: {-6, 1.5, 6}
+    Box: {0.6, 3, 0.6}
+    Rgb: {170, 120, 90}
+  }
+
+  post_right {
+    Position: {6, 1.5, 6}
+    Box: {0.6, 3, 0.6}
+    Rgb: {170, 120, 90}
+  }
+
+  post_far {
+    Position: {0, 2.5, 16}
+    Cylinder: {radius: 0.5, length: 5, segments: 24}
+    Rgb: {200, 200, 205}
+    PbrMaterial: {metallic: 0.7, roughness: 0.3}
+  }
+
+  ball {
+    Position: {-3, 0.8, 10}
+    Sphere: {radius: 0.8, segments: 24, smooth: true}
+    Rgb: {90, 160, 230}
+  }
+}
+
+player {
+  Position: {0, 0.6, 0}
+  Velocity: {0, 0, 4}
+  Box: {1, 1.2, 1}
+  Rgb: {230, 90, 70}
+  PbrMaterial: {roughness: 0.5}
+}
+
+far_camera {
+  Camera: {fov: 55}
+  FollowCamera: {
+    target: player
+    level: 1
+    glide: 8
+    no_collision: true
+    levels: [
+      {offset: {0, 4, -8}, look_offset: {0, 1, 0}},
+      {offset: {0, 9, -16}, look_offset: {0, 2, 0}}
+    ]
+  }
+}
+
+near_camera {
+  Position: {0, 4, -8}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 55}
+  FollowCamera: {
+    target: player
+    glide: 8
+    no_collision: true
+    levels: [
+      {offset: {0, 4, -8}, look_offset: {0, 1, 0}},
+      {offset: {0, 9, -16}, look_offset: {0, 2, 0}}
+    ]
+  }
+  Capture: {path: "/tmp/box/follow_camera_near.png"}
+}
+
+far_view {
+  View: {camera: far_camera, priority: 0}
+}
+
+near_target {
+  RenderTarget: {640, 360}
+}
+
+near_view {
+  View: {camera: near_camera, target: near_target, priority: -1, clear: {20, 34, 60}}
+}

@@ -22,6 +22,12 @@
                     "update_100_characters",
                     "walk_through_1m_colliders"
                 ]
+            },
+            {
+                "id": "Follow",
+                "benchcases": [
+                    "update_100_followers"
+                ]
             }
         ]
     }

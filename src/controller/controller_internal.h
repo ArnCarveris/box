@@ -28,6 +28,8 @@ typedef struct ControllerActions {
     ecs_entity_t crouch;  /**< Lower the eye while held */
     ecs_entity_t run;     /**< Walk at the run speed while held */
     ecs_entity_t fly;     /**< Toggle free flight */
+    ecs_entity_t zoom_in; /**< Step the follow camera one preset closer */
+    ecs_entity_t zoom_out;/**< Step the follow camera one preset further */
 } ControllerActions;
 
 extern ECS_COMPONENT_DECLARE(ControllerActions);
@@ -53,6 +55,16 @@ ecs_entity_t box_controller_action(
  * @return Whether the action is held
  */
 bool box_controller_held(
+    ecs_world_t *world,
+    ecs_entity_t action);
+
+/** Test whether an action became active this frame.
+ *
+ * @param world The world
+ * @param action The action entity, 0 for none
+ * @return Whether the action was pressed
+ */
+bool box_controller_pressed(
     ecs_world_t *world,
     ecs_entity_t action);
 
@@ -187,6 +199,13 @@ void BoxCameraControllerUpdate(
  * @param it Iterator over the first person controllers
  */
 void BoxFirstPersonUpdate(
+    ecs_iter_t *it);
+
+/** Follow their targets with the cameras that have a follow controller.
+ *
+ * @param it Iterator over the follow cameras
+ */
+void BoxFollowCameraUpdate(
     ecs_iter_t *it);
 
 #endif

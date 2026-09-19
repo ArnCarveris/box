@@ -19,11 +19,14 @@ void BoxControllerImport(
 
     ECS_META_COMPONENT(world, CameraController);
     ECS_META_COMPONENT(world, FirstPersonController);
+    ECS_META_COMPONENT(world, FollowLevel);
+    ECS_META_COMPONENT(world, FollowCamera);
     ECS_COMPONENT_DEFINE(world, ControllerActions);
 
     ecs_set_hooks(world, CameraController, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, FirstPersonController, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ControllerActions, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, FollowCamera, { .ctor = flecs_default_ctor });
 
     ecs_add_pair(world, ecs_id(CameraController), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(CameraController), EcsWith, ecs_id(Orientation));
@@ -32,6 +35,9 @@ void BoxControllerImport(
     ecs_add_pair(
         world, ecs_id(FirstPersonController), EcsWith, ecs_id(Orientation));
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(FollowCamera), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(FollowCamera), EcsWith, ecs_id(LookAt));
+    ecs_add_pair(world, ecs_id(FollowCamera), EcsWith, DynamicTransform);
 
     box_controller_actions_init(world);
 
@@ -57,5 +63,16 @@ void BoxControllerImport(
             { .id = ecs_id(LookAt), .oper = EcsOptional }
         },
         .callback = BoxFirstPersonUpdate
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxFollowCameraUpdate" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(FollowCamera) },
+            { .id = ecs_id(Position) },
+            { .id = ecs_id(LookAt) }
+        },
+        .callback = BoxFollowCameraUpdate
     });
 }

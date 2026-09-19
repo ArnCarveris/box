@@ -38,7 +38,7 @@ Two hard rules keep the concerns apart:
 | `box.shader` | `Shader` component, WGSL preprocessor, builtin shaders under `box.shader.builtin`, the generated includes that compose the material layers and the light modulators into the mesh shader |
 | `box.effects` | `Effect` entities, the per view post process chain and its parameters, the display transform lookup cube the tone map pass loads at first use |
 | `box.input` | device layer (`Input` singleton, event queues, `keys` codes) and action layer (`InputAction`, `InputMap` layers with `priority` and `consume`, `Binding`, key masks including the `keys.Any` families, emitted actions, the `Raise` record with `event.stop` and `input.consume`, `on.pressed` and `on.dragged` script events) |
-| `box.controller` | `CameraController`, `FirstPersonController`, their default actions and the systems that move them |
+| `box.controller` | `CameraController`, `FirstPersonController`, `FollowCamera`, their default actions and the systems that move them |
 | `box.command` | terminal sessions, HTTP endpoints, script functions for commands |
 | `box.checkpoint` | script state capture and restore |
 | `box.monitor` | `CpuMonitor`, `EcsStats`, `SystemMonitor` and `GpuTimings` singletons, sampled only while present |

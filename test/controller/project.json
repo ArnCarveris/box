@@ -58,6 +58,26 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Follow",
+                "testcases": [
+                    "the_module_binds_the_zoom_actions",
+                    "the_camera_sits_at_the_offset_of_its_target",
+                    "the_camera_follows_a_target_that_moves",
+                    "the_glide_lags_behind_a_target_that_jumps",
+                    "a_camera_without_a_target_is_left_alone",
+                    "a_preset_replaces_the_offset_of_the_controller",
+                    "the_wheel_steps_to_the_next_preset",
+                    "the_zoom_actions_step_the_preset",
+                    "a_held_zoom_action_steps_once",
+                    "the_level_clamps_to_the_presets_that_are_authored",
+                    "a_camera_without_presets_keeps_its_level_at_zero",
+                    "the_wheel_is_ignored_while_the_ui_holds_the_mouse",
+                    "the_terrain_keeps_the_camera_above_its_bounds"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
