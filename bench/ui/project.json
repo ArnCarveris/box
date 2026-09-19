@@ -4,16 +4,27 @@
     "value": {
         "description": "Benchmarks for the box.ui module",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "bench": {
-        "benchsuites": [{
-            "id": "Extract",
-            "benchcases": [
-                "extract_10k_tree",
-                "walk_10k_tree",
-                "extract_10k_static_tree"
-            ]
-        }]
+        "benchsuites": [
+            {
+                "id": "Extract",
+                "benchcases": [
+                    "extract_10k_tree",
+                    "walk_10k_tree",
+                    "extract_10k_static_tree"
+                ]
+            },
+            {
+                "id": "Layout",
+                "benchcases": [
+                    "layout_10k_tree",
+                    "layout_10k_unchanged"
+                ]
+            }
+        ]
     }
 }
