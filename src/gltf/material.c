@@ -12,12 +12,7 @@
 #include "../texture/texture_internal.h"
 #include <string.h>
 
-/** Convert a linear intensity to the display encoded byte an Rgb holds.
- *
- * @param value The linear intensity
- * @return The display encoded byte
- */
-static uint8_t box_gltf_srgb(
+uint8_t box_gltf_srgb(
     float value)
 {
     float v = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);

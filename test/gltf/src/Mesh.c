@@ -170,3 +170,44 @@ void Mesh_unloading_frees_the_mesh(void)
     box_render_extract(w, &packet);
     test_int(packet.mesh_destroy.count, 2);
 }
+
+void Mesh_vertex_colors_are_read(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Gltf, { .path = ecs_os_strdup("etc/colors.gltf") });
+
+    ecs_entity_t root = ecs_lookup_child(w, e, "root");
+    const Mesh3 *m = ecs_get(w, ecs_lookup_child(w, root, "primitive0"), Mesh3);
+    test_assert(m != NULL);
+    test_int(ecs_vec_count(&m->colors), 3);
+
+    const rgb *colors = ecs_vec_first_t(&m->colors, rgb);
+    test_int(colors[0].r, 255);
+    test_int(colors[0].g, 0);
+    test_int(colors[0].b, 0);
+    test_int(colors[1].g, 255);
+    test_int(colors[2].r, 188);
+    test_int(colors[2].g, 188);
+    test_int(colors[2].b, 188);
+}
+
+void Mesh_vertex_colors_reach_the_upload(void)
+{
+    // meshes/vertex_colors
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Gltf, { .path = ecs_os_strdup("etc/colors.gltf") });
+
+    box_render_extract(w, &packet);
+    test_int(packet.mesh_create.count, 1);
+
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *bytes = (const uint8_t*)cmd->vertices;
+    size_t stride = (size_t)BOX_VERTEX_FLOATS * sizeof(float);
+
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET], 255);
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 1], 0);
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 3], 255);
+    test_int(bytes[stride + BOX_VERTEX_COLOR_OFFSET + 1], 255);
+    test_int(bytes[stride * 2 + BOX_VERTEX_COLOR_OFFSET + 2], 188);
+}

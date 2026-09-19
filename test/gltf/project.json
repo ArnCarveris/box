@@ -42,7 +42,9 @@
                     "normals_are_mirrored_in_z",
                     "uv_v_is_flipped",
                     "primitives_with_the_same_data_share_a_mesh",
-                    "unloading_frees_the_mesh"
+                    "unloading_frees_the_mesh",
+                    "vertex_colors_are_read",
+                    "vertex_colors_reach_the_upload"
                 ]
             },
             {

@@ -56,6 +56,14 @@ void box_gltf_unload(
 void box_gltf_images(
     box_gltf_ctx_t *ctx);
 
+/** Convert a linear intensity to the display encoded byte an Rgb holds.
+ *
+ * @param value The linear intensity
+ * @return The display encoded byte
+ */
+uint8_t box_gltf_srgb(
+    float value);
+
 /** Give an entity the box material components of a glTF material.
  *
  * @param ctx The load

@@ -63,6 +63,42 @@ static void box_gltf_flip_v(
     }
 }
 
+/** Read the per vertex colors of a primitive into the color stream of a Mesh3.
+ *
+ * A glTF color is linear and a box rgb is display encoded, so every channel is
+ * encoded on the way in. The alpha of a vec4 color scales the opacity of the
+ * material in glTF, which a Mesh3 does not carry, so it is dropped.
+ *
+ * @param accessor The color accessor
+ * @param vec The color vector to fill
+ * @param count Number of vertices
+ */
+static void box_gltf_colors(
+    const cgltf_accessor *accessor,
+    ecs_vec_t *vec,
+    int32_t count)
+{
+    int32_t components = (int32_t)cgltf_num_components(accessor->type);
+    float *floats = ecs_os_malloc_n(float, count * components);
+    int32_t i;
+
+    cgltf_accessor_unpack_floats(accessor, floats,
+        (cgltf_size)count * (cgltf_size)components);
+    ecs_vec_init_t(NULL, vec, rgb, count);
+    ecs_vec_set_count_t(NULL, vec, rgb, count);
+
+    rgb *out = ecs_vec_first_t(vec, rgb);
+    for (i = 0; i < count; i ++) {
+        const float *c = &floats[i * components];
+
+        out[i].r = box_gltf_srgb(c[0]);
+        out[i].g = box_gltf_srgb(c[1]);
+        out[i].b = box_gltf_srgb(c[2]);
+    }
+
+    ecs_os_free(floats);
+}
+
 /** Read the triangles of a primitive, filling in the order of a primitive without indices.
  *
  * @param prim The primitive
@@ -105,6 +141,7 @@ bool box_gltf_mesh(
 
     const cgltf_accessor *normals = cgltf_find_accessor(prim, cgltf_attribute_type_normal, 0);
     const cgltf_accessor *uvs = cgltf_find_accessor(prim, cgltf_attribute_type_texcoord, 0);
+    const cgltf_accessor *colors = cgltf_find_accessor(prim, cgltf_attribute_type_color, 0);
     int32_t count = (int32_t)pos->count;
     Mesh3 *m = ecs_ensure(world, e, Mesh3);
 
@@ -119,6 +156,10 @@ bool box_gltf_mesh(
     if (uvs && (int32_t)uvs->count == count) {
         box_gltf_read(uvs, &m->uvs, ECS_SIZEOF(vec2), 2, count);
         box_gltf_flip_v(ecs_vec_first_t(&m->uvs, vec2), count);
+    }
+
+    if (colors && (int32_t)colors->count == count) {
+        box_gltf_colors(colors, &m->colors, count);
     }
 
     box_gltf_indices(prim, &m->indices, count);
