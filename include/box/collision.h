@@ -12,6 +12,12 @@
  * where a cheap one exists and from its world bounds otherwise, with the
  * instance scale applied. The shape tests take a resolved collider, so picking,
  * controller collision and LOD all test the same geometry.
+ *
+ * The same pass keeps a two level spatial index: a hierarchy over the bounds of
+ * every root and over the colliders that are not below one, with the colliders
+ * a root covers as its second level, next to a hierarchy of the entities that
+ * move every frame. The ray, sphere, box and frustum queries read the index the
+ * last update left behind, so they never walk the scene.
  */
 
 #ifndef BOX_COLLISION_H
@@ -91,6 +97,28 @@ ECS_STRUCT(Collider, {
 /** The entity gets no collider, whatever shape it has */
 extern ECS_TAG_DECLARE(NoCollider);
 
+/** Settings of the spatial index, read by every update */
+ECS_STRUCT(CollisionSettings, {
+    float margin;  /**< Slack around a leaf, so a small move keeps its place */
+    bool dynamic;  /**< Index the entities that move every frame */
+    bool enabled;  /**< False empties the index and leaves every query without hits */
+});
+
+/** Planes of a frustum query */
+#define BOX_FRUSTUM_PLANES (6)
+
+/** What a ray query found */
+typedef struct box_ray_hit_t {
+    ecs_entity_t entity; /**< The entity that was hit, 0 when the ray hit nothing */
+    float distance;      /**< Distance of the hit along the ray */
+    vec3 point;          /**< The point of the hit in world space */
+} box_ray_hit_t;
+
+/** Volume a frustum query tests, six planes with their normals pointing inward */
+typedef struct box_frustum_planes_t {
+    vec4 planes[BOX_FRUSTUM_PLANES]; /**< Normal in xyz and distance in w */
+} box_frustum_planes_t;
+
 /** Intersect a ray with a collider.
  *
  * @param c The collider
@@ -143,6 +171,72 @@ void box_collider_bounds(
     const Collider *c,
     vec3 *min,
     vec3 *max);
+
+/** Find the nearest collider a ray hits.
+ *
+ * @param world The world
+ * @param origin Origin of the ray in world space
+ * @param dir Direction of the ray, distances are multiples of its length
+ * @param max_dist Longest distance that counts as a hit
+ * @param out Receives the hit, NULL to only ask whether there is one
+ * @return true when the ray hit a collider
+ */
+bool box_collision_ray(
+    const ecs_world_t *world,
+    vec3 origin,
+    vec3 dir,
+    float max_dist,
+    box_ray_hit_t *out);
+
+/** Collect every collider a sphere overlaps.
+ *
+ * @param world The world
+ * @param center Center of the sphere in world space
+ * @param radius Radius of the sphere
+ * @param out Vector of ecs_entity_t the entities are appended to
+ * @return The number of entities that were appended
+ */
+int32_t box_collision_sphere(
+    const ecs_world_t *world,
+    vec3 center,
+    float radius,
+    ecs_vec_t *out);
+
+/** Collect every collider whose bounds overlap a box.
+ *
+ * @param world The world
+ * @param min Minimum corner of the box in world space
+ * @param max Maximum corner of the box in world space
+ * @param out Vector of ecs_entity_t the entities are appended to
+ * @return The number of entities that were appended
+ */
+int32_t box_collision_aabb(
+    const ecs_world_t *world,
+    vec3 min,
+    vec3 max,
+    ecs_vec_t *out);
+
+/** Collect every collider whose bounds reach into a frustum.
+ *
+ * @param world The world
+ * @param frustum The planes of the frustum
+ * @param out Vector of ecs_entity_t the entities are appended to
+ * @return The number of entities that were appended
+ */
+int32_t box_collision_frustum(
+    const ecs_world_t *world,
+    const box_frustum_planes_t *frustum,
+    ecs_vec_t *out);
+
+/** Bring the colliders, the root bounds and the index up to date.
+ *
+ * The engine runs this in OnStore, so a query reads what the last frame left
+ * behind. Call it to see a change of this frame, never from a deferred system.
+ *
+ * @param world The world
+ */
+void box_collision_update(
+    ecs_world_t *world);
 
 /** Register the box.collision module.
  *

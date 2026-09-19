@@ -235,6 +235,29 @@ static void BoxCollisionOnCollider(
     }
 }
 
+/** Take a collider that went away out of the index and mark its root.
+ *
+ * @param it Iterator over the entities
+ */
+static void BoxCollisionOnColliderGone(
+    ecs_iter_t *it)
+{
+    box_collision_state_t *state = it->ctx;
+    ecs_world_t *world = it->world;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        if (!ecs_has(world, e, RootBounds)) {
+            box_index_unset(&state->index, e);
+        }
+
+        ecs_entity_t root = box_collision_root_of(world, e);
+        if (root && root != e) {
+            box_collision_mark(state, root, BOX_ROOT_FULL);
+        }
+    }
+}
+
 /** Mark an entity whose bounds changed when it can carry a collider.
  *
  * @param it Iterator over the entities
@@ -251,6 +274,47 @@ static void BoxCollisionOnColliderBounds(
             box_collision_touch(state, e);
         }
     }
+}
+
+/** Write the collider of one entity and put it in the index where it belongs.
+ *
+ * @param world The world, never a stage
+ * @param state The state
+ * @param e The entity
+ */
+static void box_collision_apply(
+    ecs_world_t *world,
+    box_collision_state_t *state,
+    ecs_entity_t e)
+{
+    ecs_entity_t root = box_collision_root_of(world, e);
+    bool had = ecs_has(world, e, Collider);
+    Collider c = {0};
+    bool has = box_collider_resolve(world, e, &c);
+    if (has) {
+        ecs_set_ptr(world, e, Collider, &c);
+    } else if (had) {
+        ecs_remove(world, e, Collider);
+    }
+
+    if (root) {
+        if (had != has) {
+            box_collision_mark(state, root, BOX_ROOT_FULL);
+        }
+
+        goto done;
+    }
+
+    if (has && !box_hierarchy_ancestor_has(world, e, DynamicTransform)) {
+        vec3 min, max;
+        box_collider_bounds(&c, &min, &max);
+        box_index_set(&state->index, e, min, max);
+        goto done;
+    }
+
+    box_index_unset(&state->index, e);
+done:
+    return;
 }
 
 void box_collision_colliders_flush(
@@ -275,15 +339,7 @@ void box_collision_colliders_flush(
             continue;
         }
 
-        Collider c = {0};
-        if (box_collider_resolve(world, e, &c)) {
-            ecs_set_ptr(world, e, Collider, &c);
-            continue;
-        }
-
-        if (ecs_has(world, e, Collider)) {
-            ecs_remove(world, e, Collider);
-        }
+        box_collision_apply(world, state, e);
     }
 }
 
@@ -326,6 +382,13 @@ void box_collision_colliders_init(
         .query.terms = {{ .id = ecs_id(AABB) }},
         .events = { EcsOnSet },
         .callback = BoxCollisionOnColliderBounds,
+        .ctx = state
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Collider) }},
+        .events = { EcsOnRemove },
+        .callback = BoxCollisionOnColliderGone,
         .ctx = state
     });
 

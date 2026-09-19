@@ -35,6 +35,7 @@ static void box_collision_state_dtor(
 box_collision_state_t* box_collision_state_new(void)
 {
     box_collision_state_t *state = ecs_os_calloc_t(box_collision_state_t);
+    box_index_init(&state->index);
     ecs_map_init(&state->dirty, NULL);
     ecs_map_init(&state->colliders, NULL);
     ecs_vec_init_t(NULL, &state->pass, ecs_entity_t, 0);
@@ -47,6 +48,7 @@ box_collision_state_t* box_collision_state_new(void)
 void box_collision_state_free(
     box_collision_state_t *state)
 {
+    box_index_fini(&state->index);
     ecs_map_fini(&state->dirty);
     ecs_map_fini(&state->colliders);
     ecs_vec_fini_t(NULL, &state->pass, ecs_entity_t);
@@ -65,9 +67,18 @@ static void BoxCollisionUpdate(
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     box_collision_state_t *state = it->ctx;
 
+    const CollisionSettings *settings = ecs_singleton_get(world, CollisionSettings);
+    if (settings) {
+        state->index.margin = settings->margin;
+        state->index.enabled = settings->enabled;
+        state->index.dynamic = settings->dynamic;
+    }
+
+    box_collision_roots_promote(world, state);
     box_collision_shapes_init(world, state);
     box_collision_colliders_flush(world, state);
     box_collision_roots_flush(world, state);
+    box_index_movers(world, state);
 }
 
 void BoxCollisionImport(
@@ -83,6 +94,7 @@ void BoxCollisionImport(
     ECS_META_COMPONENT(world, BoxCollider);
     ECS_META_COMPONENT(world, CapsuleCollider);
     ECS_META_COMPONENT(world, Collider);
+    ECS_META_COMPONENT(world, CollisionSettings);
     ECS_TAG_DEFINE(world, NoCollider);
     ECS_COMPONENT_DEFINE(world, CollisionState);
 
@@ -98,6 +110,22 @@ void BoxCollisionImport(
     CollisionState *cs = ecs_singleton_ensure(world, CollisionState);
     cs->state = state;
     ecs_singleton_modified(world, CollisionState);
+
+    ecs_singleton_set(world, CollisionSettings, {
+        .margin = 0.25f,
+        .dynamic = true,
+        .enabled = true
+    });
+
+    state->index.query = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(WorldTransform), .inout = EcsIn },
+            { .id = DynamicTransform, .src.id = EcsSelf|EcsUp,
+                .trav = EcsChildOf, .inout = EcsInOutNone },
+            { .id = NoCollider, .oper = EcsNot, .inout = EcsInOutNone }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
 
     box_collision_roots_init(world, state);
     box_collision_colliders_init(world, state);

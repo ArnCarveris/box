@@ -84,6 +84,31 @@
                     "capsule_overlaps_aabb",
                     "bounds_of_collider"
                 ]
+            },
+            {
+                "id": "Index",
+                "testcases": [
+                    "sphere_finds_collider",
+                    "sphere_misses_far_collider",
+                    "aabb_finds_collider",
+                    "ray_finds_nearest",
+                    "ray_misses",
+                    "frustum_finds_inside",
+                    "insert_after_update",
+                    "remove_drops_from_index",
+                    "no_collider_not_in_index",
+                    "move_updates_index",
+                    "root_groups_children",
+                    "nested_root_found",
+                    "dynamic_entity_found",
+                    "dynamic_entity_moves_each_frame",
+                    "disabled_index_finds_nothing",
+                    "random_sphere_matches_brute_force",
+                    "random_aabb_matches_brute_force",
+                    "random_ray_matches_brute_force",
+                    "random_frustum_matches_brute_force",
+                    "many_inserts_and_removes"
+                ]
             }
         ]
     }

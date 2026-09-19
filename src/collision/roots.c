@@ -10,12 +10,14 @@
 
 #include "collision_internal.h"
 
-/** Running aggregate of the bounds of a subtree */
+/** Running aggregate of the bounds and the colliders of a subtree */
 typedef struct box_root_agg_t {
     box_collision_state_t *state; /**< The state, to update nested roots first */
+    ecs_vec_t *list;              /**< Colliders the root covers */
     vec3 min;                     /**< Minimum corner so far */
     vec3 max;                     /**< Maximum corner so far */
     int32_t count;                /**< Entities with bounds so far */
+    bool dynamic;                 /**< The subtree moves every frame */
 } box_root_agg_t;
 
 static void box_root_update(
@@ -88,7 +90,15 @@ static void box_root_visit(
         goto done;
     }
 
+    bool dynamic = agg->dynamic;
+    agg->dynamic = dynamic || ecs_has_id(world, e, DynamicTransform);
+    if (!agg->dynamic && ecs_has(world, e, Collider)) {
+        ecs_vec_append_t(NULL, agg->list, ecs_entity_t)[0] = e;
+        box_index_unset(&agg->state->index, e);
+    }
+
     box_hierarchy_children(world, e, box_root_visit, agg);
+    agg->dynamic = dynamic;
 done:
     return;
 }
@@ -145,10 +155,19 @@ static void box_root_aggregate(
     RootBounds *out)
 {
     box_root_agg_t agg = { .state = state };
+    agg.list = box_index_list(&state->index, root);
+    agg.dynamic = box_hierarchy_ancestor_has(world, root, DynamicTransform);
+    ecs_vec_clear(agg.list);
+
     const AABB *aabb = ecs_get(world, root, AABB);
     if (aabb) {
         box_root_add(&agg, aabb->min, aabb->max, 1);
     }
+
+    if (!agg.dynamic && ecs_has(world, root, Collider)) {
+        ecs_vec_append_t(NULL, agg.list, ecs_entity_t)[0] = root;
+    }
+
 
     box_hierarchy_children(world, root, box_root_visit, &agg);
 
@@ -221,6 +240,12 @@ static void box_root_update(
     }
 
     ecs_set_ptr(world, root, RootBounds, &next);
+    if (next.count) {
+        box_index_set(&state->index, root, next.min, next.max);
+    } else {
+        box_index_unset(&state->index, root);
+    }
+
 done:
     return;
 }
@@ -308,6 +333,7 @@ static void BoxCollisionOnRoot(
         }
 
         ecs_map_remove(&state->dirty, e);
+        box_index_unset(&state->index, e);
         box_collision_mark_of(world, state, box_hierarchy_parent(world, e));
     }
 }
@@ -364,7 +390,7 @@ static void BoxCollisionOnTransform(
     }
 }
 
-void box_collision_roots_flush(
+void box_collision_roots_promote(
     ecs_world_t *world,
     box_collision_state_t *state)
 {
@@ -378,6 +404,14 @@ void box_collision_roots_flush(
     }
 
     ecs_vec_clear(&state->instances);
+}
+
+void box_collision_roots_flush(
+    ecs_world_t *world,
+    box_collision_state_t *state)
+{
+    int32_t i, count;
+    box_collision_roots_promote(world, state);
     ecs_vec_clear(&state->pass);
 
     ecs_map_iter_t mit = ecs_map_iter(&state->dirty);

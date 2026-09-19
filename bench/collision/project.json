@@ -27,6 +27,17 @@
                     "ray_box",
                     "capsule_box"
                 ]
+            },
+            {
+                "id": "Index",
+                "benchcases": [
+                    "build_1m",
+                    "ray_1m",
+                    "ray_miss_1m",
+                    "sphere_1m",
+                    "frustum_1m",
+                    "update_1k_movers_of_1m"
+                ]
             }
         ]
     }
