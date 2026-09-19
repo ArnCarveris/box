@@ -14,13 +14,30 @@ typedef struct box_binding_t {
     uint64_t mask;       /**< Key mask of the binding */
     ecs_entity_t action; /**< Action the mask fires */
     ecs_entity_t entity; /**< Entity the binding is stored on */
+    int32_t priority;    /**< Priority of the map the binding belongs to */
+    bool consume;        /**< The key and the action are kept from lower maps */
 } box_binding_t;
+
+/** Where a held action was pressed and whether it has moved far enough to drag */
+typedef struct box_drag_t {
+    ecs_entity_t action; /**< Action that is held */
+    Mouse start;         /**< Mouse of the frame the action was pressed */
+    bool dragging;       /**< The cursor passed the drag threshold since then */
+} box_drag_t;
+
+/** One action a handler of this frame took */
+typedef struct box_reject_t {
+    ecs_entity_t action; /**< Action that was consumed */
+    bool held;           /**< Whether it was held when the consume cleared it */
+} box_reject_t;
 
 /** One binding that resolved this frame */
 typedef struct box_active_t {
     ecs_entity_t action; /**< Action the binding fires */
     ecs_entity_t source; /**< Entity the binding is stored on */
     uint64_t mask;       /**< Key mask that fired */
+    int32_t priority;    /**< Priority of the map the binding belongs to */
+    bool consume;        /**< The binding keeps its key from every lower map */
 } box_active_t;
 
 /** One action that code holds without a key */
@@ -38,6 +55,8 @@ typedef struct InputState {
     ecs_vec_t bound;       /**< box_binding_t collected from the maps this frame */
     ecs_vec_t active;      /**< box_active_t of the bindings that fired this frame */
     ecs_vec_t holds;       /**< box_hold_t of the actions that code holds */
+    ecs_vec_t drags;       /**< box_drag_t of the actions that are held */
+    ecs_vec_t rejected;    /**< box_reject_t of the consumes of the last frame */
     ecs_query_t *bindings; /**< Entities that hold a Binding */
     ecs_query_t *maps;     /**< Entities that hold an InputMap */
     ecs_query_t *actions;  /**< Entities that hold an InputAction */
@@ -78,6 +97,24 @@ typedef struct ActionEvents {
 } ActionEvents;
 
 extern ECS_COMPONENT_DECLARE(ActionEvents);
+
+/** Direct pointer to the raise record of the world, never a deferred copy.
+ *
+ * @param world The world
+ * @return The record, or NULL while the world is torn down
+ */
+Raise* box_input_raise(
+    ecs_world_t *world);
+
+/** Where a held action was pressed, for the raise of its drag.
+ *
+ * @param state The module state
+ * @param action The action entity
+ * @return The drag, or NULL when the action is not held
+ */
+const box_drag_t* box_input_drag_of(
+    const InputState *state,
+    ecs_entity_t action);
 
 /** Direct pointer to the queue singleton, never a deferred copy.
  *
@@ -160,26 +197,53 @@ void box_input_actions_init(
 void box_input_queries_fini(
     InputState *state);
 
-/** Register the waiters and the on.pressed, on.down and on.up async functions.
+/** Register the waiters, the async functions and the event and input scopes.
  *
  * @param world The world
+ * @param module The box.input module entity the function scope lives under
  */
 void box_input_events_init(
-    ecs_world_t *world);
+    ecs_world_t *world,
+    ecs_entity_t module);
+
+/** Take a key away from every map below the one a handler took it in.
+ *
+ * The actions those maps bound to the same key are consumed for the frame, which
+ * is the handler side of what a binding with consume does before a map below it
+ * resolves at all.
+ *
+ * @param world The world
+ * @param mask Key mask the handler took
+ * @param priority Priority of the map the handler took it in
+ */
+void box_input_stop_below(
+    ecs_world_t *world,
+    uint64_t mask,
+    int32_t priority);
+
+/** Forget the raises of an action that reached no waiter.
+ *
+ * @param world The world
+ * @param action The action a handler took
+ */
+void box_input_forget(
+    ecs_world_t *world,
+    ecs_entity_t action);
 
 /** Resolve the tasks that await a phase of an action.
  *
+ * The record of the world names the raise while the handlers run, so one of them
+ * stops it and the handlers behind it are left out.
+ *
  * @param world The world
- * @param action The action that fired
- * @param phase The phase it reached
- * @param source Binding or emitter the phase comes from
+ * @param event The raise, which carries the action, the phase and its source
+ * @param consumed Receives whether a handler stopped the raise
  * @return Number of waiters the raise resolved
  */
 int32_t box_input_deliver(
     ecs_world_t *world,
-    ecs_entity_t action,
-    ActionPhase phase,
-    ecs_entity_t source);
+    const ActionEvent *event,
+    bool *consumed);
 
 /** Raise the action events of the frame at the tasks that await them.
  *

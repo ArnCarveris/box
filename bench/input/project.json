@@ -19,7 +19,8 @@
             {
                 "id": "Actions",
                 "benchcases": [
-                    "resolve_100_bindings"
+                    "resolve_100_bindings",
+                    "resolve_100_bindings_in_4_layers"
                 ]
             },
             {

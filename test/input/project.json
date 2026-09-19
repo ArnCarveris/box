@@ -102,6 +102,34 @@
                 "teardown": true
             },
             {
+                "id": "Layers",
+                "testcases": [
+                    "a_binding_that_consumes_keeps_the_key_from_a_lower_map",
+                    "a_higher_map_that_does_not_consume_leaves_the_lower_one_alone",
+                    "a_map_that_consumes_covers_its_key_pairs",
+                    "a_disabled_consuming_map_lets_the_key_through",
+                    "a_consuming_map_keeps_only_the_keys_it_binds",
+                    "maps_of_one_priority_both_resolve",
+                    "a_binding_without_a_map_sits_at_the_base_layer",
+                    "the_events_of_a_frame_start_at_the_highest_map",
+                    "consuming_an_action_takes_its_key_from_the_maps_below",
+                    "consuming_leaves_the_maps_above_and_beside_it_alone",
+                    "a_script_handler_consumes_the_key_of_the_map_below",
+                    "a_script_handler_that_does_not_consume_leaves_the_map_below",
+                    "stopping_outside_a_raise_does_nothing",
+                    "consuming_an_action_clears_it_for_the_frame",
+                    "consuming_drops_the_events_of_the_frame",
+                    "consuming_a_held_action_does_not_press_it_again",
+                    "consuming_an_idle_action_reports_nothing",
+                    "a_drag_raises_after_the_threshold",
+                    "a_drag_stops_when_the_action_is_released",
+                    "a_script_follows_a_drag_with_on_dragged",
+                    "a_script_consumes_an_action"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Events",
                 "testcases": [
                     "a_script_resumes_on_the_pressed_frame",

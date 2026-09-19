@@ -4,7 +4,11 @@
  *
  * One OnLoad system fills Input from the events the platform layer queues and from
  * injected events, so injected input is indistinguishable from real input. A second
- * one resolves the Binding entities of the input maps into the InputAction state.
+ * one resolves the Binding entities of the input maps into the InputAction state,
+ * map by map from the highest InputMap.priority down. A binding that declares
+ * consume keeps its key and its action from every map below it, and a handler
+ * stops a raise the rest of the frame with box_event_stop, the way a DOM handler
+ * calls stopPropagation.
  */
 
 #ifndef BOX_INPUT_H
@@ -25,6 +29,9 @@ extern "C" {
 
 /** Bytes of the text buffer one frame collects */
 #define BOX_TEXT_MAX (32)
+
+/** Window points a held action moves the cursor before on.dragged raises */
+#define BOX_INPUT_DRAG_THRESHOLD (3.0f)
 
 /** What an input event does, mirrors box_input_kind_t of the platform layer */
 ECS_ENUM(InputEventKind, {
@@ -95,9 +102,30 @@ ECS_STRUCT(InputAction, {
     float value;       /**< Analog value or repeat count, 1 while a binding holds it */
 });
 
-/** Marks an entity as an input map: the bindings under it resolve while enabled */
+/** Marks an entity as an input map: the bindings under it resolve while enabled.
+ *
+ * The maps of a world are layers: they resolve from the highest priority down and
+ * the first map that fires an action takes both that action and the keys of the
+ * binding that fired it, so a map below it never sees them. A UI map above the map
+ * of a game is how a key that both bind reaches the UI alone.
+ */
 ECS_STRUCT(InputMap, {
-    bool enabled; /**< Bindings of this map resolve, true unless the script clears it */
+    bool enabled;     /**< Bindings of this map resolve, true unless the script clears it */
+    int32_t priority; /**< Layer of the map, the highest one resolves first, default 0 */
+    bool consume;     /**< Every binding of this map consumes, unless it says so itself */
+});
+
+/** What on.dragged hands the handler of an action that is being dragged.
+ *
+ * The start is the mouse of the frame the action was pressed, which is where a
+ * placement that follows the cursor anchors its rectangle, and the cursor is the
+ * mouse of the frame the raise belongs to.
+ */
+ECS_STRUCT(ActionDrag, {
+    ecs_entity_t action; /**< Action that is being dragged */
+    ecs_entity_t source; /**< Binding that holds it, 0 when code holds it */
+    Mouse start;         /**< Mouse of the frame the action was pressed */
+    Mouse cursor;        /**< Mouse of this frame */
 });
 
 /** One key mask bound to one action, on a child of a map entity.
@@ -108,13 +136,15 @@ ECS_STRUCT(InputMap, {
 ECS_STRUCT(Binding, {
     uint64_t mask;       /**< Key mask: key code in the low 32 bits, modifier bits above */
     ecs_entity_t action; /**< Action the mask fires */
+    bool consume;        /**< The key and the action are kept from every lower map */
 });
 
 /** What an action event of the frame reports */
 ECS_ENUM(ActionPhase, {
     ActionPressed = 0,  /**< The action became active this frame */
     ActionHeld = 1,     /**< The action is active this frame */
-    ActionReleased = 2  /**< The action stopped being active this frame */
+    ActionReleased = 2, /**< The action stopped being active this frame */
+    ActionDragged = 3   /**< The action is held and the cursor left the threshold */
 });
 
 /** One action event of the frame, kept in the private per frame list */
@@ -123,7 +153,62 @@ ECS_STRUCT(ActionEvent, {
     ActionPhase phase;   /**< What the action did */
     ecs_entity_t source; /**< Binding that fired it, or the entity that emitted it */
     uint64_t mask;       /**< Key mask that fired it, 0 when it was emitted */
+    int32_t priority;    /**< Priority of the map the binding belongs to */
 });
+
+/** The raise a handler of the frame is running for, and whether it was stopped.
+ *
+ * One record per world names what is being delivered while a handler runs, so a
+ * handler takes an interaction with box_event_stop instead of the framework
+ * guessing that it did. A stopped raise reaches no further handler of its own
+ * event and takes the key of its binding away from every lower map, which is the
+ * handler side of the consume flag of a binding. The order a frame delivers in
+ * is the order the layers resolve in: the highest map first, then the deepest
+ * node of the UI over the scene, then the scene itself.
+ */
+ECS_STRUCT(Raise, {
+    ecs_entity_t target; /**< Action or entity the raise is about, 0 between raises */
+    ecs_entity_t source; /**< Binding, emitter or element the raise came from */
+    int32_t priority;    /**< Priority of the map the raise came from */
+    bool consumed;       /**< A handler stopped the raise */
+});
+
+/** Stop the raise a handler is running for.
+ *
+ * The rest of the handlers of that raise do not run and the key of its binding
+ * is taken from every map below the one it came from, so the actions those maps
+ * bind to the same key are cleared for the frame. Outside a raise the call does
+ * nothing, which is what makes it safe to call from a task that resumed late.
+ *
+ * @param world The world
+ * @return Whether a raise was stopped
+ */
+bool box_event_stop(
+    ecs_world_t *world);
+
+/** Read the raise a handler is running for.
+ *
+ * @param world The world
+ * @return The record, which names no target between raises
+ */
+const Raise* box_event_current(
+    const ecs_world_t *world);
+
+/** Take an action for the rest of the frame from a handler.
+ *
+ * The state of the action is cleared, its drag stops and the events it has not
+ * raised yet are dropped, so nothing below the handler sees it; the frame after,
+ * an action whose key is still down carries on as held rather than pressing
+ * again. This is the explicit form of what a binding with consume does before a
+ * handler runs at all.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @return Whether the action was active this frame
+ */
+bool box_input_consume(
+    ecs_world_t *world,
+    ecs_entity_t action);
 
 /** Fire an action for one frame without a key.
  *

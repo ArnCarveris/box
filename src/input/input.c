@@ -30,6 +30,8 @@ static void box_input_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].bound, box_binding_t);
         ecs_vec_fini_t(NULL, &state[i].active, box_active_t);
         ecs_vec_fini_t(NULL, &state[i].holds, box_hold_t);
+        ecs_vec_fini_t(NULL, &state[i].drags, box_drag_t);
+        ecs_vec_fini_t(NULL, &state[i].rejected, box_reject_t);
         box_input_queries_fini(&state[i]);
     }
 }
@@ -53,7 +55,7 @@ static void box_input_events_dtor(
     }
 }
 
-/** Enable a map when it is added, so that a script only has to name it.
+/** Enable a map at the base layer when it is added, so a script only names it.
  *
  * @param ptr The component
  * @param count Number of components
@@ -64,9 +66,10 @@ static void box_input_map_ctor(
     int32_t count,
     const ecs_type_info_t *ti)
 {
-    (void)ti;
     InputMap *map = ptr;
     int32_t i;
+    ecs_os_memset(ptr, 0, (ecs_size_t)count * ti->size);
+
     for (i = 0; i < count; i ++) {
         map[i].enabled = true;
     }
@@ -101,9 +104,11 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, Input);
     ECS_META_COMPONENT(world, InputAction);
     ECS_META_COMPONENT(world, InputMap);
+    ECS_META_COMPONENT(world, ActionDrag);
     ECS_META_COMPONENT(world, Binding);
     ECS_META_COMPONENT(world, ActionPhase);
     ECS_META_COMPONENT(world, ActionEvent);
+    ECS_META_COMPONENT(world, Raise);
     ECS_COMPONENT_DEFINE(world, InputState);
     ECS_COMPONENT_DEFINE(world, ActionEvents);
 
@@ -113,6 +118,7 @@ void BoxInputImport(
     });
 
     ecs_set_hooks(world, Input, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Raise, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Binding, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, InputMap, { .ctor = box_input_map_ctor });
 
@@ -131,9 +137,12 @@ void BoxInputImport(
     box_input_actions_init(world, state);
     box_input_map_init(world);
 
+    ecs_singleton_ensure(world, Raise);
+    ecs_singleton_modified(world, Raise);
+
     ActionEvents *events = ecs_singleton_ensure(world, ActionEvents);
     ecs_vec_init_t(NULL, &events->events, ActionEvent, 0);
-    box_input_events_init(world);
+    box_input_events_init(world, ecs_id(BoxInput));
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;

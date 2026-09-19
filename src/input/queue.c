@@ -18,6 +18,17 @@ InputState* box_input_state(
     return state;
 }
 
+Raise* box_input_raise(
+    ecs_world_t *world)
+{
+    Raise *result = NULL;
+    if (ecs_id(Raise) && !ecs_is_fini(world)) {
+        result = ecs_get_mut(world, ecs_id(Raise), Raise);
+    }
+
+    return result;
+}
+
 void box_input_sink(
     void *ctx,
     const box_input_event_t *event)
