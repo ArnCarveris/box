@@ -153,6 +153,28 @@ char* box_command_run(
     const char *line,
     bool *error);
 
+/** Complete the word the caret of a command line sits in.
+ *
+ * The first word of a line completes against the command names under
+ * box.command.commands and every later word against the children of the scope
+ * its path names, relative to the working entity of the session. The word is
+ * replaced by the longest prefix every candidate shares and a single candidate
+ * is followed by a space.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param line The command line
+ * @param caret_out Byte the caret sits before, receives where it ends up
+ * @param listing Receives the candidates when more than one matched, NULL to skip
+ * @return The completed line, NULL when nothing matched, the caller frees it
+ */
+char* box_command_complete(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *line,
+    int32_t *caret_out,
+    char **listing);
+
 /** Register the observers that manage the session folders.
  *
  * @param world The world

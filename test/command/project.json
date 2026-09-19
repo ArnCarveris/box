@@ -330,6 +330,20 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Complete",
+                "testcases": [
+                    "unique_command_name_is_finished",
+                    "command_group_finishes_to_the_shared_prefix",
+                    "unknown_word_completes_to_nothing",
+                    "argument_completes_an_entity_path",
+                    "argument_lists_the_children_of_a_scope",
+                    "word_of_the_caret_keeps_the_rest_of_the_line",
+                    "argument_resolves_against_the_working_entity"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }
