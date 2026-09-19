@@ -28,6 +28,7 @@ int main(
     char *argv[])
 {
     ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, BoxCore);
     ECS_IMPORT(world, BoxJob);
     ECS_IMPORT(world, BoxCommand);
