@@ -1,0 +1,37 @@
+$ pwd
+/
+$ cd scene
+scene
+$ pwd
+scene
+$ ls
+floor
+sphere
+
+$ touch crate
+scene.crate
+$ set crate Position "{2, 0.5, 0}"
+scene.crate
+$ get crate Position
+{x: 2, y: 0.5, z: 0}
+$ cat crate
+box.transform.Position: {x: 2, y: 0.5, z: 0}
+box.transform.WorldTransform: {m: {v: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.5, 0, 1]}}
+box.transform.AABB: {min: {x: 0, y: 0, z: 0}, max: {x: 0, y: 0, z: 0}}
+(ChildOf,scene)
+
+$ has crate Position
+true
+$ mv crate cube
+scene.cube
+$ ls
+cube
+floor
+sphere
+
+$ rm cube
+scene.cube
+$ ls
+floor
+sphere
+

@@ -1,0 +1,29 @@
+{
+  "project": "script",
+  "timestamp": "2026-09-19T06:03:53Z",
+  "pass": 18,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.044127,
+  "tests": [
+    {"suite": "Incremental", "case": "templates_are_marked_manual", "status": "pass", "elapsed": 0.011167},
+    {"suite": "Incremental", "case": "instances_are_pending", "status": "pass", "elapsed": 0.011230},
+    {"suite": "Incremental", "case": "non_template_entities_appear_immediately", "status": "pass", "elapsed": 0.013346},
+    {"suite": "Incremental", "case": "count_budget_per_frame", "status": "pass", "elapsed": 0.014244},
+    {"suite": "Incremental", "case": "time_budget_stops_a_frame", "status": "pass", "elapsed": 0.012563},
+    {"suite": "Incremental", "case": "instance_is_complete_when_it_appears", "status": "pass", "elapsed": 0.013452},
+    {"suite": "Incremental", "case": "every_instance_is_expanded_eventually", "status": "pass", "elapsed": 0.011675},
+    {"suite": "Incremental", "case": "disabled_expands_everything_at_once", "status": "pass", "elapsed": 0.018400},
+    {"suite": "Incremental", "case": "disabled_expands_nested_templates", "status": "pass", "elapsed": 0.011344},
+    {"suite": "Incremental", "case": "stats_report_the_queue", "status": "pass", "elapsed": 0.010477},
+    {"suite": "Incremental", "case": "stats_report_the_worst_frame", "status": "pass", "elapsed": 0.011767},
+    {"suite": "Incremental", "case": "template_declared_before_import_is_marked", "status": "pass", "elapsed": 0.009428},
+    {"suite": "Order", "case": "nearest_to_the_camera_first", "status": "pass", "elapsed": 0.024317},
+    {"suite": "Order", "case": "reorder_when_the_camera_moves", "status": "pass", "elapsed": 0.022750},
+    {"suite": "Order", "case": "nearest_first_off_keeps_script_order", "status": "pass", "elapsed": 0.023293},
+    {"suite": "Order", "case": "no_camera_keeps_script_order", "status": "pass", "elapsed": 0.009934},
+    {"suite": "Order", "case": "instance_without_position_goes_first", "status": "pass", "elapsed": 0.022135},
+    {"suite": "Order", "case": "world_position_orders_a_child_instance", "status": "pass", "elapsed": 0.022000}
+  ]
+}
