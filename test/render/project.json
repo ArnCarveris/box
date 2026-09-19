@@ -579,6 +579,23 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Wear",
+                "testcases": [
+                    "an_entity_without_it_reads_the_neutral_values",
+                    "the_amounts_reach_the_packet",
+                    "the_detail_carries_the_seed_and_the_scale",
+                    "the_values_are_clamped_to_their_range",
+                    "a_change_reextracts_the_instance",
+                    "the_amounts_survive_a_slot_move",
+                    "an_instance_of_a_prefab_inherits_it",
+                    "a_dynamic_instance_carries_its_amounts",
+                    "a_transition_keeps_the_instance_extracted",
+                    "the_layers_of_the_shader_read_the_channel"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

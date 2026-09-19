@@ -54,6 +54,55 @@ static void box_pbr_ctor(
     }
 }
 
+/** Wear constructor leaving every layer of the entity as the scene set it.
+ *
+ * Every amount is a factor, so the neutral value is one.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_wear_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    Wear *w = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        w[i].dust = 1.0f;
+        w[i].grime = 1.0f;
+        w[i].edge = 1.0f;
+        w[i].wet = 1.0f;
+    }
+}
+
+/** WearDetail constructor leaving the noise of the entity where the scene put it.
+ *
+ * The seed is the one member whose neutral value is zero, because it offsets
+ * the noise instead of scaling an amount.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_wear_detail_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    WearDetail *w = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        w[i].burn = 1.0f;
+        w[i].scratch = 1.0f;
+        w[i].seed = 0.0f;
+        w[i].scale = 1.0f;
+    }
+}
+
 /** TextureTransform constructor setting the identity transform.
  *
  * @param ptr The components
@@ -153,6 +202,8 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, MaterialLayer);
     ECS_META_COMPONENT(world, LayerParams);
     ECS_META_COMPONENT(world, MaterialLayerSettings);
+    ECS_META_COMPONENT(world, Wear);
+    ECS_META_COMPONENT(world, WearDetail);
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);
     ECS_TAG_DEFINE(world, MaterialLayerOn);
@@ -165,6 +216,8 @@ void BoxMaterialImport(
     ecs_set_hooks(world, MaterialLayer, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, LayerParams, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, MaterialLayerSettings, { .ctor = box_layer_settings_ctor });
+    ecs_set_hooks(world, Wear, { .ctor = box_wear_ctor });
+    ecs_set_hooks(world, WearDetail, { .ctor = box_wear_detail_ctor });
 
     ecs_add_pair(world, ecs_id(TextureTransform), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureTiling), EcsOnInstantiate, EcsInherit);
@@ -179,6 +232,8 @@ void BoxMaterialImport(
     ecs_add_pair(world, DynamicMaterial, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, NoShadow, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, MaterialLayerOn, EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(Wear), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(WearDetail), EcsOnInstantiate, EcsInherit);
 
     box_tint_init(world);
     box_material_layers_init(world);

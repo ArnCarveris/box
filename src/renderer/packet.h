@@ -284,6 +284,25 @@
 /** Bit that says the 2D shape of an instance is a soft fill instead of a border */
 #define BOX_MODE_SOFT_SHIFT (4)
 
+/** Bit that says the wear words of an instance hold per entity layer amounts */
+#define BOX_MODE_WEAR_SHIFT (5)
+
+/** Words the per entity material layer amounts of an instance take.
+ *
+ * The first holds the dust, grime, edge and wetness amounts as unsigned bytes,
+ * the second the burn and scratch amounts, the noise seed and the feature scale;
+ * every one of them is a factor of what the scene set on the layer, so an
+ * instance without the component leaves both words at zero and the shader reads
+ * the neutral one instead.
+ */
+#define BOX_WEAR_WORDS (2)
+
+/** Steps of one unit the feature scale byte of a wear word holds */
+#define BOX_WEAR_SCALE_STEP (64.0f)
+
+/** Largest feature scale a wear word can hold, which is a full byte of steps */
+#define BOX_WEAR_SCALE_MAX (255.0f / BOX_WEAR_SCALE_STEP)
+
 /** Words the packed 2D shape parameters of an instance take.
  *
  * The first holds the four corner radii, the second the four edge widths, the
@@ -312,10 +331,11 @@ typedef struct box_instance_t {
     uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
     float bounds[4];       /**< World space bounding sphere: center xyz and radius */
     uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
+    uint32_t wear[BOX_WEAR_WORDS];   /**< Packed per entity layer amounts, zero without them */
 } box_instance_t;
 
 /** 32 bit words one instance takes in a GPU instance buffer */
-#define BOX_INSTANCE_WORDS (39)
+#define BOX_INSTANCE_WORDS (41)
 
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
@@ -325,6 +345,9 @@ typedef struct box_instance_t {
 
 /** Word the packed 2D shape parameters of an instance start at */
 #define BOX_INSTANCE_SHAPE (35)
+
+/** Word the packed per entity layer amounts of an instance start at */
+#define BOX_INSTANCE_WEAR (39)
 
 /** One point or spot light, laid out as the GPU light storage buffer expects it */
 typedef struct box_light_t {
@@ -914,6 +937,78 @@ static inline uint32_t box_instance_layers(
     const box_instance_t *inst)
 {
     return inst->uv_mode >> BOX_MODE_LAYER_SHIFT;
+}
+
+/** Write the per entity material layer amounts of an instance into its wear words.
+ *
+ * Every amount is a factor of what the scene set on its layer and is clamped to
+ * zero to one; the seed is clamped the same way and the feature scale counts in
+ * steps of one over BOX_WEAR_SCALE_STEP, so a scale of one is exact. The mode
+ * bit is what tells the shader the words hold anything, so an instance without
+ * the components keeps them at zero and reads the neutral values.
+ *
+ * @param inst The instance
+ * @param amounts Dust, grime, edge, wetness, burn and scratch
+ * @param seed Noise offset of every layer of the instance
+ * @param scale Feature size multiplier of every layer of the instance
+ */
+static inline void box_instance_set_wear(
+    box_instance_t *inst,
+    const float *amounts,
+    float seed,
+    float scale)
+{
+    float packed[7];
+    uint32_t i;
+    for (i = 0; i < 6; i ++) {
+        packed[i] = amounts[i];
+    }
+
+    packed[6] = seed;
+    inst->wear[0] = 0;
+    inst->wear[1] = 0;
+    for (i = 0; i < 7; i ++) {
+        float v = packed[i] < 0.0f ? 0.0f : packed[i];
+        uint32_t byte = (uint32_t)(v > 1.0f ? 255.0f : v * 255.0f + 0.5f);
+        inst->wear[i >> 2] |= byte << ((i & 3) * 8);
+    }
+
+    float steps = scale < 0.0f ? 0.0f : scale * BOX_WEAR_SCALE_STEP + 0.5f;
+    uint32_t scale_byte = (uint32_t)(steps > 255.0f ? 255.0f : steps);
+
+    inst->wear[1] |= scale_byte << 24;
+    inst->uv_mode |= 1u << BOX_MODE_WEAR_SHIFT;
+}
+
+/** Check whether the wear words of an instance hold per entity layer amounts.
+ *
+ * @param inst The instance
+ * @return True when the instance carries them
+ */
+static inline bool box_instance_worn(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode & (1u << BOX_MODE_WEAR_SHIFT)) != 0;
+}
+
+/** Read one of the per entity layer values of an instance back.
+ *
+ * @param inst The instance
+ * @param index 0 to 5 the amounts, 6 the seed and 7 the feature scale
+ * @return The value, the neutral one when the instance carries no wear
+ */
+static inline float box_instance_wear(
+    const box_instance_t *inst,
+    uint32_t index)
+{
+    float result = index == 6 ? 0.0f : 1.0f;
+    if (box_instance_worn(inst)) {
+        uint32_t byte = (inst->wear[index >> 2] >> ((index & 3) * 8)) & 0xFFu;
+        result = index == 7 ?
+            (float)byte / BOX_WEAR_SCALE_STEP : (float)byte / 255.0f;
+    }
+
+    return result;
 }
 
 /** Mark whether the shape words of an instance hold a 2D shape.

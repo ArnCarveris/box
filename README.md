@@ -105,6 +105,22 @@ and noise frequency and roughness from `b`. Wetness takes the wet roughness in
 `a.x` and the amount in `a.w`, and noise frequency, pooling and noise weight from
 `b`. `MaterialLayerSettings` turns every layer off at once.
 
+`test/integration/visual/instance_wear.flecs` is the per entity layer check: the
+same crate and ball prefab six times under the edge wear, dust and grime layers,
+clean, a third worn, two thirds worn, fully worn, with a different noise seed and
+with a coarser feature scale. `Wear: {dust, grime, edge, wet}` is a factor of the
+amount the scene set on each layer box ships, so an entity says how far gone it
+is without a material of its own, and `WearDetail: {burn, scratch, seed, scale}`
+carries the two amounts a project layer reads, the noise offset that makes two
+copies of a prefab differ and the multiplier of the feature frequency of every
+layer. A channel of zero keeps its layer off the entity, which is how glass or
+rock opts out of a layer its material enables; an entity without the components
+renders exactly as it did before. Both are inherited by the instances of a prefab
+and both are transitionable, so a wall that takes damage eases into being
+grimier. A layer body reads them as `(*s).wear.dust` and takes its noise through
+`wear_noise(s, frequency)`, which folds in the seed and the scale, so a project
+layer gets the same channel as the built in ones.
+
 `test/integration/visual/baked_room.flecs` is the baked lighting check: a tiled
 room with static point lights, emissive boxes and a pillar whose shadow the bake
 resolves, next to `dynamic_room.flecs` which lights the same room with the lights

@@ -1,0 +1,123 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ {
+  EnvironmentLight: {sky_color: {120, 145, 190}, ground_color: {75, 66, 58}, intensity: 0.7}
+}
+
+box {
+  material {
+    layers {
+      dust {
+        LayerParams: {a: {0.85, 0.80, 0.66, 1.0}, b: {1.6, 0.95, 1.0, 0}}
+      }
+
+      grime {
+        LayerParams: {a: {0.10, 0.09, 0.07, 1.0}, b: {1.2, 0.9, 0.0, 0}}
+      }
+
+      edge_wear {
+        LayerParams: {a: {0.85, 0.83, 0.78, 1.0}, b: {0.22, 0.2, 2.5, 0}}
+      }
+    }
+  }
+}
+
+camera {
+  Position: {0, 9, -18}
+  LookAt: {0, 1.2, 2}
+  Camera: {fov: 54}
+}
+
+sun {
+  Rotation: {0.8, -0.4, 0}
+  DirectionalLight: {intensity: 2.4}
+}
+
+floor {
+  Position: {0, -0.5, 1.5}
+  Box: {30, 0.2, 14}
+  Rgb: {112, 112, 120}
+  PbrMaterial: {roughness: 0.85}
+}
+
+prefabs {
+  Crate : Prefab {
+    Box: {2.6, 2.6, 2.6}
+    Rgb: {196, 74, 56}
+    PbrMaterial: {metallic: 0.1, roughness: 0.55}
+    (MaterialLayerOn, box.material.layers.edge_wear)
+    (MaterialLayerOn, box.material.layers.dust)
+    (MaterialLayerOn, box.material.layers.grime)
+  }
+
+  Ball : Prefab {
+    Sphere: {segments: 40, smooth: true, radius: 1.2}
+    Rgb: {72, 140, 210}
+    PbrMaterial: {metallic: 0.2, roughness: 0.45}
+    (MaterialLayerOn, box.material.layers.edge_wear)
+    (MaterialLayerOn, box.material.layers.dust)
+    (MaterialLayerOn, box.material.layers.grime)
+  }
+}
+
+clean_crate : prefabs.Crate {
+  Position: {-10.5, 1.3, 0}
+  Wear: {dust: 0, grime: 0, edge: 0}
+}
+
+clean_ball : prefabs.Ball {
+  Position: {-10.5, 1.2, 4.2}
+  Wear: {dust: 0, grime: 0, edge: 0}
+}
+
+third_crate : prefabs.Crate {
+  Position: {-6.3, 1.3, 0}
+  Wear: {dust: 0.35, grime: 0.35, edge: 0.35}
+}
+
+third_ball : prefabs.Ball {
+  Position: {-6.3, 1.2, 4.2}
+  Wear: {dust: 0.35, grime: 0.35, edge: 0.35}
+}
+
+two_thirds_crate : prefabs.Crate {
+  Position: {-2.1, 1.3, 0}
+  Wear: {dust: 0.7, grime: 0.7, edge: 0.7}
+}
+
+two_thirds_ball : prefabs.Ball {
+  Position: {-2.1, 1.2, 4.2}
+  Wear: {dust: 0.7, grime: 0.7, edge: 0.7}
+}
+
+full_crate : prefabs.Crate {
+  Position: {2.1, 1.3, 0}
+}
+
+full_ball : prefabs.Ball {
+  Position: {2.1, 1.2, 4.2}
+}
+
+seeded_crate : prefabs.Crate {
+  Position: {6.3, 1.3, 0}
+  WearDetail: {seed: 0.6}
+}
+
+seeded_ball : prefabs.Ball {
+  Position: {6.3, 1.2, 4.2}
+  WearDetail: {seed: 0.6}
+}
+
+coarse_crate : prefabs.Crate {
+  Position: {10.5, 1.3, 0}
+  WearDetail: {scale: 0.3}
+}
+
+coarse_ball : prefabs.Ball {
+  Position: {10.5, 1.2, 4.2}
+  WearDetail: {scale: 0.3}
+}

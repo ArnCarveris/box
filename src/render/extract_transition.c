@@ -7,7 +7,12 @@
  * from and one record per channel that is still moving, which is everything the
  * renderer thread needs to compute the value of every later frame on its own.
  * An entity whose transitions cannot be expressed that way, because two records
- * move the same channel, keeps being extracted by the game side instead.
+ * move the same channel, keeps being extracted by the game side instead. So
+ * does an entity whose only moving transition is on a component the renderer
+ * has no channel for, such as Wear, which is what makes such a transition work
+ * on a static instance: it costs one extraction per frame while it runs and
+ * nothing after. A transition that moves both kinds at once keeps the renderer
+ * records and leaves the other component to the frames the entity is extracted.
  */
 
 #include "render_internal.h"
@@ -161,6 +166,7 @@ static void box_render_context(
  * @param oriented The rotation of the entity comes from an Orientation
  * @param out Receives one record per channel
  * @param mask Receives a bit per channel that has a record
+ * @param slow Receives true when a record moves a component without a channel
  * @return Number of records, -1 when two records move one channel
  */
 static int32_t box_render_records(
@@ -168,7 +174,8 @@ static int32_t box_render_records(
     double time,
     bool oriented,
     box_transition_rec_t *out,
-    uint32_t *mask)
+    uint32_t *mask,
+    bool *slow)
 {
     const box_transition_t *records = ecs_vec_first_t(
         &transition->records, box_transition_t);
@@ -178,7 +185,12 @@ static int32_t box_render_records(
         uint32_t channel = box_render_channel(records[i].component);
         double end = records[i].start + (double)records[i].delay +
             (double)records[i].duration;
-        if (channel == BOX_DISPLAY_CHANNELS || end <= time) {
+        if (end <= time) {
+            continue;
+        }
+
+        if (channel == BOX_DISPLAY_CHANNELS) {
+            slow[0] = true;
             continue;
         }
 
@@ -228,13 +240,16 @@ uint32_t box_render_extract_transition(
     memset(&cmd, 0, sizeof(cmd));
     box_render_values(world, e, &cmd);
 
-    int32_t count = box_render_records(transition, time, cmd.oriented != 0, records, &mask);
+    bool slow = false;
+    int32_t count = box_render_records(transition, time, cmd.oriented != 0, records,
+        &mask, &slow);
     if (count < 0) {
         result = BOX_UPDATE_SLOW;
         goto done;
     }
 
     if (!count) {
+        result = slow ? BOX_UPDATE_SLOW : result;
         goto done;
     }
 

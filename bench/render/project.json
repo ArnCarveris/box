@@ -132,6 +132,12 @@
                     "toggle_1000_of_10k",
                     "extract_10k_with_a_hidden_tenth"
                 ]
+            },
+            {
+                "id": "Wear",
+                "benchcases": [
+                    "extract_10k_with_wear"
+                ]
             }
         ]
     }

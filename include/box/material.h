@@ -153,6 +153,43 @@ ECS_STRUCT(LayerParams, {
     vec4 b; /**< Second parameter vector */
 });
 
+/** Per entity amounts of the material layers box ships.
+ *
+ * Every amount is a factor of what the scene set on its layer, so the component
+ * says how dusty, grimy, chipped or wet this one entity is without a material
+ * of its own. A missing component and a component the constructor left alone
+ * are the same thing: the layers run exactly as the scene set them. Setting a
+ * channel to zero keeps that layer off the entity, which is how glass or rock
+ * opts out of a layer its material enables. The component is inherited by the
+ * instances of a prefab, applies to the entity it sits on rather than to its
+ * children, and is transitionable, so a wall that takes damage eases into being
+ * grimier instead of jumping there.
+ */
+ECS_STRUCT(Wear, {
+    float dust;    /**< Factor of the dust layer amount, 1 leaves it as the scene set it */
+    float grime;   /**< Factor of the grime layer amount */
+    float edge;    /**< Factor of the edge wear layer amount */
+    float wet;     /**< Factor of the wetness layer amount */
+});
+
+/** The rest of the per entity layer channel: two spare amounts and the noise.
+ *
+ * `burn` and `scratch` are amounts no layer of box reads; they are the channel
+ * a project layer takes its per entity amount from, which is how a burn driven
+ * by health or a scratch driven by use reaches a body. `seed` moves the noise
+ * of every layer of the entity, so two copies of a prefab wear differently, and
+ * `scale` multiplies the feature frequency of every layer. A layer samples its
+ * noise in world metres, so the feature size already survives an instance
+ * scale; this is the knob that changes it for one entity. Like Wear it is
+ * inherited by instances and transitionable.
+ */
+ECS_STRUCT(WearDetail, {
+    float burn;    /**< Factor a project burn layer reads, box ships none */
+    float scratch; /**< Factor a project scratch layer reads, box ships none */
+    float seed;    /**< Offsets the noise of every layer, so two copies differ */
+    float scale;   /**< Multiplies the feature frequency of every layer, 1 keeps it */
+});
+
 /** Whether views apply material layers at all, a singleton that defaults to enabled */
 ECS_STRUCT(MaterialLayerSettings, {
     bool enabled; /**< Layers registered by the scene are applied */
