@@ -111,9 +111,9 @@ typedef struct UiState {
 
 /** One glyph of a font, rasterized into the atlas of that font */
 typedef struct box_ui_glyph_t {
-    float advance;   /**< Pixels the pen moves after the glyph */
-    float bearing_x; /**< Pixels from the pen to the left of the bitmap */
-    float top;       /**< Pixels from the baseline down to the top of the bitmap */
+    float advance;   /**< Logical pixels the pen moves after the glyph */
+    float bearing_x; /**< Logical pixels from the pen to the left of the bitmap */
+    float top;       /**< Logical pixels from the baseline down to the top of the bitmap */
     int32_t x;       /**< Column of the bitmap in the atlas */
     int32_t y;       /**< Row of the bitmap in the atlas, from its top */
     int32_t width;   /**< Width of the bitmap in texels */
@@ -130,7 +130,9 @@ typedef struct box_ui_glyph_t {
  */
 typedef struct box_ui_atlas_t {
     char *path;           /**< Font file as the component spells it */
-    float size;           /**< Em size the glyphs are rasterized at */
+    float size;           /**< Em size of the font in logical pixels */
+    float device;         /**< Device pixels one logical pixel of the atlas covers */
+    float raster;         /**< Em size in device pixels the glyphs are rasterized at */
     void *font;           /**< stbtt_fontinfo of the parsed file */
     uint8_t *data;        /**< Bytes of the file, which the parsed font points into */
     uint8_t *coverage;    /**< One byte per texel of the atlas, rows from the top */
@@ -142,10 +144,10 @@ typedef struct box_ui_atlas_t {
     int32_t pen_y;        /**< Row the shelf being filled starts at */
     int32_t shelf;        /**< Height of the shelf being filled */
     uint32_t epoch;       /**< Times the atlas grew, part of the fingerprint of a build */
-    float scale;          /**< Factor from font units to pixels */
-    float ascent;         /**< Pixels from the baseline to the top of the line */
-    float descent;        /**< Pixels from the baseline down to the bottom of the line */
-    float line_gap;       /**< Pixels between the bottom of a line and the next top */
+    float scale;          /**< Factor from font units to device pixels */
+    float ascent;         /**< Logical pixels from the baseline to the top of the line */
+    float descent;        /**< Logical pixels from the baseline to the bottom of the line */
+    float line_gap;       /**< Logical pixels between a line and the next top */
     bool dirty;           /**< The atlas gained glyphs and has to be uploaded */
     bool failed;          /**< The font file could not be read or parsed */
 } box_ui_atlas_t;
@@ -153,8 +155,8 @@ typedef struct box_ui_atlas_t {
 /** One glyph the layout of a string placed in the box of its element */
 typedef struct box_ui_quad_t {
     const box_ui_glyph_t *glyph; /**< Glyph of the atlas the quad shows */
-    float x;                     /**< Pixels from the left of the box to the bitmap */
-    float y;                     /**< Pixels from the top of the box down to the bitmap */
+    float x;                     /**< Logical pixels from the left of the box to the bitmap */
+    float y;                     /**< Logical pixels from the top of the box to the bitmap */
 } box_ui_quad_t;
 
 /** Size a string takes when it is laid out in a box */
@@ -176,6 +178,7 @@ typedef struct TextImpl {
 typedef struct UiFonts {
     ecs_vec_t atlases; /**< box_ui_atlas_t* of every font file and size in use */
     ecs_vec_t quads;   /**< box_ui_quad_t of the string being laid out */
+    float device;      /**< Device pixels one logical pixel covers, 0 until a view said */
     bool grown;        /**< An atlas grew, every tree has to lay out again */
 } UiFonts;
 
@@ -380,9 +383,14 @@ UiFonts* box_ui_fonts(
 
 /** Atlas of a font file at an em size, parsed and opened the first time.
  *
+ * The atlas is rasterized at its em size times the device scale of the views,
+ * so a glyph holds one texel per device pixel and its quad samples the atlas
+ * without resampling. An atlas that was rasterized for another device scale is
+ * rasterized again, which raises its epoch and lays every tree out again.
+ *
  * @param world The world
  * @param path The font file, empty or NULL for the font the engine ships
- * @param size The em size in pixels, 0 for BOX_UI_FONT_SIZE
+ * @param size The em size in logical pixels, 0 for BOX_UI_FONT_SIZE
  * @return The atlas, which carries its failed flag when the file was unreadable
  */
 box_ui_atlas_t* box_ui_atlas(

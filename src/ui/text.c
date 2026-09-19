@@ -14,6 +14,7 @@
  */
 
 #include "ui_internal.h"
+#include <math.h>
 
 /** Seed of the fingerprint of a build, the FNV-1a offset basis */
 #define BOX_UI_HASH_SEED (14695981039346656037ULL)
@@ -356,7 +357,25 @@ static uint64_t box_ui_text_print(
     return hash;
 }
 
+/** Move a coordinate of a tree onto the device pixel grid of its view.
+ *
+ * @param value The coordinate in logical pixels
+ * @param device Device pixels one logical pixel covers
+ * @return The coordinate of the nearest device pixel
+ */
+static float box_ui_text_snap(
+    float value,
+    float device)
+{
+    return roundf(value * device) / device;
+}
+
 /** Give one glyph element the rectangle, the region and the place of its quad.
+ *
+ * The bitmap of a glyph holds one texel per device pixel, so the quad is as
+ * wide as its bitmap divided by the device scale and its top left corner is
+ * snapped to a device pixel: the quad then covers whole pixels and samples one
+ * texel per pixel, which is what keeps the glyph as sharp as it was rasterized.
  *
  * @param world The world
  * @param e The glyph element
@@ -373,10 +392,13 @@ static void box_ui_text_quad(
 {
     const box_ui_glyph_t *glyph = quad->glyph;
     float edge = (float)atlas->edge;
-    float width = (float)glyph->width;
-    float height = (float)glyph->height;
-    float x = p->x - p->width * 0.5f + quad->x + width * 0.5f;
-    float y = p->y + p->height * 0.5f - quad->y - height * 0.5f;
+    float device = atlas->device > 0 ? atlas->device : 1.0f;
+    float width = (float)glyph->width / device;
+    float height = (float)glyph->height / device;
+    float left = box_ui_text_snap(p->x - p->width * 0.5f + quad->x, device);
+    float top = box_ui_text_snap(p->y + p->height * 0.5f - quad->y, device);
+    float x = left + width * 0.5f;
+    float y = top - height * 0.5f;
     Image region = {
         .u0 = (float)glyph->x / edge,
         .v0 = 1.0f - (float)(glyph->y + glyph->height) / edge,

@@ -55,9 +55,79 @@ done:
     return result;
 }
 
+/** Give an atlas the raster size and the vertical metrics of its font.
+ *
+ * The raster size is the em size in device pixels, so a glyph holds one texel
+ * per device pixel, and the metrics are divided back by the device scale, so
+ * everything a layout reads stays in the logical pixels of its tree.
+ *
+ * @param atlas The atlas, its font parsed and its device scale filled in
+ */
+static void box_ui_font_metrics(
+    box_ui_atlas_t *atlas)
+{
+    stbtt_fontinfo *info = atlas->font;
+    int ascent, descent, gap;
+
+    atlas->raster = atlas->size * atlas->device;
+    atlas->scale = stbtt_ScaleForPixelHeight(info, atlas->raster);
+    stbtt_GetFontVMetrics(info, &ascent, &descent, &gap);
+
+    float logical = atlas->scale / atlas->device;
+
+    atlas->ascent = (float)ascent * logical;
+    atlas->descent = -(float)descent * logical;
+    atlas->line_gap = (float)gap * logical;
+}
+
+/** Drop every glyph of an atlas so the next string rasterizes them again.
+ *
+ * @param atlas The atlas
+ */
+static void box_ui_font_clear(
+    box_ui_atlas_t *atlas)
+{
+    ecs_map_iter_t mit = ecs_map_iter(&atlas->glyphs);
+    while (ecs_map_next(&mit)) {
+        ecs_os_free(ecs_map_ptr(&mit));
+    }
+
+    ecs_map_fini(&atlas->glyphs);
+    ecs_map_init(&atlas->glyphs, NULL);
+    ecs_os_memset(atlas->coverage, 0, atlas->edge * atlas->edge);
+    atlas->pen_x = 0;
+    atlas->pen_y = 0;
+    atlas->shelf = 0;
+}
+
+/** Rasterize an atlas again when the views draw it at another device scale.
+ *
+ * @param world The world
+ * @param atlas The atlas
+ * @param device Device pixels one logical pixel covers
+ */
+static void box_ui_font_rescale(
+    ecs_world_t *world,
+    box_ui_atlas_t *atlas,
+    float device)
+{
+    if (atlas->failed || atlas->device == device) {
+        goto done;
+    }
+
+    atlas->device = device;
+    box_ui_font_metrics(atlas);
+    box_ui_font_clear(atlas);
+    atlas->epoch ++;
+    atlas->dirty = true;
+    box_ui_fonts(world)->grown = true;
+done:
+    return;
+}
+
 /** Parse the file of an atlas and read the vertical metrics of its font.
  *
- * @param atlas The atlas, its path and size filled in
+ * @param atlas The atlas, its path, size and device scale filled in
  */
 static void box_ui_font_open(
     box_ui_atlas_t *atlas)
@@ -86,12 +156,7 @@ static void box_ui_font_open(
         goto done;
     }
 
-    int ascent, descent, gap;
-    atlas->scale = stbtt_ScaleForPixelHeight(info, atlas->size);
-    stbtt_GetFontVMetrics(info, &ascent, &descent, &gap);
-    atlas->ascent = (float)ascent * atlas->scale;
-    atlas->descent = -(float)descent * atlas->scale;
-    atlas->line_gap = (float)gap * atlas->scale;
+    box_ui_font_metrics(atlas);
     atlas->edge = BOX_UI_ATLAS_SIZE;
     atlas->coverage = ecs_os_calloc((ecs_size_t)(atlas->edge * atlas->edge));
 done:
@@ -201,10 +266,11 @@ const box_ui_glyph_t* box_ui_atlas_glyph(
     stbtt_GetCodepointBitmapBox(info, codepoint, atlas->scale, atlas->scale,
         &x0, &y0, &x1, &y1);
 
+    float logical = 1.0f / atlas->device;
     box_ui_glyph_t glyph = {
-        .advance = (float)advance * atlas->scale,
-        .bearing_x = (float)x0,
-        .top = (float)y0,
+        .advance = (float)advance * atlas->scale * logical,
+        .bearing_x = (float)x0 * logical,
+        .top = (float)y0 * logical,
         .width = x1 - x0,
         .height = y1 - y0
     };
@@ -239,6 +305,7 @@ box_ui_atlas_t* box_ui_atlas(
     UiFonts *fonts = box_ui_fonts(world);
     const char *file = path && path[0] ? path : BOX_UI_FONT;
     float em = size > 0 ? size : BOX_UI_FONT_SIZE;
+    float device = fonts->device > 0 ? fonts->device : 1.0f;
     box_ui_atlas_t *result = NULL;
     int32_t i, count = ecs_vec_count(&fonts->atlases);
     for (i = 0; i < count && !result; i ++) {
@@ -250,12 +317,14 @@ box_ui_atlas_t* box_ui_atlas(
     }
 
     if (result) {
+        box_ui_font_rescale(world, result, device);
         goto done;
     }
 
     result = ecs_os_calloc_t(box_ui_atlas_t);
     result->path = ecs_os_strdup(file);
     result->size = em;
+    result->device = device;
     ecs_map_init(&result->glyphs, NULL);
     box_ui_font_open(result);
     ecs_vec_append_t(NULL, &fonts->atlases, box_ui_atlas_t*)[0] = result;

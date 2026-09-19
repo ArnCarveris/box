@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
 #include "../../../src/ui/ui_internal.h"
 
 static ecs_world_t *w;
@@ -486,4 +487,63 @@ void Text_glyphs_composite_with_plain_alpha_in_the_ui_view(void)
     }
 
     box_packet_fini(&packet);
+}
+
+void Text_glyph_origin_lands_on_a_device_pixel(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 1920;
+    surface->height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Position, {0.3f, 0.7f, 0});
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("Hello")});
+    box_ui_update(w);
+
+    test_int(ecs_count_id(w, UiGlyph), 5);
+    ecs_iter_t it = ecs_each_id(w, UiGlyph);
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const Bounds *b = ecs_get(w, it.entities[i], Bounds);
+            float left = (b->x - b->width * 0.5f) * 2.0f;
+            float top = (b->y + b->height * 0.5f) * 2.0f;
+
+            test_assert(fabsf(left - roundf(left)) < 1e-3f);
+            test_assert(fabsf(top - roundf(top)) < 1e-3f);
+        }
+    }
+}
+
+void Text_glyph_quad_is_the_bitmap_in_logical_pixels(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 1920;
+    surface->height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("H")});
+    box_ui_update(w);
+
+    box_ui_atlas_t *atlas = box_ui_atlas(w, NULL, 0);
+    const box_ui_glyph_t *glyph = box_ui_atlas_glyph(w, atlas, 'H');
+    test_int(ecs_count_id(w, UiGlyph), 1);
+
+    ecs_iter_t it = ecs_each_id(w, UiGlyph);
+    while (ecs_each_next(&it)) {
+        const Rect *rect = ecs_get(w, it.entities[0], Rect);
+
+        test_flt(rect->width, (float)glyph->width * 0.5f);
+        test_flt(rect->height, (float)glyph->height * 0.5f);
+    }
 }

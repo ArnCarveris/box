@@ -269,3 +269,61 @@ void Font_label_function_reuses_the_element_it_made(void)
     test_str(ecs_get(w, caption, Text)->value, "Two");
     test_int(ecs_count_id(w, ecs_id(Text)), 1);
 }
+
+void Font_raster_size_follows_the_device_scale(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 1920;
+    surface->height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("Hello")});
+    box_ui_update(w);
+
+    box_ui_atlas_t *atlas = box_ui_atlas(w, NULL, 0);
+    test_flt(atlas->device, 2);
+    test_flt(atlas->raster, BOX_UI_FONT_SIZE * 2);
+    test_flt(atlas->size, BOX_UI_FONT_SIZE);
+
+    const box_ui_glyph_t *glyph = box_ui_atlas_glyph(w, atlas, 'H');
+    test_assert(glyph != NULL);
+    test_assert((float)glyph->height > BOX_UI_FONT_SIZE);
+    test_assert(atlas->ascent < BOX_UI_FONT_SIZE);
+}
+
+void Font_atlas_rerasterizes_when_the_device_scale_changes(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 1920;
+    surface->height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("Hello")});
+    box_ui_update(w);
+
+    box_ui_atlas_t *atlas = box_ui_atlas(w, NULL, 0);
+    int32_t tall = box_ui_atlas_glyph(w, atlas, 'H')->height;
+    uint32_t epoch = atlas->epoch;
+    float width = ecs_get(w, label, Bounds)->width;
+
+    surface = ecs_singleton_ensure(w, Surface);
+    surface->height = 540;
+    box_ui_update(w);
+
+    test_flt(atlas->device, 1);
+    test_flt(atlas->raster, BOX_UI_FONT_SIZE);
+    test_assert(atlas->epoch > epoch);
+    test_assert(box_ui_atlas_glyph(w, atlas, 'H')->height < tall);
+    test_assert(ecs_get(w, label, Bounds)->width > width - 1);
+    test_assert(ecs_get(w, label, Bounds)->width < width + 1);
+}

@@ -183,6 +183,44 @@ void box_ui_unbind(
     impl->height = 0;
 }
 
+/** Device pixels one logical pixel of a tree covers, for the glyph atlases.
+ *
+ * The framebuffer the scene is rendered into is what a glyph lands on, so a
+ * tree on a high density surface, or one that gives a logical pixel more than
+ * one point, draws its text at more pixels than the layout counts. The font
+ * atlases rasterize at that factor, which is why the sync of a tree hands it to
+ * the font registry before the text pass of the frame reads it, and a tree that
+ * changes it is laid out again so its glyphs follow. The registry holds one
+ * factor, the one of the tree that was synced last, so two trees that disagree
+ * share the atlases of the one that was updated last.
+ *
+ * @param surface The surface of the world
+ * @param height Logical pixels the view of the tree shows vertically
+ * @return The factor, one when the surface says nothing about its pixels
+ */
+static float box_ui_view_device(
+    const Surface *surface,
+    float height)
+{
+    float result = 1.0f;
+    if (!surface || height <= 0) {
+        goto done;
+    }
+
+    float pixels = (float)surface->scaled_height;
+    if (pixels <= 0) {
+        pixels = (float)(surface->actual_height ?
+            surface->actual_height : surface->height);
+    }
+
+    if (pixels > 0) {
+        result = pixels / height;
+    }
+
+done:
+    return result;
+}
+
 void box_ui_sync(
     ecs_world_t *world,
     const Ui *ui,
@@ -202,6 +240,13 @@ void box_ui_sync(
         float scale = ui->scale > 0 ? ui->scale : BOX_UI_SCALE;
 
         height = point_h / scale;
+    }
+
+    UiFonts *fonts = box_ui_fonts(world);
+    float device = box_ui_view_device(surface, height);
+    if (fonts->device != device) {
+        fonts->device = device;
+        impl->relayout = true;
     }
 
     float width = point_h > 0 ? height * (point_w / point_h) : 0;
