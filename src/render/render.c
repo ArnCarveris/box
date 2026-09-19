@@ -45,8 +45,8 @@ static void box_render_state_dtor(
 
         ecs_vec_fini_t(NULL, &state[i].pending_textures, box_texture_cmd_t);
         ecs_vec_fini_t(NULL, &state[i].dead_textures, uint32_t);
-        for (j = 0; j < BOX_TEXTURE_CLASSES; j ++) {
-            ecs_vec_fini_t(NULL, &state[i].free_layers[j], uint32_t);
+        for (j = 0; j < BOX_TEXTURE_PAGES; j ++) {
+            ecs_vec_fini_t(NULL, &state[i].pages[j].free_layers, uint32_t);
         }
 
         ecs_vec_fini_t(NULL, &state[i].layers, box_layer_t);
@@ -183,9 +183,9 @@ void BoxRenderImport(
     ecs_vec_init_t(NULL, &state->pending_meshes, box_mesh_cmd_t, 0);
     ecs_vec_init_t(NULL, &state->pending_textures, box_texture_cmd_t, 0);
     ecs_vec_init_t(NULL, &state->dead_textures, uint32_t, 0);
-    int32_t cls;
-    for (cls = 0; cls < BOX_TEXTURE_CLASSES; cls ++) {
-        ecs_vec_init_t(NULL, &state->free_layers[cls], uint32_t, 0);
+    int32_t page;
+    for (page = 0; page < BOX_TEXTURE_PAGES; page ++) {
+        ecs_vec_init_t(NULL, &state->pages[page].free_layers, uint32_t, 0);
     }
 
     ecs_vec_init_t(NULL, &state->layers, box_layer_t, 0);

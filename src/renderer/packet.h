@@ -175,8 +175,14 @@
 /** Light type of a cone light */
 #define BOX_LIGHT_SPOT (1)
 
-/** Texture size classes, each a 2D array texture of one edge length */
+/** Texture size classes, each a list of array textures of one edge length */
 #define BOX_TEXTURE_CLASSES (4)
+
+/** Layers one page holds, the array layer limit WebGPU guarantees on a device */
+#define BOX_TEXTURE_PAGE_LAYERS (256)
+
+/** Pages the pager hands out, shared by the size classes and bound as one list */
+#define BOX_TEXTURE_PAGES (8)
 
 /** Edge length of the smallest texture size class */
 #define BOX_TEXTURE_MIN_SIZE (256)
@@ -220,8 +226,8 @@
 /** Bit the material layer mask of an instance starts at in its mode word */
 #define BOX_MODE_LAYER_SHIFT (16)
 
-/** Layers a size class can hold, the packed instance slot is sixteen bits wide */
-#define BOX_TEXTURE_LAYER_MAX (0x3FFF - 1)
+/** Highest layer a texture handle names, every page of the pager filled */
+#define BOX_TEXTURE_LAYER_MAX (BOX_TEXTURE_PAGES * BOX_TEXTURE_PAGE_LAYERS - 1)
 
 /** Per instance data as laid out in GPU instance buffers.
  *
@@ -580,6 +586,9 @@ static inline uint32_t box_texture_class(
 
 /** Array layer of a texture handle.
  *
+ * The layer counts across the pages of the pager, so its high bits are the page
+ * the layer lives in and its low bits the layer inside that page.
+ *
  * @param handle The handle
  * @return The layer inside its size class
  */
@@ -587,6 +596,28 @@ static inline uint32_t box_texture_layer(
     uint32_t handle)
 {
     return (handle & 0xFFFFFF) - 1;
+}
+
+/** Page of the pager a texture handle lives in.
+ *
+ * @param handle The handle
+ * @return The page
+ */
+static inline uint32_t box_texture_page(
+    uint32_t handle)
+{
+    return box_texture_layer(handle) / BOX_TEXTURE_PAGE_LAYERS;
+}
+
+/** Array layer a texture handle takes inside its page.
+ *
+ * @param handle The handle
+ * @return The layer inside the page
+ */
+static inline uint32_t box_texture_page_layer(
+    uint32_t handle)
+{
+    return box_texture_layer(handle) % BOX_TEXTURE_PAGE_LAYERS;
 }
 
 /** Mip levels of a square texture, down to a single texel.
@@ -631,7 +662,9 @@ static inline size_t box_texture_bytes(
 /** Write a texture handle into one of the packed texture slots of an instance.
  *
  * A slot holds the size class in its top two bits and the layer plus one below
- * them, so a slot of zero binds no texture and two slots fit in one word.
+ * them, so a slot of zero binds no texture and two slots fit in one word. The
+ * layer spans the pages of the size class: its high bits name the page and its
+ * low bits the layer inside it, which is what the shader splits it into.
  *
  * @param inst The instance
  * @param slot Slot index, 0 albedo, 1 emissive, 2 roughness and 3 normal

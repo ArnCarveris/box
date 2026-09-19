@@ -69,7 +69,7 @@
 #define BOX_ENV_BINDINGS (4)
 
 /** First binding of the scene copy in the shared fragment bind group */
-#define BOX_SCENE_BINDING (BOX_ENV_BINDINGS + BOX_TEXTURE_CLASSES * 2)
+#define BOX_SCENE_BINDING (BOX_ENV_BINDINGS + BOX_TEXTURE_PAGES + 1)
 
 /** Entries of the shared fragment bind group */
 #define BOX_MESH_BINDINGS (BOX_SCENE_BINDING + 2)
@@ -348,13 +348,15 @@ typedef struct box_gpu_mesh_t {
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
 
-/** The 2D array texture of one texture size class */
-typedef struct box_gpu_texclass_t {
-    WGPUTexture texture;   /**< Array texture holding every layer of the class */
+/** One page of the texture pager: a 2D array texture of one size class */
+typedef struct box_gpu_texpage_t {
+    WGPUTexture texture;   /**< Array texture holding the layers of the page */
     WGPUTextureView view;  /**< Array view the mesh shader samples */
-    WGPUSampler sampler;   /**< Sampler of the class, with the anisotropy setting */
+    uint32_t cls;          /**< Size class the page holds */
     uint32_t layers;       /**< Layers the array texture holds */
-} box_gpu_texclass_t;
+    uint64_t ready[BOX_TEXTURE_PAGE_LAYERS / 64]; /**< Layers holding an image or the fallback */
+    bool used;             /**< The page holds an array texture */
+} box_gpu_texpage_t;
 
 #ifdef BOX_PLATFORM_WEB
 /** Captures that can wait for their buffer map at the same time */
@@ -517,10 +519,13 @@ struct box_renderer_t {
     WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
     WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
     WGPUComputePipeline grid_pipeline; /**< Occupancy fill pass */
-    box_gpu_texclass_t texclass[BOX_TEXTURE_CLASSES]; /**< One array texture per size class */
-    WGPUTexture texture_dummy;       /**< Single texel array texture of an unused class */
+    box_gpu_texpage_t texpage[BOX_TEXTURE_PAGES]; /**< Array textures of the texture pager */
+    WGPUSampler texture_sampler;     /**< Sampler of every page, with the anisotropy setting */
+    uint64_t texture_layout;         /**< Hash of the page layout the bind group was built for */
+    uint32_t texture_max_layers;     /**< Layers a page may hold, queried from the device */
+    WGPUTexture texture_dummy;       /**< Single texel array texture of an unopened page */
     WGPUTextureView texture_dummy_view; /**< View of the single texel array texture */
-    bool texture_dirty;              /**< A class texture changed, the bind group is stale */
+    bool texture_limit_logged;       /**< The device layer limit was reported once */
     WGPUComputePipeline cull_pipeline; /**< Frustum culling pass */
     WGPUBindGroupLayout cull_layout; /**< Uniform, source, visible and argument layout */
     WGPUBuffer cull_uniform;         /**< Frustum and range of every dispatch of the frame */
@@ -1391,7 +1396,7 @@ void box_texture_init(
 
 /** Describe the texture half of the shared fragment bind group layout.
  *
- * @param out Entries to fill, BOX_TEXTURE_CLASSES times two of them
+ * @param out Entries to fill, one per page of the pager plus the sampler
  * @param base First binding of the texture half
  */
 void box_texture_bind_layout(
@@ -1401,7 +1406,7 @@ void box_texture_bind_layout(
 /** Fill the texture half of the shared fragment bind group.
  *
  * @param r The renderer
- * @param out Entries to fill, BOX_TEXTURE_CLASSES times two of them
+ * @param out Entries to fill, one per page of the pager plus the sampler
  * @param base First binding of the texture half
  */
 void box_texture_bind_group(
@@ -1409,7 +1414,7 @@ void box_texture_bind_group(
     WGPUBindGroupEntry *out,
     uint32_t base);
 
-/** Upload the textures of a packet, growing the array texture of their class.
+/** Upload the textures of a packet, growing the array texture of their page.
  *
  * @param r The renderer
  * @param p The packet

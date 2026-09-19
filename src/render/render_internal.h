@@ -68,14 +68,22 @@ typedef struct box_sort_key_t {
     float depth;    /**< View space depth of the instance origin */
 } box_sort_key_t;
 
+/** One page of the texture pager: the layers of one array texture of a class */
+typedef struct box_texture_page_t {
+    ecs_vec_t free_layers; /**< uint32_t layers of the page waiting for reuse */
+    uint32_t cls;          /**< Size class the page holds */
+    uint32_t count;        /**< Layers of the page handed out so far */
+    bool used;             /**< The page was opened for a size class */
+} box_texture_page_t;
+
 /** Module wide registry, stored as a singleton */
 typedef struct RenderState {
     ecs_vec_t batches;        /**< box_batch_t indexed by mesh handle */
     ecs_vec_t pending_meshes; /**< box_mesh_cmd_t waiting for the next packet */
     ecs_vec_t pending_textures; /**< box_texture_cmd_t waiting for the next packet */
     ecs_vec_t dead_textures;  /**< uint32_t texture handles waiting for the next packet */
-    ecs_vec_t free_layers[BOX_TEXTURE_CLASSES]; /**< uint32_t free layers per size class */
-    uint32_t layer_count[BOX_TEXTURE_CLASSES];  /**< Layers handed out per size class */
+    box_texture_page_t pages[BOX_TEXTURE_PAGES]; /**< Pages of the texture pager */
+    bool pages_full;          /**< The pager ran out of pages and logged it */
     bool textured;            /**< A texture handle was allocated, slots need resolving */
     bool tiled;               /**< A texture transform, tiling or wrap exists, uvs need deriving */
     bool blended;             /**< A blend or back face mode exists, so instances read them */
@@ -142,14 +150,15 @@ uint32_t box_render_mesh_create(
  * The pixel array holds the whole RGBA8 mip chain of a square texture and is
  * handed to the renderer, which frees it after the upload. Passing a handle of
  * a matching size class replaces the contents of that handle instead of
- * allocating a new one.
+ * allocating a new one. A world that ran out of pages logs one error, frees the
+ * pixels and hands back handle 0, which renders the material without a texture.
  *
  * @param world The world
  * @param handle Handle to replace, 0 to allocate a new one
  * @param size Edge length in pixels, the size of a texture class
  * @param pixels The mip chain, ownership moves to the renderer
  * @param srgb Pixels are display encoded
- * @return The texture handle
+ * @return The texture handle, 0 when the pager is out of pages
  */
 uint32_t box_render_texture_create(
     ecs_world_t *world,
