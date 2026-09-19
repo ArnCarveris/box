@@ -183,7 +183,10 @@ engine ships a small `Star` as the example (`custom_shape.flecs`).
 
 `box.sky` renders a physically based atmosphere from precomputed transmittance, multiple
 scattering and sky view tables as the view background and as the IBL source when the
-environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmosphere_sunset.flecs`).
+environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmosphere_sunset.flecs`),
+draws the sun disk, a phase correct moon and a star field (`celestial.flecs`), attenuates the sun
+light by the atmosphere, drives fog from the same tables (`sky_fog.flecs`), and `TimeOfDay` moves the
+sun, moon and stars by hour, date and latitude (`time_of_day_morning.flecs` and siblings).
 
 ## Tests
 

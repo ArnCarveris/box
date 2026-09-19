@@ -34,6 +34,7 @@ doc comment on every type and member.
 - During deletion the OnRemove destination table is the empty root table, not
   NULL; test `ecs_table_get_type(it->other_table)->count == 0`.
 - Never mutate entities while iterating `ecs_children`; collect them first.
+- A system that adds a component to an entity must do it through `it->stage`.
 - `ecs_os_malloc` needs `ecs_os_init()` (or a world) before use.
 
 ## Build environments
