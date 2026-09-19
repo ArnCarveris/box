@@ -294,6 +294,41 @@ ui {
 }
 ```
 
+`Text` draws a string in the tree. The same pass measures it, wraps it to the width its `Layout`
+gives it and sizes the element around the lines it holds, so a row or a column fits itself around
+a label without an authored size; `Text.align` moves the lines inside that box, `Text.line_height`
+sets the distance between two baselines and a newline in the value always breaks. `Font {path,
+size}` says which font file at which em size the element rasterizes with and is taken from the
+element, else from the nearest one above it in the tree, else from
+`etc/fonts/B612-Regular.ttf` at 16 px, which the framework installs with its `etc` folder. One
+atlas is rasterized per file and size with stb_truetype, shared by every element that asks for it
+and doubled in place when a glyph no longer fits, and the glyphs are emitted as ordinary children
+of the element, one textured quad each through the same 2D shape path as an `Image`, so text
+needs no pass of its own. `text.measure(element, value)` returns the size a string takes,
+`text.wrap(element, value, width)` returns it with a newline wherever it no longer fits and
+`text.label(parent, name, value)` makes or finds the named text element of a parent, so a widget
+is built from script alone. See `test/integration/visual/ui_text.flecs` and
+`test/integration/command/ui_text_script.flecs`:
+
+```
+panel {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Font: {size: 18}
+  Layout: {direction: Column, width: 600, padding: 16, spacing: 12, h: Center}
+
+  button {
+    Layout: {direction: Row, padding: 12, h: Center, v: Middle}
+    Border: {radius: 18}
+    Rgb: {110, 160, 235}
+
+    caption { Rgb: {16, 24, 40} }
+  }
+}
+
+const label = text.label(panel.button, "caption", "Save changes")
+```
+
 `box.checkpoint` writes the state of a running instance back into the scripts that loaded it.
 The `checkpoint [name]` command walks every managed script, substitutes the current values of
 the components of the entities that script owns into a copy of its source and writes it as

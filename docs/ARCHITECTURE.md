@@ -13,7 +13,7 @@ include/box/     one public header per module, reflected types via ECS_STRUCT
 src/<module>/    one directory per flecs module, C11, may include flecs.h
 src/renderer/    render thread, wgpu only, MUST NOT include flecs.h
 src/platform/    window, surface and OS events (GLFW native, HTML5 on wasm)
-etc/             engine assets (WGSL shaders), installed as <BAKE_HOME>/etc/box
+etc/             engine assets (WGSL shaders, the default font), installed as <BAKE_HOME>/etc/box
 apps/box_app/etc app assets (scenes, textures, svg, fonts), both embedded on wasm
 test/            bake test projects, one suite per module
 ```
@@ -47,7 +47,7 @@ Two hard rules keep the concerns apart:
 | `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
-| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass |
+| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers |
 | later | `box.particles`, `box.transition`, `box.lod`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
