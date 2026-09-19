@@ -451,3 +451,39 @@ void Text_content_sized_row_wraps_around_its_label(void)
     test_flt(ecs_get(w, root, Bounds)->height, label->height + 24 + 32);
     test_flt(ecs_get(w, root, Rect)->width, 600);
 }
+
+void Text_glyphs_composite_with_plain_alpha_in_the_ui_view(void)
+{
+    // ui/root_position
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 960;
+    packet.height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_get_mut(w, root, Ui)->height = 540;
+    ecs_modified(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("Hi")});
+    ecs_set(w, label, Rgb, {230, 230, 255});
+    box_ui_update(w);
+    box_render_extract(w, &packet);
+
+    test_int(packet.views.count, 2);
+    box_view_t *scene = box_vec_at(&packet.views, 0);
+    box_view_t *view = box_vec_at(&packet.views, 1);
+    test_uint(scene->plain_blend, 0);
+    test_uint(view->plain_blend, 1);
+    test_uint(view->translucent_count, 0);
+    test_assert(view->transparent_count > 0);
+
+    uint32_t i;
+    for (i = 0; i < view->transparent_count; i ++) {
+        box_transparent_t *draw = box_vec_at(&packet.transparent,
+            view->transparent_first + i);
+        test_uint(draw->blend, BOX_BLEND_ALPHA);
+    }
+
+    box_packet_fini(&packet);
+}

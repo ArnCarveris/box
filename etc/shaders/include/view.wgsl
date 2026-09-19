@@ -20,7 +20,7 @@ struct View {
   light_count: u32,
   env_generation: u32,
   layers_enabled: u32,
-  pad0: u32,
+  plain_blend: u32,
   pad1: u32,
   pad2: u32,
   shadow_matrix: array<mat4x4<f32>, SHADOW_CASCADE_MAX>,

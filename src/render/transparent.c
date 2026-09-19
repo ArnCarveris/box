@@ -310,7 +310,9 @@ void box_render_extract_transparent(
             box_instance_set_caster(&entry->data, false);
         }
 
-        if (entry->blend == BOX_BLEND_ALPHA || entry->blend == BOX_BLEND_PREMULTIPLIED) {
+        bool glass = entry->blend == BOX_BLEND_ALPHA ||
+            entry->blend == BOX_BLEND_PREMULTIPLIED;
+        if (glass && !v->plain_blend) {
             v->translucent_count ++;
         }
 

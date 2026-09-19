@@ -409,7 +409,8 @@ typedef struct box_view_t {
     uint32_t light_count;   /**< Lights of the view in the packet light array */
     uint32_t env_generation; /**< Changes when the extracted environment changes */
     uint32_t layers_enabled; /**< The view applies the registered material layers */
-    uint32_t pad[3];        /**< Padding to the 16 byte GPU stride */
+    uint32_t plain_blend;   /**< Blended fragments composite source over, without the glass model */
+    uint32_t pad[2];        /**< Padding to the 16 byte GPU stride */
     float shadow_matrix[BOX_SHADOW_CASCADE_MAX * 16]; /**< World to clip of every cascade */
     float shadow_split[4];  /**< View depth a cascade ends at, the last is the distance */
     float shadow_offset[4]; /**< World offset along the normal of a cascade, its texel size */

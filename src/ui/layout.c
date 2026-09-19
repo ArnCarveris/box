@@ -232,6 +232,11 @@ static void box_ui_pin(
 
 /** Give a node the position the layout worked out for it.
  *
+ * A node the layout did not move keeps the position it was authored with, and
+ * one that has none is given the origin of its parent, because the transform of
+ * a node is only written when its Position is set: a node without one keeps the
+ * zero matrix its WorldTransform was created with and its subtree collapses.
+ *
  * @param world The world
  * @param e The node
  * @param x X relative to the parent of the node
@@ -374,6 +379,8 @@ static void box_ui_arrange(
 
         if (placed) {
             box_ui_move(world, p->e, p->x - parent->x, p->y - parent->y);
+        } else {
+            box_ui_move(world, p->e, p->local_x, p->local_y);
         }
 
         if (p->has_layout) {

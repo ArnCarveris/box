@@ -270,7 +270,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   let is_baked = in.params.z > 0.5;
   let shadow = shadow_factor(in.world_pos, gn);
   var spec = vec3<f32>(0.0);
-  if (blend == 1u || blend == 2u) {
+  if ((blend == 1u || blend == 2u) && u.plain_blend == 0u) {
     spec = glass_specular(sn, v, l, s.albedo, metallic, roughness, sun, shadow);
   }
   var color = shade(sn, v, l, s.albedo, metallic, roughness) * sun * shadow +

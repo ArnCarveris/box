@@ -634,6 +634,7 @@ static void box_view_fill(
     bool sun = box_view_sun(world, state, v) && !ui;
     if (ui) {
         v->sun_intensity = 0;
+        v->plain_blend = 1;
     }
 
     box_render_extract_shadows(world, src->entity, sun, v);

@@ -21,6 +21,13 @@
  * cannot z fight. The bias is a fixed step per node toward the camera, which
  * leaves room for BOX_UI_NODE_MAX nodes in one tree.
  *
+ * A root needs no Position: a tree that has none sits at the origin of its
+ * view, because the layout pass gives every node of a tree the Position its
+ * place asks for and a node that was never moved the origin of its parent. A
+ * node only has a world transform once its Position is set, so a node without
+ * one would keep the zero matrix it was created with and take its subtree with
+ * it.
+ *
  * A tree is walked again when it is marked: setting Ui marks it, and so does
  * every change of the tree itself. Reordering the children of a node with
  * ecs_set_child_order() raises no event, so a tree that was reordered is marked
@@ -156,8 +163,14 @@ ECS_STRUCT(Font, {
  * sits one ascent below its top and the next ones follow at line_height. The
  * glyphs themselves are children of the element, drawn over it like every other
  * node of the tree, in the Rgb of the element, which the build hands them as
- * the emissive color of an alpha blended quad so a glyph composites over what
- * is behind it instead of being lit like a surface.
+ * the emissive color of an alpha blended quad so a glyph shows the color it was
+ * given whatever the view lights it with.
+ *
+ * A blended quad of a UI view composites plainly: the view hands the renderer
+ * the plain source over contribution of every alpha blended fragment instead of
+ * the glass model the rest of the engine draws a transparent surface with, so a
+ * glyph or an image lies over what is below it without refracting it and the
+ * view needs no copy of the scene behind it.
  */
 ECS_STRUCT(Text, {
     char *value;       /**< The string, UTF-8 */

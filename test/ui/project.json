@@ -23,7 +23,9 @@
                     "two_trees_get_their_own_view_and_layer",
                     "authored_view_is_bound_instead_of_a_new_one",
                     "removing_ui_deletes_the_view_it_created",
-                    "view_and_camera_are_not_nodes_of_the_tree"
+                    "view_and_camera_are_not_nodes_of_the_tree",
+                    "root_without_a_position_draws_its_children",
+                    "root_without_a_position_sits_at_the_origin"
                 ],
                 "setup": true,
                 "teardown": true
@@ -129,7 +131,8 @@
                     "glyphs_take_the_color_of_the_element",
                     "glyphs_composite_over_what_is_behind_them",
                     "rect_of_the_element_wraps_the_string",
-                    "content_sized_row_wraps_around_its_label"
+                    "content_sized_row_wraps_around_its_label",
+                    "glyphs_composite_with_plain_alpha_in_the_ui_view"
                 ],
                 "setup": true,
                 "teardown": true

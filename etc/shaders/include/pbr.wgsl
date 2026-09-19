@@ -58,12 +58,21 @@ fn glass_tint(albedo: vec3<f32>) -> vec3<f32> {
   return albedo / peak;
 }
 
+// A blended fragment is a pane of glass: it refracts what is behind it through
+// the copy of the scene, keeps its own specular where it is thin and turns
+// opaque as it roughens. A view that composites plainly, which is what a UI
+// view does, skips all of that and hands the blend the plain source over
+// contribution of the fragment, premultiplied by its coverage.
 fn resolve(color: vec3<f32>, spec: vec3<f32>, albedo: vec3<f32>, alpha: f32,
     frag: vec2<f32>, roughness: f32, n: vec3<f32>, v: vec3<f32>,
     blend: u32) -> vec4<f32> {
   var rgb = color;
   var a = alpha;
-  if (blend == 1u || blend == 2u) {
+  if ((blend == 1u || blend == 2u) && u.plain_blend != 0u) {
+    if (blend == 1u) {
+      rgb = rgb * a;
+    }
+  } else if (blend == 1u || blend == 2u) {
     let dims = vec2<f32>(textureDimensions(scene_tex, 0));
     let levels = f32(textureNumLevels(scene_tex)) - 1.0;
     let perceptual = sqrt(clamp(roughness, 0.0, 1.0));

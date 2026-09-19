@@ -224,3 +224,61 @@ void Tree_view_and_camera_are_not_nodes_of_the_tree(void)
     test_assert(!ecs_has(w, impl->camera, UiNode));
     test_int(impl->count, 1);
 }
+
+void Tree_root_without_a_position_draws_its_children(void)
+{
+    // ui/root_position
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 960;
+    packet.height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Rect, {200, 100});
+    ecs_set(w, panel, Rgb, {200, 40, 40});
+    box_ui_update(w);
+    box_render_extract(w, &packet);
+
+    const RenderInstance *inst = ecs_get(w, panel, RenderInstance);
+    test_assert(inst != NULL);
+
+    bool seen = false;
+    uint32_t i;
+    for (i = 0; i < packet.static_updates.count; i ++) {
+        box_static_update_t *update = box_vec_at(&packet.static_updates, i);
+        if (update->slot == inst->slot && update->mesh == inst->mesh) {
+            test_flt(update->data.transform[0], 200.0f);
+            test_flt(update->data.transform[5], 100.0f);
+            test_flt(update->data.transform[3], 0);
+            test_flt(update->data.transform[7], 0);
+            seen = true;
+        }
+    }
+
+    test_bool(seen, true);
+    box_packet_fini(&packet);
+}
+
+void Tree_root_without_a_position_sits_at_the_origin(void)
+{
+    // ui/root_position
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Rect, {200, 100});
+    box_ui_update(w);
+
+    const WorldTransform *wt = ecs_get(w, root, WorldTransform);
+    test_assert(wt != NULL);
+    test_flt(wt->m.v[12], 0);
+    test_flt(wt->m.v[13], 0);
+    test_flt(wt->m.v[14], 0);
+    test_flt(wt->m.v[0], 1.0f);
+
+    const Bounds *b = ecs_get(w, panel, Bounds);
+    test_assert(b != NULL);
+    test_flt(b->x, 0);
+    test_flt(b->y, 0);
+}
