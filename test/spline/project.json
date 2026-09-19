@@ -1,0 +1,77 @@
+{
+    "id": "spline",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for spline evaluation, arc length and the cached table",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Eval",
+                "testcases": [
+                    "linear_endpoints",
+                    "linear_midpoint",
+                    "linear_tangent_and_normal",
+                    "catmull_passes_through_its_points",
+                    "catmull_midpoint_matches_the_analytic_value",
+                    "catmull_of_collinear_points_is_a_line",
+                    "bezier_endpoints",
+                    "bezier_midpoint_matches_the_analytic_value",
+                    "normal_is_perpendicular_to_a_vertical_tangent",
+                    "tension_changes_the_curve",
+                    "parameter_clamps_outside_the_range",
+                    "loop_wraps_the_parameter"
+                ]
+            },
+            {
+                "id": "ArcLength",
+                "testcases": [
+                    "length_of_a_straight_line",
+                    "length_of_a_square_loop",
+                    "length_of_a_collinear_catmull_curve",
+                    "point_at_a_distance",
+                    "distance_of_a_parameter",
+                    "parameter_of_a_distance_round_trips",
+                    "distance_past_the_end_clamps",
+                    "loop_wraps_the_distance",
+                    "even_steps_along_a_curve"
+                ]
+            },
+            {
+                "id": "Cache",
+                "testcases": [
+                    "info_is_written_on_set",
+                    "table_is_rebuilt_when_the_points_change",
+                    "table_is_rebuilt_when_the_type_changes",
+                    "table_is_removed_with_the_spline",
+                    "instance_gets_its_own_table",
+                    "deleting_the_curve_removes_it"
+                ]
+            },
+            {
+                "id": "Degenerate",
+                "testcases": [
+                    "no_points",
+                    "a_single_point",
+                    "two_identical_points",
+                    "a_bezier_without_a_full_segment",
+                    "a_loop_of_two_points",
+                    "sampling_an_entity_without_a_spline"
+                ]
+            },
+            {
+                "id": "Script",
+                "testcases": [
+                    "points_from_a_script",
+                    "position_function",
+                    "point_at_function",
+                    "length_function"
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,31 @@
+{
+    "id": "bench_spline",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for spline sampling and the arc length table",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Sample",
+                "benchcases": [
+                    "catmull_by_parameter",
+                    "linear_by_parameter",
+                    "bezier_by_parameter",
+                    "catmull_by_distance"
+                ]
+            },
+            {
+                "id": "Table",
+                "benchcases": [
+                    "build_64_segments",
+                    "rebuild_on_set"
+                ]
+            }
+        ]
+    }
+}
