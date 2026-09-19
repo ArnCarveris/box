@@ -280,6 +280,7 @@ The framework shall have a sky rendering system:
     - Fog
     - Rain
     - Synchronizes with atmosphere
+- Lights shall accept modulator plugins: a project authored WGSL function on a `Shader` entity, referenced from the light with its parameters as an ordinary component, that scales the direct light per shaded point; cloud shadows and caustics ship as the first plugins and a project can author its own without engine changes
 
 ## Materials:
 The material system shall support:
