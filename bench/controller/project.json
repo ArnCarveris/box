@@ -19,7 +19,8 @@
             {
                 "id": "Person",
                 "benchcases": [
-                    "update_100_characters"
+                    "update_100_characters",
+                    "walk_through_1m_colliders"
                 ]
             }
         ]

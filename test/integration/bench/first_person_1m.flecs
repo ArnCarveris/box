@@ -1,0 +1,67 @@
+// A million nested collision objects the first person controller walks through.
+// Every cluster is a template instance, which the collision module makes a root:
+// one drawn tower and twenty collider boxes under it. The player walks the lane
+// between two columns of clusters with a Velocity, because the benchmark app has
+// no way to hold a key down.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+using box.script
+using box.controller
+
+$ { ScriptSettings: {enabled: false} }
+
+$ { EnvironmentLight: {sky_color: {110, 130, 170}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+template Cluster {
+  prop x: f32 = 0
+  prop z: f32 = 0
+  prop tint: f32 = 0
+
+  tower {
+    Position: {0, 1, 0}
+    Box: {2.4, 2, 2.4}
+    Rgb: {120 + tint, 150 - tint, 210 - tint}
+    PbrMaterial: {roughness: 0.7}
+  }
+
+  for j in 0..20 {
+    _ {
+      AABB: {
+        min: {x + (j % 5) * 0.6 - 1.45, (j / 5) * 0.6 - 0.25, z - 0.25}
+        max: {x + (j % 5) * 0.6 - 0.95, (j / 5) * 0.6 + 0.25, z + 0.25}
+      }
+    }
+  }
+}
+
+ground {
+  Position: {440, -0.25, 440}
+  Box: {940, 0.5, 940}
+  Rgb: {70, 74, 82}
+  PbrMaterial: {roughness: 0.9}
+}
+
+clusters {
+  for i in 0..50000 {
+    _ {
+      Position: {(i % 224) * 4, 0, (i / 224) * 4}
+      Cluster: {x: (i % 224) * 4, z: (i / 224) * 4, tint: (i * 17) % 60}
+    }
+  }
+}
+
+player {
+  Position: {2, 1.7, 0}
+  FirstPersonController: {}
+  Velocity: {0, 0, 10}
+  Camera: {fov: 65}
+}
