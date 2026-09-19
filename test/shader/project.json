@@ -32,6 +32,19 @@
                 "teardown": true
             },
             {
+                "id": "Path",
+                "testcases": [
+                    "bake_home_holds_the_engine_shaders",
+                    "source_tree_answers_when_the_bake_home_is_empty",
+                    "global_bake_home_is_used_without_the_variable",
+                    "working_directory_is_searched_before_the_bake_home",
+                    "app_file_overrides_an_engine_include",
+                    "engine_include_is_used_when_the_app_has_none"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Shader",
                 "testcases": [
                     "builtin_shaders_are_entities_under_builtin",
