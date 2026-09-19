@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:20.464+00:00",
   "start_time": "2026-09-19T05:23:46.775+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T05:57:01.044+00:00",
   "dependencies": [
     "controllers/first_person",
     "collision/spatial_index"

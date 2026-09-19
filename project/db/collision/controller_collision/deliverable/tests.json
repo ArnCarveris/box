@@ -1,0 +1,831 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T05:56:05Z",
+  "pass": 115,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.231884,
+  "tests": [
+    {
+      "suite": "Camera",
+      "case": "the_module_binds_the_movement_actions",
+      "status": "pass",
+      "elapsed": 0.02275,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "forward_moves_along_the_view",
+      "status": "pass",
+      "elapsed": 0.023306,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "back_moves_against_the_view",
+      "status": "pass",
+      "elapsed": 0.022948,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "strafing_moves_sideways",
+      "status": "pass",
+      "elapsed": 0.023101,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "up_and_down_move_the_height",
+      "status": "pass",
+      "elapsed": 0.023043,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_fast_modifier_multiplies_the_speed",
+      "status": "pass",
+      "elapsed": 0.023025,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_mouse_turns_the_camera_while_captured",
+      "status": "pass",
+      "elapsed": 0.022916,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_mouse_is_ignored_without_capture",
+      "status": "pass",
+      "elapsed": 0.022856,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_look_action_turns_without_capture",
+      "status": "pass",
+      "elapsed": 0.021433,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "sensitivity_scales_the_turn",
+      "status": "pass",
+      "elapsed": 0.021495,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "pitch_stops_short_of_straight_down",
+      "status": "pass",
+      "elapsed": 0.020759,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "yaw_turns_the_movement_with_the_view",
+      "status": "pass",
+      "elapsed": 0.021447,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "clearance_keeps_the_camera_above_the_terrain",
+      "status": "pass",
+      "elapsed": 0.021416,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "a_scene_rebinds_an_action",
+      "status": "pass",
+      "elapsed": 0.021346,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "the_controller_writes_orientation_and_lookat",
+      "status": "pass",
+      "elapsed": 0.020603,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "collision_keeps_the_camera_out_of_geometry",
+      "status": "pass",
+      "elapsed": 0.021521,
+      "project": "controller"
+    },
+    {
+      "suite": "Camera",
+      "case": "disabling_collision_flies_through_geometry",
+      "status": "pass",
+      "elapsed": 0.021017,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_module_binds_the_character_actions",
+      "status": "pass",
+      "elapsed": 0.020326,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_character_stands_at_eye_height",
+      "status": "pass",
+      "elapsed": 0.019725,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "gravity_pulls_the_character_down",
+      "status": "pass",
+      "elapsed": 0.020923,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "walking_moves_in_the_view_plane",
+      "status": "pass",
+      "elapsed": 0.019895,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "running_is_faster_than_walking",
+      "status": "pass",
+      "elapsed": 0.021182,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_jump_rises_and_lands",
+      "status": "pass",
+      "elapsed": 0.020657,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_jump_needs_the_ground",
+      "status": "pass",
+      "elapsed": 0.019775,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "crouching_lowers_the_eye",
+      "status": "pass",
+      "elapsed": 0.021021,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_fly_toggle_switches_to_free_flight",
+      "status": "pass",
+      "elapsed": 0.022583,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_terrain_sets_the_ground",
+      "status": "pass",
+      "elapsed": 0.020583,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_ground_height_holds_the_character",
+      "status": "pass",
+      "elapsed": 0.020219,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "the_controller_writes_orientation_and_lookat",
+      "status": "pass",
+      "elapsed": 0.020142,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_wall_stops_the_character",
+      "status": "pass",
+      "elapsed": 0.020487,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "walking_into_a_wall_slides_along_it",
+      "status": "pass",
+      "elapsed": 0.020328,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "a_step_up_climbs_a_small_ledge",
+      "status": "pass",
+      "elapsed": 0.019785,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "standing_on_geometry_holds_the_character",
+      "status": "pass",
+      "elapsed": 0.020712,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "falling_off_geometry_lands_on_the_ground",
+      "status": "pass",
+      "elapsed": 0.021019,
+      "project": "controller"
+    },
+    {
+      "suite": "Person",
+      "case": "disabling_collision_walks_through_geometry",
+      "status": "pass",
+      "elapsed": 0.01984,
+      "project": "controller"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.018622,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_is_not_a_root",
+      "status": "pass",
+      "elapsed": 0.018515,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "template_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.019563,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "manual_root_aggregates",
+      "status": "pass",
+      "elapsed": 0.018463,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "empty_root_has_no_bounds",
+      "status": "pass",
+      "elapsed": 0.018487,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_children",
+      "status": "pass",
+      "elapsed": 0.018562,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_deep_hierarchy",
+      "status": "pass",
+      "elapsed": 0.018976,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_parent_storage",
+      "status": "pass",
+      "elapsed": 0.018564,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "own_bounds_are_included",
+      "status": "pass",
+      "elapsed": 0.013709,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_added_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.013566,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_removed_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.013872,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_moved_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.013761,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_out_of_root",
+      "status": "pass",
+      "elapsed": 0.013611,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_into_other_root",
+      "status": "pass",
+      "elapsed": 0.014145,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "nested_root_counts_once",
+      "status": "pass",
+      "elapsed": 0.013596,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "local_bounds_are_root_space",
+      "status": "pass",
+      "elapsed": 0.012946,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_move_transforms_local_bounds",
+      "status": "pass",
+      "elapsed": 0.011936,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_child_change_reaggregates",
+      "status": "pass",
+      "elapsed": 0.011805,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "non_rigid_root_reaggregates_on_move",
+      "status": "pass",
+      "elapsed": 0.011798,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "deleted_root_is_forgotten",
+      "status": "pass",
+      "elapsed": 0.011728,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_shape_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.027263,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "ico_sphere_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.026855,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_shape_derives_box",
+      "status": "pass",
+      "elapsed": 0.026786,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rounded_box_derives_box",
+      "status": "pass",
+      "elapsed": 0.02659,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_shape_derives_capsule",
+      "status": "pass",
+      "elapsed": 0.024807,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "other_shape_derives_aabb",
+      "status": "pass",
+      "elapsed": 0.025283,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "bounds_without_shape_give_aabb",
+      "status": "pass",
+      "elapsed": 0.010525,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "empty_bounds_give_no_collider",
+      "status": "pass",
+      "elapsed": 0.010439,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "no_collider_opts_out",
+      "status": "pass",
+      "elapsed": 0.010246,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "removing_no_collider_restores",
+      "status": "pass",
+      "elapsed": 0.010245,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "adding_no_collider_removes",
+      "status": "pass",
+      "elapsed": 0.010654,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.025387,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.0258,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.025871,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_sphere",
+      "status": "pass",
+      "elapsed": 0.010205,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_box",
+      "status": "pass",
+      "elapsed": 0.01036,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_capsule",
+      "status": "pass",
+      "elapsed": 0.009833,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rotation_turns_box_axes",
+      "status": "pass",
+      "elapsed": 0.010106,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "move_updates_collider",
+      "status": "pass",
+      "elapsed": 0.009759,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "shape_change_updates_collider",
+      "status": "pass",
+      "elapsed": 0.02505,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_sphere",
+      "status": "pass",
+      "elapsed": 0.003759,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_sphere",
+      "status": "pass",
+      "elapsed": 0.004215,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_respects_max_distance",
+      "status": "pass",
+      "elapsed": 0.003831,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_box",
+      "status": "pass",
+      "elapsed": 0.00358,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_rotated_box",
+      "status": "pass",
+      "elapsed": 0.003762,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_box",
+      "status": "pass",
+      "elapsed": 0.004087,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_aabb",
+      "status": "pass",
+      "elapsed": 0.004297,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_side",
+      "status": "pass",
+      "elapsed": 0.004063,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_cap",
+      "status": "pass",
+      "elapsed": 0.003739,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_capsule",
+      "status": "pass",
+      "elapsed": 0.004064,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.003686,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.003871,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_rotated_box",
+      "status": "pass",
+      "elapsed": 0.004035,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.00397,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.004078,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.003886,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.003701,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.003712,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.003804,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "bounds_of_collider",
+      "status": "pass",
+      "elapsed": 0.003668,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_finds_collider",
+      "status": "pass",
+      "elapsed": 0.009854,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_misses_far_collider",
+      "status": "pass",
+      "elapsed": 0.010226,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "aabb_finds_collider",
+      "status": "pass",
+      "elapsed": 0.010054,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_finds_nearest",
+      "status": "pass",
+      "elapsed": 0.009706,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_misses",
+      "status": "pass",
+      "elapsed": 0.009909,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "frustum_finds_inside",
+      "status": "pass",
+      "elapsed": 0.009644,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "insert_after_update",
+      "status": "pass",
+      "elapsed": 0.009789,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "remove_drops_from_index",
+      "status": "pass",
+      "elapsed": 0.009861,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "no_collider_not_in_index",
+      "status": "pass",
+      "elapsed": 0.010105,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "move_updates_index",
+      "status": "pass",
+      "elapsed": 0.009688,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "root_groups_children",
+      "status": "pass",
+      "elapsed": 0.00998,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "nested_root_found",
+      "status": "pass",
+      "elapsed": 0.009677,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_found",
+      "status": "pass",
+      "elapsed": 0.010013,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_moves_each_frame",
+      "status": "pass",
+      "elapsed": 0.01,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "disabled_index_finds_nothing",
+      "status": "pass",
+      "elapsed": 0.009571,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_sphere_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.012591,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_aabb_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.012354,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_ray_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.012356,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_frustum_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.0125,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "many_inserts_and_removes",
+      "status": "pass",
+      "elapsed": 0.013723,
+      "project": "collision"
+    }
+  ],
+  "projects": [
+    {
+      "project": "collision",
+      "pass": 80,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.125847
+    },
+    {
+      "project": "controller",
+      "pass": 35,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.106037
+    }
+  ]
+}
