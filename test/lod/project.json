@@ -101,6 +101,42 @@
                     "a_hovering_camera_holds_its_level",
                     "an_orthographic_zoom_never_oscillates"
                 ]
+            },
+            {
+                "id": "Merge",
+                "testcases": [
+                    "one_mesh_lands_in_world_space",
+                    "two_meshes_join_one_group",
+                    "materials_split_into_groups",
+                    "a_material_gathers_every_source",
+                    "welding_joins_a_shared_edge",
+                    "an_unwelded_seam_keeps_both_vertices",
+                    "identical_vertices_are_shared",
+                    "a_mesh_without_normals_gets_them",
+                    "missing_uvs_and_colors_get_defaults",
+                    "uvs_and_colors_are_kept",
+                    "the_bounds_cover_every_source",
+                    "an_empty_subtree_merges_to_nothing",
+                    "an_index_outside_the_mesh_is_dropped",
+                    "a_degenerate_triangle_is_dropped",
+                    "a_source_without_vertices_is_skipped",
+                    "the_same_input_merges_the_same_mesh"
+                ]
+            },
+            {
+                "id": "Simplify",
+                "testcases": [
+                    "a_flat_grid_loses_triangles",
+                    "the_ratio_caps_the_triangles",
+                    "a_ratio_of_one_keeps_the_mesh",
+                    "the_error_bound_limits_the_loss",
+                    "the_error_is_measured_in_world_units",
+                    "a_group_keeps_its_own_triangles",
+                    "unused_vertices_are_dropped",
+                    "the_same_mesh_simplifies_the_same_way",
+                    "an_empty_mesh_has_nothing_to_lose",
+                    "a_single_triangle_survives"
+                ]
             }
         ]
     }
