@@ -153,10 +153,14 @@ and drags through them.
 `CameraController` from `box.controller` flies a camera with the `Forward`, `Back`, `Left`,
 `Right`, `Up`, `Down`, `Fast` and `Look` actions the module binds to WASD, QE, shift and the
 right mouse button under `box.input.map`; it writes `Position`, `Orientation` and `LookAt`,
-turns with the cursor while the surface captures it, and keeps `clearance` above the bounds of
-its `terrain` entity. `FirstPersonController` walks the same actions in the XZ plane with a walk
-and a run speed, falls with gravity, jumps with `Jump`, lowers its eye with `Crouch` and toggles
-free flight with `Fly`; `test/integration/visual/first_person.flecs` stands it in a small level.
+turns with the cursor while the surface captures it, and pushes its sphere of `radius` out of
+the scene through `box_collision_move` (`no_collision` disables it, `terrain` stays a fallback
+floor). `FirstPersonController` walks the same actions in the XZ plane with a walk and a run
+speed, falls with gravity, jumps with `Jump`, lowers its eye with `Crouch` and toggles free
+flight with `Fly`; its capsule of `radius` slides along walls, climbs ledges up to `step` and
+stands on any collider (`foot` reports the ground). `test/integration/visual/first_person.flecs`
+stands it in a small level and `controller_collision.flecs` walks it into walls and steps;
+`test/integration/bench/first_person_1m.flecs` walks it through a million colliders.
 
 `JobSettings` sizes the worker pool that runs large tasks off the main thread and
 caps the milliseconds their completions may take in PreUpdate, which is how SVG
