@@ -162,7 +162,7 @@ void box_frame_resources(
 {
     box_vec_init(&r->meshes, sizeof(box_gpu_mesh_t));
     box_vec_init(&r->static_staging, sizeof(box_instance_t));
-    box_vec_init(&r->transitions, sizeof(box_transition_entry_t));
+    box_transition_pool_init(&r->transitions, sizeof(box_instance_t));
     box_vec_init(&r->views, sizeof(box_gpu_view_t));
     box_vec_init(&r->targets, sizeof(box_gpu_target_t));
 }

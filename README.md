@@ -237,12 +237,15 @@ well; with member entities the map keys a single member, as in
 drives it, so a scene without transitions pays nothing. A static entity uploads its transition
 once, on the frame it starts, and the renderer thread computes the value of every later frame from
 that record and reports the transition back when it ends, so the main thread does nothing per
-frame while a transition runs and a transitioning entity never becomes dynamic. Adding
+frame while a transition runs and a transitioning entity never becomes dynamic. The renderer
+holds the records that are still moving in one array per channel instead of next to their
+instance, so a frame interpolates them as seven passes over contiguous memory with no branch per
+record, and a scene in its steady state allocates on neither side. Adding
 `(TransitionValue, Component)` to an entity asks the engine to keep the interpolated value of that
 component there for scripts to read. `test/integration/visual/transitions.flecs` captures a
 position, a color, a scale and an emission halfway through their transitions, and
 `test/integration/bench/transitions_10k.flecs` runs ten thousand entities with ten transitions
-each.
+each, staggered over a second by their delay and restarted by the churn of the benchmark app.
 
 `box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and

@@ -429,7 +429,7 @@ void box_scene_fini(
 
     box_vec_fini(&r->meshes);
     box_vec_fini(&r->static_staging);
-    box_vec_fini(&r->transitions);
+    box_transition_pool_fini(&r->transitions);
     if (r->dynamics) wgpuBufferRelease(r->dynamics);
     r->dynamics = NULL;
     r->dynamic_capacity = 0;

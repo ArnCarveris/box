@@ -63,6 +63,18 @@
         ],
         "setup": true,
         "teardown": true
+      },
+      {
+        "id": "Scale",
+        "testcases": [
+          "packet_of_the_scene_stays_within_its_budget",
+          "steady_state_does_not_allocate",
+          "steady_state_evaluation_reuses_its_arrays",
+          "lanes_hold_what_the_single_instance_fill_computes",
+          "staggered_scene_spreads_the_starts_over_the_second"
+        ],
+        "setup": true,
+        "teardown": true
       }
     ]
   }

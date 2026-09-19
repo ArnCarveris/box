@@ -22,7 +22,10 @@
         "id": "Eval",
         "benchcases": [
           "eval_100k_records",
-          "fill_10k_instances"
+          "fill_10k_instances",
+          "pool_10k_instances",
+          "pool_restart_167_of_10k",
+          "pool_eval_60k_records"
         ]
       }
     ]

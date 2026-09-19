@@ -2,11 +2,12 @@
  * @file renderer/transition.c
  * @brief Evaluates the transitions of the static instances on the renderer thread.
  *
- * An instance whose values a transition moves keeps a record next to its slot.
- * Every frame the records are interpolated at the time of the packet and the
- * channels they touch are composed into the instance again, which is the only
- * work a running transition costs; the game side uploads the record once and
- * hears about the end of it through the packet it gets back.
+ * An instance whose values a transition moves keeps an entry in the pool and
+ * one record per channel in the lane of that channel. Every frame each lane is
+ * interpolated in one pass over its own arrays and the channels the entry
+ * moves are composed into the instance again, which is the only work a running
+ * transition costs; the game side uploads the record once and hears about the
+ * end of it through the packet it gets back.
  */
 
 #include "renderer_internal.h"
@@ -166,6 +167,34 @@ static void box_transition_emissive(
     out->emissive[3] = strength;
 }
 
+/** Write the channels a set of records moved into the instance.
+ *
+ * @param cmd The transitions of the instance
+ * @param values The displayed values of every channel
+ * @param moved Bit per channel a record moves
+ * @param out The instance data, its other fields are left alone
+ */
+static void box_transition_compose(
+    const box_transition_cmd_t *cmd,
+    const float values[BOX_DISPLAY_CHANNELS][BOX_DISPLAY_FLOATS],
+    uint32_t moved,
+    box_instance_t *out)
+{
+    if (cmd->posed) {
+        box_transition_transform(cmd, values, out);
+    }
+
+    uint32_t color = (1u << BOX_DISPLAY_RGB) | (1u << BOX_DISPLAY_TINT) |
+        (1u << BOX_DISPLAY_OPACITY);
+    if (moved & color) {
+        box_transition_color(cmd, values, out);
+    }
+
+    if (moved & (1u << BOX_DISPLAY_EMISSIVE)) {
+        box_transition_emissive(cmd, values, out);
+    }
+}
+
 bool box_transition_fill(
     const box_transition_cmd_t *cmd,
     const box_transition_rec_t *records,
@@ -184,7 +213,8 @@ bool box_transition_fill(
         float displayed[BOX_DISPLAY_FLOATS];
 
         running |= box_transition_lerp(rec->start, rec->delay, rec->duration,
-            rec->timing, rec->from, rec->to, (int32_t)rec->count, time, displayed);
+            box_transition_rate(rec->duration), rec->timing, rec->from, rec->to,
+            (int32_t)rec->count, time, displayed);
 
         uint32_t j;
         for (j = 0; j < rec->count; j ++) {
@@ -194,21 +224,275 @@ bool box_transition_fill(
         moved |= 1u << rec->channel;
     }
 
-    if (cmd->posed) {
-        box_transition_transform(cmd, values, out);
-    }
-
-    uint32_t color = (1u << BOX_DISPLAY_RGB) | (1u << BOX_DISPLAY_TINT) |
-        (1u << BOX_DISPLAY_OPACITY);
-    if (moved & color) {
-        box_transition_color(cmd, values, out);
-    }
-
-    if (moved & (1u << BOX_DISPLAY_EMISSIVE)) {
-        box_transition_emissive(cmd, values, out);
-    }
+    box_transition_compose(cmd, values, moved, out);
 
     return running;
+}
+
+void box_transition_pool_init(
+    box_transition_pool_t *pool,
+    uint32_t base_size)
+{
+    box_vec_init(&pool->entries, (uint32_t)sizeof(box_transition_entry_t));
+    box_vec_init(&pool->bases, base_size);
+
+    uint32_t channel;
+    for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+        box_vec_init(&pool->lanes[channel].times, (uint32_t)sizeof(box_transition_time_t));
+        box_vec_init(&pool->lanes[channel].spans, (uint32_t)sizeof(box_transition_span_t));
+        box_vec_init(&pool->lanes[channel].outs, (uint32_t)sizeof(box_transition_out_t));
+    }
+}
+
+void box_transition_pool_fini(
+    box_transition_pool_t *pool)
+{
+    box_vec_fini(&pool->entries);
+    box_vec_fini(&pool->bases);
+
+    uint32_t channel;
+    for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+        box_vec_fini(&pool->lanes[channel].times);
+        box_vec_fini(&pool->lanes[channel].spans);
+        box_vec_fini(&pool->lanes[channel].outs);
+    }
+}
+
+box_transition_entry_t* box_transition_pool_entry(
+    const box_transition_pool_t *pool,
+    uint32_t index)
+{
+    return box_vec_at(&pool->entries, index);
+}
+
+void* box_transition_pool_base(
+    const box_transition_pool_t *pool,
+    uint32_t index)
+{
+    return box_vec_at(&pool->bases, index);
+}
+
+/** Drop one record of a lane and move the last one into the hole.
+ *
+ * @param pool The pool
+ * @param channel The channel of the lane
+ * @param index Index of the record in the lane
+ */
+static void box_transition_lane_remove(
+    box_transition_pool_t *pool,
+    uint32_t channel,
+    uint32_t index)
+{
+    box_transition_lane_t *lane = &pool->lanes[channel];
+    uint32_t last = lane->times.count - 1;
+    if (index != last) {
+        box_transition_time_t *time = box_vec_at(&lane->times, last);
+        box_transition_entry_t *entry = box_vec_at(&pool->entries, time->owner);
+
+        *(box_transition_time_t*)box_vec_at(&lane->times, index) = *time;
+        *(box_transition_span_t*)box_vec_at(&lane->spans, index) =
+            *(box_transition_span_t*)box_vec_at(&lane->spans, last);
+        *(box_transition_out_t*)box_vec_at(&lane->outs, index) =
+            *(box_transition_out_t*)box_vec_at(&lane->outs, last);
+        entry->lane[channel] = index;
+    }
+
+    lane->times.count = last;
+    lane->spans.count = last;
+    lane->outs.count = last;
+}
+
+/** Drop every record of an entry from the lanes it sits in.
+ *
+ * @param pool The pool
+ * @param entry The entry
+ */
+static void box_transition_lanes_clear(
+    box_transition_pool_t *pool,
+    box_transition_entry_t *entry)
+{
+    uint32_t channel;
+    for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+        if (entry->lane[channel] == BOX_TRANSITION_NONE) {
+            continue;
+        }
+
+        box_transition_lane_remove(pool, channel, entry->lane[channel]);
+        entry->lane[channel] = BOX_TRANSITION_NONE;
+    }
+}
+
+/** Append one record of a command to the lane of its channel.
+ *
+ * Both ends of the record are widened to the whole channel, so the pass over
+ * the lane interpolates the same four floats for every record it holds.
+ *
+ * @param pool The pool
+ * @param owner Index of the entry the record belongs to
+ * @param entry The entry the record belongs to
+ * @param rec The record
+ */
+static void box_transition_lane_push(
+    box_transition_pool_t *pool,
+    uint32_t owner,
+    box_transition_entry_t *entry,
+    const box_transition_rec_t *rec)
+{
+    uint32_t channel = rec->channel;
+    if (channel >= BOX_DISPLAY_CHANNELS || entry->lane[channel] != BOX_TRANSITION_NONE) {
+        goto done;
+    }
+
+    box_transition_lane_t *lane = &pool->lanes[channel];
+    box_transition_time_t *time = box_vec_push(&lane->times);
+    box_transition_span_t *span = box_vec_push(&lane->spans);
+    box_transition_out_t *out = box_vec_push(&lane->outs);
+
+    time->start = rec->start;
+    time->rate = box_transition_rate(rec->duration);
+    time->delay = rec->delay;
+    time->duration = rec->duration;
+    time->timing = rec->timing;
+    time->owner = owner;
+
+    uint32_t i;
+    for (i = 0; i < BOX_DISPLAY_FLOATS; i ++) {
+        span->from[i] = entry->cmd.values[channel][i];
+        span->to[i] = entry->cmd.values[channel][i];
+        out->value[i] = entry->cmd.values[channel][i];
+    }
+
+    for (i = 0; i < rec->count && (rec->first + i) < BOX_DISPLAY_FLOATS; i ++) {
+        span->from[rec->first + i] = rec->from[i];
+        span->to[rec->first + i] = rec->to[i];
+    }
+
+    entry->lane[channel] = lane->times.count - 1;
+    entry->moved |= 1u << channel;
+    entry->running |= 1u << channel;
+done:
+    return;
+}
+
+uint32_t box_transition_pool_start(
+    box_transition_pool_t *pool,
+    uint32_t index,
+    const box_transition_cmd_t *cmd,
+    const box_transition_rec_t *records,
+    const void *base)
+{
+    box_transition_entry_t *entry;
+    if (index == BOX_TRANSITION_NONE) {
+        index = pool->entries.count;
+        entry = box_vec_push(&pool->entries);
+        box_vec_push(&pool->bases);
+
+        uint32_t channel;
+        for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+            entry->lane[channel] = BOX_TRANSITION_NONE;
+        }
+    } else {
+        entry = box_vec_at(&pool->entries, index);
+        box_transition_lanes_clear(pool, entry);
+    }
+
+    uint32_t count = cmd->count > BOX_DISPLAY_CHANNELS ? BOX_DISPLAY_CHANNELS : cmd->count;
+
+    entry->cmd = *cmd;
+    entry->cmd.first = 0;
+    entry->cmd.count = count;
+    entry->moved = 0;
+    entry->running = 0;
+    memcpy(box_vec_at(&pool->bases, index), base, pool->bases.size);
+
+    uint32_t i;
+    for (i = 0; i < count; i ++) {
+        box_transition_lane_push(pool, index, entry, &records[i]);
+    }
+
+    return index;
+}
+
+void box_transition_pool_stop(
+    box_transition_pool_t *pool,
+    uint32_t index)
+{
+    box_transition_entry_t *entry = box_vec_at(&pool->entries, index);
+    uint32_t last = pool->entries.count - 1;
+
+    box_transition_lanes_clear(pool, entry);
+    if (index != last) {
+        box_transition_entry_t *moved = box_vec_at(&pool->entries, last);
+        uint32_t channel;
+        for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+            if (moved->lane[channel] == BOX_TRANSITION_NONE) {
+                continue;
+            }
+
+            box_transition_time_t *time = box_vec_at(
+                &pool->lanes[channel].times, moved->lane[channel]);
+
+            time->owner = index;
+        }
+
+        *entry = *moved;
+        memcpy(box_vec_at(&pool->bases, index), box_vec_at(&pool->bases, last),
+            pool->bases.size);
+    }
+
+    pool->entries.count = last;
+    pool->bases.count = last;
+}
+
+void box_transition_pool_eval(
+    box_transition_pool_t *pool,
+    double time)
+{
+    box_transition_entry_t *entries = pool->entries.data;
+    uint32_t channel;
+    for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+        const box_transition_lane_t *lane = &pool->lanes[channel];
+        const box_transition_time_t *times = lane->times.data;
+        const box_transition_span_t *spans = lane->spans.data;
+        box_transition_out_t *outs = lane->outs.data;
+        uint32_t bit = ~(1u << channel);
+        uint32_t i, count = lane->times.count;
+        for (i = 0; i < count; i ++) {
+            bool running = box_transition_lerp(times[i].start, times[i].delay,
+                times[i].duration, times[i].rate, times[i].timing, spans[i].from,
+                spans[i].to, BOX_DISPLAY_FLOATS, time, outs[i].value);
+            if (!running) {
+                entries[times[i].owner].running &= bit;
+            }
+        }
+    }
+}
+
+bool box_transition_pool_compose(
+    const box_transition_pool_t *pool,
+    uint32_t index)
+{
+    const box_transition_entry_t *entry = box_vec_at(&pool->entries, index);
+    float values[BOX_DISPLAY_CHANNELS][BOX_DISPLAY_FLOATS];
+
+    memcpy(values, entry->cmd.values, sizeof(values));
+
+    uint32_t channel;
+    for (channel = 0; channel < BOX_DISPLAY_CHANNELS; channel ++) {
+        if (!(entry->moved & (1u << channel))) {
+            continue;
+        }
+
+        const box_transition_out_t *out = box_vec_at(
+            &pool->lanes[channel].outs, entry->lane[channel]);
+
+        memcpy(values[channel], out->value, sizeof(out->value));
+    }
+
+    box_transition_compose(&entry->cmd, values, entry->moved,
+        box_vec_at(&pool->bases, index));
+
+    return entry->running != 0;
 }
 
 /** Entry index of a slot of a mesh, growing the table as needed.
@@ -228,7 +512,7 @@ static uint32_t* box_transition_index(
     return box_vec_at(&m->transition_index, slot);
 }
 
-/** Drop an entry and move the last one into its place.
+/** Drop an entry and point the slot of the entry that moved at its new index.
  *
  * @param r The renderer
  * @param index Index of the entry
@@ -237,16 +521,13 @@ static void box_transition_release(
     box_renderer_t *r,
     uint32_t index)
 {
-    uint32_t last = r->transitions.count - 1;
-    if (index != last) {
-        box_transition_entry_t *moved = box_vec_at(&r->transitions, last);
+    box_transition_pool_stop(&r->transitions, index);
+    if (index < r->transitions.entries.count) {
+        box_transition_entry_t *moved = box_transition_pool_entry(&r->transitions, index);
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, moved->cmd.mesh);
 
-        *(box_transition_entry_t*)box_vec_at(&r->transitions, index) = *moved;
         *(uint32_t*)box_vec_at(&m->transition_index, moved->cmd.slot) = index;
     }
-
-    r->transitions.count = last;
 }
 
 /** Order two instance slots so that a run of them uploads in one write.
@@ -274,21 +555,12 @@ void box_transition_start(
 {
     uint32_t *index = box_transition_index(m, cmd->slot);
     if (*index == BOX_TRANSITION_NONE) {
-        *index = r->transitions.count;
-        box_vec_push(&r->transitions);
         *(uint32_t*)box_vec_push(&m->transition_slots) = cmd->slot;
         m->transition_sorted = false;
     }
 
-    box_transition_entry_t *entry = box_vec_at(&r->transitions, *index);
-    uint32_t count = cmd->count > BOX_DISPLAY_CHANNELS ? BOX_DISPLAY_CHANNELS : cmd->count;
-
-    entry->cmd = *cmd;
-    entry->cmd.first = 0;
-    entry->cmd.count = count;
-    entry->base = *data;
-    memcpy(entry->records, box_vec_at(&p->transition_records, cmd->first),
-        (size_t)count * sizeof(box_transition_rec_t));
+    *index = box_transition_pool_start(&r->transitions, *index, cmd,
+        box_vec_at(&p->transition_records, cmd->first), data);
 }
 
 void box_transition_stop(
@@ -387,18 +659,19 @@ static void box_transition_mesh(
             continue;
         }
 
-        box_transition_entry_t *entry = box_vec_at(&r->transitions, index);
-        bool running = slot < m->static_capacity &&
-            box_transition_fill(&entry->cmd, entry->records, p->time, &entry->base);
+        box_instance_t *base = box_transition_pool_base(&r->transitions, index);
+        bool running = false;
         if (slot < m->static_capacity) {
-            box_static_update_t *moved = box_vec_push(&p->static_updates);
+            box_static_update_t *moved;
 
-            box_transition_stage(r, handle, slot, &first, &entry->base);
-            box_scene_mirror(m, slot, &entry->base);
+            running = box_transition_pool_compose(&r->transitions, index);
+            moved = box_vec_push(&p->static_updates);
+            box_transition_stage(r, handle, slot, &first, base);
+            box_scene_mirror(m, slot, base);
             moved->mesh = handle;
             moved->slot = slot;
             moved->transition = BOX_UPDATE_STILL;
-            moved->data = entry->base;
+            moved->data = *base;
         }
 
         if (running) {
@@ -423,6 +696,7 @@ void box_transition_frame(
     box_packet_t *p)
 {
     box_vec_clear(&p->transitions_done);
+    box_transition_pool_eval(&r->transitions, p->time);
 
     uint32_t i;
     for (i = 0; i < r->meshes.count; i ++) {

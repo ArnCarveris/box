@@ -16,7 +16,8 @@ bool box_transition_eval(
     float *out)
 {
     return box_transition_lerp(record->start, record->delay, record->duration,
-        (uint32_t)record->timing, record->from, record->to, record->count, time, out);
+        box_transition_rate(record->duration), (uint32_t)record->timing, record->from,
+        record->to, record->count, time, out);
 }
 
 void box_transition_read(

@@ -540,7 +540,7 @@ struct box_renderer_t {
     box_sky_gpu_t sky;               /**< Tables and pipelines of the atmosphere */
     uint32_t env_clock;              /**< Counts the environments bound, to pick an entry */
     box_vec_t static_staging;        /**< box_instance_t run a static upload coalesces into */
-    box_vec_t transitions;           /**< box_transition_entry_t of the instances still moving */
+    box_transition_pool_t transitions; /**< Entries and lanes of the instances still moving */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
     WGPUComputePipeline cluster_pipeline; /**< Cluster assignment pass */
@@ -856,16 +856,6 @@ void box_scene_mirror(
     box_gpu_mesh_t *m,
     uint32_t slot,
     const box_instance_t *data);
-
-/** Entry index of a slot that carries no transition */
-#define BOX_TRANSITION_NONE (0xFFFFFFFFu)
-
-/** Transitions of one static instance, kept next to its slot by the renderer */
-typedef struct box_transition_entry_t {
-    box_transition_cmd_t cmd;    /**< The command that started them */
-    box_instance_t base;         /**< Instance data the records are composed into */
-    box_transition_rec_t records[BOX_DISPLAY_CHANNELS]; /**< One record per channel */
-} box_transition_entry_t;
 
 /** Start or replace the transitions of a static instance slot.
  *
