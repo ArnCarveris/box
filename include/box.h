@@ -35,6 +35,7 @@
 #include "box/input.h"
 #include "box/command.h"
 #include "box/monitor.h"
+#include "box/ui.h"
 #include "box/script.h"
 
 #endif

@@ -47,6 +47,7 @@ int main(
     ECS_IMPORT(world, BoxPicking);
     ECS_IMPORT(world, BoxSpline);
     ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, BoxUi);
     ECS_IMPORT(world, BoxMonitor);
     ECS_IMPORT(world, BoxScript);
 
