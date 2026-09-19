@@ -430,8 +430,8 @@ void Mesh3_rejects_a_color_count_mismatch(void)
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
-    ecs_vec_init_t(NULL, &m->colors, rgb, 1);
-    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){255, 0, 0};
+    ecs_vec_init_t(NULL, &m->colors, rgba, 1);
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 0, 0, 255};
 
     ecs_log_set_level(-4);
     ecs_modified(w, e, Mesh3);
@@ -466,9 +466,9 @@ void Mesh3_colors_are_accepted_and_uploaded(void)
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
-    ecs_vec_init_t(NULL, &m->colors, rgb, 3);
+    ecs_vec_init_t(NULL, &m->colors, rgba, 3);
     for (i = 0; i < 3; i ++) {
-        ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){255, 128, 0};
+        ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 128, 0, 255};
     }
 
     ecs_modified(w, e, Mesh3);
@@ -493,9 +493,9 @@ void Mesh3_differing_colors_upload_separately(void)
     ecs_vec_append_t(NULL, &ma->vertices, vec3)[0] = vec3_new(0, 0, 0);
     ecs_vec_append_t(NULL, &ma->vertices, vec3)[0] = vec3_new(1, 0, 0);
     ecs_vec_append_t(NULL, &ma->vertices, vec3)[0] = vec3_new(0, 1, 0);
-    ecs_vec_init_t(NULL, &ma->colors, rgb, 3);
+    ecs_vec_init_t(NULL, &ma->colors, rgba, 3);
     for (i = 0; i < 3; i ++) {
-        ecs_vec_append_t(NULL, &ma->colors, rgb)[0] = (rgb){255, 0, 0};
+        ecs_vec_append_t(NULL, &ma->colors, rgba)[0] = (rgba){255, 0, 0, 255};
     }
 
     ecs_modified(w, a, Mesh3);
@@ -505,9 +505,9 @@ void Mesh3_differing_colors_upload_separately(void)
     ecs_vec_append_t(NULL, &mb->vertices, vec3)[0] = vec3_new(0, 0, 0);
     ecs_vec_append_t(NULL, &mb->vertices, vec3)[0] = vec3_new(1, 0, 0);
     ecs_vec_append_t(NULL, &mb->vertices, vec3)[0] = vec3_new(0, 1, 0);
-    ecs_vec_init_t(NULL, &mb->colors, rgb, 3);
+    ecs_vec_init_t(NULL, &mb->colors, rgba, 3);
     for (i = 0; i < 3; i ++) {
-        ecs_vec_append_t(NULL, &mb->colors, rgb)[0] = (rgb){0, 0, 255};
+        ecs_vec_append_t(NULL, &mb->colors, rgba)[0] = (rgba){0, 0, 255, 255};
     }
 
     ecs_modified(w, b, Mesh3);
@@ -527,10 +527,10 @@ void Mesh3_colors_are_uploaded(void)
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
     ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
-    ecs_vec_init_t(NULL, &m->colors, rgb, 3);
-    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){255, 0, 0};
-    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 128, 0};
-    ecs_vec_append_t(NULL, &m->colors, rgb)[0] = (rgb){0, 0, 64};
+    ecs_vec_init_t(NULL, &m->colors, rgba, 3);
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 0, 0, 255};
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){0, 128, 0, 255};
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){0, 0, 64, 255};
     ecs_modified(w, e, Mesh3);
 
     box_render_extract(w, &packet);
@@ -547,6 +547,31 @@ void Mesh3_colors_are_uploaded(void)
     test_int(bytes[stride + BOX_VERTEX_COLOR_OFFSET + 1], 128);
     test_int(bytes[stride * 2 + BOX_VERTEX_COLOR_OFFSET + 2], 64);
     test_int(bytes[stride * 2 + BOX_VERTEX_COLOR_OFFSET + 3], 255);
+}
+
+void Mesh3_alpha_of_128_halves_the_packed_alpha(void)
+{
+    // meshes/vertex_alpha
+    ecs_entity_t e = ecs_new(w);
+    Mesh3 *m = ecs_ensure(w, e, Mesh3);
+
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(1, 0, 0);
+    ecs_vec_append_t(NULL, &m->vertices, vec3)[0] = vec3_new(0, 1, 0);
+    ecs_vec_init_t(NULL, &m->colors, rgba, 3);
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 255, 255, 128};
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 255, 255, 128};
+    ecs_vec_append_t(NULL, &m->colors, rgba)[0] = (rgba){255, 255, 255, 128};
+    ecs_modified(w, e, Mesh3);
+
+    box_render_extract(w, &packet);
+    test_int(packet.mesh_create.count, 1);
+
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    const uint8_t *bytes = (const uint8_t*)cmd->vertices;
+
+    test_int(bytes[BOX_VERTEX_COLOR_OFFSET + 3], 128);
 }
 
 void Mesh3_colors_default_to_white(void)

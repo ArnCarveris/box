@@ -86,7 +86,8 @@
                     "colors_are_accepted_and_uploaded",
                     "differing_colors_upload_separately",
                     "colors_are_uploaded",
-                    "colors_default_to_white"
+                    "colors_default_to_white",
+                    "alpha_of_128_halves_the_packed_alpha"
                 ]
             },
             {
