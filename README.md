@@ -260,6 +260,40 @@ active camera. `Ui.view` binds a view that the scene authored instead of creatin
 `test/integration/visual/ui_panels.flecs` and `ui_panels_small.flecs`, the same tree at two
 logical sizes.
 
+A layout pass gives every node of a tree a `Bounds`, the rectangle it covers in the logical
+pixels of its view, with the centre in `x, y` like a `Position` and a `Rect`; `Bounds` is written
+by the engine and only read by a scene. `Layout` arranges the children of a node in a row or a
+column in child order, with `padding` around them, `spacing` between them and `h` and `v`
+aligning them: along the axis of the layout the alignment moves the whole group, across it each
+child on its own. The box of the node is `Layout.width` by `Layout.height`, a side that is zero
+takes that side of its `Rect` and a side that is still zero takes the size of its content, so a
+row or a column grows to fit its children; a node that has a `Rect` has it resized to the box, so
+a panel with a `Border` needs no authored size. `Anchor` pins a node to an edge or the centre of
+its parent with an offset that runs toward the inside, and an anchored node is left out of the
+row or the column of its parent and does not add to its content. The pass writes the `Position`
+of every node it places and runs for a tree that changed and for no other, so a UI that stands
+still costs nothing per frame. See `test/integration/visual/ui_layout.flecs`:
+
+```
+ui {
+  Ui: {height: 540}
+  Layout: {direction: Column, width: 900, height: 500, padding: 16, spacing: 12, h: Center}
+  Border: {radius: 20, width: 3}
+  Rgb: {30, 34, 46}
+
+  header {
+    Layout: {direction: Row, width: 868, height: 56, padding: 10, spacing: 10, v: Middle}
+    Border: {radius: 12}
+    Rgb: {52, 66, 100}
+
+    badge {
+      Anchor: {h: Right, v: Middle, x: 6}
+      Rect: {90, 30}
+    }
+  }
+}
+```
+
 `box.checkpoint` writes the state of a running instance back into the scripts that loaded it.
 The `checkpoint [name]` command walks every managed script, substitutes the current values of
 the components of the entities that script owns into a copy of its source and writes it as
