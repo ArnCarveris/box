@@ -144,7 +144,9 @@
           "move_invalidates_the_old_and_the_new_position",
           "move_keeps_the_pool_layout",
           "unlit_move_defers_the_descriptor_upload",
-          "new_light_flushes_the_deferred_descriptors"
+          "new_light_flushes_the_deferred_descriptors",
+          "budget_takes_the_nearest_of_many_probes",
+          "equal_distances_still_fill_the_budget"
         ],
         "setup": true,
         "teardown": true

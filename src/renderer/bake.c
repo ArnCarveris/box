@@ -20,6 +20,9 @@
 /** Bytes of one probe in the GPU storage buffer */
 #define BOX_BAKE_PROBE_SIZE ((uint64_t)sizeof(box_probe_t))
 
+/** Jobs the first selection pass of a frame orders by distance */
+#define BOX_BAKE_ORDER_RUN (64)
+
 box_bake_mesh_t* box_bake_state_mesh(
     box_bake_state_t *s,
     uint32_t mesh)
@@ -874,6 +877,194 @@ static const box_probe_desc_t* box_bake_job_probe(
     return result;
 }
 
+/** Exchange two bake jobs.
+ *
+ * @param a The first job
+ * @param b The second job
+ */
+static void box_bake_job_swap(
+    box_bake_job_t *a,
+    box_bake_job_t *b)
+{
+    box_bake_job_t tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+/** Advance the generator the pivot of a selection step is drawn with.
+ *
+ * @param state The generator state
+ * @return The advanced state
+ */
+static uint32_t box_bake_job_rand(
+    uint32_t *state)
+{
+    *state = *state * 1664525u + 1013904223u;
+
+    return *state;
+}
+
+/** Group a range of jobs into the ones nearer, equal and further than a pivot.
+ *
+ * @param jobs The job array
+ * @param lo First job of the range
+ * @param hi Job past the range
+ * @param pivot The distance to group around
+ * @param out Receives the first equal job and the first further one
+ */
+static void box_bake_job_group(
+    box_bake_job_t *jobs,
+    uint32_t lo,
+    uint32_t hi,
+    float pivot,
+    uint32_t out[2])
+{
+    uint32_t less = lo;
+    uint32_t i = lo;
+    uint32_t more = hi;
+    while (i < more) {
+        if (jobs[i].distance < pivot) {
+            box_bake_job_swap(&jobs[less ++], &jobs[i ++]);
+        } else if (jobs[i].distance > pivot) {
+            box_bake_job_swap(&jobs[i], &jobs[-- more]);
+        } else {
+            i ++;
+        }
+    }
+
+    out[0] = less;
+    out[1] = more;
+}
+
+/** Move the jobs nearest to the camera to the front of a range.
+ *
+ * Grouping around a drawn pivot walks an ever smaller part of the range until
+ * the split point falls on a group boundary, which costs a linear pass instead
+ * of ordering a dirty set of fifty thousand instances outright. The pivot is
+ * drawn rather than sampled at fixed places, because a group leaves the jobs
+ * behind it in an order a fixed sample would keep picking the extreme of.
+ *
+ * @param jobs The job array
+ * @param count Jobs in the array
+ * @param split Jobs that end up in front, at most count
+ */
+static void box_bake_job_select(
+    box_bake_job_t *jobs,
+    uint32_t count,
+    uint32_t split)
+{
+    uint32_t seed = count * 2654435761u + split;
+    uint32_t lo = 0;
+    uint32_t hi = count;
+    while (split > lo && split < hi) {
+        uint32_t pick = lo + box_bake_job_rand(&seed) % (hi - lo);
+        uint32_t bound[2];
+        box_bake_job_group(jobs, lo, hi, jobs[pick].distance, bound);
+        if (split < bound[0]) {
+            hi = bound[0];
+        } else if (split > bound[1]) {
+            lo = bound[1];
+        } else {
+            lo = split;
+        }
+    }
+}
+
+/** Probes a run of jobs holds together.
+ *
+ * @param s The state
+ * @param jobs The first job of the run
+ * @param count Jobs in the run
+ * @return The probes of the run
+ */
+static uint32_t box_bake_job_probes(
+    box_bake_state_t *s,
+    const box_bake_job_t *jobs,
+    uint32_t count)
+{
+    uint32_t result = 0;
+    uint32_t i;
+    for (i = 0; i < count; i ++) {
+        result += box_probe_count(box_bake_job_probe(s, &jobs[i]));
+    }
+
+    return result;
+}
+
+/** Select the next run of nearest jobs behind the ones already selected.
+ *
+ * The budget counts probes and an instance holds a grid of them, so how many
+ * jobs a frame takes is not known before they are walked. A first run of a few
+ * jobs measures the probes an instance carries and the run behind it is sized
+ * from that rate, which lets a frame that drains a large dirty set select
+ * twice instead of ordering the set outright. Only a run that reaches past the
+ * budget is sorted inside itself: an earlier run is taken whole whatever its
+ * order, and every job behind a run is further away than all of it.
+ *
+ * @param s The state
+ * @param jobs The job array
+ * @param count Jobs in the array
+ * @param ready Jobs already selected and taken at the front
+ * @param left Probes the budget still has room for
+ * @param probes Probes the jobs already taken hold
+ * @return The jobs selected at the front after the call
+ */
+static uint32_t box_bake_job_order(
+    box_bake_state_t *s,
+    box_bake_job_t *jobs,
+    uint32_t count,
+    uint32_t ready,
+    uint32_t left,
+    uint32_t probes)
+{
+    uint32_t step = BOX_BAKE_ORDER_RUN;
+    if (probes) {
+        uint64_t rate = ((uint64_t)left * ready + probes - 1) / probes;
+        step = rate && rate < count ? (uint32_t)rate : count;
+    }
+
+    uint32_t result = count - ready < step ? count : ready + step;
+    box_bake_job_select(jobs + ready, count - ready, result - ready);
+    if (box_bake_job_probes(s, jobs + ready, result - ready) > left) {
+        qsort(jobs + ready, result - ready, sizeof(box_bake_job_t), box_bake_job_cmp);
+    }
+
+    return result;
+}
+
+/** Give every job its squared distance to the camera and drop the dead ones.
+ *
+ * @param s The state
+ * @return The jobs left in the dirty set
+ */
+static uint32_t box_bake_job_measure(
+    box_bake_state_t *s)
+{
+    box_bake_job_t *jobs = s->dirty.data;
+    uint32_t live = 0;
+    uint32_t i;
+    for (i = 0; i < s->dirty.count; i ++) {
+        const box_probe_desc_t *d = box_bake_job_probe(s, &jobs[i]);
+        if (!d) {
+            box_bake_mesh_t *m = box_bake_state_mesh(s, jobs[i].mesh);
+            if (jobs[i].slot < m->dirty.count) {
+                *(uint8_t*)box_vec_at(&m->dirty, jobs[i].slot) = 0;
+            }
+
+            continue;
+        }
+
+        float dx = d->position[0] - s->eye[0];
+        float dy = d->position[1] - s->eye[1];
+        float dz = d->position[2] - s->eye[2];
+        jobs[live] = jobs[i];
+        jobs[live].distance = dx * dx + dy * dy + dz * dz;
+        live ++;
+    }
+
+    return live;
+}
+
 uint32_t box_bake_state_take(
     box_bake_state_t *s,
     uint32_t budget)
@@ -889,46 +1080,33 @@ uint32_t box_bake_state_take(
     }
 
     box_bake_job_t *jobs = s->dirty.data;
-    for (i = 0; i < s->dirty.count; i ++) {
-        const box_probe_desc_t *d = box_bake_job_probe(s, &jobs[i]);
-        float dx = d ? d->position[0] - s->eye[0] : 0.0f;
-        float dy = d ? d->position[1] - s->eye[1] : 0.0f;
-        float dz = d ? d->position[2] - s->eye[2] : 0.0f;
-        jobs[i].distance = dx * dx + dy * dy + dz * dz;
-    }
-
-    qsort(jobs, s->dirty.count, sizeof(box_bake_job_t), box_bake_job_cmp);
-
-    uint32_t kept = 0;
-    for (i = 0; i < s->dirty.count; i ++) {
-        box_bake_mesh_t *m = box_bake_state_mesh(s, jobs[i].mesh);
-        const box_probe_desc_t *d = box_bake_job_probe(s, &jobs[i]);
-        if (!d) {
-            if (jobs[i].slot < m->dirty.count) {
-                *(uint8_t*)box_vec_at(&m->dirty, jobs[i].slot) = 0;
-            }
-
-            continue;
+    uint32_t live = box_bake_job_measure(s);
+    uint32_t ready = 0;
+    uint32_t taken = 0;
+    while (taken < live && result < budget) {
+        if (taken == ready) {
+            ready = box_bake_job_order(s, jobs, live, ready, budget - result, result);
         }
 
-        if (result < budget) {
-            uint32_t count = box_probe_count(d);
-            uint32_t probe;
-            for (probe = 0; probe < count; probe ++) {
-                box_bake_slot_t *job = box_vec_push(&m->jobs);
-                job->slot = jobs[i].slot;
-                job->index = probe;
-            }
-
-            *(uint8_t*)box_vec_at(&m->dirty, jobs[i].slot) = 0;
-            result += count;
-            continue;
+        box_bake_mesh_t *m = box_bake_state_mesh(s, jobs[taken].mesh);
+        const box_probe_desc_t *d = box_bake_job_probe(s, &jobs[taken]);
+        uint32_t count = box_probe_count(d);
+        uint32_t probe;
+        for (probe = 0; probe < count; probe ++) {
+            box_bake_slot_t *job = box_vec_push(&m->jobs);
+            job->slot = jobs[taken].slot;
+            job->index = probe;
         }
 
-        jobs[kept ++] = jobs[i];
+        *(uint8_t*)box_vec_at(&m->dirty, jobs[taken].slot) = 0;
+        result += count;
+        taken ++;
     }
 
-    s->dirty.count = kept;
+    s->dirty.count = live - taken;
+    if (s->dirty.count) {
+        memmove(jobs, jobs + taken, (size_t)s->dirty.count * sizeof(box_bake_job_t));
+    }
 done:
     return result;
 }

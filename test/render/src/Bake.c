@@ -1211,3 +1211,73 @@ void Bake_new_light_flushes_the_deferred_descriptors(void)
     test_assert(state.grid_dirty);
     box_bake_state_fini(&state);
 }
+
+void Bake_budget_takes_the_nearest_of_many_probes(void)
+{
+    // responsiveness/acquire_stall
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    int32_t i;
+    ecs_entity_t last = 0;
+    for (i = 0; i < 200; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {0, 0, 5.0f + (float)((i * 37) % 200)});
+        ecs_set(w, e, Box, {1, 1, 1});
+        last = e;
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(state.dirty.count, 200);
+    test_int(box_bake_state_take(&state, 8), 8);
+    test_int(state.dirty.count, 192);
+
+    const RenderInstance *inst = ecs_get(w, last, RenderInstance);
+    box_bake_mesh_t *mesh = box_bake_state_mesh(&state, inst->mesh);
+    test_int(mesh->jobs.count, 8);
+
+    float taken = 0;
+    for (i = 0; i < (int32_t)mesh->jobs.count; i ++) {
+        box_bake_slot_t *job = box_vec_at(&mesh->jobs, (uint32_t)i);
+        box_probe_desc_t *d = box_vec_at(&mesh->descs, job->slot);
+        taken = d->position[2] > taken ? d->position[2] : taken;
+    }
+
+    float rest = 1e9f;
+    for (i = 0; i < (int32_t)state.dirty.count; i ++) {
+        box_bake_job_t *job = box_vec_at(&state.dirty, (uint32_t)i);
+        box_probe_desc_t *d = box_vec_at(&mesh->descs, job->slot);
+        rest = d->position[2] < rest ? d->position[2] : rest;
+    }
+
+    test_assert(taken < rest);
+    box_bake_state_fini(&state);
+}
+
+void Bake_equal_distances_still_fill_the_budget(void)
+{
+    // responsiveness/acquire_stall
+    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    int32_t i;
+    for (i = 0; i < 64; i ++) {
+        ecs_entity_t e = ecs_new(w);
+        ecs_set(w, e, Position, {0, 0, 9});
+        ecs_set(w, e, Box, {1, 1, 1});
+    }
+
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+
+    box_bake_state_t state;
+    box_bake_state_init(&state);
+    box_bake_state_apply(&state, &packet);
+    test_int(state.dirty.count, 64);
+    test_int(box_bake_state_take(&state, 8), 8);
+    test_int(state.dirty.count, 56);
+    test_int(box_bake_state_take(&state, 8), 8);
+    test_int(state.dirty.count, 48);
+    box_bake_state_fini(&state);
+}
