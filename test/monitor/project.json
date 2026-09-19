@@ -47,6 +47,21 @@
                     "disabling_stops_collection",
                     "removing_the_monitor_stops_measurement"
                 ]
+            },
+            {
+                "id": "Spikes",
+                "testcases": [
+                    "empty_run_reports_nothing",
+                    "run_reports_mean_and_percentiles",
+                    "flat_run_has_no_spike",
+                    "frame_over_the_budget_is_a_spike",
+                    "budget_follows_the_factor",
+                    "zero_factor_disables_the_budget",
+                    "spike_keeps_the_slowest_system",
+                    "spikes_are_listed_worst_first",
+                    "report_keeps_the_worst_of_many_spikes",
+                    "collector_grows_past_its_capacity"
+                ]
             }
         ]
     }
