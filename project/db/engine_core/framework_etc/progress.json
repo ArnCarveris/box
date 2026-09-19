@@ -1,9 +1,10 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
+  "bench": false,
   "created": "2026-09-18T22:42:22.821+00:00",
   "start_time": "2026-09-19T00:43:59.437+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T00:59:31.124+00:00",
   "dependencies": [
     "engine_core/etc_install",
     "effects/shader_component"
