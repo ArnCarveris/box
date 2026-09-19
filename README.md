@@ -122,6 +122,14 @@ resolves into its children and grandchildren next to an untinted white box.
 boxes and spheres around the camera with a row behind it, which `CullSettings`
 on a view or as a singleton switches off for a bit identical comparison.
 
+`test/integration/visual/lod_spheres.flecs` is the primitive reduction check:
+four rows of spheres authored at 32 flat shaded segments, which the level
+ladder draws at 32, 16, 8 and 4 segments as their projected size falls. A scene
+opts in with `LodSettings` on a view or as a singleton, and `enabled: false`
+draws every shape at its authored count again. `test/integration/bench/lod_field.flecs`
+is the same idea at scale: 20000 spheres and 2000 cylinders over 700 units of
+depth, where the ladder is what keeps the triangle count of the frame down.
+
 `test/integration/visual/occlusion.flecs` is the Hi-Z occlusion check: a wall in
 front of 2400 boxes whose capture is bit identical to `occlusion_off.flecs`,
 next to `occlusion_sweep.flecs`, which `python3 tools/occlusion_sweep.py` sweeps
