@@ -5,10 +5,11 @@
 - `Collider` in world space with the instance scale applied, derived from the shape (`Sphere` and `IcoSphere` a ball, `Box` and `RoundedBox` an oriented box, `Capsule` a capsule, everything else its bounds), overridden by `SphereCollider`, `BoxCollider` and `CapsuleCollider`, opted out with `NoCollider`; ray, sphere and capsule tests are public in `box/collision.h`.
 - A two level index: a dynamic bounding volume hierarchy over root bounds and loose colliders, a per root collider list rebuilt only when its subtree changes, a second hierarchy for entities that move every frame. `box_collision_ray`, `_sphere`, `_aabb` and `_frustum` answer queries without walking the scene; `CollisionSettings` holds the leaf margin and the switches.
 - `box_collision_move` sweeps a capsule through the index in half radius steps, slides along the deepest contact, retries a blocked move over a ledge up to `step` and finds ground with a ray; `FirstPersonController` (`radius`, `step`, `foot`) and `CameraController` (`radius`) move through it, `no_collision` disables it and `terrain` stays a fallback floor.
-- DEBUG_PLACEHOLDER
+- `CollisionSettings.debug` (`DebugColliders`, `DebugBounds`, `DebugAll`) turns the colliders and root bounds in view into colored line segments (spheres as three circles, boxes as twelve edges, capsules as two circles and four lines, roots in white) that a new generic renderer line list draws after the sorted pass, depth tested; off it costs 4 ns a frame and no buffer, 10k colliders in view cost 0.80 ms.
+- The renderer now raises OnSet when it writes `AABB`, so shapes without a cheap collider (cones, cylinders, tori, custom meshes) get their bounds collider outside hand written tests too.
 
 ## Verification
-- TESTS_PLACEHOLDER
+- 1331 unit tests across 15 projects, all passing; `test/collision` is new with 89 tests over the `Roots`, `Colliders`, `Intersect`, `Index`, `Debug` suites and `test/controller` grew to 35.
 - Scenes in `integration/`: `controller_collision` walks the player into walls and up steps, `collision_debug` shows the wireframes, `first_person_1m.json` records a million nested colliders under 50k template roots at 0.90 ms a frame; every earlier scene bit identical.
 - Benchmarks in `bench/` against the meshes epic: a ray query over a million colliders costs 7 µs against the one millisecond budget, the sphere query 0.5 µs, the frustum query 2.9 µs, a frame with 1000 movers 494 µs and the controller sweep 8.6 µs. A hundred controllers went from 12 to 17 µs a frame, the cost of the capsule sweep each now runs.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.

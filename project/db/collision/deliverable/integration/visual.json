@@ -122,6 +122,18 @@
       "image": "project/db/collision/deliverable/integration/celestial_moon.png"
     },
     {
+      "scene": "test/integration/visual/collision_debug.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/collision/deliverable/integration/collision_debug.png"
+    },
+    {
       "scene": "test/integration/visual/controller_collision.flecs",
       "status": "pass",
       "baseline": {
@@ -516,6 +528,18 @@
         "status": "match"
       },
       "image": "project/db/collision/deliverable/integration/spline_path.png"
+    },
+    {
+      "scene": "test/integration/visual/spline_road.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/collision/deliverable/integration/spline_road.png"
     },
     {
       "scene": "test/integration/visual/ssr.flecs",
