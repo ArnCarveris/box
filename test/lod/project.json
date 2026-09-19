@@ -137,6 +137,26 @@
                     "an_empty_mesh_has_nothing_to_lose",
                     "a_single_triangle_survives"
                 ]
+            },
+            {
+                "id": "Reduce",
+                "testcases": [
+                    "the_ladder_halves_down_to_the_floor",
+                    "an_uneven_count_halves_too",
+                    "a_shape_at_its_floor_has_one_level",
+                    "a_long_ladder_stops_at_its_levels",
+                    "a_degenerate_count_has_no_ladder",
+                    "a_lower_floor_buys_more_levels",
+                    "the_chord_error_grows_with_the_radius",
+                    "more_segments_lower_the_chord_error",
+                    "a_near_shape_keeps_the_authored_level",
+                    "a_distant_shape_takes_the_coarsest_level",
+                    "a_quarter_arc_is_measured_as_its_circle",
+                    "the_band_holds_the_level_of_the_previous_frame",
+                    "a_zero_threshold_holds_the_authored_level",
+                    "an_orthographic_camera_ignores_the_distance",
+                    "a_ladder_of_one_level_never_moves"
+                ]
             }
         ]
     }

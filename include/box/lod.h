@@ -386,6 +386,84 @@ bool box_lod_simplify(
     const box_lod_simplify_desc_t *desc,
     box_lod_mesh_t *out);
 
+/** Levels one reduction ladder can hold, which is the deepest halving it does */
+#define BOX_LOD_LEVELS (6)
+
+/** Segment count a reduced shape never goes below */
+#define BOX_LOD_MIN_SEGMENTS (4)
+
+/** The segment counts one parametric shape reduces through.
+ *
+ * Level zero is the authored count, which caps the ladder, and every level
+ * after it halves the one before until the floor of the shape stops the
+ * halving, so a shape authored at or below its floor holds a single level and
+ * never reduces. Every level is an ordinary mesh of the shape, which is what
+ * lets instances at one level share it.
+ */
+typedef struct box_lod_ladder_t {
+    int32_t segments[BOX_LOD_LEVELS]; /**< Segment count of every level, the finest first */
+    int32_t count;                    /**< Levels the ladder holds, at least one */
+} box_lod_ladder_t;
+
+/** What the reduction of one instance measures.
+ *
+ * The error of a level is the chord error of its segment count at the radius
+ * of the instance, in world units, which the screen space metric projects at
+ * the bounds like the error of any other representation. The span is the part
+ * of a full circle the segments cover, so the quarter arc of a rounded box
+ * corner and the sweep of an open tube are measured as the full circle they
+ * are a part of.
+ */
+typedef struct box_lod_reduce_desc_t {
+    const box_lod_ladder_t *ladder; /**< Segment counts the shape reduces through */
+    box_lod_bounds_t bounds;        /**< World bounds of the instance */
+    box_lod_camera_t camera;        /**< Camera the error is measured in */
+    float viewport_px;              /**< Height of the viewport in pixels */
+    float radius;                   /**< Radius of the arc in world units */
+    float span;                     /**< Part of a full circle the segments cover, 0 for all */
+    float threshold;                /**< Projected error in pixels a level may not exceed */
+    float hysteresis;               /**< Band around the threshold, 0 switches at it */
+    int32_t current;                /**< Level of the previous frame, negative for none */
+} box_lod_reduce_desc_t;
+
+/** Build the level ladder of a parametric shape.
+ *
+ * @param authored Segment count the shape was authored with, the cap
+ * @param min_segments Lowest segment count the shape stays usable at
+ * @param out Receives the ladder
+ * @return The number of levels, one for a shape that never reduces
+ */
+int32_t box_lod_ladder(
+    int32_t authored,
+    int32_t min_segments,
+    box_lod_ladder_t *out);
+
+/** Chord error of a segment count at a radius.
+ *
+ * The error is the sagitta of one segment: the distance between the arc and
+ * the chord that replaces it, which is how far the surface of the shape moves
+ * when it is drawn with that many segments.
+ *
+ * @param segments Segments a full circle is drawn with
+ * @param radius Radius of the circle in world units
+ * @return The error in world units, 0 for a degenerate circle
+ */
+float box_lod_chord_error(
+    int32_t segments,
+    float radius);
+
+/** Pick the level of one instance from its projected chord error.
+ *
+ * The level of the previous frame is kept while its error stays inside the
+ * band around the threshold, exactly like box_lod_select, whose levels this
+ * builds from the ladder and the radius of the instance.
+ *
+ * @param desc The ladder, the instance and the threshold of the view
+ * @return The level of this frame, zero for the authored segment count
+ */
+int32_t box_lod_reduce(
+    const box_lod_reduce_desc_t *desc);
+
 /** Register the box.lod module.
  *
  * @param world The world
