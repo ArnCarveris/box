@@ -182,10 +182,24 @@ under the `actions` scope with an `InputAction`, an entity with `InputMap` binds
 `(keys.W, actions.Forward)` pairs or with `Binding` children that carry a full key mask
 like `keys.Ctrl|keys.S`, and a UI button or a command fires the same action without a key.
 A script task awaits an action with `await on.pressed(actions.Forward)` inside an `async`
-block, next to `on.down` and `on.up`; the await returns the source that fired the action.
+block, next to `on.down`, `on.up` and `on.dragged`; the await returns the source that fired
+the action, and `on.dragged` returns where the drag began and where the cursor is now, in
+every frame the action is held past three window points.
+
+Maps are layers. `InputMap.priority` orders them and the highest resolves first, and a
+binding that declares `consume: true` (or a map that declares it for all of its bindings)
+keeps its key and its action from every map below it, which is how a UI map sits over the
+map of a game. Nothing else is swallowed: a map that does not say so leaves the layers below
+alone and the handler decides. A handler that runs inside a raise takes it with
+`event.stop()`, and a task that resumes after the delivery takes a whole action for the
+frame with `input.consume(actions.Close)`; either clears the actions the maps below bound to
+the same key. `box_ui_mouse_captured` and the `UiCapture` singleton say whether the cursor is
+on a UI element, so a game stands back while the pointer is on a panel.
+
 A terminal drives both layers with the `key.*`, `mouse.*`, `input.*` and `action.*` commands,
 which queue injected events over frames; `test/integration/command/input.flecs` types, clicks
-and drags through them.
+and drags through them and `input_layers.flecs` holds two keys while a map above keeps one of
+them.
 
 `CameraController` from `box.controller` flies a camera with the `Forward`, `Back`, `Left`,
 `Right`, `Up`, `Down`, `Fast` and `Look` actions the module binds to WASD, QE, shift and the
@@ -320,7 +334,8 @@ threshold and the switch. An entity that carries an `Action` fires it through th
 layer when a click resolves on it, and the click walks up the parent chain to the nearest one, so
 a widget and a key binding share one action. A view whose contents have no collider answers its
 own pick before the ray query runs, which is how `box.ui` resolves the cursor against the
-rectangles of its trees. `test/integration/command/picking.flecs` hovers and clicks a crate
+rectangles of its trees; the element that hit is written to the `UiCapture` singleton every
+frame, so `box_ui_mouse_captured(world)` and a script alike know the UI holds the pointer. `test/integration/command/picking.flecs` hovers and clicks a crate
 through the `mouse.*` commands and keeps the log.
 2D shapes: `Circle`, `Line`, `Image` (a texture region on a `Rect` with fit and rotation) and
 `Border` (rounded corners and per edge widths evaluated in the fragment shader, so a radius change
@@ -785,6 +800,53 @@ recomposed when a scene registers or removes a layer.
 
 `test/integration/visual/shader_macro.flecs` is the macro check: the same scene with
 `DEBUG_NORMALS=1` on the builtin mesh shader, which outputs world normals as color.
+
+### Light modulators
+
+A `LightModulator` names a `Shader` whose WGSL file defines one function, and the
+renderer multiplies the direct light of that light by what the function returns at
+every shaded point:
+
+```wgsl
+fn box_light_modulate(p: vec3<f32>, n: vec3<f32>, l: vec3<f32>, time: f32,
+    params: LightModulatorParams) -> vec3<f32>
+```
+
+`#include "generated/light_modulators.wgsl"` is answered by the modulator registry
+the same way the layer include is: every registration is spliced in as
+`box_light_modulate_<index>` and a light multiplies the ones its mask names. The
+multiply happens after the shadow of the light, so a modulator never touches
+indirect light, a light without one costs nothing and the variant is only compiled
+once a modulator exists. Several modulators on one light multiply, which is what a
+child entity with a modulator of its own is for.
+
+The parameters are an ordinary reflected component next to the modulator that the
+plugin registered with `box_light_modulator_params`, written into a sixteen float
+block in member order, so a plugin is a WGSL file plus a component and needs no
+engine change. The framework ships two under `etc/shaders/light/`:
+
+```
+using box.light
+using box.shader
+using box.sky
+
+plugins { clouds { Shader: {path: "etc/shaders/light/clouds.wgsl"} } }
+
+$ { Weather: {overcast: 0.7} }
+
+sun {
+  DirectionalLight: {intensity: 3.2}
+  LightModulator: {shader: plugins.clouds}
+  CloudShadows: {scale: 24, speed: 2, softness: 0.5}
+}
+```
+
+`CloudShadows` is a scrolling deck of tiled noise that darkens the sun; a density of
+zero follows the overcast of the world's `Weather`, and `enabled: false` switches the
+deck off without touching the scene. `Caustics {scale, speed, intensity, depth}` in
+`etc/shaders/light/caustics.wgsl` brightens a light below the water plane its depth
+names and is the example a project copies for a plugin of its own.
+`test/integration/visual/cloud_shadows.flecs` and `caustics.flecs` are the checks.
 
 ## Post process effects
 
