@@ -1,0 +1,12 @@
+{
+  "kind": "command",
+  "results": [
+    {
+      "scene": "test/integration/command/gpu_timings.flecs",
+      "status": "pass",
+      "log": "../../../../../../tmp/claude-501/deliv/gpu_timings.log",
+      "expected": null,
+      "images": []
+    }
+  ]
+}
