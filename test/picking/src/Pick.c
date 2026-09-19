@@ -298,7 +298,10 @@ void Pick_matches_a_brute_force_pick_on_a_smaller_scene(void)
             int32_t k;
             for (k = 0; k < it.count; k ++) {
                 float dist;
-                if (box_collider_ray(&c[k], origin, dir, nearest_dist, &dist)) {
+                if (box_collider_ray(&c[k], origin, dir, BOX_PICK_DISTANCE, &dist) &&
+                    (dist < nearest_dist ||
+                     (dist == nearest_dist && it.entities[k] < nearest)))
+                {
                     nearest = it.entities[k];
                     nearest_dist = dist;
                 }
@@ -316,6 +319,94 @@ void Pick_matches_a_brute_force_pick_on_a_smaller_scene(void)
     test_assert(hits > 0);
 
     ecs_query_fini(q);
+}
+
+void Pick_matches_a_brute_force_pick_with_one_more_entity(void)
+{
+    // picking/scale
+    ecs_entity_t extra = ecs_new(w);
+    ecs_set(w, extra, Position, {50, 50, 50});
+    ecs_set(w, extra, SphereCollider, {{0, 0, 0}, 0.1f});
+    ecs_entity_t prefab = ecs_new_w_id(w, EcsPrefab);
+    int32_t roots = 200, fanout = 20, side = 14, i, j;
+    for (i = 0; i < roots; i ++) {
+        float x = (float)(i % side - side / 2) * 0.6f;
+        float z = (float)(i / side) * 0.6f;
+        ecs_entity_t root = ecs_new_w_pair(w, EcsIsA, prefab);
+        ecs_set(w, root, Position, {x, 0, z});
+        for (j = 0; j < fanout; j ++) {
+            float dx = (float)(j % 5) * 0.15f - 0.3f;
+            float dy = (float)(j / 5) * 0.15f;
+            ecs_entity_t child = ecs_new_w_pair(w, EcsChildOf, root);
+            ecs_set(w, child, Position, {dx, dy, 0});
+            ecs_set(w, child, SphereCollider, {{0, 0, 0}, 0.1f});
+            ecs_set(w, child, AABB, {
+                {x + dx - 0.1f, dy - 0.1f, z - 0.1f},
+                {x + dx + 0.1f, dy + 0.1f, z + 0.1f}});
+        }
+    }
+
+    ecs_progress(w, 0);
+
+    ecs_query_t *q = ecs_query(w, { .terms = {{ .id = ecs_id(Collider) }} });
+    uint32_t seed = 4242;
+    int32_t query, hits = 0;
+    for (query = 0; query < 40; query ++) {
+        seed = seed * 1103515245u + 12345u;
+        float cx = (float)((seed >> 16) % 200) / 100.0f - 1.0f;
+        seed = seed * 1103515245u + 12345u;
+        float cy = (float)((seed >> 16) % 200) / 100.0f - 1.0f;
+        vec2 cursor = {cx, cy};
+
+        vec3 origin, dir;
+        test_bool(box_picking_ray(w, 0, cursor, &origin, &dir), true);
+
+        ecs_entity_t nearest = 0;
+        float nearest_dist = BOX_PICK_DISTANCE;
+        ecs_iter_t it = ecs_query_iter(w, q);
+        while (ecs_query_next(&it)) {
+            const Collider *c = ecs_field(&it, Collider, 0);
+            int32_t k;
+            for (k = 0; k < it.count; k ++) {
+                float dist;
+                if (box_collider_ray(&c[k], origin, dir, BOX_PICK_DISTANCE, &dist) &&
+                    (dist < nearest_dist ||
+                     (dist == nearest_dist && it.entities[k] < nearest)))
+                {
+                    nearest = it.entities[k];
+                    nearest_dist = dist;
+                }
+            }
+        }
+
+        ecs_entity_t expect = nearest ? box_picking_target(w, nearest) : 0;
+        PickHit hit;
+        bool found = box_picking_pick(w, 0, cursor, &hit);
+        test_bool(found, nearest != 0);
+        test_uint(hit.entity, expect);
+        hits += found;
+    }
+
+    test_assert(hits > 0);
+
+    ecs_query_fini(q);
+}
+
+void Pick_equal_distance_resolves_to_the_lowest_id(void)
+{
+    // picking/picking
+    ecs_entity_t first = ecs_new(w);
+    ecs_entity_t second = ecs_new(w);
+    ecs_set(w, second, Position, {0, 0, 0});
+    ecs_set(w, second, SphereCollider, {{0, 0, 0}, 1});
+    ecs_set(w, first, Position, {0, 0, 0});
+    ecs_set(w, first, SphereCollider, {{0, 0, 0}, 1});
+    ecs_progress(w, 0);
+
+    PickHit hit;
+    test_bool(box_picking_pick(w, 0, (vec2){0, 0}, &hit), true);
+    test_uint(hit.entity, first);
+    test_flt(hit.distance, 9);
 }
 
 void Pick_a_view_with_a_render_target_does_not_pick(void)

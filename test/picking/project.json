@@ -44,7 +44,9 @@
                     "the_view_with_the_highest_priority_picks_first",
                     "a_disabled_view_does_not_pick",
                     "a_view_with_a_render_target_does_not_pick",
-                    "matches_a_brute_force_pick_on_a_smaller_scene"
+                    "matches_a_brute_force_pick_on_a_smaller_scene",
+                    "matches_a_brute_force_pick_with_one_more_entity",
+                    "equal_distance_resolves_to_the_lowest_id"
                 ],
                 "setup": true,
                 "teardown": true
