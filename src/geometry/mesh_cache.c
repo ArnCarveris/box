@@ -4,6 +4,7 @@
  */
 
 #include "geometry_internal.h"
+#include "mesh_gen_internal.h"
 #include "../render/render_internal.h"
 
 /** Cached mesh entry */
@@ -23,10 +24,19 @@ typedef struct box_custom_mesh_t {
     vec3 bounds_max; /**< Local bounds maximum */
 } box_custom_mesh_t;
 
+/** Generated mesh of a registered shape, shared by every key that matches */
+typedef struct box_shape_entry_t {
+    box_shape_key_t key; /**< Parameters of the mesh */
+    uint32_t handle;     /**< Renderer handle */
+    vec3 bounds_min;     /**< Local bounds minimum */
+    vec3 bounds_max;     /**< Local bounds maximum */
+} box_shape_entry_t;
+
 /** Mesh cache singleton */
 typedef struct GeometryState {
     ecs_vec_t entries;   /**< box_mesh_entry_t of the primitive shapes */
     ecs_vec_t customs;   /**< box_custom_mesh_t of the meshes a Mesh3 uploaded */
+    ecs_vec_t shapes;    /**< box_shape_entry_t of the meshes a registered shape built */
 } GeometryState;
 
 ECS_COMPONENT_DECLARE(GeometryState);
@@ -48,6 +58,7 @@ static void box_geometry_state_dtor(
     for (i = 0; i < count; i ++) {
         ecs_vec_fini_t(NULL, &state[i].entries, box_mesh_entry_t);
         ecs_vec_fini_t(NULL, &state[i].customs, box_custom_mesh_t);
+        ecs_vec_fini_t(NULL, &state[i].shapes, box_shape_entry_t);
     }
 }
 
@@ -128,6 +139,7 @@ void box_mesh_cache_init(
     GeometryState *state = ecs_singleton_ensure(world, GeometryState);
     ecs_vec_init_t(NULL, &state->entries, box_mesh_entry_t, 0);
     ecs_vec_init_t(NULL, &state->customs, box_custom_mesh_t, 0);
+    ecs_vec_init_t(NULL, &state->shapes, box_shape_entry_t, 0);
 }
 
 /** The custom mesh a handle belongs to.
@@ -222,4 +234,42 @@ void box_mesh_cache_release(
     ecs_vec_remove_last(&state->customs);
 done:
     return;
+}
+
+uint32_t box_mesh_cache_shape(
+    ecs_world_t *world,
+    const box_shape_key_t *key,
+    box_shape_build_fn build,
+    vec3 *bounds_min,
+    vec3 *bounds_max)
+{
+    GeometryState *state = ecs_get_mut(world, ecs_id(GeometryState), GeometryState);
+    ecs_assert(state != NULL, ECS_INVALID_OPERATION, "box.geometry is not imported");
+    box_shape_entry_t *entry = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->shapes) && !entry; i ++) {
+        box_shape_entry_t *candidate = ecs_vec_get_t(&state->shapes, box_shape_entry_t, i);
+        if (!memcmp(&candidate->key, key, sizeof(box_shape_key_t))) {
+            entry = candidate;
+        }
+    }
+
+    if (!entry) {
+        box_mesh_data_t data = {0};
+        box_mesh_builder_t builder = { .mesh = &data };
+
+        build(key, (box_shape_mesh_t*)&builder);
+        box_mesh_builder_finish(&builder);
+        entry = ecs_vec_append_t(NULL, &state->shapes, box_shape_entry_t);
+        entry->key = *key;
+        entry->handle = box_render_mesh_create(world, &data);
+        entry->bounds_min = data.bounds_min;
+        entry->bounds_max = data.bounds_max;
+        box_mesh_data_fini(&data);
+    }
+
+    *bounds_min = entry->bounds_min;
+    *bounds_max = entry->bounds_max;
+
+    return entry->handle;
 }

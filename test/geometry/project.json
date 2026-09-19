@@ -86,6 +86,26 @@
                     "colors_are_accepted_but_not_uploaded",
                     "differing_colors_upload_separately"
                 ]
+            },
+            {
+                "id": "Shape",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "writes_a_render_mesh",
+                    "uploads_the_generated_mesh",
+                    "shares_the_mesh_of_one_key",
+                    "another_key_builds_another_mesh",
+                    "changing_a_parameter_changes_the_mesh",
+                    "changing_only_the_scale_keeps_the_mesh",
+                    "prefab_instances_share_the_shape",
+                    "unregistering_stops_the_observer",
+                    "deleting_the_registration_stops_the_observer",
+                    "registering_again_replaces_the_observer",
+                    "rejects_a_registration_without_a_component",
+                    "star_example_is_registered",
+                    "star_shares_one_mesh_per_outline"
+                ]
             }
         ]
     }

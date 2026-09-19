@@ -107,4 +107,34 @@ void box_mesh_cache_release(
 void box_mesh3_init(
     ecs_world_t *world);
 
+/** Look up or generate the mesh of a registered shape.
+ *
+ * @param world The world
+ * @param key The shape key
+ * @param build The generator of the shape
+ * @param bounds_min Receives the local bounds minimum
+ * @param bounds_max Receives the local bounds maximum
+ * @return The mesh handle
+ */
+uint32_t box_mesh_cache_shape(
+    ecs_world_t *world,
+    const box_shape_key_t *key,
+    box_shape_build_fn build,
+    vec3 *bounds_min,
+    vec3 *bounds_max);
+
+/** Register the Shape component and the observers that install shape watchers.
+ *
+ * @param world The world
+ */
+void box_shape_init(
+    ecs_world_t *world);
+
+/** Register the Star shape through the public registration API.
+ *
+ * @param world The world
+ */
+void box_shape_example_init(
+    ecs_world_t *world);
+
 #endif

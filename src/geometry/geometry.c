@@ -392,9 +392,12 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Frustum);
     ECS_META_COMPONENT(world, RoundedBox);
     ECS_META_COMPONENT(world, Rect);
+    ECS_META_COMPONENT(world, Star);
 
     box_mesh_cache_init(world);
     box_mesh3_init(world);
+    box_shape_init(world);
+    box_shape_example_init(world);
 
     box_shape_watch(world, ecs_id(Box), box_on_box);
     box_shape_watch(world, ecs_id(Quad), box_on_quad);
