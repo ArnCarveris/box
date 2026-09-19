@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:26.520+00:00",
   "start_time": "2026-09-19T12:12:28.325+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T12:46:41.750+00:00",
   "dependencies": [
     "effects/shader_graph"
   ]
