@@ -4,57 +4,89 @@
     "value": {
         "description": "Unit tests for the procedural mesh generators",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "test": {
-        "testsuites": [{
-            "id": "Flat",
-            "testcases": [
-                "quad",
-                "triangle",
-                "right_triangle",
-                "ngon_matches_triangle_at_three_sides",
-                "ngon_clamps_minimum",
-                "ngon"
-            ]
-        }, {
-            "id": "Box",
-            "testcases": [
-                "box",
-                "rounded_box",
-                "rounded_box_clamps_radius",
-                "rounded_box_clamps_segments",
-                "triangle_prism",
-                "right_triangle_prism"
-            ]
-        }, {
-            "id": "Round",
-            "testcases": [
-                "sphere_smooth",
-                "sphere_flat",
-                "hemisphere_smooth",
-                "hemisphere_flat",
-                "icosphere_base_smooth",
-                "icosphere_base_flat",
-                "icosphere_subdivided"
-            ]
-        }, {
-            "id": "Axis",
-            "testcases": [
-                "cone_smooth",
-                "cone_flat",
-                "cylinder_smooth",
-                "cylinder_flat",
-                "frustum_smooth",
-                "frustum_flat",
-                "capsule_smooth",
-                "capsule_flat",
-                "tube_smooth",
-                "tube_flat",
-                "tube_open_arc",
-                "torus_smooth",
-                "torus_flat"
-            ]
-        }]
+        "testsuites": [
+            {
+                "id": "Flat",
+                "testcases": [
+                    "quad",
+                    "triangle",
+                    "right_triangle",
+                    "ngon_matches_triangle_at_three_sides",
+                    "ngon_clamps_minimum",
+                    "ngon"
+                ]
+            },
+            {
+                "id": "Box",
+                "testcases": [
+                    "box",
+                    "rounded_box",
+                    "rounded_box_clamps_radius",
+                    "rounded_box_clamps_segments",
+                    "triangle_prism",
+                    "right_triangle_prism"
+                ]
+            },
+            {
+                "id": "Round",
+                "testcases": [
+                    "sphere_smooth",
+                    "sphere_flat",
+                    "hemisphere_smooth",
+                    "hemisphere_flat",
+                    "icosphere_base_smooth",
+                    "icosphere_base_flat",
+                    "icosphere_subdivided"
+                ]
+            },
+            {
+                "id": "Axis",
+                "testcases": [
+                    "cone_smooth",
+                    "cone_flat",
+                    "cylinder_smooth",
+                    "cylinder_flat",
+                    "frustum_smooth",
+                    "frustum_flat",
+                    "capsule_smooth",
+                    "capsule_flat",
+                    "tube_smooth",
+                    "tube_flat",
+                    "tube_open_arc",
+                    "torus_smooth",
+                    "torus_flat"
+                ]
+            },
+            {
+                "id": "Mesh3",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "upload",
+                    "bounds",
+                    "derives_normals",
+                    "keeps_given_normals",
+                    "without_indices_draws_in_order",
+                    "uvs_default_to_zero",
+                    "shared_between_entities",
+                    "prefab_instances_share",
+                    "replacing_the_data_uploads_again",
+                    "freed_with_the_last_user",
+                    "removing_the_component_removes_the_mesh",
+                    "rejects_an_index_out_of_range",
+                    "rejects_a_partial_triangle",
+                    "rejects_a_normal_count_mismatch",
+                    "rejects_a_color_count_mismatch",
+                    "rejects_an_empty_mesh",
+                    "colors_are_accepted_but_not_uploaded",
+                    "differing_colors_upload_separately"
+                ]
+            }
+        ]
     }
 }

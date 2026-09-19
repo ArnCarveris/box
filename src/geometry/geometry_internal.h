@@ -63,4 +63,48 @@ uint32_t box_mesh_cache_get(
 void box_mesh_cache_init(
     ecs_world_t *world);
 
+/** Take a reference to an already uploaded custom mesh.
+ *
+ * @param world The world
+ * @param hash Content hash of the mesh data
+ * @param handle Receives the mesh handle when the mesh was found
+ * @param bounds_min Receives the local bounds minimum
+ * @param bounds_max Receives the local bounds maximum
+ * @return True when a mesh with that hash exists, false when it must be uploaded
+ */
+bool box_mesh_cache_acquire(
+    ecs_world_t *world,
+    uint64_t hash,
+    uint32_t *handle,
+    vec3 *bounds_min,
+    vec3 *bounds_max);
+
+/** Upload a custom mesh and hold the first reference to it.
+ *
+ * @param world The world
+ * @param hash Content hash of the mesh data
+ * @param data The mesh, its arrays are copied
+ * @return The mesh handle
+ */
+uint32_t box_mesh_cache_upload(
+    ecs_world_t *world,
+    uint64_t hash,
+    const box_mesh_data_t *data);
+
+/** Drop a reference to a custom mesh, freeing it when the last one goes away.
+ *
+ * @param world The world
+ * @param handle The mesh handle, a handle of a primitive shape is ignored
+ */
+void box_mesh_cache_release(
+    ecs_world_t *world,
+    uint32_t handle);
+
+/** Register the Mesh3 component hooks and observers.
+ *
+ * @param world The world
+ */
+void box_mesh3_init(
+    ecs_world_t *world);
+
 #endif

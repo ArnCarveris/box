@@ -1,0 +1,92 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+camera {
+  Position: {0, 5.5, -14}
+  LookAt: {0, 1.4, 0}
+  Camera: {fov: 50}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.7}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, intensity: 0.6} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {40, 0.5, 40}
+  Rgb: {120, 120, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+pyramid {
+  Position: {-7.5, 0, 0}
+  Mesh3: {
+    vertices: [
+      {-1, 0, -1}, {0, 2, 0}, {1, 0, -1},
+      {1, 0, -1}, {0, 2, 0}, {1, 0, 1},
+      {1, 0, 1}, {0, 2, 0}, {-1, 0, 1},
+      {-1, 0, 1}, {0, 2, 0}, {-1, 0, -1},
+      {-1, 0, -1}, {1, 0, -1}, {1, 0, 1},
+      {-1, 0, -1}, {1, 0, 1}, {-1, 0, 1}
+    ]
+  }
+  Rgb: {225, 150, 60}
+  PbrMaterial: {roughness: 0.55}
+}
+
+pyramid_shared {
+  Position: {-2.5, 0, 0}
+  Mesh3: {
+    vertices: [
+      {-1, 0, -1}, {0, 2, 0}, {1, 0, -1},
+      {1, 0, -1}, {0, 2, 0}, {1, 0, 1},
+      {1, 0, 1}, {0, 2, 0}, {-1, 0, 1},
+      {-1, 0, 1}, {0, 2, 0}, {-1, 0, -1},
+      {-1, 0, -1}, {1, 0, -1}, {1, 0, 1},
+      {-1, 0, -1}, {1, 0, 1}, {-1, 0, 1}
+    ]
+  }
+  Rgb: {90, 175, 235}
+  PbrMaterial: {roughness: 0.55}
+}
+
+gem {
+  Position: {2.5, 1.3, 0}
+  Mesh3: {
+    vertices: [
+      {0, 1.3, 0}, {1, 0, 0}, {0, 0, 1}, {-1, 0, 0}, {0, 0, -1}, {0, -1.3, 0}
+    ]
+    normals: [
+      {0, 1, 0}, {1, 0, 0}, {0, 0, 1}, {-1, 0, 0}, {0, 0, -1}, {0, -1, 0}
+    ]
+    uvs: [
+      {0.5, 1}, {0, 0.5}, {0.25, 0.5}, {0.5, 0.5}, {0.75, 0.5}, {0.5, 0}
+    ]
+    indices: [
+      0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 1, 4,
+      5, 1, 2, 5, 2, 3, 5, 3, 4, 5, 4, 1
+    ]
+  }
+  Rgb: {80, 220, 190}
+  PbrMaterial: {metallic: 0.8, roughness: 0.25}
+}
+
+sphere {
+  Position: {7.5, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {220, 220, 225}
+  PbrMaterial: {roughness: 0.35}
+}
+
+reference {
+  Position: {0, 0.9, 5}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {180, 180, 185}
+  PbrMaterial: {roughness: 0.7}
+}

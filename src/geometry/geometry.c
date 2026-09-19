@@ -373,6 +373,7 @@ void BoxGeometryImport(
     ECS_MODULE(world, BoxGeometry);
     ECS_IMPORT(world, BoxRender);
 
+    ECS_META_COMPONENT(world, Mesh3);
     ECS_META_COMPONENT(world, Box);
     ECS_META_COMPONENT(world, Quad);
     ECS_META_COMPONENT(world, Triangle);
@@ -393,6 +394,7 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Rect);
 
     box_mesh_cache_init(world);
+    box_mesh3_init(world);
 
     box_shape_watch(world, ecs_id(Box), box_on_box);
     box_shape_watch(world, ecs_id(Quad), box_on_quad);

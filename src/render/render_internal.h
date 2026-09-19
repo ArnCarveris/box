@@ -7,6 +7,7 @@
 #define BOX_RENDER_INTERNAL_H
 
 #include <box.h>
+#include <box/sky.h>
 #include "../renderer/packet.h"
 #include "../renderer/cluster.h"
 #include "../renderer/frustum.h"
@@ -80,6 +81,7 @@ typedef struct box_texture_page_t {
 typedef struct RenderState {
     ecs_vec_t batches;        /**< box_batch_t indexed by mesh handle */
     ecs_vec_t pending_meshes; /**< box_mesh_cmd_t waiting for the next packet */
+    ecs_vec_t dead_meshes;    /**< uint32_t mesh handles waiting for the next packet */
     ecs_vec_t pending_textures; /**< box_texture_cmd_t waiting for the next packet */
     ecs_vec_t dead_textures;  /**< uint32_t texture handles waiting for the next packet */
     box_texture_page_t pages[BOX_TEXTURE_PAGES]; /**< Pages of the texture pager */
@@ -144,6 +146,41 @@ RenderState* box_render_state(
 uint32_t box_render_mesh_create(
     ecs_world_t *world,
     const box_mesh_data_t *data);
+
+/** Release the renderer resources of a mesh handle with the next packet.
+ *
+ * The handle itself is retired: it is never handed out again, so an instance
+ * that still names it draws nothing instead of another mesh.
+ *
+ * @param world The world
+ * @param handle The mesh handle
+ */
+void box_render_mesh_destroy(
+    ecs_world_t *world,
+    uint32_t handle);
+
+/** Initialize the mesh command lists of the registry.
+ *
+ * @param state The registry
+ */
+void box_render_mesh_init(
+    RenderState *state);
+
+/** Release the mesh command lists of the registry and the arrays they own.
+ *
+ * @param state The registry
+ */
+void box_render_mesh_fini(
+    RenderState *state);
+
+/** Move the pending mesh commands of the registry into a packet.
+ *
+ * @param state The registry
+ * @param p The packet
+ */
+void box_render_extract_meshes(
+    RenderState *state,
+    box_packet_t *p);
 
 /** Upload a texture with the next packet and return its handle.
  *

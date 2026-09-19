@@ -5,6 +5,7 @@
 
 #include "render_internal.h"
 #include "../shader/shader_internal.h"
+#include "../sky/sky_internal.h"
 #include "../surface/surface_internal.h"
 #include "../job/job_internal.h"
 
@@ -50,24 +51,6 @@ static void box_render_update_aabb(
         aabb->min = corner ? vec3_min(aabb->min, w) : w;
         aabb->max = corner ? vec3_max(aabb->max, w) : w;
     }
-}
-
-/** Move pending mesh uploads into the packet.
- *
- * @param state The registry
- * @param p The packet
- */
-static void box_extract_meshes(
-    RenderState *state,
-    box_packet_t *p)
-{
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&state->pending_meshes); i ++) {
-        box_mesh_cmd_t *cmd = box_vec_push(&p->mesh_create);
-        *cmd = *ecs_vec_get_t(&state->pending_meshes, box_mesh_cmd_t, i);
-    }
-
-    ecs_vec_clear(&state->pending_meshes);
 }
 
 /** Extract one dirty static entity: assign a slot and emit its instance data.
@@ -249,7 +232,7 @@ void box_render_extract(
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
     box_shader_extract(world, p);
-    box_extract_meshes(state, p);
+    box_render_extract_meshes(state, p);
     box_render_extract_textures(state, p);
 
     int32_t i;
@@ -269,6 +252,7 @@ void box_render_extract(
     box_extract_counts(state, p);
     box_render_extract_groups(state, p);
     box_render_extract_views(world, state, p, capture);
+    box_sky_extract(world, p);
     const box_view_t *v = p->views.count ? box_vec_at(&p->views, 0) : NULL;
     if (v && ecs_lookup(world, "box.job.JobSettings")) {
         box_job_set_eye(world, vec3_new(v->eye[0], v->eye[1], v->eye[2]));

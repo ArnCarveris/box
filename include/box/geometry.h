@@ -18,6 +18,26 @@
 extern "C" {
 #endif
 
+/** Application authored mesh, uploaded to the renderer when it is set.
+ *
+ * Vertices are required. Normals may be empty, in which case the engine derives
+ * them from the triangles, and uvs may be empty, which leaves them at zero.
+ * Indices may be empty, which draws the vertices in the order they are given;
+ * otherwise every index must name a vertex and their count must be a multiple
+ * of three. Two entities whose data is identical share one uploaded mesh, which
+ * is released when the last of them lets go of it.
+ *
+ * Colors are kept and validated but not uploaded yet: the vertex format of the
+ * renderer has no color channel, so widening it is a separate task.
+ */
+ECS_STRUCT(Mesh3, {
+    ecs_vec(vec3) vertices;    /**< Vertex positions */
+    ecs_vec(vec3) normals;     /**< Vertex normals, empty to derive them per face */
+    ecs_vec(vec2) uvs;         /**< Texture coordinates, empty for zeros */
+    ecs_vec(uint32_t) indices; /**< Three indices per triangle, empty to draw in order */
+    ecs_vec(rgb) colors;       /**< Per vertex color, one per vertex or empty */
+});
+
 /** Box with size x, y, z */
 ECS_STRUCT(Box, {
     float x; /**< Width */

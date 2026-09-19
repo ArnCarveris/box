@@ -4,22 +4,34 @@
     "value": {
         "description": "Benchmarks for the procedural mesh generators and the mesh cache",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "bench": {
-        "benchsuites": [{
-            "id": "Generate",
-            "benchcases": [
-                "sphere",
-                "box",
-                "torus",
-                "capsule"
-            ]
-        }, {
-            "id": "Cache",
-            "benchcases": [
-                "hit"
-            ]
-        }]
+        "benchsuites": [
+            {
+                "id": "Generate",
+                "benchcases": [
+                    "sphere",
+                    "box",
+                    "torus",
+                    "capsule"
+                ]
+            },
+            {
+                "id": "Cache",
+                "benchcases": [
+                    "hit"
+                ]
+            },
+            {
+                "id": "Upload",
+                "benchcases": [
+                    "mesh_100k",
+                    "share_100k"
+                ]
+            }
+        ]
     }
 }
