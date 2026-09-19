@@ -30,6 +30,7 @@
 #include "box/collision.h"
 #include "box/picking.h"
 #include "box/spline.h"
+#include "box/lod.h"
 #include "box/controller.h"
 #include "box/surface.h"
 #include "box/sky.h"

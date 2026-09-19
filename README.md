@@ -484,7 +484,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script, transition
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script, transition, lod
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered
