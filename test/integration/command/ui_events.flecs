@@ -1,3 +1,9 @@
+// A scripted button clicked through the mouse commands: the agent moves the
+// cursor onto it, clicks it once the hover reaches it and runs the command file
+// once the action of the button fired, which is a frame after the click so the
+// tags of the handlers are there. The log shows the click bubbling from the
+// label to the button, the action arriving through the input layer and the
+// hover moving on to the panel.
 using flecs.script
 using box.transform
 using box.geometry
