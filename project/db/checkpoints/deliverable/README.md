@@ -7,7 +7,7 @@
 - The flecs edit API went linear (commit `736e76de5`): a line index built once per script and binary searched, a hashmap from entity and component to its edit, and using scopes resolved once per session. A 50k entity checkpoint went from 31.6 s to 27 ms, a flat 1.8 million entities a second.
 
 ## Verification
-- TESTS_PLACEHOLDER
+- 1474 unit tests across 18 projects, all passing; `test/checkpoint` is new with 40 tests over the `Folder`, `Report`, `Restore`, `Survive`, `Write` suites and `test/script` grew to 21 with its `Reload` suite; in flecs, `Reload` (12 cases) and `Edit.set_10k_statements` are new.
 - Scenes in `integration/`: `checkpoint.log` checkpoints a scene, moves a crate, checkpoints again and adds an unowned entity; `checkpoint_restore.log` checkpoints, moves, deletes, adds an unowned entity and restores twice, with the world matching the checkpoint after each restore; every visual scene bit identical.
 - Benchmarks in `bench/` against the picking epic: a checkpoint of 500 entities writes in 0.28 ms, 5000 in 2.6 ms and 50k in 27 ms; a restore of 500 entities takes 4.2 ms.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.
