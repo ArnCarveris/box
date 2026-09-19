@@ -53,6 +53,14 @@ ECS_STRUCT(rgb, {
     uint8_t b; /**< Blue */
 });
 
+/** Display encoded color with 8 bit channels and an 8 bit alpha channel */
+ECS_STRUCT(rgba, {
+    uint8_t r; /**< Red */
+    uint8_t g; /**< Green */
+    uint8_t b; /**< Blue */
+    uint8_t a; /**< Alpha */
+});
+
 /** Register the box.types module.
  *
  * @param world The world

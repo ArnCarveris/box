@@ -16,4 +16,5 @@ void BoxTypesImport(
     ECS_META_COMPONENT(world, vec4);
     ECS_META_COMPONENT(world, mat4);
     ECS_META_COMPONENT(world, rgb);
+    ECS_META_COMPONENT(world, rgba);
 }
