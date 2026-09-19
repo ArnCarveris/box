@@ -6,11 +6,11 @@
 - `ParticleCurves` (four key size, opacity, rotation and color over life, read in the draw pass from age and lifetime) and `ParticleAppearance` (soft circle, sprite from a texture entity, `Image` or `PbrTextures` with sheet frames, or a mesh billboard), alpha and additive pipelines after the glass pass sorted back to front by emitter, and a depth soft fade.
 - `ParticlePlayback` (playing, paused, stopped, engine written clock, reset) and `ParticleBurst` schedules evaluated from the clock so a burst lands on the same frame every run; `particle.start`, `pause`, `stop`, `reset` and `time` as script functions.
 - Scale: 52 bytes per particle with half float color, opacity, rotation and size, dispatch over used slots only, an indirect compacted draw, four vertex strip quads, `ParticleSettings` budgets shared in proportion to the asks, frustum and distance culling and half rate stepping past a distance, and `ParticleStats`.
-- RAIN_PLACEHOLDER
+- Rain as a weather state: `Weather.rain` creates one emitter under the sky, a box volume following the camera, drives its rate, drop size, wind, ground kill collision and playback from the blended amount, adds that amount to the overcast, the fog and the material wetness layer, and fills the column with a burst on the first frame; streaks come from a new `ParticleAppearance.stretch`.
 
 ## Verification
 - TESTS_PLACEHOLDER
-- Scenes in `integration/`: `particles_shapes` (a stream from each spawn shape), `particles_forces` (a fountain under gravity and wind with bounces), `particles_appearance` (one emitter per appearance and blend), `particles_control` (a burst frozen mid flight, with its command log driving every state), RAIN_SCENES_PLACEHOLDER; every earlier scene bit identical. `particles_10m.json` records ten million particles over ten emitters at 10.5 ms mean and 17.1 ms p99 in release, 95 fps against the 60 the brief asks for, and `particles_fill.json` 11200 screen filling soft sprites at 10.7 ms.
+- Scenes in `integration/`: `particles_shapes` (a stream from each spawn shape), `particles_forces` (a fountain under gravity and wind with bounces), `particles_appearance` (one emitter per appearance and blend), `particles_control` (a burst frozen mid flight, with its command log driving every state), `weather_rain` and `weather_rain_heavy` (the same scene under light and heavy rain); every earlier scene bit identical. `particles_10m.json` records ten million particles over ten emitters at 10.5 ms mean and 17.1 ms p99 in release, 95 fps against the 60 the brief asks for, and `particles_fill.json` 11200 screen filling soft sprites at 10.7 ms.
 - Benchmarks in `bench/` against the LOD epic: a million particles simulate and draw in 0.49 ms, the extract costs 240 ns per emitter with budgets, forces, curves, playback and four schedules, and the C twin of the shaders in `src/particle/simulate.h` is what the integrator, curve and collision tests check.
 - Build reports and the wasm image in the deliverable, open it through the status page Inspect link of this epic.
 
@@ -21,4 +21,4 @@
 
 ## Not in this epic
 - Colliders other than spheres and boxes, packing position and velocity (which would move existing baselines), and a second phase of the control command scene.
-- NOT_PLACEHOLDER
+- Rain drops do not splash on impact and do not wet the ground texture beyond the material layer.
