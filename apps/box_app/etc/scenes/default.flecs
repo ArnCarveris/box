@@ -3,6 +3,11 @@ using box.geometry
 using box.material
 using box.camera
 using box.light
+using box.ui
+
+$ {
+  Console: {}
+}
 
 camera {
   Position: {3, 2.5, -5}
