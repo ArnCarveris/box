@@ -140,6 +140,13 @@ float box_spline_length(
     const ecs_world_t *world,
     ecs_entity_t spline);
 
+/** Register the system that moves the followers of a path.
+ *
+ * @param world The world
+ */
+void box_spline_follow_init(
+    ecs_world_t *world);
+
 /** Register the script functions of the module.
  *
  * @param world The world

@@ -35,6 +35,27 @@ static void box_spline_ctor(
     }
 }
 
+/** FollowPath constructor: a follower that loops its curve at one unit a second.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_follow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    FollowPath *path = ptr;
+    int32_t i;
+
+    memset(ptr, 0, (size_t)count * sizeof(FollowPath));
+    for (i = 0; i < count; i ++) {
+        path[i].speed = 1.0f;
+    }
+}
+
 /** Release the control points of a Spline.
  *
  * @param ptr The components
@@ -250,10 +271,13 @@ void BoxSplineImport(
 {
     ECS_MODULE(world, BoxSpline);
     ECS_IMPORT(world, BoxTypes);
+    ECS_IMPORT(world, BoxTransform);
 
     ECS_META_COMPONENT(world, SplineType);
     ECS_META_COMPONENT(world, Spline);
     ECS_META_COMPONENT(world, SplineInfo);
+    ECS_META_COMPONENT(world, PathMode);
+    ECS_META_COMPONENT(world, FollowPath);
     ECS_COMPONENT_DEFINE(world, SplineTable);
 
     ecs_set_hooks(world, Spline, {
@@ -271,9 +295,13 @@ void BoxSplineImport(
     });
 
     ecs_set_hooks(world, SplineInfo, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, FollowPath, { .ctor = box_follow_ctor });
 
     ecs_add_pair(world, ecs_id(SplineTable), EcsOnInstantiate, EcsDontInherit);
     ecs_add_pair(world, ecs_id(SplineInfo), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(FollowPath), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(FollowPath), EcsWith, ecs_id(Rotation));
+    ecs_add_pair(world, ecs_id(FollowPath), EcsWith, DynamicTransform);
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(Spline), .inout = EcsIn }},
@@ -287,5 +315,6 @@ void BoxSplineImport(
         .callback = box_spline_on_remove
     });
 
+    box_spline_follow_init(world);
     box_spline_functions_init(world, ecs_id(BoxSpline));
 }

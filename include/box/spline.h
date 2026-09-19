@@ -54,6 +54,29 @@ ECS_STRUCT(SplineInfo, {
     int32_t segments; /**< Number of segments the control points describe */
 });
 
+/** What a follower does when it reaches the end of its path */
+ECS_ENUM(PathMode, {
+    PathLoop = 0,     /**< Start over at the beginning of the curve */
+    PathPingPong = 1, /**< Turn around and travel back */
+    PathOnce = 2      /**< Stop at the end of the curve */
+});
+
+/** Moves an entity along a spline by arc length, one step per frame.
+ *
+ * The follower is sampled at offset plus travelled, folded by the mode, so it
+ * moves at speed world units per second whatever the shape of the curve. A
+ * FollowPath adds Position, Rotation and DynamicTransform to its entity, which
+ * makes a camera or a light follow a curve as readily as a mesh.
+ */
+ECS_STRUCT(FollowPath, {
+    ecs_entity_t spline; /**< Curve entity to follow */
+    float speed;         /**< World units per second, negative travels backwards */
+    float offset;        /**< Distance along the curve the follower starts at */
+    PathMode mode;       /**< What happens at the end of the curve */
+    bool orient;         /**< Write Rotation so local +Z follows the tangent */
+    float travelled;     /**< Distance travelled since the start, written by the engine */
+});
+
 /** Register the box.spline module.
  *
  * @param world The world

@@ -1,0 +1,90 @@
+using box
+using box.spline
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ {
+  EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {70, 66, 60}, intensity: 0.75}
+}
+
+camera {
+  Position: {0, 17, -21}
+  LookAt: {0, 0.5, 0.5}
+  Camera: {fov: 52}
+}
+
+sun {
+  Rotation: {0.95, -0.5, 0}
+  DirectionalLight: {intensity: 1.5}
+}
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {44, 0.5, 44}
+  Rgb: {105, 108, 112}
+  PbrMaterial: {roughness: 0.9}
+}
+
+track {
+  Spline: {
+    points: [
+      {-9, 0.4, -6}, {0, 0.4, -9}, {9, 0.4, -6},
+      {11, 0.4, 3}, {0, 0.4, 9}, {-11, 0.4, 3}
+    ],
+    loop: true
+  }
+}
+
+const len = spline.length(track)
+
+markers {
+  for i in 0..72 {
+    const p = spline.point_at(track, len * i / 72.0)
+    _ {
+      Position: {p.x, p.y, p.z}
+      Box: {0.36, 0.16, 0.36}
+      Rgb: {240, 205, 90}
+      PbrMaterial: {roughness: 0.5}
+    }
+  }
+}
+
+runners {
+  red {
+    FollowPath: {spline: track, speed: 5, offset: 0, mode: PathLoop, orient: true}
+    Box: {0.9, 0.7, 2}
+    Rgb: {225, 70, 55}
+    PbrMaterial: {roughness: 0.35, metallic: 0.2}
+  }
+
+  green {
+    FollowPath: {spline: track, speed: 5, offset: len * 0.2, mode: PathLoop, orient: true}
+    Box: {0.9, 0.7, 2}
+    Rgb: {70, 200, 110}
+    PbrMaterial: {roughness: 0.35, metallic: 0.2}
+  }
+
+  blue {
+    FollowPath: {spline: track, speed: 5, offset: len * 0.4, mode: PathLoop, orient: true}
+    Box: {0.9, 0.7, 2}
+    Rgb: {70, 130, 235}
+    PbrMaterial: {roughness: 0.35, metallic: 0.2}
+  }
+
+  white {
+    FollowPath: {spline: track, speed: 5, offset: len * 0.6, mode: PathLoop, orient: true}
+    Sphere: {radius: 0.55, segments: 24, smooth: true}
+    Rgb: {235, 235, 240}
+    PbrMaterial: {roughness: 0.25, metallic: 0.6}
+  }
+
+  lamp {
+    FollowPath: {spline: track, speed: -4, offset: len * 0.8, mode: PathLoop}
+    Sphere: {radius: 0.3, segments: 16, smooth: true}
+    PointLight: {intensity: 40, range: 14}
+    Rgb: {120, 205, 255}
+  }
+}

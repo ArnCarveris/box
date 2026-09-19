@@ -25,6 +25,13 @@
                     "build_64_segments",
                     "rebuild_on_set"
                 ]
+            },
+            {
+                "id": "Follow",
+                "benchcases": [
+                    "followers_10k",
+                    "followers_10k_oriented"
+                ]
             }
         ]
     }
