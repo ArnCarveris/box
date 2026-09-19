@@ -193,6 +193,29 @@ typedef struct GroupImpl {
     int32_t height;      /**< Height of the target in pixels */
 } GroupImpl;
 
+/** Caret and history of a text input, added with TextInput */
+typedef struct TextInputImpl {
+    ecs_vec_t history;  /**< char* of the lines the input submitted, oldest first */
+    ecs_entity_t caret; /**< Quad that shows the caret, 0 until the input drew one */
+    int32_t walk;       /**< Line of the history the up and down arrows stand on */
+    char *stash;        /**< Line that was being typed when the walk started */
+    float offset;       /**< Pixels from the left of the box to the caret */
+    float height;       /**< Height the caret was given */
+} TextInputImpl;
+
+/** Binding, session and parts of the in game console, stored as a singleton */
+typedef struct ConsoleImpl {
+    ecs_entity_t action;  /**< Action the grave key fires, which flips the console */
+    ecs_entity_t submit;  /**< Action the console fires when it runs a line */
+    ecs_entity_t map;     /**< Input map that holds the binding of the grave key */
+    ecs_entity_t input;   /**< Element of the tree that holds the line being typed */
+    ecs_entity_t log;     /**< Element of the tree that shows the scrollback */
+    ecs_vec_t captured;   /**< ecs_entity_t of the input maps the console disabled */
+    int32_t shown;        /**< Lines of the session log the scrollback shows */
+    bool loaded;          /**< The console script was loaded */
+    bool open;            /**< The console was open after the last update */
+} ConsoleImpl;
+
 /** Quad the shadow pass drew for an element, added with BoxShadow */
 typedef struct ShadowImpl {
     ecs_entity_t quad; /**< The quad, 0 until the pass drew one */
@@ -209,6 +232,8 @@ extern ECS_TAG_DECLARE(UiQuad);
 extern ECS_COMPONENT_DECLARE(ShadowImpl);
 extern ECS_COMPONENT_DECLARE(GroupImpl);
 extern ECS_COMPONENT_DECLARE(TextImpl);
+extern ECS_COMPONENT_DECLARE(TextInputImpl);
+extern ECS_COMPONENT_DECLARE(ConsoleImpl);
 extern ECS_COMPONENT_DECLARE(UiFonts);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
@@ -502,5 +527,43 @@ void box_ui_hit_init(
 void box_ui_functions_init(
     ecs_world_t *world,
     ecs_entity_t module);
+
+/** Let every focused text input of the world edit its line with the frame.
+ *
+ * @param world The world
+ */
+void box_ui_text_input_update(
+    ecs_world_t *world);
+
+/** Register the components, the hooks and the observers of the text input.
+ *
+ * @param world The world
+ */
+void box_ui_text_input_init(
+    ecs_world_t *world);
+
+/** Open, close and fill the in game console of the world.
+ *
+ * @param world The world
+ */
+void box_ui_console_update(
+    ecs_world_t *world);
+
+/** Run the line the console submitted and write its scrollback.
+ *
+ * The pass runs after the text input of the frame, so a line that was typed and
+ * submitted in one frame is run in that frame.
+ *
+ * @param world The world
+ */
+void box_ui_console_sync(
+    ecs_world_t *world);
+
+/** Register the components, the hooks and the observers of the console.
+ *
+ * @param world The world
+ */
+void box_ui_console_init(
+    ecs_world_t *world);
 
 #endif

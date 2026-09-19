@@ -69,6 +69,13 @@
  * and the Action of an element firing through the input action layer on a
  * click. Every widget is written in script from those pieces; the module holds
  * no widget of its own.
+ *
+ * The in game console is the proof of that: a Console singleton installs the
+ * backtick binding and the first open loads the script the framework ships at
+ * BOX_UI_CONSOLE, which builds the overlay out of the elements above. The
+ * engine only fills the two parts the script marks, the scrollback of a
+ * ConsoleLog element and the line of a TextInput, and holds the keyboard for
+ * the overlay while it is open.
  */
 
 #ifndef BOX_UI_H
@@ -237,6 +244,67 @@ ECS_STRUCT(Bounds, {
     float height; /**< Height of the element */
 });
 
+/** Line of text an element lets the keyboard edit, with a caret of its own.
+ *
+ * The element shows value as its Text and carries one more child, a thin quad
+ * pinned to the left edge of its box at the width of the text before the
+ * caret. A focused input takes the characters the frame collected and the edit
+ * keys that go with them: backspace and delete around the caret, the arrows and
+ * home and end over the line, and enter, which moves the line to submitted and
+ * empties the input. It follows the focus rules of the device layer, so an
+ * input takes nothing while the window is not focused.
+ *
+ * An input with history walks the lines it submitted with the up and down
+ * arrows, keeping the line that was being typed until the walk comes back to
+ * it, and an input with complete asks box.command for the command name or the
+ * entity path the tab key completes: the longest prefix every candidate shares
+ * replaces the word the caret is in and a single candidate is followed by a
+ * space.
+ */
+ECS_STRUCT(TextInput, {
+    char *value;     /**< The line being edited, UTF-8 */
+    int32_t caret;   /**< Byte of the line the caret sits before */
+    bool focused;    /**< The element takes the text and the edit keys of the frame */
+    bool history;    /**< Up and down walk the lines that were submitted */
+    bool complete;   /**< Tab completes a command name or an entity path */
+    char *submitted; /**< Line the last enter submitted, empty when there is none */
+});
+
+/** The in game console, an overlay terminal the backtick key opens.
+ *
+ * Adding the singleton installs the binding: an InputAction under the actions
+ * scope that the grave key fires through the action layer, which flips open on
+ * every press. The first open loads the console script the framework installs
+ * at BOX_UI_CONSOLE, which builds the overlay out of ordinary UI elements and
+ * marks the two parts the engine fills, the element with a ConsoleLog that
+ * holds the scrollback and the element with a TextInput that holds the line.
+ * The module keeps no widget of its own: everything the console looks like is
+ * in that script and an application is free to install its own.
+ *
+ * An open console holds the keyboard: every other input map is disabled while
+ * it is open and enabled again when it closes, so the keys that drive a game
+ * do not drive it while a line is being typed, and its own map keeps working
+ * so the same key closes it again. A closed console keeps its tree and its
+ * session and only turns the view of the overlay off.
+ *
+ * The line a console submits is set as TerminalInput on its session, which is
+ * the session an agent reaches over HTTP with every command it holds, and the
+ * scrollback is the log of that session: every line it ran and the
+ * TerminalOutput that came back, the engine log included through the logs
+ * command. Submitting a line also fires the submit action, so a script can
+ * await on.pressed for it.
+ */
+ECS_STRUCT(Console, {
+    bool open;            /**< The overlay is shown and holds the keyboard */
+    ecs_entity_t session; /**< Terminal session of the overlay, written by the engine */
+    ecs_entity_t root;    /**< Root of the console tree, written by the engine */
+});
+
+/** Element of the console tree the engine writes the scrollback of its session into */
+ECS_STRUCT(ConsoleLog, {
+    int32_t lines; /**< Lines of the session log the element shows, 0 for the default */
+});
+
 /** Order in the frame a created UI view renders at, after the views of a scene */
 #define BOX_UI_PRIORITY (1000)
 
@@ -278,6 +346,24 @@ ECS_STRUCT(Bounds, {
 
 /** Subtrees one update may lay out before the tree is laid out as a whole */
 #define BOX_UI_SUBTREE_MAX (64)
+
+/** Script the framework installs, which the first open of the console loads */
+#define BOX_UI_CONSOLE "etc/ui/console.flecs"
+
+/** Name of the terminal session the console runs its lines on */
+#define BOX_UI_CONSOLE_SESSION "console"
+
+/** Input map that holds the binding of the grave key, the one an open console keeps */
+#define BOX_UI_CONSOLE_MAP "console_map"
+
+/** Lines of the session log a ConsoleLog element shows when it names none */
+#define BOX_UI_CONSOLE_LINES (14)
+
+/** Width of the caret of a text input in logical pixels */
+#define BOX_UI_CARET_WIDTH (2.0f)
+
+/** Lines one text input keeps in its history */
+#define BOX_UI_HISTORY_MAX (64)
 
 /** Element of a UI tree at a point in the plane the trees are laid out in.
  *

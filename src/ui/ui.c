@@ -241,6 +241,9 @@ void box_ui_update(
 static void BoxUiUpdate(
     ecs_iter_t *it)
 {
+    box_ui_console_update(it->world);
+    box_ui_text_input_update(it->world);
+    box_ui_console_sync(it->world);
     box_ui_update(it->world);
 }
 
@@ -256,6 +259,7 @@ void BoxUiImport(
     ECS_IMPORT(world, BoxMaterial);
     ECS_IMPORT(world, BoxTexture);
     ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, BoxInput);
 
     ECS_META_COMPONENT(world, Align);
     ECS_META_COMPONENT(world, VAlign);
@@ -267,6 +271,9 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Font);
     ECS_META_COMPONENT(world, Text);
+    ECS_META_COMPONENT(world, TextInput);
+    ECS_META_COMPONENT(world, Console);
+    ECS_META_COMPONENT(world, ConsoleLog);
     ECS_COMPONENT_DEFINE(world, UiImpl);
     ECS_COMPONENT_DEFINE(world, UiNode);
     ECS_COMPONENT_DEFINE(world, UiState);
@@ -293,6 +300,9 @@ void BoxUiImport(
         .dtor = box_ui_state_dtor
     });
     ecs_set_hooks(world, Font, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, TextInput, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Console, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ConsoleLog, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, TextImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiFonts, {
         .ctor = flecs_default_ctor,
@@ -355,5 +365,7 @@ void BoxUiImport(
     box_ui_shadow_init(world);
     box_ui_group_init(world);
     box_ui_hit_init(world);
+    box_ui_text_input_init(world);
+    box_ui_console_init(world);
     box_ui_functions_init(world, ecs_id(BoxUi));
 }

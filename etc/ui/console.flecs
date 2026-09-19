@@ -1,0 +1,50 @@
+// The in game console the backtick key opens. box.ui loads this script the
+// first time the console opens and fills the two elements it marks: the one
+// with a ConsoleLog shows the log of the session and the one with a TextInput
+// holds the line being typed, with its caret, its history and its completion.
+// Everything else here is ordinary UI, so an application that wants another
+// console ships its own script at etc/ui/console.flecs.
+using box.transform
+using box.geometry
+using box.material
+using box.ui
+
+console {
+  Ui: {height: 540}
+
+  panel {
+    Position: {0, 140, 0}
+    Layout: {direction: Column, width: 880, height: 260,
+             padding: 14, spacing: 8, h: Left, v: Top}
+    Border: {radius: 10, width: 2, color: {70, 90, 130, 255}}
+    Rgb: {14, 17, 26}
+    BoxShadow: {y: 8, blur: 24, color: {0, 0, 0, 160}}
+    Font: {size: 14}
+
+    scrollback {
+      Layout: {width: 852, height: 196}
+      ConsoleLog: {lines: 12}
+      Text: {value: "", align: Left}
+      Rgb: {170, 192, 225}
+    }
+
+    prompt {
+      Layout: {direction: Row, width: 852, height: 24,
+               padding: 4, spacing: 8, h: Left, v: Middle}
+      Border: {radius: 6}
+      Rgb: {24, 29, 44}
+
+      marker {
+        Text: {value: "$"}
+        Rgb: {120, 210, 160}
+      }
+
+      input {
+        Layout: {width: 812, height: 18}
+        TextInput: {focused: true, history: true, complete: true}
+        Text: {value: ""}
+        Rgb: {238, 244, 255}
+      }
+    }
+  }
+}
