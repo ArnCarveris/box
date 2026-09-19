@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-19T00:33:54.505+00:00",
   "start_time": "2026-09-19T00:34:06.280+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T00:40:23.071+00:00",
   "dependencies": [
     "effects/showcase"
   ]
