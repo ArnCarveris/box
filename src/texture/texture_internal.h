@@ -104,6 +104,26 @@ void box_texture_set_memory(
     const uint8_t *data,
     int32_t size);
 
+/** Give a texture entity an RGBA8 image a module rasterized itself.
+ *
+ * The entity gets a Texture with an empty path, so it goes through the same
+ * release and unbind path as a texture that was loaded from a file. A square
+ * image whose edge is the size of a texture class is uploaded texel for texel,
+ * which is what the glyph atlas of box.ui counts on.
+ *
+ * @param world The world
+ * @param e The texture entity
+ * @param pixels The RGBA8 texels, rows from the top of the image
+ * @param width Width of the image in texels
+ * @param height Height of the image in texels
+ */
+void box_texture_set_image(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const uint8_t *pixels,
+    int32_t width,
+    int32_t height);
+
 /** Read the texture settings of the surface, or the engine defaults.
  *
  * @param world The world
