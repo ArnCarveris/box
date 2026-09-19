@@ -52,6 +52,8 @@ static void box_render_update_aabb(
         aabb->min = corner ? vec3_min(aabb->min, w) : w;
         aabb->max = corner ? vec3_max(aabb->max, w) : w;
     }
+
+    ecs_modified(world, e, AABB);
 }
 
 /** Extract one dirty static entity: assign a slot and emit its instance data.

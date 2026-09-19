@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include "../../../src/render/render_internal.h"
 
 void Colliders_sphere_shape_derives_sphere(void)
 {
@@ -408,6 +409,41 @@ void Colliders_shape_change_updates_collider(void)
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, e, Collider)->half.x, 4);
+
+    ecs_fini(world);
+}
+
+void Colliders_rendered_bounds_derive_aabb(void)
+{
+    // collision/aabb_modified
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxRender);
+    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxCollision);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_set(world, cam, Position, {0, 0, -10});
+    ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Cylinder, {16, true, 2, 1});
+    ecs_set(world, e, Position, {1, 0, 0});
+    ecs_progress(world, 0);
+
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    box_render_extract(world, &packet);
+    box_packet_fini(&packet);
+    ecs_progress(world, 0);
+
+    test_assert(ecs_has(world, e, AABB));
+    const Collider *c = ecs_get(world, e, Collider);
+    test_assert(c != NULL);
+    test_int(c->kind, ColliderAabb);
+    test_flt(c->center.x, 1);
+    test_flt(c->half.x, 1);
+    test_flt(c->half.y, 1);
 
     ecs_fini(world);
 }

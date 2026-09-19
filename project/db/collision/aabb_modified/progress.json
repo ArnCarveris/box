@@ -1,0 +1,10 @@
+{
+  "kind": "feature",
+  "status": "complete",
+  "created": "2026-09-19T06:34:18.604+00:00",
+  "start_time": "2026-09-19T06:34:18.642+00:00",
+  "end_time": "2026-09-19T06:36:19.765+00:00",
+  "dependencies": [
+    "collision/colliders"
+  ]
+}

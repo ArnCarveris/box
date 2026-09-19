@@ -57,7 +57,8 @@
           "scale_applied_to_capsule",
           "rotation_turns_box_axes",
           "move_updates_collider",
-          "shape_change_updates_collider"
+          "shape_change_updates_collider",
+          "rendered_bounds_derive_aabb"
         ]
       },
       {
