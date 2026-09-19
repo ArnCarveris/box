@@ -2,6 +2,43 @@
   "kind": "command",
   "results": [
     {
+      "scene": "test/integration/command/checkpoint.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/checkpoint.log",
+      "expected": "test/integration/command/checkpoint.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/checkpoint_restore.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/checkpoint_restore.log",
+      "expected": "test/integration/command/checkpoint_restore.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/console.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/console.log",
+      "expected": "test/integration/command/console.expected",
+      "images": [
+        "console_capture_12_0.png"
+      ]
+    },
+    {
+      "scene": "test/integration/command/fps.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/fps.log",
+      "expected": "test/integration/command/fps.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/gpu_timings.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/gpu_timings.log",
+      "expected": null,
+      "images": []
+    },
+    {
       "scene": "test/integration/command/input.flecs",
       "status": "pass",
       "log": "project/db/monitoring/deliverable/integration/input.log",
@@ -13,6 +50,13 @@
       "status": "pass",
       "log": "project/db/monitoring/deliverable/integration/monitor.log",
       "expected": "test/integration/command/monitor.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/picking.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/picking.log",
+      "expected": "test/integration/command/picking.expected",
       "images": []
     },
     {
@@ -45,6 +89,20 @@
       "status": "pass",
       "log": "project/db/monitoring/deliverable/integration/shell.log",
       "expected": "test/integration/command/shell.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/ui_events.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/ui_events.log",
+      "expected": "test/integration/command/ui_events.expected",
+      "images": []
+    },
+    {
+      "scene": "test/integration/command/ui_text_script.flecs",
+      "status": "pass",
+      "log": "project/db/monitoring/deliverable/integration/ui_text_script.log",
+      "expected": "test/integration/command/ui_text_script.expected",
       "images": []
     }
   ]

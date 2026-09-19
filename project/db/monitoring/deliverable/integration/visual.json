@@ -2,6 +2,42 @@
   "kind": "visual",
   "results": [
     {
+      "scene": "test/integration/visual/atmosphere_noon.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/atmosphere_noon.png"
+    },
+    {
+      "scene": "test/integration/visual/atmosphere_sunrise.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/atmosphere_sunrise.png"
+    },
+    {
+      "scene": "test/integration/visual/atmosphere_sunset.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/atmosphere_sunset.png"
+    },
+    {
       "scene": "test/integration/visual/auto_exposure.flecs",
       "status": "pass",
       "baseline": {
@@ -62,6 +98,66 @@
       "image": "project/db/monitoring/deliverable/integration/bloom.png"
     },
     {
+      "scene": "test/integration/visual/celestial.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 1,
+        "mean": 0.0001,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/celestial.png"
+    },
+    {
+      "scene": "test/integration/visual/celestial_moon.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 1,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/celestial_moon.png"
+    },
+    {
+      "scene": "test/integration/visual/collision_debug.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 170,
+        "mean": 0.0002,
+        "px": 1,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/collision_debug.png"
+    },
+    {
+      "scene": "test/integration/visual/console.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/console.png"
+    },
+    {
+      "scene": "test/integration/visual/controller_collision.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/controller_collision.png"
+    },
+    {
       "scene": "test/integration/visual/culling.flecs",
       "status": "pass",
       "baseline": {
@@ -72,6 +168,18 @@
         "status": "match"
       },
       "image": "project/db/monitoring/deliverable/integration/culling.png"
+    },
+    {
+      "scene": "test/integration/visual/custom_shape.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/custom_shape.png"
     },
     {
       "scene": "test/integration/visual/dynamic_room.flecs",
@@ -110,6 +218,18 @@
       "image": "project/db/monitoring/deliverable/integration/first_person.png"
     },
     {
+      "scene": "test/integration/visual/fps_overlay.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/fps_overlay.png"
+    },
+    {
       "scene": "test/integration/visual/glass_sweep.flecs",
       "status": "pass",
       "baseline": {
@@ -120,6 +240,18 @@
         "status": "match"
       },
       "image": "project/db/monitoring/deliverable/integration/glass_sweep.png"
+    },
+    {
+      "scene": "test/integration/visual/gltf.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/gltf.png"
     },
     {
       "scene": "test/integration/visual/gtao.flecs",
@@ -192,6 +324,18 @@
         "status": "match"
       },
       "image": "project/db/monitoring/deliverable/integration/lights_city.png"
+    },
+    {
+      "scene": "test/integration/visual/mesh3.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/mesh3.png"
     },
     {
       "scene": "test/integration/visual/milk_glass.flecs",
@@ -278,6 +422,18 @@
       "image": "project/db/monitoring/deliverable/integration/pbr_spheres.png"
     },
     {
+      "scene": "test/integration/visual/picking_hover.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/picking_hover.png"
+    },
+    {
       "scene": "test/integration/visual/primitives.flecs",
       "status": "pass",
       "baseline": {
@@ -336,6 +492,102 @@
         "status": "match"
       },
       "image": "project/db/monitoring/deliverable/integration/shadows_low_sun.png"
+    },
+    {
+      "scene": "test/integration/visual/shapes_2d.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/shapes_2d.png"
+    },
+    {
+      "scene": "test/integration/visual/showcase.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/showcase.png"
+    },
+    {
+      "scene": "test/integration/visual/showcase_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/showcase_off.png"
+    },
+    {
+      "scene": "test/integration/visual/sky_fog.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/sky_fog.png"
+    },
+    {
+      "scene": "test/integration/visual/spline_path.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/spline_path.png"
+    },
+    {
+      "scene": "test/integration/visual/spline_road.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/spline_road.png"
+    },
+    {
+      "scene": "test/integration/visual/ssr.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ssr.png"
+    },
+    {
+      "scene": "test/integration/visual/ssr_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ssr_off.png"
     },
     {
       "scene": "test/integration/visual/svg_clip.flecs",
@@ -434,6 +686,42 @@
       "image": "project/db/monitoring/deliverable/integration/tiling.png"
     },
     {
+      "scene": "test/integration/visual/time_of_day_morning.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/time_of_day_morning.png"
+    },
+    {
+      "scene": "test/integration/visual/time_of_day_night.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 1,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/time_of_day_night.png"
+    },
+    {
+      "scene": "test/integration/visual/time_of_day_noon.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/time_of_day_noon.png"
+    },
+    {
       "scene": "test/integration/visual/tint.flecs",
       "status": "pass",
       "baseline": {
@@ -458,6 +746,18 @@
       "image": "project/db/monitoring/deliverable/integration/tonemap.png"
     },
     {
+      "scene": "test/integration/visual/transitions.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/transitions.png"
+    },
+    {
       "scene": "test/integration/visual/two_views.flecs",
       "status": "pass",
       "baseline": {
@@ -468,6 +768,126 @@
         "status": "match"
       },
       "image": "project/db/monitoring/deliverable/integration/two_views.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_group_alpha.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_group_alpha.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_group_alpha_direct.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_group_alpha_direct.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_hover.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_hover.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_layout.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_layout.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_panels.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_panels.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_panels_small.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_panels_small.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_shadow.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_shadow.png"
+    },
+    {
+      "scene": "test/integration/visual/ui_text.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/ui_text.png"
+    },
+    {
+      "scene": "test/integration/visual/weather_fog.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/weather_fog.png"
+    },
+    {
+      "scene": "test/integration/visual/weather_overcast.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/monitoring/deliverable/integration/weather_overcast.png"
     }
   ]
 }
