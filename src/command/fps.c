@@ -64,16 +64,17 @@ static void box_fps_command(
         goto done;
     }
 
+    bool enable = !off;
     ecs_entity_t target = box_fps_target(world);
     const FpsOverlay *overlay = ecs_get(world, target, FpsOverlay);
     const FpsOverlay *window = overlay ? overlay : ecs_singleton_get(world, FpsOverlay);
-    if (!overlay || on || off) {
+    if (!overlay || overlay->enabled != enable) {
         FpsOverlay *next = ecs_ensure(world, target, FpsOverlay);
         if (overlay) {
             *next = *overlay;
         }
 
-        next->enabled = on;
+        next->enabled = enable;
         ecs_modified(world, target, FpsOverlay);
     }
 

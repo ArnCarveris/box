@@ -83,6 +83,34 @@ void Fps_off_disables_the_overlay(void)
     test_bool(o->enabled, false);
 }
 
+void Fps_on_form_enables_the_overlay_on_the_target(void)
+{
+    // ore_engine/fps_command_overlay
+    bool error = true;
+    char *out = box_command_run(w, session, "fps on", &error);
+    test_bool(error, false);
+    test_str(out, "fps overlay on\n");
+    ecs_os_free(out);
+
+    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
+    test_assert(o != NULL);
+    test_bool(o->enabled, true);
+}
+
+void Fps_off_form_disables_the_overlay_on_the_target(void)
+{
+    // ore_engine/fps_command_overlay
+    bool error = true;
+    char *out = box_command_run(w, session, "fps off", &error);
+    test_bool(error, false);
+    test_str(out, "fps overlay off\n");
+    ecs_os_free(out);
+
+    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
+    test_assert(o != NULL);
+    test_bool(o->enabled, false);
+}
+
 void Fps_switching_keeps_the_panel_settings(void)
 {
     // monitoring/fps_command
@@ -98,9 +126,9 @@ void Fps_switching_keeps_the_panel_settings(void)
     test_flt(o->opacity, 0.25f);
 }
 
-void Fps_first_call_starts_the_window_without_the_panel(void)
+void Fps_first_call_starts_the_window_with_the_panel(void)
 {
-    // monitoring/fps_command
+    // ore_engine/fps_command_overlay
     test_assert(ecs_singleton_get(w, FpsOverlay) == NULL);
     bool error = true;
     char *out = box_command_run(w, session, "fps", &error);
@@ -110,7 +138,7 @@ void Fps_first_call_starts_the_window_without_the_panel(void)
 
     const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
     test_assert(o != NULL);
-    test_bool(o->enabled, false);
+    test_bool(o->enabled, true);
 }
 
 void Fps_window_falls_back_to_the_current_frame(void)
