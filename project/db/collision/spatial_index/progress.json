@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-09-18T08:28:19.993+00:00",
-  "start_time": null,
-  "end_time": null,
+  "start_time": "2026-09-19T05:09:47.246+00:00",
+  "end_time": "2026-09-19T05:22:53.444+00:00",
   "dependencies": [
     "collision/aabb_roots",
     "collision/colliders"
