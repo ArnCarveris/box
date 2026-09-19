@@ -211,6 +211,34 @@ from the direction it runs, which makes a road out of a flat strip and a pipe or
 closed one, and the sweep follows the curve of its own entity when it names none
 (`test/integration/visual/spline_road.flecs`).
 
+`box.transition` moves the value a view shows while the world keeps the value the author
+assigned. A `Transition` is a map from a component, or one of its member entities, to
+`TransitionParams {duration, delay, timing_function}` and is inherited by instances, so a prefab
+sets the feel of a whole family:
+
+```
+using box.material
+using box.transition
+
+prefab Button {
+  Rgb: {60, 60, 70}
+  Transition: [Rgb: {duration: 0.2, timing_function: EaseOut}]
+}
+```
+
+Assigning a component the map covers starts a transition from the value the entity currently
+shows toward the one that was assigned and replaces whatever was in flight, so a value assigned
+twice in a frame restarts from what is displayed instead of jumping. `Position`, `Rotation`,
+`Scale`, `Rgb`, `Tint`, `Emissive` and `Opacity` are covered out of the box, and adding
+`Transitionable` to any reflected component of up to four floats or bytes registers that one as
+well. The timing functions are `Linear`, `Ease`, `EaseIn`, `EaseOut` and `EaseInOut`. Only
+entities that have a transition carry the private record that drives it, so a scene without
+transitions pays nothing, and Extract re-reads those entities every frame until the last one ends
+and then stops. Adding `(TransitionValue, Component)` to an entity asks the engine to keep the
+interpolated value of that component there for scripts to read.
+`test/integration/visual/transitions.flecs` captures a position, a color, a scale and an emission
+halfway through their transitions.
+
 `box.collision` keeps incremental bounds for prefab and template roots, derives a cheap collider
 per shape (`SphereCollider`, `BoxCollider`, `CapsuleCollider` override, `NoCollider` opts out) and
 answers ray, sphere, box and frustum queries from a bounding volume hierarchy in microseconds over
@@ -363,7 +391,7 @@ bake3 run test/core --local-env -- -j 12                     # all unit tests
 bake3 run test/core --local-env -- Args -j 12                # one suite
 bake3 run test/core --local-env -- Args.fps                  # one case
 bake3 run test/core --local-env -- -j 12 --json report.json  # with JSON report
-bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script
+bake3 run test/transform --local-env -- -j 12                # other projects: geometry, render, view, shader, command, checkpoint, job, input, controller, script, transition
 ```
 
 Integration scenes live under `test/integration`: `visual/` scenes are rendered

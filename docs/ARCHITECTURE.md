@@ -48,7 +48,8 @@ Two hard rules keep the concerns apart:
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
 | `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree |
-| later | `box.particles`, `box.transition`, `box.lod`, `box.atmosphere` |
+| `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
+| later | `box.particles`, `box.lod`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
 `Box<Module>Import` function, and `src/<module>/` with one file per concern
@@ -83,6 +84,20 @@ A packet is not a copy of the scene. It carries:
 Packets come from a pool of three and reuse their vectors, so steady state does
 not allocate. Render handles (`uint32_t`) identify meshes, materials and
 instances on both sides; the game side allocates them from free lists.
+
+## Transitions
+
+A `Transition` names the components whose displayed value moves toward the value
+the author assigns instead of jumping to it. The author facing component always
+holds the assigned value; the module records the value that is displayed, the
+target, the start time and the parameters in a private `TransitionState` that
+only entities with a transition carry. Extract asks that record for the value of
+the frame, composes the pose components back into the instance matrix under the
+transform of the parent and re-reads a transitioning entity every frame until a
+view has shown the end of it, so an entity that transitions does not become
+dynamic and stops costing anything once it settles. The interpolation itself is
+`box_transition_eval` over one record, which reads nothing but the record, so it
+can move next to the instance on the renderer thread.
 
 ## Static and dynamic content
 
