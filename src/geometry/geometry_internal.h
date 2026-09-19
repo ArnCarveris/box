@@ -140,6 +140,42 @@ void box_shape_init(
 void box_shape2d_init(
     ecs_world_t *world);
 
+/** Register the level ladder component and the working state of the reduction.
+ *
+ * @param world The world
+ */
+void box_mesh_lod_init(
+    ecs_world_t *world);
+
+/** Give a shape the level ladder of its key, or take the one it had away.
+ *
+ * A family the reduction does not know, and a shape authored at or below the
+ * floor of its family, ends up without a ladder and keeps its authored mesh.
+ *
+ * @param world The world, which the ladder of the entity is read from
+ * @param stage The stage the component is set through
+ * @param e The entity
+ * @param key The mesh key of the authored shape
+ */
+void box_mesh_lod_set(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    ecs_entity_t e,
+    const box_mesh_key_t *key);
+
+/** Pick the level of every shape that carries a ladder and swap in its mesh.
+ *
+ * The instances whose level changed are queued for extraction, so the frame
+ * that selects a level is the frame that draws it. A world that never imported
+ * box.geometry has nothing to select and is left alone.
+ *
+ * @param world The world
+ * @param viewport_px Height of the surface in pixels
+ */
+void box_mesh_lod_select(
+    ecs_world_t *world,
+    float viewport_px);
+
 /** Segments a circle of a radius is drawn with, quantized so meshes are shared.
  *
  * @param radius The radius

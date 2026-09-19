@@ -26,6 +26,7 @@ static void box_shape_apply(
     RenderMesh mesh = { .scale = scale };
     mesh.handle = box_mesh_cache_get(it->world, key, &mesh.bounds_min, &mesh.bounds_max);
     ecs_set_ptr(it->stage, e, RenderMesh, &mesh);
+    box_mesh_lod_set(it->world, it->stage, e, key);
 }
 
 /** Key with only a kind, for unit shapes.
@@ -385,6 +386,7 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Star);
 
     box_mesh_cache_init(world);
+    box_mesh_lod_init(world);
     box_mesh3_init(world);
     box_shape_init(world);
     box_shape2d_init(world);

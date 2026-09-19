@@ -151,6 +151,32 @@
                     "is_half_on_the_outline",
                     "a_hard_edge_has_no_fringe"
                 ]
+            },
+            {
+                "id": "Reduce",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "a_distant_sphere_drops_to_eight_segments",
+                    "a_near_sphere_keeps_the_authored_mesh",
+                    "instances_at_one_level_share_a_mesh",
+                    "the_authored_count_caps_the_level",
+                    "a_shape_at_its_floor_never_reduces",
+                    "settings_that_are_off_keep_the_authored_mesh",
+                    "a_world_without_settings_keeps_the_authored_mesh",
+                    "a_view_without_settings_holds_the_finest_level",
+                    "a_receding_camera_coarsens_the_level",
+                    "the_band_holds_a_level_over_a_frame",
+                    "a_level_change_moves_the_instance_to_its_batch",
+                    "a_cylinder_follows_the_metric",
+                    "a_cone_follows_the_metric",
+                    "a_torus_reduces_its_rings_with_its_segments",
+                    "a_capsule_follows_the_metric",
+                    "an_open_tube_is_measured_as_the_circle_it_sweeps",
+                    "a_rounded_box_reduces_its_corners",
+                    "a_hemisphere_and_a_frustum_reduce_too",
+                    "a_box_never_carries_a_ladder"
+                ]
             }
         ]
     }

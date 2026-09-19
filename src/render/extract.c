@@ -4,6 +4,7 @@
  */
 
 #include "render_internal.h"
+#include "../geometry/geometry_internal.h"
 #include "../shader/shader_internal.h"
 #include "../sky/sky_internal.h"
 #include "../surface/surface_internal.h"
@@ -251,6 +252,7 @@ void box_render_extract(
 {
     RenderState *state = box_render_state(world);
     ecs_entity_t capture = box_render_collect_views(world, state, p);
+    box_mesh_lod_select(world, (float)p->height);
     box_render_extract_bake(world, state, p);
     box_render_extract_layers(world, state, p);
     box_shader_extract(world, p);
