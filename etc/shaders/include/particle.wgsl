@@ -56,6 +56,28 @@ const ADDITIVE: u32 = 8u;
 const SOFT: u32 = 16u;
 const PAUSED: u32 = 32u;
 
+// Words of the counter buffer of a pool, and of the argument buffer the two
+// draws of the pool are made indirect through. The two are apart because a
+// buffer a draw reads its instance count from may not be bound to the pass that
+// writes it.
+const FREE: u32 = 0u;
+const LIVE: u32 = 1u;
+const ALIVE: u32 = 2u;
+const BASE: u32 = 3u;
+const TAKE: u32 = 4u;
+const DRAW: u32 = 0u;
+const INDEXED: u32 = 4u;
+
+// The color and the opacity of a particle as the channel holds them, four half
+// floats in two words, which is all the precision an image has room for.
+fn pack_color(c: vec4<f32>) -> vec2<u32> {
+  return vec2(pack2x16float(c.rg), pack2x16float(c.ba));
+}
+
+fn unpack_color(c: vec2<u32>) -> vec4<f32> {
+  return vec4(unpack2x16float(c.x), unpack2x16float(c.y));
+}
+
 const DRAW_CIRCLE: u32 = 0u;
 const DRAW_SPRITE: u32 = 1u;
 const DRAW_BILLBOARD: u32 = 2u;

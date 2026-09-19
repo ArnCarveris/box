@@ -1,9 +1,15 @@
-// Sprites of one particle pool. Every slot of the pool is one instance of a
-// quad that faces the camera, turned by the rotation of the particle and sized
-// by its size; a slot whose lifetime is zero holds no particle and is pushed
-// outside the depth range, which clips it away. The billboard appearance draws
-// the mesh of the emitter in place of that quad, with the local x and y of
-// every vertex laid over the camera axes, so the mesh keeps facing the camera.
+// Sprites of one particle pool. Every particle the simulation left alive this
+// frame is one instance of a quad that faces the camera, turned by the rotation
+// of the particle and sized by its size. The instance is an entry of the
+// compacted list the simulation appends to, and the number of instances is the
+// length of that list, which the pass is drawn from indirectly, so a pool that
+// is half empty costs half a draw and no slot that holds no particle is ever
+// expanded. A blended pool is drawn over its slots instead, up to the highest
+// one the simulation found in use, because the order two sprites blend in has
+// to be the same from frame to frame and the order a compaction produces is
+// not. The billboard appearance draws the mesh of the emitter in place of that
+// quad, with the local x and y of every vertex laid over the camera axes, so
+// the mesh keeps facing the camera.
 //
 // The curves of the emitter are read here rather than written into the
 // channels: the age and the lifetime of a particle are already in the buffers,
@@ -26,9 +32,9 @@
 
 @group(1) @binding(0) var<storage, read> position: array<vec4<f32>>;
 @group(1) @binding(1) var<storage, read> velocity: array<vec4<f32>>;
-@group(1) @binding(2) var<storage, read> force: array<vec4<f32>>;
-@group(1) @binding(3) var<storage, read> color: array<vec4<f32>>;
-@group(1) @binding(4) var<storage, read> size: array<f32>;
+@group(1) @binding(2) var<storage, read> color: array<vec2<u32>>;
+@group(1) @binding(3) var<storage, read> extra: array<u32>;
+@group(1) @binding(4) var<storage, read> slots: array<u32>;
 @group(1) @binding(5) var<uniform> e: Emitter;
 
 @group(3) @binding(0) var scene_depth: texture_depth_2d;
@@ -79,21 +85,27 @@ fn sheet_at(corner: vec2<f32>, t: f32, life: f32) -> vec2<f32> {
 // Place one particle of the pool, with the local offset of its corner already
 // laid over the camera axes, and read the curves of the emitter at its age.
 fn place(instance: u32, local: vec3<f32>, turn: bool) -> ParticleOut {
+  var i = instance;
+  if ((e.flags & ADDITIVE) != 0u) {
+    i = slots[e.count + instance];
+  }
+  let tint = unpack_color(color[i]);
+  let attr = unpack2x16float(extra[i]);
   var out: ParticleOut;
   out.uv = local.xy;
   out.sheet = local.xy;
-  out.color = color[instance];
+  out.color = tint;
   out.view_z = 1.0;
   out.pos = vec4(2.0, 2.0, -1.0, 1.0);
-  let life = velocity[instance].w;
+  let life = velocity[i].w;
   if (life <= 0.0) {
     return out;
   }
 
-  let t = clamp(position[instance].w / life, 0.0, 1.0);
+  let t = clamp(position[i].w / life, 0.0, 1.0);
   var offset = local;
   if (turn) {
-    let angle = force[instance].w + curve_at(e.turn_curve, t) * 6.2831853;
+    let angle = attr.x + curve_at(e.turn_curve, t) * 6.2831853;
     offset = vec3(local.x * cos(angle) - local.y * sin(angle),
       local.x * sin(angle) + local.y * cos(angle), local.z);
   }
@@ -101,11 +113,11 @@ fn place(instance: u32, local: vec3<f32>, turn: bool) -> ParticleOut {
   let right = vec3(u.view[0].x, u.view[1].x, u.view[2].x);
   let up = vec3(u.view[0].y, u.view[1].y, u.view[2].y);
   let ahead = vec3(u.view[0].z, u.view[1].z, u.view[2].z);
-  let half_size = max(size[instance] * curve_at(e.size_curve, t), 0.0) * 0.5;
-  let world = position[instance].xyz +
+  let half_size = max(attr.y * curve_at(e.size_curve, t), 0.0) * 0.5;
+  let world = position[i].xyz +
     (right * offset.x + up * offset.y + ahead * offset.z) * half_size;
-  out.color = vec4(color[instance].rgb * gradient_at(t),
-    color[instance].a * curve_at(e.opacity_curve, t));
+  out.color = vec4(tint.rgb * gradient_at(t),
+    tint.a * curve_at(e.opacity_curve, t));
   out.sheet = sheet_at(local.xy, t, life);
   out.view_z = dot(vec4(u.view[0].z, u.view[1].z, u.view[2].z, u.view[3].z),
     vec4(world, 1.0));
@@ -118,9 +130,7 @@ fn place(instance: u32, local: vec3<f32>, turn: bool) -> ParticleOut {
   @builtin(vertex_index) vertex: u32,
   @builtin(instance_index) instance: u32
 ) -> ParticleOut {
-  var order = array<u32, 6>(0u, 1u, 2u, 2u, 1u, 3u);
-  let index = order[vertex];
-  let corner = vec2(f32(index & 1u), f32((index >> 1u) & 1u)) * 2.0 - 1.0;
+  let corner = vec2(f32(vertex & 1u), f32((vertex >> 1u) & 1u)) * 2.0 - 1.0;
 
   return place(instance, vec3(corner, 0.0), true);
 }

@@ -21,13 +21,18 @@
 /** Target formats the point sprite pass is compiled for, the eight bit and the float one */
 #define BOX_PARTICLE_FORMATS (2)
 
-/** Vertices one particle is expanded into, two triangles of a quad */
-#define BOX_PARTICLE_VERTICES (6)
+/** Vertices one particle is expanded into, the corners of a quad as a strip.
+ *
+ * The strip makes the same two triangles a list of six would, in the same
+ * order and with the same winding, and shades four vertices instead of six,
+ * which is a third of the vertex work of every particle of a frame.
+ */
+#define BOX_PARTICLE_VERTICES (4)
 
 /** Storage buffers the two compute passes bind, the channels plus the bookkeeping */
-#define BOX_PARTICLE_SIM_BINDINGS (8)
+#define BOX_PARTICLE_SIM_BINDINGS (7)
 
-/** Bindings the point sprite pass takes: the five channels and the emitter block */
+/** Bindings the point sprite pass takes: the four channels, the slots and the block */
 #define BOX_PARTICLE_DRAW_BINDINGS (6)
 
 /** Ways a pool is composited, blended over the image and added to it */
@@ -35,11 +40,14 @@
 
 /** Particle pool of one emitter, owned by the renderer.
  *
- * Every channel of a particle has a buffer of its own: the position carries the
- * age in its w, the velocity the lifetime, the force buffer the rotation and
- * the color the opacity, and the size has a buffer to itself. A slot whose
- * lifetime is zero holds no particle and sits in the dead list, which the
- * integrate pass pushes to and the spawn pass pops from.
+ * The place a particle is at and the velocity that integrates it keep their full
+ * precision: the position carries the age in its w and the velocity the
+ * lifetime. What only reaches the image is packed into half floats, the color
+ * with its opacity into two words and the rotation with the size into one, so a
+ * particle costs 44 bytes of channels instead of 68. A slot whose lifetime is
+ * zero holds no particle and sits in the dead list, which the integrate pass
+ * pushes to and the spawn pass pops from; the dead list and the compacted list
+ * of the slots that are alive this frame share one buffer.
  */
 typedef struct box_gpu_emitter_t {
     uint32_t id;              /**< Emitter of the packet the pool belongs to */
@@ -47,19 +55,23 @@ typedef struct box_gpu_emitter_t {
     uint32_t points;          /**< Entries the table buffer holds, points and colliders */
     uint32_t appearance;      /**< One of the BOX_PARTICLE_DRAW constants */
     uint32_t mesh;            /**< Mesh handle a billboard is drawn as, 0 for a quad */
+    uint32_t indices;         /**< Indices the draw arguments of its billboard hold */
+    uint32_t instances;       /**< Instances the draw arguments of a blended pool hold */
     bool additive;            /**< The pool is added to the image instead of blended over it */
     float origin[3];          /**< World position of its emitter, which sorts the pool */
     bool seen;                /**< The packet of this frame carries its emitter */
+    bool stepped;             /**< The frame recorded its compute passes */
     WGPUBuffer position;      /**< Position xyz and age w of every particle */
     WGPUBuffer velocity;      /**< Velocity xyz and lifetime w, zero for a free slot */
-    WGPUBuffer force;         /**< Free xyz and the rotation of every particle in w */
-    WGPUBuffer color;         /**< Linear color rgb and opacity w */
-    WGPUBuffer size;          /**< Size of every particle */
-    WGPUBuffer dead;          /**< Indices of the free slots, the dead list */
-    WGPUBuffer counts;        /**< Free slots, live particles and two spares */
+    WGPUBuffer color;         /**< Linear color and opacity of every particle, four half floats */
+    WGPUBuffer extra;         /**< Rotation and size of every particle, two half floats */
+    WGPUBuffer slots;         /**< The dead list and the alive list of the frame behind it */
+    WGPUBuffer counts;        /**< The free, live, alive and span counters of the pool */
+    WGPUBuffer args;          /**< Arguments of the indirect dispatch and the two draws */
     WGPUBuffer uniform;       /**< Emitter block of the frame */
     WGPUBuffer table;         /**< Spawn points of the shape and the colliders behind them */
     WGPUBindGroup sim_group;  /**< Buffers the spawn and the integrate pass bind */
+    WGPUBindGroup args_group; /**< Argument buffer the prepare and the finish pass write */
     WGPUBindGroup draw_group; /**< Buffers the point sprite pass reads */
 } box_gpu_emitter_t;
 
@@ -75,13 +87,16 @@ typedef struct box_particle_gpu_t {
     uint32_t sim_shader;      /**< Shader handle the compute pipelines were built from */
     uint32_t draw_shader;     /**< Shader handle the sprite pipeline was built from */
     WGPUBindGroupLayout sim_layout;  /**< Uniform and channels of the compute passes */
+    WGPUBindGroupLayout args_layout; /**< Argument buffer of the prepare and the finish pass */
     WGPUBindGroupLayout draw_layout; /**< Channels and block the point sprite pass reads */
     WGPUBindGroupLayout depth_layout; /**< Depth target the soft fade of a particle reads */
     WGPUBindGroup depth_group;       /**< Depth group of the view being recorded */
     WGPUTextureView depth_for;       /**< Depth view that group was built for */
     box_vec_t order;                 /**< box_particle_order_t of the pools of one view */
+    WGPUComputePipeline alloc;     /**< Pass that takes the slots of the frame off the dead list */
     WGPUComputePipeline spawn;     /**< Pass that fills the slots the frame spawns into */
     WGPUComputePipeline integrate; /**< Pass that ages and moves every live particle */
+    WGPUComputePipeline finish;    /**< Pass that writes the instances an added pool draws */
     WGPURenderPipeline pipeline[BOX_PARTICLE_FORMATS][BOX_PARTICLE_BLENDS]; /**< Quad pass */
     WGPURenderPipeline mesh[BOX_PARTICLE_FORMATS][BOX_PARTICLE_BLENDS]; /**< Billboard pass */
     bool failed;              /**< The particle shaders were reported as broken once */

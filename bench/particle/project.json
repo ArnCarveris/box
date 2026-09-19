@@ -20,7 +20,9 @@
                     "collider_table",
                     "curves_and_appearance",
                     "playback_and_bursts",
-                    "playback_1k"
+                    "playback_1k",
+                    "budget_1k",
+                    "cull_1k"
                 ]
             },
             {

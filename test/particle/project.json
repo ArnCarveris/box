@@ -156,6 +156,35 @@
                     "a_script_function_answers_an_entity_without_an_emitter",
                     "the_script_clock_reads_the_playback"
                 ]
+            },
+            {
+                "id": "Scale",
+                "testcases": [
+                    "share_hands_out_the_ask_inside_the_budget",
+                    "share_is_proportional_to_the_ask",
+                    "share_leaves_every_asker_one_particle",
+                    "a_budget_of_zero_is_no_budget",
+                    "the_reach_covers_the_flight_of_a_particle",
+                    "the_reach_covers_the_spawn_volume",
+                    "the_reach_reaches_the_block",
+                    "an_emitter_is_simulated_without_a_view",
+                    "an_emitter_in_the_frustum_is_simulated",
+                    "an_emitter_behind_the_camera_is_culled",
+                    "culling_off_keeps_an_emitter_behind_the_camera",
+                    "the_margin_grows_the_sphere_of_an_emitter",
+                    "an_emitter_past_the_cull_distance_is_dropped",
+                    "an_emitter_past_the_step_distance_is_halved",
+                    "the_maximum_budget_is_split_between_emitters",
+                    "an_emitter_under_the_budget_keeps_its_maximum",
+                    "the_spawn_budget_thins_the_next_frame",
+                    "a_culled_emitter_is_paused_and_spawns_nothing",
+                    "a_halved_emitter_steps_every_other_frame",
+                    "the_span_grows_with_the_particles_spawned",
+                    "the_span_is_capped_by_the_pool",
+                    "a_reset_puts_the_span_back",
+                    "the_stats_count_the_emitters_and_their_bytes",
+                    "the_stats_count_a_culled_emitter"
+                ]
             }
         ]
     }

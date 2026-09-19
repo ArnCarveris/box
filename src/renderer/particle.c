@@ -39,6 +39,31 @@ static WGPUBuffer box_particle_storage(
     return wgpuDeviceCreateBuffer(r->device, &desc);
 }
 
+/** Write the counters and the indirect arguments a fresh pool starts from.
+ *
+ * Every slot is free, nothing is alive and both draws take no instance, which
+ * is what an emitter that has not spawned yet draws. The vertex count of the
+ * quad draw never changes; the index count of a billboard is written again when
+ * the mesh of the emitter does.
+ *
+ * @param r The renderer
+ * @param pool The pool
+ */
+static void box_particle_counters(
+    box_renderer_t *r,
+    box_gpu_emitter_t *pool)
+{
+    uint32_t counts[BOX_PARTICLE_COUNTS] = {0};
+    counts[BOX_PARTICLE_COUNT_FREE] = pool->capacity;
+    wgpuQueueWriteBuffer(r->gpu_queue, pool->counts, 0, counts, sizeof(counts));
+
+    uint32_t args[BOX_PARTICLE_ARGS] = {0};
+    args[BOX_PARTICLE_ARG_DRAW] = BOX_PARTICLE_VERTICES;
+    wgpuQueueWriteBuffer(r->gpu_queue, pool->args, 0, args, sizeof(args));
+    pool->indices = 0;
+    pool->instances = 0;
+}
+
 /** Fill the dead list of a pool with every slot and mark all of them free.
  *
  * The list is written back to front, so the first particle of an emitter lands
@@ -57,12 +82,10 @@ static void box_particle_free_list(
         dead[i] = pool->capacity - 1 - i;
     }
 
-    wgpuQueueWriteBuffer(r->gpu_queue, pool->dead, 0, dead,
+    wgpuQueueWriteBuffer(r->gpu_queue, pool->slots, 0, dead,
         (size_t)pool->capacity * sizeof(uint32_t));
     free(dead);
-
-    uint32_t counts[BOX_PARTICLE_COUNTS] = { pool->capacity, 0, 0, 0 };
-    wgpuQueueWriteBuffer(r->gpu_queue, pool->counts, 0, counts, sizeof(counts));
+    box_particle_counters(r, pool);
 }
 
 /** Release every buffer and bind group of a pool.
@@ -73,14 +96,15 @@ static void box_particle_pool_fini(
     box_gpu_emitter_t *pool)
 {
     if (pool->sim_group) wgpuBindGroupRelease(pool->sim_group);
+    if (pool->args_group) wgpuBindGroupRelease(pool->args_group);
     if (pool->draw_group) wgpuBindGroupRelease(pool->draw_group);
     if (pool->position) wgpuBufferRelease(pool->position);
     if (pool->velocity) wgpuBufferRelease(pool->velocity);
-    if (pool->force) wgpuBufferRelease(pool->force);
     if (pool->color) wgpuBufferRelease(pool->color);
-    if (pool->size) wgpuBufferRelease(pool->size);
-    if (pool->dead) wgpuBufferRelease(pool->dead);
+    if (pool->extra) wgpuBufferRelease(pool->extra);
+    if (pool->slots) wgpuBufferRelease(pool->slots);
     if (pool->counts) wgpuBufferRelease(pool->counts);
+    if (pool->args) wgpuBufferRelease(pool->args);
     if (pool->uniform) wgpuBufferRelease(pool->uniform);
     if (pool->table) wgpuBufferRelease(pool->table);
     memset(pool, 0, sizeof(box_gpu_emitter_t));
@@ -104,12 +128,19 @@ static void box_particle_pool_init(
     pool->capacity = capacity;
     pool->position = box_particle_storage(r, (uint64_t)capacity * 16);
     pool->velocity = box_particle_storage(r, (uint64_t)capacity * 16);
-    pool->force = box_particle_storage(r, (uint64_t)capacity * 16);
-    pool->color = box_particle_storage(r, (uint64_t)capacity * 16);
-    pool->size = box_particle_storage(r, (uint64_t)capacity * 4);
-    pool->dead = box_particle_storage(r, (uint64_t)capacity * 4);
-    pool->counts = box_particle_storage(r, BOX_PARTICLE_COUNTS * sizeof(uint32_t));
+    pool->color = box_particle_storage(r, (uint64_t)capacity * 8);
+    pool->extra = box_particle_storage(r, (uint64_t)capacity * 4);
+    pool->slots = box_particle_storage(r, (uint64_t)capacity * 8);
     pool->table = box_particle_storage(r, sizeof(box_particle_point_t));
+
+    pool->counts = box_particle_storage(r, BOX_PARTICLE_COUNTS * sizeof(uint32_t));
+
+    WGPUBufferDescriptor args = {
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
+            WGPUBufferUsage_Indirect,
+        .size = BOX_PARTICLE_ARGS * sizeof(uint32_t)
+    };
+    pool->args = wgpuDeviceCreateBuffer(r->device, &args);
 
     WGPUBufferDescriptor desc = {
         .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
@@ -152,6 +183,14 @@ static void box_particle_layouts(
         .entries = sim
     };
     r->particles.sim_layout = wgpuDeviceCreateBindGroupLayout(r->device, &sim_desc);
+
+    WGPUBindGroupLayoutEntry args = {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Compute,
+        .buffer = { .type = WGPUBufferBindingType_Storage }
+    };
+    WGPUBindGroupLayoutDescriptor args_desc = { .entryCount = 1, .entries = &args };
+    r->particles.args_layout = wgpuDeviceCreateBindGroupLayout(r->device, &args_desc);
 
     WGPUBindGroupLayoutEntry draw[BOX_PARTICLE_DRAW_BINDINGS] = {0};
     for (i = 0; i < BOX_PARTICLE_DRAW_BINDINGS - 1; i ++) {
@@ -206,10 +245,14 @@ static void box_particle_pipelines_fini(
         }
     }
 
+    if (r->particles.alloc) wgpuComputePipelineRelease(r->particles.alloc);
     if (r->particles.spawn) wgpuComputePipelineRelease(r->particles.spawn);
     if (r->particles.integrate) wgpuComputePipelineRelease(r->particles.integrate);
+    if (r->particles.finish) wgpuComputePipelineRelease(r->particles.finish);
+    r->particles.alloc = NULL;
     r->particles.spawn = NULL;
     r->particles.integrate = NULL;
+    r->particles.finish = NULL;
 }
 
 /** Build the spawn and integrate pipelines from the simulation shader.
@@ -226,28 +269,34 @@ static void box_particle_build_sim(
         goto done;
     }
 
-    WGPUPipelineLayoutDescriptor layout_desc = {
+    WGPUBindGroupLayout groups[2] = { r->particles.sim_layout,
+        r->particles.args_layout };
+    WGPUPipelineLayoutDescriptor step_desc = {
         .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &r->particles.sim_layout
+        .bindGroupLayouts = groups
     };
-    WGPUPipelineLayout layout = wgpuDeviceCreatePipelineLayout(r->device, &layout_desc);
-    WGPUComputePipelineDescriptor spawn = {
-        .layout = layout,
-        .compute = {
-            .module = module,
-            .entryPoint = { .data = "cs_spawn", .length = WGPU_STRLEN }
-        }
+    WGPUPipelineLayout step = wgpuDeviceCreatePipelineLayout(r->device, &step_desc);
+    WGPUPipelineLayoutDescriptor args_desc = {
+        .bindGroupLayoutCount = 2,
+        .bindGroupLayouts = groups
     };
-    WGPUComputePipelineDescriptor integrate = {
-        .layout = layout,
-        .compute = {
-            .module = module,
-            .entryPoint = { .data = "cs_integrate", .length = WGPU_STRLEN }
-        }
+    WGPUPipelineLayout args = wgpuDeviceCreatePipelineLayout(r->device, &args_desc);
+
+    WGPUComputePipelineDescriptor desc = {
+        .layout = args,
+        .compute = { .module = module }
     };
-    r->particles.spawn = wgpuDeviceCreateComputePipeline(r->device, &spawn);
-    r->particles.integrate = wgpuDeviceCreateComputePipeline(r->device, &integrate);
-    wgpuPipelineLayoutRelease(layout);
+    desc.compute.entryPoint = (WGPUStringView){ "cs_finish", WGPU_STRLEN };
+    r->particles.finish = wgpuDeviceCreateComputePipeline(r->device, &desc);
+    desc.layout = step;
+    desc.compute.entryPoint = (WGPUStringView){ "cs_alloc", WGPU_STRLEN };
+    r->particles.alloc = wgpuDeviceCreateComputePipeline(r->device, &desc);
+    desc.compute.entryPoint = (WGPUStringView){ "cs_spawn", WGPU_STRLEN };
+    r->particles.spawn = wgpuDeviceCreateComputePipeline(r->device, &desc);
+    desc.compute.entryPoint = (WGPUStringView){ "cs_integrate", WGPU_STRLEN };
+    r->particles.integrate = wgpuDeviceCreateComputePipeline(r->device, &desc);
+    wgpuPipelineLayoutRelease(step);
+    wgpuPipelineLayoutRelease(args);
     wgpuShaderModuleRelease(module);
 done:
     return;
@@ -328,7 +377,10 @@ static WGPURenderPipeline box_particle_build_draw(
         },
         .fragment = &fragment,
         .depthStencil = &depth,
-        .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },
+        .primitive = {
+            .topology = mesh ? WGPUPrimitiveTopology_TriangleList :
+                WGPUPrimitiveTopology_TriangleStrip
+        },
         .multisample = { .count = 1, .mask = 0xFFFFFFFF }
     };
 
@@ -390,6 +442,7 @@ static bool box_particle_ensure(
     }
 
     result = r->particles.spawn && r->particles.integrate &&
+        r->particles.alloc && r->particles.finish &&
         r->particles.pipeline[0][0] && r->particles.pipeline[1][1] &&
         r->particles.mesh[0][0] && r->particles.mesh[1][1];
     if (!result && !r->particles.failed) {
@@ -488,19 +541,19 @@ static void box_particle_groups(
     box_gpu_emitter_t *pool)
 {
     uint64_t vectors = (uint64_t)pool->capacity * 16;
+    uint64_t pairs = (uint64_t)pool->capacity * 8;
     uint64_t scalars = (uint64_t)pool->capacity * 4;
     if (!pool->sim_group) {
         WGPUBindGroupEntry entries[BOX_PARTICLE_SIM_BINDINGS + 1] = {
             { .binding = 0, .buffer = pool->uniform, .size = BOX_PARTICLE_UNIFORM_SIZE },
             { .binding = 1, .buffer = pool->position, .size = vectors },
             { .binding = 2, .buffer = pool->velocity, .size = vectors },
-            { .binding = 3, .buffer = pool->force, .size = vectors },
-            { .binding = 4, .buffer = pool->color, .size = vectors },
-            { .binding = 5, .buffer = pool->size, .size = scalars },
-            { .binding = 6, .buffer = pool->dead, .size = scalars },
-            { .binding = 7, .buffer = pool->counts,
+            { .binding = 3, .buffer = pool->color, .size = pairs },
+            { .binding = 4, .buffer = pool->extra, .size = scalars },
+            { .binding = 5, .buffer = pool->slots, .size = pairs },
+            { .binding = 6, .buffer = pool->counts,
                 .size = BOX_PARTICLE_COUNTS * sizeof(uint32_t) },
-            { .binding = 8, .buffer = pool->table, .size = (uint64_t)(pool->points ?
+            { .binding = 7, .buffer = pool->table, .size = (uint64_t)(pool->points ?
                 pool->points : 1) * sizeof(box_particle_point_t) }
         };
         WGPUBindGroupDescriptor desc = {
@@ -511,13 +564,24 @@ static void box_particle_groups(
         pool->sim_group = wgpuDeviceCreateBindGroup(r->device, &desc);
     }
 
+    if (!pool->args_group) {
+        WGPUBindGroupEntry entry = { .binding = 0, .buffer = pool->args,
+            .size = BOX_PARTICLE_ARGS * sizeof(uint32_t) };
+        WGPUBindGroupDescriptor desc = {
+            .layout = r->particles.args_layout,
+            .entryCount = 1,
+            .entries = &entry
+        };
+        pool->args_group = wgpuDeviceCreateBindGroup(r->device, &desc);
+    }
+
     if (!pool->draw_group) {
         WGPUBindGroupEntry entries[BOX_PARTICLE_DRAW_BINDINGS] = {
             { .binding = 0, .buffer = pool->position, .size = vectors },
             { .binding = 1, .buffer = pool->velocity, .size = vectors },
-            { .binding = 2, .buffer = pool->force, .size = vectors },
-            { .binding = 3, .buffer = pool->color, .size = vectors },
-            { .binding = 4, .buffer = pool->size, .size = scalars },
+            { .binding = 2, .buffer = pool->color, .size = pairs },
+            { .binding = 3, .buffer = pool->extra, .size = scalars },
+            { .binding = 4, .buffer = pool->slots, .size = pairs },
             { .binding = 5, .buffer = pool->uniform, .size = BOX_PARTICLE_UNIFORM_SIZE }
         };
         WGPUBindGroupDescriptor desc = {
@@ -527,6 +591,41 @@ static void box_particle_groups(
         };
         pool->draw_group = wgpuDeviceCreateBindGroup(r->device, &desc);
     }
+}
+
+/** Write the counters and the arguments the frame of a pool starts from.
+ *
+ * An added pool compacts its live particles into a list the frame appends to,
+ * so its cursor is cleared here and the finish pass writes what the draw takes
+ * from it. A blended pool is drawn over its slots instead, as many as the pool
+ * has ever used, which only changes while the pool is filling.
+ *
+ * @param r The renderer
+ * @param pool The pool
+ * @param span Slots of the pool that have ever held a particle
+ */
+static void box_particle_frame(
+    box_renderer_t *r,
+    box_gpu_emitter_t *pool,
+    uint32_t span)
+{
+    if (pool->additive) {
+        uint32_t zero = 0;
+        wgpuQueueWriteBuffer(r->gpu_queue, pool->counts,
+            BOX_PARTICLE_COUNT_ALIVE * sizeof(uint32_t), &zero, sizeof(zero));
+        goto done;
+    }
+
+    if (pool->instances != span) {
+        pool->instances = span;
+        wgpuQueueWriteBuffer(r->gpu_queue, pool->args,
+            (BOX_PARTICLE_ARG_DRAW + 1) * sizeof(uint32_t), &span, sizeof(span));
+        wgpuQueueWriteBuffer(r->gpu_queue, pool->args,
+            (BOX_PARTICLE_ARG_INDEXED + 1) * sizeof(uint32_t), &span, sizeof(span));
+    }
+
+done:
+    return;
 }
 
 /** Record the integrate and the spawn pass of one emitter.
@@ -546,15 +645,27 @@ static void box_particle_dispatch(
     const box_particle_emitter_t *e,
     WGPUCommandEncoder encoder)
 {
+    uint32_t span = e->span < pool->capacity ? e->span : pool->capacity;
     WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "particles");
-    wgpuComputePassEncoderSetPipeline(pass, r->particles.integrate);
     wgpuComputePassEncoderSetBindGroup(pass, 0, pool->sim_group, 0, NULL);
-    wgpuComputePassEncoderDispatchWorkgroups(pass,
-        (pool->capacity + BOX_PARTICLE_GROUP - 1) / BOX_PARTICLE_GROUP, 1, 1);
+    if (span) {
+        wgpuComputePassEncoderSetPipeline(pass, r->particles.integrate);
+        wgpuComputePassEncoderDispatchWorkgroups(pass,
+            (span + BOX_PARTICLE_GROUP - 1) / BOX_PARTICLE_GROUP, 1, 1);
+    }
+
     if (e->spawn) {
+        wgpuComputePassEncoderSetPipeline(pass, r->particles.alloc);
+        wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
         wgpuComputePassEncoderSetPipeline(pass, r->particles.spawn);
         wgpuComputePassEncoderDispatchWorkgroups(pass,
             (e->spawn + BOX_PARTICLE_GROUP - 1) / BOX_PARTICLE_GROUP, 1, 1);
+    }
+
+    if (pool->additive) {
+        wgpuComputePassEncoderSetBindGroup(pass, 1, pool->args_group, 0, NULL);
+        wgpuComputePassEncoderSetPipeline(pass, r->particles.finish);
+        wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
     }
 
     wgpuComputePassEncoderEnd(pass);
@@ -606,7 +717,10 @@ void box_particle_simulate(
             box_particle_groups(r, pool);
             wgpuQueueWriteBuffer(r->gpu_queue, pool->uniform, 0, e,
                 BOX_PARTICLE_UNIFORM_SIZE);
-            if (!(e->flags & BOX_PARTICLE_PAUSED)) {
+            pool->stepped = !(e->flags & BOX_PARTICLE_PAUSED);
+            if (pool->stepped) {
+                box_particle_frame(r, pool,
+                    e->span < pool->capacity ? e->span : pool->capacity);
                 box_particle_dispatch(r, pool, e, encoder);
             }
         }
@@ -736,14 +850,23 @@ static void box_particle_draw(
 
     wgpuRenderPassEncoderSetBindGroup(pass, 1, pool->draw_group, 0, NULL);
     if (mesh && mesh->index_count && mesh->vertices && mesh->indices) {
+        if (pool->indices != mesh->index_count) {
+            pool->indices = mesh->index_count;
+            wgpuQueueWriteBuffer(r->gpu_queue, pool->args,
+                BOX_PARTICLE_ARG_INDEXED * sizeof(uint32_t),
+                &pool->indices, sizeof(uint32_t));
+        }
+
         wgpuRenderPassEncoderSetPipeline(pass, r->particles.mesh[format][blend]);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, mesh->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(pass, mesh->indices,
             WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderDrawIndexed(pass, mesh->index_count, pool->capacity, 0, 0, 0);
+        wgpuRenderPassEncoderDrawIndexedIndirect(pass, pool->args,
+            BOX_PARTICLE_ARG_INDEXED * sizeof(uint32_t));
     } else {
         wgpuRenderPassEncoderSetPipeline(pass, r->particles.pipeline[format][blend]);
-        wgpuRenderPassEncoderDraw(pass, BOX_PARTICLE_VERTICES, pool->capacity, 0, 0);
+        wgpuRenderPassEncoderDrawIndirect(pass, pool->args,
+            BOX_PARTICLE_ARG_DRAW * sizeof(uint32_t));
     }
 }
 
@@ -821,11 +944,13 @@ void box_particle_fini(
     box_particle_pipelines_fini(r);
     if (r->particles.depth_group) wgpuBindGroupRelease(r->particles.depth_group);
     if (r->particles.sim_layout) wgpuBindGroupLayoutRelease(r->particles.sim_layout);
+    if (r->particles.args_layout) wgpuBindGroupLayoutRelease(r->particles.args_layout);
     if (r->particles.draw_layout) wgpuBindGroupLayoutRelease(r->particles.draw_layout);
     if (r->particles.depth_layout) wgpuBindGroupLayoutRelease(r->particles.depth_layout);
     r->particles.depth_group = NULL;
     r->particles.depth_for = NULL;
     r->particles.sim_layout = NULL;
+    r->particles.args_layout = NULL;
     r->particles.draw_layout = NULL;
     r->particles.depth_layout = NULL;
     r->particles.sim_shader = BOX_SHADER_NONE;

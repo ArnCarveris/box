@@ -307,3 +307,85 @@ void Extract_playback_1k(bench_t *b)
     box_packet_fini(&packet);
     ecs_fini(world);
 }
+
+void Extract_budget_1k(bench_t *b)
+{
+    // particles/scale
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    int32_t i;
+    for (i = 0; i < BENCH_EMITTER_COUNT; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i, 1, 0});
+        ecs_set(world, e, ParticleEmitter, {
+            .max = 10000, .rate = 2000, .shape = EmitterSphere, .radius = 1,
+            .seed = (uint32_t)i + 1
+        });
+    }
+
+    ecs_singleton_set(world, ParticleSettings, {
+        .max_total = 1000000, .spawn_per_frame = 10000, .cull = true
+    });
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, BENCH_EMITTER_COUNT);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}
+
+void Extract_cull_1k(bench_t *b)
+{
+    // particles/scale
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    int32_t i;
+    for (i = 0; i < BENCH_EMITTER_COUNT; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i - 500.0f, 1, 0});
+        ecs_set(world, e, ParticleEmitter, {
+            .max = 10000, .rate = 2000, .shape = EmitterSphere, .radius = 1,
+            .speed = {1, 2}, .lifetime = {1, 2}, .seed = (uint32_t)i + 1
+        });
+    }
+
+    ecs_singleton_set(world, ParticleSettings, {
+        .cull = true, .cull_distance = 400, .step_distance = 120
+    });
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, BENCH_EMITTER_COUNT);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        box_view_t *view = box_vec_push(&packet.views);
+        memset(view, 0, sizeof(box_view_t));
+        mat4 look = mat4_look_at(vec3_new(0, 0, -60), vec3_new(0, 0, 0),
+            vec3_new(0, 1, 0));
+        mat4 proj = mat4_perspective(1.05f, 16.0f / 9.0f, 0.1f);
+        memcpy(view->view, look.v, sizeof(look.v));
+        memcpy(view->proj, proj.v, sizeof(proj.v));
+        view->eye[2] = -60;
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}

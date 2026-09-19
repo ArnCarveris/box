@@ -253,6 +253,40 @@ ECS_STRUCT(ParticleBurst, {
     int32_t repeat; /**< Times it goes off again, below zero to repeat while the emitter plays */
 });
 
+/** Budgets and culling that every emitter of a world shares.
+ *
+ * The singleton caps what the pools of a world hold together and what a frame
+ * spawns into them together. An emitter that asks for more than its share of
+ * either gets the share: the ceiling is divided in proportion to what the
+ * emitters asked for, so a scene that runs past its budget thins every stream
+ * instead of stalling or dropping one of them.
+ *
+ * The particles of an emitter stay inside a sphere its speed, its lifetime and
+ * its acceleration bound. An emitter whose sphere no view can see is not
+ * simulated at all, one further than `cull_distance` from every camera is not
+ * either, and one further than `step_distance` is simulated every other frame
+ * with both frames in one step, which is the same motion at half the cost.
+ */
+ECS_STRUCT(ParticleSettings, {
+    int32_t max_total;       /**< Particles every pool together holds, 0 for no ceiling */
+    int32_t spawn_per_frame; /**< Particles every emitter spawns in a frame, 0 for none */
+    float cull_margin;       /**< World units the sphere of an emitter is grown by */
+    float cull_distance;     /**< Distance beyond which an emitter stops, 0 for no limit */
+    float step_distance;     /**< Distance beyond which an emitter is stepped every other frame */
+    bool cull;               /**< Emitters no view can see are not simulated */
+});
+
+/** What the emitters of a world cost the frame that was extracted last */
+ECS_STRUCT(ParticleStats, {
+    int32_t emitters;  /**< Emitters the frame carried */
+    int32_t simulated; /**< Emitters the frame spawned into and stepped */
+    int32_t culled;    /**< Emitters no view could see, or that were too far away */
+    int32_t halved;    /**< Emitters the frame steps every other frame */
+    int32_t particles; /**< Particles the pools of those emitters hold together */
+    int32_t spawned;   /**< Particles the frame spawned */
+    int64_t bytes;     /**< Bytes those pools cost on the device */
+});
+
 /** Register the box.particle module.
  *
  * @param world The world

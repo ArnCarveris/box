@@ -50,7 +50,7 @@ Two hard rules keep the concerns apart:
 | `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene; the `TextInput` line with its caret, history and completion, and the `Console` singleton that binds the grave key, loads `etc/ui/console.flecs` on demand, holds the keyboard while it is open and runs its lines on `terminals.console` |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
 | `box.lod` | the proxy generator `box_lod_proxy_build`: a reusable builder clusters the primitives of a subtree by material key and proximity and emits a few `Box`, `Sphere` or `Capsule` primitives with the volume the proxy misses as an error in world units; the screen space metric `box_lod_error_px`, which projects such an error at the nearest point of the bounds of a node for a perspective or an orthographic camera, and `box_lod_select`, which holds a node at its level until the projected error leaves the band around the threshold of the view; `box_lod_merge` collapses the meshes of a subtree into one world space mesh with an index range per material key, welding the vertices that share a position, and `box_lod_simplify` collapses that mesh per group with meshoptimizer under an error bound, reporting the error it cost in world units; `box_lod_ladder` turns the authored segment count of a parametric shape into the levels it reduces through, `box_lod_chord_error` is the error one level costs at a radius and `box_lod_reduce` projects those errors and picks the level of the frame; the node hierarchy `box_lod_tree_t`, which the renderer builds from the authored tree and walks once per view: a node the frustum rejects or the depth grid hides stops its descendants, a node whose projected error is under the threshold of the view is drawn as one proxy box and its subtree is released and hidden, and `box_lod_tree_cluster` stacks renderer only clusters over loose roots without touching `Parent` or `ChildOf`; `LodPin` marks a subtree pruning keeps and `LodStats` reports what a walk visited, drew and replaced |
-| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces`, `ParticleCollision`, `ParticleCurves`, `ParticleAppearance`, `ParticlePlayback` and `ParticleBurst`; the spawn clock, the playback clock, the shape tables and the colliders the packet carries, while the particles themselves live in renderer buffers |
+| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces`, `ParticleCollision`, `ParticleCurves`, `ParticleAppearance`, `ParticlePlayback`, `ParticleBurst`, `ParticleSettings` and `ParticleStats`; the spawn clock, the playback clock, the shape tables, the colliders and the budget and culling decisions the packet carries, while the particles themselves live in renderer buffers |
 | later | `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
@@ -173,17 +173,39 @@ the fixed clock, so a frame of a fixed timestep always asks for the same number.
 
 The renderer owns a pool per emitter, created the first time the emitter appears
 in a packet and released when it stops appearing. A pool is a structure of
-arrays, one buffer per channel: position with the age in its w, velocity with the
-lifetime, acceleration with the rotation, color with the opacity and a buffer of
-sizes, plus a dead list of the free slots and a counter block. Two compute passes
-run over them once per frame, before the views are recorded: the integrate pass
-ages every live particle, moves it by its velocity and acceleration and pushes
-the slots that expire onto the dead list, and the spawn pass pops as many of them
-as the packet asked for and fills them. The dead list is what enforces the
-maximum: an emitter that asks for more particles than it has free slots simply
-does not fill them. Every random value is a hash of the seed and the index of the
-particle in the stream of the emitter, not of its slot, so the particles of a
-frame are the same on every run and on every device.
+arrays. The place of a particle and the velocity that integrates it keep their
+full precision, sixteen bytes each with the age and the lifetime in their w, and
+what only reaches the image is packed into half floats: the color with its
+opacity into two words and the rotation with the size into one. A word of the
+slot buffer holds the dead list of the free slots and a second holds the
+compacted list of what is alive this frame, which makes a particle 52 bytes, so
+ten million of them are half a gigabyte of device memory.
+
+Four compute passes run over a pool once per frame, before the views are
+recorded. The integrate pass ages every live particle, moves it by its velocity
+and acceleration and pushes the slots that expire onto the dead list; it is
+dispatched over the slots the pool has ever used, which the packet counts, so a
+pool that is filling costs the part of a pass it is using. A pass of one thread
+then takes the slots of this frame off the top of the dead list in one step and
+the spawn pass fills them, so the particle a frame spawns first always lands in
+the slot the list has on top instead of in whichever slot its thread won a race
+for: a pool that has not recycled a slot yet draws the same image on every run.
+A last pass of one thread writes the length of the compacted list into the
+arguments the sprite pass of an added pool is drawn from. Every random value is a
+hash of the seed and the index of the particle in the stream of the emitter, not
+of its slot, so the particles of a frame are the same on every run and on every
+device.
+
+`ParticleSettings` is what the emitters of a world share. `max_total` caps what
+the pools hold together and `spawn_per_frame` what a frame spawns into them, and
+an emitter over its share gets the share: the ceiling is divided in proportion to
+the asks, which do not change while a scene stands still, so a pool is never
+rebuilt because a frame was busy. The extract bounds the particles of an emitter
+with a sphere its speed, its lifetime, its acceleration and its spawn volume
+give, tests that sphere against the frustum and the eye of every view of the
+packet and either steps the emitter, steps it every other frame with both frames
+in one step or freezes it where it is with the pause bit the playback uses.
+`ParticleStats` reports what the frame cost.
 
 The forces of an emitter are the sum of the `ParticleForces` of the world, of
 the entity the emitter names and of the one it carries itself, and they live in
@@ -225,9 +247,14 @@ emitter takes as many as the scene hangs under it. What the bursts ask for is
 added to what the rate asked for and the two are capped by the pool together.
 
 Each view then draws every pool with one instanced sprite pass after its sorted
-draws: a slot becomes a camera facing quad turned by its rotation and sized by
-its size, or the mesh of its emitter laid over the camera axes, and a slot whose
-lifetime is zero is pushed outside the depth range. The pass binds the block of
+draws: a particle becomes a camera facing quad of four vertices as a triangle
+strip, turned by its rotation and sized by its size, or the mesh of its emitter
+laid over the camera axes. Both draws are indirect. An added pool takes its
+instances from the compacted list the simulation built, so no slot that holds
+nothing is expanded; a blended pool is drawn over its slots in slot order with as
+many instances as the pool has used, because the order two sprites blend in has
+to be the same from frame to frame and the order a compaction produces is not,
+and a slot whose lifetime is zero is pushed outside the depth range. The pass binds the block of
 the emitter next to the channels, so the curves over the normalised age of a
 particle are evaluated there instead of being written into the buffers: the age
 and the lifetime are already in the channels, so a size, opacity, rotation or

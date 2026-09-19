@@ -1075,8 +1075,47 @@ typedef struct box_dynamic_batch_t {
 /** Points the shape table of one emitter holds, sampled from a mesh or a curve */
 #define BOX_PARTICLE_POINTS (64)
 
-/** Words the counter buffer of a pool holds: free slots, live particles and two spares */
-#define BOX_PARTICLE_COUNTS (4)
+/** Word of the counter buffer holding the free slots of a pool */
+#define BOX_PARTICLE_COUNT_FREE (0)
+
+/** Word of the counter buffer holding the live particles of a pool */
+#define BOX_PARTICLE_COUNT_LIVE (1)
+
+/** Word of the counter buffer the compacted alive list is written through */
+#define BOX_PARTICLE_COUNT_ALIVE (2)
+
+/** Word of the counter buffer holding the free slots the frame allocates from */
+#define BOX_PARTICLE_COUNT_BASE (3)
+
+/** Word of the counter buffer holding the slots the frame allocated */
+#define BOX_PARTICLE_COUNT_TAKE (4)
+
+/** Words the counter buffer of a pool holds, one per counter */
+#define BOX_PARTICLE_COUNTS (8)
+
+/** Bytes one particle of a pool costs: its channels, its slot and its alive entry.
+ *
+ * The position and the velocity keep their full precision, sixteen bytes each
+ * with the age and the lifetime in their w, and what only reaches the image is
+ * packed into half floats: the color with its opacity into two words and the
+ * rotation with the size into one. The dead list and the compacted alive list
+ * add a word each.
+ */
+#define BOX_PARTICLE_BYTES (52)
+
+/** First word of the draw arguments of the quad pass, four of them */
+#define BOX_PARTICLE_ARG_DRAW (0)
+
+/** First word of the draw arguments of the billboard pass, five of them */
+#define BOX_PARTICLE_ARG_INDEXED (4)
+
+/** Words the argument buffer of a pool holds, the arguments of its two draws.
+ *
+ * The arguments live apart from the counters because a buffer a draw reads its
+ * instance count from may not be bound to the pass that writes it; only the
+ * finish pass takes it, in a bind group of its own.
+ */
+#define BOX_PARTICLE_ARGS (12)
 
 /** Spawn point of an emitter without a volume, its origin */
 #define BOX_PARTICLE_POINT (0)
@@ -1193,6 +1232,8 @@ typedef struct box_particle_emitter_t {
     uint32_t point_first;   /**< First point of its shape table in the packet */
     uint32_t mesh;          /**< Mesh handle a billboard is drawn as, 0 for a quad */
     float origin[3];        /**< World position of the emitter, which sorts its pool */
+    float reach;            /**< Radius its particles stay inside, which culls the emitter */
+    uint32_t span;          /**< Slots of its pool that have ever held a particle */
 } box_particle_emitter_t;
 
 /** Bytes of an emitter that the uniform buffer of its pool holds */

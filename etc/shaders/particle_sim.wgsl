@@ -6,15 +6,24 @@
 //
 // Every random number comes from a hash of the seed and the index of the
 // particle in the stream of the emitter, so the particles of a frame are the
-// same on every run and on every device. The slot a particle lands in is not,
-// which only changes the order the sprites are blended in.
+// same on every run and on every device. The slot a particle lands in is taken
+// off the top of the dead list in spawn order by a pass of one thread, so it is
+// the same on every run as well until a pool starts recycling the slots its
+// dead particles hand back, which no order fixes.
 //
-// The channels are one buffer each: the position carries the age in its w, the
-// velocity the lifetime, the force buffer the rotation and the color the
-// opacity. A slot with a lifetime of zero holds no particle. The xyz of the
-// force buffer is free: the acceleration of a particle is the one of its
-// emitter, which the uniform carries, so a force that changes reaches the
-// particles that are already in the air.
+// The channels keep the place of a particle and the velocity that integrates it
+// in full precision, the position with the age in its w and the velocity with
+// the lifetime, and pack what only reaches the image into half floats: the
+// color with its opacity into two words and the rotation with the size into
+// one. A slot with a lifetime of zero holds no particle.
+//
+// Nothing is dispatched over the slots a pool has never used: the packet counts
+// the particles an emitter spawned since its pool was built and the integrate
+// pass is dispatched over that many slots, so a pool that is filling costs the
+// part of a pass it is using. An added pool also appends every slot it leaves
+// alive to a compacted list that the finish pass writes the length of into the
+// arguments its sprite pass is drawn from, so its draw expands the particles
+// that are alive and nothing else.
 //
 // The integrate pass is a semi implicit Euler step with the drag solved
 // exactly: the forces are added to the velocity, the drag pulls that velocity
@@ -24,20 +33,22 @@
 // change here is a change in both places.
 //
 // The table carries the spawn points of the shape first and the colliders of
-// the emitter after them, because this pass already binds the eight storage
-// buffers a device guarantees.
+// the emitter after them, because this pass already binds the storage buffers a
+// device guarantees.
 
 #include "include/particle.wgsl"
 
 @group(0) @binding(0) var<uniform> e: Emitter;
 @group(0) @binding(1) var<storage, read_write> position: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read_write> velocity: array<vec4<f32>>;
-@group(0) @binding(3) var<storage, read_write> force: array<vec4<f32>>;
-@group(0) @binding(4) var<storage, read_write> color: array<vec4<f32>>;
-@group(0) @binding(5) var<storage, read_write> size: array<f32>;
-@group(0) @binding(6) var<storage, read_write> dead: array<u32>;
-@group(0) @binding(7) var<storage, read_write> counts: array<atomic<u32>>;
-@group(0) @binding(8) var<storage, read> table: array<Point>;
+@group(0) @binding(3) var<storage, read_write> color: array<vec2<u32>>;
+@group(0) @binding(4) var<storage, read_write> extra: array<u32>;
+@group(0) @binding(5) var<storage, read_write> slots: array<u32>;
+@group(0) @binding(6) var<storage, read_write> counts: array<atomic<u32>>;
+@group(0) @binding(7) var<storage, read> table: array<Point>;
+@group(1) @binding(0) var<storage, read_write> args: array<u32>;
+
+const ALIVE_LIST: u32 = 0u;
 
 const SHAPE_POINT: u32 = 0u;
 const SHAPE_SPHERE: u32 = 1u;
@@ -45,9 +56,6 @@ const SHAPE_BOX: u32 = 2u;
 const SHAPE_DISC: u32 = 3u;
 const SHAPE_MESH: u32 = 4u;
 const SHAPE_SPLINE: u32 = 5u;
-
-const FREE: u32 = 0u;
-const LIVE: u32 = 1u;
 
 const COLLIDER_SPHERE: f32 = 0.0;
 
@@ -140,10 +148,19 @@ fn kill(i: u32) {
   velocity[i] = vec4(0.0);
   let slot = atomicAdd(&counts[FREE], 1u);
   if (slot < e.count) {
-    dead[slot] = i;
+    slots[slot] = i;
   }
   atomicSub(&counts[LIVE], 1u);
 }
+
+// The compacted list of an added pool is appended to one workgroup at a time:
+// the workgroup counts in its own memory what it has to write, takes that many
+// entries off the global cursor with a single atomic and writes them side by
+// side. Ten million particles would otherwise be ten million atomic adds on one
+// word, which is most of what the pass would cost. A blended pool is drawn in
+// slot order and never reads the list, so it pays none of this.
+var<workgroup> wg_alive: atomic<u32>;
+var<workgroup> wg_base: u32;
 
 // Turbulence of the field of the emitter at a point, three sines of the point
 // so that a particle passing the same place is always pushed the same way.
@@ -231,46 +248,119 @@ fn resolve(p: ptr<function, vec3<f32>>, v: ptr<function, vec3<f32>>) -> bool {
   return hit;
 }
 
-@compute @workgroup_size(PARTICLE_GROUP)
-fn cs_integrate(@builtin(global_invocation_id) id: vec3<u32>) {
-  let i = id.x;
+// Write the instances both draws of an added pool take: the length of the
+// compacted list, which holds exactly the particles that are alive and in
+// whatever order the frame appended them, because adding is commutative. A
+// blended pool never runs this pass. It is drawn over its slots in slot order,
+// with as many instances as the pool has ever used, because the order two
+// sprites blend in has to be the same from frame to frame and the order a
+// compaction produces is not; the slots that hold nothing are clipped away by
+// the vertex stage, as they always were.
+@compute @workgroup_size(1)
+fn cs_finish() {
+  let alive = min(atomicLoad(&counts[ALIVE]), e.count);
+  args[DRAW + 1u] = alive;
+  args[INDEXED + 1u] = alive;
+}
+
+// Step one particle of the pool, or leave a free slot alone.
+//
+// @param i Slot of the particle
+// @return true when the slot still holds a live particle after the step
+fn step(i: u32) -> bool {
+  var result = false;
   if (i >= e.count) {
-    return;
+    return result;
   }
+
   let v = velocity[i];
   if (v.w <= 0.0) {
-    return;
+    return result;
   }
+
   let p = position[i];
   let age = p.w + e.delta;
   if (age >= v.w) {
     kill(i);
-    return;
+    return result;
   }
+
   var moved = accelerate(v.xyz, wander(p.xyz));
   var placed = p.xyz + moved * e.delta;
   if (e.colliders > 0u || (e.flags & GROUND) != 0u) {
     if (resolve(&placed, &moved) && (e.flags & DIE) != 0u) {
       kill(i);
-      return;
+      return result;
     }
   }
+
   position[i] = vec4(placed, age);
   velocity[i] = vec4(moved, v.w);
+  result = true;
+  return result;
+}
+
+// Append the slots of a workgroup that hold a live particle to the compacted
+// list of an added pool, with one atomic for the whole workgroup. Every thread
+// reaches every barrier, which is what a workgroup barrier asks for.
+fn compact(local: u32, i: u32, alive: bool) {
+  let wanted = (e.flags & ADDITIVE) != 0u;
+  if (local == 0u) {
+    atomicStore(&wg_alive, 0u);
+  }
+
+  workgroupBarrier();
+  var mine = 0u;
+  if (wanted && alive) {
+    mine = atomicAdd(&wg_alive, 1u);
+  }
+
+  workgroupBarrier();
+  if (local == 0u && wanted) {
+    wg_base = atomicAdd(&counts[ALIVE], atomicLoad(&wg_alive));
+  }
+
+  workgroupBarrier();
+  if (wanted && alive && wg_base + mine < e.count) {
+    slots[e.count + wg_base + mine] = i;
+  }
 }
 
 @compute @workgroup_size(PARTICLE_GROUP)
-fn cs_spawn(@builtin(global_invocation_id) id: vec3<u32>) {
-  let k = id.x;
-  if (k >= e.spawn) {
-    return;
+fn cs_integrate(@builtin(global_invocation_id) id: vec3<u32>,
+  @builtin(local_invocation_index) local: u32)
+{
+  let i = id.x;
+  compact(local, i, step(i));
+}
+
+// Take the slots this frame spawns into off the top of the dead list in one
+// step, so that the particle a frame spawns first always lands in the slot the
+// list has on top instead of in whichever slot its thread won a race for. That
+// is what makes a pool that has not recycled a slot yet draw the same image on
+// every run, and it costs one pass of one thread.
+@compute @workgroup_size(1)
+fn cs_alloc() {
+  let free = min(atomicLoad(&counts[FREE]), e.count);
+  let take = min(e.spawn, free);
+  atomicStore(&counts[BASE], free);
+  atomicStore(&counts[TAKE], take);
+  atomicStore(&counts[FREE], free - take);
+  atomicAdd(&counts[LIVE], take);
+}
+
+// Fill one slot of the dead list with a new particle of the stream.
+//
+// @param k Index of the particle in the spawns of this frame
+// @param slot Receives the slot the particle landed in
+// @return true when the frame had a slot for it
+fn spawn(k: u32, slot: ptr<function, u32>) -> bool {
+  if (k >= atomicLoad(&counts[TAKE])) {
+    return false;
   }
-  let taken = atomicSub(&counts[FREE], 1u);
-  if (taken == 0u || taken > e.count) {
-    atomicAdd(&counts[FREE], 1u);
-    return;
-  }
-  let i = dead[taken - 1u];
+
+  let i = slots[atomicLoad(&counts[BASE]) - 1u - k];
+  *slot = i;
   let particle = e.first + k;
 
   var axis = vec3(0.0, 1.0, 0.0);
@@ -287,8 +377,18 @@ fn cs_spawn(@builtin(global_invocation_id) id: vec3<u32>) {
 
   position[i] = vec4(to_world(local), 0.0);
   velocity[i] = vec4(world_dir * speed, max(life, 0.0001));
-  force[i] = vec4(0.0, 0.0, 0.0, radians(between(e.rotation, random(particle, 8u))));
-  color[i] = vec4(tint, between(e.opacity, random(particle, 9u)));
-  size[i] = between(e.size, random(particle, 10u));
-  atomicAdd(&counts[LIVE], 1u);
+  extra[i] = pack2x16float(vec2(radians(between(e.rotation, random(particle, 8u))),
+    between(e.size, random(particle, 10u))));
+  color[i] = pack_color(vec4(tint, between(e.opacity, random(particle, 9u))));
+
+  return true;
+}
+
+@compute @workgroup_size(PARTICLE_GROUP)
+fn cs_spawn(@builtin(global_invocation_id) id: vec3<u32>,
+  @builtin(local_invocation_index) local: u32)
+{
+  var slot = 0u;
+  let filled = spawn(id.x, &slot);
+  compact(local, slot, filled);
 }

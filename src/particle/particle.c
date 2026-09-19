@@ -183,6 +183,45 @@ static void box_particle_collision_ctor(
     }
 }
 
+/** Settings constructor: cull the emitters no view can see and no other limit.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_settings_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleSettings *s = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        memset(&s[i], 0, sizeof(ParticleSettings));
+        s[i].cull = true;
+    }
+}
+
+/** Free the view vector the registry of a world collects its frustums in.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_state_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleState *s = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_vec_fini_t(NULL, &s[i].views, box_particle_view_t);
+    }
+}
+
 /** Create one shader entity of the module under box.particle.shaders.
  *
  * @param world The world
@@ -257,6 +296,8 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, PlaybackState);
     ECS_META_COMPONENT(world, ParticlePlayback);
     ECS_META_COMPONENT(world, ParticleBurst);
+    ECS_META_COMPONENT(world, ParticleSettings);
+    ECS_META_COMPONENT(world, ParticleStats);
     ECS_COMPONENT_DEFINE(world, ParticleEmitterImpl);
     ECS_COMPONENT_DEFINE(world, ParticleState);
 
@@ -265,8 +306,12 @@ void BoxParticleImport(
     ecs_set_hooks(world, ParticleCollision, { .ctor = box_particle_collision_ctor });
     ecs_set_hooks(world, ParticleCurves, { .ctor = box_particle_curves_ctor });
     ecs_set_hooks(world, ParticleAppearance, { .ctor = box_particle_appearance_ctor });
+    ecs_set_hooks(world, ParticleSettings, { .ctor = box_particle_settings_ctor });
     ecs_set_hooks(world, ParticleEmitterImpl, { .ctor = flecs_default_ctor });
-    ecs_set_hooks(world, ParticleState, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ParticleState, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_particle_state_dtor
+    });
     ecs_add_pair(world, ecs_id(ParticleEmitter), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(ParticleEmitter), EcsWith, ecs_id(ParticleEmitterImpl));
     ecs_add_pair(world, ecs_id(ParticleEmitterImpl), EcsOnInstantiate, EcsDontInherit);
@@ -300,7 +345,12 @@ void BoxParticleImport(
     ParticleState *state = ecs_singleton_ensure(world, ParticleState);
     state->emitters = query;
     state->bursts = bursts;
+    ecs_vec_init_t(NULL, &state->views, box_particle_view_t, 0);
     ecs_singleton_modified(world, ParticleState);
+    ecs_singleton_ensure(world, ParticleSettings);
+    ecs_singleton_modified(world, ParticleSettings);
+    ecs_singleton_ensure(world, ParticleStats);
+    ecs_singleton_modified(world, ParticleStats);
 
     box_particle_functions_init(world, ecs_id(BoxParticle));
 

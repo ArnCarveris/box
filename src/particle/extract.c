@@ -86,7 +86,7 @@ static uint32_t box_particle_spawn(
     uint32_t max)
 {
     uint32_t result = 0;
-    if (impl->state != ParticlePlaying || !max) {
+    if (impl->state != ParticlePlaying || !max || delta < 0.0f) {
         goto done;
     }
 
@@ -563,6 +563,96 @@ static void box_particle_shaders(
     }
 }
 
+/** Seconds the simulation of an emitter advances this frame.
+ *
+ * An emitter the views reject is frozen where it is; one that is far from every
+ * camera is stepped every other frame with the two frames in one step, which is
+ * the same motion at half the cost, and carries the frame it skipped.
+ *
+ * @param impl Its bookkeeping, which carries the skipped frames
+ * @param step One of the BOX_PARTICLE_STEP constants
+ * @param delta Seconds the frame advanced the world
+ * @param flags Receives the pause bit when the emitter is not stepped
+ * @return The seconds to step, below zero when the emitter is not stepped
+ */
+static float box_particle_step(
+    ParticleEmitterImpl *impl,
+    int32_t step,
+    float delta,
+    uint32_t *flags)
+{
+    float result = -1.0f;
+    if (step == BOX_PARTICLE_STEP_NONE) {
+        *flags |= BOX_PARTICLE_PAUSED;
+        goto done;
+    }
+
+    if (step == BOX_PARTICLE_STEP_HALF) {
+        impl->tick ++;
+        if (impl->tick & 1) {
+            impl->carry += (double)delta;
+            *flags |= BOX_PARTICLE_PAUSED;
+            goto done;
+        }
+    }
+
+    result = (float)(impl->carry + (double)delta);
+    impl->carry = 0;
+done:
+    return result;
+}
+
+/** Give every emitter of a world its share of the particles the world allows.
+ *
+ * The share is proportional to what the emitters asked for, so a scene over its
+ * ceiling thins every stream by the same fraction instead of stalling, and it
+ * only depends on the asks, which is what keeps a pool from being rebuilt
+ * because a frame was busy.
+ *
+ * @param world The world
+ * @param state The registry holding the emitter query
+ * @param settings The budgets of the world, NULL for none
+ */
+static void box_particle_budget(
+    ecs_world_t *world,
+    const ParticleState *state,
+    const ParticleSettings *settings)
+{
+    uint32_t ceiling = settings && settings->max_total > 0 ?
+        (uint32_t)settings->max_total : 0;
+    if (!ceiling) {
+        goto done;
+    }
+
+    uint64_t total = 0;
+    ecs_iter_t it = ecs_query_iter(world, state->emitters);
+    while (ecs_query_next(&it)) {
+        const ParticleEmitter *emitter = ecs_field(&it, ParticleEmitter, 0);
+        ParticleEmitterImpl *impl = ecs_field(&it, ParticleEmitterImpl, 2);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            impl[i].budget = box_particle_max(&emitter[i]);
+            total += impl[i].budget;
+        }
+    }
+
+    if (total <= (uint64_t)ceiling) {
+        goto done;
+    }
+
+    it = ecs_query_iter(world, state->emitters);
+    while (ecs_query_next(&it)) {
+        ParticleEmitterImpl *impl = ecs_field(&it, ParticleEmitterImpl, 2);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            impl[i].budget = box_particle_share(impl[i].budget, total, ceiling);
+        }
+    }
+
+done:
+    return;
+}
+
 /** Advance the clock of every emitter of a world before its bursts are read.
  *
  * The clock has to run before the schedules are evaluated and the blocks are
@@ -607,9 +697,24 @@ void box_particle_extract(
     }
 
     box_particle_shaders(world, state, p);
+    const ParticleSettings *settings = ecs_singleton_get(world, ParticleSettings);
+    ParticleState *mutable_state = ECS_CONST_CAST(ParticleState*, state);
+    box_particle_views(p, &mutable_state->views);
+    const box_particle_view_t *views = ecs_vec_first(&mutable_state->views);
+    int32_t view_count = ecs_vec_count(&mutable_state->views);
+    uint32_t spawn_budget = settings && settings->spawn_per_frame > 0 ?
+        (uint32_t)settings->spawn_per_frame : 0;
+    uint32_t ceiling = settings && settings->max_total > 0 ?
+        (uint32_t)settings->max_total : 0;
+    uint64_t asked = mutable_state->asked;
+    uint64_t spawning = 0;
+    ParticleStats stats;
+    memset(&stats, 0, sizeof(ParticleStats));
+
     float delta = ecs_get_world_info(world)->delta_time;
     box_particle_clocks(world, state, delta);
     box_particle_bursts(world, state);
+    box_particle_budget(world, state, settings);
     ecs_vec_t hits;
     ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_iter_t it = ecs_query_iter(world, state->emitters);
@@ -627,7 +732,7 @@ void box_particle_extract(
             ecs_field(&it, ParticleAppearance, 6) : NULL;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            uint32_t max = box_particle_max(&emitter[i]);
+            uint32_t max = ceiling ? impl[i].budget : box_particle_max(&emitter[i]);
             if (!impl[i].id) {
                 impl[i].id = (uint32_t)it.entities[i];
             }
@@ -651,19 +756,56 @@ void box_particle_extract(
             out->id = impl[i].id;
             out->max = max;
             out->flags |= impl[i].flags;
-            out->delta = impl[i].state == ParticlePaused ? 0.0f : delta;
+            int32_t step = BOX_PARTICLE_STEP_FULL;
+            if (view_count) {
+                out->reach = box_particle_reach(&emitter[i], &impl[i]);
+                step = box_particle_cull(views, view_count, out->origin,
+                    out->reach, settings);
+            }
+
+            uint32_t flags = 0;
+            float advance = box_particle_step(&impl[i], step, delta, &flags);
+            out->flags |= flags;
+            out->delta = impl[i].state == ParticlePaused || advance < 0.0f ?
+                0.0f : advance;
             out->first = impl[i].spawned;
-            out->spawn = box_particle_spawn(&emitter[i], &impl[i], delta, max);
+            uint32_t want = box_particle_spawn(&emitter[i], &impl[i], advance, max);
+            out->spawn = box_particle_share(want, asked, spawn_budget);
+            spawning += want;
             if (impl[i].max != max) {
                 out->flags |= BOX_PARTICLE_RESET;
                 impl[i].max = max;
             }
 
+            if (out->flags & BOX_PARTICLE_RESET) {
+                impl[i].used = 0;
+            }
+
             impl[i].spawned += out->spawn;
+            impl[i].used += out->spawn;
+            if (impl[i].used > max) {
+                impl[i].used = max;
+            }
+
+            out->span = impl[i].used;
+            stats.emitters ++;
+            stats.particles += (int32_t)max;
+            stats.spawned += (int32_t)out->spawn;
+            stats.bytes += (int64_t)max * BOX_PARTICLE_BYTES;
+            if (step == BOX_PARTICLE_STEP_NONE) {
+                stats.culled ++;
+            } else {
+                stats.simulated ++;
+                stats.halved += step == BOX_PARTICLE_STEP_HALF ? 1 : 0;
+            }
         }
     }
 
     ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
+    mutable_state->asked = spawning;
+    ParticleStats *out = ecs_singleton_ensure(world, ParticleStats);
+    *out = stats;
+    ecs_singleton_modified(world, ParticleStats);
 done:
     return;
 }

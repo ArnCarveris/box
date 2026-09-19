@@ -639,13 +639,41 @@ drive it without an endpoint of its own: `set fireworks.firework ParticlePlaybac
 controls as script functions, `particle.start`, `particle.pause`, `particle.stop`,
 `particle.reset` and `particle.time`, which each take the emitter entity.
 
+`ParticleSettings` is the singleton that holds what every emitter of a world shares.
+`max_total` caps what the pools hold together and `spawn_per_frame` caps what a frame
+spawns into them; an emitter that asks for more than its share of either gets its share,
+divided in proportion to the asks, so a scene over its budget thins every stream instead
+of stalling or losing one. The particles of an emitter stay inside a sphere its speed,
+its lifetime and its acceleration bound: `cull` drops the emitters no view can see,
+`cull_distance` drops the ones too far from every camera and `step_distance` steps the
+ones beyond it every other frame with both frames in one step. `ParticleStats` reports
+what the last frame cost: the emitters, how many were simulated, culled or halved, the
+particles the pools hold and the bytes they take on the device.
+
+```
+using box.particle
+
+$ { ParticleSettings: {max_total: 10000000, spawn_per_frame: 200000, step_distance: 150} }
+```
+
+A particle costs 52 bytes: sixteen for its place with its age, sixteen for the velocity
+with its lifetime, two words for its color and opacity and one for its rotation and size
+as half floats, and a word each in the dead list and in the compacted list of what is
+alive. The integrate pass is dispatched over the slots a pool has used rather than over
+its ceiling, and an added pool is drawn indirectly over that compacted list, so neither
+the simulation nor the draw touches a slot that holds nothing. A blended pool is drawn
+over its slots in order instead, because the order two sprites blend in has to be the
+same from frame to frame.
+
 `test/integration/visual/particles_shapes.flecs` shows a stream from each of the six
 shapes, `test/integration/visual/particles_forces.flecs` a jet splashing off a plate, a
 plume blown over by wind and a burst of sparks,
 `test/integration/visual/particles_appearance.flecs` smoke, fire, sparks, a sprite sheet
 and mesh billboards, `test/integration/visual/particles_control.flecs` a burst caught in
-flight next to a repeating schedule, a running stream and a stopped one, and
-`test/integration/bench/particles_1m.flecs` runs a million of them.
+flight next to a repeating schedule, a running stream and a stopped one,
+`test/integration/bench/particles_1m.flecs` runs a million of them,
+`test/integration/bench/particles_10m.flecs` ten million over ten emitters and
+`test/integration/bench/particles_fill.flecs` eleven thousand screen filling soft sprites.
 
 ## Tests
 

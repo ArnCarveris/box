@@ -169,6 +169,31 @@ done:
     return;
 }
 
+/** Farthest sampled point of the table of an emitter from its origin.
+ *
+ * The culling needs the extent of a mesh or a spline shape, and the table only
+ * changes when the shape, the source or the seed does, so it is measured here
+ * instead of once per frame.
+ *
+ * @param impl The bookkeeping holding the table
+ */
+static void box_particle_extent(
+    ParticleEmitterImpl *impl)
+{
+    float result = 0;
+    uint32_t i;
+    for (i = 0; i < impl->points; i ++) {
+        vec3 point = vec3_new(impl->table[i].position[0],
+            impl->table[i].position[1], impl->table[i].position[2]);
+        float length = vec3_length(point);
+        if (length > result) {
+            result = length;
+        }
+    }
+
+    impl->extent = result;
+}
+
 void box_particle_sample(
     ecs_world_t *world,
     const ParticleEmitter *emitter,
@@ -183,6 +208,7 @@ void box_particle_sample(
 
     memset(impl->table, 0, sizeof(impl->table));
     impl->points = 0;
+    impl->extent = 0;
     impl->shape = (int32_t)emitter->shape;
     impl->source = emitter->source;
     impl->seed = emitter->seed;
@@ -199,6 +225,7 @@ void box_particle_sample(
         box_particle_spline(world, emitter->source, impl);
     }
 
+    box_particle_extent(impl);
 done:
     return;
 }
