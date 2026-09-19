@@ -402,6 +402,41 @@ template Button {
 }
 ```
 
+The in game console is the proof that the framework carries a real widget. Adding the
+`Console` singleton installs the binding: an `InputAction` under `actions` that the grave key
+fires through the action layer, and the first open loads the script the framework installs at
+`etc/ui/console.flecs`, which builds the overlay out of the elements above and marks the two
+parts the engine fills, the element with a `ConsoleLog` that holds the scrollback and the
+element with a `TextInput` that holds the line. An application that wants another console
+ships its own script at that path; nothing about the way the overlay looks is in C.
+
+```
+$ {
+  Console: {}
+}
+```
+
+A `TextInput` is an editable line with a caret of its own, a thin quad pinned to the left edge
+of its box at the width of the text before the caret. A focused input takes the characters the
+frame collected and the edit keys that go with them: backspace and delete around the caret, the
+arrows and home and end over the line, and enter, which moves the line to `submitted` and
+empties the input. `history` walks the submitted lines with the up and down arrows and keeps the
+line that was being typed until the walk comes back to it, and `complete` asks `box.command` for
+the command name or the entity path the tab key completes, replacing the word the caret is in
+with the longest prefix every candidate shares and following a single candidate with a space.
+
+An open console holds the keyboard: every input map but its own is disabled while it is open
+and enabled again when it closes, so the keys that drive a game do not drive it while a line is
+being typed, and the same key still closes it. The line it submits is set as `TerminalInput` on
+`terminals.console`, an ordinary session with a folder and a log that an agent reaches over
+HTTP with every command it holds, and the scrollback is the log of that session: every line it
+ran and the `TerminalOutput` that came back, the engine log included through the `logs`
+command. Submitting also fires `actions.ConsoleLine`, so a script can `await on.pressed` for it.
+A closed console keeps its tree and its session and only turns the view of the overlay off.
+`test/integration/visual/console.flecs` shows the overlay over a scene and
+`test/integration/command/console.flecs` opens it with `key.press`, types a line with
+`key.type` and captures the screen.
+
 `box.checkpoint` writes the state of a running instance back into the scripts that loaded it.
 The `checkpoint [name]` command walks every managed script, substitutes the current values of
 the components of the entities that script owns into a copy of its source and writes it as

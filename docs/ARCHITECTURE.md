@@ -47,7 +47,7 @@ Two hard rules keep the concerns apart:
 | `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events, the `Action` a click fires and the source a view without colliders answers its pick with |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
-| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene |
+| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene; the `TextInput` line with its caret, history and completion, and the `Console` singleton that binds the grave key, loads `etc/ui/console.flecs` on demand, holds the keyboard while it is open and runs its lines on `terminals.console` |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
 | later | `box.particles`, `box.lod`, `box.atmosphere` |
 
@@ -140,6 +140,15 @@ command per line, skipping blank lines and `#` comments; a quoted argument that 
 line leaves open continues on the next line. `Terminal.log` copies the session log
 to a file outside the process folder, which is how the command integration tests
 collect it.
+
+The in game console is the same interface with a UI in front of it. `box.ui` gives
+the `Console` singleton a session named `terminals.console`, sets the submitted
+line as its `TerminalInput` and shows that session's log as the scrollback, so the
+overlay and an agent over HTTP talk to one terminal. `box_command_complete`
+answers the tab key of a `TextInput`: the first word of a line completes against
+the command names, every later word against the children of the scope its path
+names. `box.ui` imports `box.command` the first time a console opens, so a world
+that never opens one never pays for it.
 
 ## Checkpoints
 
