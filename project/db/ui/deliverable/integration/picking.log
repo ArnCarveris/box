@@ -1,0 +1,20 @@
+$ has scene.crate box.picking.Hovered
+false
+$ has scene.crate WasHovered
+false
+$ mouse.sweep 200,360 640,360 4 4
+sweep 200,360 to 640,360 in 4 steps over 4 frames
+$ input.wait
+5 events pending
+$ has scene.crate box.picking.Hovered
+true
+$ mouse.click left 640,360
+left click for 1 frame
+$ has scene.crate box.picking.Hovered
+true
+$ has scene.crate WasHovered
+true
+$ has scene box.picking.Hovered
+false
+$ has scene.ball box.picking.Hovered
+false
