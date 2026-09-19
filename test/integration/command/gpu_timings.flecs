@@ -1,0 +1,116 @@
+// A scene with a sun, four post process effects and the GpuTimings singleton.
+// The agent holds a bound key for twelve frames and waits for its release,
+// which spends the frames the renderer needs to record a frame, resolve its
+// timestamps and read them back, and runs the command file once that release
+// arrived, so the log holds the passes of a measured frame.
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.movement
+using box.input
+using box.effects
+using box.monitor
+using box.command
+
+$ {
+  GpuTimings: {}
+  EnvironmentLight: {sky_color: {110, 130, 165}, ground_color: {55, 52, 50}, intensity: 0.8}
+}
+
+camera {
+  Position: {0, 4, -11}
+  LookAt: {0, 1.2, 0}
+  Camera: {fov: 55}
+}
+
+main {
+  View: {camera: camera}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 2}
+}
+
+scene {
+  ground {
+    Position: {0, -0.25, 0}
+    Box: {40, 0.5, 40}
+    Rgb: {120, 120, 125}
+    PbrMaterial: {roughness: 0.9}
+  }
+
+  sphere {
+    Position: {-3.2, 1.2, 0}
+    Sphere: {segments: 32, smooth: true, radius: 1.2}
+    Rgb: {220, 90, 70}
+  }
+
+  crate {
+    Position: {0, 1.1, 0}
+    Rotation: {0, 0.6, 0}
+    Box: {2.2, 2.2, 2.2}
+    Rgb: {80, 160, 240}
+    AngularVelocity: {0, 0.8, 0}
+  }
+
+  lamp {
+    Position: {3.2, 1.2, 0}
+    Sphere: {segments: 16, smooth: true, radius: 0.5}
+    Rgb: {20, 20, 20}
+    Emissive: {strength: 120, color: {255, 240, 200}}
+  }
+}
+
+box { effects { stack {
+  gtao {
+    Effect: {enabled: true}
+    Gtao: {radius: 2.5, slices: 4, steps: 10, power: 2, temporal: true, half_res: true}
+  }
+  auto_exposure {
+    Effect: {enabled: true}
+  }
+  bloom {
+    Effect: {enabled: true}
+    Bloom: {intensity: 0.22, radius: 1, knee: 0, firefly_clamp: 8}
+  }
+  tonemap {
+    Effect: {enabled: true}
+    ToneMapping: {white: 1, dither: true}
+  }
+} } }
+
+actions {
+  Wait { InputAction: {description: "Held while the timings of a frame arrive"} }
+}
+
+input_map {
+  InputMap
+  (keys.A, actions.Wait)
+}
+
+template Agent {
+  mut waited = 0
+
+  async {
+    await on.up(actions.Wait)
+    waited = 1
+  }
+
+  if waited == 1 {
+    CommandScript: {path: "../../test/integration/command/gpu_timings.cmd"}
+  } else {
+    TerminalInput: {line: "key.press A 12"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    Agent
+  }
+}
