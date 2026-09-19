@@ -18,7 +18,9 @@
                     "mesh_shape_table",
                     "three_forces",
                     "collider_table",
-                    "curves_and_appearance"
+                    "curves_and_appearance",
+                    "playback_and_bursts",
+                    "playback_1k"
                 ]
             },
             {

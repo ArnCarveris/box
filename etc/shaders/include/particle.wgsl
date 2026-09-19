@@ -54,6 +54,7 @@ const GROUND: u32 = 2u;
 const DIE: u32 = 4u;
 const ADDITIVE: u32 = 8u;
 const SOFT: u32 = 16u;
+const PAUSED: u32 = 32u;
 
 const DRAW_CIRCLE: u32 = 0u;
 const DRAW_SPRITE: u32 = 1u;

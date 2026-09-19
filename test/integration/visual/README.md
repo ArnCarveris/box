@@ -80,6 +80,7 @@ Rules for adding one:
 | Particle emitter shapes | `particles_shapes` | Six streams a few frames old: point, sphere, box, disc, the surface of a mesh and a spline, one color each. |
 | Particle forces and collision | `particles_forces` | A jet splashing off a plate, a plume blown over by wind with turbulence and a burst of sparks with a speed and a color variance flattened on the floor. |
 | Particle appearances and blending | `particles_appearance` | Five emitters: soft sprite smoke fading into a wall, additive fire down its gradient, sparks, a sprite sheet whose frames grow with the age, and star billboards of a mesh. |
+| Particle playback and bursts | `particles_control` | A burst caught two frames into its flight, a schedule of three pulses as nested shells, a running stream and the empty ground where a stopped emitter stands. |
 | Impostors | `lod_impostors` | Four mast yards fanning away: the near one keeps its masts, the two behind it are billboards of the eight views captured into their atlas, and the farthest is small enough for the box over its bounds again. |
 
 ## The showcase scene

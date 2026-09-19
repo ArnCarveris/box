@@ -68,6 +68,11 @@ static uint32_t box_particle_max(
  * particles than the pool holds are dropped here; the dead list of the pool is
  * what enforces the maximum exactly.
  *
+ * The bursts that went off this frame are added to what the rate asked for and
+ * the two are capped together, so a burst never spawns past the pool either. An
+ * emitter that is paused or stopped asks for nothing and keeps the fraction it
+ * had, so playing it again carries on where it left off.
+ *
  * @param emitter The emitter
  * @param impl Its bookkeeping
  * @param delta Seconds the frame advanced the world
@@ -81,18 +86,30 @@ static uint32_t box_particle_spawn(
     uint32_t max)
 {
     uint32_t result = 0;
-    if (emitter->rate <= 0.0f || delta <= 0.0f || !max) {
-        impl->accumulator = 0;
+    if (impl->state != ParticlePlaying || !max) {
         goto done;
     }
 
-    impl->accumulator += (double)emitter->rate * (double)delta;
-    if (impl->accumulator >= (double)max) {
-        impl->accumulator = (double)max;
+    if (emitter->rate <= 0.0f || delta <= 0.0f) {
+        impl->accumulator = 0;
+    } else {
+        impl->accumulator += (double)emitter->rate * (double)delta;
+        if (impl->accumulator >= (double)max) {
+            impl->accumulator = (double)max;
+        }
+
+        result = (uint32_t)impl->accumulator;
+        impl->accumulator -= (double)result;
     }
 
-    result = (uint32_t)impl->accumulator;
-    impl->accumulator -= (double)result;
+    if (impl->burst) {
+        result += impl->burst;
+    }
+
+    if (result > max) {
+        result = max;
+    }
+
 done:
     return result;
 }
@@ -546,6 +563,35 @@ static void box_particle_shaders(
     }
 }
 
+/** Advance the clock of every emitter of a world before its bursts are read.
+ *
+ * The clock has to run before the schedules are evaluated and the blocks are
+ * written, because a burst that sits on a child of an emitter is reached by its
+ * own query and only the emitter knows how far its playback has come.
+ *
+ * @param world The world
+ * @param state The registry holding the emitter query
+ * @param delta Seconds the frame advanced the world
+ */
+static void box_particle_clocks(
+    ecs_world_t *world,
+    const ParticleState *state,
+    float delta)
+{
+    ecs_iter_t it = ecs_query_iter(world, state->emitters);
+    while (ecs_query_next(&it)) {
+        ParticleEmitterImpl *impl = ecs_field(&it, ParticleEmitterImpl, 2);
+        ParticlePlayback *playback = ecs_field_is_set(&it, 7) ?
+            ecs_field(&it, ParticlePlayback, 7) : NULL;
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            impl[i].flags = 0;
+            box_particle_playback(playback ? &playback[i] : NULL, &impl[i],
+                delta, &impl[i].flags);
+        }
+    }
+}
+
 void box_particle_extract(
     ecs_world_t *world,
     box_packet_t *p)
@@ -562,6 +608,8 @@ void box_particle_extract(
 
     box_particle_shaders(world, state, p);
     float delta = ecs_get_world_info(world)->delta_time;
+    box_particle_clocks(world, state, delta);
+    box_particle_bursts(world, state);
     ecs_vec_t hits;
     ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_iter_t it = ecs_query_iter(world, state->emitters);
@@ -602,7 +650,8 @@ void box_particle_extract(
                 p, &hits, out);
             out->id = impl[i].id;
             out->max = max;
-            out->delta = delta;
+            out->flags |= impl[i].flags;
+            out->delta = impl[i].state == ParticlePaused ? 0.0f : delta;
             out->first = impl[i].spawned;
             out->spawn = box_particle_spawn(&emitter[i], &impl[i], delta, max);
             if (impl[i].max != max) {

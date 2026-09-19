@@ -254,6 +254,9 @@ void BoxParticleImport(
     ECS_META_COMPONENT(world, ParticleShape);
     ECS_META_COMPONENT(world, ParticleBlend);
     ECS_META_COMPONENT(world, ParticleAppearance);
+    ECS_META_COMPONENT(world, PlaybackState);
+    ECS_META_COMPONENT(world, ParticlePlayback);
+    ECS_META_COMPONENT(world, ParticleBurst);
     ECS_COMPONENT_DEFINE(world, ParticleEmitterImpl);
     ECS_COMPONENT_DEFINE(world, ParticleState);
 
@@ -278,14 +281,28 @@ void BoxParticleImport(
             { .id = ecs_id(ParticleForces), .oper = EcsOptional, .inout = EcsIn },
             { .id = ecs_id(ParticleCollision), .oper = EcsOptional, .inout = EcsIn },
             { .id = ecs_id(ParticleCurves), .oper = EcsOptional, .inout = EcsIn },
-            { .id = ecs_id(ParticleAppearance), .oper = EcsOptional, .inout = EcsIn }
+            { .id = ecs_id(ParticleAppearance), .oper = EcsOptional, .inout = EcsIn },
+            { .id = ecs_id(ParticlePlayback), .oper = EcsOptional, .inout = EcsInOut }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    ecs_query_t *bursts = ecs_query(world, {
+        .entity = ecs_entity(world, { .name = "bursts" }),
+        .terms = {
+            { .id = ecs_id(ParticleBurst), .inout = EcsIn },
+            { .id = ecs_id(ParticleEmitterImpl), .inout = EcsInOut,
+                .src.id = EcsSelf|EcsUp, .trav = EcsChildOf }
         },
         .cache_kind = EcsQueryCacheAuto
     });
 
     ParticleState *state = ecs_singleton_ensure(world, ParticleState);
     state->emitters = query;
+    state->bursts = bursts;
     ecs_singleton_modified(world, ParticleState);
+
+    box_particle_functions_init(world, ecs_id(BoxParticle));
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(ParticleEmitter) }},

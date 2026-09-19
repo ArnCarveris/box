@@ -50,7 +50,7 @@ Two hard rules keep the concerns apart:
 | `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree; the hit test that resolves the cursor against the `Bounds` of a view and answers its pick before the scene; the `TextInput` line with its caret, history and completion, and the `Console` singleton that binds the grave key, loads `etc/ui/console.flecs` on demand, holds the keyboard while it is open and runs its lines on `terminals.console` |
 | `box.transition` | `Transition` maps a component or member to `TransitionParams`; the private per entity record of what is displayed, the timing functions and the `(TransitionValue, Component)` pair |
 | `box.lod` | the proxy generator `box_lod_proxy_build`: a reusable builder clusters the primitives of a subtree by material key and proximity and emits a few `Box`, `Sphere` or `Capsule` primitives with the volume the proxy misses as an error in world units; the screen space metric `box_lod_error_px`, which projects such an error at the nearest point of the bounds of a node for a perspective or an orthographic camera, and `box_lod_select`, which holds a node at its level until the projected error leaves the band around the threshold of the view; `box_lod_merge` collapses the meshes of a subtree into one world space mesh with an index range per material key, welding the vertices that share a position, and `box_lod_simplify` collapses that mesh per group with meshoptimizer under an error bound, reporting the error it cost in world units; `box_lod_ladder` turns the authored segment count of a parametric shape into the levels it reduces through, `box_lod_chord_error` is the error one level costs at a radius and `box_lod_reduce` projects those errors and picks the level of the frame; the node hierarchy `box_lod_tree_t`, which the renderer builds from the authored tree and walks once per view: a node the frustum rejects or the depth grid hides stops its descendants, a node whose projected error is under the threshold of the view is drawn as one proxy box and its subtree is released and hidden, and `box_lod_tree_cluster` stacks renderer only clusters over loose roots without touching `Parent` or `ChildOf`; `LodPin` marks a subtree pruning keeps and `LodStats` reports what a walk visited, drew and replaced |
-| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces`, `ParticleCollision`, `ParticleCurves` and `ParticleAppearance`; the spawn clock, the shape tables and the colliders the packet carries, while the particles themselves live in renderer buffers |
+| `box.particle` | `ParticleEmitter` with its shape, ranges and seed, `ParticleForces`, `ParticleCollision`, `ParticleCurves`, `ParticleAppearance`, `ParticlePlayback` and `ParticleBurst`; the spawn clock, the playback clock, the shape tables and the colliders the packet carries, while the particles themselves live in renderer buffers |
 | later | `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single
@@ -203,6 +203,26 @@ a device guarantees. A particle that ends its step behind a surface is lifted
 back onto it and keeps the bounce of the speed it had into it and loses the
 friction of the speed it had along it, or is killed and handed back to the dead
 list.
+
+`ParticlePlayback` is the only state the effect itself has. Its clock runs in the
+bookkeeping of the emitter and is published into the component every frame; it
+only advances while the emitter plays, a stop leaves the particles in the air to
+finish their life while nothing more is spawned, a pause raises a bit in the
+block that makes the renderer record neither compute pass so the pool is drawn
+exactly as it was, and a reset raises the bit that empties the pool and puts the
+clock back to zero. The trigger is written back to false by the frame that acts
+on it, so every control is an ordinary component write that a script, the REST
+API or a terminal command makes; the module registers the same four as script
+functions under its own name.
+
+A `ParticleBurst` is evaluated from that clock instead of from a countdown: the
+number of times a schedule went off by a time is the time over its period capped
+by its repeat count, and the bursts of a frame are the difference between that
+count at the two ends of the frame, so nothing is carried between frames and a
+burst lands on the same frame on every run. Its query reaches the emitter over
+`ChildOf`, so a schedule sits on the emitter or on any of its descendants and one
+emitter takes as many as the scene hangs under it. What the bursts ask for is
+added to what the rate asked for and the two are capped by the pool together.
 
 Each view then draws every pool with one instanced sprite pass after its sorted
 draws: a slot becomes a camera facing quad turned by its rotation and sized by

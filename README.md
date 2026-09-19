@@ -609,12 +609,43 @@ smoke {
 }
 ```
 
+`ParticlePlayback` starts, pauses, stops and resets an effect, and `ParticleBurst`
+spawns a lump of particles at a time of its playback alongside the continuous rate.
+Stopping ends the emission and leaves the particles that are in the air to finish,
+pausing freezes the whole pool where it is and drawing carries on, and `reset` is a
+trigger the frame that sees it acts on and writes back to false. The clock of the
+playback is written by the engine and only runs while the emitter plays, so a schedule
+keeps its place over a pause and starts again when a stopped emitter is played. A burst
+sits on the emitter or on any of its descendants, which is how one emitter takes several
+schedules.
+
+```
+using box.particle
+
+firework {
+  Position: {0, 4, 0}
+  ParticleEmitter: {max: 20000, rate: 0, spread: 180, speed: {min: 6, max: 14}, seed: 9}
+  ParticlePlayback: {state: ParticlePlaying}
+
+  shells {
+    ParticleBurst: {count: 600, at: 0.5, repeat: 3}
+  }
+}
+```
+
+Every control is a component write, so a script, the REST API and a terminal command
+drive it without an endpoint of its own: `set fireworks.firework ParticlePlayback
+{state: ParticlePaused}` freezes it from a session. The module also registers the same
+controls as script functions, `particle.start`, `particle.pause`, `particle.stop`,
+`particle.reset` and `particle.time`, which each take the emitter entity.
+
 `test/integration/visual/particles_shapes.flecs` shows a stream from each of the six
 shapes, `test/integration/visual/particles_forces.flecs` a jet splashing off a plate, a
 plume blown over by wind and a burst of sparks,
 `test/integration/visual/particles_appearance.flecs` smoke, fire, sparks, a sprite sheet
-and mesh billboards, and `test/integration/bench/particles_1m.flecs` runs a million of
-them.
+and mesh billboards, `test/integration/visual/particles_control.flecs` a burst caught in
+flight next to a repeating schedule, a running stream and a stopped one, and
+`test/integration/bench/particles_1m.flecs` runs a million of them.
 
 ## Tests
 

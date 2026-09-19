@@ -16,6 +16,9 @@
 /** Colliders the collision case puts around its emitter */
 #define BENCH_COLLIDER_COUNT (256)
 
+/** Burst schedules the playback case hangs under its emitter */
+#define BENCH_BURST_COUNT (4)
+
 void Extract_one_emitter(bench_t *b)
 {
     // particles/emitter
@@ -220,6 +223,78 @@ void Extract_curves_and_appearance(bench_t *b)
     ecs_progress(world, 1.0f / 60.0f);
 
     bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}
+
+void Extract_playback_and_bursts(bench_t *b)
+{
+    // particles/control
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, ParticleEmitter, {.max = 100000, .rate = 20000, .seed = 3});
+    ecs_add(world, e, ParticlePlayback);
+
+    int32_t i;
+    for (i = 0; i < BENCH_BURST_COUNT; i ++) {
+        ecs_entity_t schedule = ecs_new_w_pair(world, EcsChildOf, e);
+        ecs_set(world, schedule, ParticleBurst, {
+            .count = 500, .at = 0.25f * (float)(i + 1), .repeat = -1
+        });
+    }
+
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, 1);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        box_packet_reset(&packet);
+        bench_resume(b);
+        box_particle_extract(world, &packet);
+        bench_keep(packet.particles.count);
+    }
+
+    box_packet_fini(&packet);
+    ecs_fini(world);
+}
+
+void Extract_playback_1k(bench_t *b)
+{
+    // particles/control
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxParticle);
+    box_packet_t packet;
+    box_packet_init(&packet);
+
+    int32_t i;
+    for (i = 0; i < BENCH_EMITTER_COUNT; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)i, 1, 0});
+        ecs_set(world, e, ParticleEmitter, {
+            .max = 10000, .rate = 2000, .shape = EmitterSphere, .radius = 1,
+            .seed = (uint32_t)i + 1
+        });
+        ecs_add(world, e, ParticlePlayback);
+        ecs_set(world, e, ParticleBurst, {.count = 100, .at = 0.5f, .repeat = -1});
+    }
+
+    ecs_progress(world, 1.0f / 60.0f);
+
+    bench_set_items(b, BENCH_EMITTER_COUNT);
 
     while (bench_iter(b)) {
         bench_pause(b);

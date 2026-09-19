@@ -125,6 +125,37 @@
                     "a_particle_at_the_surface_is_gone",
                     "a_particle_fades_in_over_the_softness"
                 ]
+            },
+            {
+                "id": "Playback",
+                "testcases": [
+                    "an_emitter_without_a_playback_plays",
+                    "a_playback_starts_out_playing",
+                    "stopping_ends_the_emission",
+                    "a_stopped_emitter_keeps_its_particles_moving",
+                    "pausing_freezes_the_pool",
+                    "playing_again_carries_on_from_the_pause",
+                    "the_clock_only_runs_while_the_emitter_plays",
+                    "starting_a_stopped_emitter_rewinds_its_clock",
+                    "a_pause_and_a_play_keep_the_clock",
+                    "reset_empties_the_pool_and_clears_the_trigger",
+                    "reset_rewinds_the_clock",
+                    "a_burst_without_a_time_goes_off_once",
+                    "a_burst_goes_off_at_its_time",
+                    "a_burst_repeats_on_its_period",
+                    "a_burst_repeats_while_the_emitter_plays",
+                    "a_burst_runs_alongside_the_rate",
+                    "a_burst_is_capped_by_the_pool",
+                    "a_burst_on_a_child_reaches_its_emitter",
+                    "two_schedules_of_an_emitter_add_up",
+                    "a_stopped_emitter_holds_its_schedule",
+                    "a_reset_replays_the_schedule",
+                    "a_schedule_counts_the_bursts_of_a_span",
+                    "a_schedule_without_a_count_never_goes_off",
+                    "the_script_functions_drive_the_playback",
+                    "a_script_function_answers_an_entity_without_an_emitter",
+                    "the_script_clock_reads_the_playback"
+                ]
             }
         ]
     }

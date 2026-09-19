@@ -1120,6 +1120,9 @@ typedef struct box_dynamic_batch_t {
 /** The particles of the emitter fade out against the geometry behind them */
 #define BOX_PARTICLE_SOFT (16u)
 
+/** The playback of the emitter is paused: its pool is drawn but never stepped */
+#define BOX_PARTICLE_PAUSED (32u)
+
 /** The particles of the emitter are drawn as a soft round sprite */
 #define BOX_PARTICLE_DRAW_CIRCLE (0)
 

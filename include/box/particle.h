@@ -20,6 +20,11 @@
  * ParticleForces moves the particles of an emitter with gravity, wind, drag and
  * turbulence, and ParticleCollision gives them a ground plane and the colliders
  * of the scene to bounce off, slide along or die on.
+ *
+ * ParticlePlayback starts, pauses, stops and resets an emitter and carries the
+ * clock its ParticleBurst schedules go off on, so every control of the effect
+ * is a component write that a script, the REST API or a terminal command makes
+ * without an endpoint of its own.
  */
 
 #ifndef BOX_PARTICLE_H
@@ -200,6 +205,52 @@ ECS_STRUCT(ParticleAppearance, {
     int32_t rows;         /**< Frames down the sheet, 0 and 1 are the whole texture */
     float fps;            /**< Frames per second, 0 plays the sheet once over the life */
     float softness;       /**< World units a particle fades out over near geometry */
+});
+
+/** State the playback of an emitter is in */
+ECS_ENUM(PlaybackState, {
+    ParticlePlaying = 0, /**< The emitter emits and its particles move */
+    ParticlePaused = 1,  /**< The pool is frozen: nothing is emitted and nothing moves */
+    ParticleStopped = 2  /**< Emission ended, the particles that are alive finish */
+});
+
+/** Playback of the emitter of an entity.
+ *
+ * An emitter without the component plays, so a stream that is never controlled
+ * costs nothing. Stopping ends the emission and leaves the particles that are
+ * in the air to finish their life, pausing freezes the whole pool where it is
+ * and starting a stopped emitter begins its clock again, which is what replays
+ * a burst schedule from the top.
+ *
+ * `reset` is a trigger: the frame that sees it empties the pool of the emitter,
+ * sets the clock back to zero and writes the member back to false.
+ *
+ * The clock is written by the engine, not read from it: it advances while the
+ * emitter plays and stands still while it is paused or stopped, so the times
+ * the bursts of the emitter go off at are the seconds it has been playing.
+ */
+ECS_STRUCT(ParticlePlayback, {
+    PlaybackState state; /**< Playing, paused or stopped */
+    double time;         /**< Seconds the emitter has been playing, written every frame */
+    bool reset;          /**< Empty the pool of the emitter, cleared again by the frame */
+});
+
+/** Burst of particles an emitter spawns at a time of its playback.
+ *
+ * A burst runs alongside the continuous rate of the emitter and is capped by
+ * the same pool, so a burst of more particles than the emitter keeps alive
+ * fills what is free. The component sits on the emitter itself or on any of its
+ * descendants, which is how one emitter is given several schedules.
+ *
+ * The burst goes off `at` seconds into the playback and `repeat` more times
+ * every `at` seconds after that, so `{count: 200, at: 0.5, repeat: 3}` is four
+ * puffs half a second apart. A burst at a time of zero goes off once, on the
+ * first frame the emitter plays.
+ */
+ECS_STRUCT(ParticleBurst, {
+    int32_t count;  /**< Particles the burst spawns in one frame */
+    float at;       /**< Seconds into the playback it goes off, and the period of its repeats */
+    int32_t repeat; /**< Times it goes off again, below zero to repeat while the emitter plays */
 });
 
 /** Register the box.particle module.

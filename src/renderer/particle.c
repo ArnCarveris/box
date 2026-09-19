@@ -531,6 +531,10 @@ static void box_particle_groups(
 
 /** Record the integrate and the spawn pass of one emitter.
  *
+ * A paused emitter records neither: its pool is left exactly as the frame that
+ * paused it left it and is still drawn, which is what freezes an effect in
+ * place instead of letting it run on without being seen.
+ *
  * @param r The renderer
  * @param pool The pool
  * @param e The emitter of the packet
@@ -602,7 +606,9 @@ void box_particle_simulate(
             box_particle_groups(r, pool);
             wgpuQueueWriteBuffer(r->gpu_queue, pool->uniform, 0, e,
                 BOX_PARTICLE_UNIFORM_SIZE);
-            box_particle_dispatch(r, pool, e, encoder);
+            if (!(e->flags & BOX_PARTICLE_PAUSED)) {
+                box_particle_dispatch(r, pool, e, encoder);
+            }
         }
     }
 
