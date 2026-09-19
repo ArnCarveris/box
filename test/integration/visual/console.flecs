@@ -1,0 +1,53 @@
+// The in game console open over a 3D scene: the overlay that the framework
+// script etc/ui/console.flecs builds out of ordinary UI elements, with the
+// scrollback filled from the log of its terminal session and the caret of its
+// input at the start of an empty line. The scene opens the console by setting
+// the singleton and gives its session a line to run before it opens, so the
+// scrollback has something to show in the frame that is captured.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.ui
+using box.command
+
+camera {
+  Position: {0, 5, -8}
+  LookAt: {0, 0, 1}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+ground {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+crate {
+  Position: {0, 0.75, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {200, 120, 70}
+}
+
+ball {
+  Position: {-3, 1, 0}
+  Sphere: {radius: 1, segments: 24}
+  Rgb: {80, 160, 240}
+}
+
+terminals {
+  console {
+    Terminal: {}
+    TerminalInput: {line: "man capture"}
+  }
+}
+
+$ {
+  Console: {open: true}
+}
