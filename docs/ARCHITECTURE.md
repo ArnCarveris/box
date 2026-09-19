@@ -13,7 +13,8 @@ include/box/     one public header per module, reflected types via ECS_STRUCT
 src/<module>/    one directory per flecs module, C11, may include flecs.h
 src/renderer/    render thread, wgpu only, MUST NOT include flecs.h
 src/platform/    window, surface and OS events (GLFW native, HTML5 on wasm)
-etc/             default scenes, shaders (WGSL) and assets, embedded on wasm
+etc/             engine assets (WGSL shaders), installed as <BAKE_HOME>/etc/box
+apps/box_app/etc app assets (scenes, textures, svg, fonts), both embedded on wasm
 test/            bake test projects, one suite per module
 ```
 

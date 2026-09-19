@@ -216,9 +216,9 @@ the captured frame, so a scene with SVG textures renders the same every run.
 
 ## Shaders
 
-Every shader of the engine is a WGSL file under `apps/box_app/etc/shaders/`, loaded
-by a `Shader` component that holds a path and a comma separated `NAME=value` macro
-list. Setting it preprocesses the file and hands the source to the renderer, which
+Every shader of the engine is a WGSL file under `etc/shaders/` of the framework,
+loaded by a `Shader` component that holds a path and a comma separated `NAME=value`
+macro list. Setting it preprocesses the file and hands the source to the renderer, which
 compiles a module and rebuilds the pipelines that use it; a file that does not
 preprocess leaves the previous shader drawing and reports the file and line through
 `ShaderStatus`. The builtin shaders are entities under `box.shader.builtin`, so
@@ -230,11 +230,22 @@ box { shader { builtin { mesh {
 } } } }
 ```
 
-A path is resolved against the shader search path: the working directory, then
-`apps/box_app` under the working directory or the nearest ancestor of it that has
-one, then the directory of the executable. That makes a checkout work from the
-repository root and from a test project, an installed game work from any working
-directory, and the wasm build work from the embedded `etc`.
+A path names the `etc` folder of a project and is resolved against the shader
+search path: the working directory, then `<BAKE_HOME>/etc/box`, then the nearest
+ancestor of the working directory that has an `etc/shaders`, then `apps/box_app` at
+or above it, then the directory of the executable. That makes an application find
+its own files first and override an engine file, an installed game work from any
+working directory, a checkout work from the repository root and from a test
+project, and the wasm build work from the embedded `etc`.
+
+Engine assets live in `etc/` of the framework and application assets in
+`apps/box_app/etc/`: every build of the framework installs `etc/` into the bake
+environment as `<BAKE_HOME>/etc/box` (`~/bake3` globally, `.bake/local_env/<name>`
+for a local environment), which is what `etc/shaders/mesh.wgsl` resolves to in an
+installed game. An application ships its own scenes, textures, SVGs and fonts, plus
+the shaders that belong to it alone; `BAKE_HOME` and `BAKE_ENVIRONMENT` are exported
+by `bake3 run`, `test` and `bench`, and `bake3 info box` prints the install path. The
+wasm build embeds both folders under `etc`, so the same paths work in the browser.
 
 The preprocessor understands `#include "file"` relative to the including file with
 cycle detection, `#define NAME value` with identifier substitution, `#if NAME`,
@@ -480,6 +491,7 @@ apps/box_app/   the engine executable, its scenes under etc/ and the wasm shell 
 bench/          bake3 bench projects, one per engine module
 design/         design brief and datamodel sketches (documentation only)
 docs/           architecture notes and the coordination process
+etc/            engine assets (WGSL shaders), installed as <BAKE_HOME>/etc/box
 include/box/    public headers, one per module
 project/        project management tool and its database
 src/            engine sources, one directory per flecs module (see docs/ARCHITECTURE.md)
