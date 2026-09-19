@@ -1,0 +1,64 @@
+// Two script waiters of a loaded scene await the same action. The agent presses
+// the key that raises it, then a second key that runs the command file a frame
+// later, so the log shows that both templates resumed on the one raise.
+using flecs.script
+using box.input
+using box.command
+
+Fired {}
+
+actions {
+  Jump { InputAction: {description: "Jump over the crate"} }
+  Check { InputAction: {description: "Report what the waiters caught"} }
+}
+
+input_map {
+  InputMap
+  (keys.Space, actions.Jump)
+  (keys.C, actions.Check)
+}
+
+template Waiter {
+  mut hits = 0
+  async {
+    await on.pressed(actions.Jump)
+    hits = 1
+  }
+
+  if hits == 1 {
+    Fired
+  }
+}
+
+Waiter first
+Waiter second
+
+template Agent {
+  mut jumped = 0
+  mut checked = 0
+
+  async {
+    await on.pressed(actions.Jump)
+    jumped = 1
+  }
+
+  async {
+    await on.pressed(actions.Check)
+    checked = 1
+  }
+
+  if checked == 1 {
+    CommandScript: {path: "../../test/integration/command/waiter_resume.cmd"}
+  } else if jumped == 1 {
+    TerminalInput: {line: "key.down C"}
+  } else {
+    TerminalInput: {line: "key.down Space"}
+  }
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    Agent
+  }
+}

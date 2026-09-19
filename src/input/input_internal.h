@@ -81,12 +81,14 @@ typedef struct box_missed_t {
     ecs_entity_t action; /**< Action the raise was about */
     ActionPhase phase;   /**< Phase it reached */
     ecs_entity_t source; /**< Binding or emitter the raise came from */
+    bool consumed;       /**< A waiter caught up to it, so it ends with the frame */
 } box_missed_t;
 
 /** Private list of the script tasks that await an action */
 typedef struct ActionWaiters {
     ecs_vec_t waiters; /**< box_waiter_t, one per pending await */
     ecs_vec_t missed;  /**< box_missed_t, one per phase no waiter has caught up to */
+    int32_t resolving; /**< Depth of the missed raises being delivered right now */
 } ActionWaiters;
 
 extern ECS_COMPONENT_DECLARE(ActionWaiters);

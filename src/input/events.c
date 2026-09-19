@@ -62,6 +62,9 @@ static int32_t box_input_missed_find(
  * Delivers the missed raise of the phase right away when the frame that raised it
  * reached no waiter, the way `box_pick_hover` retries a missed hover, so a waiter
  * that registers in the frame a scene loads still catches the events of that frame.
+ * Every waiter that catches up gets the raise, because the instances of a scene
+ * start their tasks together; the raise a waiter resumed on is dropped at the next
+ * raise pass, so the await the resumed task registers again does not take it twice.
  *
  * @param ctx Call context, whose ctx holds the phase
  * @param argc Number of arguments
@@ -77,16 +80,24 @@ static void box_input_wait(
     ActionPhase phase = (ActionPhase)(uintptr_t)ctx->ctx;
     ecs_entity_t action = argc == 1 ? *(ecs_entity_t*)argv[0].ptr : 0;
     ActionWaiters *waiters = box_input_waiters(ctx->world);
-    int32_t missed = waiters ? box_input_missed_find(waiters, action, phase) : -1;
+    int32_t missed = waiters && !waiters->resolving
+        ? box_input_missed_find(waiters, action, phase)
+        : -1;
     if (!action || !waiters) {
         ecs_script_future_reject(future, "on.pressed expects an action entity");
         ecs_script_future_release(future);
     } else if (missed >= 0) {
-        ecs_entity_t source = ecs_vec_get_t(&waiters->missed, box_missed_t, missed)->source;
-        ecs_vec_remove_ordered_t(&waiters->missed, box_missed_t, missed);
+        box_missed_t *entry = ecs_vec_get_t(&waiters->missed, box_missed_t, missed);
+        ecs_entity_t source = entry->source;
+        entry->consumed = true;
+        waiters->resolving ++;
         ecs_script_future_resolve(future, &(ecs_value_t){
             .type = ecs_id(ecs_entity_t), .ptr = &source });
         ecs_script_future_release(future);
+        waiters = box_input_waiters(ctx->world);
+        if (waiters) {
+            waiters->resolving --;
+        }
     } else {
         box_waiter_t *waiter = ecs_vec_append_t(
             NULL, &waiters->waiters, box_waiter_t);
@@ -429,9 +440,27 @@ static void box_input_missed_update(
     missed->action = action;
     missed->phase = phase;
     missed->source = source;
+    missed->consumed = false;
 
 done:
     return;
+}
+
+/** Drop the missed raises a waiter already resumed on in an earlier frame.
+ *
+ * @param waiters The waiters
+ */
+static void box_input_missed_expire(
+    ActionWaiters *waiters)
+{
+    int32_t i = 0;
+    while (i < ecs_vec_count(&waiters->missed)) {
+        if (ecs_vec_get_t(&waiters->missed, box_missed_t, i)->consumed) {
+            ecs_vec_remove_ordered_t(&waiters->missed, box_missed_t, i);
+        } else {
+            i ++;
+        }
+    }
 }
 
 void BoxInputRaise(
@@ -439,6 +468,10 @@ void BoxInputRaise(
 {
     ecs_world_t *world = it->world;
     ActionWaiters *waiters = box_input_waiters(world);
+    if (waiters) {
+        box_input_missed_expire(waiters);
+    }
+
     const ActionEvent *events;
     int32_t i = 0;
     while (i < box_input_events(world, &events)) {

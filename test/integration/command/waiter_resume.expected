@@ -1,0 +1,8 @@
+$ key.down Space
+Space down
+$ key.down C
+C down
+$ has first Fired
+true
+$ has second Fired
+true

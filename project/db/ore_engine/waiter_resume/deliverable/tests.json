@@ -1,0 +1,873 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T22:43:05Z",
+  "pass": 121,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.318829,
+  "tests": [
+    {
+      "suite": "Incremental",
+      "case": "templates_are_marked_manual",
+      "status": "pass",
+      "elapsed": 0.011487,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instances_are_pending",
+      "status": "pass",
+      "elapsed": 0.012689,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "non_template_entities_appear_immediately",
+      "status": "pass",
+      "elapsed": 0.011479,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "count_budget_per_frame",
+      "status": "pass",
+      "elapsed": 0.012466,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "time_budget_stops_a_frame",
+      "status": "pass",
+      "elapsed": 0.01333,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instance_is_complete_when_it_appears",
+      "status": "pass",
+      "elapsed": 0.012078,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "every_instance_is_expanded_eventually",
+      "status": "pass",
+      "elapsed": 0.01324,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_everything_at_once",
+      "status": "pass",
+      "elapsed": 0.016519,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_nested_templates",
+      "status": "pass",
+      "elapsed": 0.011859,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_queue",
+      "status": "pass",
+      "elapsed": 0.011969,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_worst_frame",
+      "status": "pass",
+      "elapsed": 0.011575,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "template_declared_before_import_is_marked",
+      "status": "pass",
+      "elapsed": 0.010325,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_to_the_camera_first",
+      "status": "pass",
+      "elapsed": 0.028847,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "reorder_when_the_camera_moves",
+      "status": "pass",
+      "elapsed": 0.028863,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_first_off_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.028733,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "no_camera_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.011268,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "instance_without_position_goes_first",
+      "status": "pass",
+      "elapsed": 0.029403,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "world_position_orders_a_child_instance",
+      "status": "pass",
+      "elapsed": 0.028784,
+      "project": "script"
+    },
+    {
+      "suite": "Async",
+      "case": "a_waiter_in_a_manual_template_resumes",
+      "status": "pass",
+      "elapsed": 0.020553,
+      "project": "script"
+    },
+    {
+      "suite": "Async",
+      "case": "several_waiters_resume_on_one_action",
+      "status": "pass",
+      "elapsed": 0.02026,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "rewritten_file_is_reloaded",
+      "status": "pass",
+      "elapsed": 0.011446,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "parse_error_keeps_the_scene",
+      "status": "pass",
+      "elapsed": 0.011377,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "reloaded_instances_are_pending",
+      "status": "pass",
+      "elapsed": 0.01147,
+      "project": "script"
+    },
+    {
+      "suite": "Input",
+      "case": "defaults_of_the_singleton",
+      "status": "pass",
+      "elapsed": 0.019433,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_is_set_for_one_frame",
+      "status": "pass",
+      "elapsed": 0.019633,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "held_key_keeps_its_state",
+      "status": "pass",
+      "elapsed": 0.019762,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "release_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.019531,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_and_release_in_one_frame_keeps_the_press",
+      "status": "pass",
+      "elapsed": 0.019654,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_buttons_use_their_own_slots",
+      "status": "pass",
+      "elapsed": 0.020056,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_holds_the_characters_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.019356,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_encodes_utf8",
+      "status": "pass",
+      "elapsed": 0.019407,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_stops_at_its_size",
+      "status": "pass",
+      "elapsed": 0.020898,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "scroll_accumulates_over_frames",
+      "status": "pass",
+      "elapsed": 0.020577,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_window_position_follows_the_events",
+      "status": "pass",
+      "elapsed": 0.021007,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_delta_is_the_movement_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.020419,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_view_and_normalized_come_from_the_surface",
+      "status": "pass",
+      "elapsed": 0.02007,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_center_is_the_origin_of_the_view",
+      "status": "pass",
+      "elapsed": 0.019686,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "a_new_world_is_focused",
+      "status": "pass",
+      "elapsed": 0.020506,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "focus_loss_clears_the_key_state",
+      "status": "pass",
+      "elapsed": 0.020088,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_presses_nothing",
+      "status": "pass",
+      "elapsed": 0.019668,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_does_not_jump_the_cursor",
+      "status": "pass",
+      "elapsed": 0.019714,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.019616,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_minimized",
+      "status": "pass",
+      "elapsed": 0.019543,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "injected_keys_are_applied_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.019286,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "minimize_event_sets_and_clears_the_flag",
+      "status": "pass",
+      "elapsed": 0.019263,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_of_one_frame_releases_the_next_frame",
+      "status": "pass",
+      "elapsed": 0.018873,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_with_a_duration_holds_the_key",
+      "status": "pass",
+      "elapsed": 0.019364,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_down_without_a_duration_stays_down",
+      "status": "pass",
+      "elapsed": 0.020299,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "delay_postpones_the_event",
+      "status": "pass",
+      "elapsed": 0.01984,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "platform_events_are_applied_before_injected",
+      "status": "pass",
+      "elapsed": 0.019068,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "events_of_one_frame_keep_their_order",
+      "status": "pass",
+      "elapsed": 0.019273,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_sweep_walks_the_cursor_over_frames",
+      "status": "pass",
+      "elapsed": 0.019304,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "pending_counts_the_queued_events",
+      "status": "pass",
+      "elapsed": 0.019455,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "reset_empties_the_queue_and_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.019586,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "printable_keys_are_ascii",
+      "status": "pass",
+      "elapsed": 0.01888,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "mouse_buttons_are_128_and_129",
+      "status": "pass",
+      "elapsed": 0.02111,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "spare_codes_are_unique_and_fit_the_table",
+      "status": "pass",
+      "elapsed": 0.020543,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "keys_are_exported_as_script_constants",
+      "status": "pass",
+      "elapsed": 0.020537,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "family_modifiers_are_reserved_above_the_slots",
+      "status": "pass",
+      "elapsed": 0.020716,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_printable_keys_map_to_themselves",
+      "status": "pass",
+      "elapsed": 0.020675,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_named_keys_map_to_spare_codes",
+      "status": "pass",
+      "elapsed": 0.020418,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_unknown_keys_map_to_none",
+      "status": "pass",
+      "elapsed": 0.020579,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "reflection_describes_the_singleton",
+      "status": "pass",
+      "elapsed": 0.020357,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_binding_presses_holds_and_releases",
+      "status": "pass",
+      "elapsed": 0.021311,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_modifier_binding_matches_its_side",
+      "status": "pass",
+      "elapsed": 0.020249,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_family_modifier_matches_either_side",
+      "status": "pass",
+      "elapsed": 0.021236,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_more_specific_binding_wins",
+      "status": "pass",
+      "elapsed": 0.02118,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_pure_modifier_binding_fires_while_it_is_held",
+      "status": "pass",
+      "elapsed": 0.020644,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_binding_claims_the_modifier_of_a_pure_binding",
+      "status": "pass",
+      "elapsed": 0.020887,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_actions_share_one_mask",
+      "status": "pass",
+      "elapsed": 0.020886,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_masks_share_one_action",
+      "status": "pass",
+      "elapsed": 0.020841,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "rebinding_moves_the_action_to_another_key",
+      "status": "pass",
+      "elapsed": 0.021626,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "unbinding_releases_the_action",
+      "status": "pass",
+      "elapsed": 0.021385,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_disabled_map_stops_its_bindings",
+      "status": "pass",
+      "elapsed": 0.021157,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_pair_on_a_map_binds_an_action",
+      "status": "pass",
+      "elapsed": 0.020894,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "emitting_fires_an_action_without_a_key",
+      "status": "pass",
+      "elapsed": 0.021107,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_event_list_holds_the_phases_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.020954,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_script_authors_the_map",
+      "status": "pass",
+      "elapsed": 0.02106,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_scene_map_binds_its_actions",
+      "status": "pass",
+      "elapsed": 0.021265,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_binding_that_consumes_keeps_the_key_from_a_lower_map",
+      "status": "pass",
+      "elapsed": 0.02129,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_higher_map_that_does_not_consume_leaves_the_lower_one_alone",
+      "status": "pass",
+      "elapsed": 0.020708,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_map_that_consumes_covers_its_key_pairs",
+      "status": "pass",
+      "elapsed": 0.020299,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_disabled_consuming_map_lets_the_key_through",
+      "status": "pass",
+      "elapsed": 0.020741,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_consuming_map_keeps_only_the_keys_it_binds",
+      "status": "pass",
+      "elapsed": 0.02059,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "maps_of_one_priority_both_resolve",
+      "status": "pass",
+      "elapsed": 0.020653,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_binding_without_a_map_sits_at_the_base_layer",
+      "status": "pass",
+      "elapsed": 0.0206,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "the_events_of_a_frame_start_at_the_highest_map",
+      "status": "pass",
+      "elapsed": 0.020525,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_action_takes_its_key_from_the_maps_below",
+      "status": "pass",
+      "elapsed": 0.02123,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_leaves_the_maps_above_and_beside_it_alone",
+      "status": "pass",
+      "elapsed": 0.020892,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_handler_consumes_the_key_of_the_map_below",
+      "status": "pass",
+      "elapsed": 0.021498,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_handler_that_does_not_consume_leaves_the_map_below",
+      "status": "pass",
+      "elapsed": 0.021257,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "stopping_outside_a_raise_does_nothing",
+      "status": "pass",
+      "elapsed": 0.020645,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_action_clears_it_for_the_frame",
+      "status": "pass",
+      "elapsed": 0.020609,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_drops_the_events_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.020307,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_a_held_action_does_not_press_it_again",
+      "status": "pass",
+      "elapsed": 0.020398,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_idle_action_reports_nothing",
+      "status": "pass",
+      "elapsed": 0.021129,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_drag_raises_after_the_threshold",
+      "status": "pass",
+      "elapsed": 0.021212,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_drag_stops_when_the_action_is_released",
+      "status": "pass",
+      "elapsed": 0.021001,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_follows_a_drag_with_on_dragged",
+      "status": "pass",
+      "elapsed": 0.022027,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_consumes_an_action",
+      "status": "pass",
+      "elapsed": 0.020984,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_key_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.02078,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_mouse_button_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.020355,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_modifier_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.02028,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_event_carries_the_key_that_fired_it",
+      "status": "pass",
+      "elapsed": 0.0207,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_key_that_went_down_this_frame_is_the_one_reported",
+      "status": "pass",
+      "elapsed": 0.020763,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_frame_without_a_key_does_not_fire",
+      "status": "pass",
+      "elapsed": 0.020759,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_key_family_leaves_the_mouse_buttons_alone",
+      "status": "pass",
+      "elapsed": 0.020664,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_mouse_family_leaves_the_keys_alone",
+      "status": "pass",
+      "elapsed": 0.020629,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_binding_with_a_modifier_needs_the_modifier",
+      "status": "pass",
+      "elapsed": 0.02059,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_higher_map_that_consumes_keeps_the_key_from_an_any_binding",
+      "status": "pass",
+      "elapsed": 0.020768,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "an_any_binding_that_consumes_keeps_its_key_from_a_lower_map",
+      "status": "pass",
+      "elapsed": 0.019927,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_key_pair_of_a_map_binds_the_any_family",
+      "status": "pass",
+      "elapsed": 0.021432,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_binding_list_of_the_action_holds_the_family",
+      "status": "pass",
+      "elapsed": 0.021276,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "a_script_resumes_on_the_pressed_frame",
+      "status": "pass",
+      "elapsed": 0.02217,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_down_resumes_while_the_action_is_held",
+      "status": "pass",
+      "elapsed": 0.022168,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_up_resumes_when_the_action_is_released",
+      "status": "pass",
+      "elapsed": 0.021736,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "several_waiters_resume_on_one_action",
+      "status": "pass",
+      "elapsed": 0.022288,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "an_emitted_action_resumes_a_waiter",
+      "status": "pass",
+      "elapsed": 0.021622,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "the_wait_carries_the_source",
+      "status": "pass",
+      "elapsed": 0.021585,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "deleting_the_entity_of_a_task_cancels_the_wait",
+      "status": "pass",
+      "elapsed": 0.019105,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "a_waiter_registered_at_scene_load_catches_the_press",
+      "status": "pass",
+      "elapsed": 0.019096,
+      "project": "input"
+    }
+  ],
+  "projects": [
+    {
+      "project": "input",
+      "pass": 98,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.265705
+    },
+    {
+      "project": "script",
+      "pass": 23,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.053124
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "kind": "bug",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-09-19T20:52:04.083+00:00",
-  "start_time": null,
-  "end_time": null,
+  "start_time": "2026-09-19T22:20:38.429+00:00",
+  "end_time": "2026-09-19T22:43:19.961+00:00",
   "dependencies": []
 }

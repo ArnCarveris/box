@@ -39,6 +39,13 @@
                 ]
             },
             {
+                "id": "Async",
+                "testcases": [
+                    "a_waiter_in_a_manual_template_resumes",
+                    "several_waiters_resume_on_one_action"
+                ]
+            },
+            {
                 "id": "Reload",
                 "testcases": [
                     "rewritten_file_is_reloaded",
