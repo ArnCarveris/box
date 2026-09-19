@@ -181,6 +181,10 @@ through the same mesh cache as the primitives (`test/integration/visual/mesh3.fl
 `Shape` registration lets a project add its own parametric shape with the same sharing; the
 engine ships a small `Star` as the example (`custom_shape.flecs`).
 
+`box.sky` renders a physically based atmosphere from precomputed transmittance, multiple
+scattering and sky view tables as the view background and as the IBL source when the
+environment names it (`atmosphere_sunrise.flecs`, `atmosphere_noon.flecs`, `atmosphere_sunset.flecs`).
+
 ## Tests
 
 ```sh

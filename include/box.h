@@ -27,6 +27,7 @@
 #include "box/movement.h"
 #include "box/controller.h"
 #include "box/surface.h"
+#include "box/sky.h"
 #include "box/input.h"
 #include "box/command.h"
 #include "box/monitor.h"
