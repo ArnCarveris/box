@@ -158,7 +158,8 @@ static void box_index_test(
     float dist = 0;
     if (q->kind == BoxQueryRay) {
         if (box_collider_ray(c, q->origin, q->dir, q->max_dist, &dist) &&
-            dist < ctx->hit->distance)
+            (dist < ctx->hit->distance ||
+             (dist == ctx->hit->distance && e < ctx->hit->entity)))
         {
             ctx->hit->entity = e;
             ctx->hit->distance = dist;

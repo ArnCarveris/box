@@ -122,7 +122,7 @@ ECS_STRUCT(CollisionSettings, {
 
 /** What a ray query found */
 typedef struct box_ray_hit_t {
-    ecs_entity_t entity; /**< The entity that was hit, 0 when the ray hit nothing */
+    ecs_entity_t entity; /**< The hit entity, the lowest id at equal distance, 0 for none */
     float distance;      /**< Distance of the hit along the ray */
     vec3 point;          /**< The point of the hit in world space */
 } box_ray_hit_t;

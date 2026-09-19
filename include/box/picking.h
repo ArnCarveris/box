@@ -169,6 +169,9 @@ ecs_entity_t box_picking_target(
 
 /** Pick the nearest entity along the ray of a normalized position in a view.
  *
+ * Two colliders at the same distance resolve to the lower entity id, so the
+ * result does not depend on the order the index visits them.
+ *
  * @param world The world
  * @param view The view entity, 0 for the camera a world without views renders
  * @param cursor Normalized position in the image of the view
