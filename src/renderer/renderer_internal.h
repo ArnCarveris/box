@@ -80,6 +80,18 @@
 /** Cull modes a sorted pipeline is built for: back faces culled or kept */
 #define BOX_CULL_MODES (2)
 
+/** Sorted pipelines with and without the normal attachment of a chain */
+#define BOX_COVER_MODES (2)
+
+/** The draw writes no normal attachment */
+#define BOX_NORMALS_NONE (0)
+
+/** The draw writes the world normal and the indirect fractions of its surface */
+#define BOX_NORMALS_WRITE (1)
+
+/** The draw folds its coverage into the indirect fractions of the surface behind */
+#define BOX_NORMALS_COVER (2)
+
 /** Bytes of the uniform block holding the parameters of every material layer */
 #define BOX_LAYER_UNIFORM_SIZE (BOX_LAYER_MAX * sizeof(box_layer_params_t))
 
@@ -415,8 +427,9 @@ struct box_renderer_t {
     WGPURenderPipeline pipeline[BOX_EFFECT_FORMATS]; /**< Lit mesh pipeline per target format */
     WGPUShaderModule mesh_shader;    /**< Module every mesh pipeline is built from */
     WGPUPipelineLayout mesh_layout;  /**< Pipeline layout shared by the mesh pipelines */
-    WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES][BOX_EFFECT_FORMATS];
-        /**< Sorted pass, per blend mode, cull mode and target format */
+    WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]
+        [BOX_EFFECT_FORMATS][BOX_COVER_MODES];
+        /**< Sorted pass, per blend mode, cull mode, target format and coverage */
     WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full level range */
@@ -689,6 +702,7 @@ void box_target_fini(
  * @param depth_write The draw writes the depth buffer
  * @param blend Blend state of the color target, NULL for no blending
  * @param hdr The draw writes the float scene target of a view with a chain
+ * @param normals One of the BOX_NORMALS constants, what it writes there
  * @return The pipeline
  */
 WGPURenderPipeline box_frame_pipeline(
@@ -698,7 +712,8 @@ WGPURenderPipeline box_frame_pipeline(
     WGPUCullMode cull,
     bool depth_write,
     const WGPUBlendState *blend,
-    bool hdr);
+    bool hdr,
+    uint32_t normals);
 
 /** Render and present one packet.
  *

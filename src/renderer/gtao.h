@@ -83,6 +83,46 @@ static inline float box_gtao_slice(
     return proj_len * 0.25f * (first + second);
 }
 
+/** Factor the occlusion pass multiplies the color of a pixel by.
+ *
+ * The chain runs after the lighting, so the pass cannot reach the ambient term
+ * of a pixel and scales the fraction of it that came from the environment and
+ * the probes instead. The same expression runs in gtao.wgsl.
+ *
+ * @param indirect Indirect diffuse fraction the frame recorded for the pixel
+ * @param ao Visibility of the pixel, one where nothing occludes it
+ * @return The factor, one where nothing is occluded or nothing is indirect
+ */
+static inline float box_gtao_ambient(
+    float indirect,
+    float ao)
+{
+    float f = indirect < 0.0f ? 0.0f : (indirect > 1.0f ? 1.0f : indirect);
+    float v = ao < 0.0f ? 0.0f : (ao > 1.0f ? 1.0f : ao);
+
+    return 1.0f - f * (1.0f - v);
+}
+
+/** Indirect fraction a pixel keeps after a sorted draw blended over it.
+ *
+ * A pixel a transparent draw covered is no longer the surface the mesh pass
+ * shaded: only what is left of that surface may be darkened, so the sorted pass
+ * folds the coverage of its fragment into the fraction the frame recorded. The
+ * blend state of the normal attachment runs the same expression.
+ *
+ * @param indirect The fraction the mesh pass recorded
+ * @param coverage Alpha the sorted draw resolved for its fragment
+ * @return The fraction left of the surface behind the draw
+ */
+static inline float box_gtao_covered(
+    float indirect,
+    float coverage)
+{
+    float c = coverage < 0.0f ? 0.0f : (coverage > 1.0f ? 1.0f : coverage);
+
+    return indirect * (1.0f - c);
+}
+
 /** Extent of the occlusion textures of a view on one axis.
  *
  * @param size Extent of the view in pixels

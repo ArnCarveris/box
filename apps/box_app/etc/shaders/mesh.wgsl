@@ -306,3 +306,21 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   out.normal = vec4(oct.x, oct.y, indirect.x, gb_pack(indirect.y, indirect.z));
   return out;
 }
+
+// The sorted pass draws over the normal attachment the opaque pass filled, and
+// a pixel a transparent draw covered is no longer the surface that pass shaded:
+// the light it shows is partly the light of the draw. The attachment keeps the
+// world normal of the surface behind, because a reflection still leaves from
+// it, and this stage hands the blend the coverage of the fragment in the alpha
+// channel. The blend state scales the indirect diffuse fraction by what is left
+// of the surface behind and drops the indirect specular fraction, so an
+// occlusion pass darkens only the part of the pixel that still comes from the
+// surface and a reflection pass leaves a covered pixel alone.
+@fragment fn fs_cover(in: VertexOut, @builtin(front_facing) front: bool) -> MeshOut {
+  var normal = vec3<f32>(0.0);
+  var indirect = vec3<f32>(0.0);
+  var out: MeshOut;
+  out.color = mesh_shade(in, front, &normal, &indirect);
+  out.normal = vec4(0.0, 0.0, 0.0, clamp(out.color.a, 0.0, 1.0));
+  return out;
+}

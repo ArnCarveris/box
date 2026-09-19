@@ -46,6 +46,19 @@ static void box_frame_init_view(
     r->view_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 }
 
+/** Blend the coverage of a sorted draw is folded into the normal attachment with.
+ *
+ * The color equation keeps what is left of the surface behind the fragment and
+ * the alpha equation clears the channel, so the write mask of the target turns
+ * it into `indirect *= 1 - coverage` for the diffuse fraction and `0` for the
+ * specular one.
+ */
+static const WGPUBlendState box_frame_cover_blend = {
+    .color = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero,
+        WGPUBlendFactor_OneMinusSrcAlpha },
+    .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_Zero }
+};
+
 WGPURenderPipeline box_frame_pipeline(
     box_renderer_t *r,
     uint64_t stride,
@@ -53,7 +66,8 @@ WGPURenderPipeline box_frame_pipeline(
     WGPUCullMode cull,
     bool depth_write,
     const WGPUBlendState *blend,
-    bool hdr)
+    bool hdr,
+    uint32_t normals)
 {
     WGPUVertexAttribute vertex_attrs[4] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
@@ -87,16 +101,26 @@ WGPURenderPipeline box_frame_pipeline(
         }
     };
 
-    WGPUColorTargetState target = {
-        .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
-        .blend = blend,
-        .writeMask = WGPUColorWriteMask_All
+    bool cover = normals == BOX_NORMALS_COVER;
+    WGPUColorTargetState targets[2] = {
+        {
+            .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
+            .blend = blend,
+            .writeMask = WGPUColorWriteMask_All
+        }, {
+            .format = BOX_EFFECT_NORMAL_FORMAT,
+            .blend = cover ? &box_frame_cover_blend : NULL,
+            .writeMask = cover ?
+                WGPUColorWriteMask_Blue | WGPUColorWriteMask_Alpha : WGPUColorWriteMask_All
+        }
     };
+    const char *entry = normals == BOX_NORMALS_NONE ? "fs_main" :
+        (cover ? "fs_cover" : "fs_normal");
     WGPUFragmentState fragment = {
         .module = r->mesh_shader,
-        .entryPoint = { .data = "fs_main", .length = WGPU_STRLEN },
-        .targetCount = 1,
-        .targets = &target
+        .entryPoint = { .data = entry, .length = WGPU_STRLEN },
+        .targetCount = normals == BOX_NORMALS_NONE ? 1u : 2u,
+        .targets = targets
     };
     WGPUDepthStencilState depth = {
         .format = WGPUTextureFormat_Depth32Float,
@@ -160,7 +184,7 @@ void box_frame_init(
     };
     r->mesh_layout = wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
     r->pipeline[0] = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
-        true, NULL, false);
+        true, NULL, false, BOX_NORMALS_NONE);
     box_effect_init(r);
 }
 
@@ -268,7 +292,7 @@ static WGPURenderPipeline box_frame_mesh_pipeline(
     uint32_t slot = hdr ? 1 : 0;
     if (!r->pipeline[slot]) {
         r->pipeline[slot] = box_frame_pipeline(r, sizeof(box_instance_t), 0,
-            WGPUCullMode_Back, true, NULL, hdr);
+            WGPUCullMode_Back, true, NULL, hdr, BOX_NORMALS_NONE);
     }
 
     return r->pipeline[slot];
@@ -287,7 +311,7 @@ bool box_frame_rebuild(
     r->mesh_shader = module;
     r->device_error = false;
     WGPURenderPipeline pipeline = box_frame_pipeline(r, sizeof(box_instance_t), 0,
-        WGPUCullMode_Back, true, NULL, false);
+        WGPUCullMode_Back, true, NULL, false, BOX_NORMALS_NONE);
     result = pipeline != NULL && !r->device_error;
     if (result) {
         box_transparent_reset(r);
@@ -362,6 +386,11 @@ static void box_frame_write_view(
  * The opaque target is copied and its blur chain filled first, so the blended
  * draws can read what is behind them at the blur their roughness asks for.
  *
+ * The pass keeps the normal attachment of the opaque pass when the chain asked
+ * for one, so a draw folds its coverage into the indirect fractions of the
+ * pixels it blends over and the occlusion and reflection passes stop treating
+ * them as the surface behind.
+ *
  * @param r The renderer
  * @param view The view
  * @param p The packet
@@ -381,20 +410,31 @@ static void box_frame_sorted(
         box_transparent_prepare(r, encoder, target);
     }
 
-    WGPURenderPassColorAttachment color = {
-        .view = attachment,
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = WGPULoadOp_Load,
-        .storeOp = WGPUStoreOp_Store
+    WGPURenderPassColorAttachment color[2] = {
+        {
+            .view = attachment,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .loadOp = WGPULoadOp_Load,
+            .storeOp = WGPUStoreOp_Store
+        }
     };
+    uint32_t attachments = 1;
+    if (r->effect_normal) {
+        color[1].view = r->effect_normal->view;
+        color[1].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+        color[1].loadOp = WGPULoadOp_Load;
+        color[1].storeOp = WGPUStoreOp_Store;
+        attachments = 2;
+    }
+
     WGPURenderPassDepthStencilAttachment depth = {
         .view = r->v->depth_view,
         .depthLoadOp = WGPULoadOp_Load,
         .depthStoreOp = WGPUStoreOp_Store
     };
     WGPURenderPassDescriptor desc = {
-        .colorAttachmentCount = 1,
-        .colorAttachments = &color,
+        .colorAttachmentCount = attachments,
+        .colorAttachments = color,
         .depthStencilAttachment = &depth
     };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);

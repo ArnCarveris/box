@@ -190,7 +190,10 @@
                     "ssr_march_misses_off_screen",
                     "ssr_weight_falls_with_the_roughness",
                     "builtin_ssr_is_off_by_default",
-                    "ssr_parameters_reach_the_pass"
+                    "ssr_parameters_reach_the_pass",
+                    "ambient_scale_darkens_the_indirect_fraction",
+                    "coverage_leaves_the_surface_behind_it",
+                    "covered_pixel_keeps_its_color"
                 ],
                 "setup": true,
                 "teardown": true

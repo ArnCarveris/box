@@ -910,3 +910,34 @@ void Effects_ssr_parameters_reach_the_pass(void)
     test_flt(pass->params[3], 0.8f);
     test_flt(pass->params[4], 0.2f);
 }
+
+void Effects_ambient_scale_darkens_the_indirect_fraction(void)
+{
+    // effects/showcase
+    test_flt(box_gtao_ambient(0.0f, 0.0f), 1.0f);
+    test_flt(box_gtao_ambient(1.0f, 1.0f), 1.0f);
+    test_flt(box_gtao_ambient(1.0f, 0.0f), 0.0f);
+    test_flt(box_gtao_ambient(0.5f, 0.5f), 0.75f);
+    test_flt(box_gtao_ambient(0.25f, 0.5f), 0.875f);
+    test_assert(box_gtao_ambient(0.5f, 0.2f) < box_gtao_ambient(0.5f, 0.8f));
+}
+
+void Effects_coverage_leaves_the_surface_behind_it(void)
+{
+    // effects/showcase
+    test_flt(box_gtao_covered(0.6f, 0.0f), 0.6f);
+    test_flt(box_gtao_covered(0.6f, 0.5f), 0.3f);
+    test_flt(box_gtao_covered(0.6f, 1.0f), 0.0f);
+    float bare = 1.0f - box_gtao_ambient(0.6f, 0.4f);
+    float half = 1.0f - box_gtao_ambient(box_gtao_covered(0.6f, 0.5f), 0.4f);
+    test_flt(half, bare * 0.5f);
+}
+
+void Effects_covered_pixel_keeps_its_color(void)
+{
+    // effects/showcase
+    float covered = box_gtao_covered(1.0f, 1.0f);
+    test_flt(covered, 0.0f);
+    test_flt(box_gtao_ambient(covered, 0.0f), 1.0f);
+    test_flt(box_gtao_ambient(covered, 0.5f), 1.0f);
+}

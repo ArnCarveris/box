@@ -384,25 +384,33 @@ void box_transparent_prepare(
  * @param blend One of the BOX_BLEND constants
  * @param back One of the BOX_BACK constants
  * @param hdr The pass writes the float scene target of a view with a chain
+ * @param cover The pass draws into the normal attachment of a chain
  * @return The pipeline
  */
 static WGPURenderPipeline box_transparent_pipeline(
     box_renderer_t *r,
     uint32_t blend,
     uint32_t back,
-    bool hdr)
+    bool hdr,
+    bool cover)
 {
     uint32_t cull = back == BOX_BACK_CULL;
     uint32_t slot = hdr ? 1 : 0;
-    if (!r->sorted_pipelines[blend][cull][slot]) {
-        const WGPUBlendState *state = blend ? &box_blend_states[blend] : NULL;
-        r->sorted_pipelines[blend][cull][slot] = box_frame_pipeline(r,
-            sizeof(box_transparent_t), offsetof(box_transparent_t, data),
-            cull ? WGPUCullMode_Back : WGPUCullMode_None, blend == BOX_BLEND_OPAQUE, state,
-            hdr);
+    uint32_t mode = cover ? 1 : 0;
+    uint32_t normals = BOX_NORMALS_NONE;
+    if (cover) {
+        normals = blend == BOX_BLEND_OPAQUE ? BOX_NORMALS_WRITE : BOX_NORMALS_COVER;
     }
 
-    return r->sorted_pipelines[blend][cull][slot];
+    if (!r->sorted_pipelines[blend][cull][slot][mode]) {
+        const WGPUBlendState *state = blend ? &box_blend_states[blend] : NULL;
+        r->sorted_pipelines[blend][cull][slot][mode] = box_frame_pipeline(r,
+            sizeof(box_transparent_t), offsetof(box_transparent_t, data),
+            cull ? WGPUCullMode_Back : WGPUCullMode_None, blend == BOX_BLEND_OPAQUE, state,
+            hdr, normals);
+    }
+
+    return r->sorted_pipelines[blend][cull][slot][mode];
 }
 
 void box_transparent_draw(
@@ -412,6 +420,7 @@ void box_transparent_draw(
     WGPURenderPassEncoder pass)
 {
     bool hdr = r->effect_scene != NULL;
+    bool cover = r->effect_normal != NULL;
     uint32_t end = view->transparent_first + view->transparent_count;
     uint32_t first = view->transparent_first;
     while (first < end) {
@@ -431,7 +440,7 @@ void box_transparent_draw(
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, entry->mesh);
         if (m->alive) {
             wgpuRenderPassEncoderSetPipeline(pass,
-                box_transparent_pipeline(r, entry->blend, entry->back, hdr));
+                box_transparent_pipeline(r, entry->blend, entry->back, hdr, cover));
             wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
             wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->sorted,
                 (uint64_t)first * sizeof(box_transparent_t),
@@ -454,9 +463,13 @@ void box_transparent_reset(
         for (cull = 0; cull < BOX_CULL_MODES; cull ++) {
             uint32_t slot;
             for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
-                if (r->sorted_pipelines[blend][cull][slot]) {
-                    wgpuRenderPipelineRelease(r->sorted_pipelines[blend][cull][slot]);
-                    r->sorted_pipelines[blend][cull][slot] = NULL;
+                uint32_t mode;
+                for (mode = 0; mode < BOX_COVER_MODES; mode ++) {
+                    WGPURenderPipeline p = r->sorted_pipelines[blend][cull][slot][mode];
+                    if (p) {
+                        wgpuRenderPipelineRelease(p);
+                        r->sorted_pipelines[blend][cull][slot][mode] = NULL;
+                    }
                 }
             }
         }
