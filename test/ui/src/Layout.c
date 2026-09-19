@@ -533,3 +533,38 @@ void Layout_structural_change_numbers_the_tree_again(void)
     test_int(ecs_get(w, last, UiNode)->order, 5);
     test_flt(ecs_get(w, last, RenderInstance)->depth, -5 * BOX_UI_STEP);
 }
+
+void Layout_fill_sizes_an_element_as_a_fraction_of_its_parent(void)
+{
+    // ore_engine/console_pane
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Rect, {400, 200});
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Layout, {.width = 300, .height = 200, .padding = 10});
+    ecs_entity_t child = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, child, Fill, {.width = 0.5f, .height = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, child, Bounds)->width, 140);
+    test_flt(ecs_get(w, child, Bounds)->height, 180);
+}
+
+void Layout_fill_of_the_root_follows_the_view(void)
+{
+    // ore_engine/console_pane
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 960;
+    surface->height = 540;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Fill, {.width = 0.5f, .height = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, panel, Bounds)->width, 480);
+    test_flt(ecs_get(w, panel, Bounds)->height, 540);
+}

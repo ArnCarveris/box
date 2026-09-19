@@ -89,7 +89,9 @@
                     "moved_leaf_lays_out_its_subtree_only",
                     "content_sized_ancestors_are_laid_out_again",
                     "changed_leaf_keeps_the_places_of_the_tree",
-                    "structural_change_numbers_the_tree_again"
+                    "structural_change_numbers_the_tree_again",
+                    "fill_sizes_an_element_as_a_fraction_of_its_parent",
+                    "fill_of_the_root_follows_the_view"
                 ],
                 "setup": true,
                 "teardown": true

@@ -10,27 +10,28 @@ using box.material
 using box.ui
 
 console {
-  Ui: {height: 540}
+  Ui: {height: 0}
 
   panel {
-    Position: {0, 140, 0}
-    Layout: {direction: Column, width: 880, height: 260,
-             padding: 14, spacing: 8, h: Left, v: Top}
-    Border: {radius: 10, width: 2, color: {70, 90, 130, 255}}
-    Rgb: {14, 17, 26}
-    BoxShadow: {y: 8, blur: 24, color: {0, 0, 0, 160}}
+    Anchor: {h: Left, v: Top}
+    Layout: {direction: Column, padding: 14, spacing: 8, h: Left, v: Top}
+    Fill: {width: 0.5, height: 1}
+    Rect: {}
+    Rgb: {0, 0, 0}
+    Opacity: {0.75}
     Font: {size: 14}
 
     scrollback {
-      Layout: {width: 852, height: 196}
+      Layout: {}
+      Fill: {width: 1}
       ConsoleLog: {lines: 12}
       Text: {value: "", align: Left}
       Rgb: {170, 192, 225}
     }
 
     prompt {
-      Layout: {direction: Row, width: 852, height: 24,
-               padding: 4, spacing: 8, h: Left, v: Middle}
+      Layout: {direction: Row, height: 24, padding: 4, spacing: 8, h: Left, v: Middle}
+      Fill: {width: 1}
       Border: {radius: 6}
       Rgb: {24, 29, 44}
 
@@ -40,7 +41,8 @@ console {
       }
 
       input {
-        Layout: {width: 812, height: 18}
+        Layout: {height: 18}
+        Fill: {width: 1}
         TextInput: {focused: true, history: true, complete: true}
         Text: {value: ""}
         Rgb: {238, 244, 255}

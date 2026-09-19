@@ -159,6 +159,20 @@ ECS_STRUCT(Anchor, {
     float y;  /**< Offset from that edge on the y axis */
 });
 
+/** Sizes a side of an element as a fraction of the matching side of its parent.
+ *
+ * A side of zero leaves the matching side of the Layout or the Rect of the
+ * element alone, so an element can fill half its parent on one axis and keep
+ * an authored size on the other. The parent must already know its own box: an
+ * explicit Layout.width or Layout.height, inside its padding, or, for the root
+ * of a tree that has neither, the logical size of the view that draws it. A
+ * parent with none of those leaves the side at zero too.
+ */
+ECS_STRUCT(Fill, {
+    float width;  /**< Fraction of the width of the parent, 0 leaves it alone */
+    float height; /**< Fraction of the height of the parent, 0 leaves it alone */
+});
+
 /** Font a text element rasterizes its glyphs with, inherited by its subtree.
  *
  * The path is resolved against the search path of the engine, so

@@ -17,6 +17,7 @@ typedef struct UiImpl {
     ecs_entity_t layer;  /**< Layer every node of the tree joins */
     int32_t count;       /**< Nodes the last walk of the tree numbered */
     float height;        /**< Logical pixels the view showed after the last update */
+    float width;         /**< Logical pixels the view showed across after the last update */
     bool owned;          /**< The module created the view and its camera */
     bool dirty;          /**< The tree must be walked and numbered again */
     bool relayout;       /**< The tree must be laid out again */
@@ -84,6 +85,8 @@ typedef struct UiPlace {
     float max_height; /**< Height of the tallest of those children */
     float cursor;     /**< Place along the axis the next child takes */
     int32_t flow;     /**< Children the layout places */
+    float fill_width;  /**< Width a Fill resolved for the node, 0 when none did */
+    float fill_height; /**< Height a Fill resolved for the node, 0 when none did */
 } UiPlace;
 
 /** Module wide registry of box.ui, stored as a singleton */

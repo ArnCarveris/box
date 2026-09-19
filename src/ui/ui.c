@@ -267,6 +267,7 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Ui);
     ECS_META_COMPONENT(world, Layout);
     ECS_META_COMPONENT(world, Anchor);
+    ECS_META_COMPONENT(world, Fill);
     ECS_META_COMPONENT(world, Bounds);
     ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Font);
@@ -291,6 +292,7 @@ void BoxUiImport(
     ecs_set_hooks(world, UiNode, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Fill, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Bounds, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, BoxShadow, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ShadowImpl, { .ctor = flecs_default_ctor });

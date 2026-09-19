@@ -285,6 +285,8 @@ static float box_ui_text_wrap_width(
     float result = 0;
     if (p->has_layout && p->layout.width > 0) {
         result = p->layout.width - p->layout.padding * 2;
+    } else if (p->fill_width > 0) {
+        result = p->fill_width;
     } else if (p->has_rect && p->width > 0) {
         result = p->width;
     }
@@ -314,11 +316,11 @@ void box_ui_text_measure(
         impl->height = extent.height;
     }
 
-    if (!p->has_layout || p->layout.width <= 0) {
+    if (p->fill_width <= 0 && (!p->has_layout || p->layout.width <= 0)) {
         p->width = extent.width;
     }
 
-    if (!p->has_layout || p->layout.height <= 0) {
+    if (p->fill_height <= 0 && (!p->has_layout || p->layout.height <= 0)) {
         p->height = extent.height;
     }
 

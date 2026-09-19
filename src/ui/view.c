@@ -192,27 +192,38 @@ void box_ui_sync(
         goto done;
     }
 
+    const Surface *surface = ecs_singleton_get(world, Surface);
+    float point_w = surface ?
+        (float)(surface->point_width ? surface->point_width : surface->width) : 0;
+    float point_h = surface ?
+        (float)(surface->point_height ? surface->point_height : surface->height) : 0;
     float height = ui->height;
     if (height <= 0) {
-        const Surface *surface = ecs_singleton_get(world, Surface);
-        float points = surface ?
-            (float)(surface->point_height ? surface->point_height : surface->height) : 0;
         float scale = ui->scale > 0 ? ui->scale : BOX_UI_SCALE;
 
-        height = points / scale;
+        height = point_h / scale;
     }
 
-    if (height <= 0 || height == impl->height) {
+    float width = point_h > 0 ? height * (point_w / point_h) : 0;
+    bool height_changed = height > 0 && height != impl->height;
+    bool width_changed = width > 0 && width != impl->width;
+    if (!height_changed && !width_changed) {
         goto done;
     }
 
-    Camera *camera = ecs_get_mut(world, impl->camera, Camera);
-    if (!camera) {
-        goto done;
+    if (height_changed) {
+        Camera *camera = ecs_get_mut(world, impl->camera, Camera);
+        if (camera) {
+            camera->ortho_height = height;
+            impl->height = height;
+        }
     }
 
-    camera->ortho_height = height;
-    impl->height = height;
+    if (width_changed) {
+        impl->width = width;
+    }
+
+    impl->relayout = true;
 done:
     return;
 }

@@ -1,8 +1,9 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "complete",
   "created": "2026-09-19T22:21:13.417+00:00",
-  "start_time": null,
-  "end_time": null,
-  "dependencies": []
+  "start_time": "2026-09-19T22:44:16.314+00:00",
+  "end_time": "2026-09-19T23:11:26.675+00:00",
+  "dependencies": [],
+  "bench": false
 }

@@ -65,6 +65,90 @@ static void box_ui_read(
         p->height = r->height;
     }
 
+    if (p->fill_width > 0) {
+        p->width = p->fill_width;
+    }
+
+    if (p->fill_height > 0) {
+        p->height = p->fill_height;
+    }
+}
+
+/** Box a Fill sizes a child against: the box a Fill already gave the parent,
+ * an explicit Layout or Rect of the parent, or, for the root of a tree that
+ * has neither, the view that draws it, inside the padding of the parent when
+ * it has a Layout.
+ *
+ * @param world The world
+ * @param root The root of the tree being walked
+ * @param parent The place of the parent the Fill of a child resolves against
+ * @param width Receives the width of the box, 0 when none is known
+ * @param height Receives the height of the box, 0 when none is known
+ */
+static void box_ui_fill_box(
+    ecs_world_t *world,
+    ecs_entity_t root,
+    const UiPlace *parent,
+    float *width,
+    float *height)
+{
+    const Layout *l = ecs_get(world, parent->e, Layout);
+    const Rect *r = ecs_get(world, parent->e, Rect);
+    const UiImpl *impl = parent->e == root ? ecs_get(world, root, UiImpl) : NULL;
+    float pad = l ? l->padding * 2 : 0;
+
+    *width = parent->fill_width > 0 ? parent->fill_width :
+        (l && l->width > 0 ? l->width : (r ? r->width : (impl ? impl->width : 0)));
+    *height = parent->fill_height > 0 ? parent->fill_height :
+        (l && l->height > 0 ? l->height : (r ? r->height : (impl ? impl->height : 0)));
+    if (*width > 0) {
+        *width -= pad;
+    }
+
+    if (*height > 0) {
+        *height -= pad;
+    }
+}
+
+/** Give every node with a Fill the box its fraction of its parent works out to.
+ *
+ * The places of a tree are in pre-order, so a parent always comes before the
+ * children a forward walk gives their fraction to, which is what lets a child
+ * of a child fill a box its own parent just resolved.
+ *
+ * @param world The world
+ * @param root The root of the tree being walked
+ */
+static void box_ui_resolve_fill(
+    ecs_world_t *world,
+    ecs_entity_t root)
+{
+    UiState *state = box_ui_state(world);
+    int32_t i, count = ecs_vec_count(&state->places);
+    for (i = 0; i < count; i ++) {
+        UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
+        const UiPlace *parent;
+        const Fill *fill;
+        float pw, ph;
+        if (p->aux || p->parent < 0) {
+            continue;
+        }
+
+        fill = ecs_get(world, p->e, Fill);
+        if (!fill || (fill->width <= 0 && fill->height <= 0)) {
+            continue;
+        }
+
+        parent = ecs_vec_get_t(&state->places, UiPlace, p->parent);
+        box_ui_fill_box(world, root, parent, &pw, &ph);
+        if (fill->width > 0 && pw > 0) {
+            p->fill_width = pw * fill->width;
+        }
+
+        if (fill->height > 0 && ph > 0) {
+            p->fill_height = ph * fill->height;
+        }
+    }
 }
 
 /** Give the sides of a box that are still zero the size of its content.
@@ -116,51 +200,55 @@ static void box_ui_add(
     }
 }
 
-/** X of a box of a given width against an edge of the box of its parent.
+/** X of a box of a given width against an edge of a box of the given width.
  *
- * @param parent The place of the parent
+ * @param parent_x X of the centre of the box of the parent
+ * @param parent_width Width of the box of the parent
  * @param pad Padding that insets the box of the parent
  * @param width Width of the box that is aligned
  * @param h Edge of the parent the box is aligned against
  * @return X of the centre of the aligned box
  */
 static float box_ui_align_x(
-    const UiPlace *parent,
+    float parent_x,
+    float parent_width,
     float pad,
     float width,
     Align h)
 {
-    float half = parent->width * 0.5f - pad - width * 0.5f;
-    float result = parent->x;
+    float half = parent_width * 0.5f - pad - width * 0.5f;
+    float result = parent_x;
     if (h == AlignLeft) {
-        result = parent->x - half;
+        result = parent_x - half;
     } else if (h == AlignRight) {
-        result = parent->x + half;
+        result = parent_x + half;
     }
 
     return result;
 }
 
-/** Y of a box of a given height against an edge of the box of its parent.
+/** Y of a box of a given height against an edge of a box of the given height.
  *
- * @param parent The place of the parent
+ * @param parent_y Y of the centre of the box of the parent
+ * @param parent_height Height of the box of the parent
  * @param pad Padding that insets the box of the parent
  * @param height Height of the box that is aligned
  * @param v Edge of the parent the box is aligned against
  * @return Y of the centre of the aligned box
  */
 static float box_ui_align_y(
-    const UiPlace *parent,
+    float parent_y,
+    float parent_height,
     float pad,
     float height,
     VAlign v)
 {
-    float half = parent->height * 0.5f - pad - height * 0.5f;
-    float result = parent->y;
+    float half = parent_height * 0.5f - pad - height * 0.5f;
+    float result = parent_y;
     if (v == VAlignTop) {
-        result = parent->y + half;
+        result = parent_y + half;
     } else if (v == VAlignBottom) {
-        result = parent->y - half;
+        result = parent_y - half;
     }
 
     return result;
@@ -211,29 +299,49 @@ static void box_ui_flow(
     const Layout *l = &parent->layout;
     if (l->direction == DirectionRow) {
         child->x = parent->cursor + child->width * 0.5f;
-        child->y = box_ui_align_y(parent, l->padding, child->height, l->v);
+        child->y = box_ui_align_y(parent->y, parent->height, l->padding,
+            child->height, l->v);
         parent->cursor += child->width + l->spacing;
     } else {
         child->y = parent->cursor - child->height * 0.5f;
-        child->x = box_ui_align_x(parent, l->padding, child->width, l->h);
+        child->x = box_ui_align_x(parent->x, parent->width, l->padding,
+            child->width, l->h);
         parent->cursor -= child->height + l->spacing;
     }
 }
 
 /** Pin a child against the edges of its parent its anchor names.
  *
+ * A parent that is the root of a tree and has neither a Layout nor a Rect of
+ * its own has no box of its own either: the edges an anchored child of such a
+ * root pins against are those of the view that draws the tree instead, which
+ * does not touch the Bounds the root itself publishes.
+ *
+ * @param world The world
+ * @param root The root of the tree being walked
  * @param parent The place of the parent
  * @param child The place of the child
  */
 static void box_ui_pin(
+    ecs_world_t *world,
+    ecs_entity_t root,
     const UiPlace *parent,
     UiPlace *child)
 {
     const Anchor *a = &child->anchor;
     float pad = parent->has_layout ? parent->layout.padding : 0;
+    float pw = parent->width;
+    float ph = parent->height;
+    if (pw <= 0 && ph <= 0 && parent->e == root) {
+        const UiImpl *impl = ecs_get(world, root, UiImpl);
+        if (impl) {
+            pw = impl->width;
+            ph = impl->height;
+        }
+    }
 
-    child->x = box_ui_align_x(parent, pad, child->width, a->h);
-    child->y = box_ui_align_y(parent, pad, child->height, a->v);
+    child->x = box_ui_align_x(parent->x, pw, pad, child->width, a->h);
+    child->y = box_ui_align_y(parent->y, ph, pad, child->height, a->v);
     child->x += a->h == AlignRight ? -a->x : a->x;
     child->y += a->v == VAlignTop ? -a->y : a->y;
 }
@@ -386,7 +494,7 @@ static void box_ui_arrange(
             p->x = p->local_x;
             p->y = p->local_y;
         } else if (p->has_anchor) {
-            box_ui_pin(parent, p);
+            box_ui_pin(world, root, parent, p);
             placed = true;
         } else if (parent->has_layout &&
             parent->layout.direction != DirectionNone)
@@ -419,6 +527,7 @@ void box_ui_layout(
     ecs_world_t *world,
     ecs_entity_t root)
 {
+    box_ui_resolve_fill(world, root);
     box_ui_measure(world);
     box_ui_arrange(world, root);
     box_ui_text_build(world);
