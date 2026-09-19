@@ -1,44 +1,51 @@
 {
-    "id": "bench_collision",
-    "type": "application",
-    "value": {
-        "description": "Benchmarks for the box.collision module",
-        "public": false,
-        "use": [
-            "box"
+  "id": "bench_collision",
+  "type": "application",
+  "value": {
+    "description": "Benchmarks for the box.collision module",
+    "public": false,
+    "use": [
+      "box"
+    ]
+  },
+  "bench": {
+    "benchsuites": [
+      {
+        "id": "Roots",
+        "benchcases": [
+          "idle_100k",
+          "update_1k_of_100k",
+          "move_1k_rigid_of_100k",
+          "instantiate_1k"
         ]
-    },
-    "bench": {
-        "benchsuites": [
-            {
-                "id": "Roots",
-                "benchcases": [
-                    "idle_100k",
-                    "update_1k_of_100k",
-                    "move_1k_rigid_of_100k",
-                    "instantiate_1k"
-                ]
-            },
-            {
-                "id": "Colliders",
-                "benchcases": [
-                    "resolve_1k_of_100k",
-                    "ray_sphere",
-                    "ray_box",
-                    "capsule_box"
-                ]
-            },
-            {
-                "id": "Index",
-                "benchcases": [
-                    "build_1m",
-                    "ray_1m",
-                    "ray_miss_1m",
-                    "sphere_1m",
-                    "frustum_1m",
-                    "update_1k_movers_of_1m"
-                ]
-            }
+      },
+      {
+        "id": "Colliders",
+        "benchcases": [
+          "resolve_1k_of_100k",
+          "ray_sphere",
+          "ray_box",
+          "capsule_box"
         ]
-    }
+      },
+      {
+        "id": "Index",
+        "benchcases": [
+          "build_1m",
+          "ray_1m",
+          "ray_miss_1m",
+          "sphere_1m",
+          "frustum_1m",
+          "update_1k_movers_of_1m"
+        ]
+      },
+      {
+        "id": "Debug",
+        "benchcases": [
+          "extract_off_10k",
+          "extract_colliders_10k"
+        ]
+      }
+    ]
+  }
 }

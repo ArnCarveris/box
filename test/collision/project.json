@@ -1,115 +1,128 @@
 {
-    "id": "collision",
-    "type": "application",
-    "value": {
-        "description": "Unit tests for the box.collision module",
-        "public": false,
-        "use": [
-            "box"
+  "id": "collision",
+  "type": "application",
+  "value": {
+    "description": "Unit tests for the box.collision module",
+    "public": false,
+    "use": [
+      "box"
+    ]
+  },
+  "test": {
+    "testsuites": [
+      {
+        "id": "Roots",
+        "testcases": [
+          "prefab_instance_is_root",
+          "prefab_is_not_a_root",
+          "template_instance_is_root",
+          "manual_root_aggregates",
+          "empty_root_has_no_bounds",
+          "aggregates_children",
+          "aggregates_deep_hierarchy",
+          "aggregates_parent_storage",
+          "own_bounds_are_included",
+          "child_added_updates_bounds",
+          "child_removed_updates_bounds",
+          "child_moved_updates_bounds",
+          "reparent_out_of_root",
+          "reparent_into_other_root",
+          "nested_root_counts_once",
+          "local_bounds_are_root_space",
+          "rigid_root_move_transforms_local_bounds",
+          "rigid_root_child_change_reaggregates",
+          "non_rigid_root_reaggregates_on_move",
+          "deleted_root_is_forgotten"
         ]
-    },
-    "test": {
-        "testsuites": [
-            {
-                "id": "Roots",
-                "testcases": [
-                    "prefab_instance_is_root",
-                    "prefab_is_not_a_root",
-                    "template_instance_is_root",
-                    "manual_root_aggregates",
-                    "empty_root_has_no_bounds",
-                    "aggregates_children",
-                    "aggregates_deep_hierarchy",
-                    "aggregates_parent_storage",
-                    "own_bounds_are_included",
-                    "child_added_updates_bounds",
-                    "child_removed_updates_bounds",
-                    "child_moved_updates_bounds",
-                    "reparent_out_of_root",
-                    "reparent_into_other_root",
-                    "nested_root_counts_once",
-                    "local_bounds_are_root_space",
-                    "rigid_root_move_transforms_local_bounds",
-                    "rigid_root_child_change_reaggregates",
-                    "non_rigid_root_reaggregates_on_move",
-                    "deleted_root_is_forgotten"
-                ]
-            },
-            {
-                "id": "Colliders",
-                "testcases": [
-                    "sphere_shape_derives_sphere",
-                    "ico_sphere_derives_sphere",
-                    "box_shape_derives_box",
-                    "rounded_box_derives_box",
-                    "capsule_shape_derives_capsule",
-                    "other_shape_derives_aabb",
-                    "bounds_without_shape_give_aabb",
-                    "empty_bounds_give_no_collider",
-                    "no_collider_opts_out",
-                    "removing_no_collider_restores",
-                    "adding_no_collider_removes",
-                    "sphere_override_wins_over_shape",
-                    "box_override_wins_over_shape",
-                    "capsule_override_wins_over_shape",
-                    "scale_applied_to_sphere",
-                    "scale_applied_to_box",
-                    "scale_applied_to_capsule",
-                    "rotation_turns_box_axes",
-                    "move_updates_collider",
-                    "shape_change_updates_collider"
-                ]
-            },
-            {
-                "id": "Intersect",
-                "testcases": [
-                    "ray_hits_sphere",
-                    "ray_misses_sphere",
-                    "ray_respects_max_distance",
-                    "ray_hits_box",
-                    "ray_hits_rotated_box",
-                    "ray_misses_box",
-                    "ray_hits_aabb",
-                    "ray_hits_capsule_side",
-                    "ray_hits_capsule_cap",
-                    "ray_misses_capsule",
-                    "sphere_overlaps_sphere",
-                    "sphere_overlaps_box",
-                    "sphere_overlaps_rotated_box",
-                    "sphere_overlaps_capsule",
-                    "sphere_overlaps_aabb",
-                    "capsule_overlaps_sphere",
-                    "capsule_overlaps_box",
-                    "capsule_overlaps_capsule",
-                    "capsule_overlaps_aabb",
-                    "bounds_of_collider"
-                ]
-            },
-            {
-                "id": "Index",
-                "testcases": [
-                    "sphere_finds_collider",
-                    "sphere_misses_far_collider",
-                    "aabb_finds_collider",
-                    "ray_finds_nearest",
-                    "ray_misses",
-                    "frustum_finds_inside",
-                    "insert_after_update",
-                    "remove_drops_from_index",
-                    "no_collider_not_in_index",
-                    "move_updates_index",
-                    "root_groups_children",
-                    "nested_root_found",
-                    "dynamic_entity_found",
-                    "dynamic_entity_moves_each_frame",
-                    "disabled_index_finds_nothing",
-                    "random_sphere_matches_brute_force",
-                    "random_aabb_matches_brute_force",
-                    "random_ray_matches_brute_force",
-                    "random_frustum_matches_brute_force",
-                    "many_inserts_and_removes"
-                ]
-            }
+      },
+      {
+        "id": "Colliders",
+        "testcases": [
+          "sphere_shape_derives_sphere",
+          "ico_sphere_derives_sphere",
+          "box_shape_derives_box",
+          "rounded_box_derives_box",
+          "capsule_shape_derives_capsule",
+          "other_shape_derives_aabb",
+          "bounds_without_shape_give_aabb",
+          "empty_bounds_give_no_collider",
+          "no_collider_opts_out",
+          "removing_no_collider_restores",
+          "adding_no_collider_removes",
+          "sphere_override_wins_over_shape",
+          "box_override_wins_over_shape",
+          "capsule_override_wins_over_shape",
+          "scale_applied_to_sphere",
+          "scale_applied_to_box",
+          "scale_applied_to_capsule",
+          "rotation_turns_box_axes",
+          "move_updates_collider",
+          "shape_change_updates_collider"
         ]
-    }
+      },
+      {
+        "id": "Intersect",
+        "testcases": [
+          "ray_hits_sphere",
+          "ray_misses_sphere",
+          "ray_respects_max_distance",
+          "ray_hits_box",
+          "ray_hits_rotated_box",
+          "ray_misses_box",
+          "ray_hits_aabb",
+          "ray_hits_capsule_side",
+          "ray_hits_capsule_cap",
+          "ray_misses_capsule",
+          "sphere_overlaps_sphere",
+          "sphere_overlaps_box",
+          "sphere_overlaps_rotated_box",
+          "sphere_overlaps_capsule",
+          "sphere_overlaps_aabb",
+          "capsule_overlaps_sphere",
+          "capsule_overlaps_box",
+          "capsule_overlaps_capsule",
+          "capsule_overlaps_aabb",
+          "bounds_of_collider"
+        ]
+      },
+      {
+        "id": "Index",
+        "testcases": [
+          "sphere_finds_collider",
+          "sphere_misses_far_collider",
+          "aabb_finds_collider",
+          "ray_finds_nearest",
+          "ray_misses",
+          "frustum_finds_inside",
+          "insert_after_update",
+          "remove_drops_from_index",
+          "no_collider_not_in_index",
+          "move_updates_index",
+          "root_groups_children",
+          "nested_root_found",
+          "dynamic_entity_found",
+          "dynamic_entity_moves_each_frame",
+          "disabled_index_finds_nothing",
+          "random_sphere_matches_brute_force",
+          "random_aabb_matches_brute_force",
+          "random_ray_matches_brute_force",
+          "random_frustum_matches_brute_force",
+          "many_inserts_and_removes"
+        ]
+      },
+      {
+        "id": "Debug",
+        "testcases": [
+          "off_emits_no_lines",
+          "sphere_draws_three_circles",
+          "box_draws_twelve_edges",
+          "capsule_draws_two_circles_and_four_lines",
+          "root_bounds_draw_a_box",
+          "all_draws_colliders_and_bounds",
+          "collider_outside_the_view_is_skipped",
+          "lines_are_cleared_between_packets"
+        ]
+      }
+    ]
+  }
 }
