@@ -1,0 +1,52 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.particle
+
+camera {
+  Position: {0, 7, -26}
+  LookAt: {0, 6, 0}
+  Camera: {fov: 60}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.4}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, intensity: 0.6} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {90, 0.5, 90}
+  Rgb: {100, 103, 108}
+  PbrMaterial: {roughness: 0.9}
+}
+
+pillars {
+  for i in 0..48 {
+    _ {
+      Position: {(i % 24) * 2.2 - 25.3, 1.2, (i / 24) * 28 - 14}
+      Box: {0.8, 2.4, 0.8}
+      Rgb: {150, 150, 158}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+}
+
+fountain {
+  Position: {0, 0.5, 0}
+  ParticleEmitter: {
+    max: 1000000, rate: 500000, shape: EmitterDisc, radius: 6,
+    direction: {0, 1, 0}, spread: 22,
+    speed: {min: 3, max: 9},
+    lifetime: {min: 1.9, max: 2.1},
+    size: {min: 0.12, max: 0.24},
+    opacity: {min: 0.5, max: 0.9},
+    acceleration: {0, -1.5, 0},
+    color: {235, 180, 120},
+    seed: 21
+  }
+}
