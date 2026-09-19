@@ -37,6 +37,14 @@
                     "instance_without_position_goes_first",
                     "world_position_orders_a_child_instance"
                 ]
+            },
+            {
+                "id": "Reload",
+                "testcases": [
+                    "rewritten_file_is_reloaded",
+                    "parse_error_keeps_the_scene",
+                    "reloaded_instances_are_pending"
+                ]
             }
         ]
     }
