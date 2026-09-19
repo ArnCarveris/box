@@ -1,0 +1,208 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T13:15:06Z",
+  "pass": 26,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.017998,
+  "tests": [
+    {
+      "suite": "Merge",
+      "case": "one_mesh_lands_in_world_space",
+      "status": "pass",
+      "elapsed": 0.004369,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "two_meshes_join_one_group",
+      "status": "pass",
+      "elapsed": 0.005595,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "materials_split_into_groups",
+      "status": "pass",
+      "elapsed": 0.004359,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_material_gathers_every_source",
+      "status": "pass",
+      "elapsed": 0.005161,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "welding_joins_a_shared_edge",
+      "status": "pass",
+      "elapsed": 0.005355,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_unwelded_seam_keeps_both_vertices",
+      "status": "pass",
+      "elapsed": 0.005418,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "identical_vertices_are_shared",
+      "status": "pass",
+      "elapsed": 0.004444,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_mesh_without_normals_gets_them",
+      "status": "pass",
+      "elapsed": 0.004594,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "missing_uvs_and_colors_get_defaults",
+      "status": "pass",
+      "elapsed": 0.00407,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "uvs_and_colors_are_kept",
+      "status": "pass",
+      "elapsed": 0.004067,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "the_bounds_cover_every_source",
+      "status": "pass",
+      "elapsed": 0.004219,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_empty_subtree_merges_to_nothing",
+      "status": "pass",
+      "elapsed": 0.004,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "an_index_outside_the_mesh_is_dropped",
+      "status": "pass",
+      "elapsed": 0.003746,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_degenerate_triangle_is_dropped",
+      "status": "pass",
+      "elapsed": 0.003875,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "a_source_without_vertices_is_skipped",
+      "status": "pass",
+      "elapsed": 0.003798,
+      "project": "lod"
+    },
+    {
+      "suite": "Merge",
+      "case": "the_same_input_merges_the_same_mesh",
+      "status": "pass",
+      "elapsed": 0.003836,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_flat_grid_loses_triangles",
+      "status": "pass",
+      "elapsed": 0.004935,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_ratio_caps_the_triangles",
+      "status": "pass",
+      "elapsed": 0.005314,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_ratio_of_one_keeps_the_mesh",
+      "status": "pass",
+      "elapsed": 0.005165,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_error_bound_limits_the_loss",
+      "status": "pass",
+      "elapsed": 0.004822,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_error_is_measured_in_world_units",
+      "status": "pass",
+      "elapsed": 0.006077,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_group_keeps_its_own_triangles",
+      "status": "pass",
+      "elapsed": 0.00602,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "unused_vertices_are_dropped",
+      "status": "pass",
+      "elapsed": 0.004885,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "the_same_mesh_simplifies_the_same_way",
+      "status": "pass",
+      "elapsed": 0.005686,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "an_empty_mesh_has_nothing_to_lose",
+      "status": "pass",
+      "elapsed": 0.003529,
+      "project": "lod"
+    },
+    {
+      "suite": "Simplify",
+      "case": "a_single_triangle_survives",
+      "status": "pass",
+      "elapsed": 0.003474,
+      "project": "lod"
+    }
+  ],
+  "projects": [
+    {
+      "project": "lod",
+      "pass": 16,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.009511
+    },
+    {
+      "project": "lod",
+      "pass": 10,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.008487
+    }
+  ]
+}

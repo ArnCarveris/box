@@ -1,0 +1,27 @@
+{
+  "project": "lod",
+  "timestamp": "2026-09-19T13:15:06Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.009511,
+  "tests": [
+    {"suite": "Merge", "case": "one_mesh_lands_in_world_space", "status": "pass", "elapsed": 0.004369},
+    {"suite": "Merge", "case": "two_meshes_join_one_group", "status": "pass", "elapsed": 0.005595},
+    {"suite": "Merge", "case": "materials_split_into_groups", "status": "pass", "elapsed": 0.004359},
+    {"suite": "Merge", "case": "a_material_gathers_every_source", "status": "pass", "elapsed": 0.005161},
+    {"suite": "Merge", "case": "welding_joins_a_shared_edge", "status": "pass", "elapsed": 0.005355},
+    {"suite": "Merge", "case": "an_unwelded_seam_keeps_both_vertices", "status": "pass", "elapsed": 0.005418},
+    {"suite": "Merge", "case": "identical_vertices_are_shared", "status": "pass", "elapsed": 0.004444},
+    {"suite": "Merge", "case": "a_mesh_without_normals_gets_them", "status": "pass", "elapsed": 0.004594},
+    {"suite": "Merge", "case": "missing_uvs_and_colors_get_defaults", "status": "pass", "elapsed": 0.004070},
+    {"suite": "Merge", "case": "uvs_and_colors_are_kept", "status": "pass", "elapsed": 0.004067},
+    {"suite": "Merge", "case": "the_bounds_cover_every_source", "status": "pass", "elapsed": 0.004219},
+    {"suite": "Merge", "case": "an_empty_subtree_merges_to_nothing", "status": "pass", "elapsed": 0.004000},
+    {"suite": "Merge", "case": "an_index_outside_the_mesh_is_dropped", "status": "pass", "elapsed": 0.003746},
+    {"suite": "Merge", "case": "a_degenerate_triangle_is_dropped", "status": "pass", "elapsed": 0.003875},
+    {"suite": "Merge", "case": "a_source_without_vertices_is_skipped", "status": "pass", "elapsed": 0.003798},
+    {"suite": "Merge", "case": "the_same_input_merges_the_same_mesh", "status": "pass", "elapsed": 0.003836}
+  ]
+}

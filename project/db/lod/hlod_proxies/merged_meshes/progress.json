@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:26.191+00:00",
   "start_time": "2026-09-19T12:49:32.081+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T13:16:50.093+00:00",
   "dependencies": [
     "lod/hlod_proxies/reduced_primitives"
   ]

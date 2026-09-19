@@ -1,0 +1,21 @@
+{
+  "project": "lod",
+  "timestamp": "2026-09-19T13:15:06Z",
+  "pass": 10,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.008487,
+  "tests": [
+    {"suite": "Simplify", "case": "a_flat_grid_loses_triangles", "status": "pass", "elapsed": 0.004935},
+    {"suite": "Simplify", "case": "the_ratio_caps_the_triangles", "status": "pass", "elapsed": 0.005314},
+    {"suite": "Simplify", "case": "a_ratio_of_one_keeps_the_mesh", "status": "pass", "elapsed": 0.005165},
+    {"suite": "Simplify", "case": "the_error_bound_limits_the_loss", "status": "pass", "elapsed": 0.004822},
+    {"suite": "Simplify", "case": "the_error_is_measured_in_world_units", "status": "pass", "elapsed": 0.006077},
+    {"suite": "Simplify", "case": "a_group_keeps_its_own_triangles", "status": "pass", "elapsed": 0.006020},
+    {"suite": "Simplify", "case": "unused_vertices_are_dropped", "status": "pass", "elapsed": 0.004885},
+    {"suite": "Simplify", "case": "the_same_mesh_simplifies_the_same_way", "status": "pass", "elapsed": 0.005686},
+    {"suite": "Simplify", "case": "an_empty_mesh_has_nothing_to_lose", "status": "pass", "elapsed": 0.003529},
+    {"suite": "Simplify", "case": "a_single_triangle_survives", "status": "pass", "elapsed": 0.003474}
+  ]
+}
