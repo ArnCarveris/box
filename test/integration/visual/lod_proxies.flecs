@@ -1,0 +1,134 @@
+// Two rows of three props, each row fanning out from the camera. The near one of
+// each row keeps its parts and the two behind it are replaced by a generated
+// proxy: the crates of the left row cluster into the set of primitives
+// box_lod_proxy_build emits, the rigs of the right row carry too many materials
+// for that set to stay under their error and fall back to the merged and
+// simplified mesh box_lod_merge and box_lod_simplify build. The job system runs
+// the generation on the main thread here, so the frame a proxy arrives in is the
+// same on every machine.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+using box.job
+
+$ { BakeSettings: {enabled: false} }
+
+$ { JobSettings: {workers: -1, budget_ms: 0} }
+
+$ { LodSettings: {enabled: true, quality: 1, error_px: 8, hysteresis: 0.25} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.8, -0.55, 0}
+  DirectionalLight: {intensity: 1.2}
+}
+
+camera {
+  Position: {0, 10, -16}
+  LookAt: {0, 4, 44}
+  Camera: {fov: 60, far_: 2000}
+}
+
+ground {
+  Position: {0, -0.5, 100}
+  Scale: {400, 1, 400}
+  Box: {1, 1, 1}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+template Crates {
+  for i in 0..27 {
+    _ {
+      Position: {(i % 3) * 2.2 - 2.2, (i / 9) * 2.2 + 1.1, ((i / 3) % 3) * 2.2 - 2.2}
+      Scale: {2, 2, 2}
+      Box: {1, 1, 1}
+      Rgb: {196, 122, 72}
+      PbrMaterial: {roughness: 0.55}
+    }
+  }
+}
+
+template Rig {
+  for i in 0..4 {
+    _ {
+      Position: {(i % 2) * 5 - 2.5, 3, (i / 2) * 5 - 2.5}
+      Scale: {0.7, 6, 0.7}
+      Box: {1, 1, 1}
+      Rgb: {118, 122, 130}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+
+  deck {
+    Position: {0, 6.4, 0}
+    Scale: {7, 0.8, 7}
+    Box: {1, 1, 1}
+    Rgb: {140, 142, 146}
+    PbrMaterial: {roughness: 0.75}
+  }
+
+  for i in 0..12 {
+    _ {
+      Position: {(i % 4) * 1.8 - 2.7, 7.6, (i / 4) * 2.2 - 2.2}
+      Scale: {1.4, 1.4, 1.4}
+      Box: {1, 1, 1}
+      Rgb: {216, 90 + (i % 6) * 30, 72}
+      PbrMaterial: {roughness: 0.35}
+    }
+  }
+
+  for i in 0..5 {
+    _ {
+      Position: {i * 1.5 - 3, 9.4, 0}
+      Sphere: {segments: 16, smooth: true, radius: 0.6}
+      Rgb: {110, 190, 230}
+      PbrMaterial: {roughness: 0.3, metallic: 0.6}
+    }
+  }
+
+  tank {
+    Position: {0, 2.2, 0}
+    Capsule: {segments: 16, smooth: true, radius: 1.4, length: 2.2}
+    Rgb: {225, 200, 110}
+    PbrMaterial: {roughness: 0.4}
+  }
+}
+
+crates {
+  _ {
+    Position: {-7, 0, 9}
+    Crates: {}
+  }
+
+  _ {
+    Position: {-26, 0, 32}
+    Crates: {}
+  }
+
+  _ {
+    Position: {-55, 0, 64}
+    Crates: {}
+  }
+}
+
+rigs {
+  _ {
+    Position: {7, 0, 9}
+    Rig: {}
+  }
+
+  _ {
+    Position: {26, 0, 32}
+    Rig: {}
+  }
+
+  _ {
+    Position: {55, 0, 64}
+    Rig: {}
+  }
+}

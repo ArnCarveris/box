@@ -72,6 +72,7 @@ Rules for adding one:
 | The same city without LOD | `lod_city_off` | The same silhouette with every part of every tower drawn, which is what `lod_city` is compared against by eye. |
 | Detail pruning | `lod_pruning` | Three open frames at 70, 150 and 290 units: the near one keeps its bolts and railings, the far ones lose them and keep their columns, floors and the pinned sign. |
 | The same frames with `LodPin` | `lod_pruning_off` | Every frame pinned, so the bolts and railings of the distant ones are drawn, which is what `lod_pruning` is compared against by eye. |
+| Generated HLOD proxies | `lod_proxies` | Two rows of three props: the near one of each row keeps its parts, the crates behind it become the handful of primitives the generator clusters them into and the rigs, which carry too many materials for that, become one merged and simplified mesh. |
 
 ## The showcase scene
 

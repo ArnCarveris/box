@@ -318,7 +318,7 @@ static void box_view_camera(
  * @param v The view to fill
  * @return True when the world holds a directional light
  */
-static bool box_view_sun(
+bool box_render_view_sun(
     ecs_world_t *world,
     RenderState *state,
     box_view_t *v)
@@ -658,7 +658,7 @@ static void box_view_fill(
         box_view_overlay(world, src->entity, v);
     }
 
-    bool sun = box_view_sun(world, state, v) && !ui;
+    bool sun = box_render_view_sun(world, state, v) && !ui;
     if (ui) {
         v->sun_intensity = 0;
         v->plain_blend = 1;

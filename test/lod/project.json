@@ -207,6 +207,30 @@
                     "no_threshold_prunes_nothing",
                     "the_threshold_moves_with_the_distance"
                 ]
+            },
+            {
+                "id": "Cache",
+                "testcases": [
+                    "a_subtree_keeps_its_parts_until_its_proxy_arrives",
+                    "a_clustered_subtree_is_replaced_by_its_primitive_set",
+                    "many_materials_fall_back_to_a_merged_mesh",
+                    "a_node_that_fills_the_view_keeps_its_parts",
+                    "moving_a_rigid_root_builds_nothing_again",
+                    "a_changed_descendant_builds_its_proxy_again",
+                    "a_change_in_another_root_leaves_the_proxy_alone",
+                    "destroying_a_root_frees_its_proxy",
+                    "the_job_system_builds_the_proxy_off_the_frame",
+                    "the_nearest_subtree_is_built_first",
+                    "the_statistics_report_the_proxies_and_the_queue"
+                ]
+            },
+            {
+                "id": "Shadow",
+                "testcases": [
+                    "a_caster_the_view_misses_is_replaced_by_its_proxy",
+                    "a_small_shadow_threshold_keeps_the_caster_detailed",
+                    "a_world_without_a_sun_walks_the_view_alone"
+                ]
             }
         ]
     }

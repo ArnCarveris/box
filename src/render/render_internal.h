@@ -21,6 +21,9 @@
 /** The LOD hierarchy the traversal owns, private to extract_lod.c */
 typedef struct box_lod_state_t box_lod_state_t;
 
+/** The generated proxies of the traversal, declared in render/lod_cache.h */
+typedef struct box_lod_cache_t box_lod_cache_t;
+
 /** Contiguous run of the static slots of a mesh that share a layer mask */
 typedef struct box_slot_group_t {
     uint32_t mask;   /**< Layers the entities of the run belong to, 0 for every view */
@@ -218,7 +221,7 @@ void box_render_lod_update(
     RenderState *state,
     box_packet_t *p);
 
-/** Append the proxies of the collapsed nodes as one dynamic batch.
+/** Append the proxies of the collapsed nodes as dynamic batches.
  *
  * @param world The world
  * @param state The registry
@@ -228,6 +231,41 @@ void box_render_lod_proxies(
     ecs_world_t *world,
     RenderState *state,
     box_packet_t *p);
+
+/** The proxy cache of the traversal, which the statistics and the tests read.
+ *
+ * @param state The registry
+ * @return The cache, NULL when the traversal has no state
+ */
+box_lod_cache_t* box_render_lod_cache(
+    RenderState *state);
+
+/** Tell the traversal that the look or the place of an entity changed.
+ *
+ * Every generated proxy that holds the entity is thrown away, which is the
+ * proxy of the entity itself and of every node above it; nothing else in the
+ * hierarchy is touched.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The entity
+ */
+void box_render_lod_touch(
+    ecs_world_t *world,
+    RenderState *state,
+    ecs_entity_t e);
+
+/** Fill the sun of a view from the first directional light, or a default one.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param v The view to fill
+ * @return True when the world holds a light the view is lit by
+ */
+bool box_render_view_sun(
+    ecs_world_t *world,
+    RenderState *state,
+    box_view_t *v);
 
 /** Fill a scratch view with the target, the camera and the LOD settings it has.
  *

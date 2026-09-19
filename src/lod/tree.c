@@ -676,26 +676,44 @@ done:
 /** Decide what the walk does with one interior node.
  *
  * @param n The node
+ * @param node Index of the node, which the level callback names it by
  * @param desc The view and its threshold
  * @param scale Pixels one world unit covers at the bounds of the node
  * @return True when the node is replaced by its proxy
  */
 static bool box_lod_walk_collapse(
     box_lod_node_t *n,
+    int32_t node,
     const box_lod_walk_desc_t *desc,
     float scale)
 {
-    float error_px[2] = { 0.0f, scale * n->error };
+    float error[BOX_LOD_LEVEL_MAX] = {0};
+    float error_px[BOX_LOD_LEVEL_MAX + 1] = {0};
+    int32_t count = desc->levels ? desc->levels(desc->ctx, node, error) : 0;
+    int32_t i;
+
+    if (count <= 0) {
+        count = 1;
+        error[0] = n->error;
+    }
+
+    for (i = 0; i < count; i ++) {
+        error_px[i + 1] = scale * error[i];
+    }
+
     box_lod_select_desc_t select = {
-        .error_px = error_px, .count = 2, .current = n->level,
+        .error_px = error_px, .count = count + 1, .current = n->level,
         .threshold = desc->threshold, .hysteresis = desc->hysteresis
     };
 
-    bool result = box_lod_select(&select) == 1;
+    int32_t level = box_lod_select(&select);
+    bool result = level > 0;
+    bool finer = (n->votes & BOX_LOD_VOTE_COLLAPSE) && n->level > 0 && n->level < level;
+
     if (!result) {
         n->level = 0;
     } else if (!(n->votes & BOX_LOD_VOTE_DESCEND)) {
-        n->level = 1;
+        n->level = finer ? n->level : level;
     }
 
     return result;
@@ -783,7 +801,7 @@ void box_lod_tree_walk(
             continue;
         }
 
-        bool collapse = box_lod_walk_collapse(n, desc, scale);
+        bool collapse = box_lod_walk_collapse(n, cur, desc, scale);
         if (!collapse && desc->hidden && desc->hidden(desc->ctx, n)) {
             collapse = true;
             stats.occluded ++;

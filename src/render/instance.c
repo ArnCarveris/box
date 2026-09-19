@@ -20,6 +20,8 @@ void box_render_mark_dirty(
         inst->dirty = true;
         ecs_vec_append_t(NULL, &state->dirty, ecs_entity_t)[0] = e;
     }
+
+    box_render_lod_touch(world, state, e);
 done:
     return;
 }

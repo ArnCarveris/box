@@ -492,6 +492,11 @@ ECS_STRUCT(LodStats, {
     int32_t rejected; /**< Nodes the frustum stopped */
     int32_t pruned;   /**< Nodes the contribution test dropped */
     int32_t nodes;    /**< Nodes the hierarchy holds */
+    int32_t meshes;   /**< Proxies drawn as a merged and simplified mesh */
+    int32_t shapes;   /**< Proxies drawn as a generated set of primitives */
+    int32_t boxes;    /**< Proxies still drawn as the box over their bounds */
+    int32_t queued;   /**< Proxies waiting for the generator */
+    int32_t cached;   /**< Proxies the cache of the renderer holds */
 });
 
 /** The node has no children and stands for one renderable instance */
@@ -549,7 +554,7 @@ typedef struct box_lod_node_t {
     int32_t first_child; /**< First child node, negative for none */
     int32_t next;        /**< Next sibling, negative for the last */
     int32_t leaves;      /**< Leaves the subtree of the node holds */
-    int32_t level;       /**< Decision of the previous frame, 0 descends and 1 collapses */
+    int32_t level;       /**< Level of the previous frame, 0 descends and 1 or more collapses */
     uint32_t flags;      /**< BOX_LOD_NODE bits of the node */
     uint32_t votes;      /**< BOX_LOD_VOTE bits the walks of this frame left */
     uint32_t stamp;      /**< Walk the votes belong to, which is what clears them */
@@ -604,6 +609,26 @@ typedef void (*box_lod_emit_t)(
     int32_t node,
     uint32_t vote);
 
+/** Representations one node can be replaced by, the node itself excluded */
+#define BOX_LOD_LEVEL_MAX (3)
+
+/** Fills the error ladder of a node the walk is about to replace.
+ *
+ * The levels run from the finest representation to the cheapest, so their
+ * errors rise with the level and the walk takes the cheapest one that stays
+ * under the threshold. A caller without a generator leaves this out, which
+ * gives every node the single level its own error describes.
+ *
+ * @param ctx The context of the walk
+ * @param node Index of the node
+ * @param error Receives the error in world units of every level
+ * @return The number of levels, 0 to fall back to the error of the node
+ */
+typedef int32_t (*box_lod_levels_t)(
+    void *ctx,
+    int32_t node,
+    float *error);
+
 /** What one walk of the tree measures and what it reports its result to.
  *
  * The visible callback is the culling of the view: it answers false for a node
@@ -622,6 +647,7 @@ typedef struct box_lod_walk_desc_t {
     box_lod_visible_t hidden;   /**< Depth test of the view, NULL to test no node */
     box_lod_open_t open;        /**< Materialises the children of a node, NULL for none */
     box_lod_emit_t emit;        /**< Receives a resolved node, NULL to only count */
+    box_lod_levels_t levels;    /**< Error ladder of a node, NULL for its own error */
     void *ctx;                  /**< Passed to the callbacks */
 } box_lod_walk_desc_t;
 
