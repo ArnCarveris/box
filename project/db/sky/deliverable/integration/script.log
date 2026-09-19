@@ -1,0 +1,33 @@
+$ script_read script_content.flecs
+using box.transform
+
+path {
+  a {
+    Position: {0, 0, 0}
+  }
+
+  b {
+    Position: {2, 0, 0}
+  }
+}
+
+$ script_patch script_content.flecs "@@ -8,4 +8,8 @@
+   b {
+     Position: {2, 0, 0}
+   }
++
++  c {
++    Position: {4, 0, 0}
++  }
+ }"
+ok
+$ ls path
+a
+b
+c
+
+$ script_grep Position
+test/integration/command/script_content.flecs:5:    Position: {0, 0, 0}
+test/integration/command/script_content.flecs:9:    Position: {2, 0, 0}
+test/integration/command/script_content.flecs:13:    Position: {4, 0, 0}
+
