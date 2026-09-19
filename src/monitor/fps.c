@@ -16,7 +16,7 @@
 /** Frame times the published numbers of every overlay are taken from */
 typedef struct box_fps_monitor_t {
     box_fps_ring_t ring; /**< Frame times of the most recent frames */
-    int64_t frame;       /**< World frame the last sample was taken in */
+    int64_t frame;       /**< World frame the last sample was taken in, -1 for none */
 } box_fps_monitor_t;
 
 /** FpsOverlay constructor: enabled, in the top right corner and mostly opaque.
@@ -83,6 +83,7 @@ void box_fps_overlay_init(
     ecs_set_hooks(world, FpsOverlay, { .ctor = box_fps_overlay_ctor });
 
     box_fps_monitor_t *ctx = ecs_os_calloc_t(box_fps_monitor_t);
+    ctx->frame = -1;
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxPublishFps" }),
         .phase = EcsPostFrame,

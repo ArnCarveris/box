@@ -27,6 +27,23 @@
                 "teardown": true
             },
             {
+                "id": "Fps",
+                "testcases": [
+                    "prints_the_window_of_the_last_second",
+                    "worst_frame_is_the_slowest_of_the_window",
+                    "on_enables_the_overlay",
+                    "off_disables_the_overlay",
+                    "switching_keeps_the_panel_settings",
+                    "first_call_starts_the_window_without_the_panel",
+                    "window_falls_back_to_the_current_frame",
+                    "window_follows_the_first_call",
+                    "unknown_state_is_an_error",
+                    "help_lists_the_command"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Dispatch",
                 "testcases": [
                     "command_with_arguments",

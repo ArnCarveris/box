@@ -261,6 +261,13 @@ void box_render_cmd_init(
 void box_render_cmd_fini(
     TerminalSession *s);
 
+/** Register the fps command.
+ *
+ * @param world The world
+ */
+void box_fps_cmd_init(
+    ecs_world_t *world);
+
 /** Register the input command group: the key, mouse, input and action commands.
  *
  * @param world The world
