@@ -4,17 +4,30 @@
     "value": {
         "description": "Benchmarks for the box.collision module",
         "public": false,
-        "use": ["box"]
+        "use": [
+            "box"
+        ]
     },
     "bench": {
-        "benchsuites": [{
-            "id": "Roots",
-            "benchcases": [
-                "idle_100k",
-                "update_1k_of_100k",
-                "move_1k_rigid_of_100k",
-                "instantiate_1k"
-            ]
-        }]
+        "benchsuites": [
+            {
+                "id": "Roots",
+                "benchcases": [
+                    "idle_100k",
+                    "update_1k_of_100k",
+                    "move_1k_rigid_of_100k",
+                    "instantiate_1k"
+                ]
+            },
+            {
+                "id": "Colliders",
+                "benchcases": [
+                    "resolve_1k_of_100k",
+                    "ray_sphere",
+                    "ray_box",
+                    "capsule_box"
+                ]
+            }
+        ]
     }
 }
