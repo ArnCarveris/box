@@ -36,6 +36,10 @@ doc comment on every type and member.
 - Never mutate entities while iterating `ecs_children`; collect them first.
 - A system that adds a component to an entity must do it through `it->stage`.
 - `ecs_os_malloc` needs `ecs_os_init()` (or a world) before use.
+- A template async block with two sequential awaits restarts on a `mut`
+  reassignment; use one async block per await.
+- Writing a component through `ecs_get_mut` or `ecs_ensure` raises no OnSet;
+  call `ecs_modified` when observers must see the value.
 
 ## Build environments
 
