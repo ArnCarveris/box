@@ -267,6 +267,7 @@
                     "history_comes_back_to_the_line_being_typed",
                     "tab_completes_a_command_name",
                     "caret_sits_at_the_width_of_the_text_before_it",
+                    "caret_advances_by_the_width_of_a_typed_space",
                     "caret_goes_with_the_focus"
                 ],
                 "setup": true,

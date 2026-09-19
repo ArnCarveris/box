@@ -237,6 +237,31 @@ void TextInput_caret_sits_at_the_width_of_the_text_before_it(void)
     test_assert(wide > 0);
 }
 
+void TextInput_caret_advances_by_the_width_of_a_typed_space(void)
+{
+    // ore_engine/console_caret_space
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'a' });
+    ecs_progress(w, 0);
+
+    ecs_entity_t caret = ecs_lookup_child(w, element, "caret");
+    test_assert(caret != 0);
+    float after_a = ecs_get(w, caret, Anchor)->x;
+
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = ' ' });
+    ecs_progress(w, 0);
+    float after_first_space = ecs_get(w, caret, Anchor)->x;
+    test_assert(after_first_space > after_a);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = ' ' });
+    ecs_progress(w, 0);
+    float after_second_space = ecs_get(w, caret, Anchor)->x;
+    test_assert(after_second_space > after_first_space);
+
+    float first_step = after_first_space - after_a;
+    float second_step = after_second_space - after_first_space;
+    test_assert(fabsf(first_step - second_step) < 0.01f);
+}
+
 void TextInput_caret_goes_with_the_focus(void)
 {
     // ui/console

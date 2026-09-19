@@ -355,14 +355,23 @@ static float box_ui_input_offset(
     char *prefix = ecs_os_malloc(caret + 1);
     box_ui_extent_t extent;
     Text text = { .value = prefix };
+    float trailing = 0;
+    int32_t i;
 
     ecs_os_memcpy(prefix, input->value, caret);
     prefix[caret] = '\0';
     box_ui_text_run(world, atlas, &text, 0, 0, &extent);
+
+    for (i = caret; i > 0 && (prefix[i - 1] == ' ' || prefix[i - 1] == '\t'); i --) {
+        const box_ui_glyph_t *glyph = box_ui_atlas_glyph(world, atlas, ' ');
+
+        trailing += glyph ? glyph->advance * (prefix[i - 1] == '\t' ? 4.0f : 1.0f) : 0;
+    }
+
     ecs_os_free(prefix);
     height[0] = box_ui_text_line_height(atlas, stored);
 
-    return extent.width;
+    return extent.width + trailing;
 }
 
 /** Give the element of an input the quad that shows its caret.

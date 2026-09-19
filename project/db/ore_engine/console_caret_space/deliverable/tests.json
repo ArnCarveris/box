@@ -1,0 +1,25 @@
+{
+  "project": "ui",
+  "timestamp": "2026-09-19T23:14:32Z",
+  "pass": 14,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.136676,
+  "tests": [
+    {"suite": "TextInput", "case": "typed_text_reaches_the_line", "status": "pass", "elapsed": 0.069375},
+    {"suite": "TextInput", "case": "line_is_shown_as_the_text_of_the_element", "status": "pass", "elapsed": 0.067997},
+    {"suite": "TextInput", "case": "unfocused_input_takes_nothing", "status": "pass", "elapsed": 0.068355},
+    {"suite": "TextInput", "case": "backspace_removes_the_character_before_the_caret", "status": "pass", "elapsed": 0.068426},
+    {"suite": "TextInput", "case": "arrows_move_the_caret_over_the_line", "status": "pass", "elapsed": 0.069859},
+    {"suite": "TextInput", "case": "typing_inserts_at_the_caret", "status": "pass", "elapsed": 0.070903},
+    {"suite": "TextInput", "case": "enter_submits_the_line_and_empties_it", "status": "pass", "elapsed": 0.069829},
+    {"suite": "TextInput", "case": "newline_in_the_typed_text_submits_the_line", "status": "pass", "elapsed": 0.068342},
+    {"suite": "TextInput", "case": "history_walks_the_lines_that_were_submitted", "status": "pass", "elapsed": 0.067917},
+    {"suite": "TextInput", "case": "history_comes_back_to_the_line_being_typed", "status": "pass", "elapsed": 0.067119},
+    {"suite": "TextInput", "case": "tab_completes_a_command_name", "status": "pass", "elapsed": 0.068203},
+    {"suite": "TextInput", "case": "caret_sits_at_the_width_of_the_text_before_it", "status": "pass", "elapsed": 0.066430},
+    {"suite": "TextInput", "case": "caret_advances_by_the_width_of_a_typed_space", "status": "pass", "elapsed": 0.065494},
+    {"suite": "TextInput", "case": "caret_goes_with_the_focus", "status": "pass", "elapsed": 0.063487}
+  ]
+}
