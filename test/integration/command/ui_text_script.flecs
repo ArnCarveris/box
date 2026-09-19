@@ -1,0 +1,57 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.ui
+using box.command
+
+camera {
+  Position: {0, 0, -10}
+  Camera: {fov: 55}
+}
+
+// A button built from script only: the layout sizes itself around the label
+// text.label adds, and text.wrap and text.measure size the paragraph beside it
+// without any widget logic in the module.
+panel {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Font: {size: 18}
+  Layout: {direction: Column, width: 600, padding: 16, spacing: 12, h: Center}
+  Border: {radius: 16, width: 2, color: {120, 140, 190, 255}}
+  Rgb: {28, 32, 44}
+
+  button {
+    Layout: {direction: Row, padding: 12, h: Center, v: Middle}
+    Border: {radius: 18}
+    Rgb: {110, 160, 235}
+
+    caption {
+      Rgb: {16, 24, 40}
+    }
+  }
+
+  paragraph {
+    Layout: {width: 520}
+
+    body {
+      Rgb: {190, 205, 240}
+    }
+  }
+}
+
+const label = text.label(panel.button, "caption", "Save changes")
+const wrapped = text.wrap(panel, "the helpers wrap a paragraph and build a label from script", 240)
+const body = text.label(panel.paragraph, "body", wrapped)
+const size = text.measure(panel, "Save changes")
+
+measured {
+  Rect: {size.x, size.y}
+}
+
+terminals {
+  agent0 {
+    Terminal: {}
+    CommandScript: {path: "../../test/integration/command/ui_text_script.cmd"}
+  }
+}

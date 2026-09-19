@@ -1,0 +1,166 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.ui
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 55}
+}
+
+ui {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Layout: {direction: Column, width: 920, height: 500,
+           padding: 16, spacing: 10, h: Center}
+  Border: {radius: 20, width: 3, color: {120, 140, 190, 255}}
+  Rgb: {26, 30, 42}
+
+  title {
+    Font: {size: 40}
+    Text: {value: "Text and text helpers"}
+    Rgb: {235, 240, 255}
+  }
+
+  subtitle {
+    Font: {size: 18}
+    Text: {value: "one quad per glyph, measured and wrapped by the layout pass"}
+    Rgb: {150, 170, 215}
+  }
+
+  columns {
+    Layout: {direction: Row, width: 888, height: 260, spacing: 10, h: Center}
+
+    left {
+      Layout: {direction: Column, width: 288, height: 260,
+               padding: 12, spacing: 8, h: Left}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {38, 44, 60}
+
+      left_head {
+        Font: {size: 22}
+        Text: {value: "Left"}
+        Rgb: {245, 205, 95}
+      }
+
+      left_body {
+        Font: {size: 15}
+        Layout: {width: 264}
+        Text: {value: "The layout pass wraps a paragraph to the width its layout gives it and breaks between words.",
+               align: Left}
+        Rgb: {205, 215, 235}
+      }
+    }
+
+    middle {
+      Layout: {direction: Column, width: 288, height: 260,
+               padding: 12, spacing: 8, h: Center}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {32, 50, 48}
+
+      middle_head {
+        Font: {size: 22}
+        Text: {value: "Center"}
+        Rgb: {120, 215, 170}
+      }
+
+      middle_body {
+        Font: {size: 15}
+        Layout: {width: 264}
+        Text: {value: "Every line of a centred paragraph is moved on its own, so a short last line sits in the middle.",
+               align: Center}
+        Rgb: {205, 230, 220}
+      }
+    }
+
+    right {
+      Layout: {direction: Column, width: 288, height: 260,
+               padding: 12, spacing: 8, h: Right}
+      Border: {radius: 14, width: 2, color: {95, 115, 160, 255}}
+      Rgb: {48, 38, 58}
+
+      right_head {
+        Font: {size: 22}
+        Text: {value: "Right"}
+        Rgb: {200, 165, 240}
+      }
+
+      right_body {
+        Font: {size: 15}
+        Layout: {width: 264}
+        Text: {value: "A right aligned paragraph puts every line against the right edge of the box it was given.",
+               align: Right}
+        Rgb: {225, 210, 240}
+      }
+    }
+  }
+
+  sizes {
+    Layout: {direction: Row, width: 888, height: 56, padding: 8,
+             spacing: 14, h: Center, v: Middle}
+    Border: {radius: 12}
+    Rgb: {38, 44, 60}
+
+    size_small {
+      Font: {size: 12}
+      Text: {value: "12 px"}
+      Rgb: {190, 205, 240}
+    }
+    size_medium {
+      Font: {size: 20}
+      Text: {value: "20 px"}
+      Rgb: {190, 205, 240}
+    }
+    size_large {
+      Font: {size: 30}
+      Text: {value: "30 px"}
+      Rgb: {190, 205, 240}
+    }
+    size_huge {
+      Font: {size: 40}
+      Text: {value: "40 px"}
+      Rgb: {190, 205, 240}
+    }
+  }
+
+  buttons {
+    Layout: {direction: Row, width: 888, height: 48, padding: 6,
+             spacing: 10, h: Right, v: Middle}
+
+    note {
+      Anchor: {h: Left, v: Middle, x: 10}
+      Font: {size: 14}
+      Text: {value: "newline\nin one element"}
+      Rgb: {120, 140, 190}
+    }
+
+    cancel {
+      Layout: {direction: Row, width: 120, height: 34,
+               padding: 8, h: Center, v: Middle}
+      Border: {radius: 17}
+      Rgb: {84, 96, 128}
+
+      cancel_label {
+        Font: {size: 16}
+        Text: {value: "Cancel"}
+        Rgb: {235, 240, 255}
+      }
+    }
+
+    ok {
+      Layout: {direction: Row, width: 120, height: 34,
+               padding: 8, h: Center, v: Middle}
+      Border: {radius: 17}
+      Rgb: {110, 160, 235}
+
+      ok_label {
+        Font: {size: 16}
+        Text: {value: "Save"}
+        Rgb: {16, 24, 40}
+      }
+    }
+  }
+}
