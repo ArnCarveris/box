@@ -8,6 +8,7 @@
 #include "../sky/sky_internal.h"
 #include "../surface/surface_internal.h"
 #include "../job/job_internal.h"
+#include "../collision/collision_internal.h"
 
 bool box_render_is_dynamic(
     ecs_world_t *world,
@@ -255,6 +256,7 @@ void box_render_extract(
     box_render_extract_groups(state, p);
     box_render_extract_views(world, state, p, capture);
     box_sky_extract(world, p);
+    box_collision_debug_extract(world, p);
     const box_view_t *v = p->views.count ? box_vec_at(&p->views, 0) : NULL;
     if (v && ecs_lookup(world, "box.job.JobSettings")) {
         box_job_set_eye(world, vec3_new(v->eye[0], v->eye[1], v->eye[2]));

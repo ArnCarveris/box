@@ -12,6 +12,7 @@
 
 #include <box.h>
 #include "../transform/transform_internal.h"
+#include "../renderer/packet.h"
 
 /** The bounds of the root must be aggregated from its subtree again */
 #define BOX_ROOT_FULL (1)
@@ -99,6 +100,7 @@ typedef struct box_collision_state_t {
     ecs_vec_t resolve;   /**< Entities a flush took off the collider map */
     ecs_vec_t instances; /**< Instances that still need a RootBounds */
     box_index_t index;   /**< The spatial index of the world */
+    ecs_vec_t debug_hits; /**< ecs_entity_t the debug drawing collected, reused per frame */
     bool shapes;         /**< The shape observers of box.geometry exist */
 } box_collision_state_t;
 
@@ -382,5 +384,19 @@ void box_index_unset(
 void box_index_movers(
     ecs_world_t *world,
     box_collision_state_t *state);
+
+/** Turn the colliders and the root bounds a view sees into packet lines.
+ *
+ * The extract of a frame calls this once its views are known. A world without
+ * the module, a packet without a view and a CollisionDebugNone setting all
+ * return before anything is walked, so the drawing costs a frame nothing while
+ * it is off.
+ *
+ * @param world The world of the extract, which may be a stage
+ * @param p The packet of the frame
+ */
+void box_collision_debug_extract(
+    ecs_world_t *world,
+    box_packet_t *p);
 
 #endif

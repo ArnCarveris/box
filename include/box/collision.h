@@ -13,6 +13,10 @@
  * instance scale applied. The shape tests take a resolved collider, so picking,
  * controller collision and LOD all test the same geometry.
  *
+ * With CollisionSettings.debug the extract of a frame turns the colliders and
+ * the root bounds a view can see into a list of line segments the renderer
+ * draws over the image, which is how a scene shows what it collides with.
+ *
  * The same pass keeps a two level spatial index: a hierarchy over the bounds of
  * every root and over the colliders that are not below one, with the colliders
  * a root covers as its second level, next to a hierarchy of the entities that
@@ -97,11 +101,20 @@ ECS_STRUCT(Collider, {
 /** The entity gets no collider, whatever shape it has */
 extern ECS_TAG_DECLARE(NoCollider);
 
+/** What the debug drawing of the module adds to the image of a view */
+ECS_ENUM(CollisionDebug, {
+    DebugNone = 0,      /**< Nothing is drawn, which costs a frame nothing */
+    DebugColliders = 1, /**< Wireframe of every collider in view */
+    DebugBounds = 2,    /**< Box of the bounds of every root in view */
+    DebugAll = 3        /**< Both the colliders and the root bounds */
+});
+
 /** Settings of the spatial index, read by every update */
 ECS_STRUCT(CollisionSettings, {
-    float margin;  /**< Slack around a leaf, so a small move keeps its place */
-    bool dynamic;  /**< Index the entities that move every frame */
-    bool enabled;  /**< False empties the index and leaves every query without hits */
+    float margin;         /**< Slack around a leaf, so a small move keeps its place */
+    bool dynamic;         /**< Index the entities that move every frame */
+    bool enabled;         /**< False empties the index and leaves every query without hits */
+    CollisionDebug debug; /**< Wireframes the extract of a frame draws */
 });
 
 /** Planes of a frustum query */

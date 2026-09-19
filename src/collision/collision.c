@@ -41,6 +41,7 @@ box_collision_state_t* box_collision_state_new(void)
     ecs_vec_init_t(NULL, &state->pass, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->resolve, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->instances, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->debug_hits, ecs_entity_t, 0);
 
     return state;
 }
@@ -54,6 +55,7 @@ void box_collision_state_free(
     ecs_vec_fini_t(NULL, &state->pass, ecs_entity_t);
     ecs_vec_fini_t(NULL, &state->resolve, ecs_entity_t);
     ecs_vec_fini_t(NULL, &state->instances, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &state->debug_hits, ecs_entity_t);
     ecs_os_free(state);
 }
 
@@ -94,6 +96,7 @@ void BoxCollisionImport(
     ECS_META_COMPONENT(world, BoxCollider);
     ECS_META_COMPONENT(world, CapsuleCollider);
     ECS_META_COMPONENT(world, Collider);
+    ECS_META_COMPONENT(world, CollisionDebug);
     ECS_META_COMPONENT(world, CollisionSettings);
     ECS_TAG_DEFINE(world, NoCollider);
     ECS_COMPONENT_DEFINE(world, CollisionState);
@@ -114,7 +117,8 @@ void BoxCollisionImport(
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f,
         .dynamic = true,
-        .enabled = true
+        .enabled = true,
+        .debug = DebugNone
     });
 
     state->index.query = ecs_query(world, {
