@@ -27,28 +27,50 @@
 /** How fast the velocity follows the input when the controller does not say */
 #define BOX_PERSON_ACCEL (12.0f)
 
-/** Height the character stands at, which is the ground plus its eye height.
+/** Radius of the capsule when the controller does not say */
+#define BOX_PERSON_RADIUS (0.35f)
+
+/** Highest ledge the character steps onto when the controller does not say */
+#define BOX_PERSON_STEP (0.45f)
+
+/** How far below its foot the character looks for the ground */
+#define BOX_PERSON_PROBE (0.15f)
+
+/** Height of the eye of a character, which crouching lowers.
  *
  * @param world The world
  * @param actions The actions of the module
  * @param fp The controller
- * @return The height of the eye when the character stands on the ground
+ * @return The height of the eye above the foot
  */
-static float box_person_stand(
+static float box_person_eye(
     ecs_world_t *world,
     const ControllerActions *actions,
     const FirstPersonController *fp)
 {
-    const AABB *bounds = fp->terrain && ecs_is_alive(world, fp->terrain)
-        ? ecs_get(world, fp->terrain, AABB)
-        : NULL;
-    float ground = bounds ? bounds->max.y : fp->ground;
     float eye = box_controller_value(fp->eye, BOX_PERSON_EYE);
     if (box_controller_held(world, actions->crouch)) {
         eye = box_controller_value(fp->crouch, BOX_PERSON_CROUCH);
     }
 
-    return ground + eye;
+    return eye;
+}
+
+/** Height of the floor the character falls back on without scene geometry.
+ *
+ * @param world The world
+ * @param fp The controller
+ * @return The height the foot of the character rests at
+ */
+static float box_person_floor(
+    ecs_world_t *world,
+    const FirstPersonController *fp)
+{
+    const AABB *bounds = fp->terrain && ecs_is_alive(world, fp->terrain)
+        ? ecs_get(world, fp->terrain, AABB)
+        : NULL;
+
+    return bounds ? bounds->max.y : fp->ground;
 }
 
 /** Toggle free flight when the Fly action was pressed this frame.
@@ -105,19 +127,17 @@ static void box_person_walk(
         box_controller_value(fp->acceleration, BOX_PERSON_ACCEL), dt);
 }
 
-/** Apply gravity, the jump and the ground to a walking character.
+/** Apply the jump of the frame and the gravity of a character in the air.
  *
  * @param world The world
  * @param actions The actions of the module
  * @param fp The controller, its velocity and grounded flag are written
- * @param p The position, written
  * @param dt Seconds the frame took
  */
-static void box_person_ground(
+static void box_person_gravity(
     ecs_world_t *world,
     const ControllerActions *actions,
     FirstPersonController *fp,
-    Position *p,
     float dt)
 {
     const InputAction *jump = actions->jump
@@ -128,19 +148,9 @@ static void box_person_ground(
         fp->grounded = false;
     }
 
-    float stand = box_person_stand(world, actions, fp);
-    if (fp->grounded) {
-        p->y = stand;
-        fp->velocity.y = 0;
-    } else {
+    if (!fp->grounded) {
         fp->velocity.y -=
             box_controller_value(fp->gravity, BOX_PERSON_GRAVITY) * dt;
-        p->y += fp->velocity.y * dt;
-        if (p->y <= stand) {
-            p->y = stand;
-            fp->velocity.y = 0;
-            fp->grounded = true;
-        }
     }
 }
 
@@ -169,6 +179,58 @@ static void box_person_fly(
         box_controller_value(fp->acceleration, BOX_PERSON_ACCEL), dt);
 }
 
+/** Move a character through the scene and put its eye where it ended up.
+ *
+ * @param world The world
+ * @param actions The actions of the module
+ * @param fp The controller, its grounded flag and fall are written
+ * @param e The entity of the character
+ * @param p The position of the eye, written
+ * @param dt Seconds the frame took
+ */
+static void box_person_step(
+    ecs_world_t *world,
+    const ControllerActions *actions,
+    FirstPersonController *fp,
+    ecs_entity_t e,
+    Position *p,
+    float dt)
+{
+    float eye = box_person_eye(world, actions, fp);
+    float step = box_controller_value(fp->step, BOX_PERSON_STEP);
+    bool stood = fp->grounded && !fp->flying;
+    vec3 foot = vec3_new(p->x, stood ? fp->foot : p->y - eye, p->z);
+    box_controller_body_t body = {
+        .entity = e,
+        .radius = box_controller_value(fp->radius, BOX_PERSON_RADIUS),
+        .height = eye,
+        .step = fp->flying ? 0 : step,
+        .probe = fp->flying ? 0 : (stood ? step : BOX_PERSON_PROBE),
+        .enabled = !fp->no_collision
+    };
+
+    bool grounded = box_controller_move(world, &body, &foot, &fp->velocity, dt);
+    if (!fp->flying) {
+        float floor = box_person_floor(world, fp);
+        bool near = stood && foot.y - floor <= BOX_PERSON_PROBE;
+        if (foot.y < floor || (!grounded && near)) {
+            foot.y = floor;
+            grounded = true;
+        }
+
+        if (grounded && fp->velocity.y < 0) {
+            fp->velocity.y = 0;
+        }
+
+        fp->grounded = grounded;
+    }
+
+    fp->foot = foot.y;
+    p->x = foot.x;
+    p->y = foot.y + eye;
+    p->z = foot.z;
+}
+
 void BoxFirstPersonUpdate(
     ecs_iter_t *it)
 {
@@ -187,14 +249,13 @@ void BoxFirstPersonUpdate(
         box_person_toggle(world, actions, &fp[i]);
         if (fp[i].flying) {
             box_person_fly(world, actions, &fp[i], dt);
-            p[i].y += fp[i].velocity.y * dt;
         } else {
             box_person_walk(world, actions, &fp[i], dt);
-            box_person_ground(world, actions, &fp[i], &p[i], dt);
+            box_person_gravity(world, actions, &fp[i], dt);
         }
 
-        p[i].x += fp[i].velocity.x * dt;
-        p[i].z += fp[i].velocity.z * dt;
+        box_person_step(
+            world, actions, &fp[i], it->entities[i], &p[i], dt);
         box_controller_pose(
             &p[i], &o[i], look ? &look[i] : NULL, fp[i].yaw, fp[i].pitch);
     }

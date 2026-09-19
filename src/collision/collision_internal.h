@@ -164,6 +164,28 @@ bool box_collider_resolve(
     ecs_entity_t e,
     Collider *out);
 
+/** Find the direction and the distance that separate a capsule from a collider.
+ *
+ * The segment of the capsule and the surface of the collider are brought
+ * together with the walk the distance tests use, and the normal points from the
+ * collider towards the capsule, which is the way out of it.
+ *
+ * @param c The collider
+ * @param a First end of the segment of the capsule in world space
+ * @param b Second end of the segment of the capsule in world space
+ * @param radius Radius of the capsule
+ * @param normal Receives the direction that separates the two
+ * @param depth Receives how far the capsule reaches into the collider
+ * @return true when the capsule overlaps the collider
+ */
+bool box_collider_push(
+    const Collider *c,
+    vec3 a,
+    vec3 b,
+    float radius,
+    vec3 *normal,
+    float *depth);
+
 /** Register the observers that recognise roots and mark them.
  *
  * @param world The world

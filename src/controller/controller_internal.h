@@ -56,6 +56,35 @@ bool box_controller_held(
     ecs_world_t *world,
     ecs_entity_t action);
 
+/** The capsule a controller asks the scene to move for it */
+typedef struct box_controller_body_t {
+    ecs_entity_t entity; /**< The controller, whose own collider the move ignores */
+    float radius;        /**< Radius of the capsule */
+    float height;        /**< Height of the capsule above its foot */
+    float step;          /**< Highest ledge it steps onto, 0 for none */
+    float probe;         /**< How far below the foot it looks for the ground */
+    bool enabled;        /**< False moves without touching the scene */
+} box_controller_body_t;
+
+/** Move the foot of a controller through the scene, sliding along what it hits.
+ *
+ * The velocity is only written when the move ran into something above it, so a
+ * jump into a ceiling stops rising; the caller owns the rest of the fall.
+ *
+ * @param world The world
+ * @param body The capsule of the controller
+ * @param foot Foot of the capsule, written in place
+ * @param velocity Velocity of the controller, written when it hit a ceiling
+ * @param dt Seconds the frame took
+ * @return true when the move found ground under the foot
+ */
+bool box_controller_move(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    vec3 *foot,
+    vec3 *velocity,
+    float dt);
+
 /** Keep an entity above the bounds of a terrain entity.
  *
  * @param world The world

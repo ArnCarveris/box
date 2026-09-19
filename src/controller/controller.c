@@ -15,6 +15,7 @@ void BoxControllerImport(
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxSurface);
     ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, BoxCollision);
 
     ECS_META_COMPONENT(world, CameraController);
     ECS_META_COMPONENT(world, FirstPersonController);

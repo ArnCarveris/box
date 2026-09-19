@@ -24,8 +24,10 @@ extern "C" {
 /** Fly controller of a camera, driven by the Forward to Down and Fast actions.
  *
  * The system writes Position and Orientation every frame, and LookAt when the
- * entity has one. Pitch and yaw follow the Orientation convention, so a positive
- * pitch looks down, and a member that is zero or less takes its default.
+ * entity has one. A sphere of the radius slides along the colliders of the
+ * scene, which keeps the camera out of geometry, and the terrain entity is the
+ * floor it falls back on. Pitch and yaw follow the Orientation convention, so a
+ * positive pitch looks down, and a member that is zero or less takes its default.
  */
 ECS_STRUCT(CameraController, {
     float speed;          /**< Units per second at full throttle, 10 by default */
@@ -34,6 +36,8 @@ ECS_STRUCT(CameraController, {
     float sensitivity;    /**< Radians turned per point of cursor movement */
     ecs_entity_t terrain; /**< Entity the camera stays above, 0 for none */
     float clearance;      /**< Units kept above the bounds of the terrain */
+    float radius;         /**< Radius it keeps free of scene geometry, 0.5 by default */
+    bool no_collision;    /**< Fly through the scene instead of colliding with it */
     float yaw;            /**< Yaw in radians, written every frame */
     float pitch;          /**< Pitch in radians, written every frame */
     vec3 velocity;        /**< Velocity in units per second, written every frame */
@@ -43,9 +47,11 @@ ECS_STRUCT(CameraController, {
  *
  * The controller walks in the XZ plane at the walk or the run speed, falls with
  * gravity, jumps from the ground and lowers its eye while Crouch is held. The Fly
- * action toggles free flight, which moves like the camera controller. The ground
- * is the top of the bounds of the terrain entity, or the ground height when there
- * is none, and a member that is zero or less takes its default.
+ * action toggles free flight, which moves like the camera controller. A capsule
+ * of the eye height slides along the colliders of the scene, steps onto ledges
+ * of at most the step height and finds the ground with a probe below its foot;
+ * the terrain entity, or the ground height when there is none, is the floor it
+ * falls back on. A member that is zero or less takes its default.
  */
 ECS_STRUCT(FirstPersonController, {
     float walk;           /**< Units per second while walking, 4 by default */
@@ -58,9 +64,13 @@ ECS_STRUCT(FirstPersonController, {
     float sensitivity;    /**< Radians turned per point of cursor movement */
     ecs_entity_t terrain; /**< Entity whose bounds are the ground, 0 for the height */
     float ground;         /**< Height of the ground without a terrain entity */
+    float radius;         /**< Radius of the capsule it walks with, 0.35 by default */
+    float step;           /**< Highest ledge it steps onto, 0.45 by default */
+    bool no_collision;    /**< Walk through the scene instead of colliding with it */
     float yaw;            /**< Yaw in radians, written every frame */
     float pitch;          /**< Pitch in radians, written every frame */
     vec3 velocity;        /**< Velocity in units per second, written every frame */
+    float foot;           /**< Height the foot stands at, written every frame */
     bool grounded;        /**< The character stands on the ground */
     bool flying;          /**< Free flight, toggled by the Fly action */
 });

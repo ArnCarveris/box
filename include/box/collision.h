@@ -228,6 +228,49 @@ int32_t box_collision_frustum(
     const box_frustum_planes_t *frustum,
     ecs_vec_t *out);
 
+/** A capsule move a controller asks the scene to resolve.
+ *
+ * The capsule stands on its foot: its lower cap sits a radius above the
+ * position and its upper cap a radius below the top of its height, so a height
+ * of twice the radius is a sphere around the middle.
+ */
+typedef struct box_move_desc_t {
+    vec3 position;     /**< Foot of the capsule at the start of the move */
+    vec3 motion;       /**< What the move would be without the scene */
+    float radius;      /**< Radius of the capsule, zero moves through anything */
+    float height;      /**< Height of the capsule above its foot */
+    float step;        /**< Highest ledge the capsule steps onto, zero for none */
+    float probe;       /**< How far below the foot the ground probe reaches */
+    ecs_entity_t skip; /**< Entity the move ignores, which is its own collider */
+} box_move_desc_t;
+
+/** What a capsule move ended up as */
+typedef struct box_move_result_t {
+    vec3 position;       /**< Foot of the capsule after the move */
+    vec3 motion;         /**< The move the capsule made, which a wall shortens */
+    ecs_entity_t ground; /**< What the capsule stands on, 0 when it stands on nothing */
+    float ground_y;      /**< Height of the ground the probe found */
+    bool grounded;       /**< The probe found ground under the foot */
+    bool blocked;        /**< The capsule was pushed out of something */
+} box_move_result_t;
+
+/** Move a capsule through the scene, sliding along what it runs into.
+ *
+ * The move reads the colliders of the cells the capsule can reach this frame
+ * from the index once, walks its motion in small steps and pushes the capsule
+ * out of what it reaches into after every one, which is what slides it along a
+ * wall. A move a wall stopped is tried again over a ledge of at most the step
+ * height, and the ground probe is a ray down the same colliders.
+ *
+ * @param world The world
+ * @param desc The move
+ * @param out Receives what the move ended up as
+ */
+void box_collision_move(
+    const ecs_world_t *world,
+    const box_move_desc_t *desc,
+    box_move_result_t *out);
+
 /** Bring the colliders, the root bounds and the index up to date.
  *
  * The engine runs this in OnStore, so a query reads what the last frame left

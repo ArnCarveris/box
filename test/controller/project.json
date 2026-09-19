@@ -27,7 +27,9 @@
                     "yaw_turns_the_movement_with_the_view",
                     "clearance_keeps_the_camera_above_the_terrain",
                     "a_scene_rebinds_an_action",
-                    "the_controller_writes_orientation_and_lookat"
+                    "the_controller_writes_orientation_and_lookat",
+                    "collision_keeps_the_camera_out_of_geometry",
+                    "disabling_collision_flies_through_geometry"
                 ],
                 "setup": true,
                 "teardown": true
@@ -46,7 +48,13 @@
                     "the_fly_toggle_switches_to_free_flight",
                     "the_terrain_sets_the_ground",
                     "the_ground_height_holds_the_character",
-                    "the_controller_writes_orientation_and_lookat"
+                    "the_controller_writes_orientation_and_lookat",
+                    "a_wall_stops_the_character",
+                    "walking_into_a_wall_slides_along_it",
+                    "a_step_up_climbs_a_small_ledge",
+                    "standing_on_geometry_holds_the_character",
+                    "falling_off_geometry_lands_on_the_ground",
+                    "disabling_collision_walks_through_geometry"
                 ],
                 "setup": true,
                 "teardown": true

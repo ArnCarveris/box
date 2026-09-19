@@ -15,6 +15,9 @@
 /** How fast the velocity follows the input when the controller does not say */
 #define BOX_CAMERA_ACCEL (8.0f)
 
+/** Radius the camera keeps free of geometry when the controller does not say */
+#define BOX_CAMERA_RADIUS (0.5f)
+
 /** Move the velocity of a controller towards what its actions ask for.
  *
  * @param world The world
@@ -44,6 +47,36 @@ static void box_camera_move(
         box_controller_value(cc->acceleration, BOX_CAMERA_ACCEL), dt);
 }
 
+/** Move a camera through the scene, sliding along the geometry it runs into.
+ *
+ * @param world The world
+ * @param cc The controller, its fall is stopped by a ceiling
+ * @param e The entity of the camera
+ * @param p The position, written
+ * @param dt Seconds the frame took
+ */
+static void box_camera_travel(
+    ecs_world_t *world,
+    CameraController *cc,
+    ecs_entity_t e,
+    Position *p,
+    float dt)
+{
+    float radius = box_controller_value(cc->radius, BOX_CAMERA_RADIUS);
+    box_controller_body_t body = {
+        .entity = e,
+        .radius = radius,
+        .height = radius * 2.0f,
+        .enabled = !cc->no_collision
+    };
+
+    vec3 foot = vec3_new(p->x, p->y - radius, p->z);
+    box_controller_move(world, &body, &foot, &cc->velocity, dt);
+    p->x = foot.x;
+    p->y = foot.y + radius;
+    p->z = foot.z;
+}
+
 void BoxCameraControllerUpdate(
     ecs_iter_t *it)
 {
@@ -60,9 +93,7 @@ void BoxCameraControllerUpdate(
             box_controller_value(cc[i].sensitivity, BOX_CONTROLLER_SENSITIVITY),
             &cc[i].yaw, &cc[i].pitch);
         box_camera_move(world, actions, &cc[i], dt);
-        p[i].x += cc[i].velocity.x * dt;
-        p[i].y += cc[i].velocity.y * dt;
-        p[i].z += cc[i].velocity.z * dt;
+        box_camera_travel(world, &cc[i], it->entities[i], &p[i], dt);
         box_controller_clearance(
             world, cc[i].terrain, cc[i].clearance, &p[i], &cc[i].velocity);
         box_controller_pose(

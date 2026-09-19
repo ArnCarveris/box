@@ -410,3 +410,119 @@ void box_collider_bounds(
     min[0] = vec3_sub(c->center, span);
     max[0] = vec3_add(c->center, span);
 }
+
+/** Find the way out of a collider for a point that is inside it.
+ *
+ * A round collider pushes the point away from its center or its axis, and a box
+ * pushes it through the face it is nearest to, which is the shortest way out.
+ *
+ * @param c The collider
+ * @param p The point in the frame of the collider
+ * @param gap Receives the distance between the point and the surface
+ * @return The way out in the frame of the collider
+ */
+static vec3 box_shape_inside(
+    const Collider *c,
+    vec3 p,
+    float *gap)
+{
+    vec3 result = vec3_new(0, 1, 0);
+    gap[0] = 0;
+    if (c->kind == ColliderSphere) {
+        goto done;
+    }
+
+    if (c->kind == ColliderCapsule) {
+        result = vec3_new(1, 0, 0);
+        goto done;
+    }
+
+    const float *pd = &p.x;
+    const float *hd = &c->half.x;
+    int32_t axis, best = 0;
+    for (axis = 0; axis < 3; axis ++) {
+        float left = hd[axis] - fabsf(pd[axis]);
+        if (axis == 0 || left < gap[0]) {
+            gap[0] = left;
+            best = axis;
+        }
+    }
+
+    float sign = pd[best] < 0 ? -1.0f : 1.0f;
+    result = vec3_new(best == 0 ? sign : 0, best == 1 ? sign : 0,
+        best == 2 ? sign : 0);
+done:
+    return result;
+}
+
+/** Move a direction of the frame of a collider back into world space.
+ *
+ * @param c The collider
+ * @param d The direction in the frame of the collider
+ * @return The direction in world space
+ */
+static vec3 box_shape_to_world(
+    const Collider *c,
+    vec3 d)
+{
+    vec3 result = vec3_scale(c->axis_x, d.x);
+    result = vec3_add(result, vec3_scale(c->axis_y, d.y));
+
+    return vec3_add(result, vec3_scale(c->axis_z, d.z));
+}
+
+bool box_collider_push(
+    const Collider *c,
+    vec3 a,
+    vec3 b,
+    float radius,
+    vec3 *normal,
+    float *depth)
+{
+    bool result = false;
+    if (c->kind == ColliderNone) {
+        goto done;
+    }
+
+    vec3 p0 = box_shape_to_local(c, a);
+    vec3 p1 = box_shape_to_local(c, b);
+    vec3 q = vec3_new(0, 0, 0);
+    vec3 p = box_shape_on_segment(p0, p1, q);
+    float reach = radius;
+    int32_t i;
+    if (c->kind == ColliderSphere) {
+        reach += c->half.x;
+    } else if (c->kind == ColliderCapsule) {
+        vec3 s0, s1;
+        box_shape_capsule_segment(c, &s0, &s1);
+        for (i = 0; i < BOX_SHAPE_STEPS; i ++) {
+            q = box_shape_on_segment(s0, s1, p);
+            p = box_shape_on_segment(p0, p1, q);
+        }
+
+        reach += c->half.x;
+    } else {
+        for (i = 0; i < BOX_SHAPE_STEPS; i ++) {
+            q = box_shape_clamp(p, c->half);
+            p = box_shape_on_segment(p0, p1, q);
+        }
+
+        q = box_shape_clamp(p, c->half);
+    }
+
+    vec3 d = vec3_sub(p, q);
+    float dist = vec3_length(d);
+    if (dist >= reach) {
+        goto done;
+    }
+
+    float gap = 0;
+    vec3 n = dist > 1e-5f
+        ? vec3_scale(d, 1.0f / dist)
+        : box_shape_inside(c, p, &gap);
+    normal[0] = box_shape_to_world(c, n);
+    depth[0] = reach - dist + gap;
+    result = true;
+done:
+    return result;
+}

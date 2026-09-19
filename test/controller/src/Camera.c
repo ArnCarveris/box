@@ -309,3 +309,38 @@ void Camera_the_controller_writes_orientation_and_lookat(void)
     test_assert(look->z < 0.01f);
     test_flt(ecs_get(w, camera, Orientation)->yaw, 1.5707963f);
 }
+
+void Camera_collision_keeps_the_camera_out_of_geometry(void)
+{
+    // collision/controller_collision
+    ecs_entity_t block = ecs_entity(w, { .name = "block" });
+    ecs_set(w, block, AABB, { .min = {-5, -5, 3}, .max = {5, 5, 4} });
+    box_collision_update(w);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, 1.0f / 60);
+    }
+
+    const Position *p = ecs_get(w, camera, Position);
+    test_assert(p->z > 2.3f);
+    test_assert(p->z < 2.6f);
+}
+
+void Camera_disabling_collision_flies_through_geometry(void)
+{
+    // collision/controller_collision
+    ecs_entity_t block = ecs_entity(w, { .name = "block" });
+    ecs_set(w, block, AABB, { .min = {-5, -5, 3}, .max = {5, 5, 4} });
+    ecs_get_mut(w, camera, CameraController)->no_collision = true;
+    box_collision_update(w);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, 1.0f / 60);
+    }
+
+    test_assert(ecs_get(w, camera, Position)->z > 4.0f);
+}

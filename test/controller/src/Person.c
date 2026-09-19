@@ -252,3 +252,125 @@ void Person_the_controller_writes_orientation_and_lookat(void)
     test_flt(look->y, 1.7f);
     test_assert(look->z < 0.01f);
 }
+
+void Person_a_wall_stops_the_character(void)
+{
+    // collision/controller_collision
+    ecs_entity_t wall = ecs_entity(w, { .name = "wall" });
+    ecs_set(w, wall, AABB, { .min = {-10, 0, 2}, .max = {10, 3, 2.5f} });
+    box_collision_update(w);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->z > 1.5f);
+    test_assert(p->z < 1.7f);
+    test_flt(p->y, 1.7f);
+    test_bool(ecs_get(w, person, FirstPersonController)->grounded, true);
+}
+
+void Person_walking_into_a_wall_slides_along_it(void)
+{
+    // collision/controller_collision
+    ecs_entity_t wall = ecs_entity(w, { .name = "wall" });
+    ecs_set(w, wall, AABB, { .min = {-10, 0, 2}, .max = {10, 3, 2.5f} });
+    box_collision_update(w);
+
+    ecs_get_mut(w, person, FirstPersonController)->yaw = 0.7853982f;
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->z < 1.7f);
+    test_assert(p->x > 1.5f);
+    test_flt(p->y, 1.7f);
+}
+
+void Person_a_step_up_climbs_a_small_ledge(void)
+{
+    // collision/controller_collision
+    ecs_entity_t ledge = ecs_entity(w, { .name = "ledge" });
+    ecs_set(w, ledge, AABB, { .min = {-5, 0, 1}, .max = {5, 0.3f, 6} });
+    box_collision_update(w);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->z > 2.0f);
+    test_assert(p->y > 1.95f);
+    test_assert(p->y < 2.05f);
+    test_bool(ecs_get(w, person, FirstPersonController)->grounded, true);
+}
+
+void Person_standing_on_geometry_holds_the_character(void)
+{
+    // collision/controller_collision
+    ecs_entity_t platform = ecs_entity(w, { .name = "platform" });
+    ecs_set(w, platform, AABB, { .min = {-2, 0, -2}, .max = {2, 2, 2} });
+    ecs_set(w, person, Position, {0, 6, 0});
+    box_collision_update(w);
+
+    int32_t i;
+    for (i = 0; i < 120; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->y > 3.65f);
+    test_assert(p->y < 3.75f);
+    test_bool(ecs_get(w, person, FirstPersonController)->grounded, true);
+    test_flt(ecs_get(w, person, FirstPersonController)->velocity.y, 0);
+}
+
+void Person_falling_off_geometry_lands_on_the_ground(void)
+{
+    // collision/controller_collision
+    ecs_entity_t platform = ecs_entity(w, { .name = "platform" });
+    ecs_set(w, platform, AABB, { .min = {-2, 0, -2}, .max = {2, 2, 2} });
+    ecs_set(w, person, Position, {0, 3.7f, 0});
+    box_collision_update(w);
+
+    ecs_progress(w, STEP);
+    test_bool(ecs_get(w, person, FirstPersonController)->grounded, true);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 150; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->z > 2.5f);
+    test_flt(p->y, 1.7f);
+    test_bool(ecs_get(w, person, FirstPersonController)->grounded, true);
+}
+
+void Person_disabling_collision_walks_through_geometry(void)
+{
+    // collision/controller_collision
+    ecs_entity_t wall = ecs_entity(w, { .name = "wall" });
+    ecs_set(w, wall, AABB, { .min = {-10, 0, 2}, .max = {10, 3, 2.5f} });
+    ecs_get_mut(w, person, FirstPersonController)->no_collision = true;
+    box_collision_update(w);
+
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        ecs_progress(w, STEP);
+    }
+
+    const Position *p = ecs_get(w, person, Position);
+    test_assert(p->z > 2.5f);
+    test_flt(p->y, 1.7f);
+}
