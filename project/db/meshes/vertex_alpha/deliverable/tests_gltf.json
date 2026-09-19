@@ -1,0 +1,21 @@
+{
+  "project": "gltf",
+  "timestamp": "2026-09-19T04:40:35Z",
+  "pass": 10,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.079934,
+  "tests": [
+    {"suite": "Mesh", "case": "primitive_gets_a_render_mesh", "status": "pass", "elapsed": 0.047478},
+    {"suite": "Mesh", "case": "mesh_is_uploaded", "status": "pass", "elapsed": 0.048488},
+    {"suite": "Mesh", "case": "positions_are_mirrored_in_z", "status": "pass", "elapsed": 0.047585},
+    {"suite": "Mesh", "case": "winding_survives_the_mirror", "status": "pass", "elapsed": 0.047974},
+    {"suite": "Mesh", "case": "normals_are_mirrored_in_z", "status": "pass", "elapsed": 0.048352},
+    {"suite": "Mesh", "case": "uv_v_is_flipped", "status": "pass", "elapsed": 0.048212},
+    {"suite": "Mesh", "case": "primitives_with_the_same_data_share_a_mesh", "status": "pass", "elapsed": 0.048338},
+    {"suite": "Mesh", "case": "unloading_frees_the_mesh", "status": "pass", "elapsed": 0.048321},
+    {"suite": "Mesh", "case": "vertex_colors_are_read", "status": "pass", "elapsed": 0.032158},
+    {"suite": "Mesh", "case": "vertex_colors_reach_the_upload", "status": "pass", "elapsed": 0.032252}
+  ]
+}

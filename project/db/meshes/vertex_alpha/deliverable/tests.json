@@ -1,0 +1,467 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-19T04:40:35Z",
+  "pass": 62,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.248946,
+  "tests": [
+    {
+      "suite": "Mesh3",
+      "case": "upload",
+      "status": "pass",
+      "elapsed": 0.024955,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "bounds",
+      "status": "pass",
+      "elapsed": 0.025403,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "derives_normals",
+      "status": "pass",
+      "elapsed": 0.025057,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "keeps_given_normals",
+      "status": "pass",
+      "elapsed": 0.025577,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "without_indices_draws_in_order",
+      "status": "pass",
+      "elapsed": 0.025219,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "uvs_default_to_zero",
+      "status": "pass",
+      "elapsed": 0.025352,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "shared_between_entities",
+      "status": "pass",
+      "elapsed": 0.025411,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "prefab_instances_share",
+      "status": "pass",
+      "elapsed": 0.025154,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "replacing_the_data_uploads_again",
+      "status": "pass",
+      "elapsed": 0.0259,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "freed_with_the_last_user",
+      "status": "pass",
+      "elapsed": 0.025793,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "removing_the_component_removes_the_mesh",
+      "status": "pass",
+      "elapsed": 0.025562,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_an_index_out_of_range",
+      "status": "pass",
+      "elapsed": 0.025828,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_partial_triangle",
+      "status": "pass",
+      "elapsed": 0.025897,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_normal_count_mismatch",
+      "status": "pass",
+      "elapsed": 0.025639,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_a_color_count_mismatch",
+      "status": "pass",
+      "elapsed": 0.025708,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "rejects_an_empty_mesh",
+      "status": "pass",
+      "elapsed": 0.025354,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_are_accepted_and_uploaded",
+      "status": "pass",
+      "elapsed": 0.024309,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "differing_colors_upload_separately",
+      "status": "pass",
+      "elapsed": 0.024286,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_are_uploaded",
+      "status": "pass",
+      "elapsed": 0.024375,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "colors_default_to_white",
+      "status": "pass",
+      "elapsed": 0.024091,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh3",
+      "case": "alpha_of_128_halves_the_packed_alpha",
+      "status": "pass",
+      "elapsed": 0.024005,
+      "project": "geometry"
+    },
+    {
+      "suite": "Mesh",
+      "case": "primitive_gets_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.047478,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "mesh_is_uploaded",
+      "status": "pass",
+      "elapsed": 0.048488,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "positions_are_mirrored_in_z",
+      "status": "pass",
+      "elapsed": 0.047585,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "winding_survives_the_mirror",
+      "status": "pass",
+      "elapsed": 0.047974,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "normals_are_mirrored_in_z",
+      "status": "pass",
+      "elapsed": 0.048352,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "uv_v_is_flipped",
+      "status": "pass",
+      "elapsed": 0.048212,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "primitives_with_the_same_data_share_a_mesh",
+      "status": "pass",
+      "elapsed": 0.048338,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "unloading_frees_the_mesh",
+      "status": "pass",
+      "elapsed": 0.048321,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "vertex_colors_are_read",
+      "status": "pass",
+      "elapsed": 0.032158,
+      "project": "gltf"
+    },
+    {
+      "suite": "Mesh",
+      "case": "vertex_colors_reach_the_upload",
+      "status": "pass",
+      "elapsed": 0.032252,
+      "project": "gltf"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.024265,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.023842,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.022788,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.023661,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.022765,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.023874,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract",
+      "status": "pass",
+      "elapsed": 0.024379,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract_empty_batch",
+      "status": "pass",
+      "elapsed": 0.023632,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.024769,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.023537,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.02407,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.023215,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.023685,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.023687,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_written_in_the_delta",
+      "status": "pass",
+      "elapsed": 0.023883,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_cover_a_rotated_instance",
+      "status": "pass",
+      "elapsed": 0.023296,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.023851,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.02333,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.023205,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.023124,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.021314,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "parent_tree_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.023247,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_parent_node_children_dynamic",
+      "status": "pass",
+      "elapsed": 0.022626,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mixed_tree_only_dynamic_reuploaded",
+      "status": "pass",
+      "elapsed": 0.023126,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "reparent_between_storages_requeues_subtree",
+      "status": "pass",
+      "elapsed": 0.022284,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_parent_node_frees_slots",
+      "status": "pass",
+      "elapsed": 0.023247,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_color_is_the_composed_tint",
+      "status": "pass",
+      "elapsed": 0.023087,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "tinted_opaque_entity_stays_static",
+      "status": "pass",
+      "elapsed": 0.022799,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "primitive_vertices_are_white",
+      "status": "pass",
+      "elapsed": 0.02263,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_color_is_kept_beside_the_instance_color",
+      "status": "pass",
+      "elapsed": 0.021951,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_alpha_reaches_the_upload",
+      "status": "pass",
+      "elapsed": 0.022405,
+      "project": "render"
+    }
+  ],
+  "projects": [
+    {
+      "project": "geometry",
+      "pass": 21,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.075349
+    },
+    {
+      "project": "gltf",
+      "pass": 10,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.079934
+    },
+    {
+      "project": "render",
+      "pass": 31,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.093663
+    }
+  ]
+}

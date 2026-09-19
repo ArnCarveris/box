@@ -1,0 +1,32 @@
+{
+  "project": "geometry",
+  "timestamp": "2026-09-19T04:40:35Z",
+  "pass": 21,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.075349,
+  "tests": [
+    {"suite": "Mesh3", "case": "upload", "status": "pass", "elapsed": 0.024955},
+    {"suite": "Mesh3", "case": "bounds", "status": "pass", "elapsed": 0.025403},
+    {"suite": "Mesh3", "case": "derives_normals", "status": "pass", "elapsed": 0.025057},
+    {"suite": "Mesh3", "case": "keeps_given_normals", "status": "pass", "elapsed": 0.025577},
+    {"suite": "Mesh3", "case": "without_indices_draws_in_order", "status": "pass", "elapsed": 0.025219},
+    {"suite": "Mesh3", "case": "uvs_default_to_zero", "status": "pass", "elapsed": 0.025352},
+    {"suite": "Mesh3", "case": "shared_between_entities", "status": "pass", "elapsed": 0.025411},
+    {"suite": "Mesh3", "case": "prefab_instances_share", "status": "pass", "elapsed": 0.025154},
+    {"suite": "Mesh3", "case": "replacing_the_data_uploads_again", "status": "pass", "elapsed": 0.025900},
+    {"suite": "Mesh3", "case": "freed_with_the_last_user", "status": "pass", "elapsed": 0.025793},
+    {"suite": "Mesh3", "case": "removing_the_component_removes_the_mesh", "status": "pass", "elapsed": 0.025562},
+    {"suite": "Mesh3", "case": "rejects_an_index_out_of_range", "status": "pass", "elapsed": 0.025828},
+    {"suite": "Mesh3", "case": "rejects_a_partial_triangle", "status": "pass", "elapsed": 0.025897},
+    {"suite": "Mesh3", "case": "rejects_a_normal_count_mismatch", "status": "pass", "elapsed": 0.025639},
+    {"suite": "Mesh3", "case": "rejects_a_color_count_mismatch", "status": "pass", "elapsed": 0.025708},
+    {"suite": "Mesh3", "case": "rejects_an_empty_mesh", "status": "pass", "elapsed": 0.025354},
+    {"suite": "Mesh3", "case": "colors_are_accepted_and_uploaded", "status": "pass", "elapsed": 0.024309},
+    {"suite": "Mesh3", "case": "differing_colors_upload_separately", "status": "pass", "elapsed": 0.024286},
+    {"suite": "Mesh3", "case": "colors_are_uploaded", "status": "pass", "elapsed": 0.024375},
+    {"suite": "Mesh3", "case": "colors_default_to_white", "status": "pass", "elapsed": 0.024091},
+    {"suite": "Mesh3", "case": "alpha_of_128_halves_the_packed_alpha", "status": "pass", "elapsed": 0.024005}
+  ]
+}
