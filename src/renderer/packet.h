@@ -58,6 +58,24 @@
 /** Screen heights a translucent surface bends the background sample it reads by */
 #define BOX_GLASS_REFRACT (0.03)
 
+/** Width of the transmittance table, one column per distance through the medium */
+#define BOX_SKY_TRANS_W (256)
+
+/** Height of the transmittance table, one row per altitude */
+#define BOX_SKY_TRANS_H (64)
+
+/** Width of the multiple scattering table, one column per sun elevation */
+#define BOX_SKY_MS_W (32)
+
+/** Height of the multiple scattering table, one row per altitude */
+#define BOX_SKY_MS_H (32)
+
+/** Width of the sky view table, one column per azimuth */
+#define BOX_SKY_VIEW_W (192)
+
+/** Height of the sky view table, one row per zenith angle */
+#define BOX_SKY_VIEW_H (108)
+
 /** Shader slot of the mesh pipelines, which the material layers compose */
 #define BOX_SHADER_MESH (0)
 
@@ -292,6 +310,34 @@ typedef struct box_bake_t {
     uint32_t steps;     /**< Ray march samples per visibility test */
 } box_bake_t;
 
+/** Atmosphere of the frame, the parameter block the sky shaders read
+ *
+ * The vectors hold the medium in the units the shaders integrate in: radii and
+ * scale heights in kilometers and the scattering and absorption coefficients
+ * per kilometer, so the renderer copies the block into its uniform and adds
+ * only what belongs to the view it is drawing.
+ */
+typedef struct box_sky_t {
+    float sun_dir[4];       /**< Direction toward the sun, w is the display encode flag */
+    float sun_color[4];     /**< Radiance of the sun over the medium, w the haze density */
+    float ground_albedo[4]; /**< Color the planet reflects, w unused */
+    float bounds[4];        /**< Planet radius, top radius, Rayleigh and Mie scale heights */
+    float scat_rayleigh[4]; /**< Rayleigh scattering per kilometer, w unused */
+    float scat_mie[4];      /**< Mie scattering per kilometer, w unused */
+    float ext_mie[4];       /**< Mie extinction per kilometer, w unused */
+    float abs_ozone[4];     /**< Ozone absorption per kilometer, w unused */
+    float abs_strat[4];     /**< Stratospheric aerosol absorption per kilometer, w unused */
+    float abs_haze[4];      /**< Grey haze absorption per kilometer, w unused */
+    float mie_params[4];    /**< Anisotropy, haze distance, disk cosine and disk radiance */
+    float world_scale[4];   /**< Units per kilometer, its inverse, sea level y, ground km */
+    float night[4];         /**< Radiance the sky keeps after sunset, w unused */
+    float turbulence[4];    /**< Warp amount, spatial scale, speed and the time of the frame */
+    uint32_t active;        /**< The world holds an atmosphere entity */
+    uint32_t lut_dirty;     /**< The transmittance and multiple scattering tables must rerun */
+    uint32_t view_dirty;    /**< The sky view table must rerun */
+    uint32_t generation;    /**< Rises every time the sky view table is rendered again */
+} box_sky_t;
+
 /** Froxel grid of a view, copied from the ClusterSettings singleton */
 typedef struct box_cluster_t {
     uint32_t x;           /**< Clusters across the view */
@@ -368,6 +414,8 @@ typedef struct box_view_t {
     uint32_t overlay_corner; /**< Corner of the view the panel is pinned to */
     float overlay_scale;    /**< Size multiplier of the panel, one for its natural size */
     float overlay_opacity;  /**< Opacity of the panel background, one for opaque */
+    uint32_t sky;           /**< The view draws the atmosphere behind its geometry */
+    uint32_t sky_env;       /**< Its environment is prefiltered from the atmosphere */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */
@@ -873,6 +921,9 @@ typedef struct box_packet_t {
     box_vec_t bake_lights;                   /**< box_light_t of every static light, unculled */
     box_vec_t emitters;                      /**< box_emitter_t of every static emissive instance */
     box_bake_t bake;                         /**< Settings of the baked lighting pass */
+    box_sky_t sky;                           /**< Atmosphere of the frame, inactive without one */
+    uint32_t sky_lut_shader;                 /**< Shader handle of the sky table passes */
+    uint32_t sky_shader;                     /**< Shader handle of the sky and haze pass */
 } box_packet_t;
 
 /** Initialize the vectors of a packet.
@@ -883,6 +934,8 @@ static inline void box_packet_init(
     box_packet_t *p)
 {
     memset(p, 0, sizeof(box_packet_t));
+    p->sky_lut_shader = BOX_SHADER_NONE;
+    p->sky_shader = BOX_SHADER_NONE;
     box_vec_init(&p->views, sizeof(box_view_t));
     box_vec_init(&p->target_create, sizeof(box_target_cmd_t));
     box_vec_init(&p->target_destroy, sizeof(uint32_t));
@@ -918,7 +971,10 @@ static inline void box_packet_reset(
     p->capture_path[0] = '\0';
     p->has_view = false;
     p->capture_view = BOX_VIEW_NONE;
+    p->sky_lut_shader = BOX_SHADER_NONE;
+    p->sky_shader = BOX_SHADER_NONE;
     memset(&p->view, 0, sizeof(box_view_t));
+    memset(&p->sky, 0, sizeof(box_sky_t));
     box_vec_clear(&p->views);
     box_vec_clear(&p->target_create);
     box_vec_clear(&p->target_destroy);

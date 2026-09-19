@@ -518,7 +518,17 @@ void box_environment_update(
         e->generation = view->env_generation;
         box_env_uniforms(r, slot, view);
         uint32_t base = slot * BOX_ENV_PASSES;
-        box_env_cube(encoder, e->source, r->env_gradient_pipeline, r->env_pass_group, 0, base);
+        if (box_sky_environment(r, view)) {
+            uint32_t face;
+            for (face = 0; face < BOX_ENV_FACES; face ++) {
+                WGPUTextureView target = box_env_face(e->source, face, 0);
+                box_sky_environment_face(r, encoder, target, base + face);
+                wgpuTextureViewRelease(target);
+            }
+        } else {
+            box_env_cube(encoder, e->source, r->env_gradient_pipeline,
+                r->env_pass_group, 0, base);
+        }
 
         uint32_t mip;
         for (mip = 0; mip < BOX_ENV_MIPS; mip ++) {

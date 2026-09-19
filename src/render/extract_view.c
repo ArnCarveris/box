@@ -8,6 +8,7 @@
 
 #include "render_internal.h"
 #include "../effects/effects_internal.h"
+#include "../sky/sky_internal.h"
 #include <stdlib.h>
 
 /** Degrees in one radian, the unit the camera field of view is given in */
@@ -428,6 +429,8 @@ static void box_view_environment(
     box_view_env_color(env.ground_color, v->env_ground);
     v->env_intensity = env.intensity;
     v->env_generation = box_view_env_generation(state, index, &env);
+    v->sky_env = env.source && ecs_is_alive(world, env.source) &&
+        ecs_has(world, env.source, Atmosphere) ? 1u : 0u;
 }
 
 /** Resolve the layers a view shows and the layers that cast its shadows.
@@ -575,8 +578,9 @@ static void box_view_fill(
     box_view_environment(world, state, src->entity, index, v);
     box_render_extract_lights(world, state, p, src->entity, v, index == 0);
     box_render_extract_transparent(world, state, p, v);
+    v->sky = box_sky_entity(world) ? 1u : 0u;
     box_effects_extract(world, src->entity, p, v);
-    if (v->effect_count) {
+    if (v->effect_count || v->sky) {
         box_view_motion(state, index, v);
     }
 

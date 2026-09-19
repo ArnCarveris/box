@@ -151,6 +151,8 @@ void box_shader_apply(
         } else {
             box_effect_invalidate(r, cmd->handle);
         }
+
+        box_sky_invalidate(r, cmd->handle);
     }
 }
 

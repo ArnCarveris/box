@@ -291,6 +291,7 @@ void box_device_fini(
     box_lights_fini(r);
     box_transparent_fini(r);
     box_environment_fini(r);
+    box_sky_fini(r);
     box_texture_fini(r);
     box_bake_fini(r);
     box_cull_fini(r);

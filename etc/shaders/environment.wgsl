@@ -1,6 +1,14 @@
 #include "include/env.wgsl"
 #include "include/env_sample.wgsl"
 
+// The environment of a view whose EnvironmentLight names an atmosphere is
+// filled from the sky view table instead of from the two colors, so the image
+// based lighting of the scene is the sky the frame draws.
+#define SKY_BINDING 3
+#define SKY_VIEW_BINDING 4
+#define SKY_SAMPLER_BINDING 5
+#include "include/sky.wgsl"
+
 @fragment fn fs_gradient(in: EnvOut) -> @location(0) vec4<f32> {
   let d = face_dir(u32(e.params.x), in.uv);
   let t = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
@@ -31,4 +39,8 @@
     }
   }
   return vec4(scale / f32(count), bias / f32(count), 0.0, 1.0);
+}
+
+@fragment fn fs_sky(in: EnvOut) -> @location(0) vec4<f32> {
+  return vec4(sky_view_radiance(face_dir(u32(e.params.x), in.uv)), 1.0);
 }

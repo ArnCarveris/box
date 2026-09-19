@@ -61,6 +61,11 @@ static void box_view_depth(
     r->v->depth = wgpuDeviceCreateTexture(r->device, &depth_desc);
     r->v->depth_view = wgpuTextureCreateView(r->v->depth, NULL);
     r->v->depth_sample = wgpuTextureCreateView(r->v->depth, NULL);
+    if (r->v->sky_group) {
+        wgpuBindGroupRelease(r->v->sky_group);
+        r->v->sky_group = NULL;
+    }
+
     box_hiz_resize(r->v);
 }
 
@@ -116,6 +121,7 @@ void box_view_release(
     box_cull_view_fini(v);
     box_hiz_view_fini(v);
     box_shadow_view_fini(v);
+    box_sky_view_release(v);
     box_vec_fini(&v->shadow_draws);
     box_vec_fini(&v->shadow_staging);
     box_vec_fini(&v->shadow_culls);

@@ -17,6 +17,7 @@
 #include "gtao.h"
 #include "hiz.h"
 #include "overlay.h"
+#include "sky.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -265,6 +266,9 @@ typedef struct box_gpu_view_t {
     bool hiz_active;                 /**< The frame recorded occlusion dispatches for the view */
     WGPUBuffer view_buffer;          /**< Uniform buffer holding the view */
     WGPUBindGroup view_group;        /**< Bind group with the view and layer uniforms */
+    WGPUBuffer sky_uniform;          /**< Atmosphere uniform of the view */
+    WGPUBindGroup sky_group;         /**< Bind group of the sky pass of the view */
+    uint32_t sky_epoch;              /**< Epoch of the tables that bind group was built for */
     WGPUBuffer lights;               /**< Light storage buffer of the view */
     uint32_t light_capacity;         /**< Lights the light buffer of the view can hold */
     WGPUBuffer clusters;             /**< Light offset and count per cluster of the view */
@@ -501,6 +505,7 @@ struct box_renderer_t {
     box_gpu_view_t *v;               /**< View the renderer is recording, never NULL in a pass */
     box_vec_t targets;               /**< box_gpu_target_t indexed by target handle */
     box_gpu_env_t envs[BOX_ENV_SLOTS]; /**< Prefiltered environments the views share */
+    box_sky_gpu_t sky;               /**< Tables and pipelines of the atmosphere */
     uint32_t env_clock;              /**< Counts the environments bound, to pick an entry */
     WGPUBuffer dynamics;             /**< Shared dynamic instance buffer */
     uint32_t dynamic_capacity;       /**< Instances the dynamic buffer can hold */
@@ -1579,6 +1584,90 @@ void box_environment_rebuild(
  * @param r The renderer
  */
 void box_environment_fini(
+    box_renderer_t *r);
+
+/** Create the sampler, uniform and layouts of the atmosphere.
+ *
+ * @param r The renderer
+ */
+void box_sky_init(
+    box_renderer_t *r);
+
+/** Write the uniform of a view and record the table passes that are out of date.
+ *
+ * The tables are shared, so only the first view of a frame that finds them
+ * behind the generation of the packet records them.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @param encoder The command encoder
+ */
+void box_sky_update(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder);
+
+/** Draw the sky and the aerial perspective of a view over what it rendered.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @param encoder The command encoder
+ * @param attachment The color target the view drew into
+ */
+void box_sky_record(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView attachment);
+
+/** Check whether the environment of a view comes from the atmosphere.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @return true when the sky view table fills its environment cubemap
+ */
+bool box_sky_environment(
+    box_renderer_t *r,
+    const box_view_t *view);
+
+/** Fill one face of an environment cubemap from the sky view table.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param target The face to fill
+ * @param index Index of the face in the environment uniform buffer
+ */
+void box_sky_environment_face(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView target,
+    uint32_t index);
+
+/** Drop the pipelines a shader handle of the atmosphere built.
+ *
+ * @param r The renderer
+ * @param handle The shader slot that changed
+ */
+void box_sky_invalidate(
+    box_renderer_t *r,
+    uint32_t handle);
+
+/** Release the uniform and bind group the atmosphere kept for a view.
+ *
+ * @param v The view
+ */
+void box_sky_view_release(
+    box_gpu_view_t *v);
+
+/** Release the tables, pipelines and bind groups of the atmosphere.
+ *
+ * @param r The renderer
+ */
+void box_sky_fini(
     box_renderer_t *r);
 
 /** Create the bake pipelines, their layouts and the probe bookkeeping.

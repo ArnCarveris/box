@@ -170,6 +170,7 @@ void box_frame_init(
     box_texture_init(r);
     box_transparent_init(r);
     box_environment_init(r);
+    box_sky_init(r);
     box_bake_init(r);
     box_cull_init(r);
     box_hiz_init(r);
@@ -620,6 +621,7 @@ static void box_frame_view(
     box_frame_write_view(r, view);
     box_cull_view(r, view, p);
     box_shadow_prepare(r, view, p);
+    box_sky_update(r, view, p, encoder);
     box_environment_update(r, view, encoder);
     box_lights_dispatch(r, view, encoder);
     box_cull_dispatch(r, encoder);
@@ -684,6 +686,7 @@ static void box_frame_view(
         box_frame_uncovered(r, encoder, attachment);
     }
 
+    box_sky_record(r, view, p, encoder, attachment);
     if (view->transparent_count) {
         box_frame_sorted(r, view, p, encoder, target, attachment);
     }
