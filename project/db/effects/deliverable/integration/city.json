@@ -1,0 +1,17 @@
+{
+  "scene": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/test/integration/bench/city.flecs",
+  "entities": 20001,
+  "static": 20001,
+  "dynamic": 0,
+  "churn": [1, 1000],
+  "frames": 300,
+  "mean_ms": 1.566,
+  "p50_ms": 1.531,
+  "p99_ms": 3.638,
+  "max_ms": 3.873,
+  "fps": 638.5,
+  "drawn": 2025,
+  "culled": 5307,
+  "occluded": 12669,
+  "shadow_static_rebuilds": 300
+}

@@ -1,0 +1,33 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-19T00:41:20Z",
+  "pass": 23,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.820558,
+  "tests": [
+    {"suite": "Cpu", "case": "absent_monitor_is_not_sampled", "status": "pass", "elapsed": 0.010465},
+    {"suite": "Cpu", "case": "sample_reports_the_cores", "status": "pass", "elapsed": 0.010458},
+    {"suite": "Cpu", "case": "busy_loop_raises_the_process_percent", "status": "pass", "elapsed": 0.382994},
+    {"suite": "Cpu", "case": "system_percent_stays_in_range", "status": "pass", "elapsed": 0.071407},
+    {"suite": "Cpu", "case": "short_window_follows_the_load", "status": "pass", "elapsed": 0.101296},
+    {"suite": "Cpu", "case": "long_window_lags_the_load", "status": "pass", "elapsed": 0.100985},
+    {"suite": "Cpu", "case": "removing_the_monitor_stops_sampling", "status": "pass", "elapsed": 0.131213},
+    {"suite": "Cpu", "case": "budget_sleep_is_published", "status": "pass", "elapsed": 0.725224},
+    {"suite": "Cpu", "case": "budget_slows_a_synthetic_load", "status": "pass", "elapsed": 0.809953},
+    {"suite": "Stats", "case": "setting_the_component_imports_the_addon", "status": "pass", "elapsed": 0.011161},
+    {"suite": "Stats", "case": "collects_after_the_period", "status": "pass", "elapsed": 0.011043},
+    {"suite": "Stats", "case": "period_holds_back_the_collection", "status": "pass", "elapsed": 0.011412},
+    {"suite": "Stats", "case": "entity_count_follows_the_world", "status": "pass", "elapsed": 0.011177},
+    {"suite": "Stats", "case": "frame_time_window_is_averaged", "status": "pass", "elapsed": 0.031615},
+    {"suite": "Stats", "case": "slowest_systems_are_listed", "status": "pass", "elapsed": 0.092588},
+    {"suite": "Stats", "case": "removing_the_component_stops_collection", "status": "pass", "elapsed": 0.011726},
+    {"suite": "Systems", "case": "off_by_default", "status": "pass", "elapsed": 0.008617},
+    {"suite": "Systems", "case": "disabled_monitor_collects_nothing", "status": "pass", "elapsed": 0.028830},
+    {"suite": "Systems", "case": "slow_system_is_attributed_to_itself", "status": "pass", "elapsed": 0.038713},
+    {"suite": "Systems", "case": "frame_total_covers_the_systems", "status": "pass", "elapsed": 0.050660},
+    {"suite": "Systems", "case": "phase_totals_are_kept_per_phase", "status": "pass", "elapsed": 0.051166},
+    {"suite": "Systems", "case": "disabling_stops_collection", "status": "pass", "elapsed": 0.048633},
+    {"suite": "Systems", "case": "removing_the_monitor_stops_measurement", "status": "pass", "elapsed": 0.048549}
+  ]
+}

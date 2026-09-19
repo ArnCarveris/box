@@ -1,0 +1,521 @@
+{
+  "kind": "visual",
+  "results": [
+    {
+      "scene": "test/integration/visual/auto_exposure.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/auto_exposure.png"
+    },
+    {
+      "scene": "test/integration/visual/back_faces.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/back_faces.png"
+    },
+    {
+      "scene": "test/integration/visual/baked_room.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/baked_room.png"
+    },
+    {
+      "scene": "test/integration/visual/blending.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/blending.png"
+    },
+    {
+      "scene": "test/integration/visual/bloom.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/bloom.png"
+    },
+    {
+      "scene": "test/integration/visual/culling.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/culling.png"
+    },
+    {
+      "scene": "test/integration/visual/dynamic_room.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/dynamic_room.png"
+    },
+    {
+      "scene": "test/integration/visual/effect_toggle.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 2,
+        "mean": 0.316,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/effect_toggle.png"
+    },
+    {
+      "scene": "test/integration/visual/first_person.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/first_person.png"
+    },
+    {
+      "scene": "test/integration/visual/glass_sweep.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/glass_sweep.png"
+    },
+    {
+      "scene": "test/integration/visual/gtao.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/gtao.png"
+    },
+    {
+      "scene": "test/integration/visual/gtao_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/gtao_off.png"
+    },
+    {
+      "scene": "test/integration/visual/height_fog.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 4,
+        "mean": 0.0837,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/height_fog.png"
+    },
+    {
+      "scene": "test/integration/visual/layers.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/layers.png"
+    },
+    {
+      "scene": "test/integration/visual/layers_views.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/layers_views.png"
+    },
+    {
+      "scene": "test/integration/visual/lights_city.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/lights_city.png"
+    },
+    {
+      "scene": "test/integration/visual/milk_glass.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/milk_glass.png"
+    },
+    {
+      "scene": "test/integration/visual/normal_bump.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/normal_bump.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/occlusion.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/occlusion_off.png"
+    },
+    {
+      "scene": "test/integration/visual/occlusion_sweep.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/occlusion_sweep.png"
+    },
+    {
+      "scene": "test/integration/visual/parent_tree.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/parent_tree.png"
+    },
+    {
+      "scene": "test/integration/visual/pbr_spheres.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/pbr_spheres.png"
+    },
+    {
+      "scene": "test/integration/visual/primitives.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/primitives.png"
+    },
+    {
+      "scene": "test/integration/visual/shader_macro.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/shader_macro.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/shadows.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows_dynamic.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/shadows_dynamic.png"
+    },
+    {
+      "scene": "test/integration/visual/shadows_low_sun.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/shadows_low_sun.png"
+    },
+    {
+      "scene": "test/integration/visual/showcase.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/showcase.png"
+    },
+    {
+      "scene": "test/integration/visual/showcase_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/showcase_off.png"
+    },
+    {
+      "scene": "test/integration/visual/ssr.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/ssr.png"
+    },
+    {
+      "scene": "test/integration/visual/ssr_off.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/ssr_off.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_clip.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_clip.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_filter.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 5,
+        "mean": 0.0002,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_filter.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_gradient.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 2,
+        "mean": 0.0001,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_gradient.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_icons.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 3,
+        "mean": 0.0003,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_icons.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_mask.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_mask.png"
+    },
+    {
+      "scene": "test/integration/visual/svg_text.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 7,
+        "mean": 0.0001,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/svg_text.png"
+    },
+    {
+      "scene": "test/integration/visual/textured.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/textured.png"
+    },
+    {
+      "scene": "test/integration/visual/tiling.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/tiling.png"
+    },
+    {
+      "scene": "test/integration/visual/tint.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/tint.png"
+    },
+    {
+      "scene": "test/integration/visual/tonemap.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/tonemap.png"
+    },
+    {
+      "scene": "test/integration/visual/two_views.flecs",
+      "status": "pass",
+      "baseline": {
+        "ok": true,
+        "max": 0,
+        "mean": 0.0,
+        "px": 0,
+        "status": "match"
+      },
+      "image": "project/db/effects/deliverable/integration/two_views.png"
+    }
+  ]
+}

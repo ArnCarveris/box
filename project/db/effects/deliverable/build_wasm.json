@@ -1,0 +1,1289 @@
+{
+  "tool": "bake3",
+  "tool_version": "1.0.0",
+  "timestamp": "2026-09-19T00:43:28Z",
+  "host": {"os": "Darwin", "arch": "arm64", "cpu_count": 16},
+  "cfg": "release",
+  "target": "em",
+  "environment": "next",
+  "git": {"sha": "d4f1c6a0613408f2e4edec194170fd2690973db8", "dirty": true, "branch": "main"},
+  "total_sec": 8.029013,
+  "ok": true,
+  "totals": {
+    "kind": {
+      "compile": 13.307542,
+      "link": 0.066845,
+      "bundle": 0.057842,
+      "discovery": 0.006355,
+      "generate": 0.000035,
+      "etc": 0.003490,
+      "other": 0.000000
+    },
+    "project": {
+      "box": {"total_sec": 1.826949, "compile_sec": 13.216337, "link_sec": 0.066845, "files": 112},
+      "box_app": {"total_sec": 6.195355, "compile_sec": 0.091205, "link_sec": 6.096544, "files": 1}
+    }
+  },
+  "steps": [
+    {
+      "name": "discovery",
+      "kind": "discovery",
+      "project": null,
+      "start_sec": 0.000006,
+      "duration_sec": 0.006360,
+      "ok": true,
+      "children": [
+        {
+          "name": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.000009,
+          "duration_sec": 0.006284,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "resolve dependencies",
+          "kind": "discovery",
+          "project": null,
+          "start_sec": 0.006293,
+          "duration_sec": 0.000071,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "flecs",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.006385,
+      "duration_sec": 0.057387,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "stb",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.063898,
+      "duration_sec": 0.000130,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "resvg",
+      "kind": "bundle",
+      "project": "box",
+      "start_sec": 0.064095,
+      "duration_sec": 0.000325,
+      "ok": true,
+      "children": []
+    },
+    {
+      "name": "box",
+      "kind": "project",
+      "project": "box",
+      "start_sec": 0.064539,
+      "duration_sec": 1.769107,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box",
+          "start_sec": 0.064545,
+          "duration_sec": 0.000029,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/renderer/hiz.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065573,
+          "duration_sec": 0.276314,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/hiz.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065594,
+          "duration_sec": 0.311212,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bloom.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065610,
+          "duration_sec": 0.268790,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/bloom.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/scene.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065620,
+          "duration_sec": 0.273761,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/scene.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065637,
+          "duration_sec": 0.270007,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065657,
+          "duration_sec": 0.263975,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/effect.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065737,
+          "duration_sec": 0.274017,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/effect.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.065761,
+          "duration_sec": 0.266568,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.329645,
+          "duration_sec": 0.184317,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/image.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.332372,
+          "duration_sec": 0.197568,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/image.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.334408,
+          "duration_sec": 0.100078,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/gtao.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.335652,
+          "duration_sec": 0.098615,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/gtao.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.339388,
+          "duration_sec": 0.103083,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/device.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.339762,
+          "duration_sec": 0.096676,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/device.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.341902,
+          "duration_sec": 0.097484,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/renderer.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.376817,
+          "duration_sec": 0.104527,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/renderer.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/frame.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.434278,
+          "duration_sec": 0.105505,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/frame.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/environment.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.434495,
+          "duration_sec": 0.104007,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/environment.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.436446,
+          "duration_sec": 0.094204,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.439394,
+          "duration_sec": 0.092656,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/exposure.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.442480,
+          "duration_sec": 0.091307,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/exposure.c.o",
+          "children": []
+        },
+        {
+          "name": "src/renderer/cull.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.481355,
+          "duration_sec": 0.139991,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/renderer/cull.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/monitor.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.513974,
+          "duration_sec": 0.103861,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/monitor/monitor.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/stats.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.529955,
+          "duration_sec": 0.098370,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/monitor/stats.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/cpu_sample.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.530668,
+          "duration_sec": 0.092595,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/monitor/cpu_sample.c.o",
+          "children": []
+        },
+        {
+          "name": "src/monitor/systems.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.532056,
+          "duration_sec": 0.097733,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/monitor/systems.c.o",
+          "children": []
+        },
+        {
+          "name": "src/types/types.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.533796,
+          "duration_sec": 0.092718,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/types/types.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/args.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.538509,
+          "duration_sec": 0.094995,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/args.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/process.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.539790,
+          "duration_sec": 0.100634,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/process.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/cpu.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.617847,
+          "duration_sec": 0.096449,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/cpu.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/run.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.621354,
+          "duration_sec": 0.092941,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/run.c.o",
+          "children": []
+        },
+        {
+          "name": "src/core/core.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.623272,
+          "duration_sec": 0.091175,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/core/core.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/update.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.626522,
+          "duration_sec": 0.099335,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/update.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/queue.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.628333,
+          "duration_sec": 0.093828,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/queue.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/input.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.629797,
+          "duration_sec": 0.095245,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/input.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/keys.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.633510,
+          "duration_sec": 0.102427,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/keys.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.640432,
+          "duration_sec": 0.114599,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/input/events.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.714321,
+          "duration_sec": 0.101009,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/input/events.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/billboard.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.714337,
+          "duration_sec": 0.100989,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/camera/billboard.c.o",
+          "children": []
+        },
+        {
+          "name": "src/camera/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.714454,
+          "duration_sec": 0.097900,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/camera/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/platform/platform_glfw.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.722189,
+          "duration_sec": 0.077928,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/platform/platform_glfw.c.o",
+          "children": []
+        },
+        {
+          "name": "src/platform/platform_web.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.725052,
+          "duration_sec": 0.094716,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/platform/platform_web.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.725865,
+          "duration_sec": 0.117861,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_lights.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.735949,
+          "duration_sec": 0.116786,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_lights.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.755046,
+          "duration_sec": 0.129923,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.800128,
+          "duration_sec": 0.102999,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/instance.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.812367,
+          "duration_sec": 0.113198,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/instance.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.815339,
+          "duration_sec": 0.102727,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.815350,
+          "duration_sec": 0.101919,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/transparent.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.819777,
+          "duration_sec": 0.124251,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/transparent.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_bake.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.843736,
+          "duration_sec": 0.106127,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_bake.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/batch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.852745,
+          "duration_sec": 0.103562,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/batch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/extract_shadow.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.884976,
+          "duration_sec": 0.119328,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/extract_shadow.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/view_layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.903138,
+          "duration_sec": 0.099244,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/view_layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/render/tiling.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.917281,
+          "duration_sec": 0.101596,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/render/tiling.c.o",
+          "children": []
+        },
+        {
+          "name": "src/surface/surface.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.918074,
+          "duration_sec": 0.103705,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/surface/surface.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.925587,
+          "duration_sec": 0.093280,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/script/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/script/pending.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.944040,
+          "duration_sec": 0.113107,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/script/pending.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/controller.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.949873,
+          "duration_sec": 0.092530,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/controller.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/look.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 0.956316,
+          "duration_sec": 0.092941,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/look.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/person.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.002391,
+          "duration_sec": 0.101472,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/person.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/actions.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.004312,
+          "duration_sec": 0.095520,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/actions.c.o",
+          "children": []
+        },
+        {
+          "name": "src/controller/camera.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.018882,
+          "duration_sec": 0.094639,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/controller/camera.c.o",
+          "children": []
+        },
+        {
+          "name": "src/movement/movement.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.018907,
+          "duration_sec": 0.095515,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/movement/movement.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/pool.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.021785,
+          "duration_sec": 0.104602,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/job/pool.c.o",
+          "children": []
+        },
+        {
+          "name": "src/job/job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.042415,
+          "duration_sec": 0.095590,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/job/job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/view/view.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.049266,
+          "duration_sec": 0.099727,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/view/view.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg_job.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.057157,
+          "duration_sec": 0.107424,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/texture/svg_job.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/texture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.099844,
+          "duration_sec": 0.104833,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/texture/texture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/refs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.103872,
+          "duration_sec": 0.102567,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/texture/refs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/load.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.113531,
+          "duration_sec": 0.451102,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/texture/load.c.o",
+          "children": []
+        },
+        {
+          "name": "src/texture/svg.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.114425,
+          "duration_sec": 0.107444,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/texture/svg.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.126396,
+          "duration_sec": 0.094858,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/shader/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/preprocess.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.138012,
+          "duration_sec": 0.111729,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/shader/preprocess.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.149002,
+          "duration_sec": 0.095539,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/shader/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/shader/shader.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.164591,
+          "duration_sec": 0.100597,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/shader/shader.c.o",
+          "children": []
+        },
+        {
+          "name": "src/light/light.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.204688,
+          "duration_sec": 0.092130,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/light/light.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/dispatch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.206447,
+          "duration_sec": 0.098418,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/dispatch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/patch.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.221267,
+          "duration_sec": 0.095766,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/patch.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/terminal.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.221880,
+          "duration_sec": 0.095177,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/terminal.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command_script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.244565,
+          "duration_sec": 0.094717,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/command_script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/command.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.249751,
+          "duration_sec": 0.091422,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/command.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/render.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.265201,
+          "duration_sec": 0.108796,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/render.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/search.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.296829,
+          "duration_sec": 0.106576,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/search.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/shell.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.304877,
+          "duration_sec": 0.102773,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/shell.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/endpoint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.317042,
+          "duration_sec": 0.095490,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/endpoint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/capture.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.317063,
+          "duration_sec": 0.096011,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/capture.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/path.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.339292,
+          "duration_sec": 0.098231,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/path.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/base64.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.341181,
+          "duration_sec": 0.093066,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/base64.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/http.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.374008,
+          "duration_sec": 0.098272,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/http.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/builtin.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.403415,
+          "duration_sec": 0.096424,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/builtin.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/script.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.407658,
+          "duration_sec": 0.096046,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/script.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/wasm.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.412539,
+          "duration_sec": 0.094833,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/wasm.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/logs.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.413080,
+          "duration_sec": 0.100529,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/logs.c.o",
+          "children": []
+        },
+        {
+          "name": "src/command/input_cmd.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.434258,
+          "duration_sec": 0.111156,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/command/input_cmd.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_box.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.437533,
+          "duration_sec": 0.098344,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_gen_box.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_axis.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.472291,
+          "duration_sec": 0.096771,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_gen_axis.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_round.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.499853,
+          "duration_sec": 0.103417,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_gen_round.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/geometry.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.503712,
+          "duration_sec": 0.108661,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/geometry.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_cache.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.507380,
+          "duration_sec": 0.095873,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_cache.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_gen_flat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.513617,
+          "duration_sec": 0.092196,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_gen_flat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/geometry/mesh_data.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.535889,
+          "duration_sec": 0.114544,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/geometry/mesh_data.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/extract.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.545423,
+          "duration_sec": 0.105487,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/effects/extract.c.o",
+          "children": []
+        },
+        {
+          "name": "src/effects/effects.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.564643,
+          "duration_sec": 0.106738,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/effects/effects.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/static.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.569072,
+          "duration_sec": 0.095742,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/transform/static.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/transform.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.603262,
+          "duration_sec": 0.105052,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/transform/transform.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/lookat.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.603276,
+          "duration_sec": 0.096215,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/transform/lookat.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/hierarchy.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.605821,
+          "duration_sec": 0.092847,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/transform/hierarchy.c.o",
+          "children": []
+        },
+        {
+          "name": "src/transform/dynamic.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.612383,
+          "duration_sec": 0.094848,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/transform/dynamic.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/tint.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.650443,
+          "duration_sec": 0.100112,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/material/tint.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/layers.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.650918,
+          "duration_sec": 0.094306,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/material/layers.c.o",
+          "children": []
+        },
+        {
+          "name": "src/material/material.c",
+          "kind": "compile",
+          "project": "box",
+          "start_sec": 1.664825,
+          "duration_sec": 0.096998,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box/wasm32-Emscripten-release/obj/src/material/material.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box",
+          "start_sec": 1.761860,
+          "duration_sec": 0.066845,
+          "ok": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "box_app",
+      "kind": "project",
+      "project": "box_app",
+      "start_sec": 1.833654,
+      "duration_sec": 6.195355,
+      "ok": true,
+      "children": [
+        {
+          "name": "bake_config.h",
+          "kind": "generate",
+          "project": "box_app",
+          "start_sec": 1.833662,
+          "duration_sec": 0.000006,
+          "ok": true,
+          "children": []
+        },
+        {
+          "name": "src/main.c",
+          "kind": "compile",
+          "project": "box_app",
+          "start_sec": 1.835140,
+          "duration_sec": 0.091205,
+          "ok": true,
+          "object": "/Users/sandermertens/GitHub/SanderMertens/flecs-projects/box/.bake/local_env/next/build/box_app/wasm32-Emscripten-release/obj/src/main.c.o",
+          "children": []
+        },
+        {
+          "name": "link",
+          "kind": "link",
+          "project": "box_app",
+          "start_sec": 1.926371,
+          "duration_sec": 6.096544,
+          "ok": true,
+          "children": [
+            {
+              "name": "embed",
+              "kind": "other",
+              "project": "box_app",
+              "start_sec": 1.926385,
+              "duration_sec": 0.000000,
+              "ok": true,
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "etc",
+          "kind": "etc",
+          "project": "box_app",
+          "start_sec": 8.023271,
+          "duration_sec": 0.003490,
+          "ok": true,
+          "children": []
+        }
+      ]
+    }
+  ]
+}
