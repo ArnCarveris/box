@@ -25,6 +25,18 @@ ECS_COMPONENT_DECLARE(ParticleState);
 /** Half angle in degrees of the cone an emitter spreads over by default */
 #define BOX_PARTICLE_DEFAULT_SPREAD (15.0f)
 
+/** Downward acceleration a ParticleForces without a gravity of its own falls at */
+#define BOX_PARTICLE_DEFAULT_GRAVITY (9.81f)
+
+/** World units around an emitter its colliders are taken from by default */
+#define BOX_PARTICLE_DEFAULT_REACH (16.0f)
+
+/** Fraction of the speed into a surface a hit keeps when the author names none */
+#define BOX_PARTICLE_DEFAULT_BOUNCE (0.4f)
+
+/** Fraction of the speed along a surface a hit loses when the author names none */
+#define BOX_PARTICLE_DEFAULT_FRICTION (0.3f)
+
 /** Emitter constructor: a white stream of a thousand particles leaving upwards.
  *
  * @param ptr The components
@@ -60,6 +72,49 @@ static void box_particle_emitter_ctor(
         e[i].color.g = 255;
         e[i].color.b = 255;
         e[i].seed = 1;
+    }
+}
+
+/** Forces constructor: the gravity of earth and no wind, drag or turbulence.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_forces_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleForces *f = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        memset(&f[i], 0, sizeof(ParticleForces));
+        f[i].gravity = vec3_new(0, -BOX_PARTICLE_DEFAULT_GRAVITY, 0);
+    }
+}
+
+/** Collision constructor: a bouncy ground plane at the origin.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_particle_collision_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    ParticleCollision *c = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        memset(&c[i], 0, sizeof(ParticleCollision));
+        c[i].ground = true;
+        c[i].reach = BOX_PARTICLE_DEFAULT_REACH;
+        c[i].bounce = BOX_PARTICLE_DEFAULT_BOUNCE;
+        c[i].friction = BOX_PARTICLE_DEFAULT_FRICTION;
     }
 }
 
@@ -121,14 +176,19 @@ void BoxParticleImport(
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxSpline);
     ECS_IMPORT(world, BoxShader);
+    ECS_IMPORT(world, BoxCollision);
 
     ECS_META_COMPONENT(world, EmitterShape);
     ECS_META_COMPONENT(world, ParticleRange);
     ECS_META_COMPONENT(world, ParticleEmitter);
+    ECS_META_COMPONENT(world, ParticleForces);
+    ECS_META_COMPONENT(world, ParticleCollision);
     ECS_COMPONENT_DEFINE(world, ParticleEmitterImpl);
     ECS_COMPONENT_DEFINE(world, ParticleState);
 
     ecs_set_hooks(world, ParticleEmitter, { .ctor = box_particle_emitter_ctor });
+    ecs_set_hooks(world, ParticleForces, { .ctor = box_particle_forces_ctor });
+    ecs_set_hooks(world, ParticleCollision, { .ctor = box_particle_collision_ctor });
     ecs_set_hooks(world, ParticleEmitterImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ParticleState, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(ParticleEmitter), EcsWith, ecs_id(WorldTransform));
@@ -141,7 +201,9 @@ void BoxParticleImport(
         .terms = {
             { .id = ecs_id(ParticleEmitter), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = ecs_id(ParticleEmitterImpl), .inout = EcsInOut }
+            { .id = ecs_id(ParticleEmitterImpl), .inout = EcsInOut },
+            { .id = ecs_id(ParticleForces), .oper = EcsOptional, .inout = EcsIn },
+            { .id = ecs_id(ParticleCollision), .oper = EcsOptional, .inout = EcsIn }
         },
         .cache_kind = EcsQueryCacheAuto
     });

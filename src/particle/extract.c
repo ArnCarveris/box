@@ -6,6 +6,12 @@
  * starts between and how many particles the frame spawns. The count comes from
  * an accumulator on the fixed clock, so a frame of a fixed timestep always
  * spawns the same number of particles, and the pool of the renderer caps it.
+ *
+ * The block also carries the forces of the emitter, which are the sum of the
+ * ParticleForces of the world, of the entity the emitter names and of the one
+ * it carries itself, and what its particles collide with: the ground plane and
+ * the colliders the collision index holds within the reach of the emitter,
+ * written into the table of the block after its spawn points.
  */
 
 #include "particle_internal.h"
@@ -109,6 +115,202 @@ static void box_particle_transform(
     }
 }
 
+/** Hold a channel of a display encoded color inside its byte range.
+ *
+ * @param value The channel
+ * @return The channel as a byte
+ */
+static uint8_t box_particle_channel(
+    int32_t value)
+{
+    int32_t result = value;
+    if (result < 0) {
+        result = 0;
+    }
+
+    if (result > 255) {
+        result = 255;
+    }
+
+    return (uint8_t)result;
+}
+
+/** Write the two linear ends of the color range of an emitter.
+ *
+ * The variance is a per channel amount around the color of the emitter, so an
+ * emitter that names none writes the same color twice and every particle of it
+ * comes out in that color.
+ *
+ * @param emitter The emitter
+ * @param out The block of the packet
+ */
+static void box_particle_color(
+    const ParticleEmitter *emitter,
+    box_particle_emitter_t *out)
+{
+    uint8_t color[3] = { emitter->color.r, emitter->color.g, emitter->color.b };
+    uint8_t spread[3] = { emitter->color_variance.r, emitter->color_variance.g,
+        emitter->color_variance.b };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out->color[i] = box_srgb_to_linear(
+            box_particle_channel((int32_t)color[i] - (int32_t)spread[i]));
+        out->color_max[i] = box_srgb_to_linear(
+            box_particle_channel((int32_t)color[i] + (int32_t)spread[i]));
+    }
+
+    out->color[3] = 1.0f;
+    out->color_max[3] = 1.0f;
+}
+
+/** Add one ParticleForces to the forces an emitter resolved so far.
+ *
+ * @param from The component, NULL when the source has none
+ * @param out The sum
+ */
+static void box_particle_add(
+    const ParticleForces *from,
+    ParticleForces *out)
+{
+    if (from) {
+        out->gravity = vec3_add(out->gravity, from->gravity);
+        out->wind = vec3_add(out->wind, from->wind);
+        out->drag += from->drag;
+        out->turbulence += from->turbulence;
+    }
+}
+
+/** Write the forces of an emitter into its block.
+ *
+ * The forces of the world reach every emitter, the forces of the entity the
+ * emitter names reach the emitters that share it and the ones it carries itself
+ * reach only its own particles; the three are added, so a group under one wind
+ * can still be given a drag of its own.
+ *
+ * @param world The world
+ * @param emitter The emitter
+ * @param own The ParticleForces of the emitter entity, NULL when it has none
+ * @param out The block of the packet
+ */
+static void box_particle_forces(
+    ecs_world_t *world,
+    const ParticleEmitter *emitter,
+    const ParticleForces *own,
+    box_particle_emitter_t *out)
+{
+    ParticleForces sum;
+    memset(&sum, 0, sizeof(ParticleForces));
+    box_particle_add(ecs_singleton_get(world, ParticleForces), &sum);
+    if (emitter->forces && ecs_is_alive(world, emitter->forces)) {
+        box_particle_add(ecs_get(world, emitter->forces, ParticleForces), &sum);
+    }
+
+    box_particle_add(own, &sum);
+    out->acceleration[0] = emitter->acceleration.x + sum.gravity.x;
+    out->acceleration[1] = emitter->acceleration.y + sum.gravity.y;
+    out->acceleration[2] = emitter->acceleration.z + sum.gravity.z;
+    out->acceleration[3] = sum.drag > 0.0f ? sum.drag : 0.0f;
+    out->wind[0] = sum.wind.x;
+    out->wind[1] = sum.wind.y;
+    out->wind[2] = sum.wind.z;
+    out->wind[3] = sum.turbulence > 0.0f ? sum.turbulence : 0.0f;
+}
+
+/** Write one collider of the world into the table of an emitter.
+ *
+ * A sphere keeps its radius, which it holds in every component of its half
+ * extents, and every other shape is written as the box of its world bounds,
+ * which is what keeps the test in the integrate pass a handful of instructions.
+ *
+ * @param collider The collider
+ * @param out The entry of the table
+ */
+static void box_particle_collider(
+    const Collider *collider,
+    box_particle_point_t *out)
+{
+    vec3 center = collider->center;
+    vec3 half = collider->half;
+    out->position[3] = BOX_PARTICLE_COLLIDER_SPHERE;
+    if (collider->kind != ColliderSphere) {
+        vec3 min, max;
+        box_collider_bounds(collider, &min, &max);
+        center = vec3_scale(vec3_add(min, max), 0.5f);
+        half = vec3_scale(vec3_sub(max, min), 0.5f);
+        out->position[3] = BOX_PARTICLE_COLLIDER_BOX;
+    }
+
+    out->position[0] = center.x;
+    out->position[1] = center.y;
+    out->position[2] = center.z;
+    out->normal[0] = half.x;
+    out->normal[1] = half.y;
+    out->normal[2] = half.z;
+    out->normal[3] = 0.0f;
+}
+
+/** Write what the particles of an emitter collide with into its block.
+ *
+ * The colliders are taken from the collision index over the box the reach of
+ * the emitter spans around it, capped at what the table holds, and the emitter
+ * skips its own collider so a mesh that spawns particles is not hit by them.
+ *
+ * @param world The world
+ * @param entity The emitter entity
+ * @param collision Its ParticleCollision, NULL when it has none
+ * @param origin World position of the emitter
+ * @param p The packet
+ * @param hits Vector the index query collects its entities in
+ * @param out The block of the packet
+ */
+static void box_particle_collision(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    const ParticleCollision *collision,
+    vec3 origin,
+    box_packet_t *p,
+    ecs_vec_t *hits,
+    box_particle_emitter_t *out)
+{
+    if (!collision) {
+        goto done;
+    }
+
+    out->collision[0] = collision->height;
+    out->collision[1] = collision->bounce;
+    out->collision[2] = collision->friction;
+    if (collision->ground) {
+        out->flags |= BOX_PARTICLE_GROUND;
+    }
+
+    if (collision->die) {
+        out->flags |= BOX_PARTICLE_DIE;
+    }
+
+    if (collision->reach <= 0.0f) {
+        goto done;
+    }
+
+    vec3 reach = vec3_new(collision->reach, collision->reach, collision->reach);
+    ecs_vec_clear(hits);
+    box_collision_aabb(world, vec3_sub(origin, reach), vec3_add(origin, reach), hits);
+    int32_t i, count = ecs_vec_count(hits);
+    for (i = 0; i < count && out->collider_count < BOX_PARTICLE_COLLIDERS; i ++) {
+        ecs_entity_t found = ecs_vec_get_t(hits, ecs_entity_t, i)[0];
+        const Collider *collider = found == entity ?
+            NULL : ecs_get(world, found, Collider);
+        if (!collider || collider->kind == ColliderNone) {
+            continue;
+        }
+
+        box_particle_collider(collider, box_vec_push(&p->particle_points));
+        out->collider_count ++;
+    }
+
+done:
+    return;
+}
+
 /** Write the ranges, the color and the shape parameters of an emitter.
  *
  * @param emitter The emitter
@@ -134,13 +336,7 @@ static void box_particle_params(
         spread = 180.0f;
     }
 
-    out->color[0] = box_srgb_to_linear(emitter->color.r);
-    out->color[1] = box_srgb_to_linear(emitter->color.g);
-    out->color[2] = box_srgb_to_linear(emitter->color.b);
-    out->color[3] = 1.0f;
-    out->acceleration[0] = emitter->acceleration.x;
-    out->acceleration[1] = emitter->acceleration.y;
-    out->acceleration[2] = emitter->acceleration.z;
+    box_particle_color(emitter, out);
     out->direction[0] = dir.x;
     out->direction[1] = dir.y;
     out->direction[2] = dir.z;
@@ -223,11 +419,17 @@ void box_particle_extract(
 
     box_particle_shaders(world, state, p);
     float delta = ecs_get_world_info(world)->delta_time;
+    ecs_vec_t hits;
+    ecs_vec_init_t(NULL, &hits, ecs_entity_t, 0);
     ecs_iter_t it = ecs_query_iter(world, state->emitters);
     while (ecs_query_next(&it)) {
         const ParticleEmitter *emitter = ecs_field(&it, ParticleEmitter, 0);
         const WorldTransform *transform = ecs_field(&it, WorldTransform, 1);
         ParticleEmitterImpl *impl = ecs_field(&it, ParticleEmitterImpl, 2);
+        const ParticleForces *forces = ecs_field_is_set(&it, 3) ?
+            ecs_field(&it, ParticleForces, 3) : NULL;
+        const ParticleCollision *collision = ecs_field_is_set(&it, 4) ?
+            ecs_field(&it, ParticleCollision, 4) : NULL;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             uint32_t max = box_particle_max(&emitter[i]);
@@ -240,7 +442,12 @@ void box_particle_extract(
             memset(out, 0, sizeof(box_particle_emitter_t));
             box_particle_transform(&transform[i].m, out->transform);
             box_particle_params(&emitter[i], out);
+            box_particle_forces(world, &emitter[i], forces ? &forces[i] : NULL, out);
             box_particle_table(&impl[i], p, out);
+            box_particle_collision(world, it.entities[i],
+                collision ? &collision[i] : NULL,
+                vec3_new(out->transform[3], out->transform[7], out->transform[11]),
+                p, &hits, out);
             out->id = impl[i].id;
             out->max = max;
             out->delta = delta;
@@ -255,6 +462,7 @@ void box_particle_extract(
         }
     }
 
+    ecs_vec_fini_t(NULL, &hits, ecs_entity_t);
 done:
     return;
 }

@@ -40,6 +40,63 @@
                     "a_shape_without_a_table_carries_no_points",
                     "the_render_extract_fills_the_emitters"
                 ]
+            },
+            {
+                "id": "Forces",
+                "testcases": [
+                    "an_emitter_without_forces_carries_none",
+                    "gravity_adds_to_the_acceleration_of_the_emitter",
+                    "wind_drag_and_turbulence_reach_the_block",
+                    "the_forces_of_the_world_reach_every_emitter",
+                    "a_referenced_entity_lends_its_forces",
+                    "the_three_sources_are_summed",
+                    "authored_forces_fall_at_the_gravity_of_earth",
+                    "gravity_matches_the_analytic_fall",
+                    "drag_matches_the_analytic_decay",
+                    "drag_pulls_the_velocity_towards_the_wind",
+                    "a_particle_without_drag_ignores_the_wind",
+                    "turbulence_is_a_field_of_the_position",
+                    "turbulence_scales_with_its_amplitude",
+                    "turbulence_pushes_a_particle_off_its_course"
+                ]
+            },
+            {
+                "id": "Random",
+                "testcases": [
+                    "a_draw_stays_inside_the_unit_range",
+                    "the_same_seed_draws_the_same_particle",
+                    "another_seed_draws_another_particle",
+                    "every_property_is_drawn_from_its_own_stream",
+                    "two_particles_of_a_stream_differ",
+                    "a_range_that_does_not_rise_hands_out_its_minimum",
+                    "a_draw_covers_the_range",
+                    "a_cone_of_no_spread_is_its_axis",
+                    "a_cone_stays_inside_its_spread",
+                    "a_cone_spreads_over_the_whole_sphere",
+                    "the_color_range_reaches_the_block",
+                    "an_emitter_without_a_variance_draws_one_color",
+                    "a_color_variance_is_held_inside_the_channel"
+                ]
+            },
+            {
+                "id": "Collision",
+                "testcases": [
+                    "an_emitter_without_collision_hits_nothing",
+                    "the_ground_plane_reaches_the_block",
+                    "a_particle_that_dies_on_a_hit_says_so",
+                    "a_collider_in_reach_lands_in_the_table",
+                    "a_collider_out_of_reach_is_left_out",
+                    "an_emitter_does_not_collide_with_itself",
+                    "a_box_collider_is_written_as_its_world_bounds",
+                    "the_colliders_follow_the_spawn_points",
+                    "the_colliders_are_capped",
+                    "a_particle_under_the_ground_is_lifted_onto_it",
+                    "a_bounce_turns_the_speed_into_the_surface_around",
+                    "friction_takes_the_speed_along_the_surface",
+                    "a_particle_leaving_a_surface_keeps_its_course",
+                    "a_particle_inside_a_sphere_leaves_along_its_normal",
+                    "a_particle_leaves_a_box_over_its_nearest_face"
+                ]
             }
         ]
     }

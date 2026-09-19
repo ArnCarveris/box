@@ -29,6 +29,10 @@ Rules for adding one:
   runner's harness sets `ScriptSettings: {enabled: false}` so templates expand
   in one frame; `budget_ms: 0` with a `templates_per_frame` limit is the
   deterministic way to test incremental loading itself.
+- A scene full of blended particles is only reproducible when its sprites are
+  faint: the slot a particle lands in comes from an atomic pop of the dead
+  list, so the order the sprites blend in changes between runs and only a low
+  opacity makes that order stop mattering.
 - A task only inspects and updates the baseline of the scene it works on; every
   other scene must keep matching.
 
@@ -74,6 +78,7 @@ Rules for adding one:
 | The same frames with `LodPin` | `lod_pruning_off` | Every frame pinned, so the bolts and railings of the distant ones are drawn, which is what `lod_pruning` is compared against by eye. |
 | Generated HLOD proxies | `lod_proxies` | Two rows of three props: the near one of each row keeps its parts, the crates behind it become the handful of primitives the generator clusters them into and the rigs, which carry too many materials for that, become one merged and simplified mesh. |
 | Particle emitter shapes | `particles_shapes` | Six streams a few frames old: point, sphere, box, disc, the surface of a mesh and a spline, one color each. |
+| Particle forces and collision | `particles_forces` | A jet splashing off a plate, a plume blown over by wind with turbulence and a burst of sparks with a speed and a color variance flattened on the floor. |
 | Impostors | `lod_impostors` | Four mast yards fanning away: the near one keeps its masts, the two behind it are billboards of the eight views captured into their atlas, and the farthest is small enough for the box over its bounds again. |
 
 ## The showcase scene

@@ -545,8 +545,46 @@ second. The pool of the renderer is the maximum: a spawn takes a slot from the d
 that the integrate pass pushes the expired particles onto, and an emitter that asks for
 more particles than it has slots simply does not fill them.
 
+`ParticleForces` adds gravity, wind, drag and turbulence. An emitter adds the component
+of the world, the one of the entity its `forces` member names and the one it carries
+itself, so a scene can blow one wind over every emitter while an emitter keeps a drag of
+its own. Wind reaches a particle through the drag: the drag pulls the velocity of a
+particle towards the wind, which is solved in closed form and is stable at any timestep,
+so a particle without drag keeps its course whatever the wind is. Turbulence is a field
+of three sines over the position, so a particle that passes the same place is always
+pushed the same way and a wander is as reproducible as the rest of the simulation.
+
+`ParticleCollision` gives the particles a ground plane and the colliders of the scene.
+The extract takes the colliders within `reach` of the emitter from the collision index,
+at most sixteen, and writes them into the block behind its spawn points; a sphere is
+tested as a sphere, every other shape as the box of its world bounds. A particle that
+hits keeps `bounce` of the speed it had into the surface, loses `friction` of the speed
+it had along it, or dies on the spot with `die`.
+
+```
+using box.particle
+
+$ { ParticleForces: {wind: {6, 0, 0}, drag: 1.5} }
+
+splash {
+  Position: {0, 3, 0}
+  ParticleEmitter: {
+    max: 20000, rate: 4000, direction: {0, -1, 0}, spread: 20,
+    speed: {min: 4, max: 8}, color: {110, 195, 245}, color_variance: {20, 10, 0}, seed: 7
+  }
+  ParticleForces: {}
+  ParticleCollision: {ground: true, bounce: 0.4, friction: 0.2}
+}
+```
+
+Every property a particle starts with is drawn from a range: the direction from the cone
+of `spread`, the speed, the lifetime, the size, the rotation, the opacity and the color,
+which is drawn between `color` minus and `color` plus `color_variance` per channel.
+
 `test/integration/visual/particles_shapes.flecs` shows a stream from each of the six
-shapes and `test/integration/bench/particles_1m.flecs` runs a million of them.
+shapes, `test/integration/visual/particles_forces.flecs` a jet splashing off a plate, a
+plume blown over by wind and a burst of sparks, and
+`test/integration/bench/particles_1m.flecs` runs a million of them.
 
 ## Tests
 

@@ -15,7 +15,9 @@
                 "benchcases": [
                     "one_emitter",
                     "emitters_1k",
-                    "mesh_shape_table"
+                    "mesh_shape_table",
+                    "three_forces",
+                    "collider_table"
                 ]
             },
             {

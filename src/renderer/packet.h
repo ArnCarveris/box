@@ -1099,10 +1099,33 @@ typedef struct box_dynamic_batch_t {
 /** The pool of the emitter is emptied before the frame spawns into it */
 #define BOX_PARTICLE_RESET (1u)
 
-/** One point of the shape table of an emitter, in the space of its transform */
+/** The particles of the emitter collide with the horizontal ground plane */
+#define BOX_PARTICLE_GROUND (2u)
+
+/** A particle of the emitter dies where it hits instead of bouncing */
+#define BOX_PARTICLE_DIE (4u)
+
+/** Colliders one emitter tests its particles against, the widest the table holds */
+#define BOX_PARTICLE_COLLIDERS (16)
+
+/** Collider of the table that is a sphere around its center */
+#define BOX_PARTICLE_COLLIDER_SPHERE (0.0f)
+
+/** Collider of the table that is the axis aligned box of its half extents */
+#define BOX_PARTICLE_COLLIDER_BOX (1.0f)
+
+/** One entry of the table of an emitter, a spawn point or a collider.
+ *
+ * The spawn points of the shape come first, in the space of the transform of
+ * the emitter, and the colliders the particles bounce off follow them in world
+ * space: their center sits in the position with the shape constant in its w and
+ * their half extents in the normal, which is the radius in every component of a
+ * sphere. Both live in one table because the simulation pass already binds the
+ * eight storage buffers a device guarantees.
+ */
 typedef struct box_particle_point_t {
-    float position[4]; /**< Point of the surface or the curve, w unused */
-    float normal[4];   /**< Unit direction the point emits along, w unused */
+    float position[4]; /**< Point of the surface or the curve, or the center of a collider */
+    float normal[4];   /**< Unit direction the point emits along, or the half extents */
 } box_particle_point_t;
 
 /** Parameters of one emitter, the only particle data the packet carries.
@@ -1114,8 +1137,11 @@ typedef struct box_particle_point_t {
  */
 typedef struct box_particle_emitter_t {
     float transform[12];    /**< Rows of the 3x4 world matrix of the emitter */
-    float color[4];         /**< Linear color a particle starts with, w unused */
-    float acceleration[4];  /**< Constant acceleration in world units, w unused */
+    float color[4];         /**< Lowest linear color a particle starts with, w unused */
+    float color_max[4];     /**< Highest linear color a particle starts with, w unused */
+    float acceleration[4];  /**< Constant acceleration and gravity, w the drag per second */
+    float wind[4];          /**< Velocity the drag pulls towards, w the turbulence */
+    float collision[4];     /**< Height of the ground, the bounce and the friction, w unused */
     float direction[4];     /**< Emission direction in emitter space, w its spread cosine */
     float extents[4];       /**< Half extents of the box shape, w the radius of the others */
     float speed[2];         /**< Lowest and highest initial speed */
@@ -1132,7 +1158,7 @@ typedef struct box_particle_emitter_t {
     uint32_t seed;          /**< Seed the random draw of a particle is hashed from */
     uint32_t point_count;   /**< Points of its shape table, 0 for a shape without one */
     uint32_t flags;         /**< BOX_PARTICLE_RESET and the playback bits above it */
-    uint32_t pad2;          /**< Padding to the 16 byte GPU stride */
+    uint32_t collider_count; /**< Colliders of its table, which follow its shape points */
     uint32_t id;            /**< Pool of the emitter, the low word of its entity */
     uint32_t point_first;   /**< First point of its shape table in the packet */
 } box_particle_emitter_t;

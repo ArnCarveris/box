@@ -373,7 +373,10 @@ static box_gpu_emitter_t* box_particle_pool(
     return result;
 }
 
-/** Upload the shape table of an emitter and grow its buffer when it has to.
+/** Upload the table of an emitter and grow its buffer when it has to.
+ *
+ * The table holds the spawn points of the shape and the colliders of the
+ * emitter behind them, so both are one upload and one binding.
  *
  * @param r The renderer
  * @param pool The pool
@@ -386,18 +389,19 @@ static void box_particle_table(
     const box_particle_emitter_t *e,
     const box_packet_t *p)
 {
-    if (!e->point_count) {
+    uint32_t count = e->point_count + e->collider_count;
+    if (!count) {
         goto done;
     }
 
-    if (e->point_count > pool->points) {
+    if (count > pool->points) {
         if (pool->table) {
             wgpuBufferRelease(pool->table);
         }
 
         pool->table = box_particle_storage(r,
-            (uint64_t)e->point_count * sizeof(box_particle_point_t));
-        pool->points = e->point_count;
+            (uint64_t)count * sizeof(box_particle_point_t));
+        pool->points = count;
         if (pool->sim_group) {
             wgpuBindGroupRelease(pool->sim_group);
             pool->sim_group = NULL;
@@ -406,7 +410,7 @@ static void box_particle_table(
 
     const box_particle_point_t *points = box_vec_at(&p->particle_points, e->point_first);
     wgpuQueueWriteBuffer(r->gpu_queue, pool->table, 0, points,
-        (size_t)e->point_count * sizeof(box_particle_point_t));
+        (size_t)count * sizeof(box_particle_point_t));
 done:
     return;
 }

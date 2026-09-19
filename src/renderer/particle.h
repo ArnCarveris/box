@@ -33,7 +33,7 @@
 /** Particle pool of one emitter, owned by the renderer.
  *
  * Every channel of a particle has a buffer of its own: the position carries the
- * age in its w, the velocity the lifetime, the acceleration the rotation and
+ * age in its w, the velocity the lifetime, the force buffer the rotation and
  * the color the opacity, and the size has a buffer to itself. A slot whose
  * lifetime is zero holds no particle and sits in the dead list, which the
  * integrate pass pushes to and the spawn pass pops from.
@@ -41,17 +41,17 @@
 typedef struct box_gpu_emitter_t {
     uint32_t id;              /**< Emitter of the packet the pool belongs to */
     uint32_t capacity;        /**< Particles the buffers hold */
-    uint32_t points;          /**< Points the shape table buffer holds */
+    uint32_t points;          /**< Entries the table buffer holds, points and colliders */
     bool seen;                /**< The packet of this frame carries its emitter */
     WGPUBuffer position;      /**< Position xyz and age w of every particle */
     WGPUBuffer velocity;      /**< Velocity xyz and lifetime w, zero for a free slot */
-    WGPUBuffer force;         /**< Acceleration xyz and rotation w */
+    WGPUBuffer force;         /**< Free xyz and the rotation of every particle in w */
     WGPUBuffer color;         /**< Linear color rgb and opacity w */
     WGPUBuffer size;          /**< Size of every particle */
     WGPUBuffer dead;          /**< Indices of the free slots, the dead list */
     WGPUBuffer counts;        /**< Free slots, live particles and two spares */
     WGPUBuffer uniform;       /**< Emitter block of the frame */
-    WGPUBuffer table;         /**< Shape table of the frame, one point per spawn candidate */
+    WGPUBuffer table;         /**< Spawn points of the shape and the colliders behind them */
     WGPUBindGroup sim_group;  /**< Buffers the spawn and the integrate pass bind */
     WGPUBindGroup draw_group; /**< Buffers the point sprite pass reads */
 } box_gpu_emitter_t;

@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T08:28:19.676+00:00",
   "start_time": "2026-09-19T17:44:13.548+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T18:16:17.943+00:00",
   "dependencies": [
     "particles/emitter"
   ]

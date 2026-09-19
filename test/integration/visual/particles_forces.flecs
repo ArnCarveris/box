@@ -1,0 +1,83 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.particle
+
+camera {
+  Position: {0, 1.7, -5.0}
+  LookAt: {0, 0.35, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.5}
+}
+
+$ { EnvironmentLight: {sky_color: {120, 135, 165}, ground_color: {60, 58, 55}, intensity: 0.6} }
+
+ground {
+  Position: {0, -0.25, 0}
+  Box: {24, 0.5, 24}
+  Rgb: {105, 108, 112}
+  PbrMaterial: {roughness: 0.9}
+}
+
+platform {
+  Position: {-2.9, 0.2, 0}
+  Box: {1.7, 0.4, 1.7}
+  Rgb: {150, 148, 156}
+  PbrMaterial: {roughness: 0.6}
+}
+
+jet {
+  Position: {-2.9, 1.35, 0}
+  ParticleEmitter: {
+    max: 9000, rate: 60000, shape: EmitterDisc, radius: 0.1,
+    direction: {0, -1, 0}, spread: 30,
+    speed: {min: 20, max: 30},
+    lifetime: {min: 1, max: 2},
+    size: {min: 0.04, max: 0.075},
+    opacity: {min: 0.85, max: 1},
+    color: {110, 195, 245},
+    seed: 31
+  }
+  ParticleForces: {gravity: {0, -200, 0}}
+  ParticleCollision: {ground: false, reach: 6, bounce: 0.3, friction: 0.08}
+}
+
+plume {
+  Position: {0, 0.25, 0}
+  ParticleEmitter: {
+    max: 9000, rate: 60000, shape: EmitterDisc, radius: 0.22,
+    direction: {0, 1, 0}, spread: 7,
+    speed: {min: 24, max: 32},
+    lifetime: {min: 1, max: 2},
+    size: {min: 0.06, max: 0.12},
+    opacity: {min: 0.6, max: 0.95},
+    color: {225, 225, 235},
+    seed: 32
+  }
+  ParticleForces: {
+    gravity: {0, -40, 0}, wind: {30, 4, 0}, drag: 22, turbulence: 260
+  }
+}
+
+sparks {
+  Position: {2.9, 0.4, 0}
+  ParticleEmitter: {
+    max: 9000, rate: 30000, shape: EmitterSphere, radius: 0.08,
+    direction: {0, 0, 0}, spread: 180,
+    speed: {min: 4, max: 30},
+    lifetime: {min: 1, max: 2},
+    size: {min: 0.08, max: 0.14},
+    opacity: {min: 0.2, max: 0.3},
+    color: {250, 175, 70},
+    color_variance: {5, 70, 60},
+    seed: 33
+  }
+  ParticleForces: {gravity: {0, -200, 0}}
+  ParticleCollision: {ground: true, height: 0, reach: 6, bounce: 0.2, friction: 0.55}
+}
