@@ -11,7 +11,7 @@ template Tile {
     Svg: {file: "etc/svg/badge.svg", width: 64, height: 64}
   }
 
-  Quad: {1, 1}
+  Quad: {0.5, 0.5}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 1}
   PbrTextures: {albedo: icon}
@@ -42,9 +42,9 @@ backdrop {
   Rgb: {26, 30, 38}
 }
 
-for i in 0..240 {
+for i in 0..1000 {
   _ {
-    Position: {(i % 20) * 1.15 - 10.9, (i / 20) * 1.15 - 6.3, 0}
+    Position: {(i % 40) * 0.575 - 11.2, (i / 40) * 0.575 - 6.9, 0}
     Tile: {}
   }
 }
