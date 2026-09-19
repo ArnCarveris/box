@@ -1,9 +1,9 @@
 {
   "kind": "feature",
-  "status": "in progress",
+  "status": "complete",
   "created": "2026-09-18T23:34:09.597+00:00",
   "start_time": "2026-09-19T01:53:21.335+00:00",
-  "end_time": null,
+  "end_time": "2026-09-19T01:54:06.194+00:00",
   "dependencies": [
     "monitoring/fps_overlay",
     "command/terminal"
