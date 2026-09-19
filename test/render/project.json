@@ -497,6 +497,23 @@
         ],
         "setup": true,
         "teardown": true
+      },
+      {
+        "id": "Shapes2D",
+        "setup": true,
+        "teardown": true,
+        "testcases": [
+          "a_plain_instance_has_no_shape",
+          "a_border_sets_the_shape_bit",
+          "radii_are_ratios_of_the_short_side",
+          "widths_are_ratios_of_the_short_side",
+          "the_half_extents_carry_the_aspect",
+          "a_scale_moves_the_ratios",
+          "the_border_color_reaches_the_instance",
+          "a_colorless_border_takes_the_rgb",
+          "a_radius_change_re_extracts_the_instance",
+          "a_border_survives_the_sorted_pass"
+        ]
       }
     ]
   }

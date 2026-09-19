@@ -109,6 +109,48 @@
                     "star_example_is_registered",
                     "star_shares_one_mesh_per_outline"
                 ]
+            },
+            {
+                "id": "Shapes2D",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "rect_builds_a_quad",
+                    "circle_writes_a_render_mesh",
+                    "circle_segments_follow_the_radius",
+                    "circle_shares_the_mesh_of_an_ngon",
+                    "circle_uses_a_given_segment_count",
+                    "circles_of_one_size_share_a_mesh",
+                    "line_writes_a_render_mesh",
+                    "line_shares_one_mesh_per_outline",
+                    "line_uvs_run_along_the_segment",
+                    "image_adds_a_rect",
+                    "image_uvs_show_the_region",
+                    "image_cover_crops_the_region",
+                    "image_contain_widens_the_region",
+                    "image_fit_follows_the_texture_aspect",
+                    "image_rotation_turns_the_uvs",
+                    "border_adds_a_rect",
+                    "border_shorthand_fills_every_corner",
+                    "border_keeps_the_quad_mesh",
+                    "changing_a_radius_keeps_the_mesh",
+                    "removing_a_border_drops_the_shape"
+                ]
+            },
+            {
+                "id": "Coverage",
+                "testcases": [
+                    "center_is_inside",
+                    "edge_is_zero",
+                    "outside_is_positive",
+                    "a_radius_cuts_the_corner",
+                    "a_radius_is_clamped_to_the_short_side",
+                    "corners_are_resolved_apart",
+                    "is_one_inside",
+                    "is_zero_outside",
+                    "is_half_on_the_outline",
+                    "a_hard_edge_has_no_fringe"
+                ]
             }
         ]
     }
