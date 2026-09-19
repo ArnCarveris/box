@@ -1,8 +1,8 @@
 {
   "kind": "feature",
-  "status": "pending",
+  "status": "in progress",
   "created": "2026-09-18T22:42:22.821+00:00",
-  "start_time": null,
+  "start_time": "2026-09-19T00:43:59.437+00:00",
   "end_time": null,
   "dependencies": [
     "engine_core/etc_install",
