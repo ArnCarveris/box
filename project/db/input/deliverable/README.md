@@ -17,6 +17,9 @@
 - Making every key constant a script variable is what lets a map combine masks with `|` in plain script, and keeping bindings as pairs or children keeps the map editable from the terminal.
 - flecs script async functions resolve a future from a per frame event list without any polling in script.
 
+## Follow up
+- `input/pressed_at_load` (closed after the UI epic): a script waiter for `on.pressed`, `on.down` or `on.up` that registers in the frame the key was raised is now caught up once, the way picking retries a missed hover, so a template that awaits a key at scene load sees the first press.
+
 ## Not in this epic
 - No real window run was part of the verification; the platform callbacks are covered by the mapping tables and the injection path.
 - Gamepads and touch are out of scope of the brief.
