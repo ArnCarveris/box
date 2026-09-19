@@ -236,6 +236,156 @@ float box_lod_error_px(
 int32_t box_lod_select(
     const box_lod_select_desc_t *desc);
 
+/** Part of the triangles a simplification keeps when its description asks for none */
+#define BOX_LOD_SIMPLIFY_RATIO (0.25f)
+
+/** Part of a merged mesh whose triangles share one material key.
+ *
+ * Groups are sorted by material key and their index ranges do not overlap, so
+ * one group is one draw call over the range of indices it names.
+ */
+typedef struct box_lod_mesh_group_t {
+    uint64_t material;   /**< Material key every triangle of the group shares */
+    int32_t first_index; /**< First index of the group in the merged mesh */
+    int32_t index_count; /**< Indices the group holds */
+    float error;         /**< Error the simplification of the group cost, in world units */
+} box_lod_mesh_group_t;
+
+/** One mesh of the subtree a merge collapses.
+ *
+ * A source names its entity the way box_lod_primitive_t does, with a world
+ * transform and a material key, and hands over the arrays of a Mesh3 in place
+ * of the bounds the proxy generator takes, so an authored mesh and the cached
+ * mesh of a primitive are both merged without a copy.
+ */
+typedef struct box_lod_mesh_source_t {
+    mat4 transform;          /**< World transform of the mesh */
+    const vec3 *vertices;    /**< Vertex positions in the space of the transform */
+    const vec3 *normals;     /**< Vertex normals, NULL to derive them from the triangles */
+    const vec2 *uvs;         /**< Texture coordinates, NULL for zeros */
+    const rgba *colors;      /**< Vertex colors, NULL for opaque white */
+    const uint32_t *indices; /**< Three indices per triangle, NULL to read them in order */
+    int32_t vertex_count;    /**< Vertices the mesh holds */
+    int32_t index_count;     /**< Indices the mesh holds, 0 to take the vertex count */
+    uint64_t material;       /**< Material key, opaque to the merge */
+} box_lod_mesh_source_t;
+
+/** What a merge is allowed to do.
+ *
+ * Welding is what lets a simplification cross the seam between two sources: it
+ * joins the vertices that share a world position whatever their normals are and
+ * averages those normals. Without it a vertex only joins another when its
+ * position and all of its attributes match, which keeps every hard edge.
+ */
+typedef struct box_lod_merge_desc_t {
+    const box_lod_mesh_source_t *sources; /**< Meshes of the subtree */
+    int32_t count;                        /**< Number of meshes */
+    bool weld;                            /**< Join the vertices that share a position */
+} box_lod_merge_desc_t;
+
+/** The mesh a subtree merges into.
+ *
+ * The arrays point into the builder that produced them and stay valid until the
+ * same builder runs again. Positions and normals are in world space, the groups
+ * split the indices by material key, and the error is the length in world units
+ * the surface moved by, which is zero for a mesh that was only merged.
+ */
+typedef struct box_lod_mesh_t {
+    const vec3 *vertices;               /**< World position of every vertex */
+    const vec3 *normals;                /**< World normal of every vertex, unit length */
+    const vec2 *uvs;                    /**< Texture coordinate of every vertex */
+    const rgba *colors;                 /**< Color of every vertex */
+    const uint32_t *indices;            /**< Three indices per triangle */
+    int32_t vertex_count;               /**< Vertices the mesh holds */
+    int32_t index_count;                /**< Indices the mesh holds */
+    const box_lod_mesh_group_t *groups; /**< One group per material key of the sources */
+    int32_t group_count;                /**< Number of groups */
+    vec3 min;                           /**< Minimum corner of the world bounds */
+    vec3 max;                           /**< Maximum corner of the world bounds */
+    float error;                        /**< Error of the mesh in world units */
+} box_lod_mesh_t;
+
+/** What a simplification aims for.
+ *
+ * The simplifier stops at the first goal it reaches: it never keeps fewer
+ * triangles than the ratio asks for and never moves the surface further than
+ * the bound, so a group that cannot reach the ratio within the bound keeps more
+ * triangles than it was asked to.
+ */
+typedef struct box_lod_simplify_desc_t {
+    float ratio;      /**< Part of the triangles to keep, 0 for BOX_LOD_SIMPLIFY_RATIO */
+    float max_error;  /**< Error bound in world units, 0 for the size of the mesh */
+    bool lock_border; /**< Leave the vertices on the border of the mesh where they are */
+} box_lod_simplify_desc_t;
+
+/** Working memory of the mesh merge and of its simplification.
+ *
+ * A builder holds one merged mesh, which the simplification rewrites in place,
+ * and is reused for every subtree, which is what keeps a rebuild free of
+ * allocations. Its vectors are read through the mesh a build hands out.
+ */
+typedef struct box_lod_mesh_builder_t {
+    ecs_vec_t vertices; /**< World position of every vertex */
+    ecs_vec_t normals;  /**< Summed world normal of every vertex */
+    ecs_vec_t uvs;      /**< Texture coordinate of every vertex */
+    ecs_vec_t colors;   /**< Color of every vertex */
+    ecs_vec_t keys;     /**< Normal a vertex was matched on, which its sum loses */
+    ecs_vec_t indices;  /**< Three indices per triangle */
+    ecs_vec_t groups;   /**< One group per material key of the sources */
+    ecs_vec_t table;    /**< Open addressed table the merge looks vertices up in */
+    ecs_vec_t scratch;  /**< Bytes the merge orders sources in and the simplification remaps in */
+    vec3 min;           /**< Minimum corner of the world bounds of the mesh */
+    vec3 max;           /**< Maximum corner of the world bounds of the mesh */
+} box_lod_mesh_builder_t;
+
+/** Initialise a mesh builder.
+ *
+ * @param builder The builder
+ */
+void box_lod_mesh_builder_init(
+    box_lod_mesh_builder_t *builder);
+
+/** Release the working memory of a mesh builder.
+ *
+ * @param builder The builder
+ */
+void box_lod_mesh_builder_fini(
+    box_lod_mesh_builder_t *builder);
+
+/** Merge the meshes of a subtree into one world space mesh.
+ *
+ * Every source is transformed into world space and appended to the group of its
+ * material key, so the result is one vertex buffer and one index buffer with a
+ * range per material. The result is the same for the same inputs.
+ *
+ * @param builder The builder that holds the mesh
+ * @param desc The meshes of the subtree
+ * @param out Receives the merged mesh
+ * @return True when the mesh has triangles, false for an empty subtree
+ */
+bool box_lod_merge(
+    box_lod_mesh_builder_t *builder,
+    const box_lod_merge_desc_t *desc,
+    box_lod_mesh_t *out);
+
+/** Simplify the mesh a builder holds, in place.
+ *
+ * Every group is simplified on its own, so a triangle never takes the material
+ * of its neighbour, the vertices no triangle uses any more are dropped and the
+ * error of the mesh is the largest error of its groups, measured in world units
+ * so the screen space metric can project it. The result is the same for the
+ * same mesh.
+ *
+ * @param builder The builder holding the mesh a merge produced
+ * @param desc What the simplification aims for
+ * @param out Receives the simplified mesh
+ * @return True when the mesh has triangles, false for an empty mesh
+ */
+bool box_lod_simplify(
+    box_lod_mesh_builder_t *builder,
+    const box_lod_simplify_desc_t *desc,
+    box_lod_mesh_t *out);
+
 /** Register the box.lod module.
  *
  * @param world The world
