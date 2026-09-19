@@ -16,6 +16,7 @@
 #include "exposure.h"
 #include "gtao.h"
 #include "hiz.h"
+#include "overlay.h"
 #include "queue.h"
 #include "gpu.h"
 
@@ -408,6 +409,19 @@ typedef struct box_exposure_state_t {
     float pad;     /**< Padding to the 16 byte GPU stride */
 } box_exposure_state_t;
 
+/** Uniform block the overlay pass reads */
+typedef struct box_overlay_uniform_t {
+    float size[4];  /**< Width and height of the view and their reciprocals */
+    float flags[4]; /**< x is 1 when the hardware encodes what the pass writes */
+} box_overlay_uniform_t;
+
+/** Buffers one view draws its frame rate panel from */
+typedef struct box_gpu_overlay_t {
+    WGPUBuffer uniform;  /**< Size of the view and the encoding of its image */
+    WGPUBuffer rects;    /**< Rectangles of the panel, at most BOX_OVERLAY_RECT_MAX */
+    WGPUBindGroup group; /**< Bind group holding both buffers */
+} box_gpu_overlay_t;
+
 /** Uniform block of the motion vector pass */
 typedef struct box_motion_uniform_t {
     float inv_clip[16];  /**< Clip to world of this frame */
@@ -474,6 +488,12 @@ struct box_renderer_t {
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
     WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
+    WGPUBindGroupLayout overlay_layout; /**< Uniform and rectangles of the overlay pass */
+    WGPURenderPipeline overlay_pipeline; /**< Pass that draws the rectangles of a panel */
+    box_vec_t overlays;              /**< box_gpu_overlay_t indexed by view index */
+    box_fps_ring_t overlay_ring;     /**< Frame times between the packets the renderer drew */
+    double overlay_time;             /**< Packet time of the previous frame, for the interval */
+    bool overlay_timed;              /**< A previous packet time was recorded */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
     WGPUBindGroupLayout view_layout; /**< Layout of the view uniform bind group */
     box_vec_t meshes;                /**< box_gpu_mesh_t indexed by handle */
@@ -1091,6 +1111,48 @@ void box_effect_init(
  * @param r The renderer
  */
 void box_effect_fini(
+    box_renderer_t *r);
+
+/** Build the pipeline and the bind group layout of the frame rate overlay.
+ *
+ * @param r The renderer
+ */
+void box_overlay_init(
+    box_renderer_t *r);
+
+/** Record the interval between this packet and the previous one in the ring.
+ *
+ * @param r The renderer
+ * @param p The packet
+ */
+void box_overlay_frame(
+    box_renderer_t *r,
+    const box_packet_t *p);
+
+/** Draw the frame rate panel of a view over the image it produced.
+ *
+ * The pass runs after the effect chain and before the capture, so the panel is
+ * part of the image a headless run writes. A view without the overlay records
+ * nothing.
+ *
+ * @param r The renderer
+ * @param view The view of the packet
+ * @param index Index of the view in the packet
+ * @param encoder The command encoder
+ * @param image The texture the view drew its image into
+ */
+void box_overlay_record(
+    box_renderer_t *r,
+    const box_view_t *view,
+    uint32_t index,
+    WGPUCommandEncoder encoder,
+    WGPUTexture image);
+
+/** Release the pipeline and the per view buffers of the overlay.
+ *
+ * @param r The renderer
+ */
+void box_overlay_fini(
     box_renderer_t *r);
 
 /** Drop the cached pipeline of a shader handle so the next pass rebuilds it.

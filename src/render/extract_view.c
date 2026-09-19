@@ -480,6 +480,37 @@ static void box_view_cull(
     v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
+/** Copy the frame rate overlay of a view into it, the view first and the singleton after.
+ *
+ * The component belongs to box.monitor, which a world that never imports the
+ * module leaves unregistered; the view then carries no panel at all.
+ *
+ * @param world The world
+ * @param e The View entity, 0 for the view a world without views gets
+ * @param v The view to fill
+ */
+static void box_view_overlay(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_view_t *v)
+{
+    if (!ecs_id(FpsOverlay)) {
+        goto done;
+    }
+
+    const FpsOverlay *o = box_render_view_setting(world, e, ecs_id(FpsOverlay));
+    if (!o || !o->enabled) {
+        goto done;
+    }
+
+    v->overlay = 1u;
+    v->overlay_corner = (uint32_t)o->corner;
+    v->overlay_scale = o->scale > 0.0f ? o->scale : 1.0f;
+    v->overlay_opacity = o->opacity;
+done:
+    return;
+}
+
 /** Fill the clip to world and the reprojection matrices a chain of a view reads.
  *
  * A pass reconstructs a world position from the depth with the inverse and the
@@ -538,6 +569,7 @@ static void box_view_fill(
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
     box_view_cull(world, src->entity, v);
+    box_view_overlay(world, src->entity, v);
     bool sun = box_view_sun(world, state, v);
     box_render_extract_shadows(world, src->entity, sun, v);
     box_view_environment(world, state, src->entity, index, v);

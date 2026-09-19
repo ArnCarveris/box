@@ -106,8 +106,11 @@
 /** Ambient occlusion trace and resolve passes the occlusion input runs */
 #define BOX_SHADER_GTAO (15)
 
+/** Shader slot of the pass that draws the rectangles of the frame rate panel */
+#define BOX_SHADER_OVERLAY (16)
+
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (16)
+#define BOX_SHADER_BUILTIN_MAX (17)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -361,6 +364,10 @@ typedef struct box_view_t {
     uint32_t strict_layers; /**< A view that lists layers draws its members only */
     uint32_t shadow_resolution; /**< Edge of one cascade of its shadow map in texels */
     float shadow_bounds[BOX_SHADOW_CASCADE_MAX * 4]; /**< Sphere of a cascade, center and radius */
+    uint32_t overlay;       /**< The view draws the frame rate panel over its image */
+    uint32_t overlay_corner; /**< Corner of the view the panel is pinned to */
+    float overlay_scale;    /**< Size multiplier of the panel, one for its natural size */
+    float overlay_opacity;  /**< Opacity of the panel background, one for opaque */
 } box_view_t;
 
 /** Bytes of a view that the view uniform buffer holds */

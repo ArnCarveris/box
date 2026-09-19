@@ -102,6 +102,33 @@ ECS_STRUCT(SystemMonitor, {
     PhaseTime phases[8];   /**< Milliseconds per phase, in pipeline order */
 });
 
+/** Corner of a view an overlay panel is pinned to */
+ECS_ENUM(FpsCorner, {
+    FpsTopLeft = 0,     /**< Top left corner of the view */
+    FpsTopRight = 1,    /**< Top right corner of the view */
+    FpsBottomLeft = 2,  /**< Bottom left corner of the view */
+    FpsBottomRight = 3  /**< Bottom right corner of the view */
+});
+
+/** Frame rate panel drawn on a view, or on every view as a singleton.
+ *
+ * The panel shows the frame rate as seven segment digits and the last second of
+ * frame times as one bar each, green while the frame stayed above sixty frames
+ * per second, yellow above thirty and red below. It is drawn after the effect
+ * chain of the view and before its capture, so a headless run sees it, and a
+ * view without the component pays for nothing. The last three fields are
+ * written by the engine from the same window the bars cover.
+ */
+ECS_STRUCT(FpsOverlay, {
+    bool enabled;      /**< Draw the panel, default true */
+    FpsCorner corner;  /**< Corner of the view the panel is pinned to */
+    float scale;       /**< Size multiplier of the panel, default 1 */
+    float opacity;     /**< Opacity of the panel background, default 0.7 */
+    double fps;        /**< Frames per second of the window, written by the engine */
+    double mean_ms;    /**< Mean frame time of the window, written by the engine */
+    double worst_ms;   /**< Worst frame time of the window, written by the engine */
+});
+
 /** Register the box.monitor module.
  *
  * @param world The world

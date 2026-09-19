@@ -186,6 +186,7 @@ void box_frame_init(
     r->pipeline[0] = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
         true, NULL, false, BOX_NORMALS_NONE);
     box_effect_init(r);
+    box_overlay_init(r);
 }
 
 /** Mesh pipeline that writes the world normals into a second color attachment.
@@ -609,6 +610,7 @@ static void box_frame_view(
     box_view_select(r, index);
     uint32_t passes = box_effect_prepare(r, view, p);
     box_view_prepare(r, view);
+    WGPUTexture image = target;
     if (passes && r->effect_scene) {
         target = r->effect_scene->texture;
     }
@@ -698,6 +700,7 @@ static void box_frame_view(
         wgpuTextureViewRelease(final);
     }
 
+    box_overlay_record(r, view, index, encoder, image);
     wgpuTextureViewRelease(attachment);
 done:
     return;
@@ -731,6 +734,7 @@ void box_frame_render(
     box_renderer_t *r,
     const box_packet_t *p)
 {
+    box_overlay_frame(r, p);
     box_device_resize(r, p->width, p->height);
     box_shader_apply(r, p);
     if (!r->initialized && box_shader_ready(r)) {

@@ -49,6 +49,31 @@
                 ]
             },
             {
+                "id": "Fps",
+                "testcases": [
+                    "empty_ring_reports_nothing",
+                    "ring_keeps_the_newest_frame_first",
+                    "ring_wraps_past_its_size",
+                    "ring_ignores_a_negative_frame",
+                    "window_covers_one_second_of_frames",
+                    "stats_summarize_the_window",
+                    "sixty_frames_a_second_is_green",
+                    "above_thirty_frames_a_second_is_yellow",
+                    "below_thirty_frames_a_second_is_red",
+                    "every_class_has_its_own_color",
+                    "digit_segments_follow_the_table",
+                    "every_digit_lights_at_least_two_segments",
+                    "segments_stay_inside_the_digit_cell",
+                    "panel_is_pinned_to_its_corner",
+                    "panel_grows_with_its_scale",
+                    "panel_draws_one_bar_per_frame",
+                    "a_slow_frame_turns_its_bar_red",
+                    "overlay_defaults_are_enabled_in_a_corner",
+                    "window_is_published_on_the_component",
+                    "absent_overlay_publishes_nothing"
+                ]
+            },
+            {
                 "id": "Spikes",
                 "testcases": [
                     "empty_run_reports_nothing",

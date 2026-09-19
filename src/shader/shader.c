@@ -37,7 +37,8 @@ static const box_shader_builtin_t box_shader_builtins[] = {
     { "motion", "etc/shaders/motion.wgsl", BOX_SHADER_MOTION },
     { "exposure", "etc/shaders/exposure.wgsl", BOX_SHADER_EXPOSURE },
     { "pyramid", "etc/shaders/pyramid.wgsl", BOX_SHADER_PYRAMID },
-    { "gtao_trace", "etc/shaders/gtao_trace.wgsl", BOX_SHADER_GTAO }
+    { "gtao_trace", "etc/shaders/gtao_trace.wgsl", BOX_SHADER_GTAO },
+    { "overlay", "etc/shaders/overlay.wgsl", BOX_SHADER_OVERLAY }
 };
 
 /** Registry destructor releasing the sources that never reached a packet.
