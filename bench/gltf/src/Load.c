@@ -168,6 +168,7 @@ void Load_mesh_100k(bench_t *b)
     const char *path = "/tmp/box_bench_gltf_mesh.glb";
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxGltf);
 
     bench_glb(path, 1, 225);
     bench_set_items(b, 224 * 224 * 2);
@@ -192,6 +193,7 @@ void Load_nodes_500(bench_t *b)
     const char *path = "/tmp/box_bench_gltf_nodes.glb";
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, BoxGltf);
 
     bench_glb(path, 500, 4);
     bench_set_items(b, 500);
