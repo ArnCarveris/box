@@ -17,6 +17,9 @@
 - On wgpu-native a texture read recorded before the render pass that fills it reads nothing; the first occlusion pass needs its own command buffer.
 - Occlusion culling only pays when shading is expensive; the counts are the win to keep, the default should follow the cost.
 
+## Follow up
+- `culling/instance_cap` (closed after the collision epic): the device was created without `requiredLimits`, so the WebGPU defaults capped a storage binding at 128 MiB, about 860k instances, and a larger scene aborted with an invalid bind group. The device now asks for the adapter's limits, the instance buffers double up to that ceiling and static slots are written in runs of neighbours; `instances_1m.flecs` draws 988k instances at 116 fps and its load frame went from 9.2 s to 67 ms.
+
 ## Not in this epic
 - LOD traversal integrates with the visible sets later; shadows and transparency are frustum culled only.
 - Sub threshold static batches are not occlusion culled; a CPU pyramid readback would be needed.
