@@ -5,6 +5,6 @@
   "start_time": null,
   "end_time": null,
   "dependencies": [
-    "culling/frustum"
+    "culling/frustum_culling"
   ]
 }
