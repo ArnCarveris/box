@@ -477,6 +477,7 @@ static void box_ui_text_element(
         } else {
             e = ecs_new_w_pair(world, EcsChildOf, p->e);
             ecs_add_id(world, e, UiGlyph);
+            ecs_add_id(world, e, UiQuad);
             ecs_add_pair(world, e, EcsIsA, atlas->prefab);
         }
 

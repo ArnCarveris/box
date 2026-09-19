@@ -158,6 +158,40 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Shadow",
+                "testcases": [
+                    "element_gets_a_quad",
+                    "quad_covers_the_box_plus_the_spread_and_the_blur",
+                    "quad_is_offset_from_its_element",
+                    "quad_is_drawn_behind_its_element",
+                    "quad_takes_the_radii_of_the_element",
+                    "transparent_shadow_draws_no_quad",
+                    "quad_takes_no_room_in_a_row",
+                    "removing_the_shadow_drops_the_quad",
+                    "quad_extracts_as_a_soft_shape"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Group",
+                "testcases": [
+                    "opaque_subtree_takes_no_target",
+                    "transparent_leaf_takes_no_target",
+                    "child_with_its_own_opacity_takes_no_target",
+                    "transparent_subtree_gets_a_view_and_a_target",
+                    "target_is_the_size_of_the_bounds",
+                    "target_follows_the_bounds",
+                    "composite_quad_carries_the_opacity",
+                    "subtree_joins_the_layer_of_its_group",
+                    "nested_groups_render_inside_out",
+                    "opaque_again_drops_the_group",
+                    "composite_reaches_the_packet_with_its_target"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

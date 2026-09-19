@@ -94,6 +94,12 @@
 /** The draw folds its coverage into the indirect fractions of the surface behind */
 #define BOX_NORMALS_COVER (2)
 
+/** The draw composites a render target instead of shading a surface */
+#define BOX_NORMALS_GROUP (3)
+
+/** The composite also folds its coverage into the normal attachment of a chain */
+#define BOX_NORMALS_GROUP_COVER (4)
+
 /** Bytes of the uniform block holding the parameters of every material layer */
 #define BOX_LAYER_UNIFORM_SIZE (BOX_LAYER_MAX * sizeof(box_layer_params_t))
 
@@ -239,11 +245,13 @@ typedef struct box_gpu_cull_t {
 
 /** Offscreen color texture a view renders into, created from a packet command */
 typedef struct box_gpu_target_t {
-    WGPUTexture color;     /**< Color texture of the target */
-    WGPUTextureView view;  /**< Render attachment view of the color texture */
-    uint32_t width;        /**< Width in pixels */
-    uint32_t height;       /**< Height in pixels */
-    bool alive;            /**< Handle is in use */
+    WGPUTexture color;         /**< Color texture of the target */
+    WGPUTextureView view;      /**< Render attachment view of the color texture */
+    WGPUBindGroup composite;   /**< Mesh group that binds the color in the scene slot */
+    uint32_t composite_epoch;  /**< Environment epoch that group was built for */
+    uint32_t width;            /**< Width in pixels */
+    uint32_t height;           /**< Height in pixels */
+    bool alive;                /**< Handle is in use */
 } box_gpu_target_t;
 
 /** One prefiltered environment, shared by every view of its generation */
@@ -462,6 +470,8 @@ struct box_renderer_t {
     WGPURenderPipeline sorted_pipelines[BOX_BLEND_COUNT][BOX_CULL_MODES]
         [BOX_EFFECT_FORMATS][BOX_COVER_MODES];
         /**< Sorted pass, per blend mode, cull mode, target format and coverage */
+    WGPURenderPipeline group_pipelines[BOX_EFFECT_FORMATS][BOX_COVER_MODES];
+        /**< Composite of a group, per target format and coverage */
     WGPUBuffer sorted;               /**< Instance buffer of the sorted pass */
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full level range */
@@ -544,6 +554,7 @@ struct box_renderer_t {
     WGPURenderPipeline env_irradiance_pipeline; /**< Cosine convolution of one face */
     WGPURenderPipeline env_brdf_pipeline; /**< Split sum integration of the lookup table */
     WGPUBindGroupLayout env_layout;  /**< Layout of the environment group of the mesh shader */
+    uint32_t env_epoch;              /**< Rises when an environment group is built again */
     box_bake_state_t bake;           /**< Probe descriptors, dirty set and previous inputs */
     WGPUBuffer bake_uniform;         /**< Grid and count uniforms of the bake passes */
     WGPUBuffer bake_lights;          /**< Static lights the bake accumulates */
@@ -752,6 +763,20 @@ box_gpu_target_t* box_target_get(
  */
 void box_target_fini(
     box_renderer_t *r);
+
+/** Build a mesh bind group that binds a texture in the slot of the scene copy.
+ *
+ * The composite of a group reads the target its subtree was rendered into out
+ * of that slot, so it needs the environment group of its view with one binding
+ * swapped instead of a bind group layout of its own.
+ *
+ * @param r The renderer
+ * @param scene The texture view the scene slot binds
+ * @return The bind group, owned by the caller
+ */
+WGPUBindGroup box_environment_scene_group(
+    box_renderer_t *r,
+    WGPUTextureView scene);
 
 /** Create a variant of the mesh pipeline.
  *

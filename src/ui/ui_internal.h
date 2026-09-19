@@ -24,15 +24,17 @@ typedef struct UiImpl {
 
 /** Place of an entity in the UI tree that holds it */
 typedef struct UiNode {
-    ecs_entity_t root; /**< Root of the tree, the entity that has Ui */
-    int32_t order;     /**< Index of the node in the walk of its tree */
+    ecs_entity_t root;  /**< Root of the tree, the entity that has Ui */
+    ecs_entity_t layer; /**< Layer the node joined, of its tree or of a group above it */
+    int32_t order;      /**< Index of the node in the walk of its tree */
 } UiNode;
 
 /** Node a walk still has to visit, with the place the walk gave its parent */
 typedef struct UiVisit {
-    ecs_entity_t e; /**< The node */
-    int32_t parent; /**< Place of the parent, -1 for the root of the tree */
-    bool glyph;     /**< The node is a glyph quad the text pass placed */
+    ecs_entity_t e;  /**< The node */
+    int32_t parent;  /**< Place of the parent, -1 for the root of the tree */
+    bool aux;        /**< The node is a quad the module placed itself */
+    bool composite;  /**< The node is the quad that composites the subtree of its parent */
 } UiVisit;
 
 /** Place of one node in the walk of its tree and the box the layout gave it.
@@ -51,7 +53,13 @@ typedef struct UiPlace {
     bool has_anchor;  /**< The node is pinned to its parent */
     bool has_rect;    /**< The node has a rectangle the box resizes */
     bool has_text;    /**< The node holds a string the pass draws */
-    bool glyph;       /**< The node is a glyph quad, which the pass does not place */
+    bool has_shadow;  /**< The node casts a box shadow the pass draws behind it */
+    bool aux;         /**< The node is a quad the module placed, not one the pass places */
+    bool composite;   /**< The node is the quad that composites the subtree of its parent */
+    int32_t kids;     /**< Children without an opacity of their own */
+    int32_t heirs;    /**< Children of the node that composite a subtree of their own */
+    int32_t depth;    /**< Groups between the node and the root of its tree */
+    ecs_entity_t layer; /**< Layer the node joins, written by the numbering */
     float x;          /**< X of the centre of the box in the tree */
     float y;          /**< Y of the centre of the box in the tree */
     float width;      /**< Width of the box */
@@ -74,9 +82,13 @@ typedef struct UiState {
     ecs_vec_t places;   /**< UiPlace of every node of the tree being walked */
     int32_t trees;      /**< Trees the world holds, zero skips the observers */
     int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
+    int32_t shadows;    /**< Box shadows the world holds, zero skips the shadow pass */
+    int32_t groups;     /**< Subtrees that composite, zero skips their bookkeeping */
+    int32_t opacities;  /**< Opacity components the world holds, zero skips the group pass */
+    ecs_entity_t shadow_prefab; /**< Prefab the shadow quads take their material from */
     bool busy;          /**< An update runs, the observers mark no tree */
     bool instanced;     /**< A node gained a shape, its depth bias is missing */
-    bool respawn;       /**< The text pass made or dropped glyphs, collect again */
+    bool respawn;       /**< A pass made or dropped quads, collect the tree again */
 } UiState;
 
 /** One glyph of a font, rasterized into the atlas of that font */
@@ -149,10 +161,38 @@ typedef struct UiFonts {
     bool grown;        /**< An atlas grew, every tree has to lay out again */
 } UiFonts;
 
+/** View, target and quad of a subtree that composites as one image.
+ *
+ * The subtree is rendered by a view of its own into a target the size of its
+ * Bounds, and the quad shows that target in the layer of the parent, at the
+ * place and the depth of the node, so the children of the subtree composite
+ * with each other once and with the frame once.
+ */
+typedef struct GroupImpl {
+    ecs_entity_t target; /**< RenderTarget the subtree is rendered into */
+    ecs_entity_t view;   /**< View that renders the subtree */
+    ecs_entity_t camera; /**< Orthographic camera of that view */
+    ecs_entity_t layer;  /**< Layer the subtree joins instead of the layer above it */
+    ecs_entity_t quad;   /**< Quad that composites the target in the layer above */
+    int32_t width;       /**< Width of the target in pixels */
+    int32_t height;      /**< Height of the target in pixels */
+} GroupImpl;
+
+/** Quad the shadow pass drew for an element, added with BoxShadow */
+typedef struct ShadowImpl {
+    ecs_entity_t quad; /**< The quad, 0 until the pass drew one */
+    uint64_t hash;     /**< Fingerprint of what the last build drew */
+} ShadowImpl;
+
 extern ECS_COMPONENT_DECLARE(UiImpl);
 extern ECS_COMPONENT_DECLARE(UiNode);
 extern ECS_COMPONENT_DECLARE(UiState);
 extern ECS_TAG_DECLARE(UiGlyph);
+extern ECS_TAG_DECLARE(UiShadow);
+extern ECS_TAG_DECLARE(UiComposite);
+extern ECS_TAG_DECLARE(UiQuad);
+extern ECS_COMPONENT_DECLARE(ShadowImpl);
+extern ECS_COMPONENT_DECLARE(GroupImpl);
 extern ECS_COMPONENT_DECLARE(TextImpl);
 extern ECS_COMPONENT_DECLARE(UiFonts);
 
@@ -270,9 +310,11 @@ void box_ui_walk(
  * the Position of those nodes and the Rect of a node a layout sized.
  *
  * @param world The world
+ * @param root The root of the tree being walked
  */
 void box_ui_layout(
-    ecs_world_t *world);
+    ecs_world_t *world,
+    ecs_entity_t root);
 
 /** Direct pointer to the font registry singleton, never a deferred copy.
  *
@@ -378,6 +420,45 @@ void box_ui_text_build(
  * @param world The world
  */
 void box_ui_text_init(
+    ecs_world_t *world);
+
+/** Give every element of the collected tree the quad of its box shadow.
+ *
+ * @param world The world
+ */
+void box_ui_shadow_build(
+    ecs_world_t *world);
+
+/** Register the components, the hooks and the observers of the shadow pass.
+ *
+ * @param world The world
+ */
+void box_ui_shadow_init(
+    ecs_world_t *world);
+
+/** Give every transparent subtree of the collected tree its view and its quad.
+ *
+ * @param world The world
+ * @param root The root of the tree being walked
+ */
+void box_ui_group_build(
+    ecs_world_t *world,
+    ecs_entity_t root);
+
+/** Release the view, the target and the quad of a subtree that composited.
+ *
+ * @param world The world, the stage when this runs in an observer
+ * @param group The group state of the node
+ */
+void box_ui_group_release(
+    ecs_world_t *world,
+    GroupImpl *group);
+
+/** Register the components and the observers of the group pass.
+ *
+ * @param world The world
+ */
+void box_ui_group_init(
     ecs_world_t *world);
 
 /** Register the text.measure, text.wrap and text.label script functions.

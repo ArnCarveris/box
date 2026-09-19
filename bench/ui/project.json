@@ -32,6 +32,14 @@
                     "layout_1000_glyphs_unchanged",
                     "measure_1000_glyphs"
                 ]
+            },
+            {
+                "id": "Group",
+                "benchcases": [
+                    "extract_ten_transparent_panels",
+                    "extract_ten_opaque_panels",
+                    "ten_transparent_panels_unchanged"
+                ]
             }
         ]
     }

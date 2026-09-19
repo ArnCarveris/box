@@ -47,7 +47,7 @@ Two hard rules keep the concerns apart:
 | `box.picking` | cursor rays through the views, hit resolution to the root or a `Pickable`, bubbling `on.click` script events |
 | `box.job` | worker pool, prioritised jobs, completion on the main thread in a budget |
 | `box.spline` | `Spline` with its cached arc length table, `FollowPath`, `SplineMesh` sweeps |
-| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers |
+| `box.ui` | `Ui` roots a UI tree, its layer and the orthographic view that draws it in logical pixels; `Layout`, `Anchor` and the read only `Bounds` of the layout pass; `Font` and `Text` with the glyph atlases, the quads they emit and the `text.*` script helpers; `BoxShadow` as a soft quad behind an element and the view, target and composite quad of a transparent subtree |
 | later | `box.particles`, `box.transition`, `box.lod`, `box.atmosphere` |
 
 Each module has `include/box/<module>.h` with its components and a single

@@ -11,6 +11,21 @@
 /** Entries the sorted list orders by insertion instead of by radix passes */
 #define BOX_SORT_SMALL (32)
 
+uint32_t box_render_group_handle(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    uint32_t result = 0;
+    const RenderGroup *group = ecs_get(world, e, RenderGroup);
+    const RenderTargetImpl *impl = group && group->target ?
+        ecs_get(world, group->target, RenderTargetImpl) : NULL;
+    if (impl) {
+        result = impl->handle;
+    }
+
+    return result;
+}
+
 uint32_t box_render_blend_mode(
     ecs_world_t *world,
     ecs_entity_t e)
@@ -302,6 +317,7 @@ void box_render_extract_transparent(
 
         entry->blend = box_render_blend_mode(world, e);
         entry->back = box_render_back_mode(world, e);
+        entry->group = box_render_group_handle(world, e);
         if (entry->blend == BOX_BLEND_OPAQUE && entry->data.color[3] < 1.0f) {
             entry->blend = BOX_BLEND_ALPHA;
         }

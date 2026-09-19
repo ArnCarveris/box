@@ -17,6 +17,11 @@ ECS_COMPONENT_DECLARE(UiImpl);
 ECS_COMPONENT_DECLARE(UiNode);
 ECS_COMPONENT_DECLARE(UiState);
 ECS_TAG_DECLARE(UiGlyph);
+ECS_TAG_DECLARE(UiShadow);
+ECS_TAG_DECLARE(UiComposite);
+ECS_TAG_DECLARE(UiQuad);
+ECS_COMPONENT_DECLARE(ShadowImpl);
+ECS_COMPONENT_DECLARE(GroupImpl);
 ECS_COMPONENT_DECLARE(TextImpl);
 ECS_COMPONENT_DECLARE(UiFonts);
 
@@ -252,12 +257,18 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Layout);
     ECS_META_COMPONENT(world, Anchor);
     ECS_META_COMPONENT(world, Bounds);
+    ECS_META_COMPONENT(world, BoxShadow);
     ECS_META_COMPONENT(world, Font);
     ECS_META_COMPONENT(world, Text);
     ECS_COMPONENT_DEFINE(world, UiImpl);
     ECS_COMPONENT_DEFINE(world, UiNode);
     ECS_COMPONENT_DEFINE(world, UiState);
     ECS_TAG_DEFINE(world, UiGlyph);
+    ECS_TAG_DEFINE(world, UiShadow);
+    ECS_TAG_DEFINE(world, UiComposite);
+    ECS_TAG_DEFINE(world, UiQuad);
+    ECS_COMPONENT_DEFINE(world, ShadowImpl);
+    ECS_COMPONENT_DEFINE(world, GroupImpl);
     ECS_COMPONENT_DEFINE(world, TextImpl);
     ECS_COMPONENT_DEFINE(world, UiFonts);
 
@@ -267,6 +278,9 @@ void BoxUiImport(
     ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Bounds, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, BoxShadow, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ShadowImpl, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, GroupImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiState, {
         .ctor = flecs_default_ctor,
         .dtor = box_ui_state_dtor
@@ -287,6 +301,9 @@ void BoxUiImport(
     ecs_add_pair(world, ecs_id(Font), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Text), EcsWith, ecs_id(TextImpl));
     ecs_add_pair(world, ecs_id(TextImpl), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(BoxShadow), EcsWith, ecs_id(ShadowImpl));
+    ecs_add_pair(world, ecs_id(ShadowImpl), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, ecs_id(GroupImpl), EcsOnInstantiate, EcsDontInherit);
 
     UiState *state = ecs_singleton_ensure(world, UiState);
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
@@ -326,5 +343,7 @@ void BoxUiImport(
 
     box_ui_tree_init(world);
     box_ui_text_init(world);
+    box_ui_shadow_init(world);
+    box_ui_group_init(world);
     box_ui_functions_init(world, ecs_id(BoxUi));
 }

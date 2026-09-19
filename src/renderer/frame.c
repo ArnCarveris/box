@@ -105,7 +105,8 @@ WGPURenderPipeline box_frame_pipeline(
         }
     };
 
-    bool cover = normals == BOX_NORMALS_COVER;
+    bool cover = normals == BOX_NORMALS_COVER || normals == BOX_NORMALS_GROUP_COVER;
+    bool lone = normals == BOX_NORMALS_NONE || normals == BOX_NORMALS_GROUP;
     WGPUColorTargetState targets[2] = {
         {
             .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
@@ -118,12 +119,12 @@ WGPURenderPipeline box_frame_pipeline(
                 WGPUColorWriteMask_Blue | WGPUColorWriteMask_Alpha : WGPUColorWriteMask_All
         }
     };
-    const char *entry = normals == BOX_NORMALS_NONE ? "fs_main" :
-        (cover ? "fs_cover" : "fs_normal");
+    const char *entries[] = { "fs_main", "fs_normal", "fs_cover", "fs_group",
+        "fs_group_cover" };
     WGPUFragmentState fragment = {
         .module = r->mesh_shader,
-        .entryPoint = { .data = entry, .length = WGPU_STRLEN },
-        .targetCount = normals == BOX_NORMALS_NONE ? 1u : 2u,
+        .entryPoint = { .data = entries[normals], .length = WGPU_STRLEN },
+        .targetCount = lone ? 1u : 2u,
         .targets = targets
     };
     WGPUDepthStencilState depth = {

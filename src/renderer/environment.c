@@ -310,18 +310,48 @@ static void box_env_groups(
     r->env_pass_group = wgpuDeviceCreateBindGroup(r->device, &pass_desc);
 }
 
+/** Fill the entries of the mesh bind group of the current view.
+ *
+ * @param r The renderer
+ * @param out Receives BOX_MESH_BINDINGS entries
+ */
+static void box_env_mesh_entries(
+    box_renderer_t *r,
+    WGPUBindGroupEntry *out)
+{
+    box_gpu_env_t *e = &r->envs[r->v->env_slot];
+
+    out[0] = (WGPUBindGroupEntry){ .binding = 0, .textureView = e->irradiance_view };
+    out[1] = (WGPUBindGroupEntry){ .binding = 1, .textureView = e->specular_view };
+    out[2] = (WGPUBindGroupEntry){ .binding = 2, .textureView = r->env_brdf_view };
+    out[3] = (WGPUBindGroupEntry){ .binding = 3, .sampler = r->env_sampler };
+    box_texture_bind_group(r, out + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
+    box_transparent_bind_group(r, out + BOX_SCENE_BINDING, BOX_SCENE_BINDING);
+}
+
+WGPUBindGroup box_environment_scene_group(
+    box_renderer_t *r,
+    WGPUTextureView scene)
+{
+    WGPUBindGroupEntry mesh_entries[BOX_MESH_BINDINGS];
+
+    box_env_mesh_entries(r, mesh_entries);
+    mesh_entries[BOX_SCENE_BINDING].textureView = scene;
+    WGPUBindGroupDescriptor mesh_desc = {
+        .layout = r->env_layout,
+        .entryCount = BOX_MESH_BINDINGS,
+        .entries = mesh_entries
+    };
+
+    return wgpuDeviceCreateBindGroup(r->device, &mesh_desc);
+}
+
 void box_environment_group(
     box_renderer_t *r)
 {
-    box_gpu_env_t *e = &r->envs[r->v->env_slot];
-    WGPUBindGroupEntry mesh_entries[BOX_MESH_BINDINGS] = {
-        { .binding = 0, .textureView = e->irradiance_view },
-        { .binding = 1, .textureView = e->specular_view },
-        { .binding = 2, .textureView = r->env_brdf_view },
-        { .binding = 3, .sampler = r->env_sampler }
-    };
-    box_texture_bind_group(r, mesh_entries + BOX_ENV_BINDINGS, BOX_ENV_BINDINGS);
-    box_transparent_bind_group(r, mesh_entries + BOX_SCENE_BINDING, BOX_SCENE_BINDING);
+    WGPUBindGroupEntry mesh_entries[BOX_MESH_BINDINGS];
+
+    box_env_mesh_entries(r, mesh_entries);
     WGPUBindGroupDescriptor mesh_desc = {
         .layout = r->env_layout,
         .entryCount = BOX_MESH_BINDINGS,
@@ -333,6 +363,7 @@ void box_environment_group(
 
     r->v->env_group = wgpuDeviceCreateBindGroup(r->device, &mesh_desc);
     r->v->env_dirty = false;
+    r->env_epoch ++;
 }
 
 void box_environment_rebuild(

@@ -413,6 +413,97 @@ static WGPURenderPipeline box_transparent_pipeline(
     return r->sorted_pipelines[blend][cull][slot][mode];
 }
 
+/** Pipeline that composites a render target, created the first time it is drawn.
+ *
+ * @param r The renderer
+ * @param hdr The pass writes the float scene target of a view with a chain
+ * @param cover The pass draws into the normal attachment of a chain
+ * @return The pipeline
+ */
+static WGPURenderPipeline box_transparent_group_pipeline(
+    box_renderer_t *r,
+    bool hdr,
+    bool cover)
+{
+    uint32_t slot = hdr ? 1 : 0;
+    uint32_t mode = cover ? 1 : 0;
+    if (!r->group_pipelines[slot][mode]) {
+        r->group_pipelines[slot][mode] = box_frame_pipeline(r,
+            sizeof(box_transparent_t), offsetof(box_transparent_t, data),
+            WGPUCullMode_None, false, &box_blend_states[BOX_BLEND_ALPHA], hdr,
+            cover ? BOX_NORMALS_GROUP_COVER : BOX_NORMALS_GROUP);
+    }
+
+    return r->group_pipelines[slot][mode];
+}
+
+/** Mesh bind group of a target, which binds its color in the scene slot.
+ *
+ * The group is kept with the target and built again when the environment group
+ * of a view was, because it holds the same environment and the same texture
+ * pages with one binding swapped.
+ *
+ * @param r The renderer
+ * @param handle The target handle
+ * @return The bind group, NULL when the handle names no live target
+ */
+static WGPUBindGroup box_transparent_group_bind(
+    box_renderer_t *r,
+    uint32_t handle)
+{
+    WGPUBindGroup result = NULL;
+    box_gpu_target_t *t = box_target_get(r, handle);
+    if (!t || !t->view) {
+        goto done;
+    }
+
+    if (!t->composite || t->composite_epoch != r->env_epoch) {
+        if (t->composite) {
+            wgpuBindGroupRelease(t->composite);
+        }
+
+        t->composite = box_environment_scene_group(r, t->view);
+        t->composite_epoch = r->env_epoch;
+    }
+
+    result = t->composite;
+done:
+    return result;
+}
+
+/** Draw the composite of one group at its place in the sorted list.
+ *
+ * @param r The renderer
+ * @param entry The sorted entry of the composite
+ * @param index Index of that entry in the sorted instance buffer
+ * @param pass The render pass
+ */
+static void box_transparent_group_draw(
+    box_renderer_t *r,
+    const box_transparent_t *entry,
+    uint32_t index,
+    WGPURenderPassEncoder pass)
+{
+    box_gpu_mesh_t *m = box_vec_at(&r->meshes, entry->mesh);
+    WGPUBindGroup bind = box_transparent_group_bind(r, entry->group);
+    if (!m->alive || !bind) {
+        goto done;
+    }
+
+    wgpuRenderPassEncoderSetPipeline(pass, box_transparent_group_pipeline(r,
+        r->effect_scene != NULL, r->effect_normal != NULL));
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, bind, 0, NULL);
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->sorted,
+        (uint64_t)index * sizeof(box_transparent_t), sizeof(box_transparent_t));
+    wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
+        WGPU_WHOLE_SIZE);
+    wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, 1, 0, 0, 0);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
+done:
+    return;
+}
+
 void box_transparent_draw(
     box_renderer_t *r,
     const box_view_t *view,
@@ -425,11 +516,17 @@ void box_transparent_draw(
     uint32_t first = view->transparent_first;
     while (first < end) {
         box_transparent_t *entry = box_vec_at(&p->transparent, first);
+        if (entry->group) {
+            box_transparent_group_draw(r, entry, first, pass);
+            first ++;
+            continue;
+        }
+
         uint32_t last = first + 1;
         while (last < end) {
             box_transparent_t *next = box_vec_at(&p->transparent, last);
             if (next->mesh != entry->mesh || next->blend != entry->blend ||
-                next->back != entry->back)
+                next->back != entry->back || next->group)
             {
                 break;
             }
@@ -457,6 +554,17 @@ void box_transparent_draw(
 void box_transparent_reset(
     box_renderer_t *r)
 {
+    uint32_t slot;
+    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
+        uint32_t mode;
+        for (mode = 0; mode < BOX_COVER_MODES; mode ++) {
+            if (r->group_pipelines[slot][mode]) {
+                wgpuRenderPipelineRelease(r->group_pipelines[slot][mode]);
+                r->group_pipelines[slot][mode] = NULL;
+            }
+        }
+    }
+
     uint32_t blend;
     for (blend = 0; blend < BOX_BLEND_COUNT; blend ++) {
         uint32_t cull;

@@ -1,0 +1,76 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.ui
+
+camera {
+  Position: {0, 0, -10}
+  LookAt: {0, 0, 0}
+  Camera: {fov: 55}
+}
+
+ui {
+  Ui: {height: 540}
+  Position: {0, 0, 0}
+  Rect: {960, 540}
+  Rgb: {24, 28, 38}
+
+  stripe_a {
+    Position: {-300, 0, 0}
+    Rect: {160, 540}
+    Rgb: {230, 190, 90}
+  }
+
+  stripe_b {
+    Position: {-100, 0, 0}
+    Rect: {160, 540}
+    Rgb: {80, 170, 230}
+  }
+
+  stripe_c {
+    Position: {100, 0, 0}
+    Rect: {160, 540}
+    Rgb: {225, 105, 90}
+  }
+
+  stripe_d {
+    Position: {300, 0, 0}
+    Rect: {160, 540}
+    Rgb: {110, 205, 150}
+  }
+
+  card {
+    Position: {0, 0, 0}
+    Rect: {560, 320}
+    Border: {radius: 26, width: 3, color: {235, 240, 255, 255}}
+    Rgb: {36, 42, 60}
+    Opacity: {0.55}
+
+    blob_a {
+      Position: {-110, 24, 0}
+      Circle: {radius: 90}
+      Rgb: {235, 120, 95}
+    }
+
+    blob_b {
+      Position: {0, -26, 0}
+      Circle: {radius: 90}
+      Rgb: {120, 215, 170}
+    }
+
+    blob_c {
+      Position: {110, 24, 0}
+      Circle: {radius: 90}
+      Rgb: {150, 170, 235}
+    }
+
+    bar {
+      Position: {0, -128, 0}
+      Rect: {480, 28}
+      Border: {radius: 14}
+      Rgb: {245, 205, 95}
+    }
+  }
+}

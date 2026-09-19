@@ -171,6 +171,7 @@ static box_gpu_target_t* box_target_entry(
 static void box_target_release(
     box_gpu_target_t *t)
 {
+    if (t->composite) wgpuBindGroupRelease(t->composite);
     if (t->view) wgpuTextureViewRelease(t->view);
     if (t->color) wgpuTextureRelease(t->color);
     memset(t, 0, sizeof(box_gpu_target_t));

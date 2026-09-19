@@ -373,6 +373,7 @@ static void box_render_fill_shape(
         ((uint32_t)color.b << 16) | ((uint32_t)color.a << 24);
     out->shape[3] = box_shape_pack2(half[0] / large, half[1] / large);
     box_instance_set_shape(out, true);
+    box_instance_set_soft(out, ecs_has_id(world, e, RenderSoftShape));
 done:
     return;
 }

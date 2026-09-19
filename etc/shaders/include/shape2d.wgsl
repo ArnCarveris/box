@@ -12,6 +12,11 @@
 // BOX_MODE_SHAPE_SHIFT on the engine side.
 const SHAPE2D_BIT: u32 = 0x8000u;
 
+// Bit of the instance mode word that says the shape is a soft fill instead of a
+// rectangle with a border, which is BOX_MODE_SOFT_SHIFT on the engine side. The
+// edge widths are then the distance the fill fades out over.
+const SHAPE2D_SOFT: u32 = 0x10u;
+
 // Half extents of the rectangle in units of its smaller half extent.
 fn shape2d_extent(packed: u32) -> vec2<f32> {
   let a = unpack2x16unorm(packed);
@@ -54,4 +59,25 @@ fn shape2d_eval(words: vec4<u32>, local: vec2<f32>, footprint: vec2<f32>)
   }
 
   return vec2(cov, ring);
+}
+
+// Coverage of a soft filled rounded rectangle, which is the shape the edge
+// widths inset, faded out over twice those widths. A box shadow is that fill:
+// the instance covers the shape plus its blur on every side, the widths are the
+// blur, and the fade runs from fully covered at the outline of the inset shape
+// to nothing at the edge of the instance. The ramp is smoothed once, which is
+// close enough to the falloff of a blur and costs two multiplies.
+fn shape2d_soft(words: vec4<u32>, local: vec2<f32>, footprint: vec2<f32>) -> f32 {
+  let he = shape2d_extent(words.w);
+  let p = (local * 2.0 - vec2(1.0)) * he;
+  let px = max(length(footprint * 2.0 * he), 1e-6);
+  let radii = unpack4x8unorm(words.x);
+  let w = unpack4x8unorm(words.y);
+  let inner_he = max(he - vec2(w.y + w.w, w.x + w.z) * 0.5, vec2(0.0));
+  let inner_r = max(radii - vec4(
+    max(w.x, w.w), max(w.x, w.y), max(w.z, w.y), max(w.z, w.w)), vec4(0.0));
+  let center = vec2(w.w - w.y, w.z - w.x) * 0.5;
+  let d = shape2d_distance(p - center, inner_he, inner_r);
+  let t = shape2d_coverage(d, max(w.x + w.z, px));
+  return t * t * (3.0 - 2.0 * t);
 }

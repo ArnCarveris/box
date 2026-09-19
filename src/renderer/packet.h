@@ -268,6 +268,9 @@
 /** Bit the material layer mask of an instance starts at in its mode word */
 #define BOX_MODE_LAYER_SHIFT (16)
 
+/** Bit that says the 2D shape of an instance is a soft fill instead of a border */
+#define BOX_MODE_SOFT_SHIFT (4)
+
 /** Words the packed 2D shape parameters of an instance take.
  *
  * The first holds the four corner radii, the second the four edge widths, the
@@ -891,6 +894,34 @@ static inline bool box_instance_shape(
     return (inst->uv_mode & (1u << BOX_MODE_SHAPE_SHIFT)) != 0;
 }
 
+/** Mark whether the 2D shape of an instance is a soft fill.
+ *
+ * A soft shape covers the rectangle its edge widths inset and fades out over
+ * those widths instead of drawing a border ring, which is what a box shadow
+ * draws with the rounded rectangle of a border.
+ *
+ * @param inst The instance
+ * @param on The shape is a soft fill
+ */
+static inline void box_instance_set_soft(
+    box_instance_t *inst,
+    bool on)
+{
+    inst->uv_mode &= ~(1u << BOX_MODE_SOFT_SHIFT);
+    inst->uv_mode |= on ? (1u << BOX_MODE_SOFT_SHIFT) : 0u;
+}
+
+/** Check whether the 2D shape of an instance is a soft fill.
+ *
+ * @param inst The instance
+ * @return True when the fragment stage fades the shape out
+ */
+static inline bool box_instance_soft(
+    const box_instance_t *inst)
+{
+    return (inst->uv_mode & (1u << BOX_MODE_SOFT_SHIFT)) != 0;
+}
+
 /** Pack four ratios in 0..1 into one word of four bytes.
  *
  * @param values Four ratios, the first landing in the low byte
@@ -974,11 +1005,17 @@ typedef struct box_static_count_t {
     uint32_t count;         /**< Instances in use */
 } box_static_count_t;
 
-/** One instance the sorted pass draws after the opaque batches */
+/** One instance the sorted pass draws after the opaque batches.
+ *
+ * An entry with a group handle is not a lit draw but the composite of a subtree
+ * that was rendered into that target: the quad shows the target instead of its
+ * own material and its color alpha is the opacity the subtree composites with.
+ */
 typedef struct box_transparent_t {
     uint32_t mesh;       /**< Mesh handle */
     uint32_t blend;      /**< Blend equation, BOX_BLEND_OPAQUE for a two sided opaque draw */
     uint32_t back;       /**< Back face mode of the instance */
+    uint32_t group;      /**< Render target the quad composites, 0 for an ordinary draw */
     float depth;         /**< View space depth of its origin, larger is farther away */
     box_instance_t data; /**< Instance data */
 } box_transparent_t;

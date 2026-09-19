@@ -71,29 +71,47 @@ done:
  * @param world The world
  * @param e The node
  * @param root The root of the tree
- * @param impl The private state of the root
+ * @param layer Layer the node joins, of its tree or of a group above it
  * @param order Index of the node in the walk
+ * @param depth Offset along the world z axis the node is drawn at
  */
 static void box_ui_number(
     ecs_world_t *world,
     ecs_entity_t e,
     ecs_entity_t root,
-    const UiImpl *impl,
-    int32_t order)
+    ecs_entity_t layer,
+    int32_t order,
+    float depth)
 {
     UiNode *node = ecs_get_mut(world, e, UiNode);
-    if (node) {
+    ecs_entity_t was = node ? node->layer : 0;
+    if (node && was == layer) {
         node->root = root;
         node->order = order;
-    } else {
-        ecs_set(world, e, UiNode, { .root = root, .order = order });
+        goto done;
     }
 
-    if (impl->layer && !ecs_has_pair(world, e, Layer, impl->layer)) {
-        ecs_add_pair(world, e, Layer, impl->layer);
+    if (!node) {
+        ecs_set(world, e, UiNode, { .root = root, .layer = 0, .order = order });
     }
 
-    box_render_set_depth(world, e, -(float)order * BOX_UI_STEP);
+    if (was) {
+        ecs_remove_pair(world, e, Layer, was);
+    }
+
+    if (layer && !ecs_has_pair(world, e, Layer, layer)) {
+        ecs_add_pair(world, e, Layer, layer);
+    }
+
+    node = ecs_get_mut(world, e, UiNode);
+    if (node) {
+        node->root = root;
+        node->layer = layer;
+        node->order = order;
+    }
+
+done:
+    box_render_set_depth(world, e, depth);
 }
 
 /** Collect the nodes of a tree into the places of the registry, in pre-order.
@@ -115,9 +133,11 @@ static int32_t box_ui_collect(
     UiVisit *first = ecs_vec_append_t(NULL, &state->stack, UiVisit);
     first->e = e;
     first->parent = -1;
-    first->glyph = false;
+    first->aux = false;
+    first->composite = false;
 
-    bool texts = state->texts != 0;
+    bool quads = state->texts || state->shadows || state->groups;
+    bool alpha = state->opacities != 0;
     while (ecs_vec_count(&state->stack)) {
         int32_t last = ecs_vec_count(&state->stack) - 1;
         UiVisit visit = ecs_vec_get_t(&state->stack, UiVisit, last)[0];
@@ -128,7 +148,14 @@ static int32_t box_ui_collect(
         memset(place, 0, sizeof(UiPlace));
         place->e = visit.e;
         place->parent = visit.parent;
-        place->glyph = visit.glyph;
+        place->aux = visit.aux;
+        place->composite = visit.composite;
+        bool heir = !visit.composite &&
+            (!alpha || !ecs_has(world, visit.e, Opacity));
+        if (visit.parent >= 0 && heir) {
+            ecs_vec_get_t(&state->places, UiPlace, visit.parent)->kids ++;
+        }
+
         ecs_vec_clear(&state->nodes);
         box_hierarchy_collect(world, visit.e, &state->nodes);
 
@@ -141,7 +168,8 @@ static int32_t box_ui_collect(
                 UiVisit *next = ecs_vec_append_t(NULL, &state->stack, UiVisit);
                 next->e = child;
                 next->parent = index;
-                next->glyph = texts && ecs_has_id(world, child, UiGlyph);
+                next->aux = quads && ecs_has_id(world, child, UiQuad);
+                next->composite = next->aux && ecs_has_id(world, child, UiComposite);
             }
         }
     }
@@ -150,6 +178,11 @@ static int32_t box_ui_collect(
 }
 
 /** Number the collected nodes of a tree and join them to its layer.
+ *
+ * The bias of a node is a step per place of the walk, so a node is drawn over
+ * everything before it. A shadow quad is the one node that goes the other way:
+ * it belongs to the element that casts it and is drawn part of a step behind
+ * it, which leaves it over everything that comes before that element.
  *
  * @param world The world
  * @param e The root of the tree
@@ -161,11 +194,29 @@ static void box_ui_number_places(
     const UiImpl *tree)
 {
     UiState *state = box_ui_state(world);
+    bool groups = state->groups != 0;
     int32_t i, count = ecs_vec_count(&state->places);
     for (i = 0; i < count; i ++) {
         UiPlace *place = ecs_vec_get_t(&state->places, UiPlace, i);
+        UiPlace *parent = place->parent >= 0 ?
+            ecs_vec_get_t(&state->places, UiPlace, place->parent) : NULL;
+        ecs_entity_t outer = parent ? parent->layer : tree->layer;
+        float order = (float)i;
+        if (place->composite) {
+            outer = parent && parent->parent >= 0 ?
+                ecs_vec_get_t(&state->places, UiPlace, parent->parent)->layer :
+                tree->layer;
+            order = (float)place->parent;
+        } else if (place->aux && ecs_has_id(world, place->e, UiShadow)) {
+            order = (float)place->parent - BOX_UI_SHADOW_STEP;
+        }
 
-        box_ui_number(world, place->e, e, tree, i);
+        const GroupImpl *group = groups && !place->aux ?
+            ecs_get(world, place->e, GroupImpl) : NULL;
+        place->layer = group ? group->layer : outer;
+        ecs_entity_t layer = place->layer;
+
+        box_ui_number(world, place->e, e, layer, i, -order * BOX_UI_STEP);
     }
 }
 
@@ -184,7 +235,7 @@ void box_ui_walk(
     state->respawn = false;
     int32_t count = box_ui_collect(world, e, &tree);
     if (tree.relayout) {
-        box_ui_layout(world);
+        box_ui_layout(world, e);
     }
 
     state = box_ui_state(world);
@@ -218,9 +269,6 @@ void box_ui_drop(
     }
 
     ecs_entity_t root = node->root;
-    const UiImpl *impl = ecs_is_alive(world, root) ?
-        ecs_get(world, root, UiImpl) : NULL;
-    ecs_entity_t layer = impl ? impl->layer : 0;
     ecs_vec_t todo;
 
     ecs_vec_init_t(NULL, &todo, ecs_entity_t, 0);
@@ -230,6 +278,8 @@ void box_ui_drop(
         ecs_entity_t cur = ecs_vec_get_t(&todo, ecs_entity_t, last)[0];
         ecs_vec_remove_last(&todo);
         box_hierarchy_collect(world, cur, &todo);
+        const UiNode *left = ecs_get(world, cur, UiNode);
+        ecs_entity_t layer = left ? left->layer : 0;
         if (layer) {
             ecs_remove_pair(world, cur, Layer, layer);
         }
@@ -378,11 +428,12 @@ void box_ui_tree_init(
 
     ecs_id_t placed[] = {
         ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor),
-        ecs_id(Text), ecs_id(Font), ecs_id(Rgb)
+        ecs_id(Text), ecs_id(Font), ecs_id(Rgb), ecs_id(BoxShadow),
+        ecs_id(Opacity)
     };
 
     int32_t i;
-    for (i = 0; i < 7; i ++) {
+    for (i = 0; i < 9; i ++) {
         ecs_observer(world, {
             .query.terms = {
                 { .id = placed[i], .inout = EcsInOutNone },

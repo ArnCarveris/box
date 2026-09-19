@@ -235,7 +235,9 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     let ts = tex_sample(slot_normal, uv, ddx, ddy).xyz * 2.0 - vec3(1.0);
     n = perturb(n, dp1, dp2, ddx, ddy, ts);
   }
-  if ((in.uv_mode.x & SHAPE2D_BIT) != 0u) {
+  if ((in.uv_mode.x & SHAPE2D_BIT) != 0u && (in.uv_mode.x & SHAPE2D_SOFT) != 0u) {
+    alpha = alpha * shape2d_soft(in.shape, in.bounds_pos.xy, shape_fw);
+  } else if ((in.uv_mode.x & SHAPE2D_BIT) != 0u) {
     let shape = shape2d_eval(in.shape, in.bounds_pos.xy, shape_fw);
     let border = unpack4x8unorm(in.shape.z);
     albedo = mix(albedo, srgb_to_linear(border.rgb), shape.y);
@@ -298,6 +300,29 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   *out_normal = sn;
   return resolve(color, spec, s.albedo, s.alpha, in.clip.xy, roughness, sn, v,
     blend);
+}
+
+// A subtree that composites as one image is drawn by a quad that shows the
+// target its own view rendered it into, weighted by the opacity of the group.
+// The target holds premultiplied color over a transparent clear, so the weight
+// reaches the blend as one more multiply and the children of the subtree never
+// show through each other. The quad binds that target in the slot the glass
+// model reads the scene copy from, which is why this stage needs no binding of
+// its own.
+fn group_composite(in: VertexOut) -> vec4<f32> {
+  let uv = vec2(in.bounds_pos.x, 1.0 - in.bounds_pos.y);
+  return textureSampleLevel(scene_tex, scene_samp, uv, 0.0) * in.color.a;
+}
+
+@fragment fn fs_group(in: VertexOut) -> @location(0) vec4<f32> {
+  return group_composite(in);
+}
+
+@fragment fn fs_group_cover(in: VertexOut) -> MeshOut {
+  var out: MeshOut;
+  out.color = group_composite(in);
+  out.normal = vec4(0.0, 0.0, 0.0, clamp(out.color.a, 0.0, 1.0));
+  return out;
 }
 
 @fragment fn fs_main(in: VertexOut, @builtin(front_facing) front: bool)

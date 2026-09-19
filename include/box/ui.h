@@ -171,11 +171,44 @@ ECS_STRUCT(Font, {
  * the glass model the rest of the engine draws a transparent surface with, so a
  * glyph or an image lies over what is below it without refracting it and the
  * view needs no copy of the scene behind it.
+ *
+ * An element with a BoxShadow casts one: a second quad behind it that fills the
+ * rounded rectangle of its Border, grown by the spread and faded out over the
+ * blur, with the same analytic shape a Border draws and no geometry of its own.
+ *
+ * An Opacity below one on an element that holds children makes its subtree
+ * composite as one image: the subtree is rendered at full strength by a view of
+ * its own into a target the size of its Bounds and one quad shows that target
+ * with the opacity of the element, so two children that overlap no longer show
+ * through each other. The path is taken only when the opacity of the element
+ * reaches something below it, which is a child without an opacity of its own or
+ * a child that composites a subtree of its own, so an element that is the only
+ * thing its opacity applies to keeps the single draw it always had. The subtree
+ * is clipped to the Bounds of its element, so a child that sticks out of its
+ * parent is cut off, and a nested transparent subtree renders before the one
+ * that holds it.
  */
 ECS_STRUCT(Text, {
     char *value;       /**< The string, UTF-8 */
     float line_height; /**< Logical pixels between two baselines, 0 for the font default */
     Align align;       /**< Alignment of the lines inside the box of the element */
+});
+
+/** Blurred shadow drawn behind the rounded rectangle of an element.
+ *
+ * The shadow is a second quad below the element, offset by x to the right and
+ * by y downward, grown by spread on every side and faded out over blur, and it
+ * takes the corner radii of the Border of the element so a rounded panel casts
+ * a rounded shadow. It is not part of the layout: it takes no room in the row
+ * or the column of its parent and leaves the Bounds of its element alone. A
+ * shadow with a transparent color draws nothing.
+ */
+ECS_STRUCT(BoxShadow, {
+    float x;      /**< Logical pixels the shadow is offset to the right */
+    float y;      /**< Logical pixels the shadow is offset downward */
+    float blur;   /**< Logical pixels the edge of the shadow fades out over */
+    float spread; /**< Logical pixels the shadow grows by on every side */
+    rgba color;   /**< Color of the shadow, its alpha the strength */
 });
 
 /** Rectangle an element covers, written by the layout pass and read only.
@@ -221,6 +254,12 @@ ECS_STRUCT(Bounds, {
 
 /** Edge length of a glyph atlas before it grew, one texture size class */
 #define BOX_UI_ATLAS_SIZE (256)
+
+/** Part of a step the shadow of an element sits behind that element */
+#define BOX_UI_SHADOW_STEP (0.5f)
+
+/** Pixels the target of a subtree that composites may span on one axis */
+#define BOX_UI_GROUP_MAX (4096)
 
 /** Register the box.ui module.
  *

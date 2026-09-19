@@ -21,10 +21,12 @@
  *
  * @param world The world
  * @param p The place of the node
+ * @param shadows The world holds box shadows, so a node may cast one
  */
 static void box_ui_read(
     ecs_world_t *world,
-    UiPlace *p)
+    UiPlace *p,
+    bool shadows)
 {
     const Layout *l = ecs_get(world, p->e, Layout);
     const Anchor *a = ecs_get(world, p->e, Anchor);
@@ -34,6 +36,7 @@ static void box_ui_read(
     p->has_layout = l != NULL;
     p->has_anchor = a != NULL;
     p->has_rect = r != NULL;
+    p->has_shadow = shadows && ecs_has(world, p->e, BoxShadow);
     if (l) {
         p->layout = *l;
         p->width = l->width;
@@ -325,13 +328,14 @@ static void box_ui_measure(
     UiState *state = box_ui_state(world);
     int32_t i;
     bool texts = state->texts != 0;
+    bool shadows = state->shadows != 0;
     for (i = ecs_vec_count(&state->places) - 1; i >= 0; i --) {
         UiPlace *p = ecs_vec_get_t(&state->places, UiPlace, i);
-        if (p->glyph) {
+        if (p->aux) {
             continue;
         }
 
-        box_ui_read(world, p);
+        box_ui_read(world, p, shadows);
         if (texts) {
             box_ui_text_measure(world, p);
         }
@@ -357,7 +361,7 @@ static void box_ui_arrange(
         UiPlace *parent = p->parent >= 0 ?
             ecs_vec_get_t(&state->places, UiPlace, p->parent) : NULL;
         bool placed = false;
-        if (p->glyph) {
+        if (p->aux) {
             continue;
         }
 
@@ -395,9 +399,12 @@ static void box_ui_arrange(
 }
 
 void box_ui_layout(
-    ecs_world_t *world)
+    ecs_world_t *world,
+    ecs_entity_t root)
 {
     box_ui_measure(world);
     box_ui_arrange(world);
     box_ui_text_build(world);
+    box_ui_shadow_build(world);
+    box_ui_group_build(world, root);
 }

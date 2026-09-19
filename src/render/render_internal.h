@@ -56,6 +56,24 @@ typedef struct RenderShape2D {
     rgba color;      /**< Border color, a zero alpha takes the Rgb of the entity */
 } RenderShape2D;
 
+/** Draws the 2D shape of an entity as the soft fill its edge widths inset.
+ *
+ * The tag lives beside RenderShape2D instead of in it because the modules that
+ * build a shape fill that struct field by field, so a flag inside it would be
+ * whatever their stack held.
+ */
+extern ECS_TAG_DECLARE(RenderSoftShape);
+
+/** Subtree a quad composites, which a view rendered into a render target.
+ *
+ * The quad is an ordinary sorted draw that shows the color of the target
+ * instead of a lit material, weighted by the opacity of the instance, so a
+ * subtree that was rendered once reaches the frame as one image.
+ */
+typedef struct RenderGroup {
+    ecs_entity_t target; /**< RenderTarget entity whose color the quad shows */
+} RenderGroup;
+
 /** One registered material layer, kept in the order the layers are applied in */
 typedef struct box_layer_t {
     ecs_entity_t entity; /**< The layer entity */
@@ -145,6 +163,7 @@ typedef struct RenderState {
 extern ECS_COMPONENT_DECLARE(RenderInstance);
 extern ECS_COMPONENT_DECLARE(RenderState);
 extern ECS_COMPONENT_DECLARE(RenderShape2D);
+extern ECS_COMPONENT_DECLARE(RenderGroup);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
  *
@@ -653,6 +672,16 @@ ecs_entity_t box_render_active_camera(
 void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p);
+
+/** Render target handle the composite quad of an entity shows.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The handle, 0 when the entity composites no subtree
+ */
+uint32_t box_render_group_handle(
+    ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Append the dynamic batches a view draws, grouped by mesh.
  *
