@@ -53,6 +53,21 @@ Rules for adding one:
 | Parent and ChildOf hierarchies | `parent_tree` | A spinning Parent tree carrying arms and hands, a mixed tower. |
 | Tint composition | `tint` | Primary tints on single objects and on every hierarchy flavor, parent color plus child darkening on the grandchild. |
 | Every effect at once | `showcase`, `showcase_off` | The whole chain over transparency, glass, layers and PBR textures; the pair shows what the chain does to the same content. |
+| Post process effects | `tonemap`, `auto_exposure`, `bloom`, `gtao`, `gtao_off`, `ssr`, `ssr_off`, `height_fog`, `effect_toggle`, `shader_macro` | Each effect on its own content against its off pair; the toggle scene flips one effect, the macro scene compiles a shader variant. |
+| Occlusion culling | `occlusion`, `occlusion_off`, `occlusion_sweep` | Identical pictures with Hi-Z on and off; the sweep shows a camera passing occluders. |
+| Sky and atmosphere | `atmosphere_noon`, `atmosphere_sunrise`, `atmosphere_sunset`, `time_of_day_morning`, `time_of_day_noon`, `time_of_day_night`, `celestial`, `celestial_moon`, `sky_fog` | Hillaire sky at three sun heights, the day cycle, sun and moon discs, aerial fog. |
+| Weather | `weather_fog`, `weather_overcast` | Ground fog and an overcast sky over the same scene. |
+| SVG features | `svg_text`, `svg_gradient`, `svg_mask`, `svg_clip`, `svg_filter` | One resvg feature per scene, rasterized crisp at its size. |
+| Custom meshes and glTF | `mesh3`, `custom_shape`, `gltf` | Script authored meshes with vertex alpha, three stars and an ngon from the shape registry, an authored crate and the Khronos vertex colored box. |
+| 2D shapes | `shapes_2d` | Discs, lines, borders with radii and fitted images on one sheet. |
+| Splines | `spline_path`, `spline_road` | Boxes at even arc length with followers and a light on a loop; a road loop with a centre line and a smooth pipe. |
+| Controllers | `first_person`, `controller_collision` | The first person controller in a small level; the same controller walked into walls and up steps. |
+| Collision debug | `collision_debug` | Collider wireframes per shape kind and root bounds in white, the cone in its bounds box. |
+| Picking | `picking_hover` | The middle of five boxes tinted by its `on.hover` handler after the cursor sweeps onto it. |
+| FPS overlay | `fps_overlay` | The frame rate panel with its bar chart in a corner of the view. |
+| Transitions | `transitions` | Color and position transitions captured halfway under the fixed timestep. |
+| UI | `ui_panels`, `ui_panels_small`, `ui_layout`, `ui_text`, `ui_shadow`, `ui_group_alpha`, `ui_group_alpha_direct`, `ui_hover`, `console` | Nested panels at two surface sizes, the layout gallery, paragraphs and a labelled button, box shadows, a transparent group through the texture path against the ghosting direct path, a hovered button, the open console over a scene. |
+| Primitive LOD | `lod_spheres` | A field of spheres at several distances with the segment ladder selected per projected error. |
 
 ## The showcase scene
 
