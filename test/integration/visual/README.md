@@ -52,3 +52,29 @@ Rules for adding one:
 | Cascaded shadows | `shadows`, `shadows_low_sun`, `shadows_dynamic` | Shadows attached to casters, sharp near and softer far, no acne, no seams, moving casters. |
 | Parent and ChildOf hierarchies | `parent_tree` | A spinning Parent tree carrying arms and hands, a mixed tower. |
 | Tint composition | `tint` | Primary tints on single objects and on every hierarchy flavor, parent color plus child darkening on the grandchild. |
+| Every effect at once | `showcase`, `showcase_off` | The whole chain over transparency, glass, layers and PBR textures; the pair shows what the chain does to the same content. |
+
+## The showcase scene
+
+`showcase` runs gtao, ssr, height fog, bloom, auto exposure and tone mapping
+together over one scene, and `showcase_off` is the same content with every
+effect off. Left to right, each region carries a check:
+
+- The checker wall and the three layered crates on the left: occlusion in the
+  corner, between the stacked crates and under their edges, with the dust, edge
+  wear and grime layers still reading through it.
+- The polished slab in the middle: reflections of the metal ball, the spinning
+  box and the emissive bar, which fade into the fog with distance instead of
+  reaching the fogged floor at the back.
+- The emissive bar and the spark: bloom from the tone mapped highlights, so
+  halving the strength of the bar halves its halo instead of leaving it clipped.
+- The blue alpha panel, the green additive panel and the frosted glass panel:
+  neither the occlusion nor the reflections treat them as the surface behind
+  them, and the frosted panel blurs the same HDR image the chain reads, so the
+  lamp behind it rolls off instead of clipping.
+- The colonnade at the back: height fog over everything the chain did before it,
+  and a sky gradient the tone map dithers instead of banding.
+
+The two images differ over the blended panels beyond the chain itself: a view
+with a chain blends them in linear light in its float target, a view without one
+blends them in the space its 8 bit target is shown in.
