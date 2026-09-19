@@ -1,0 +1,56 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.view
+
+$ { BakeSettings: {enabled: false} }
+
+$ { LodSettings: {enabled: true, error_px: 2} }
+
+$ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
+
+sun {
+  Rotation: {0.85, -0.5, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+camera {
+  Position: {0, 12, -60}
+  LookAt: {0, 2, 240}
+  Camera: {fov: 60, far_: 900}
+}
+
+ground {
+  Position: {0, -0.5, 240}
+  Box: {900, 1, 900}
+  Rgb: {58, 60, 64}
+  PbrMaterial: {roughness: 0.95}
+}
+
+field {
+  for i in 0..20000 {
+    _ {
+      Position: {
+        (i % 100) * 7 - 350,
+        1.2,
+        (i / 100) * 3 - 20
+      }
+      Sphere: {segments: 32, smooth: true, radius: 1.2}
+      Rgb: {(i * 37) % 256, (i * 91) % 256, (i * 53) % 256}
+      PbrMaterial: {roughness: 0.5}
+    }
+  }
+}
+
+poles {
+  for i in 0..2000 {
+    _ {
+      Position: {(i % 50) * 14 - 350, 3, (i / 50) * 15 - 20}
+      Cylinder: {segments: 24, smooth: true, length: 6, radius: 0.5}
+      Rgb: {180, 180, 190}
+      PbrMaterial: {roughness: 0.6}
+    }
+  }
+}

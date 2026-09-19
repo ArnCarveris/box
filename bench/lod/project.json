@@ -33,6 +33,13 @@
                     "merge_100k_welded",
                     "simplify_100k"
                 ]
+            },
+            {
+                "id": "Reduce",
+                "benchcases": [
+                    "select_10k_still",
+                    "select_10k_walk"
+                ]
             }
         ]
     }
