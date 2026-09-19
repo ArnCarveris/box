@@ -321,7 +321,7 @@ static void box_shape2d_on_border(
     Border *b = ecs_field(it, Border, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        RenderShape2D shape;
+        RenderShape2D shape = {0};
 
         shape.radii[0] = b[i].radius_top_left > 0.0f ? b[i].radius_top_left : b[i].radius;
         shape.radii[1] = b[i].radius_top_right > 0.0f ? b[i].radius_top_right : b[i].radius;
