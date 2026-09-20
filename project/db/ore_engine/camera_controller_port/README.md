@@ -32,3 +32,16 @@ cases still green, and the default scene flown by hand in `box_app`.
 
 - flecs-engine `src/modules/camera/camera_controller.c`, `src/controller/camera.c`,
   `src/controller/look.c`, `include/box/controller.h`, `project/db/controllers/deliverable/README.md`
+
+## Also
+
+Adding `CameraController: {}` to the camera of the default scene moved the camera, which is
+why the scene has it removed at the moment. A controller added to a camera that has a
+`Position` and a `LookAt` or a `Rotation` must start from that orientation: initialize yaw
+and pitch from the current look direction on the frame the controller appears and leave the
+position alone until an action or the mouse moves it. Cover it with a `test/controller` case
+that adds the controller to a placed camera, progresses a frame with no input, and asserts
+the position and the look direction are unchanged. Once that holds, put `using box.controller`
+and `CameraController: {}` back in `apps/box_app/etc/scenes/default.flecs` (you own that file
+for this change) and verify with a headless capture that the first frame matches the frame
+without the controller.
