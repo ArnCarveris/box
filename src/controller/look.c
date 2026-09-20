@@ -35,7 +35,7 @@ void box_controller_look(
         goto done;
     }
 
-    yaw[0] -= in->mouse.delta.x * sensitivity;
+    yaw[0] += in->mouse.delta.x * sensitivity;
     pitch[0] += in->mouse.delta.y * sensitivity;
     if (pitch[0] > BOX_CONTROLLER_PITCH_MAX) {
         pitch[0] = BOX_CONTROLLER_PITCH_MAX;
@@ -55,7 +55,7 @@ vec3 box_controller_direction(
     float yaw)
 {
     vec3 forward = vec3_new(sinf(yaw), 0, cosf(yaw));
-    vec3 right = vec3_new(-cosf(yaw), 0, sinf(yaw));
+    vec3 right = vec3_new(cosf(yaw), 0, -sinf(yaw));
     vec3 result = vec3_new(0, 0, 0);
     if (box_controller_held(world, actions->forward)) {
         result = vec3_add(result, forward);

@@ -124,11 +124,11 @@ static vec2 box_camera_turn_target(
     float speed = box_controller_value(
         cc->angular_speed, BOX_CAMERA_ANGULAR_SPEED);
     if (box_controller_held(world, actions->turn_right)) {
-        result.y -= 1.0f;
+        result.y += 1.0f;
     }
 
     if (box_controller_held(world, actions->turn_left)) {
-        result.y += 1.0f;
+        result.y -= 1.0f;
     }
 
     if (box_controller_held(world, actions->turn_up)) {
@@ -186,7 +186,7 @@ static void box_camera_turn(
             cc->sensitivity, BOX_CONTROLLER_SENSITIVITY);
         const Input *in = ecs_singleton_get(world, Input);
         cc->angular_velocity.y = in
-            ? -in->mouse.delta.x * sensitivity * yaw_scale / dt : 0.0f;
+            ? in->mouse.delta.x * sensitivity * yaw_scale / dt : 0.0f;
         cc->angular_velocity.x = in
             ? in->mouse.delta.y * sensitivity / dt : 0.0f;
     }

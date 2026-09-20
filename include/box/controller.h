@@ -35,8 +35,10 @@ extern "C" {
  * gives the camera a push along the view. A sphere of the radius slides along
  * the colliders of the scene, which keeps the camera out of geometry, and the
  * terrain entity is the floor it falls back on. Pitch and yaw follow the
- * Orientation convention, so a positive pitch looks down, and a member that
- * is zero or less takes its default.
+ * Orientation convention, so a positive pitch looks down and a growing yaw
+ * turns to the right, the way the cursor and the Right action turn; the
+ * scene has x to the right of a camera that looks along z. A member that is
+ * zero or less takes its default.
  */
 ECS_STRUCT(CameraController, {
     float speed;          /**< Units per second at full throttle, 40 by default */

@@ -13,7 +13,7 @@ static ecs_entity_t camera;
 void Camera_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxController);
+    ECS_IMPORT(w, Box);
     camera = ecs_entity(w, { .name = "camera" });
     ecs_add(w, camera, CameraController);
 
@@ -88,7 +88,7 @@ void Camera_strafing_moves_sideways(void)
     }
 
     const Position *p = ecs_get(w, camera, Position);
-    test_assert(p->x < -1.0f);
+    test_assert(p->x > 1.0f);
     test_flt(p->z, 0);
 
     box_input_reset(w);
@@ -99,7 +99,7 @@ void Camera_strafing_moves_sideways(void)
         ecs_progress(w, 0.1f);
     }
 
-    test_assert(ecs_get(w, camera, Position)->x > back);
+    test_assert(ecs_get(w, camera, Position)->x < back);
 }
 
 void Camera_up_and_down_move_the_height(void)
@@ -162,9 +162,9 @@ void Camera_the_mouse_turns_the_camera_while_captured(void)
     ecs_progress(w, 0.1f);
 
     const CameraController *cc = ecs_get(w, camera, CameraController);
-    test_flt(cc->yaw, -0.03f);
+    test_flt(cc->yaw, 0.03f);
     test_flt(cc->pitch, 0.06f);
-    test_flt(ecs_get(w, camera, Orientation)->yaw, -0.03f);
+    test_flt(ecs_get(w, camera, Orientation)->yaw, 0.03f);
     test_flt(ecs_get(w, camera, Orientation)->pitch, 0.06f);
 }
 
@@ -193,7 +193,7 @@ void Camera_the_look_action_turns_without_capture(void)
         .kind = InputMouseMove, .value = {10, 0} });
     ecs_progress(w, 0.1f);
 
-    test_flt(ecs_get(w, camera, CameraController)->yaw, -0.03f);
+    test_flt(ecs_get(w, camera, CameraController)->yaw, 0.03f);
 }
 
 void Camera_sensitivity_scales_the_turn(void)
@@ -209,7 +209,7 @@ void Camera_sensitivity_scales_the_turn(void)
         .kind = InputMouseMove, .value = {10, 0} });
     ecs_progress(w, 0.1f);
 
-    test_flt(ecs_get(w, camera, CameraController)->yaw, -0.1f);
+    test_flt(ecs_get(w, camera, CameraController)->yaw, 0.1f);
 }
 
 void Camera_pitch_stops_short_of_straight_down(void)
@@ -345,7 +345,7 @@ void Camera_sprint_scales_the_mouse_yaw(void)
         .kind = InputMouseMove, .value = {10, 0} });
     ecs_progress(w, 0.1f);
 
-    test_flt(ecs_get(w, camera, CameraController)->yaw, -0.01f);
+    test_flt(ecs_get(w, camera, CameraController)->yaw, 0.01f);
 }
 
 void Camera_the_turn_actions_follow_the_angular_smoothing_curve(void)
@@ -361,7 +361,7 @@ void Camera_the_turn_actions_follow_the_angular_smoothing_curve(void)
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(w, dt);
-        expected += (-1.5f - expected) * alpha;
+        expected += (1.5f - expected) * alpha;
         yaw += expected * dt;
     }
 
@@ -385,7 +385,7 @@ void Camera_sprint_scales_the_turn_action_yaw(void)
     }
 
     test_assert(fabsf(ecs_get(w, camera, CameraController)->angular_velocity.y
-        - 0.5f) < 0.01f);
+        + 0.5f) < 0.01f);
 }
 
 void Camera_the_wheel_gives_an_impulse_along_the_view(void)
@@ -415,8 +415,8 @@ void Camera_the_turn_coasts_to_a_stop_after_the_button_releases(void)
     ecs_progress(w, 1.0f / 60.0f);
 
     const CameraController *cc = ecs_get(w, camera, CameraController);
-    test_assert(cc->yaw < yaw_after_turn);
-    test_assert(cc->angular_velocity.y < 0);
+    test_assert(cc->yaw > yaw_after_turn);
+    test_assert(cc->angular_velocity.y > 0);
 }
 
 void Camera_the_angular_velocity_zeroes_at_the_pitch_clamp(void)
