@@ -1,6 +1,6 @@
 # box_app burns 700% CPU on the default scene
 
-A windowed box_app on the default scene sits at 700% CPU while nothing moves; an idle frame must cost one core at most and the workers must sleep.
+Reported as a box_app at 700% CPU; the process turned out to be another one, see headless_cpu_cap. Kept as the check that an idle default scene queues no per frame jobs and stays under one core.
 
 ## Details
 
