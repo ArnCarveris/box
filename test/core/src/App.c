@@ -7,12 +7,40 @@
 #include <bake_test.h>
 #include <sys/stat.h>
 #include <string.h>
+#include "../../../src/core/core_internal.h"
+#include "../../../src/job/job_internal.h"
 
 static void QuitAfterTwo(
     ecs_iter_t *it)
 {
     if (ecs_singleton_get(it->world, App)->frame == 2) {
         ecs_quit(it->world);
+    }
+}
+
+static void JobBusySpin(
+    void *ctx)
+{
+    (void)ctx;
+    ecs_time_t t0;
+    ecs_os_get_time(&t0);
+    ecs_time_t probe = t0;
+    while (ecs_time_measure(&probe) < 1.2) {
+        probe = t0;
+    }
+}
+
+static void SubmitBusyJobs(
+    ecs_iter_t *it)
+{
+    const App *app = ecs_singleton_get(it->world, App);
+    if (app->frame == 0) {
+        int32_t i;
+        for (i = 0; i < 8; i ++) {
+            box_job_desc_t desc = {0};
+            desc.run = JobBusySpin;
+            box_job_submit(it->world, &desc);
+        }
     }
 }
 
@@ -97,4 +125,25 @@ void App_cpu_budget_slows_loop(void)
     ecs_fini(world);
 
     test_assert(budgeted > uncapped * 2);
+}
+
+void App_headless_default_budget_caps_busy_jobs(void)
+{
+    // ore_engine/headless_cpu_cap
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, BoxJob);
+    ECS_SYSTEM(world, SubmitBusyJobs, EcsOnUpdate, 0);
+    App *app = ecs_singleton_ensure(world, App);
+    app->headless = true;
+    app->timeout = 1.0;
+
+    double cpu_start = box_cpu_process_time();
+    double wall_start = box_cpu_wall_time();
+    test_int(box_run(world), 0);
+    double wall_used = box_cpu_wall_time() - wall_start;
+    double cpu_used = box_cpu_process_time() - cpu_start;
+    ecs_fini(world);
+
+    test_assert(cpu_used < wall_used * 1.5);
 }

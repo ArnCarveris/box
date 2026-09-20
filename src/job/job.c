@@ -60,6 +60,17 @@ static void BoxJobUpdate(
     box_job_pool_stats(pool, stats);
 }
 
+/** JobSettings observer: apply a change to the settings as soon as it is set.
+ *
+ * @param it Iterator over the settings that were set
+ */
+static void box_job_on_settings(
+    ecs_iter_t *it)
+{
+    const JobSettings *settings = ecs_field(it, JobSettings, 0);
+    box_job_pool_configure(box_job_get_pool(it->world), settings);
+}
+
 box_job_t box_job_submit(
     ecs_world_t *world,
     const box_job_desc_t *desc)
@@ -138,4 +149,10 @@ void BoxJobImport(
     ecs_singleton_modified(world, JobPool);
 
     ECS_SYSTEM(world, BoxJobUpdate, EcsPreUpdate, 0);
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(JobSettings), .inout = EcsIn }},
+        .events = { EcsOnSet },
+        .callback = box_job_on_settings
+    });
 }

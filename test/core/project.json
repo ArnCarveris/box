@@ -37,7 +37,8 @@
                 "stops_after_timeout",
                 "stops_on_quit",
                 "process_dir_created_and_removed",
-                "cpu_budget_slows_loop"
+                "cpu_budget_slows_loop",
+                "headless_default_budget_caps_busy_jobs"
             ]
         }, {
             "id": "Queue",

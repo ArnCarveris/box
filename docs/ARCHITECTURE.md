@@ -355,10 +355,11 @@ otherwise reset.
 ## Headless and agents
 
 Every process creates `/tmp/box/<pid>` and removes it on exit. `--headless`
-requires `--frames` or `--timeout`, respects `--cpu-budget` by sleeping when it
-exceeds its share, and refuses to start when the CPU is oversubscribed. Headless
-rendering uses an offscreen target so `capture` and `render` commands work
-without a window.
+requires `--frames` or `--timeout`, caps the whole process at `--cpu-budget`
+cores (one by default) by sleeping when it exceeds its share, starts at most
+`ceil(budget)` job workers, prints the budget and the measured share at exit,
+and refuses to start when the CPU is oversubscribed. Headless rendering uses an
+offscreen target so `capture` and `render` commands work without a window.
 
 ## Coding rules
 

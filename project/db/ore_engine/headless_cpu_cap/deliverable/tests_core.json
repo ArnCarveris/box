@@ -1,0 +1,17 @@
+{
+  "project": "core",
+  "timestamp": "2026-09-20T01:00:35Z",
+  "pass": 6,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 1.214126,
+  "tests": [
+    {"suite": "App", "case": "stops_after_frames", "status": "pass", "elapsed": 0.014141},
+    {"suite": "App", "case": "stops_after_timeout", "status": "pass", "elapsed": 0.214160},
+    {"suite": "App", "case": "stops_on_quit", "status": "pass", "elapsed": 0.014202},
+    {"suite": "App", "case": "process_dir_created_and_removed", "status": "pass", "elapsed": 0.014137},
+    {"suite": "App", "case": "cpu_budget_slows_loop", "status": "pass", "elapsed": 0.033132},
+    {"suite": "App", "case": "headless_default_budget_caps_busy_jobs", "status": "pass", "elapsed": 1.213923}
+  ]
+}
