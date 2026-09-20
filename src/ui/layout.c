@@ -35,11 +35,13 @@ static void box_ui_read(
 {
     const Layout *l = ecs_get(world, p->e, Layout);
     const Anchor *a = ecs_get(world, p->e, Anchor);
+    const WorldAnchor *wa = ecs_get(world, p->e, WorldAnchor);
     const Rect *r = ecs_get(world, p->e, Rect);
     const Position *pos = ecs_get(world, p->e, Position);
 
     p->has_layout = l != NULL;
     p->has_anchor = a != NULL;
+    p->has_world = wa != NULL;
     p->has_rect = r != NULL;
     p->has_shadow = shadows && ecs_has(world, p->e, BoxShadow);
     if (l) {
@@ -50,6 +52,10 @@ static void box_ui_read(
 
     if (a) {
         p->anchor = *a;
+    }
+
+    if (wa) {
+        p->world = *wa;
     }
 
     if (pos) {
@@ -204,7 +210,7 @@ static void box_ui_scrolled(
     const UiPlace *parent,
     UiPlace *child)
 {
-    if (!parent->has_scroll || child->has_anchor) {
+    if (!parent->has_scroll || child->has_anchor || child->has_world) {
         goto done;
     }
 
@@ -500,7 +506,7 @@ static void box_ui_measure(
             box_ui_scroll_resolve(world, p);
         }
 
-        if (p->parent >= 0 && !p->has_anchor) {
+        if (p->parent >= 0 && !p->has_anchor && !p->has_world) {
             box_ui_add(ecs_vec_get_t(&state->places, UiPlace, p->parent), p);
         }
     }
@@ -538,6 +544,8 @@ static void box_ui_arrange(
         } else if (!parent) {
             p->x = p->local_x;
             p->y = p->local_y;
+        } else if (p->has_world) {
+            box_ui_world_pin(world, root, p);
         } else if (p->has_anchor) {
             box_ui_pin(world, root, parent, p);
         } else if (parent->has_layout &&

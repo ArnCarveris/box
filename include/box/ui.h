@@ -46,9 +46,10 @@
  * row or a column in child order, with padding around them, spacing between
  * them and an alignment on both axes, and writes the Position of every child it
  * places; a child with an Anchor is pinned to an edge or the centre of its
- * parent instead and takes no room in the row or the column. The pass runs for
- * a tree that changed and for no other, so a UI that stands still costs
- * nothing.
+ * parent instead and takes no room in the row or the column, and a child with
+ * a WorldAnchor is pinned to the screen projection of a world entity, for a
+ * health bar or a label over a thing in the scene. The pass runs for a tree
+ * that changed and for no other, so a UI that stands still costs nothing.
  *
  * A node with a Text is measured by that pass too: its glyphs are rasterized
  * into the atlas of its Font, the string is wrapped to the width its Layout
@@ -164,6 +165,24 @@ ECS_STRUCT(Anchor, {
     VAlign v; /**< Edge of the parent the element is pinned to on the y axis */
     float x;  /**< Offset from that edge on the x axis */
     float y;  /**< Offset from that edge on the y axis */
+});
+
+/** Follows the screen projection of a world entity or point through a view.
+ *
+ * The element is placed where the camera of the view projects the world
+ * position of the entity plus the offset, in the logical pixels of its tree,
+ * and its tree is laid out again on every frame that projection moves, after
+ * the transforms of the frame have propagated. While the point is behind the
+ * camera or outside the view the element carries Hidden, which the anchor
+ * removes again by itself; a Hidden an author put there is left alone. Like an
+ * element with an Anchor it takes no room in the row or the column of its
+ * parent, and the Layout of its own children keeps working, so a label and a
+ * bar stack under one anchor.
+ */
+ECS_STRUCT(WorldAnchor, {
+    ecs_entity_t entity; /**< Entity followed, 0 projects the offset as a world point */
+    vec3 offset;         /**< World units added to the position of the entity */
+    ecs_entity_t view;   /**< View whose camera projects, 0 takes the active camera */
 });
 
 /** Sizes a side of an element as a fraction of the matching side of its parent.

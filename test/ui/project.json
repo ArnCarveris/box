@@ -97,6 +97,24 @@
                 "teardown": true
             },
             {
+                "id": "WorldAnchor",
+                "testcases": [
+                    "projects_a_world_point_into_the_view",
+                    "a_perspective_camera_projects_the_centre",
+                    "follows_the_entity_it_names",
+                    "offset_adds_world_units",
+                    "hides_behind_the_camera",
+                    "hides_outside_the_view",
+                    "keeps_a_hidden_an_author_set",
+                    "takes_no_room_in_the_flow",
+                    "children_keep_their_layout",
+                    "a_moving_target_moves_the_element_in_the_same_frame",
+                    "a_still_scene_lays_out_nothing"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Anchor",
                 "testcases": [
                     "pins_to_the_edges_of_the_parent",

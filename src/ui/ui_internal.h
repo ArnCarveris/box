@@ -62,8 +62,10 @@ typedef struct UiPlace {
     int32_t parent;   /**< Place of the parent, -1 for the root of the tree */
     Layout layout;    /**< Layout of the node, zeroed when it has none */
     Anchor anchor;    /**< Anchor of the node, zeroed when it has none */
+    WorldAnchor world; /**< World anchor of the node, zeroed when it has none */
     bool has_layout;  /**< The node arranges its children */
     bool has_anchor;  /**< The node is pinned to its parent */
+    bool has_world;   /**< The node is pinned to the projection of a world point */
     bool has_rect;    /**< The node has a rectangle the box resizes */
     bool has_text;    /**< The node holds a string the pass draws */
     bool has_shadow;  /**< The node casts a box shadow the pass draws behind it */
@@ -96,6 +98,17 @@ typedef struct UiPlace {
     bool clipped;      /**< An element above the node clips it */
 } UiPlace;
 
+/** Last projection of a world anchored element, written by the layout.
+ *
+ * The pass after the transforms of a frame compares a fresh projection with
+ * it, so a tree is only laid out again when an anchored element moved.
+ */
+typedef struct WorldAnchorImpl {
+    float x;      /**< X the projection landed on, in logical pixels */
+    float y;      /**< Y the projection landed on, in logical pixels */
+    bool visible; /**< The point was in front of the camera and inside the view */
+} WorldAnchorImpl;
+
 /** Module wide registry of box.ui, stored as a singleton */
 typedef struct UiState {
     ecs_vec_t roots;    /**< ecs_entity_t roots of one update, collected first */
@@ -116,6 +129,7 @@ typedef struct UiState {
     bool instanced;     /**< A node gained a shape, its depth bias is missing */
     bool respawn;       /**< A pass made or dropped quads, collect the tree again */
     bool unclip;        /**< A Scroll was removed, the clips it left must be dropped */
+    bool anchors_moved; /**< A world anchored element moved after the transforms of the frame */
 } UiState;
 
 /** One glyph of a font, rasterized into the atlas of that font */
@@ -266,6 +280,8 @@ extern ECS_COMPONENT_DECLARE(TextImpl);
 extern ECS_COMPONENT_DECLARE(TextInputImpl);
 extern ECS_COMPONENT_DECLARE(ConsoleImpl);
 extern ECS_COMPONENT_DECLARE(UiFonts);
+extern ECS_COMPONENT_DECLARE(WorldAnchorImpl);
+extern ECS_TAG_DECLARE(UiWorldHidden);
 
 /** Direct pointer to the registry singleton, never a deferred copy.
  *
@@ -554,6 +570,40 @@ void box_ui_group_build(
 void box_ui_group_release(
     ecs_world_t *world,
     GroupImpl *group);
+
+/** Project the world point of an anchor into the logical pixels of a tree.
+ *
+ * @param world The world
+ * @param anchor The anchor
+ * @param root The root of the tree of the element
+ * @param x Receives the x of the projection, in logical pixels of the view
+ * @param y Receives the y of the projection, in logical pixels of the view
+ * @return Whether the point is in front of the camera and inside the view
+ */
+bool box_ui_world_project(
+    ecs_world_t *world,
+    const WorldAnchor *anchor,
+    ecs_entity_t root,
+    float *x,
+    float *y);
+
+/** Place a world anchored node on its projection and hide it when it has none.
+ *
+ * @param world The world
+ * @param root The root of the tree
+ * @param p The place of the node, its x and y are written
+ */
+void box_ui_world_pin(
+    ecs_world_t *world,
+    ecs_entity_t root,
+    UiPlace *p);
+
+/** Register the systems that follow world anchors after the transforms moved.
+ *
+ * @param world The world
+ */
+void box_ui_world_init(
+    ecs_world_t *world);
 
 /** Register the components and the observers of the group pass.
  *

@@ -268,6 +268,7 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Ui);
     ECS_META_COMPONENT(world, Layout);
     ECS_META_COMPONENT(world, Anchor);
+    ECS_META_COMPONENT(world, WorldAnchor);
     ECS_META_COMPONENT(world, Fill);
     ECS_META_COMPONENT(world, Overflow);
     ECS_META_COMPONENT(world, Scroll);
@@ -289,12 +290,18 @@ void BoxUiImport(
     ECS_COMPONENT_DEFINE(world, GroupImpl);
     ECS_COMPONENT_DEFINE(world, TextImpl);
     ECS_COMPONENT_DEFINE(world, UiFonts);
+    ECS_COMPONENT_DEFINE(world, WorldAnchorImpl);
+    ECS_TAG_DEFINE(world, UiWorldHidden);
 
     ecs_set_hooks(world, Ui, { .ctor = box_ui_ctor });
     ecs_set_hooks(world, UiImpl, { .ctor = box_ui_impl_ctor });
     ecs_set_hooks(world, UiNode, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, WorldAnchor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, WorldAnchorImpl, { .ctor = flecs_default_ctor });
+    ecs_add_pair(world, ecs_id(WorldAnchorImpl), EcsOnInstantiate, EcsDontInherit);
+    ecs_add_pair(world, UiWorldHidden, EcsOnInstantiate, EcsDontInherit);
     ecs_set_hooks(world, Fill, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Scroll, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Bounds, { .ctor = flecs_default_ctor });
@@ -370,6 +377,7 @@ void BoxUiImport(
     box_ui_text_init(world);
     box_ui_shadow_init(world);
     box_ui_group_init(world);
+    box_ui_world_init(world);
     box_ui_scroll_init(world);
     box_ui_hit_init(world);
     box_ui_text_input_init(world);

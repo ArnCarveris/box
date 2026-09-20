@@ -1,0 +1,114 @@
+// Health bars and a label pinned to the screen projection of crates in the
+// scene with WorldAnchor: one bar per crate, offset above it in world units,
+// a labelled bar whose Layout stacks a Text over its track, a bar that follows
+// a crate that moves every frame and lands over it in the frame it moved, and
+// a crate behind the camera whose bar is hidden and draws nothing.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.movement
+using box.ui
+
+camera {
+  Position: {0, 4, -10}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.5}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {20, 0.2, 20}
+  Rgb: {140, 145, 155}
+}
+
+crate_a {
+  Position: {-4, 0.6, 0}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {200, 120, 70}
+}
+
+crate_b {
+  Position: {0, 0.6, 2}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {80, 150, 230}
+}
+
+crate_c {
+  Position: {4, 0.6, -2}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {110, 205, 150}
+  DynamicTransform
+  Velocity: {-2, 0, 0}
+}
+
+crate_behind {
+  Position: {0, 0.6, -14}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {230, 90, 90}
+}
+
+ui {
+  Ui: {}
+
+  bar_a {
+    WorldAnchor: {entity: crate_a, offset: {0, 1.1, 0}}
+    Rect: {90, 12}
+    Border: {radius: 4}
+    Rgb: {30, 32, 40}
+
+    fill {
+      Anchor: {h: Left, v: Middle, x: 2}
+      Rect: {60, 8}
+      Rgb: {90, 200, 90}
+    }
+  }
+
+  bar_b {
+    WorldAnchor: {entity: crate_b, offset: {0, 1.1, 0}}
+    Layout: {direction: Column, spacing: 3, h: Center}
+
+    label {
+      Text: {value: "crate b"}
+      Font: {size: 13}
+      Rgb: {240, 244, 255}
+    }
+
+    track {
+      Rect: {90, 12}
+      Border: {radius: 4}
+      Rgb: {30, 32, 40}
+
+      fill {
+        Anchor: {h: Left, v: Middle, x: 2}
+        Rect: {30, 8}
+        Rgb: {230, 120, 60}
+      }
+    }
+  }
+
+  bar_c {
+    WorldAnchor: {entity: crate_c, offset: {0, 1.1, 0}}
+    Rect: {90, 12}
+    Border: {radius: 4}
+    Rgb: {30, 32, 40}
+
+    fill {
+      Anchor: {h: Left, v: Middle, x: 2}
+      Rect: {86, 8}
+      Rgb: {90, 200, 90}
+    }
+  }
+
+  bar_behind {
+    WorldAnchor: {entity: crate_behind, offset: {0, 1.1, 0}}
+    Rect: {90, 12}
+    Rgb: {255, 0, 255}
+  }
+}
