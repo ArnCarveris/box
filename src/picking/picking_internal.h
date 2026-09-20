@@ -29,6 +29,9 @@ typedef struct PickState {
     ecs_query_t *views;      /**< View entities the module picks against */
     ecs_query_t *cameras;    /**< Camera entities with a world transform */
     box_picking_source_t source; /**< Answers the pick of a view without a ray, 0 for none */
+    box_picking_through_t through; /**< Whether a source hit lets events through, 0 for never */
+    PickHit fallback;        /**< Ray hit behind a source hit that lets events through */
+    bool fallback_valid;     /**< The fallback holds a hit of this cursor */
     ecs_vec_t waiters;       /**< box_pick_waiter_t, one per pending await */
     PickHit hit;             /**< Hit of the last ray query */
     PickHit press;           /**< Hit the press of the held button landed on */

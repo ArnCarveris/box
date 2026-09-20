@@ -299,6 +299,10 @@
                     "a_handler_receives_the_point_in_logical_pixels",
                     "an_element_that_appears_under_a_still_cursor_is_hovered",
                     "an_element_that_moves_under_a_still_cursor_is_hovered"
+                ,
+                    "a_passthrough_tree_lets_an_untaken_event_reach_the_scene",
+                    "a_handler_keeps_a_passthrough_event_from_the_scene",
+                    "a_task_that_resumed_from_a_click_consumes_its_action"
                 ],
                 "setup": true,
                 "teardown": true

@@ -9,6 +9,7 @@
  */
 
 #include "picking_internal.h"
+#include "../input/input_internal.h"
 
 /** The async functions of the on scope, in the order of the PickEvent constants */
 static const char *box_pick_wait_names[5] = {
@@ -100,21 +101,57 @@ static bool box_pick_deliver(
     return result;
 }
 
+/** Fire the action of a node a click landed on, which takes the click.
+ *
+ * @param world The world
+ * @param e The node
+ * @return true when the node carries an action that fired
+ */
+static bool box_pick_node_action(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const Action *action = ecs_get(world, e, Action);
+    bool result = action && action->action &&
+        ecs_has(world, action->action, InputAction);
+    if (result) {
+        box_input_emit(world, action->action, e);
+    }
+
+    return result;
+}
+
 ecs_entity_t box_picking_raise(
     ecs_world_t *world,
     PickEvent event,
     const PickHit *hit)
 {
     PickState *state = box_picking_state(world);
+    Raise *raise = box_input_raise(world);
+    Raise outer = raise ? raise[0] : (Raise){0};
     ecs_entity_t result = 0;
     ecs_entity_t e = hit->entity;
     while (state && e && ecs_is_alive(world, e)) {
-        if (box_pick_deliver(state, e, event, hit)) {
+        if (raise) {
+            raise->target = e;
+            raise->source = hit->entity;
+            raise->priority = BOX_PICK_PRIORITY;
+            raise->consumed = false;
+        }
+
+        bool taken = box_pick_deliver(state, e, event, hit);
+        taken = (event == PickClick && box_pick_node_action(world, e)) || taken;
+        taken = (raise && raise->consumed) || taken;
+        if (taken) {
             result = e;
             break;
         }
 
         e = ecs_get_parent(world, e);
+    }
+
+    if (raise) {
+        raise[0] = outer;
     }
 
     return result;

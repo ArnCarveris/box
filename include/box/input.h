@@ -164,7 +164,16 @@ ECS_STRUCT(ActionEvent, {
  * event and takes the key of its binding away from every lower map, which is the
  * handler side of the consume flag of a binding. The order a frame delivers in
  * is the order the layers resolve in: the highest map first, then the deepest
- * node of the UI over the scene, then the scene itself.
+ * node of the UI over the scene, then the scene itself. A pick event bubbles
+ * from the node the cursor is on up its parents against this record with the
+ * priority BOX_PICK_PRIORITY: a script handler the node resolves takes it,
+ * because its task resumes after the delivery, a click on a node with an
+ * Action takes it by firing the action, box_event_stop inside the delivery
+ * takes it, and a taken event reaches no ancestor. A UI element keeps an event
+ * from the scene behind it unless its tree opted in with Ui.passthrough, in
+ * which case an event no node took goes on to the ray of the views behind. A
+ * task that resumed from a click takes the action it fired for the rest of
+ * the frame with box_input_consume, the same call a key handler makes.
  */
 ECS_STRUCT(Raise, {
     ecs_entity_t target; /**< Action or entity the raise is about, 0 between raises */

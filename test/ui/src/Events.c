@@ -467,3 +467,154 @@ void Events_an_element_that_moves_under_a_still_cursor_is_hovered(void)
 
     test_bool(ecs_has_id(w, button, Hovered), true);
 }
+
+void Events_a_passthrough_tree_lets_an_untaken_event_reach_the_scene(void)
+{
+    // ore_engine/event_propagation
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.geometry\n"
+        "using box.ui\n"
+        "cam {\n"
+        "  Position: {0, 0, -10}\n"
+        "  Camera: {fov: 60, aspect_ratio: 1}\n"
+        "}\n"
+        "view {\n"
+        "  View: {camera: cam, priority: 0, enabled: true}\n"
+        "}\n"
+        "template Target {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "  async {\n"
+        "    await on.hover(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n"
+        "ui {\n"
+        "  Ui: {height: 540, passthrough: true}\n"
+        "  button { Rect: {60, 40} }\n"
+        "}\n" });
+    test_assert(s != 0);
+    ecs_entity_t ball = ecs_lookup(w, "ball");
+    ecs_entity_t button = ecs_lookup(w, "ui.button");
+    test_assert(ball != 0 && button != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {480, 270} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, button, Hovered), true);
+    test_bool(ecs_has_id(w, ball, Hovered), false);
+    test_bool(ecs_has_id(w, ball, fired_tag), true);
+}
+
+void Events_a_handler_keeps_a_passthrough_event_from_the_scene(void)
+{
+    // ore_engine/event_propagation
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.geometry\n"
+        "using box.ui\n"
+        "cam {\n"
+        "  Position: {0, 0, -10}\n"
+        "  Camera: {fov: 60, aspect_ratio: 1}\n"
+        "}\n"
+        "view {\n"
+        "  View: {camera: cam, priority: 0, enabled: true}\n"
+        "}\n"
+        "template Target {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "  async {\n"
+        "    await on.hover(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "template Button {\n"
+        "  mut hits = 0\n"
+        "  Rect: {60, 40}\n"
+        "  async {\n"
+        "    await on.hover(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    LeafFired\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n"
+        "ui {\n"
+        "  Ui: {height: 540, passthrough: true}\n"
+        "  Button button\n"
+        "}\n" });
+    test_assert(s != 0);
+    ecs_entity_t ball = ecs_lookup(w, "ball");
+    ecs_entity_t button = ecs_lookup(w, "ui.button");
+    test_assert(ball != 0 && button != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {480, 270} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, button, leaf_tag), true);
+    test_bool(ecs_has_id(w, ball, fired_tag), false);
+}
+
+void Events_a_task_that_resumed_from_a_click_consumes_its_action(void)
+{
+    // ore_engine/event_propagation
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.geometry\n"
+        "using box.input\n"
+        "using box.picking\n"
+        "using box.ui\n"
+        "actions {\n"
+        "  Save { InputAction: {description: \"Save the world\"} }\n"
+        "}\n"
+        "template Button {\n"
+        "  mut taken = false\n"
+        "  Rect: {120, 60}\n"
+        "  Action: {action: actions.Save}\n"
+        "  async {\n"
+        "    await on.click(this)\n"
+        "    taken = input.consume(actions.Save)\n"
+        "  }\n"
+        "  if taken {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "ui {\n"
+        "  Ui: {height: 540}\n"
+        "  Button button\n"
+        "}\n" });
+    test_assert(s != 0);
+    ecs_entity_t button = ecs_lookup(w, "ui.button");
+    test_assert(button != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {480, 270} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, button, fired_tag), true);
+}

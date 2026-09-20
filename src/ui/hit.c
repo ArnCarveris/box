@@ -388,6 +388,22 @@ bool box_ui_mouse_captured(
     return capture != NULL && capture->mouse;
 }
 
+/** Tell whether the tree of an element lets events no node took through.
+ *
+ * @param world The world
+ * @param e The element the hit test answered with
+ * @return true when the Ui of its tree has passthrough set
+ */
+static bool box_ui_hit_through(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const UiNode *node = ecs_get(world, e, UiNode);
+    const Ui *ui = node ? ecs_get(world, node->root, Ui) : NULL;
+
+    return ui != NULL && ui->passthrough;
+}
+
 void box_ui_hit_init(
     ecs_world_t *world)
 {
@@ -426,4 +442,5 @@ void box_ui_hit_init(
     });
 
     box_picking_set_source(world, box_ui_hit_pick);
+    box_picking_set_through(world, box_ui_hit_through);
 }

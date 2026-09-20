@@ -1,0 +1,27 @@
+{
+  "project": "ui",
+  "timestamp": "2026-09-20T02:44:48Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.164507,
+  "tests": [
+    {"suite": "Events", "case": "hovered_marks_the_element_under_the_cursor", "status": "pass", "elapsed": 0.087147},
+    {"suite": "Events", "case": "hover_resumes_a_handler", "status": "pass", "elapsed": 0.088070},
+    {"suite": "Events", "case": "click_resumes_a_handler", "status": "pass", "elapsed": 0.087627},
+    {"suite": "Events", "case": "click_bubbles_to_the_parent", "status": "pass", "elapsed": 0.088317},
+    {"suite": "Events", "case": "a_child_handler_consumes_the_click", "status": "pass", "elapsed": 0.088535},
+    {"suite": "Events", "case": "drag_resumes_a_handler", "status": "pass", "elapsed": 0.087576},
+    {"suite": "Events", "case": "an_element_consumes_the_pick_before_the_scene", "status": "pass", "elapsed": 0.087218},
+    {"suite": "Events", "case": "the_scene_is_picked_beside_the_tree", "status": "pass", "elapsed": 0.086972},
+    {"suite": "Events", "case": "a_click_emits_the_action_of_the_element", "status": "pass", "elapsed": 0.076725},
+    {"suite": "Events", "case": "the_action_of_an_ancestor_fires", "status": "pass", "elapsed": 0.076833},
+    {"suite": "Events", "case": "a_handler_receives_the_point_in_logical_pixels", "status": "pass", "elapsed": 0.076275},
+    {"suite": "Events", "case": "an_element_that_appears_under_a_still_cursor_is_hovered", "status": "pass", "elapsed": 0.076022},
+    {"suite": "Events", "case": "an_element_that_moves_under_a_still_cursor_is_hovered", "status": "pass", "elapsed": 0.076053},
+    {"suite": "Events", "case": "a_passthrough_tree_lets_an_untaken_event_reach_the_scene", "status": "pass", "elapsed": 0.076105},
+    {"suite": "Events", "case": "a_handler_keeps_a_passthrough_event_from_the_scene", "status": "pass", "elapsed": 0.076060},
+    {"suite": "Events", "case": "a_task_that_resumed_from_a_click_consumes_its_action", "status": "pass", "elapsed": 0.075464}
+  ]
+}

@@ -26,7 +26,9 @@ static void box_pick_query(
     PickHit hit;
 
     memset(&state->hit, 0, sizeof(PickHit));
+    memset(&state->fallback, 0, sizeof(PickHit));
     state->hit.cursor = cursor;
+    state->fallback_valid = false;
     for (i = 0; i < count; i ++) {
         state->queries ++;
         if (box_picking_pick(world, views[i].entity, cursor, &hit)) {
@@ -35,8 +37,41 @@ static void box_pick_query(
         }
     }
 
+    bool through = state->hit.entity && !state->hit.collider &&
+        state->through && state->through(world, state->hit.entity);
+    for (i = i + 1; through && i < count; i ++) {
+        state->queries ++;
+        if (box_picking_pick(world, views[i].entity, cursor, &hit)) {
+            state->fallback = hit;
+            state->fallback_valid = true;
+            break;
+        }
+    }
+
     state->cursor = cursor;
     state->valid = true;
+}
+
+/** Raise an event on the hit, and on the hit behind it when nothing took it.
+ *
+ * @param world The world
+ * @param state The module state
+ * @param event The interaction to raise
+ * @param hit The hit the handlers receive
+ * @return The entity that took the event, 0 when nothing did
+ */
+static ecs_entity_t box_pick_raise(
+    ecs_world_t *world,
+    PickState *state,
+    PickEvent event,
+    const PickHit *hit)
+{
+    ecs_entity_t result = box_picking_raise(world, event, hit);
+    if (!result && state->fallback_valid && hit == &state->hit) {
+        result = box_picking_raise(world, event, &state->fallback);
+    }
+
+    return result;
 }
 
 /** Move the Hovered tag to the entity the cursor points at.
@@ -57,7 +92,7 @@ static void box_pick_hover(
 {
     if (state->hovered == entity) {
         if (state->hover_missed &&
-            box_picking_raise(it->stage, PickHover, &state->hit))
+            box_pick_raise(it->stage, state, PickHover, &state->hit))
         {
             state->hover_missed = false;
         }
@@ -74,7 +109,7 @@ static void box_pick_hover(
     if (entity) {
         ecs_add_id(it->stage, entity, Hovered);
         state->hover_missed =
-            box_picking_raise(it->stage, PickHover, &state->hit) == 0;
+            box_pick_raise(it->stage, state, PickHover, &state->hit) == 0;
     }
 
 done:
@@ -124,7 +159,7 @@ static void box_pick_buttons(
         state->press_window = in->mouse.window;
         state->dragging = false;
         if (state->hit.entity) {
-            box_picking_raise(it->stage, PickPress, &state->hit);
+            box_pick_raise(it->stage, state, PickPress, &state->hit);
         }
     }
 
@@ -143,12 +178,11 @@ static void box_pick_buttons(
 
     if (released) {
         if (state->hit.entity) {
-            box_picking_raise(it->stage, PickRelease, &state->hit);
+            box_pick_raise(it->stage, state, PickRelease, &state->hit);
         }
 
         if (!state->dragging && state->hit.entity == state->press.entity) {
-            box_picking_raise(it->stage, PickClick, &state->hit);
-            box_picking_action(it->stage, state->hit.entity);
+            box_pick_raise(it->stage, state, PickClick, &state->hit);
         }
 
         memset(&state->press, 0, sizeof(PickHit));

@@ -72,6 +72,16 @@ void box_picking_set_source(
     }
 }
 
+void box_picking_set_through(
+    ecs_world_t *world,
+    box_picking_through_t through)
+{
+    PickState *state = box_picking_state(world);
+    if (state) {
+        state->through = through;
+    }
+}
+
 void box_picking_invalidate(
     ecs_world_t *world)
 {

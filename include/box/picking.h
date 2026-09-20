@@ -132,6 +132,32 @@ void box_picking_set_source(
     ecs_world_t *world,
     box_picking_source_t source);
 
+/** Tell whether an entity a source answered lets unconsumed events through.
+ *
+ * A tree of box.ui that opted in keeps its element under the cursor, but an
+ * event no handler of that element or its ancestors took goes on to the ray of
+ * the views behind it, so a scene under a transparent overlay still hears it.
+ *
+ * @param world The world
+ * @param entity The entity the source answered with
+ * @return true when an unconsumed event falls through to the ray query
+ */
+typedef bool (*box_picking_through_t)(
+    const ecs_world_t *world,
+    ecs_entity_t entity);
+
+/** Install the test that decides whether a source hit lets events through.
+ *
+ * @param world The world
+ * @param through The test, 0 to drop the one that was installed
+ */
+void box_picking_set_through(
+    ecs_world_t *world,
+    box_picking_through_t through);
+
+/** Priority the Raise record carries while a pick event is delivered */
+#define BOX_PICK_PRIORITY (-1)
+
 /** Build the world ray of a normalized position in a view.
  *
  * The position is the one the Mouse of the Input singleton reports: the origin
@@ -187,13 +213,16 @@ bool box_picking_pick(
 /** Raise a pick event at the handlers of an entity and of its ancestors.
  *
  * The event starts at the entity of the hit and walks up the parent chain. The
- * first entity whose handlers the event resolves consumes it, so an ancestor of
- * a consuming entity never sees it.
+ * bubble is delivered against the Raise record of the world, one node at a
+ * time from the hit up: a handler the node resolves takes the event, because a
+ * task resumes after the delivery and cannot stop it itself, a click on a node
+ * with an Action fires the action and takes it, and box_event_stop called
+ * inside the delivery takes it too. A taken event reaches no ancestor.
  *
  * @param world The world
  * @param event The interaction to raise
  * @param hit The hit the handlers receive
- * @return The entity that consumed the event, 0 when nothing handled it
+ * @return The entity that took the event, 0 when nothing did
  */
 ecs_entity_t box_picking_raise(
     ecs_world_t *world,

@@ -107,6 +107,7 @@ ECS_STRUCT(Ui, {
     float height;      /**< Logical pixels the view shows vertically, 0 follows the surface */
     float scale;       /**< Surface points one logical pixel covers, default 1 */
     int32_t priority;  /**< Order of a created view in the frame, default 1000 */
+    bool passthrough;  /**< An event no element took goes on to the scene behind the tree */
 });
 
 /** Where an element or the children of a layout sit on the x axis */

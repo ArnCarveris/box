@@ -550,3 +550,84 @@ void Events_a_click_fires_the_action_of_the_entity(void)
     test_bool(ecs_get(w, action, InputAction)->pressed, true);
     test_bool(ecs_get(w, action, InputAction)->released, true);
 }
+
+void Events_a_click_that_fires_an_action_stops_the_bubble(void)
+{
+    // ore_engine/event_propagation
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.input\n"
+        "using box.picking\n"
+        "actions { Fire { InputAction: {description: \"Fire\"} } }\n"
+        "template Rig {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  async {\n"
+        "    await on.click(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "  ball {\n"
+        "    Position: {0, 0, 0}\n"
+        "    SphereCollider: {radius: 1}\n"
+        "    Action: {action: actions.Fire}\n"
+        "  }\n"
+        "}\n"
+        "Rig rig\n" });
+    test_assert(s != 0);
+    ecs_entity_t rig = ecs_lookup(w, "rig");
+    ecs_entity_t fire = ecs_lookup(w, "actions.Fire");
+    test_assert(rig != 0 && fire != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, rig, fired_tag), false);
+}
+
+void Events_a_parent_takes_the_click_when_the_child_has_no_action(void)
+{
+    // ore_engine/event_propagation
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "template Rig {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  async {\n"
+        "    await on.click(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "  ball {\n"
+        "    Position: {0, 0, 0}\n"
+        "    SphereCollider: {radius: 1}\n"
+        "  }\n"
+        "}\n"
+        "Rig rig\n" });
+    test_assert(s != 0);
+    ecs_entity_t rig = ecs_lookup(w, "rig");
+    test_assert(rig != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, rig, fired_tag), true);
+}

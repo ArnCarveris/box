@@ -1,0 +1,1202 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-20T02:44:48Z",
+  "pass": 167,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.647667,
+  "tests": [
+    {
+      "suite": "Ray",
+      "case": "center_of_the_default_camera_looks_forward",
+      "status": "pass",
+      "elapsed": 0.038733,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "without_a_camera_there_is_no_ray",
+      "status": "pass",
+      "elapsed": 0.038632,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "follows_the_cursor_to_the_right",
+      "status": "pass",
+      "elapsed": 0.038947,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "follows_the_cursor_up",
+      "status": "pass",
+      "elapsed": 0.03911,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "widens_with_the_aspect_of_the_surface",
+      "status": "pass",
+      "elapsed": 0.038988,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "camera_aspect_ratio_overrides_the_surface",
+      "status": "pass",
+      "elapsed": 0.038708,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "turns_with_the_camera",
+      "status": "pass",
+      "elapsed": 0.038947,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "of_an_orthographic_camera_is_parallel",
+      "status": "pass",
+      "elapsed": 0.038696,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "a_view_builds_its_ray_from_its_own_camera",
+      "status": "pass",
+      "elapsed": 0.027542,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "a_view_without_a_camera_has_no_ray",
+      "status": "pass",
+      "elapsed": 0.027251,
+      "project": "picking"
+    },
+    {
+      "suite": "Ray",
+      "case": "aspect_of_a_render_target_comes_from_the_target",
+      "status": "pass",
+      "elapsed": 0.027699,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "finds_the_object_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.027637,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "misses_when_the_ray_points_away",
+      "status": "pass",
+      "elapsed": 0.027262,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "takes_the_nearest_of_two_objects",
+      "status": "pass",
+      "elapsed": 0.027421,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "hit_carries_the_normal_of_the_collider",
+      "status": "pass",
+      "elapsed": 0.026972,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "beyond_the_max_distance_is_a_miss",
+      "status": "pass",
+      "elapsed": 0.027037,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_prefab_root",
+      "status": "pass",
+      "elapsed": 0.025143,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_template_root",
+      "status": "pass",
+      "elapsed": 0.025928,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_descendant_is_the_target",
+      "status": "pass",
+      "elapsed": 0.024768,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_between_the_hit_and_the_root_is_the_target",
+      "status": "pass",
+      "elapsed": 0.024686,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "an_entity_outside_a_root_targets_itself",
+      "status": "pass",
+      "elapsed": 0.024774,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "the_view_with_the_highest_priority_picks_first",
+      "status": "pass",
+      "elapsed": 0.024414,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_disabled_view_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.024697,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_view_with_a_render_target_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.024215,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "matches_a_brute_force_pick_on_a_smaller_scene",
+      "status": "pass",
+      "elapsed": 0.067684,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "matches_a_brute_force_pick_with_one_more_entity",
+      "status": "pass",
+      "elapsed": 0.06814,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "equal_distance_resolves_to_the_lowest_id",
+      "status": "pass",
+      "elapsed": 0.024769,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "hover_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.02511,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_waiter_registered_while_already_hovered_resumes_on_the_next_update",
+      "status": "pass",
+      "elapsed": 0.025104,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "the_hovered_tag_follows_the_cursor",
+      "status": "pass",
+      "elapsed": 0.024508,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "press_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.025296,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "release_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.024234,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "click_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.024491,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "drag_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.02419,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_drag_does_not_raise_a_click",
+      "status": "pass",
+      "elapsed": 0.023893,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_receives_the_hit",
+      "status": "pass",
+      "elapsed": 0.023941,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "an_event_bubbles_to_the_parent",
+      "status": "pass",
+      "elapsed": 0.023903,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_child_handler_consumes_the_event",
+      "status": "pass",
+      "elapsed": 0.023796,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_still_cursor_runs_no_query",
+      "status": "pass",
+      "elapsed": 0.024952,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "every_view_costs_one_query",
+      "status": "pass",
+      "elapsed": 0.024943,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "disabled_picking_raises_nothing",
+      "status": "pass",
+      "elapsed": 0.024434,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_cancelled_task_drops_its_waiter",
+      "status": "pass",
+      "elapsed": 0.02525,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_fires_the_action_of_the_entity",
+      "status": "pass",
+      "elapsed": 0.0249,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_that_fires_an_action_stops_the_bubble",
+      "status": "pass",
+      "elapsed": 0.025304,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_parent_takes_the_click_when_the_child_has_no_action",
+      "status": "pass",
+      "elapsed": 0.023912,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "an_entity_is_not_picked",
+      "status": "pass",
+      "elapsed": 0.035768,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_subtree_is_not_picked",
+      "status": "pass",
+      "elapsed": 0.037419,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "the_nearest_visible_object_is_picked",
+      "status": "pass",
+      "elapsed": 0.038357,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_root_leaves_the_index_with_empty_bounds",
+      "status": "pass",
+      "elapsed": 0.037165,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_part_of_a_root_shrinks_its_bounds",
+      "status": "pass",
+      "elapsed": 0.037615,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_ray_query_misses_it",
+      "status": "pass",
+      "elapsed": 0.037198,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_sphere_query_skips_it",
+      "status": "pass",
+      "elapsed": 0.036841,
+      "project": "picking"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_mover_leaves_the_dynamic_index",
+      "status": "pass",
+      "elapsed": 0.036331,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "hovered_marks_the_element_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.087147,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "hover_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.08807,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "click_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.087627,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "click_bubbles_to_the_parent",
+      "status": "pass",
+      "elapsed": 0.088317,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_child_handler_consumes_the_click",
+      "status": "pass",
+      "elapsed": 0.088535,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "drag_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.087576,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_consumes_the_pick_before_the_scene",
+      "status": "pass",
+      "elapsed": 0.087218,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "the_scene_is_picked_beside_the_tree",
+      "status": "pass",
+      "elapsed": 0.086972,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_emits_the_action_of_the_element",
+      "status": "pass",
+      "elapsed": 0.076725,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "the_action_of_an_ancestor_fires",
+      "status": "pass",
+      "elapsed": 0.076833,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_receives_the_point_in_logical_pixels",
+      "status": "pass",
+      "elapsed": 0.076275,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_that_appears_under_a_still_cursor_is_hovered",
+      "status": "pass",
+      "elapsed": 0.076022,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_that_moves_under_a_still_cursor_is_hovered",
+      "status": "pass",
+      "elapsed": 0.076053,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_passthrough_tree_lets_an_untaken_event_reach_the_scene",
+      "status": "pass",
+      "elapsed": 0.076105,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_keeps_a_passthrough_event_from_the_scene",
+      "status": "pass",
+      "elapsed": 0.07606,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_task_that_resumed_from_a_click_consumes_its_action",
+      "status": "pass",
+      "elapsed": 0.075464,
+      "project": "ui"
+    },
+    {
+      "suite": "Input",
+      "case": "defaults_of_the_singleton",
+      "status": "pass",
+      "elapsed": 0.02347,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_is_set_for_one_frame",
+      "status": "pass",
+      "elapsed": 0.023649,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "held_key_keeps_its_state",
+      "status": "pass",
+      "elapsed": 0.021607,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "release_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.022964,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "press_and_release_in_one_frame_keeps_the_press",
+      "status": "pass",
+      "elapsed": 0.023218,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_buttons_use_their_own_slots",
+      "status": "pass",
+      "elapsed": 0.024153,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_holds_the_characters_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.024838,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_encodes_utf8",
+      "status": "pass",
+      "elapsed": 0.021552,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "text_buffer_stops_at_its_size",
+      "status": "pass",
+      "elapsed": 0.020483,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "scroll_accumulates_over_frames",
+      "status": "pass",
+      "elapsed": 0.020953,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_window_position_follows_the_events",
+      "status": "pass",
+      "elapsed": 0.019592,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_delta_is_the_movement_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.020704,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_view_and_normalized_come_from_the_surface",
+      "status": "pass",
+      "elapsed": 0.019131,
+      "project": "input"
+    },
+    {
+      "suite": "Input",
+      "case": "mouse_center_is_the_origin_of_the_view",
+      "status": "pass",
+      "elapsed": 0.019413,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "a_new_world_is_focused",
+      "status": "pass",
+      "elapsed": 0.020809,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "focus_loss_clears_the_key_state",
+      "status": "pass",
+      "elapsed": 0.019896,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_presses_nothing",
+      "status": "pass",
+      "elapsed": 0.020524,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "refocus_does_not_jump_the_cursor",
+      "status": "pass",
+      "elapsed": 0.019659,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.01973,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "platform_keys_are_ignored_while_minimized",
+      "status": "pass",
+      "elapsed": 0.019761,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "injected_keys_are_applied_while_unfocused",
+      "status": "pass",
+      "elapsed": 0.019073,
+      "project": "input"
+    },
+    {
+      "suite": "Focus",
+      "case": "minimize_event_sets_and_clears_the_flag",
+      "status": "pass",
+      "elapsed": 0.019508,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_of_one_frame_releases_the_next_frame",
+      "status": "pass",
+      "elapsed": 0.019382,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_press_with_a_duration_holds_the_key",
+      "status": "pass",
+      "elapsed": 0.018728,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_down_without_a_duration_stays_down",
+      "status": "pass",
+      "elapsed": 0.020391,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "delay_postpones_the_event",
+      "status": "pass",
+      "elapsed": 0.02025,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "platform_events_are_applied_before_injected",
+      "status": "pass",
+      "elapsed": 0.020248,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "events_of_one_frame_keep_their_order",
+      "status": "pass",
+      "elapsed": 0.020133,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "a_sweep_walks_the_cursor_over_frames",
+      "status": "pass",
+      "elapsed": 0.019769,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "pending_counts_the_queued_events",
+      "status": "pass",
+      "elapsed": 0.019421,
+      "project": "input"
+    },
+    {
+      "suite": "Inject",
+      "case": "reset_empties_the_queue_and_clears_the_state",
+      "status": "pass",
+      "elapsed": 0.018812,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "printable_keys_are_ascii",
+      "status": "pass",
+      "elapsed": 0.018482,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "mouse_buttons_are_128_and_129",
+      "status": "pass",
+      "elapsed": 0.020155,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "spare_codes_are_unique_and_fit_the_table",
+      "status": "pass",
+      "elapsed": 0.020063,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "keys_are_exported_as_script_constants",
+      "status": "pass",
+      "elapsed": 0.020034,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "family_modifiers_are_reserved_above_the_slots",
+      "status": "pass",
+      "elapsed": 0.020541,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_printable_keys_map_to_themselves",
+      "status": "pass",
+      "elapsed": 0.020093,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_named_keys_map_to_spare_codes",
+      "status": "pass",
+      "elapsed": 0.02049,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "glfw_unknown_keys_map_to_none",
+      "status": "pass",
+      "elapsed": 0.020022,
+      "project": "input"
+    },
+    {
+      "suite": "Codes",
+      "case": "reflection_describes_the_singleton",
+      "status": "pass",
+      "elapsed": 0.020285,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_binding_presses_holds_and_releases",
+      "status": "pass",
+      "elapsed": 0.02029,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_modifier_binding_matches_its_side",
+      "status": "pass",
+      "elapsed": 0.019559,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_family_modifier_matches_either_side",
+      "status": "pass",
+      "elapsed": 0.019732,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_more_specific_binding_wins",
+      "status": "pass",
+      "elapsed": 0.019847,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_pure_modifier_binding_fires_while_it_is_held",
+      "status": "pass",
+      "elapsed": 0.019316,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_binding_claims_the_modifier_of_a_pure_binding",
+      "status": "pass",
+      "elapsed": 0.01985,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_actions_share_one_mask",
+      "status": "pass",
+      "elapsed": 0.01944,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "two_masks_share_one_action",
+      "status": "pass",
+      "elapsed": 0.019555,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "rebinding_moves_the_action_to_another_key",
+      "status": "pass",
+      "elapsed": 0.020149,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "unbinding_releases_the_action",
+      "status": "pass",
+      "elapsed": 0.019902,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_disabled_map_stops_its_bindings",
+      "status": "pass",
+      "elapsed": 0.019497,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_key_pair_on_a_map_binds_an_action",
+      "status": "pass",
+      "elapsed": 0.01983,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "emitting_fires_an_action_without_a_key",
+      "status": "pass",
+      "elapsed": 0.019406,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_event_list_holds_the_phases_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.019563,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "a_script_authors_the_map",
+      "status": "pass",
+      "elapsed": 0.019748,
+      "project": "input"
+    },
+    {
+      "suite": "Actions",
+      "case": "the_scene_map_binds_its_actions",
+      "status": "pass",
+      "elapsed": 0.019634,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_binding_that_consumes_keeps_the_key_from_a_lower_map",
+      "status": "pass",
+      "elapsed": 0.020871,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_higher_map_that_does_not_consume_leaves_the_lower_one_alone",
+      "status": "pass",
+      "elapsed": 0.021183,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_map_that_consumes_covers_its_key_pairs",
+      "status": "pass",
+      "elapsed": 0.020929,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_disabled_consuming_map_lets_the_key_through",
+      "status": "pass",
+      "elapsed": 0.021168,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_consuming_map_keeps_only_the_keys_it_binds",
+      "status": "pass",
+      "elapsed": 0.020929,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "maps_of_one_priority_both_resolve",
+      "status": "pass",
+      "elapsed": 0.02074,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_binding_without_a_map_sits_at_the_base_layer",
+      "status": "pass",
+      "elapsed": 0.020228,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "the_events_of_a_frame_start_at_the_highest_map",
+      "status": "pass",
+      "elapsed": 0.020179,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_action_takes_its_key_from_the_maps_below",
+      "status": "pass",
+      "elapsed": 0.02064,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_leaves_the_maps_above_and_beside_it_alone",
+      "status": "pass",
+      "elapsed": 0.020259,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_handler_consumes_the_key_of_the_map_below",
+      "status": "pass",
+      "elapsed": 0.021201,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_handler_that_does_not_consume_leaves_the_map_below",
+      "status": "pass",
+      "elapsed": 0.020704,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "stopping_outside_a_raise_does_nothing",
+      "status": "pass",
+      "elapsed": 0.020061,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_action_clears_it_for_the_frame",
+      "status": "pass",
+      "elapsed": 0.020097,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_drops_the_events_of_the_frame",
+      "status": "pass",
+      "elapsed": 0.019893,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_a_held_action_does_not_press_it_again",
+      "status": "pass",
+      "elapsed": 0.019616,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "consuming_an_idle_action_reports_nothing",
+      "status": "pass",
+      "elapsed": 0.020932,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_drag_raises_after_the_threshold",
+      "status": "pass",
+      "elapsed": 0.020456,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_drag_stops_when_the_action_is_released",
+      "status": "pass",
+      "elapsed": 0.020767,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_follows_a_drag_with_on_dragged",
+      "status": "pass",
+      "elapsed": 0.021248,
+      "project": "input"
+    },
+    {
+      "suite": "Layers",
+      "case": "a_script_consumes_an_action",
+      "status": "pass",
+      "elapsed": 0.020756,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_key_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.020346,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_mouse_button_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.020183,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_modifier_fires_the_any_binding",
+      "status": "pass",
+      "elapsed": 0.019689,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_event_carries_the_key_that_fired_it",
+      "status": "pass",
+      "elapsed": 0.020658,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_key_that_went_down_this_frame_is_the_one_reported",
+      "status": "pass",
+      "elapsed": 0.020723,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_frame_without_a_key_does_not_fire",
+      "status": "pass",
+      "elapsed": 0.020347,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_key_family_leaves_the_mouse_buttons_alone",
+      "status": "pass",
+      "elapsed": 0.020705,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_mouse_family_leaves_the_keys_alone",
+      "status": "pass",
+      "elapsed": 0.020307,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_binding_with_a_modifier_needs_the_modifier",
+      "status": "pass",
+      "elapsed": 0.020297,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_higher_map_that_consumes_keeps_the_key_from_an_any_binding",
+      "status": "pass",
+      "elapsed": 0.020288,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "an_any_binding_that_consumes_keeps_its_key_from_a_lower_map",
+      "status": "pass",
+      "elapsed": 0.01995,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "a_key_pair_of_a_map_binds_the_any_family",
+      "status": "pass",
+      "elapsed": 0.020437,
+      "project": "input"
+    },
+    {
+      "suite": "AnyKey",
+      "case": "the_binding_list_of_the_action_holds_the_family",
+      "status": "pass",
+      "elapsed": 0.020401,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "a_script_resumes_on_the_pressed_frame",
+      "status": "pass",
+      "elapsed": 0.020745,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_down_resumes_while_the_action_is_held",
+      "status": "pass",
+      "elapsed": 0.020716,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "on_up_resumes_when_the_action_is_released",
+      "status": "pass",
+      "elapsed": 0.020522,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "several_waiters_resume_on_one_action",
+      "status": "pass",
+      "elapsed": 0.020535,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "an_emitted_action_resumes_a_waiter",
+      "status": "pass",
+      "elapsed": 0.020586,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "the_wait_carries_the_source",
+      "status": "pass",
+      "elapsed": 0.020708,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "deleting_the_entity_of_a_task_cancels_the_wait",
+      "status": "pass",
+      "elapsed": 0.019277,
+      "project": "input"
+    },
+    {
+      "suite": "Events",
+      "case": "a_waiter_registered_at_scene_load_catches_the_press",
+      "status": "pass",
+      "elapsed": 0.019213,
+      "project": "input"
+    }
+  ],
+  "projects": [
+    {
+      "project": "input",
+      "pass": 98,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.264242
+    },
+    {
+      "project": "picking",
+      "pass": 53,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.218918
+    },
+    {
+      "project": "ui",
+      "pass": 16,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.164507
+    }
+  ]
+}
