@@ -50,6 +50,20 @@ void box_checkpoint_ctx_fini(
 char* box_checkpoint_report(
     box_checkpoint_ctx_t *ctx);
 
+/** Test whether an entity sits under a module, which makes it framework state.
+ *
+ * A script the framework loads at import, like the widget library of box.ui,
+ * is created under its module, and so is everything it declares; none of it
+ * belongs in a checkpoint of the scene.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when a parent of the entity carries the Module tag
+ */
+bool box_checkpoint_in_module(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Collect the managed scripts of the world in the order a checkpoint uses.
  *
  * @param world The world

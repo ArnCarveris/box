@@ -4,17 +4,26 @@
  */
 
 #include "command_internal.h"
+#include "../checkpoint/checkpoint_internal.h"
 #include <string.h>
 
 /** Test whether a script has a filename and can be updated.
  *
+ * A script the framework loaded under one of its modules, like the widget
+ * library of box.ui, is not part of the scene and stays out of the commands.
+ *
+ * @param world The world
+ * @param e The script entity
  * @param script The script component
- * @return true when the script has a filename and is not a template
+ * @return true when the script has a filename, is not a template and is not framework state
  */
 static bool box_script_editable(
+    const ecs_world_t *world,
+    ecs_entity_t e,
     const EcsScript *script)
 {
-    return script->filename != NULL && script->template_ == NULL;
+    return script->filename != NULL && script->template_ == NULL &&
+        !box_checkpoint_in_module(world, e);
 }
 
 /** Get the file name of a path without its folders.
@@ -50,7 +59,7 @@ static ecs_entity_t box_script_find(
         const EcsScript *script = ecs_field(&it, EcsScript, 0);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            if (!box_script_editable(&script[i])) {
+            if (!box_script_editable(world, it.entities[i], &script[i])) {
                 continue;
             }
 
@@ -238,7 +247,7 @@ static void box_script_grep(
         const EcsScript *script = ecs_field(&it, EcsScript, 0);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            if (!box_script_editable(&script[i]) || !script[i].code) {
+            if (!box_script_editable(world, it.entities[i], &script[i]) || !script[i].code) {
                 continue;
             }
 

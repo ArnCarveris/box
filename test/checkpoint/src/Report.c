@@ -172,3 +172,24 @@ void Report_command_takes_a_name(void)
     ecs_os_free(out);
     ecs_fini(world);
 }
+
+void Report_a_script_under_a_module_is_not_checkpointed(void)
+{
+    // ore_engine/ui_canonical
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, BoxUi);
+    test_assert(ecs_lookup(world, "box.ui.widgets_script") != 0);
+    test_assert(ecs_lookup(world, "box.ui.widgets.Button") != 0);
+
+    ecs_entity_t t = ecs_entity(world, { .name = "agent0" });
+    ecs_add(world, t, Terminal);
+
+    char *out = box_command_run(world, t, "checkpoint", NULL);
+    test_assert(out != NULL);
+    test_assert(strstr(out, "widgets") == NULL);
+    test_assert(strstr(out, "box.ui.widgets") == NULL);
+
+    ecs_os_free(out);
+    ecs_fini(world);
+}

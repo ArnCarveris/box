@@ -176,6 +176,20 @@ int box_checkpoint_mkdir(
     return result;
 }
 
+bool box_checkpoint_in_module(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = false;
+    ecs_entity_t parent = ecs_get_target(world, e, EcsChildOf, 0);
+    while (parent && !result) {
+        result = ecs_has_id(world, parent, EcsModule);
+        parent = ecs_get_target(world, parent, EcsChildOf, 0);
+    }
+
+    return result;
+}
+
 void box_checkpoint_managed(
     ecs_world_t *world,
     ecs_vec_t *scripts)
@@ -185,7 +199,9 @@ void box_checkpoint_managed(
         const EcsScript *code = ecs_field(&it, EcsScript, 0);
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            if (code[i].script && !code[i].template_) {
+            if (code[i].script && !code[i].template_ &&
+                !box_checkpoint_in_module(world, it.entities[i]))
+            {
                 ecs_vec_append_t(NULL, scripts, ecs_entity_t)[0] =
                     it.entities[i];
             }
