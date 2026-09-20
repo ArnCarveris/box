@@ -76,9 +76,9 @@ done:
 /** Ensure the UI element the frame rate is drawn with exists.
  *
  * The element is a Text of its own, pinned to the corner of the view its
- * FpsOverlay selects with the same margin and padding the panel uses, so the
- * regular UI text path draws the number where the seven segment digits used
- * to sit. A tree that draws only this element follows the surface, so it
+ * FpsOverlay selects with the same margin the panel uses, in the points the
+ * panel is sized in, so the regular UI text path draws the number where the
+ * seven segment digits used to sit. A tree that draws only this element follows the surface, so it
  * keeps the same corner across a resize.
  *
  * @param world The world
@@ -103,6 +103,9 @@ done:
 
 /** Position, size and content of the text element with the settings of one overlay.
  *
+ * The number sits at the padding from the side of the panel and a quarter of
+ * the panel height from its top, whichever corner the panel is pinned to.
+ *
  * @param world The world
  * @param text The text element
  * @param overlay The overlay the corner, the scale and the frame rate come from
@@ -114,6 +117,12 @@ static void box_fps_text_update(
 {
     float scale = overlay->scale > 0.0f ? overlay->scale : 1.0f;
     float offset = (BOX_OVERLAY_MARGIN + BOX_OVERLAY_PAD) * scale;
+    float label = BOX_OVERLAY_LABEL_Y - BOX_OVERLAY_LABEL_H / 2.0f;
+    if (overlay->corner == FpsBottomLeft || overlay->corner == FpsBottomRight) {
+        label = BOX_OVERLAY_HEIGHT - BOX_OVERLAY_LABEL_Y - BOX_OVERLAY_LABEL_H / 2.0f;
+    }
+
+    float top = (BOX_OVERLAY_MARGIN + label) * scale;
     ecs_entity_t root = ecs_get_target(world, text, EcsChildOf, 0);
     float extent[2];
     box_fps_text_extent(world, extent);
@@ -122,7 +131,7 @@ static void box_fps_text_update(
     Align h;
     VAlign v;
     box_fps_text_align(overlay->corner, &h, &v);
-    ecs_set(world, text, Anchor, { .h = h, .v = v, .x = offset, .y = offset });
+    ecs_set(world, text, Anchor, { .h = h, .v = v, .x = offset, .y = top });
     ecs_set(world, text, Font, { .size = BOX_OVERLAY_LABEL_H * scale });
 
     int32_t value = (int32_t)(overlay->fps + 0.5);

@@ -183,7 +183,10 @@ static int32_t box_overlay_panel(
     return count;
 }
 
-/** Append one bar per frame of the window, the newest frame on the right.
+/** Append one bar per frame of the chart, the newest frame on the right.
+ *
+ * A bar is BOX_OVERLAY_BAR_W wide with a gap of BOX_OVERLAY_BAR_GAP to its left
+ * and at least as tall as it is wide, so a fast frame still shows.
  *
  * @param ring The ring the frame times come from
  * @param chart Left, top, width and height of the chart in pixels
@@ -199,12 +202,14 @@ static int32_t box_overlay_bars(
     int32_t count,
     int32_t max)
 {
-    int32_t frames = box_fps_ring_window(ring, BOX_FPS_WINDOW_MS);
+    int32_t frames = ring->count;
     if (frames > BOX_OVERLAY_BARS) {
         frames = BOX_OVERLAY_BARS;
     }
 
-    float width = chart[2] / (float)BOX_OVERLAY_BARS;
+    float slot = chart[2] / (float)BOX_OVERLAY_BARS;
+    float width = slot * (BOX_OVERLAY_BAR_W / BOX_OVERLAY_SLOT_W);
+    float gap = slot - width;
     float bottom = chart[1] + chart[3];
     int32_t i;
     for (i = 0; i < frames; i ++) {
@@ -221,8 +226,8 @@ static int32_t box_overlay_bars(
 
         float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
         box_fps_class_color(box_fps_class(time_ms), color);
-        float rect[4] = { chart[0] + chart[2] - (float)(i + 1) * width, bottom - height,
-            width, height };
+        float rect[4] = { chart[0] + chart[2] - (float)(i + 1) * slot + gap,
+            bottom - height, width, height };
         count = box_overlay_push(out, count, max, rect, color);
     }
 
@@ -254,7 +259,7 @@ int32_t box_overlay_build(
 
     float chart[4] = { panel[0] + pad,
         panel[1] + pad + BOX_OVERLAY_LABEL_H * scale + pad,
-        BOX_OVERLAY_BARS * BOX_OVERLAY_BAR_W * scale, BOX_OVERLAY_CHART_H * scale };
+        BOX_OVERLAY_BARS * BOX_OVERLAY_SLOT_W * scale, BOX_OVERLAY_CHART_H * scale };
     int32_t count = box_overlay_panel(layout, panel, chart, out, max);
     count = box_overlay_bars(ring, chart, out, count, max);
 

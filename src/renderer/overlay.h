@@ -2,12 +2,14 @@
  * @file renderer/overlay.h
  * @brief Frame time ring, the color class of a frame and the panel it is drawn as.
  *
- * The panel itself is a background rectangle and the last second of frame
- * times as one bar each plus two reference lines, so every part of it the
- * renderer draws is a rectangle. The frame rate is drawn separately, as regular
- * UI text box.monitor owns. The ring and the thresholds live here because the
- * bars, the published numbers and the command that prints them share them, and
- * because neither side of the frame packet may include the other.
+ * The panel itself is a background rectangle and the most recent frame times
+ * as one bar each plus two reference lines, so every part of it the renderer
+ * draws is a rectangle. The chart holds a fixed number of bars, so it is full
+ * whatever the frame rate is once that many frames have been drawn. The frame
+ * rate is drawn separately, as regular UI text box.monitor owns. The ring and
+ * the thresholds live here because the bars, the published numbers and the
+ * command that prints them share them, and because neither side of the frame
+ * packet may include the other.
  */
 
 #ifndef BOX_RENDERER_OVERLAY_H
@@ -75,32 +77,41 @@ typedef struct box_fps_stats_t {
 /** Corner constant of a panel pinned to the bottom right of its view */
 #define BOX_OVERLAY_BOTTOM_RIGHT (3)
 
-/** Bars the chart of a panel draws at most, the newest frame on the right */
+/** Bars the chart of a panel draws, one per frame with the newest on the right */
 #define BOX_OVERLAY_BARS (120)
 
 /** Rectangles a panel holds: its background, its two reference lines and its bars */
 #define BOX_OVERLAY_RECT_MAX (BOX_OVERLAY_BARS + 3)
 
 /** Pixels between the panel and the edges of its view, before the scale */
-#define BOX_OVERLAY_MARGIN (8.0f)
+#define BOX_OVERLAY_MARGIN (10.0f)
 
 /** Pixels between the panel border and its contents, before the scale */
-#define BOX_OVERLAY_PAD (4.0f)
+#define BOX_OVERLAY_PAD (6.0f)
 
 /** Width of one bar of the chart in pixels, before the scale */
-#define BOX_OVERLAY_BAR_W (1.0f)
+#define BOX_OVERLAY_BAR_W (3.0f)
+
+/** Pixels between two bars of the chart, before the scale */
+#define BOX_OVERLAY_BAR_GAP (1.0f)
+
+/** Pixels one bar and the gap to its left take, before the scale */
+#define BOX_OVERLAY_SLOT_W (BOX_OVERLAY_BAR_W + BOX_OVERLAY_BAR_GAP)
 
 /** Height of the chart in pixels, before the scale */
-#define BOX_OVERLAY_CHART_H (32.0f)
+#define BOX_OVERLAY_CHART_H (60.0f)
 
 /** Height of the row the frame rate label takes above the chart, before the scale */
-#define BOX_OVERLAY_LABEL_H (16.0f)
+#define BOX_OVERLAY_LABEL_H (20.0f)
 
 /** Width of the panel in pixels, before the scale */
-#define BOX_OVERLAY_WIDTH (BOX_OVERLAY_BARS * BOX_OVERLAY_BAR_W + 2.0f * BOX_OVERLAY_PAD)
+#define BOX_OVERLAY_WIDTH (BOX_OVERLAY_BARS * BOX_OVERLAY_SLOT_W + 2.0f * BOX_OVERLAY_PAD)
 
 /** Height of the panel in pixels, before the scale */
 #define BOX_OVERLAY_HEIGHT (BOX_OVERLAY_LABEL_H + BOX_OVERLAY_CHART_H + 3.0f * BOX_OVERLAY_PAD)
+
+/** Pixels from the top of the panel to the middle of the frame rate label, before the scale */
+#define BOX_OVERLAY_LABEL_Y (BOX_OVERLAY_HEIGHT / 4.0f)
 
 /** One rectangle of a panel, in pixels of its view */
 typedef struct box_overlay_rect_t {
@@ -108,11 +119,16 @@ typedef struct box_overlay_rect_t {
     float color[4]; /**< Color the rectangle is filled with, display encoded RGBA */
 } box_overlay_rect_t;
 
-/** Where and how large the panel of a view is drawn */
+/** Where and how large the panel of a view is drawn.
+ *
+ * The scale carries the pixels per point of the view as well as the size the
+ * overlay asks for, so the panel keeps the size of the text box.monitor lays
+ * out in points on a display with more than one pixel per point.
+ */
 typedef struct box_overlay_layout_t {
     float width;    /**< Width of the view in pixels */
     float height;   /**< Height of the view in pixels */
-    float scale;    /**< Size multiplier of the panel, one for its natural size */
+    float scale;    /**< Pixels one pixel of the natural size of the panel covers */
     float opacity;  /**< Opacity of the panel background, one for opaque */
     int32_t corner; /**< Corner of the view the panel is pinned to */
 } box_overlay_layout_t;

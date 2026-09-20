@@ -603,7 +603,9 @@ static void box_view_lod(
 /** Copy the frame rate overlay of a view into it, the view first and the singleton after.
  *
  * The component belongs to box.monitor, which a world that never imports the
- * module leaves unregistered; the view then carries no panel at all.
+ * module leaves unregistered; the view then carries no panel at all. The scale
+ * of the panel is multiplied by the pixels per point of the view, so the panel
+ * matches the text box.monitor lays out in points on any display.
  *
  * @param world The world
  * @param e The View entity, 0 for the view a world without views gets
@@ -627,9 +629,15 @@ static void box_view_overlay(
         goto done;
     }
 
+    const Surface *surface = ecs_singleton_get(world, Surface);
+    float device = 1.0f;
+    if (surface && surface->point_height > 0 && v->height > 0) {
+        device = (float)v->height / (float)surface->point_height;
+    }
+
     v->overlay = 1u;
     v->overlay_corner = (uint32_t)o->corner;
-    v->overlay_scale = o->scale > 0.0f ? o->scale : 1.0f;
+    v->overlay_scale = (o->scale > 0.0f ? o->scale : 1.0f) * device;
     v->overlay_opacity = o->opacity;
 done:
     return;

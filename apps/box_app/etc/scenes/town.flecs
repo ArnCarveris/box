@@ -1,6 +1,23 @@
 using flecs.script
 using box.*
 
+$ {
+  Console: {}
+  EnvironmentLight: {sky_color: {150, 178, 210}, ground_color: {60, 56, 50}, intensity: 1}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1.1}
+}
+
+camera {
+  Position: {14, 7, -18}
+  LookAt: {0, 1, 0}
+  Camera: {fov: 55}
+  CameraController: {speed: 14}
+}
+
 const timber: Rgb = {91, 65, 57}
 const roofTile: Rgb = {66, 83, 99}
 const cream: Rgb = {248, 230, 196}
@@ -59,14 +76,14 @@ template Planter {
   }
   {
     Position: {0, 0.46, 0}
-    Sphere: {radius: 0.28}
+    Sphere: {radius: 0.28, segments: 16, smooth: true}
     Rgb: leaf
   }
   if blossoms {
     for i in 0..5 {
       {
         Position: {math.cos(i * 1.26) * 0.19, 0.64, math.sin(i * 1.26) * 0.19}
-        Sphere: {radius: 0.07}
+        Sphere: {radius: 0.07, segments: 16, smooth: true}
         Rgb: pink
       }
     }
@@ -122,7 +139,7 @@ template Lantern {
   }
   {
     Position: {}
-    Sphere: {radius: 0.25}
+    Sphere: {radius: 0.25, segments: 16, smooth: true}
     Rgb: {241, 116, 91}
   }
   for i in 0..3 {
@@ -516,7 +533,7 @@ template GardenRoof : Roof {
   for i in 0..3 {
     {
       Position: {(i - 1) * width * 0.22, 1.63, -depth * 0.15}
-      Sphere: {radius: 0.3}
+      Sphere: {radius: 0.3, segments: 16, smooth: true}
       Rgb: leaf
     }
     Planter() { Position: {(i - 1) * width * 0.24, 0.12, -depth * 0.32} }
@@ -734,7 +751,7 @@ template CherryTree {
   for i in 0..5 {
     {
       Position: {math.cos(i * 1.26) * 0.48, 2.05 + (i % 2) * 0.3, math.sin(i * 1.26) * 0.48}
-      Sphere: {radius: 0.66}
+      Sphere: {radius: 0.66, segments: 16, smooth: true}
       Rgb: {243, 179 + i * 5, 196 + i * 4}
     }
   }
@@ -1018,17 +1035,3 @@ template Town {
 }
 
 Town sakura_machi(rows: 3, columns: 3, seed: 42)
-
-sun {
-  Rotation: {0.9, -0.6, 0}
-  DirectionalLight: {intensity: 1.1}
-}
-
-$ { EnvironmentLight: {sky_color: {150, 178, 210}, ground_color: {60, 56, 50}, intensity: 1} }
-
-camera {
-  Position: {14, 7, -18}
-  LookAt: {0, 1, 0}
-  Camera: {fov: 55}
-  CameraController: {speed: 14}
-}
