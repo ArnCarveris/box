@@ -1,0 +1,672 @@
+// The canonical widget library of box.ui: script templates over the layout,
+// text, shape and event components, with a style sheet prefab they read their
+// colors and sizes from. box.ui loads this file at import into the scope
+// box.ui.widgets, so a scene writes `using box.ui.widgets` and instantiates
+// `Button ok(label: "OK")`. State lives in the prop and mut variables of an
+// instance, which are components a game or a test reads and writes as data.
+module box.ui.widgets
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.render
+using box.picking
+using box.ui
+
+struct Style(
+  panel: Rgb,
+  panel_dark: Rgb,
+  panel_light: Rgb,
+  accent: Rgb,
+  text: Rgb,
+  text_dim: Rgb,
+  hover: Rgb,
+  pressed: Rgb,
+  disabled: Rgb,
+  font: f32,
+  radius: f32,
+  pad: f32
+)
+
+prefab DefaultStyle {
+  Style: {
+    panel: {46, 50, 58},
+    panel_dark: {32, 35, 41},
+    panel_light: {182, 188, 198},
+    accent: {98, 168, 122},
+    text: {214, 218, 224},
+    text_dim: {140, 148, 160},
+    hover: {60, 65, 75},
+    pressed: {24, 26, 31},
+    disabled: {58, 60, 66},
+    font: 12,
+    radius: 6,
+    pad: 8
+  }
+}
+
+// A push button with hover, pressed and disabled looks that fires an action.
+template Button {
+  prop label = "Button"
+  prop style: entity = DefaultStyle
+  prop width = 120
+  prop height = 28
+  prop disabled = false
+  prop action: entity = 0
+
+  mut pressed = false
+
+  const s = style[Style]
+
+  Rect: {width, height}
+  Border: {radius: s.radius}
+
+  caption {
+
+    HitThrough
+    Text: {value: label, align: Center}
+    Font: {size: s.font}
+    if disabled {
+      Rgb: s.text_dim
+    } else {
+      Rgb: s.text
+    }
+  }
+
+  const hover = this?[Hovered]
+
+  if disabled {
+    Rgb: s.disabled
+  } else if pressed {
+    Rgb: s.pressed
+  } else if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel
+  }
+
+  if action != 0 && !disabled {
+    Action: {action}
+  }
+
+  async {
+    while true {
+      await on.press(this)
+      pressed = true
+      await on.release(this)
+      pressed = false
+    }
+  }
+}
+
+// A bar filled to value over max.
+template ProgressBar {
+  prop value: f32 = 0
+  prop max: f32 = 100
+  prop style: entity = DefaultStyle
+  prop width = 160
+  prop height = 12
+
+  const s = style[Style]
+  const ratio = math.clamp(value / max, 0, 1)
+
+  Rect: {width, height}
+  Border: {radius: s.radius}
+  Rgb: s.panel_dark
+
+  fill {
+
+    HitThrough
+    Anchor: {h: Left, v: Middle, x: 2}
+    Rect: {(width - 4) * ratio, height - 4}
+    Border: {radius: s.radius}
+    Rgb: s.accent
+  }
+}
+
+// A horizontal slider whose level follows a press or a drag along its track.
+template Slider {
+  prop value: f32 = 25
+  prop min: f32 = 0
+  prop max: f32 = 100
+  prop style: entity = DefaultStyle
+  prop width = 200
+  prop height = 24
+
+  mut level: f32 = math.clamp(value, min, max)
+
+  const s = style[Style]
+  const ratio = (level - min) / (max - min)
+  const track_width = width - s.pad * 2
+
+  Rect: {width, height}
+  Border: {radius: s.radius}
+
+  track {
+
+    HitThrough
+    Rect: {track_width, 4}
+    Rgb: s.panel_dark
+  }
+
+  fill {
+
+    HitThrough
+    Anchor: {h: Left, v: Middle, x: s.pad}
+    Rect: {track_width * ratio, 4}
+    Rgb: s.accent
+  }
+
+  knob {
+
+    HitThrough
+    Position: {track_width * (ratio - 0.5), 0, 0}
+    Circle: {radius: 6}
+    Rgb: s.panel_light
+  }
+
+  const hover = this?[Hovered]
+
+  if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel
+  }
+
+  async {
+    while true {
+      const hit = await on.press(this)
+      const b = this[Bounds]
+      const x = hit.point.x - (b.x - b.width / 2) - s.pad
+      level = min + math.clamp(x / track_width, 0, 1) * (max - min)
+    }
+  }
+
+  async {
+    while true {
+      const hit = await on.drag(this)
+      const b = this[Bounds]
+      const x = hit.point.x - (b.x - b.width / 2) - s.pad
+      level = min + math.clamp(x / track_width, 0, 1) * (max - min)
+    }
+  }
+}
+
+// A box with a label that toggles on click.
+template Checkbox {
+  prop label = "Checkbox"
+  prop value = false
+  prop style: entity = DefaultStyle
+  prop size = 16
+
+  mut checked = value
+
+  const s = style[Style]
+
+  Layout: {direction: Row, spacing: s.pad, v: Middle}
+
+  box {
+
+    HitThrough
+    Rect: {size, size}
+    Border: {radius: 3}
+
+    if checked {
+      mark {
+        HitThrough
+        Rect: {size - 6, size - 6}
+        Border: {radius: 2}
+        Rgb: s.accent
+      }
+    }
+  }
+
+  caption {
+
+    HitThrough
+    Text: {value: label}
+    Font: {size: s.font}
+    Rgb: s.text
+  }
+
+  const hover = this?[Hovered]
+
+  if hover {
+    box { Rgb: s.hover }
+  } else {
+    box { Rgb: s.panel_dark }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      checked = !checked
+    }
+  }
+}
+
+// A column of radio buttons of which one is active at a time.
+template RadioGroup {
+  prop value = ""
+  prop style: entity = DefaultStyle
+
+  mut active: string = value
+
+  const s = style[Style]
+
+  Layout: {direction: Column, spacing: 4, h: Left}
+}
+
+// One choice of a RadioGroup, active when its label is the active one.
+template RadioButton : parent RadioGroup {
+  prop label = "Choice"
+  prop size = 16
+
+  const s = style[Style]
+
+  Layout: {direction: Row, spacing: s.pad, v: Middle}
+
+  indicator {
+
+    HitThrough
+    Circle: {radius: size / 2}
+
+    if active == label {
+      dot {
+        HitThrough
+        Circle: {radius: size / 4}
+        Rgb: s.accent
+      }
+    }
+  }
+
+  caption {
+
+    HitThrough
+    Text: {value: label}
+    Font: {size: s.font}
+    Rgb: s.text
+  }
+
+  const hover = this?[Hovered]
+
+  if hover {
+    indicator { Rgb: s.hover }
+  } else {
+    indicator { Rgb: s.panel_dark }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      active = label
+    }
+  }
+}
+
+// One choice of an expanded Dropdown, drawn selected when it is the choice.
+template DropdownItem {
+  prop label = ""
+  prop selected = false
+  prop style: entity = DefaultStyle
+  prop width = 160
+  prop height = 28
+
+  const s = style[Style]
+
+  Rect: {width, height}
+
+  caption {
+
+    HitThrough
+    Anchor: {h: Left, v: Middle, x: s.pad}
+    Text: {value: label}
+    Font: {size: s.font}
+    if selected {
+      Rgb: s.panel_dark
+    } else {
+      Rgb: s.text
+    }
+  }
+
+  const hover = this?[Hovered]
+
+  if selected {
+    Rgb: s.accent
+  } else if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel_dark
+  }
+}
+
+// A closed box that shows its choices below it when clicked.
+template Dropdown {
+  prop labels = ["Apple", "Banana", "Pear"]
+  prop value: i32 = 0
+  prop open = false
+  prop style: entity = DefaultStyle
+  prop width = 160
+  prop height = 28
+
+  mut selected: i32 = math.clamp(value, 0, labels.count() - 1)
+  mut expanded = open
+
+  const s = style[Style]
+  const count = labels.count()
+
+  Rect: {width, height}
+  Border: {radius: s.radius}
+
+  caption {
+
+    HitThrough
+    Anchor: {h: Left, v: Middle, x: s.pad}
+    Text: {value: labels[selected]}
+    Font: {size: s.font}
+    Rgb: s.text
+  }
+
+  arrow {
+
+    HitThrough
+    Anchor: {h: Right, v: Middle, x: s.pad}
+    if expanded {
+      Text: {value: "-"}
+    } else {
+      Text: {value: "+"}
+    }
+    Font: {size: s.font}
+    Rgb: s.text_dim
+  }
+
+  const hover = this?[Hovered]
+
+  if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel
+  }
+
+  if expanded {
+    for i in 0..count {
+      DropdownItem "item_{i}"(label: labels[i], selected: selected == i,
+        style: style, width: width, height: height)
+      {
+        Position: {0, -(i + 1) * height, 0}
+      }
+    }
+  }
+
+  async {
+    while true {
+      const hit = await on.click(this)
+      const b = this[Bounds]
+      const below = (b.y - b.height / 2) - hit.point.y
+      if expanded {
+        if below > 0 {
+          const row: i32 = below / height
+          selected = math.clamp(row, 0, count - 1)
+        }
+        expanded = false
+      } else {
+        expanded = true
+      }
+    }
+  }
+}
+
+// One tab of a TabStrip, drawn active when it is the open one.
+template Tab {
+  prop label = ""
+  prop active = false
+  prop style: entity = DefaultStyle
+  prop width = 90
+  prop height = 28
+
+  const s = style[Style]
+
+  Rect: {width, height}
+  Border: {radius: s.radius}
+
+  caption {
+
+    HitThrough
+    Text: {value: label, align: Center}
+    Font: {size: s.font}
+    if active {
+      Rgb: s.panel_dark
+    } else {
+      Rgb: s.text
+    }
+  }
+
+  const hover = this?[Hovered]
+
+  if active {
+    Rgb: s.accent
+  } else if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel
+  }
+}
+
+// A row of tabs of which one is active at a time.
+template TabStrip {
+  prop labels = ["One", "Two", "Three"]
+  prop value: i32 = 0
+  prop style: entity = DefaultStyle
+  prop width = 90
+  prop height = 28
+
+  mut active: i32 = math.clamp(value, 0, labels.count() - 1)
+
+  const s = style[Style]
+  const count = labels.count()
+
+  Layout: {direction: Row, spacing: 2}
+
+  for i in 0..count {
+    Tab "tab_{i}"(label: labels[i], active: active == i, style: style,
+      width: width, height: height)
+  }
+
+  async {
+    while true {
+      const hit = await on.click(this)
+      const b = this[Bounds]
+      const x = hit.point.x - (b.x - b.width / 2)
+      const i: i32 = x / (width + 2)
+      active = math.clamp(i, 0, count - 1)
+    }
+  }
+}
+
+// One row of a List, drawn selected when it is the selected one.
+template ListRow {
+  prop label = ""
+  prop selected = false
+  prop style: entity = DefaultStyle
+  prop width = 160
+  prop height = 24
+
+  const s = style[Style]
+
+  Rect: {width, height}
+
+  caption {
+
+    HitThrough
+    Anchor: {h: Left, v: Middle, x: s.pad}
+    Text: {value: label}
+    Font: {size: s.font}
+    if selected {
+      Rgb: s.panel_dark
+    } else {
+      Rgb: s.text
+    }
+  }
+
+  const hover = this?[Hovered]
+
+  if selected {
+    Rgb: s.accent
+  } else if hover {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel_dark
+  }
+}
+
+// A scrolling column of rows of which one can be selected.
+template List {
+  prop items = ["First", "Second", "Third"]
+  prop value: i32 = -1
+  prop style: entity = DefaultStyle
+  prop width = 160
+  prop height = 96
+  prop row_height = 24
+
+  mut selected: i32 = value
+
+  const s = style[Style]
+  const count = items.count()
+
+  Layout: {direction: Column, width: width, height: height, h: Left, v: Top}
+  Scroll: {y: Auto}
+  Border: {radius: s.radius}
+  Rgb: s.panel_dark
+
+  for i in 0..count {
+    ListRow "row_{i}"(label: items[i], selected: selected == i, style: style,
+      width: width, height: row_height)
+  }
+
+  async {
+    while true {
+      const hit = await on.click(this)
+      const b = this[Bounds]
+      const y = (b.y + b.height / 2) - hit.point.y + this[Scroll].offset.y
+      const i: i32 = y / row_height
+      if i < count {
+        selected = i
+      }
+    }
+  }
+}
+
+// A grid of cells of one size, which GridCell children place themselves in.
+template Grid {
+  prop columns: i32 = 3
+  prop cell = 48
+  prop spacing = 4
+  prop style: entity = DefaultStyle
+
+  const s = style[Style]
+  const step = cell + spacing
+}
+
+// One cell of a Grid, placed by its index in reading order.
+template GridCell : parent Grid {
+  prop index: i32 = 0
+
+  const s = style[Style]
+  const step = cell + spacing
+  const row: i32 = index / columns
+  const col = index - row * columns
+
+  Position: {(col - (columns - 1) / 2) * step, -row * step, 0}
+  Rect: {cell, cell}
+  Border: {radius: s.radius}
+
+  if this?[Hovered] {
+    Rgb: s.hover
+  } else {
+    Rgb: s.panel
+  }
+}
+
+// A label that appears under a target while the cursor is on it.
+template Tooltip {
+  prop text = "Tooltip"
+  prop target: entity = 0
+  prop style: entity = DefaultStyle
+  prop offset = 20
+
+  const s = style[Style]
+
+  if target?[Hovered] {
+    Anchor: {h: Center, v: Bottom, y: -offset}
+    Layout: {padding: 4}
+    Border: {radius: 4}
+    Rgb: s.panel_dark
+
+    caption {
+
+      HitThrough
+      Text: {value: text}
+      Font: {size: s.font}
+      Rgb: s.text
+    }
+  } else {
+    Hidden
+  }
+}
+
+// A dialog over a dimmed backdrop that fills its parent, hidden while closed.
+// The content of a dialog goes under its panel, `dialog.panel { ... }`, so it
+// draws over the panel and centres on it.
+template Modal {
+  prop open = false
+  prop title = "Modal"
+  prop style: entity = DefaultStyle
+  prop width = 320
+  prop height = 200
+
+  const s = style[Style]
+
+  Fill: {width: 1, height: 1}
+
+  if !open {
+    Hidden
+  }
+
+  backdrop {
+    Anchor: {h: Center, v: Middle}
+    Fill: {width: 1, height: 1}
+    Rect: {}
+    Rgb: {0, 0, 0}
+    Opacity: {0.6}
+  }
+
+  panel {
+    Anchor: {h: Center, v: Middle}
+    Rect: {width, height}
+    Border: {radius: s.radius}
+    Rgb: s.panel
+
+    heading {
+
+      HitThrough
+      Anchor: {h: Center, v: Top, y: s.pad}
+      Text: {value: title, align: Center}
+      Font: {size: s.font + 2}
+      Rgb: s.text
+    }
+  }
+}
+
+// A box that clips a column of children and scrolls them with the wheel.
+template ScrollView {
+  prop style: entity = DefaultStyle
+  prop width = 200
+  prop height = 120
+
+  const s = style[Style]
+
+  Layout: {direction: Column, width: width, height: height, padding: s.pad, spacing: 4, h: Left, v: Top}
+  Scroll: {y: Auto}
+  Border: {radius: s.radius}
+  Rgb: s.panel_dark
+}

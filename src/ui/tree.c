@@ -86,7 +86,8 @@ done:
  *
  * Such a node changes size when a node below it does, which moves it and its
  * siblings in the layout of its parent, so a change below it is laid out from
- * that parent on.
+ * that parent on. A Rect the layout wrote itself is the content size of the
+ * last pass, not a box of its own, so it does not end the walk.
  *
  * @param world The world
  * @param e The node
@@ -99,7 +100,8 @@ static bool box_ui_content_sized(
     const Layout *l = ecs_get(world, e, Layout);
     bool result = false;
     if (l) {
-        const Rect *r = ecs_get(world, e, Rect);
+        const Rect *r = ecs_has_id(world, e, UiContentRect) ?
+            NULL : ecs_get(world, e, Rect);
         float width = l->width != 0 ? l->width : (r ? r->width : 0);
         float height = l->height != 0 ? l->height : (r ? r->height : 0);
 
@@ -582,7 +584,8 @@ done:
  *
  * The observer is matched with UiNode, so it hears the nodes of a tree only and
  * the entities of the scene around them cost nothing. A component set on an
- * entity before it joins a tree is picked up by the walk that adds it.
+ * entity before it joins a tree is picked up by the walk that adds it. A Rect
+ * an author sets is a box of its own again, whatever the layout wrote before.
  *
  * @param it Iterator over the nodes that changed
  */
@@ -594,8 +597,13 @@ static void box_ui_on_layout(
         goto done;
     }
 
+    bool rect = it->event == EcsOnSet && ecs_field_id(it, 0) == ecs_id(Rect);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
+        if (rect && ecs_has_id(it->world, it->entities[i], UiContentRect)) {
+            ecs_remove_id(it->world, it->entities[i], UiContentRect);
+        }
+
         box_ui_mark_layout(it->world, it->entities[i]);
     }
 

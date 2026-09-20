@@ -24,6 +24,8 @@ ECS_COMPONENT_DECLARE(ShadowImpl);
 ECS_COMPONENT_DECLARE(GroupImpl);
 ECS_COMPONENT_DECLARE(TextImpl);
 ECS_COMPONENT_DECLARE(UiFonts);
+ECS_TAG_DECLARE(HitThrough);
+ECS_TAG_DECLARE(UiContentRect);
 
 /** Ui constructor: a tree that creates its own view at the UI priority.
  *
@@ -252,6 +254,7 @@ void BoxUiImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxUi);
+    ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxView);
@@ -292,6 +295,9 @@ void BoxUiImport(
     ECS_COMPONENT_DEFINE(world, UiFonts);
     ECS_COMPONENT_DEFINE(world, WorldAnchorImpl);
     ECS_TAG_DEFINE(world, UiWorldHidden);
+    ECS_TAG_DEFINE(world, HitThrough);
+    ECS_TAG_DEFINE(world, UiContentRect);
+    ecs_add_pair(world, UiContentRect, EcsOnInstantiate, EcsDontInherit);
 
     ecs_set_hooks(world, Ui, { .ctor = box_ui_ctor });
     ecs_set_hooks(world, UiImpl, { .ctor = box_ui_impl_ctor });
@@ -378,6 +384,7 @@ void BoxUiImport(
     box_ui_shadow_init(world);
     box_ui_group_init(world);
     box_ui_world_init(world);
+    box_ui_widgets_load(world);
     box_ui_scroll_init(world);
     box_ui_hit_init(world);
     box_ui_text_input_init(world);

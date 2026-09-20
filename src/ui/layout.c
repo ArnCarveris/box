@@ -22,7 +22,8 @@
  *
  * The size of the node is the size of its Layout, and a side of that size that
  * is zero takes the side of the Rect of the node, which leaves the sides the
- * content has to fill at zero.
+ * content has to fill at zero. A Rect the layout wrote itself holds the content
+ * size of the last pass and gives no side, so the content is measured again.
  *
  * @param world The world
  * @param p The place of the node
@@ -63,11 +64,12 @@ static void box_ui_read(
         p->local_y = pos->y;
     }
 
-    if (r && p->width == 0) {
+    bool content = l && ecs_has_id(world, p->e, UiContentRect);
+    if (r && !content && p->width == 0) {
         p->width = r->width;
     }
 
-    if (r && p->height == 0) {
+    if (r && !content && p->height == 0) {
         p->height = r->height;
     }
 
@@ -441,6 +443,10 @@ static void box_ui_resize(
     float width,
     float height)
 {
+    if (!ecs_has_id(world, e, UiContentRect)) {
+        ecs_add_id(world, e, UiContentRect);
+    }
+
     Rect *r = ecs_get_mut(world, e, Rect);
     if (!r || (r->width == width && r->height == height)) {
         goto done;

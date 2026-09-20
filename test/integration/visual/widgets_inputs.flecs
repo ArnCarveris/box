@@ -1,0 +1,54 @@
+// The input family of the script widget library: a progress bar at a third,
+// a slider at three quarters, an expanded dropdown with its second choice
+// selected and a list with a selected row, over a scene.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.ui
+using box.ui.widgets
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+ui {
+  Ui: {}
+
+  left {
+    Position: {-180, 60, 0}
+    Layout: {direction: Column, padding: 16, spacing: 16, h: Left}
+    Rect: {}
+    Border: {radius: 10}
+    Rgb: {24, 28, 38}
+
+    ProgressBar progress(value: 33, width: 200)
+    Slider slider(value: 75, width: 200)
+    Dropdown drop(labels: ["Copper", "Iron", "Gold"], value: 1, open: true, width: 200)
+  }
+
+  right {
+    Position: {180, 60, 0}
+    Layout: {direction: Column, padding: 16, h: Left}
+    Rect: {}
+    Border: {radius: 10}
+    Rgb: {24, 28, 38}
+
+    List list(items: ["Drill", "Furnace", "Belt", "Rocket", "Silo"], value: 2,
+      width: 200, height: 96)
+  }
+}

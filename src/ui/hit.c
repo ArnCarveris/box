@@ -18,7 +18,9 @@
  * how a script and box_ui_mouse_captured learn that the pointer is on a panel.
  *
  * A node a Hidden switch takes out of the frame is not under the cursor either,
- * so a panel that is hidden hands the pointer back to the scene behind it.
+ * so a panel that is hidden hands the pointer back to the scene behind it, and
+ * a node with HitThrough is passed over, so the caption of a widget leaves the
+ * widget under the cursor.
  */
 
 #include "ui_internal.h"
@@ -396,7 +398,8 @@ void box_ui_hit_init(
             { .id = ecs_id(UiNode), .inout = EcsIn },
             { .id = ecs_id(Bounds), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = UiQuad, .oper = EcsNot }
+            { .id = UiQuad, .oper = EcsNot },
+            { .id = HitThrough, .oper = EcsNot }
         }
     });
 

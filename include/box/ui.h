@@ -185,6 +185,14 @@ ECS_STRUCT(WorldAnchor, {
     ecs_entity_t view;   /**< View whose camera projects, 0 takes the active camera */
 });
 
+/** Lets the cursor pass through an element to the element behind it.
+ *
+ * A caption or an indicator inside a widget carries it, so the widget itself
+ * is the element under the cursor, holds Hovered and receives the events,
+ * instead of the part the cursor happens to be on.
+ */
+extern ECS_TAG_DECLARE(HitThrough);
+
 /** Sizes a side of an element as a fraction of the matching side of its parent.
  *
  * A side of zero leaves the matching side of the Layout or the Rect of the
@@ -425,6 +433,9 @@ ECS_STRUCT(ConsoleLog, {
 
 /** Script the framework installs, which the first open of the console loads */
 #define BOX_UI_CONSOLE "etc/ui/console.flecs"
+
+/** Script the widget library is loaded from at import, into box.ui.widgets */
+#define BOX_UI_WIDGETS "etc/ui/widgets/widgets.flecs"
 
 /** Name of the terminal session the console runs its lines on */
 #define BOX_UI_CONSOLE_SESSION "console"

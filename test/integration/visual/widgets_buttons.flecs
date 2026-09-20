@@ -1,0 +1,68 @@
+// The button family of the script widget library over a scene: buttons in
+// their plain, hovered and disabled looks, a checkbox that is checked, a
+// radio group with its active choice, a tab strip with its open tab and a
+// tooltip under the hovered button. A terminal moves the cursor onto the
+// second button, which is what shows the hover look and the tooltip.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.command
+using box.ui
+using box.ui.widgets
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+ui {
+  Ui: {}
+
+  panel {
+    Position: {0, 0, 0}
+    Layout: {direction: Column, padding: 16, spacing: 14, h: Left}
+    Rect: {}
+    Border: {radius: 10}
+    Rgb: {24, 28, 38}
+
+    buttons {
+      Layout: {direction: Row, spacing: 10}
+      Button plain(label: "Plain")
+      Button hovered(label: "Hovered") {
+        Tooltip tip(text: "A tooltip", target: ui.panel.buttons.hovered)
+      }
+      Button off(label: "Disabled", disabled: true)
+    }
+
+    Checkbox check(label: "Sound on", value: true)
+
+    RadioGroup group(value: "Maple") {
+      RadioButton oak(label: "Oak")
+      RadioButton maple(label: "Maple")
+      RadioButton pine(label: "Pine")
+    }
+
+    TabStrip tabs(labels: ["Build", "Craft", "Trade"], value: 1)
+  }
+}
+
+terminals {
+  agent {
+    Terminal: {}
+    TerminalInput: {line: "mouse.move 480 205"}
+  }
+}

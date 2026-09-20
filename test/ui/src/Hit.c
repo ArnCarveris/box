@@ -229,3 +229,23 @@ void Hit_world_without_a_tree_hits_nothing(void)
 
     test_uint(box_ui_hit(w, 0, 0, 0), 0);
 }
+
+void Hit_a_hit_through_element_hands_the_point_to_its_parent(void)
+{
+    // ore_engine/ui_canonical
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Rect, {200, 100});
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Rect, {100, 50});
+    ecs_entity_t caption = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, caption, Rect, {40, 20});
+    ecs_add_id(w, caption, HitThrough);
+    box_ui_update(w);
+
+    test_uint(box_ui_hit(w, 0, 0, 0), panel);
+
+    ecs_remove_id(w, caption, HitThrough);
+    box_ui_update(w);
+    test_uint(box_ui_hit(w, 0, 0, 0), caption);
+}

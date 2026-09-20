@@ -1,0 +1,70 @@
+// The panel family of the script widget library: a grid of cells, a scroll
+// view whose rows run past its box and an open modal over everything, on a
+// scene.
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+using box.ui
+using box.ui.widgets
+
+camera {
+  Position: {0, 3, -9}
+  LookAt: {0, 0.5, 0}
+  Camera: {fov: 55}
+}
+
+sun {
+  Rotation: {0.9, -0.6, 0}
+  DirectionalLight: {intensity: 1}
+}
+
+floor {
+  Position: {0, -0.5, 0}
+  Box: {14, 0.5, 14}
+  Rgb: {80, 90, 110}
+}
+
+crate {
+  Position: {0, 0.75, 0}
+  Box: {1.5, 1.5, 1.5}
+  Rgb: {200, 120, 70}
+}
+
+ui {
+  Ui: {}
+
+  grid {
+    Position: {-260, 80, 0}
+    Grid: {columns: 3, cell: 44, spacing: 6}
+    GridCell c0(index: 0)
+    GridCell c1(index: 1)
+    GridCell c2(index: 2)
+    GridCell c3(index: 3)
+    GridCell c4(index: 4)
+  }
+
+  ScrollView view(width: 220, height: 120) {
+    Position: {260, 80, 0}
+    for i in 0..8 {
+      "row_{i}" {
+        Rect: {188, 22}
+        Border: {radius: 4}
+        Rgb: {46, 50, 58}
+      }
+    }
+  }
+
+  Modal dialog(open: true, title: "Launch the rocket?", width: 320, height: 160)
+}
+
+ui {
+  dialog {
+    panel {
+      Button yes(label: "Launch") {
+        Anchor: {h: Center, v: Bottom, y: 16}
+      }
+    }
+  }
+}

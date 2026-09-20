@@ -568,3 +568,29 @@ void Layout_fill_of_the_root_follows_the_view(void)
     test_flt(ecs_get(w, panel, Bounds)->width, 480);
     test_flt(ecs_get(w, panel, Bounds)->height, 540);
 }
+
+void Layout_content_sized_ancestors_follow_a_grandchild_that_appears_later(void)
+{
+    // ore_engine/ui_canonical
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Layout, {.direction = DirectionColumn, .padding = 16});
+    ecs_set(w, panel, Rect, {0, 0});
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, row, Layout, {.direction = DirectionRow, .spacing = 10});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_progress(w, 0);
+    test_flt(ecs_get(w, panel, Bounds)->width, 42);
+
+    ecs_set(w, a, Rect, {120, 28});
+    ecs_set(w, b, Rect, {120, 28});
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_flt(ecs_get(w, row, Bounds)->width, 250);
+    test_flt(ecs_get(w, panel, Bounds)->width, 282);
+    test_flt(ecs_get(w, panel, Rect)->width, 282);
+    test_flt(ecs_get(w, panel, Bounds)->height, 60);
+}

@@ -283,6 +283,9 @@ extern ECS_COMPONENT_DECLARE(UiFonts);
 extern ECS_COMPONENT_DECLARE(WorldAnchorImpl);
 extern ECS_TAG_DECLARE(UiWorldHidden);
 
+/** The Rect of the node was written by the layout, so it is not a box of its own */
+extern ECS_TAG_DECLARE(UiContentRect);
+
 /** Direct pointer to the registry singleton, never a deferred copy.
  *
  * @param world The world
@@ -603,6 +606,13 @@ void box_ui_world_pin(
  * @param world The world
  */
 void box_ui_world_init(
+    ecs_world_t *world);
+
+/** Load the script widget library of BOX_UI_WIDGETS into box.ui.widgets.
+ *
+ * @param world The world
+ */
+void box_ui_widgets_load(
     ecs_world_t *world);
 
 /** Register the components and the observers of the group pass.
