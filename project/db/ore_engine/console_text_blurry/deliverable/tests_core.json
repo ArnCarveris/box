@@ -1,0 +1,15 @@
+{
+  "project": "core",
+  "timestamp": "2026-09-20T01:22:42Z",
+  "pass": 4,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 1.132631,
+  "tests": [
+    {"suite": "Surface", "case": "headless_surface_reports_size", "status": "pass", "elapsed": 0.412524},
+    {"suite": "Surface", "case": "headless_device_scale_doubles_the_framebuffer", "status": "pass", "elapsed": 1.132505},
+    {"suite": "Surface", "case": "headless_surface_writes_png", "status": "pass", "elapsed": 0.080481},
+    {"suite": "Surface", "case": "write_nth_adds_frame_suffix", "status": "pass", "elapsed": 0.647637}
+  ]
+}

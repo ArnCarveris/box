@@ -198,6 +198,8 @@
                     "subtree_joins_the_layer_of_its_group",
                     "nested_groups_render_inside_out",
                     "opaque_again_drops_the_group",
+                    "target_follows_the_device_scale",
+                    "target_edges_land_on_device_pixels",
                     "composite_reaches_the_packet_with_its_target"
                 ],
                 "setup": true,

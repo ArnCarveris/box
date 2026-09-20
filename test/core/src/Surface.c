@@ -38,6 +38,26 @@ void Surface_headless_surface_reports_size(void)
     ecs_fini(world);
 }
 
+void Surface_headless_device_scale_doubles_the_framebuffer(void)
+{
+    // ore_engine/console_text_blurry
+    ecs_world_t *world = surface_world(2);
+    Surface *s = ecs_singleton_ensure(world, Surface);
+    s->width = 320;
+    s->height = 200;
+    s->device_scale = 2;
+    ecs_singleton_modified(world, Surface);
+    test_int(box_run(world), 0);
+    const Surface *after = ecs_singleton_get(world, Surface);
+    test_int(after->actual_width, 640);
+    test_int(after->actual_height, 400);
+    test_int(after->scaled_width, 640);
+    test_int(after->scaled_height, 400);
+    test_int(after->point_width, 320);
+    test_int(after->point_height, 200);
+    ecs_fini(world);
+}
+
 void Surface_headless_surface_writes_png(void)
 {
     // engine_core/surface

@@ -198,7 +198,7 @@ void box_ui_unbind(
  * @param height Logical pixels the view of the tree shows vertically
  * @return The factor, one when the surface says nothing about its pixels
  */
-static float box_ui_view_device(
+float box_ui_view_device(
     const Surface *surface,
     float height)
 {

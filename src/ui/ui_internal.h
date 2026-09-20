@@ -340,6 +340,20 @@ void box_ui_update(
 void box_ui_tree_init(
     ecs_world_t *world);
 
+/** Device pixels one logical pixel of a view covers.
+ *
+ * The scene framebuffer of the surface, or its window when the scene is not
+ * scaled, over the logical height the view shows; the group targets and the
+ * font atlases share the factor with the view.
+ *
+ * @param surface The surface of the world
+ * @param height Logical pixels the view of the tree shows vertically
+ * @return The factor, one when the surface says nothing about its pixels
+ */
+float box_ui_view_device(
+    const Surface *surface,
+    float height);
+
 /** Point the camera of a tree at its plane and size it in logical pixels.
  *
  * @param world The world

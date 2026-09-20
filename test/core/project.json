@@ -57,6 +57,7 @@
             "id": "Surface",
             "testcases": [
                 "headless_surface_reports_size",
+                "headless_device_scale_doubles_the_framebuffer",
                 "headless_surface_writes_png",
                 "write_nth_adds_frame_suffix"
             ]

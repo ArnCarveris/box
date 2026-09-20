@@ -29,7 +29,7 @@ Two hard rules keep the concerns apart:
 |---|---|
 | `box.types` | `vec2/3/4`, `mat4`, `rgb` and math helpers |
 | `box.core` | `App` singleton, command line with the `AppOption` entities of an application, process folder, frame loop, CPU budget |
-| `box.surface` | `Surface` component; setting it brings up a window or offscreen target; `resolution_scale` divides the pixels the scene is drawn at and reports them as `scaled_*`, and the renderer magnifies that image onto the window |
+| `box.surface` | `Surface` component; setting it brings up a window or offscreen target; `resolution_scale` divides the pixels the scene is drawn at and reports them as `scaled_*`, and the renderer magnifies that image onto the window; `device_scale` is the framebuffer pixels per point a window reports and a headless run takes |
 | `box.transform` | `Position/Rotation/Scale/WorldTransform`, static vs dynamic propagation, AABB |
 | `box.geometry` | primitive shape components, mesh cache, shape registry; the level ladder of a parametric shape, whose mesh the reduction picks per frame from the projected error of the instance |
 | `box.material` | `Rgb`, `PbrMaterial`, `Emissive`, `Tint`, textures, material layers; `Wear` and `WearDetail`, the per entity amounts, noise seed and feature scale the layers of an instance read out of two packed instance words |

@@ -18,6 +18,10 @@
 
 /** Pixels of the target one logical pixel of a tree covers.
  *
+ * It is the device scale of the view of the tree, so a target holds one texel
+ * per framebuffer pixel and its composite never resamples what it holds; a
+ * high density window has twice the pixels its points say.
+ *
  * @param world The world
  * @param root The root of the tree
  * @return The factor, one when the tree does not know its view size
@@ -29,11 +33,11 @@ static float box_ui_group_scale(
     float result = 1.0f;
     const UiImpl *impl = ecs_get(world, root, UiImpl);
     const Surface *surface = ecs_singleton_get(world, Surface);
-    if (!impl || !surface || impl->height <= 0 || surface->height <= 0) {
+    if (!impl || !surface || impl->height <= 0) {
         goto done;
     }
 
-    result = (float)surface->height / impl->height;
+    result = box_ui_view_device(surface, impl->height);
 done:
     return result;
 }
@@ -127,6 +131,12 @@ static void box_ui_group_create(
 
 /** Give the target, the camera and the quad of a group the box of its element.
  *
+ * The target holds whole pixels, so the camera shows exactly the logical span
+ * those pixels cover and the quad is that span wide, with its top left corner
+ * on a device pixel of the view above: every texel of the target then lands
+ * on one pixel of the frame, which is what keeps the text of the subtree as
+ * sharp as the text outside it.
+ *
  * @param world The world
  * @param p The place of the element
  * @param opacity Opacity the subtree composites with
@@ -145,6 +155,12 @@ static void box_ui_group_sync(
     const WorldTransform *wt = ecs_get(world, p->e, WorldTransform);
     float x = wt ? wt->m.v[12] : p->x;
     float y = wt ? wt->m.v[13] : p->y;
+    float span_w = (float)width / scale;
+    float span_h = (float)height / scale;
+    float left = roundf((x - p->width * 0.5f) * scale) / scale;
+    float top = roundf((y + p->height * 0.5f) * scale) / scale;
+    float cx = left + span_w * 0.5f;
+    float cy = top - span_h * 0.5f;
 
     if (group->width != width || group->height != height) {
         ecs_set(world, group->target, RenderTarget, {
@@ -154,18 +170,19 @@ static void box_ui_group_sync(
     }
 
     Camera *camera = ecs_get_mut(world, group->camera, Camera);
-    if (camera && camera->ortho_height != p->height) {
-        camera->ortho_height = p->height;
+    if (camera && camera->ortho_height != span_h) {
+        camera->ortho_height = span_h;
         ecs_modified(world, group->camera, Camera);
     }
 
-    ecs_set(world, group->camera, Position, { x, y, -BOX_UI_DEPTH });
+    ecs_set(world, group->camera, Position, { cx, cy, -BOX_UI_DEPTH });
+    ecs_set(world, group->quad, Position, { cx - x, cy - y, 0 });
     Rect *rect = ecs_get_mut(world, group->quad, Rect);
     if (!rect) {
-        ecs_set(world, group->quad, Rect, { p->width, p->height });
-    } else if (rect->width != p->width || rect->height != p->height) {
-        rect->width = p->width;
-        rect->height = p->height;
+        ecs_set(world, group->quad, Rect, { span_w, span_h });
+    } else if (rect->width != span_w || rect->height != span_h) {
+        rect->width = span_w;
+        rect->height = span_h;
         ecs_modified(world, group->quad, Rect);
     }
 

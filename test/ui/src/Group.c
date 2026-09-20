@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/ui/ui_internal.h"
+#include <math.h>
 
 static ecs_world_t *w;
 
@@ -268,4 +269,71 @@ void Group_composite_reaches_the_packet_with_its_target(void)
     test_bool(seen, true);
     test_int(packet.views.count, 3);
     box_packet_fini(&packet);
+}
+
+void Group_target_follows_the_device_scale(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 960;
+    surface->height = 540;
+    surface->actual_width = 1920;
+    surface->actual_height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Rect, {200, 100});
+    ecs_set(w, panel, Opacity, {0.5f});
+    ecs_entity_t child = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, child, Rect, {80, 40});
+    box_ui_update(w);
+
+    const GroupImpl *group = ecs_get(w, panel, GroupImpl);
+    test_assert(group != NULL);
+    test_int(group->width, 400);
+    test_int(group->height, 200);
+    const RenderTarget *target = ecs_get(w, group->target, RenderTarget);
+    test_assert(target != NULL);
+    test_int(target->width, 400);
+    test_int(target->height, 200);
+    test_flt(ecs_get(w, group->camera, Camera)->ortho_height, 100);
+}
+
+void Group_target_edges_land_on_device_pixels(void)
+{
+    // ore_engine/console_text_blurry
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 960;
+    surface->height = 540;
+    surface->actual_width = 1920;
+    surface->actual_height = 1080;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Position, {10.3f, 20.7f, 0});
+    ecs_set(w, panel, Rect, {200.5f, 100.25f});
+    ecs_set(w, panel, Opacity, {0.5f});
+    ecs_entity_t child = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, child, Rect, {80, 40});
+    box_ui_update(w);
+
+    const GroupImpl *group = ecs_get(w, panel, GroupImpl);
+    test_assert(group != NULL);
+    test_int(group->width, 401);
+    test_int(group->height, 201);
+    const Position *cam = ecs_get(w, group->camera, Position);
+    const Rect *quad = ecs_get(w, group->quad, Rect);
+    test_flt(quad->width, 200.5f);
+    test_flt(quad->height, 100.5f);
+    float left = (cam->x - quad->width * 0.5f) * 2.0f;
+    float top = (cam->y + quad->height * 0.5f) * 2.0f;
+    test_flt(left, roundf(left));
+    test_flt(top, roundf(top));
+    test_flt(ecs_get(w, group->camera, Camera)->ortho_height, 100.5f);
 }

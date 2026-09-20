@@ -175,14 +175,18 @@ static void BoxSurfacePoll(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (!impl[i].window) {
-            s[i].actual_width = s[i].width;
-            s[i].actual_height = s[i].height;
+            float device = s[i].device_scale > 1.0f ? s[i].device_scale : 1.0f;
+
+            s[i].actual_width = (int32_t)((float)s[i].width * device + 0.5f);
+            s[i].actual_height = (int32_t)((float)s[i].height * device + 0.5f);
             s[i].point_width = s[i].width;
             s[i].point_height = s[i].height;
         } else {
             box_window_poll(impl[i].window);
             box_window_size(impl[i].window, &s[i].actual_width, &s[i].actual_height,
                 &s[i].point_width, &s[i].point_height);
+            s[i].device_scale = s[i].point_height > 0 ?
+                (float)s[i].actual_height / (float)s[i].point_height : 1.0f;
             if (box_window_should_close(impl[i].window)) {
                 ecs_quit(it->world);
             }

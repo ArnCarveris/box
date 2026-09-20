@@ -63,6 +63,8 @@ ECS_ENUM(TextureCacheMode, {
  * end of the frame. Everything authored stays in points, so a UI tree keeps its
  * logical size, a picking ray keeps taking a normalized cursor and a capture
  * writes the window size; only the pixels of the scene get cheaper.
+ * device_scale is what a high density window reports, and what a headless
+ * run takes to give its offscreen target the pixels of such a window.
  */
 ECS_STRUCT(Surface, {
     int32_t width;          /**< Requested width in points */
@@ -72,6 +74,7 @@ ECS_STRUCT(Surface, {
     int32_t point_width;    /**< Window width in points */
     int32_t point_height;   /**< Window height in points */
     float resolution_scale; /**< Divides the pixels the scene is rendered at, 2 is half */
+    float device_scale;     /**< Framebuffer pixels per point, from a window or set headless */
     int32_t scaled_width;   /**< Width the scene is rendered at, written by the engine */
     int32_t scaled_height;  /**< Height the scene is rendered at, written by the engine */
     bool vsync;             /**< Present with vertical sync */
