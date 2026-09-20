@@ -46,12 +46,17 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    two tasks need the same file, sequence them instead. Give a cheap, well
    specified task to sonnet and keep opus for design work.
 
-6. **Verify.** Never take a report at face value: rerun the suite it claims
+6. **Headless.** An agent never opens a window: `box_app`, benches and scenes run with
+   `--headless` and `--frames` or `--timeout`, are driven over the command port and are
+   checked through captures. `pm brief` prints the rule; a windowed run takes over the
+   keyboard and the screen of whoever is working on the machine.
+
+7. **Verify.** Never take a report at face value: rerun the suite it claims
    (`bake3 run test/<project> --local-env=<name> -- <Suite> -j 8`), open the scene
    it changed, and run `python3 tools/lint.py`. A claim that is not reproduced is
    not done.
 
-7. **Deliver.**
+8. **Deliver.**
 
    ```sh
    python3 project/pm.py deliver sky/atmosphere --tests render:Atmosphere,core --bench render
@@ -62,7 +67,7 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
-8. **Close.** `python3 project/pm.py done <epic>/<task>` refuses while
+9. **Close.** `python3 project/pm.py done <epic>/<task>` refuses while
    `tests.json` or `bench.json` is missing and prints what it wants; a task that
    changes nothing that runs per frame sets `"bench": false` in its
    `progress.json` instead. `--force` completes anyway and says so.

@@ -41,6 +41,12 @@ doc comment on every type and member.
 - Writing a component through `ecs_get_mut` or `ecs_ensure` raises no OnSet;
   call `ecs_modified` when observers must see the value.
 
+## Headless only
+
+Never open a window. Run `box_app`, benches and scenes with `--headless` and `--frames` or
+`--timeout`, drive them over the command port and look at captures; a windowed run takes over
+the keyboard and screen of the person working on this machine.
+
 ## Build environments
 
 Use a private environment when working next to other agents:

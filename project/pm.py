@@ -1245,6 +1245,19 @@ RULE_ECONOMY = """Keep the run cheap: no browser checks, no screenshots other th
 this task, and no full test sweep until the end. Read the files the task needs and stop
 there, prefer a targeted suite over a project run, and keep the final report short."""
 
+RULE_HEADLESS = """Never open a window. Every run of `box_app`, a bench or a scene is headless:
+
+```sh
+bake3 run box_app --local-env={env} -- --headless --timeout 30 --port 0 etc/scenes/default.flecs
+```
+
+To drive the application, keep the command port (`--port <n>`, one per agent) and send
+commands over HTTP; to see what it renders, use the `capture` command or a scene that sets
+`Surface.write_to_file`, and inspect the PNG. A headless run needs `--frames` or `--timeout`
+and steps with a fixed delta, which is what makes captures deterministic. A windowed run
+grabs the keyboard and the screen of the person working next to you; if a check truly needs
+one, stop and report it instead."""
+
 RULE_WORKTREE = """Another agent is editing this tree. Verify in a private worktree:
 `git worktree add ../box-{env} HEAD`, symlink `.bake/bundles` into it and build there with
 `--local-env={env}`, so a half written file of another agent cannot break your run. Commit
@@ -1263,6 +1276,7 @@ BRIEF_RULES = (
     ("Visual baselines", RULE_VISUAL),
     ("Commits", RULE_COMMITS),
     ("Deliverable", RULE_DELIVERABLE),
+    ("Headless", RULE_HEADLESS),
     ("Economy", RULE_ECONOMY),
 )
 
