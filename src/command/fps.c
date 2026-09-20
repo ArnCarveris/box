@@ -13,13 +13,47 @@
 #include "command_internal.h"
 #include "../render/render_internal.h"
 
-/** Entity the overlay of the world is set on.
+/** Check whether a view draws a UI tree, which it does by listing its layer.
  *
- * The active view owns the panel once the world renders views of its own; a
- * world without them keeps it on the singleton, which every view falls back to.
+ * The renderer never fills the panel of a view that draws a UI tree, because
+ * the overlay is a scene decoration and box.monitor already draws the number
+ * of that view as regular UI text. Picking such a view as the target would
+ * set the panel where the renderer refuses to draw it.
  *
  * @param world The world
- * @return The active view, or the FpsOverlay singleton when there is none
+ * @param state The registry
+ * @param e The View entity
+ * @return True when the view lists the layer of a UI tree
+ */
+static bool box_fps_view_is_ui(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e)
+{
+    bool result = false;
+    if (!state->ui_mask || !e) {
+        goto done;
+    }
+
+    const View *view = ecs_get(world, e, View);
+    if (!view || !view->layers[0]) {
+        goto done;
+    }
+
+    result = (box_render_view_layers(state, view->layers) & state->ui_mask) != 0;
+done:
+    return result;
+}
+
+/** Entity the overlay of the world is set on.
+ *
+ * The first view of the frame that does not draw a UI tree owns the panel,
+ * because that is the only kind of view the renderer draws it for; a world
+ * that lists only UI views, or none at all, keeps it on the singleton, which
+ * every view falls back to.
+ *
+ * @param world The world
+ * @return The target view, or the FpsOverlay singleton when there is none
  */
 static ecs_entity_t box_fps_target(
     ecs_world_t *world)
@@ -28,8 +62,20 @@ static ecs_entity_t box_fps_target(
     ecs_entity_t registry = ecs_lookup(world, "box.render.RenderState");
     if (registry) {
         const RenderState *state = ecs_get_id(world, registry, registry);
-        result = state ? box_render_primary_view(
-            ECS_CONST_CAST(RenderState*, state)) : 0;
+        if (state) {
+            int32_t i, count = ecs_vec_count(&state->view_list);
+            for (i = 0; i < count && !result; i ++) {
+                const box_view_src_t *src =
+                    ecs_vec_get_t(&state->view_list, box_view_src_t, i);
+                if (!box_fps_view_is_ui(world, state, src->entity)) {
+                    result = src->entity;
+                }
+            }
+
+            if (!result) {
+                result = box_render_primary_view(ECS_CONST_CAST(RenderState*, state));
+            }
+        }
     }
 
     if (!result) {
