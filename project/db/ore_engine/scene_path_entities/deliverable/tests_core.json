@@ -1,0 +1,31 @@
+{
+  "project": "core",
+  "timestamp": "2026-09-20T19:55:06Z",
+  "pass": 20,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.267647,
+  "tests": [
+    {"suite": "Args", "case": "no_args_defaults", "status": "pass", "elapsed": 0.105589},
+    {"suite": "Args", "case": "headless_requires_stop_condition", "status": "pass", "elapsed": 0.104478},
+    {"suite": "Args", "case": "headless_with_frames", "status": "pass", "elapsed": 0.105862},
+    {"suite": "Args", "case": "timeout_seconds", "status": "pass", "elapsed": 0.104631},
+    {"suite": "Args", "case": "timeout_infinite", "status": "pass", "elapsed": 0.105535},
+    {"suite": "Args", "case": "cpu_budget", "status": "pass", "elapsed": 0.106023},
+    {"suite": "Args", "case": "fps", "status": "pass", "elapsed": 0.105863},
+    {"suite": "Args", "case": "unknown_option_fails", "status": "pass", "elapsed": 0.105506},
+    {"suite": "Args", "case": "scene_file_loads", "status": "pass", "elapsed": 0.087271},
+    {"suite": "Args", "case": "missing_scene_fails", "status": "pass", "elapsed": 0.086668},
+    {"suite": "Args", "case": "a_flag_option_sets_its_bool_member", "status": "pass", "elapsed": 0.086399},
+    {"suite": "Args", "case": "an_option_takes_the_value_behind_its_equals_sign", "status": "pass", "elapsed": 0.085722},
+    {"suite": "Args", "case": "an_option_without_a_value_takes_its_fallback", "status": "pass", "elapsed": 0.085801},
+    {"suite": "Args", "case": "an_option_that_needs_a_value_takes_the_next_argument", "status": "pass", "elapsed": 0.085395},
+    {"suite": "Args", "case": "an_option_that_needs_a_value_fails_without_one", "status": "pass", "elapsed": 0.084838},
+    {"suite": "Args", "case": "an_unclaimed_option_still_fails", "status": "pass", "elapsed": 0.084792},
+    {"suite": "Args", "case": "the_usage_text_lists_the_options_of_the_world", "status": "pass", "elapsed": 0.075159},
+    {"suite": "Args", "case": "a_scene_still_loads_next_to_an_option", "status": "pass", "elapsed": 0.076372},
+    {"suite": "Args", "case": "an_option_with_a_bad_value_fails", "status": "pass", "elapsed": 0.075414},
+    {"suite": "Args", "case": "a_scene_loads_under_the_scenes_scope", "status": "pass", "elapsed": 0.075429}
+  ]
+}

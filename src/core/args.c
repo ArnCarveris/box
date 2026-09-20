@@ -252,6 +252,38 @@ char* box_args_usage(
     return ecs_strbuf_get(&buf);
 }
 
+/** The entity a scene of the command line is loaded on: scenes.<stem of the file>.
+ *
+ * A script loaded on no entity takes its entity from its path, and an absolute
+ * path leaves a root entity with an empty name in the world, which is what a
+ * command that walks the root then trips over. A reload of the same file lands
+ * on the same entity and replaces the scene.
+ *
+ * @param world The world
+ * @param path The path of the scene file
+ * @return The scene entity, under the scenes scope
+ */
+static ecs_entity_t box_scene_entity(
+    ecs_world_t *world,
+    const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    const char *base = slash ? slash + 1 : path;
+    const char *dot = strrchr(base, '.');
+    size_t len = dot && dot != base ? (size_t)(dot - base) : strlen(base);
+    char *stem = ecs_os_malloc((ecs_size_t)len + 1);
+
+    memcpy(stem, base, len);
+    stem[len] = '\0';
+
+    ecs_entity_t scenes = ecs_entity(world, { .name = "scenes" });
+    ecs_entity_t result = ecs_entity(world, { .name = stem, .parent = scenes });
+
+    ecs_os_free(stem);
+
+    return result;
+}
+
 /** Print usage to stderr.
  *
  * @param world The world
@@ -317,7 +349,9 @@ int box_parse_args(
             }
         } else {
             ecs_singleton_modified(world, App);
-            if (!ecs_script(world, { .filename = arg })) {
+            if (!ecs_script(world, {
+                .entity = box_scene_entity(world, arg), .filename = arg }))
+            {
                 ecs_err("failed to load scene '%s'", arg);
                 goto error;
             }

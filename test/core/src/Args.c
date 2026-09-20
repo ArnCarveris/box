@@ -18,7 +18,7 @@ typedef struct Stress {
 static ecs_world_t* args_world(void)
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
 
     return world;
 }
@@ -382,5 +382,35 @@ void Args_an_option_with_a_bad_value_fails(void)
     char *argv[] = { "box", "--stresstest=maybe" };
     test_int(box_parse_args(world, 2, argv), -1);
     ecs_log_set_level(-1);
+    ecs_fini(world);
+}
+
+void Args_a_scene_loads_under_the_scenes_scope(void)
+{
+    // ore_engine/scene_path_entities
+    ecs_world_t *world = args_world();
+    const char *path = "/tmp/box_args_scoped.flecs";
+    FILE *f = fopen(path, "w");
+    test_assert(f != NULL);
+    fputs("crate {}\n", f);
+    fclose(f);
+    char *argv[] = { "box", (char*)path };
+    test_int(box_parse_args(world, 2, argv), 0);
+
+    ecs_entity_t scene = ecs_lookup(world, "scenes.box_args_scoped");
+    test_assert(scene != 0);
+    test_assert(ecs_has(world, scene, EcsScript));
+    test_assert(ecs_lookup(world, "crate") != 0);
+
+    ecs_iter_t it = ecs_children(world, 0);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const char *name = ecs_get_name(world, it.entities[i]);
+            test_assert(!name || name[0] != '\0');
+        }
+    }
+
+    remove(path);
     ecs_fini(world);
 }
