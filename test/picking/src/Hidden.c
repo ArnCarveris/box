@@ -12,8 +12,7 @@ static ecs_world_t *w;
 void Hidden_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxPicking);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -10});
     ecs_set(w, cam, Camera, {.fov = 60});

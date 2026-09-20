@@ -38,6 +38,7 @@
                     "beyond_the_max_distance_is_a_miss",
                     "resolves_to_the_prefab_root",
                     "resolves_to_the_template_root",
+                    "a_row_of_template_roots_picks_the_one_under_the_cursor",
                     "a_pickable_descendant_is_the_target",
                     "a_pickable_between_the_hit_and_the_root_is_the_target",
                     "an_entity_outside_a_root_targets_itself",
@@ -71,7 +72,8 @@
                     "a_cancelled_task_drops_its_waiter",
                     "a_click_fires_the_action_of_the_entity",
                     "a_click_that_fires_an_action_stops_the_bubble",
-                    "a_parent_takes_the_click_when_the_child_has_no_action"
+                    "a_parent_takes_the_click_when_the_child_has_no_action",
+                    "only_the_root_under_the_cursor_hears_the_hover_in_a_row"
                 ],
                 "setup": true,
                 "teardown": true

@@ -14,7 +14,7 @@ static ecs_entity_t leaf_tag;
 void Events_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxPicking);
+    ECS_IMPORT(w, Box);
     Surface *s = ecs_singleton_ensure(w, Surface);
     s->width = 100;
     s->height = 100;
@@ -575,6 +575,7 @@ void Events_a_click_that_fires_an_action_stops_the_bubble(void)
         "    Position: {0, 0, 0}\n"
         "    SphereCollider: {radius: 1}\n"
         "    Action: {action: actions.Fire}\n"
+        "    Pickable\n"
         "  }\n"
         "}\n"
         "Rig rig\n" });
@@ -630,4 +631,42 @@ void Events_a_parent_takes_the_click_when_the_child_has_no_action(void)
     ecs_progress(w, 0);
 
     test_bool(ecs_has_id(w, rig, fired_tag), true);
+}
+
+void Events_only_the_root_under_the_cursor_hears_the_hover_in_a_row(void)
+{
+    // ore_engine/import_order_audit
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "template Hoverable {\n"
+        "  mut hover = 0\n"
+        "  async {\n"
+        "    await on.hover(this)\n"
+        "    hover = 1\n"
+        "  }\n"
+        "  if hover == 1 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "row {\n"
+        "  a {\n    Position: {-4, 0, 0}\n    Box: {2, 2, 2}\n    Hoverable\n  }\n"
+        "  b {\n    Position: {-2, 0, 0}\n    Box: {2, 2, 2}\n    Hoverable\n  }\n"
+        "  c {\n    Position: {0, 0, 0}\n    Box: {2, 2, 2}\n    Hoverable\n  }\n"
+        "  d {\n    Position: {2, 0, 0}\n    Box: {2, 2, 2}\n    Hoverable\n  }\n"
+        "}\n" });
+    test_assert(s != 0);
+    ecs_entity_t a = ecs_lookup(w, "row.a");
+    ecs_entity_t c = ecs_lookup(w, "row.c");
+    test_assert(a != 0 && c != 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+
+    test_bool(ecs_has_id(w, c, fired_tag), true);
+    test_bool(ecs_has_id(w, a, fired_tag), false);
+    test_bool(ecs_has_id(w, ecs_lookup(w, "row.b"), fired_tag), false);
 }

@@ -12,7 +12,7 @@ static ecs_world_t *w;
 void Pick_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxPicking);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -10});
     ecs_set(w, cam, Camera, {.fov = 60});
@@ -132,7 +132,7 @@ void Pick_resolves_to_the_prefab_root(void)
 void Pick_resolves_to_the_template_root(void)
 {
     // picking/picking
-    ECS_IMPORT(w, BoxScript);
+    ECS_IMPORT(w, Box);
     test_int(ecs_script_run(w, "test",
         "using box.transform\n"
         "using box.collision\n"
@@ -425,4 +425,36 @@ void Pick_a_view_with_a_render_target_does_not_pick(void)
     box_pick_view_t views[BOX_PICK_VIEW_MAX];
     test_int(box_picking_views(w, state, views, BOX_PICK_VIEW_MAX), 1);
     test_uint(views[0].entity, 0);
+}
+
+void Pick_a_row_of_template_roots_picks_the_one_under_the_cursor(void)
+{
+    // ore_engine/import_order_audit
+    ECS_IMPORT(w, Box);
+    test_int(ecs_script_run(w, "test",
+        "using box.transform\n"
+        "using box.geometry\n"
+        "template Block {\n"
+        "  Box: {2, 2, 2}\n"
+        "}\n"
+        "row {\n"
+        "  a {\n    Position: {-4, 0, 0}\n    Block\n  }\n"
+        "  b {\n    Position: {-2, 0, 0}\n    Block\n  }\n"
+        "  c {\n    Position: {0, 0, 0}\n    Block\n  }\n"
+        "  d {\n    Position: {2, 0, 0}\n    Block\n  }\n"
+        "}\n", NULL), 0);
+
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t a = ecs_lookup(w, "row.a");
+    ecs_entity_t c = ecs_lookup(w, "row.c");
+    test_assert(a != 0 && c != 0);
+    test_assert(ecs_has(w, a, RootBounds));
+    test_assert(ecs_has(w, c, RootBounds));
+
+    PickHit hit;
+    test_bool(box_picking_pick(w, 0, (vec2){0, 0}, &hit), true);
+    test_uint(hit.entity, c);
+    test_bool(box_picking_pick(w, 0, (vec2){-0.7f, 0}, &hit), true);
+    test_uint(hit.entity, a);
 }

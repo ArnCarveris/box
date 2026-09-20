@@ -66,6 +66,29 @@ done:
     return;
 }
 
+/** Add the world bounds of the collider of an entity whose AABB covers nothing.
+ *
+ * A template root or a child that carries only a collider, like a picking
+ * target, has an empty AABB or none, so its collider is what tells the
+ * aggregate where it is.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param agg The aggregate
+ */
+static void box_root_add_collider(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    box_root_agg_t *agg)
+{
+    Collider c = {0};
+    vec3 min, max;
+    if (box_collider_resolve(world, e, &c)) {
+        box_collider_bounds(&c, &min, &max);
+        box_root_add(agg, min, max, 1);
+    }
+}
+
 /** Visit one entity below a root.
  *
  * @param world The world
@@ -87,8 +110,10 @@ static void box_root_visit(
     }
 
     const AABB *aabb = ecs_get(world, e, AABB);
-    if (aabb) {
+    if (aabb && !box_root_empty(aabb->min, aabb->max)) {
         box_root_add(agg, aabb->min, aabb->max, 1);
+    } else {
+        box_root_add_collider(world, e, agg);
     }
 
     if (ecs_has(world, e, RootBounds)) {
@@ -168,8 +193,10 @@ static void box_root_aggregate(
     ecs_vec_clear(agg.list);
 
     const AABB *aabb = ecs_get(world, root, AABB);
-    if (aabb) {
+    if (aabb && !box_root_empty(aabb->min, aabb->max)) {
         box_root_add(&agg, aabb->min, aabb->max, 1);
+    } else {
+        box_root_add_collider(world, root, &agg);
     }
 
     if (!agg.dynamic && ecs_has(world, root, Collider)) {
@@ -539,6 +566,16 @@ void box_collision_roots_init(
         .callback = BoxCollisionOnInstance,
         .ctx = state
     });
+
+    ecs_entity_t root = ecs_lookup(world, "flecs.script.ScriptTemplateRoot");
+    if (root) {
+        ecs_observer(world, {
+            .query.terms = {{ .id = ecs_pair(root, EcsWildcard) }},
+            .events = { EcsOnAdd },
+            .callback = BoxCollisionOnInstance,
+            .ctx = state
+        });
+    }
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(RootBounds) }},

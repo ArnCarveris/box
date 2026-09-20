@@ -12,7 +12,7 @@ static ecs_world_t *w;
 void Ray_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxPicking);
+    ECS_IMPORT(w, Box);
 }
 
 void Ray_teardown(void)
