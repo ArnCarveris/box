@@ -468,7 +468,8 @@ typedef struct box_view_t {
     float shadow_pad;       /**< Padding to the 16 byte GPU stride */
     uint32_t shadow_cascades; /**< Cascades the view renders, 0 when it has no shadows */
     uint32_t shadow_filter; /**< PCF taps the comparison takes per axis */
-    uint32_t shadow_pad2[2]; /**< Padding to the 16 byte GPU stride */
+    uint32_t unlit;         /**< The view shows albedo and emissive without shading it */
+    uint32_t shadow_pad2;   /**< Padding to the 16 byte GPU stride */
     uint32_t target;        /**< Render target handle, 0 draws into the surface */
     uint32_t width;         /**< Target width in pixels */
     uint32_t height;        /**< Target height in pixels */

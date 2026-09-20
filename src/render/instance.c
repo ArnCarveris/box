@@ -747,7 +747,12 @@ void box_render_fill_instance(
     const ActualTint *tint = box_render_displayed(transition, ecs_id(ActualTint),
         time, ecs_get(world, e, ActualTint), &tint_value, sizeof(ActualTint));
 
-    box_render_color(rgb, tint, opacity ? opacity->value : 1.0f, out->color);
+    float alpha = opacity ? opacity->value : 1.0f;
+    if (opacity && ecs_has_id(world, e, RenderGrouped)) {
+        alpha = 1.0f;
+    }
+
+    box_render_color(rgb, tint, alpha, out->color);
 
     const Emissive *emissive = box_render_displayed(transition, ecs_id(Emissive),
         time, ecs_get(world, e, Emissive), &emissive_value, sizeof(Emissive));

@@ -33,6 +33,6 @@ struct View {
   shadow_pad: f32,
   shadow_cascades: u32,
   shadow_filter: u32,
+  unlit: u32,
   shadow_pad2: u32,
-  shadow_pad3: u32,
 };

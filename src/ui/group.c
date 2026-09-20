@@ -6,7 +6,9 @@
  * that opacity to every node below it, and two children that overlap would show
  * through each other. Such a subtree gets a view of its own that renders it at
  * full strength into a target the size of its Bounds, and a quad in the layer
- * above shows that target once with the opacity of the element. Everything else
+ * above shows that target once with the opacity of the element; the element
+ * itself is tagged RenderGrouped so its own draw into the target keeps its full
+ * strength too, or its opacity would reach the frame twice. Everything else
  * is untouched: a subtree that is fully opaque, and an element with an opacity
  * but no children, keeps the one draw it always had.
  */
@@ -197,6 +199,7 @@ static bool box_ui_group_element(
         if (group) {
             box_ui_group_release(world, group);
             ecs_remove(world, p.e, GroupImpl);
+            ecs_remove_id(world, p.e, RenderGrouped);
             box_ui_state(world)->respawn = true;
         }
 
@@ -209,6 +212,7 @@ static bool box_ui_group_element(
         memset(&created, 0, sizeof(GroupImpl));
         box_ui_group_create(world, p.e, BOX_UI_PRIORITY, &created);
         ecs_set_ptr(world, p.e, GroupImpl, &created);
+        ecs_add_id(world, p.e, RenderGrouped);
         box_ui_state(world)->respawn = true;
     }
 

@@ -468,8 +468,9 @@ done:
 
 /** Copy the environment of a view into it, the view first and the singleton after.
  *
- * A UI view lights its tree with a flat white environment instead, so a node
- * shows the color it was given whatever the scene around it is lit with.
+ * A UI view shades its tree unlit, so a node shows the color it was given
+ * whatever the scene around it is lit with, and takes a flat white environment
+ * for the passes that read one anyway.
  *
  * @param world The world
  * @param state The registry
@@ -698,6 +699,7 @@ static void box_view_fill(
     if (ui) {
         v->sun_intensity = 0;
         v->plain_blend = 1;
+        v->unlit = 1;
     }
 
     box_render_extract_shadows(world, src->entity, sun, v);

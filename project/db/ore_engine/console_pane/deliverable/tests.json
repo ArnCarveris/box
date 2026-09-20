@@ -1,193 +1,4408 @@
 {
-  "project": "ui",
-  "timestamp": "2026-09-19T23:09:28Z",
-  "pass": 182,
+  "project": "all",
+  "timestamp": "2026-09-20T00:47:54Z",
+  "pass": 626,
   "fail": 0,
   "empty": 0,
-  "timeout": 0,
-  "elapsed": 1.660442,
+  "elapsed": 8.932683,
   "tests": [
-    {"suite": "Tree", "case": "root_gets_a_view_a_camera_and_a_layer", "status": "pass", "elapsed": 0.076321},
-    {"suite": "Tree", "case": "root_without_children_is_one_node", "status": "pass", "elapsed": 0.076479},
-    {"suite": "Tree", "case": "descendants_join_the_tree", "status": "pass", "elapsed": 0.076497},
-    {"suite": "Tree", "case": "node_added_later_joins_the_tree", "status": "pass", "elapsed": 0.076474},
-    {"suite": "Tree", "case": "node_that_leaves_the_tree_is_dropped", "status": "pass", "elapsed": 0.076463},
-    {"suite": "Tree", "case": "nested_root_starts_its_own_tree", "status": "pass", "elapsed": 0.076708},
-    {"suite": "Tree", "case": "entity_outside_a_tree_has_no_node", "status": "pass", "elapsed": 0.076316},
-    {"suite": "Tree", "case": "two_trees_get_their_own_view_and_layer", "status": "pass", "elapsed": 0.075895},
-    {"suite": "Tree", "case": "authored_view_is_bound_instead_of_a_new_one", "status": "pass", "elapsed": 0.068654},
-    {"suite": "Tree", "case": "removing_ui_deletes_the_view_it_created", "status": "pass", "elapsed": 0.067850},
-    {"suite": "Tree", "case": "view_and_camera_are_not_nodes_of_the_tree", "status": "pass", "elapsed": 0.068222},
-    {"suite": "Tree", "case": "root_without_a_position_draws_its_children", "status": "pass", "elapsed": 0.068107},
-    {"suite": "Tree", "case": "root_without_a_position_sits_at_the_origin", "status": "pass", "elapsed": 0.067756},
-    {"suite": "Order", "case": "child_is_in_front_of_its_parent", "status": "pass", "elapsed": 0.068478},
-    {"suite": "Order", "case": "nested_children_are_numbered_depth_first", "status": "pass", "elapsed": 0.068570},
-    {"suite": "Order", "case": "later_sibling_is_in_front_of_the_earlier_one", "status": "pass", "elapsed": 0.068084},
-    {"suite": "Order", "case": "reordered_children_swap_their_depth", "status": "pass", "elapsed": 0.069068},
-    {"suite": "Order", "case": "node_added_later_is_in_front_of_its_siblings", "status": "pass", "elapsed": 0.069180},
-    {"suite": "Order", "case": "depth_reaches_the_instance_of_the_packet", "status": "pass", "elapsed": 0.068018},
-    {"suite": "Order", "case": "depth_orders_the_sorted_draws_of_the_view", "status": "pass", "elapsed": 0.068630},
-    {"suite": "Order", "case": "tree_of_a_thousand_nodes_stays_in_front_of_the_near_plane", "status": "pass", "elapsed": 0.105074},
-    {"suite": "Order", "case": "dropped_node_loses_its_depth", "status": "pass", "elapsed": 0.068571},
-    {"suite": "UiView", "case": "camera_is_orthographic_in_logical_pixels", "status": "pass", "elapsed": 0.068200},
-    {"suite": "UiView", "case": "view_follows_a_new_height", "status": "pass", "elapsed": 0.068165},
-    {"suite": "UiView", "case": "view_follows_the_points_of_the_surface", "status": "pass", "elapsed": 0.063694},
-    {"suite": "UiView", "case": "scale_divides_the_height_of_the_surface", "status": "pass", "elapsed": 0.063100},
-    {"suite": "UiView", "case": "view_renders_after_the_view_of_the_scene", "status": "pass", "elapsed": 0.063313},
-    {"suite": "UiView", "case": "scene_view_is_synthesized_next_to_a_ui_view", "status": "pass", "elapsed": 0.063195},
-    {"suite": "UiView", "case": "scene_view_hides_the_tree", "status": "pass", "elapsed": 0.063222},
-    {"suite": "UiView", "case": "ui_view_draws_the_tree_only", "status": "pass", "elapsed": 0.063144},
-    {"suite": "UiView", "case": "ui_view_has_no_sun_no_lights_and_a_flat_environment", "status": "pass", "elapsed": 0.062747},
-    {"suite": "UiView", "case": "two_trees_reach_their_own_view", "status": "pass", "elapsed": 0.049809},
-    {"suite": "UiView", "case": "existing_scene_view_is_not_synthesized_twice", "status": "pass", "elapsed": 0.064350},
-    {"suite": "Layout", "case": "every_node_gets_bounds", "status": "pass", "elapsed": 0.064553},
-    {"suite": "Layout", "case": "row_places_children_left_to_right", "status": "pass", "elapsed": 0.064241},
-    {"suite": "Layout", "case": "column_places_children_top_to_bottom", "status": "pass", "elapsed": 0.064309},
-    {"suite": "Layout", "case": "padding_insets_the_children", "status": "pass", "elapsed": 0.063865},
-    {"suite": "Layout", "case": "spacing_separates_the_children", "status": "pass", "elapsed": 0.063626},
-    {"suite": "Layout", "case": "row_grows_to_fit_its_children", "status": "pass", "elapsed": 0.063236},
-    {"suite": "Layout", "case": "column_grows_to_fit_its_children", "status": "pass", "elapsed": 0.047197},
-    {"suite": "Layout", "case": "layout_resizes_the_rect_of_its_element", "status": "pass", "elapsed": 0.068863},
-    {"suite": "Layout", "case": "rect_gives_the_size_when_the_layout_has_none", "status": "pass", "elapsed": 0.068419},
-    {"suite": "Layout", "case": "row_aligns_its_children_on_both_axes", "status": "pass", "elapsed": 0.067920},
-    {"suite": "Layout", "case": "column_aligns_its_children_on_both_axes", "status": "pass", "elapsed": 0.068096},
-    {"suite": "Layout", "case": "nested_rows_and_columns", "status": "pass", "elapsed": 0.068098},
-    {"suite": "Layout", "case": "direction_none_keeps_the_authored_position", "status": "pass", "elapsed": 0.067719},
-    {"suite": "Layout", "case": "root_position_offsets_the_tree", "status": "pass", "elapsed": 0.067548},
-    {"suite": "Layout", "case": "changed_child_lays_out_the_tree_again", "status": "pass", "elapsed": 0.062048},
-    {"suite": "Layout", "case": "changed_layout_lays_out_the_tree_again", "status": "pass", "elapsed": 0.068972},
-    {"suite": "Layout", "case": "node_added_later_is_laid_out", "status": "pass", "elapsed": 0.068988},
-    {"suite": "Layout", "case": "tree_that_did_not_change_is_not_laid_out", "status": "pass", "elapsed": 0.068897},
-    {"suite": "Layout", "case": "node_that_leaves_the_tree_loses_its_bounds", "status": "pass", "elapsed": 0.068873},
-    {"suite": "Layout", "case": "moved_leaf_lays_out_its_subtree_only", "status": "pass", "elapsed": 0.068537},
-    {"suite": "Layout", "case": "content_sized_ancestors_are_laid_out_again", "status": "pass", "elapsed": 0.068819},
-    {"suite": "Layout", "case": "changed_leaf_keeps_the_places_of_the_tree", "status": "pass", "elapsed": 0.069090},
-    {"suite": "Layout", "case": "structural_change_numbers_the_tree_again", "status": "pass", "elapsed": 0.068401},
-    {"suite": "Layout", "case": "fill_sizes_an_element_as_a_fraction_of_its_parent", "status": "pass", "elapsed": 0.068944},
-    {"suite": "Layout", "case": "fill_of_the_root_follows_the_view", "status": "pass", "elapsed": 0.068727},
-    {"suite": "Anchor", "case": "pins_to_the_edges_of_the_parent", "status": "pass", "elapsed": 0.068574},
-    {"suite": "Anchor", "case": "offset_moves_toward_the_inside", "status": "pass", "elapsed": 0.068620},
-    {"suite": "Anchor", "case": "offset_in_the_centre_follows_the_axes", "status": "pass", "elapsed": 0.068295},
-    {"suite": "Anchor", "case": "uses_the_padding_of_the_parent", "status": "pass", "elapsed": 0.068402},
-    {"suite": "Anchor", "case": "anchored_child_takes_no_room_in_a_row", "status": "pass", "elapsed": 0.067952},
-    {"suite": "Anchor", "case": "anchored_child_does_not_size_its_parent", "status": "pass", "elapsed": 0.068115},
-    {"suite": "Anchor", "case": "anchor_of_a_nested_element_follows_its_parent", "status": "pass", "elapsed": 0.074932},
-    {"suite": "Anchor", "case": "changed_anchor_lays_out_the_tree_again", "status": "pass", "elapsed": 0.074444},
-    {"suite": "Anchor", "case": "removed_anchor_returns_the_child_to_the_row", "status": "pass", "elapsed": 0.074101},
-    {"suite": "Text", "case": "element_is_as_wide_as_its_string", "status": "pass", "elapsed": 0.075990},
-    {"suite": "Text", "case": "longer_string_is_wider", "status": "pass", "elapsed": 0.076241},
-    {"suite": "Text", "case": "empty_string_has_no_glyphs", "status": "pass", "elapsed": 0.074264},
-    {"suite": "Text", "case": "one_glyph_per_visible_character", "status": "pass", "elapsed": 0.075837},
-    {"suite": "Text", "case": "glyph_shows_a_region_of_the_atlas", "status": "pass", "elapsed": 0.075622},
-    {"suite": "Text", "case": "glyph_binds_the_atlas_texture", "status": "pass", "elapsed": 0.069197},
-    {"suite": "Text", "case": "glyph_is_drawn_over_its_element", "status": "pass", "elapsed": 0.069281},
-    {"suite": "Text", "case": "newline_starts_a_second_line", "status": "pass", "elapsed": 0.069698},
-    {"suite": "Text", "case": "line_height_sets_the_distance_between_lines", "status": "pass", "elapsed": 0.069172},
-    {"suite": "Text", "case": "layout_width_wraps_the_string", "status": "pass", "elapsed": 0.067989},
-    {"suite": "Text", "case": "wrapped_lines_stay_inside_the_width", "status": "pass", "elapsed": 0.068167},
-    {"suite": "Text", "case": "align_center_centres_the_lines", "status": "pass", "elapsed": 0.067735},
-    {"suite": "Text", "case": "align_right_puts_the_lines_against_the_edge", "status": "pass", "elapsed": 0.066754},
-    {"suite": "Text", "case": "changed_value_rebuilds_the_glyphs", "status": "pass", "elapsed": 0.070891},
-    {"suite": "Text", "case": "shorter_string_drops_the_glyphs_it_lost", "status": "pass", "elapsed": 0.070118},
-    {"suite": "Text", "case": "unchanged_text_keeps_its_glyphs", "status": "pass", "elapsed": 0.069442},
-    {"suite": "Text", "case": "removed_text_drops_its_glyphs", "status": "pass", "elapsed": 0.069501},
-    {"suite": "Text", "case": "text_sizes_the_row_that_holds_it", "status": "pass", "elapsed": 0.069509},
-    {"suite": "Text", "case": "layout_height_overrides_the_measured_height", "status": "pass", "elapsed": 0.069250},
-    {"suite": "Text", "case": "glyphs_take_the_color_of_the_element", "status": "pass", "elapsed": 0.068500},
-    {"suite": "Text", "case": "glyphs_composite_over_what_is_behind_them", "status": "pass", "elapsed": 0.067689},
-    {"suite": "Text", "case": "rect_of_the_element_wraps_the_string", "status": "pass", "elapsed": 0.069948},
-    {"suite": "Text", "case": "content_sized_row_wraps_around_its_label", "status": "pass", "elapsed": 0.069572},
-    {"suite": "Text", "case": "glyphs_composite_with_plain_alpha_in_the_ui_view", "status": "pass", "elapsed": 0.068556},
-    {"suite": "Font", "case": "default_font_is_the_one_the_engine_ships", "status": "pass", "elapsed": 0.066464},
-    {"suite": "Font", "case": "one_atlas_per_file_and_size", "status": "pass", "elapsed": 0.066523},
-    {"suite": "Font", "case": "missing_font_file_fails_once", "status": "pass", "elapsed": 0.065767},
-    {"suite": "Font", "case": "missing_font_draws_nothing", "status": "pass", "elapsed": 0.066704},
-    {"suite": "Font", "case": "size_scales_the_measurement", "status": "pass", "elapsed": 0.068921},
-    {"suite": "Font", "case": "font_of_an_ancestor_is_used", "status": "pass", "elapsed": 0.069833},
-    {"suite": "Font", "case": "own_font_wins_from_the_one_above_it", "status": "pass", "elapsed": 0.069093},
-    {"suite": "Font", "case": "another_font_rebuilds_the_glyphs", "status": "pass", "elapsed": 0.070454},
-    {"suite": "Font", "case": "atlas_grows_when_the_glyphs_do_not_fit", "status": "pass", "elapsed": 0.068050},
-    {"suite": "Font", "case": "grown_atlas_keeps_every_glyph", "status": "pass", "elapsed": 0.066406},
-    {"suite": "Font", "case": "grown_atlas_uploads_at_its_new_size", "status": "pass", "elapsed": 0.085129},
-    {"suite": "Font", "case": "measure_function_returns_the_size", "status": "pass", "elapsed": 0.068281},
-    {"suite": "Font", "case": "wrap_function_breaks_at_the_width", "status": "pass", "elapsed": 0.065779},
-    {"suite": "Font", "case": "label_function_creates_a_text_element", "status": "pass", "elapsed": 0.065419},
-    {"suite": "Font", "case": "label_function_reuses_the_element_it_made", "status": "pass", "elapsed": 0.063403},
-    {"suite": "Shadow", "case": "element_gets_a_quad", "status": "pass", "elapsed": 0.063462},
-    {"suite": "Shadow", "case": "quad_covers_the_box_plus_the_spread_and_the_blur", "status": "pass", "elapsed": 0.063275},
-    {"suite": "Shadow", "case": "quad_is_offset_from_its_element", "status": "pass", "elapsed": 0.062615},
-    {"suite": "Shadow", "case": "quad_is_drawn_behind_its_element", "status": "pass", "elapsed": 0.061966},
-    {"suite": "Shadow", "case": "quad_takes_the_radii_of_the_element", "status": "pass", "elapsed": 0.061583},
-    {"suite": "Shadow", "case": "transparent_shadow_draws_no_quad", "status": "pass", "elapsed": 0.047681},
-    {"suite": "Shadow", "case": "quad_takes_no_room_in_a_row", "status": "pass", "elapsed": 0.070189},
-    {"suite": "Shadow", "case": "removing_the_shadow_drops_the_quad", "status": "pass", "elapsed": 0.069952},
-    {"suite": "Shadow", "case": "quad_extracts_as_a_soft_shape", "status": "pass", "elapsed": 0.069457},
-    {"suite": "Group", "case": "opaque_subtree_takes_no_target", "status": "pass", "elapsed": 0.068739},
-    {"suite": "Group", "case": "transparent_leaf_takes_no_target", "status": "pass", "elapsed": 0.068439},
-    {"suite": "Group", "case": "child_with_its_own_opacity_takes_no_target", "status": "pass", "elapsed": 0.068975},
-    {"suite": "Group", "case": "transparent_subtree_gets_a_view_and_a_target", "status": "pass", "elapsed": 0.067881},
-    {"suite": "Group", "case": "target_is_the_size_of_the_bounds", "status": "pass", "elapsed": 0.066921},
-    {"suite": "Group", "case": "target_follows_the_bounds", "status": "pass", "elapsed": 0.069025},
-    {"suite": "Group", "case": "composite_quad_carries_the_opacity", "status": "pass", "elapsed": 0.069077},
-    {"suite": "Group", "case": "subtree_joins_the_layer_of_its_group", "status": "pass", "elapsed": 0.068686},
-    {"suite": "Group", "case": "nested_groups_render_inside_out", "status": "pass", "elapsed": 0.069119},
-    {"suite": "Group", "case": "opaque_again_drops_the_group", "status": "pass", "elapsed": 0.068420},
-    {"suite": "Group", "case": "composite_reaches_the_packet_with_its_target", "status": "pass", "elapsed": 0.068124},
-    {"suite": "Capture", "case": "a_world_without_a_tree_captures_nothing", "status": "pass", "elapsed": 0.067630},
-    {"suite": "Capture", "case": "the_cursor_over_an_element_captures_the_mouse", "status": "pass", "elapsed": 0.067892},
-    {"suite": "Capture", "case": "the_capture_names_the_element_under_the_cursor", "status": "pass", "elapsed": 0.068414},
-    {"suite": "Capture", "case": "the_cursor_beside_the_tree_captures_nothing", "status": "pass", "elapsed": 0.067808},
-    {"suite": "Capture", "case": "a_collider_of_the_scene_does_not_capture", "status": "pass", "elapsed": 0.067274},
-    {"suite": "Capture", "case": "an_element_that_leaves_the_tree_releases_the_capture", "status": "pass", "elapsed": 0.067536},
-    {"suite": "Hit", "case": "element_under_the_point_is_found", "status": "pass", "elapsed": 0.066396},
-    {"suite": "Hit", "case": "point_outside_every_element_hits_nothing", "status": "pass", "elapsed": 0.066696},
-    {"suite": "Hit", "case": "deepest_element_under_the_point_wins", "status": "pass", "elapsed": 0.067302},
-    {"suite": "Hit", "case": "later_sibling_wins_where_two_overlap", "status": "pass", "elapsed": 0.066727},
-    {"suite": "Hit", "case": "element_without_a_rectangle_is_not_hit", "status": "pass", "elapsed": 0.068613},
-    {"suite": "Hit", "case": "rotated_element_follows_its_corners", "status": "pass", "elapsed": 0.067879},
-    {"suite": "Hit", "case": "scaled_element_covers_its_scaled_rectangle", "status": "pass", "elapsed": 0.067989},
-    {"suite": "Hit", "case": "element_of_another_view_is_not_hit", "status": "pass", "elapsed": 0.067829},
-    {"suite": "Hit", "case": "clipped_child_of_a_transparent_subtree_is_not_hit", "status": "pass", "elapsed": 0.067835},
-    {"suite": "Hit", "case": "glyphs_of_a_label_are_not_hit", "status": "pass", "elapsed": 0.067780},
-    {"suite": "Hit", "case": "element_that_left_the_tree_is_not_hit", "status": "pass", "elapsed": 0.067550},
-    {"suite": "Hit", "case": "moved_element_is_hit_where_it_went", "status": "pass", "elapsed": 0.066805},
-    {"suite": "Hit", "case": "world_without_a_tree_hits_nothing", "status": "pass", "elapsed": 0.065092},
-    {"suite": "Events", "case": "hovered_marks_the_element_under_the_cursor", "status": "pass", "elapsed": 0.064657},
-    {"suite": "Events", "case": "hover_resumes_a_handler", "status": "pass", "elapsed": 0.065756},
-    {"suite": "Events", "case": "click_resumes_a_handler", "status": "pass", "elapsed": 0.065653},
-    {"suite": "Events", "case": "click_bubbles_to_the_parent", "status": "pass", "elapsed": 0.065606},
-    {"suite": "Events", "case": "a_child_handler_consumes_the_click", "status": "pass", "elapsed": 0.065976},
-    {"suite": "Events", "case": "drag_resumes_a_handler", "status": "pass", "elapsed": 0.064997},
-    {"suite": "Events", "case": "an_element_consumes_the_pick_before_the_scene", "status": "pass", "elapsed": 0.064794},
-    {"suite": "Events", "case": "the_scene_is_picked_beside_the_tree", "status": "pass", "elapsed": 0.060903},
-    {"suite": "Events", "case": "a_click_emits_the_action_of_the_element", "status": "pass", "elapsed": 0.061634},
-    {"suite": "Events", "case": "the_action_of_an_ancestor_fires", "status": "pass", "elapsed": 0.061084},
-    {"suite": "Events", "case": "a_handler_receives_the_point_in_logical_pixels", "status": "pass", "elapsed": 0.061061},
-    {"suite": "Events", "case": "an_element_that_appears_under_a_still_cursor_is_hovered", "status": "pass", "elapsed": 0.059845},
-    {"suite": "Events", "case": "an_element_that_moves_under_a_still_cursor_is_hovered", "status": "pass", "elapsed": 0.060348},
-    {"suite": "TextInput", "case": "typed_text_reaches_the_line", "status": "pass", "elapsed": 0.065173},
-    {"suite": "TextInput", "case": "line_is_shown_as_the_text_of_the_element", "status": "pass", "elapsed": 0.065170},
-    {"suite": "TextInput", "case": "unfocused_input_takes_nothing", "status": "pass", "elapsed": 0.070704},
-    {"suite": "TextInput", "case": "backspace_removes_the_character_before_the_caret", "status": "pass", "elapsed": 0.073005},
-    {"suite": "TextInput", "case": "arrows_move_the_caret_over_the_line", "status": "pass", "elapsed": 0.072556},
-    {"suite": "TextInput", "case": "typing_inserts_at_the_caret", "status": "pass", "elapsed": 0.073597},
-    {"suite": "TextInput", "case": "enter_submits_the_line_and_empties_it", "status": "pass", "elapsed": 0.071703},
-    {"suite": "TextInput", "case": "newline_in_the_typed_text_submits_the_line", "status": "pass", "elapsed": 0.069886},
-    {"suite": "TextInput", "case": "history_walks_the_lines_that_were_submitted", "status": "pass", "elapsed": 0.068485},
-    {"suite": "TextInput", "case": "history_comes_back_to_the_line_being_typed", "status": "pass", "elapsed": 0.068379},
-    {"suite": "TextInput", "case": "tab_completes_a_command_name", "status": "pass", "elapsed": 0.071805},
-    {"suite": "TextInput", "case": "caret_sits_at_the_width_of_the_text_before_it", "status": "pass", "elapsed": 0.069766},
-    {"suite": "TextInput", "case": "caret_goes_with_the_focus", "status": "pass", "elapsed": 0.066506},
-    {"suite": "Console", "case": "singleton_installs_the_grave_binding", "status": "pass", "elapsed": 0.065396},
-    {"suite": "Console", "case": "grave_key_opens_and_closes_the_overlay", "status": "pass", "elapsed": 0.070303},
-    {"suite": "Console", "case": "open_loads_the_script_and_takes_its_parts", "status": "pass", "elapsed": 0.069233},
-    {"suite": "Console", "case": "open_creates_its_terminal_session", "status": "pass", "elapsed": 0.069001},
-    {"suite": "Console", "case": "open_holds_the_keyboard", "status": "pass", "elapsed": 0.069236},
-    {"suite": "Console", "case": "closed_overlay_is_not_drawn", "status": "pass", "elapsed": 0.066759},
-    {"suite": "Console", "case": "submitted_line_runs_on_the_session", "status": "pass", "elapsed": 0.164380},
-    {"suite": "Console", "case": "scrollback_shows_the_session_log", "status": "pass", "elapsed": 0.068028},
-    {"suite": "Console", "case": "submitted_line_fires_the_line_action", "status": "pass", "elapsed": 0.065002},
-    {"suite": "Console", "case": "script_is_loaded_once", "status": "pass", "elapsed": 0.062124},
-    {"suite": "Console", "case": "script_awaits_the_console_action", "status": "pass", "elapsed": 0.062107}
+    {
+      "suite": "Tree",
+      "case": "root_gets_a_view_a_camera_and_a_layer",
+      "status": "pass",
+      "elapsed": 0.076031,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "root_without_children_is_one_node",
+      "status": "pass",
+      "elapsed": 0.077145,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "descendants_join_the_tree",
+      "status": "pass",
+      "elapsed": 0.077088,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "node_added_later_joins_the_tree",
+      "status": "pass",
+      "elapsed": 0.077036,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "node_that_leaves_the_tree_is_dropped",
+      "status": "pass",
+      "elapsed": 0.076811,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "nested_root_starts_its_own_tree",
+      "status": "pass",
+      "elapsed": 0.07698,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "entity_outside_a_tree_has_no_node",
+      "status": "pass",
+      "elapsed": 0.07673,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "two_trees_get_their_own_view_and_layer",
+      "status": "pass",
+      "elapsed": 0.077462,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "authored_view_is_bound_instead_of_a_new_one",
+      "status": "pass",
+      "elapsed": 0.069137,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "removing_ui_deletes_the_view_it_created",
+      "status": "pass",
+      "elapsed": 0.068484,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "view_and_camera_are_not_nodes_of_the_tree",
+      "status": "pass",
+      "elapsed": 0.068001,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "root_without_a_position_draws_its_children",
+      "status": "pass",
+      "elapsed": 0.068604,
+      "project": "ui"
+    },
+    {
+      "suite": "Tree",
+      "case": "root_without_a_position_sits_at_the_origin",
+      "status": "pass",
+      "elapsed": 0.067926,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "child_is_in_front_of_its_parent",
+      "status": "pass",
+      "elapsed": 0.068207,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "nested_children_are_numbered_depth_first",
+      "status": "pass",
+      "elapsed": 0.06799,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "later_sibling_is_in_front_of_the_earlier_one",
+      "status": "pass",
+      "elapsed": 0.06803,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "reordered_children_swap_their_depth",
+      "status": "pass",
+      "elapsed": 0.077493,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "node_added_later_is_in_front_of_its_siblings",
+      "status": "pass",
+      "elapsed": 0.076999,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "depth_reaches_the_instance_of_the_packet",
+      "status": "pass",
+      "elapsed": 0.077171,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "depth_orders_the_sorted_draws_of_the_view",
+      "status": "pass",
+      "elapsed": 0.07656,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "tree_of_a_thousand_nodes_stays_in_front_of_the_near_plane",
+      "status": "pass",
+      "elapsed": 0.11406,
+      "project": "ui"
+    },
+    {
+      "suite": "Order",
+      "case": "dropped_node_loses_its_depth",
+      "status": "pass",
+      "elapsed": 0.076925,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "camera_is_orthographic_in_logical_pixels",
+      "status": "pass",
+      "elapsed": 0.076236,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "view_follows_a_new_height",
+      "status": "pass",
+      "elapsed": 0.075836,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "view_follows_the_points_of_the_surface",
+      "status": "pass",
+      "elapsed": 0.064357,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "scale_divides_the_height_of_the_surface",
+      "status": "pass",
+      "elapsed": 0.064426,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "view_renders_after_the_view_of_the_scene",
+      "status": "pass",
+      "elapsed": 0.064241,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "scene_view_is_synthesized_next_to_a_ui_view",
+      "status": "pass",
+      "elapsed": 0.063668,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "scene_view_hides_the_tree",
+      "status": "pass",
+      "elapsed": 0.06366,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "ui_view_draws_the_tree_only",
+      "status": "pass",
+      "elapsed": 0.063835,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "ui_view_has_no_sun_no_lights_and_a_flat_environment",
+      "status": "pass",
+      "elapsed": 0.064036,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "two_trees_reach_their_own_view",
+      "status": "pass",
+      "elapsed": 0.050878,
+      "project": "ui"
+    },
+    {
+      "suite": "UiView",
+      "case": "existing_scene_view_is_not_synthesized_twice",
+      "status": "pass",
+      "elapsed": 0.065216,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "every_node_gets_bounds",
+      "status": "pass",
+      "elapsed": 0.065672,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "row_places_children_left_to_right",
+      "status": "pass",
+      "elapsed": 0.065473,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "column_places_children_top_to_bottom",
+      "status": "pass",
+      "elapsed": 0.064633,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "padding_insets_the_children",
+      "status": "pass",
+      "elapsed": 0.065216,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "spacing_separates_the_children",
+      "status": "pass",
+      "elapsed": 0.065254,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "row_grows_to_fit_its_children",
+      "status": "pass",
+      "elapsed": 0.064867,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "column_grows_to_fit_its_children",
+      "status": "pass",
+      "elapsed": 0.050122,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "layout_resizes_the_rect_of_its_element",
+      "status": "pass",
+      "elapsed": 0.068323,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "rect_gives_the_size_when_the_layout_has_none",
+      "status": "pass",
+      "elapsed": 0.068133,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "row_aligns_its_children_on_both_axes",
+      "status": "pass",
+      "elapsed": 0.066679,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "column_aligns_its_children_on_both_axes",
+      "status": "pass",
+      "elapsed": 0.067422,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "nested_rows_and_columns",
+      "status": "pass",
+      "elapsed": 0.067471,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "direction_none_keeps_the_authored_position",
+      "status": "pass",
+      "elapsed": 0.065982,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "root_position_offsets_the_tree",
+      "status": "pass",
+      "elapsed": 0.066983,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "changed_child_lays_out_the_tree_again",
+      "status": "pass",
+      "elapsed": 0.058541,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "changed_layout_lays_out_the_tree_again",
+      "status": "pass",
+      "elapsed": 0.070273,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "node_added_later_is_laid_out",
+      "status": "pass",
+      "elapsed": 0.069613,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "tree_that_did_not_change_is_not_laid_out",
+      "status": "pass",
+      "elapsed": 0.069173,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "node_that_leaves_the_tree_loses_its_bounds",
+      "status": "pass",
+      "elapsed": 0.069065,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "moved_leaf_lays_out_its_subtree_only",
+      "status": "pass",
+      "elapsed": 0.069166,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "content_sized_ancestors_are_laid_out_again",
+      "status": "pass",
+      "elapsed": 0.069181,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "changed_leaf_keeps_the_places_of_the_tree",
+      "status": "pass",
+      "elapsed": 0.067996,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "structural_change_numbers_the_tree_again",
+      "status": "pass",
+      "elapsed": 0.068168,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "fill_sizes_an_element_as_a_fraction_of_its_parent",
+      "status": "pass",
+      "elapsed": 0.069684,
+      "project": "ui"
+    },
+    {
+      "suite": "Layout",
+      "case": "fill_of_the_root_follows_the_view",
+      "status": "pass",
+      "elapsed": 0.06939,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "pins_to_the_edges_of_the_parent",
+      "status": "pass",
+      "elapsed": 0.069019,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "offset_moves_toward_the_inside",
+      "status": "pass",
+      "elapsed": 0.068935,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "offset_in_the_centre_follows_the_axes",
+      "status": "pass",
+      "elapsed": 0.068132,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "uses_the_padding_of_the_parent",
+      "status": "pass",
+      "elapsed": 0.067731,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "anchored_child_takes_no_room_in_a_row",
+      "status": "pass",
+      "elapsed": 0.068877,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "anchored_child_does_not_size_its_parent",
+      "status": "pass",
+      "elapsed": 0.068342,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "anchor_of_a_nested_element_follows_its_parent",
+      "status": "pass",
+      "elapsed": 0.068487,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "changed_anchor_lays_out_the_tree_again",
+      "status": "pass",
+      "elapsed": 0.068144,
+      "project": "ui"
+    },
+    {
+      "suite": "Anchor",
+      "case": "removed_anchor_returns_the_child_to_the_row",
+      "status": "pass",
+      "elapsed": 0.067538,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "element_is_as_wide_as_its_string",
+      "status": "pass",
+      "elapsed": 0.068949,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "longer_string_is_wider",
+      "status": "pass",
+      "elapsed": 0.068635,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "empty_string_has_no_glyphs",
+      "status": "pass",
+      "elapsed": 0.066328,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "one_glyph_per_visible_character",
+      "status": "pass",
+      "elapsed": 0.069105,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_shows_a_region_of_the_atlas",
+      "status": "pass",
+      "elapsed": 0.068838,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_binds_the_atlas_texture",
+      "status": "pass",
+      "elapsed": 0.073753,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_is_drawn_over_its_element",
+      "status": "pass",
+      "elapsed": 0.06914,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "newline_starts_a_second_line",
+      "status": "pass",
+      "elapsed": 0.072739,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "line_height_sets_the_distance_between_lines",
+      "status": "pass",
+      "elapsed": 0.073355,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "layout_width_wraps_the_string",
+      "status": "pass",
+      "elapsed": 0.072166,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrapped_lines_stay_inside_the_width",
+      "status": "pass",
+      "elapsed": 0.072073,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "align_center_centres_the_lines",
+      "status": "pass",
+      "elapsed": 0.067486,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "align_right_puts_the_lines_against_the_edge",
+      "status": "pass",
+      "elapsed": 0.070711,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "changed_value_rebuilds_the_glyphs",
+      "status": "pass",
+      "elapsed": 0.074551,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "shorter_string_drops_the_glyphs_it_lost",
+      "status": "pass",
+      "elapsed": 0.074326,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "unchanged_text_keeps_its_glyphs",
+      "status": "pass",
+      "elapsed": 0.070815,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "removed_text_drops_its_glyphs",
+      "status": "pass",
+      "elapsed": 0.070714,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "text_sizes_the_row_that_holds_it",
+      "status": "pass",
+      "elapsed": 0.070455,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "layout_height_overrides_the_measured_height",
+      "status": "pass",
+      "elapsed": 0.069874,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_take_the_color_of_the_element",
+      "status": "pass",
+      "elapsed": 0.070036,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_composite_over_what_is_behind_them",
+      "status": "pass",
+      "elapsed": 0.06815,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "rect_of_the_element_wraps_the_string",
+      "status": "pass",
+      "elapsed": 0.069629,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "content_sized_row_wraps_around_its_label",
+      "status": "pass",
+      "elapsed": 0.069564,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_composite_with_plain_alpha_in_the_ui_view",
+      "status": "pass",
+      "elapsed": 0.068581,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_origin_lands_on_a_device_pixel",
+      "status": "pass",
+      "elapsed": 0.06839,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_quad_is_the_bitmap_in_logical_pixels",
+      "status": "pass",
+      "elapsed": 0.067104,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "default_font_is_the_one_the_engine_ships",
+      "status": "pass",
+      "elapsed": 0.066452,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "one_atlas_per_file_and_size",
+      "status": "pass",
+      "elapsed": 0.066416,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "missing_font_file_fails_once",
+      "status": "pass",
+      "elapsed": 0.066074,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "missing_font_draws_nothing",
+      "status": "pass",
+      "elapsed": 0.069465,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "size_scales_the_measurement",
+      "status": "pass",
+      "elapsed": 0.072045,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "font_of_an_ancestor_is_used",
+      "status": "pass",
+      "elapsed": 0.071098,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "own_font_wins_from_the_one_above_it",
+      "status": "pass",
+      "elapsed": 0.070387,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "another_font_rebuilds_the_glyphs",
+      "status": "pass",
+      "elapsed": 0.070808,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "atlas_grows_when_the_glyphs_do_not_fit",
+      "status": "pass",
+      "elapsed": 0.067839,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "grown_atlas_keeps_every_glyph",
+      "status": "pass",
+      "elapsed": 0.068264,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "grown_atlas_uploads_at_its_new_size",
+      "status": "pass",
+      "elapsed": 0.086125,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "measure_function_returns_the_size",
+      "status": "pass",
+      "elapsed": 0.06755,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "wrap_function_breaks_at_the_width",
+      "status": "pass",
+      "elapsed": 0.065357,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "label_function_creates_a_text_element",
+      "status": "pass",
+      "elapsed": 0.066593,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "label_function_reuses_the_element_it_made",
+      "status": "pass",
+      "elapsed": 0.063326,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "raster_size_follows_the_device_scale",
+      "status": "pass",
+      "elapsed": 0.065984,
+      "project": "ui"
+    },
+    {
+      "suite": "Font",
+      "case": "atlas_rerasterizes_when_the_device_scale_changes",
+      "status": "pass",
+      "elapsed": 0.065754,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "element_gets_a_quad",
+      "status": "pass",
+      "elapsed": 0.063313,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_covers_the_box_plus_the_spread_and_the_blur",
+      "status": "pass",
+      "elapsed": 0.049716,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_is_offset_from_its_element",
+      "status": "pass",
+      "elapsed": 0.066556,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_is_drawn_behind_its_element",
+      "status": "pass",
+      "elapsed": 0.065391,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_takes_the_radii_of_the_element",
+      "status": "pass",
+      "elapsed": 0.065355,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "transparent_shadow_draws_no_quad",
+      "status": "pass",
+      "elapsed": 0.063573,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_takes_no_room_in_a_row",
+      "status": "pass",
+      "elapsed": 0.063471,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "removing_the_shadow_drops_the_quad",
+      "status": "pass",
+      "elapsed": 0.063844,
+      "project": "ui"
+    },
+    {
+      "suite": "Shadow",
+      "case": "quad_extracts_as_a_soft_shape",
+      "status": "pass",
+      "elapsed": 0.063301,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "opaque_subtree_takes_no_target",
+      "status": "pass",
+      "elapsed": 0.061805,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "transparent_leaf_takes_no_target",
+      "status": "pass",
+      "elapsed": 0.06936,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "child_with_its_own_opacity_takes_no_target",
+      "status": "pass",
+      "elapsed": 0.070554,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "transparent_subtree_gets_a_view_and_a_target",
+      "status": "pass",
+      "elapsed": 0.070906,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "target_is_the_size_of_the_bounds",
+      "status": "pass",
+      "elapsed": 0.071073,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "target_follows_the_bounds",
+      "status": "pass",
+      "elapsed": 0.070254,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "composite_quad_carries_the_opacity",
+      "status": "pass",
+      "elapsed": 0.070352,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "subtree_joins_the_layer_of_its_group",
+      "status": "pass",
+      "elapsed": 0.070201,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "nested_groups_render_inside_out",
+      "status": "pass",
+      "elapsed": 0.069796,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "opaque_again_drops_the_group",
+      "status": "pass",
+      "elapsed": 0.068272,
+      "project": "ui"
+    },
+    {
+      "suite": "Group",
+      "case": "composite_reaches_the_packet_with_its_target",
+      "status": "pass",
+      "elapsed": 0.06732,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "a_world_without_a_tree_captures_nothing",
+      "status": "pass",
+      "elapsed": 0.066164,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "the_cursor_over_an_element_captures_the_mouse",
+      "status": "pass",
+      "elapsed": 0.066321,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "the_capture_names_the_element_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.066242,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "the_cursor_beside_the_tree_captures_nothing",
+      "status": "pass",
+      "elapsed": 0.066412,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "a_collider_of_the_scene_does_not_capture",
+      "status": "pass",
+      "elapsed": 0.065821,
+      "project": "ui"
+    },
+    {
+      "suite": "Capture",
+      "case": "an_element_that_leaves_the_tree_releases_the_capture",
+      "status": "pass",
+      "elapsed": 0.066257,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "element_under_the_point_is_found",
+      "status": "pass",
+      "elapsed": 0.075856,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "point_outside_every_element_hits_nothing",
+      "status": "pass",
+      "elapsed": 0.075141,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "deepest_element_under_the_point_wins",
+      "status": "pass",
+      "elapsed": 0.074812,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "later_sibling_wins_where_two_overlap",
+      "status": "pass",
+      "elapsed": 0.074764,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "element_without_a_rectangle_is_not_hit",
+      "status": "pass",
+      "elapsed": 0.074478,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "rotated_element_follows_its_corners",
+      "status": "pass",
+      "elapsed": 0.074666,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "scaled_element_covers_its_scaled_rectangle",
+      "status": "pass",
+      "elapsed": 0.074505,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "element_of_another_view_is_not_hit",
+      "status": "pass",
+      "elapsed": 0.074481,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "clipped_child_of_a_transparent_subtree_is_not_hit",
+      "status": "pass",
+      "elapsed": 0.070689,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "glyphs_of_a_label_are_not_hit",
+      "status": "pass",
+      "elapsed": 0.073412,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "element_that_left_the_tree_is_not_hit",
+      "status": "pass",
+      "elapsed": 0.071234,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "moved_element_is_hit_where_it_went",
+      "status": "pass",
+      "elapsed": 0.070261,
+      "project": "ui"
+    },
+    {
+      "suite": "Hit",
+      "case": "world_without_a_tree_hits_nothing",
+      "status": "pass",
+      "elapsed": 0.071104,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "hovered_marks_the_element_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.071448,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "hover_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.071994,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "click_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.071788,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "click_bubbles_to_the_parent",
+      "status": "pass",
+      "elapsed": 0.068522,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_child_handler_consumes_the_click",
+      "status": "pass",
+      "elapsed": 0.068716,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "drag_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.067492,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_consumes_the_pick_before_the_scene",
+      "status": "pass",
+      "elapsed": 0.066843,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "the_scene_is_picked_beside_the_tree",
+      "status": "pass",
+      "elapsed": 0.067269,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_emits_the_action_of_the_element",
+      "status": "pass",
+      "elapsed": 0.065956,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "the_action_of_an_ancestor_fires",
+      "status": "pass",
+      "elapsed": 0.065695,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_receives_the_point_in_logical_pixels",
+      "status": "pass",
+      "elapsed": 0.064727,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_that_appears_under_a_still_cursor_is_hovered",
+      "status": "pass",
+      "elapsed": 0.070012,
+      "project": "ui"
+    },
+    {
+      "suite": "Events",
+      "case": "an_element_that_moves_under_a_still_cursor_is_hovered",
+      "status": "pass",
+      "elapsed": 0.070327,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "typed_text_reaches_the_line",
+      "status": "pass",
+      "elapsed": 0.075918,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "line_is_shown_as_the_text_of_the_element",
+      "status": "pass",
+      "elapsed": 0.075593,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "unfocused_input_takes_nothing",
+      "status": "pass",
+      "elapsed": 0.073267,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "backspace_removes_the_character_before_the_caret",
+      "status": "pass",
+      "elapsed": 0.075292,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "arrows_move_the_caret_over_the_line",
+      "status": "pass",
+      "elapsed": 0.075108,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "typing_inserts_at_the_caret",
+      "status": "pass",
+      "elapsed": 0.075899,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "enter_submits_the_line_and_empties_it",
+      "status": "pass",
+      "elapsed": 0.065598,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "newline_in_the_typed_text_submits_the_line",
+      "status": "pass",
+      "elapsed": 0.063376,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "history_walks_the_lines_that_were_submitted",
+      "status": "pass",
+      "elapsed": 0.062235,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "history_comes_back_to_the_line_being_typed",
+      "status": "pass",
+      "elapsed": 0.060622,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "tab_completes_a_command_name",
+      "status": "pass",
+      "elapsed": 0.061356,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_sits_at_the_width_of_the_text_before_it",
+      "status": "pass",
+      "elapsed": 0.05947,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_advances_by_the_width_of_a_typed_space",
+      "status": "pass",
+      "elapsed": 0.059547,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_goes_with_the_focus",
+      "status": "pass",
+      "elapsed": 0.056601,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "singleton_installs_the_grave_binding",
+      "status": "pass",
+      "elapsed": 0.071422,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "grave_key_opens_and_closes_the_overlay",
+      "status": "pass",
+      "elapsed": 0.076124,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "open_loads_the_script_and_takes_its_parts",
+      "status": "pass",
+      "elapsed": 0.074443,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "open_creates_its_terminal_session",
+      "status": "pass",
+      "elapsed": 0.074358,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "open_holds_the_keyboard",
+      "status": "pass",
+      "elapsed": 0.074592,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "closed_overlay_is_not_drawn",
+      "status": "pass",
+      "elapsed": 0.07296,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "submitted_line_runs_on_the_session",
+      "status": "pass",
+      "elapsed": 0.173603,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "scrollback_shows_the_session_log",
+      "status": "pass",
+      "elapsed": 0.076642,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "submitted_line_fires_the_line_action",
+      "status": "pass",
+      "elapsed": 0.062707,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "script_is_loaded_once",
+      "status": "pass",
+      "elapsed": 0.059192,
+      "project": "ui"
+    },
+    {
+      "suite": "Console",
+      "case": "script_awaits_the_console_action",
+      "status": "pass",
+      "elapsed": 0.05866,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "visible_axis_does_not_clip",
+      "status": "pass",
+      "elapsed": 0.050959,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "visible_axis_keeps_the_offset_at_zero",
+      "status": "pass",
+      "elapsed": 0.050702,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "hidden_clips_the_children_to_the_box",
+      "status": "pass",
+      "elapsed": 0.050742,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "hidden_takes_no_wheel",
+      "status": "pass",
+      "elapsed": 0.049078,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "scroll_clips_and_takes_the_wheel",
+      "status": "pass",
+      "elapsed": 0.064965,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "auto_scrolls_when_the_content_is_larger",
+      "status": "pass",
+      "elapsed": 0.064277,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "auto_does_not_scroll_when_the_content_fits",
+      "status": "pass",
+      "elapsed": 0.064028,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "offset_is_clamped_to_the_content",
+      "status": "pass",
+      "elapsed": 0.062479,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "offset_below_zero_is_clamped_away",
+      "status": "pass",
+      "elapsed": 0.061525,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "offset_moves_the_children_up",
+      "status": "pass",
+      "elapsed": 0.0608,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "offset_moves_the_children_left",
+      "status": "pass",
+      "elapsed": 0.060749,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "anchored_child_is_not_moved_by_the_offset",
+      "status": "pass",
+      "elapsed": 0.05204,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "nested_clips_intersect",
+      "status": "pass",
+      "elapsed": 0.061393,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "wheel_moves_the_hovered_element",
+      "status": "pass",
+      "elapsed": 0.060094,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "wheel_leaves_an_unhovered_element_alone",
+      "status": "pass",
+      "elapsed": 0.060628,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "wheel_moves_the_innermost_scrollable_ancestor",
+      "status": "pass",
+      "elapsed": 0.060825,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "wheel_passes_through_an_element_that_cannot_scroll",
+      "status": "pass",
+      "elapsed": 0.057385,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "clip_reaches_the_instance_of_the_packet",
+      "status": "pass",
+      "elapsed": 0.056778,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "removing_scroll_drops_the_clip",
+      "status": "pass",
+      "elapsed": 0.056827,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "glyphs_of_a_scrolled_text_are_clipped",
+      "status": "pass",
+      "elapsed": 0.052483,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "offset_moves_the_glyphs_of_a_text",
+      "status": "pass",
+      "elapsed": 0.058748,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "log_that_grows_stays_at_the_end",
+      "status": "pass",
+      "elapsed": 0.058841,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "log_that_grows_stays_put_after_a_scroll_up",
+      "status": "pass",
+      "elapsed": 0.060583,
+      "project": "ui"
+    },
+    {
+      "suite": "Scroll",
+      "case": "hit_test_skips_a_clipped_node",
+      "status": "pass",
+      "elapsed": 0.055523,
+      "project": "ui"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.037676,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_entity_gets_slot_and_update",
+      "status": "pass",
+      "elapsed": 0.037644,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "unchanged_entity_not_reextracted",
+      "status": "pass",
+      "elapsed": 0.036868,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "position_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.03683,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "color_change_reextracts_static",
+      "status": "pass",
+      "elapsed": 0.037581,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_swaps_last_into_slot",
+      "status": "pass",
+      "elapsed": 0.037296,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract",
+      "status": "pass",
+      "elapsed": 0.036801,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_before_first_extract_empty_batch",
+      "status": "pass",
+      "elapsed": 0.037784,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.035265,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_child_of_dynamic_parent",
+      "status": "pass",
+      "elapsed": 0.034772,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "static_to_dynamic_releases_slot",
+      "status": "pass",
+      "elapsed": 0.035422,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_to_static_gets_slot",
+      "status": "pass",
+      "elapsed": 0.03454,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_transform_includes_shape_scale",
+      "status": "pass",
+      "elapsed": 0.0344,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "aabb_written_for_static",
+      "status": "pass",
+      "elapsed": 0.033774,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_written_in_the_delta",
+      "status": "pass",
+      "elapsed": 0.03416,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "bounds_cover_a_rotated_instance",
+      "status": "pass",
+      "elapsed": 0.033721,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "camera_fills_view",
+      "status": "pass",
+      "elapsed": 0.035235,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "default_camera_without_entity",
+      "status": "pass",
+      "elapsed": 0.035045,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "sun_from_directional_light",
+      "status": "pass",
+      "elapsed": 0.035163,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mesh_shared_between_same_shapes",
+      "status": "pass",
+      "elapsed": 0.034295,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "different_segments_different_mesh",
+      "status": "pass",
+      "elapsed": 0.034599,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "parent_tree_uploaded_once",
+      "status": "pass",
+      "elapsed": 0.035323,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "dynamic_parent_node_children_dynamic",
+      "status": "pass",
+      "elapsed": 0.034582,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "mixed_tree_only_dynamic_reuploaded",
+      "status": "pass",
+      "elapsed": 0.034301,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "reparent_between_storages_requeues_subtree",
+      "status": "pass",
+      "elapsed": 0.035476,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "delete_parent_node_frees_slots",
+      "status": "pass",
+      "elapsed": 0.035971,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "instance_color_is_the_composed_tint",
+      "status": "pass",
+      "elapsed": 0.052243,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "tinted_opaque_entity_stays_static",
+      "status": "pass",
+      "elapsed": 0.03499,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "primitive_vertices_are_white",
+      "status": "pass",
+      "elapsed": 0.042592,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_color_is_kept_beside_the_instance_color",
+      "status": "pass",
+      "elapsed": 0.035267,
+      "project": "render"
+    },
+    {
+      "suite": "Extract",
+      "case": "vertex_alpha_reaches_the_upload",
+      "status": "pass",
+      "elapsed": 0.043762,
+      "project": "render"
+    },
+    {
+      "suite": "Instances",
+      "case": "static_1m_renders_a_frame",
+      "status": "pass",
+      "elapsed": 6.992832,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "timings_are_off_until_they_are_asked_for",
+      "status": "pass",
+      "elapsed": 0.78461,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "enabled_timings_report_the_passes_of_a_frame",
+      "status": "pass",
+      "elapsed": 0.552466,
+      "project": "render"
+    },
+    {
+      "suite": "Gpu",
+      "case": "disabled_timings_stop_the_queries",
+      "status": "pass",
+      "elapsed": 0.542431,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_extracted",
+      "status": "pass",
+      "elapsed": 0.036051,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_color_is_linear",
+      "status": "pass",
+      "elapsed": 0.035304,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "spot_light_direction_and_cone",
+      "status": "pass",
+      "elapsed": 0.040855,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "point_light_is_not_a_spot_cone",
+      "status": "pass",
+      "elapsed": 0.041041,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_behind_camera_culled",
+      "status": "pass",
+      "elapsed": 0.032394,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_far_to_the_side_culled",
+      "status": "pass",
+      "elapsed": 0.032032,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_beyond_far_plane_culled",
+      "status": "pass",
+      "elapsed": 0.031763,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "light_inside_frustum_kept",
+      "status": "pass",
+      "elapsed": 0.032233,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "range_reaches_into_the_frustum",
+      "status": "pass",
+      "elapsed": 0.032499,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "directional_light_stays_the_sun",
+      "status": "pass",
+      "elapsed": 0.032583,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.034814,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "settings_override_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.043059,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "camera_range_is_the_cluster_depth",
+      "status": "pass",
+      "elapsed": 0.049987,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_of_view_center",
+      "status": "pass",
+      "elapsed": 0.055867,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_index_follows_screen_position",
+      "status": "pass",
+      "elapsed": 0.056574,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "cluster_slices_grow_with_depth",
+      "status": "pass",
+      "elapsed": 0.04686,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "lights_land_in_expected_clusters",
+      "status": "pass",
+      "elapsed": 0.061978,
+      "project": "render"
+    },
+    {
+      "suite": "Lights",
+      "case": "moved_light_is_reextracted",
+      "status": "pass",
+      "elapsed": 0.061891,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "defaults_without_component",
+      "status": "pass",
+      "elapsed": 0.052818,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "colors_are_linear",
+      "status": "pass",
+      "elapsed": 0.049475,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "intensity_copied_into_view",
+      "status": "pass",
+      "elapsed": 0.032898,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "zero_intensity_is_one",
+      "status": "pass",
+      "elapsed": 0.033343,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_stable_without_change",
+      "status": "pass",
+      "elapsed": 0.03062,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "generation_changes_on_change",
+      "status": "pass",
+      "elapsed": 0.031648,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "removed_component_restores_defaults",
+      "status": "pass",
+      "elapsed": 0.032108,
+      "project": "render"
+    },
+    {
+      "suite": "Environment",
+      "case": "source_is_reserved",
+      "status": "pass",
+      "elapsed": 0.030947,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_light_is_static",
+      "status": "pass",
+      "elapsed": 0.032041,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_is_not_static",
+      "status": "pass",
+      "elapsed": 0.030875,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "light_under_dynamic_parent_is_dynamic",
+      "status": "pass",
+      "elapsed": 0.032601,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_lights_are_listed_unculled",
+      "status": "pass",
+      "elapsed": 0.032359,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "dynamic_light_not_in_bake_lights",
+      "status": "pass",
+      "elapsed": 0.031085,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "bake_lights_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.031629,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_defaults",
+      "status": "pass",
+      "elapsed": 0.032621,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "settings_override",
+      "status": "pass",
+      "elapsed": 0.032685,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_static_is_an_emitter",
+      "status": "pass",
+      "elapsed": 0.032608,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emissive_dynamic_is_not_an_emitter",
+      "status": "pass",
+      "elapsed": 0.031627,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitters_empty_when_disabled",
+      "status": "pass",
+      "elapsed": 0.033203,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "static_instance_is_flagged_baked",
+      "status": "pass",
+      "elapsed": 0.032489,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "toggle_requeues_every_instance",
+      "status": "pass",
+      "elapsed": 0.032084,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "sh_reconstructs_the_light_direction",
+      "status": "pass",
+      "elapsed": 0.030681,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "voxel_grid_marks_static_geometry",
+      "status": "pass",
+      "elapsed": 0.033646,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_behind_a_wall_is_darker",
+      "status": "pass",
+      "elapsed": 0.032577,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "probe_is_not_occluded_by_its_own_bounds",
+      "status": "pass",
+      "elapsed": 0.031214,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "emitter_lights_a_probe",
+      "status": "pass",
+      "elapsed": 0.031863,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_its_probe",
+      "status": "pass",
+      "elapsed": 0.046643,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_instance_marks_only_its_neighbourhood",
+      "status": "pass",
+      "elapsed": 0.056287,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "moved_light_marks_the_probes_in_range",
+      "status": "pass",
+      "elapsed": 0.051672,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "budget_limits_the_probes_per_frame",
+      "status": "pass",
+      "elapsed": 0.051288,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "nearest_probes_are_baked_first",
+      "status": "pass",
+      "elapsed": 0.073336,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "disabled_settings_drop_the_probes",
+      "status": "pass",
+      "elapsed": 0.064843,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "baking_is_enabled_by_default",
+      "status": "pass",
+      "elapsed": 0.062905,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_from_bounds_and_spacing",
+      "status": "pass",
+      "elapsed": 0.062194,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_dims_clamped_to_the_maximum",
+      "status": "pass",
+      "elapsed": 0.033053,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "large_instance_gets_a_probe_grid",
+      "status": "pass",
+      "elapsed": 0.033576,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "pool_reuses_the_probes_of_a_removed_instance",
+      "status": "pass",
+      "elapsed": 0.03376,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_sits_on_the_bounds",
+      "status": "pass",
+      "elapsed": 0.033624,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "grid_probe_follows_the_instance_scale",
+      "status": "pass",
+      "elapsed": 0.033503,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_corners",
+      "status": "pass",
+      "elapsed": 0.031988,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_weights_at_the_center",
+      "status": "pass",
+      "elapsed": 0.034173,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "trilinear_sample_mixes_the_corners",
+      "status": "pass",
+      "elapsed": 0.032744,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_without_static_light_marks_only_itself",
+      "status": "pass",
+      "elapsed": 0.032837,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_near_static_light_marks_neighbours",
+      "status": "pass",
+      "elapsed": 0.032258,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_invalidates_the_old_and_the_new_position",
+      "status": "pass",
+      "elapsed": 0.032311,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "move_keeps_the_pool_layout",
+      "status": "pass",
+      "elapsed": 0.032815,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "unlit_move_defers_the_descriptor_upload",
+      "status": "pass",
+      "elapsed": 0.033751,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "new_light_flushes_the_deferred_descriptors",
+      "status": "pass",
+      "elapsed": 0.031751,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "budget_takes_the_nearest_of_many_probes",
+      "status": "pass",
+      "elapsed": 0.033291,
+      "project": "render"
+    },
+    {
+      "suite": "Bake",
+      "case": "equal_distances_still_fill_the_budget",
+      "status": "pass",
+      "elapsed": 0.032696,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "component_consumed_by_extract",
+      "status": "pass",
+      "elapsed": 0.031304,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "camera_becomes_the_view",
+      "status": "pass",
+      "elapsed": 0.03131,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "two_cameras_over_two_frames",
+      "status": "pass",
+      "elapsed": 0.032044,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "overrides_write_to_file",
+      "status": "pass",
+      "elapsed": 0.032183,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "write_to_file_kept_without_component",
+      "status": "pass",
+      "elapsed": 0.03144,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_is_the_first_camera",
+      "status": "pass",
+      "elapsed": 0.031149,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "active_camera_without_camera_entity",
+      "status": "pass",
+      "elapsed": 0.031628,
+      "project": "render"
+    },
+    {
+      "suite": "Capture",
+      "case": "removed_after_a_deferred_extract",
+      "status": "pass",
+      "elapsed": 0.031852,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_to_children",
+      "status": "pass",
+      "elapsed": 0.033405,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.033024,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_to_parent",
+      "status": "pass",
+      "elapsed": 0.032075,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.031587,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "instance_color_uses_tint_and_opacity",
+      "status": "pass",
+      "elapsed": 0.031775,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "emissive_scaled_by_strength",
+      "status": "pass",
+      "elapsed": 0.031593,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "pbr_defaults",
+      "status": "pass",
+      "elapsed": 0.032844,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_parent_component",
+      "status": "pass",
+      "elapsed": 0.032578,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_change_propagates_through_parent",
+      "status": "pass",
+      "elapsed": 0.032582,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "parent_child_tint_composes_with_the_parent",
+      "status": "pass",
+      "elapsed": 0.033034,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "new_parent_child_inherits_tint",
+      "status": "pass",
+      "elapsed": 0.031204,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_resolves_through_mixed_tree",
+      "status": "pass",
+      "elapsed": 0.031417,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_falls_back_through_parent",
+      "status": "pass",
+      "elapsed": 0.03281,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_follows_reparent_between_storages",
+      "status": "pass",
+      "elapsed": 0.033497,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_zero_keeps_the_color",
+      "status": "pass",
+      "elapsed": 0.033583,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_half_blends_the_color",
+      "status": "pass",
+      "elapsed": 0.032998,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_mix_at_full_replaces_the_color",
+      "status": "pass",
+      "elapsed": 0.031535,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_two_levels",
+      "status": "pass",
+      "elapsed": 0.032294,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_three_levels",
+      "status": "pass",
+      "elapsed": 0.033614,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "child_tint_over_an_untinted_parent",
+      "status": "pass",
+      "elapsed": 0.033136,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "root_tint_change_recomposes_the_subtree",
+      "status": "pass",
+      "elapsed": 0.032668,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "middle_tint_change_recomposes_below_it",
+      "status": "pass",
+      "elapsed": 0.032268,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_removed_restores_the_ancestor_result",
+      "status": "pass",
+      "elapsed": 0.031989,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_childof_chain",
+      "status": "pass",
+      "elapsed": 0.032763,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_through_a_parent_chain",
+      "status": "pass",
+      "elapsed": 0.033787,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_childof_under_parent",
+      "status": "pass",
+      "elapsed": 0.034705,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composes_with_parent_under_childof",
+      "status": "pass",
+      "elapsed": 0.034332,
+      "project": "render"
+    },
+    {
+      "suite": "Material",
+      "case": "tint_composition_survives_a_reparent",
+      "status": "pass",
+      "elapsed": 0.034306,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "png_loads_into_a_create_command",
+      "status": "pass",
+      "elapsed": 0.051547,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "requested_size_selects_the_class",
+      "status": "pass",
+      "elapsed": 0.065525,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "source_size_picks_the_nearest_class",
+      "status": "pass",
+      "elapsed": 0.047751,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "quality_caps_the_class",
+      "status": "pass",
+      "elapsed": 0.048792,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "new_path_updates_the_same_handle",
+      "status": "pass",
+      "elapsed": 0.05253,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.050646,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "albedo_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.050412,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "every_slot_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.049319,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "prefab_slots_are_inherited",
+      "status": "pass",
+      "elapsed": 0.044011,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "reload_reextracts_dependents",
+      "status": "pass",
+      "elapsed": 0.047343,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "deleting_a_texture_unbinds_and_warns",
+      "status": "pass",
+      "elapsed": 0.043601,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "missing_file_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.046998,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "kept_source_pixels_survive_the_upload",
+      "status": "pass",
+      "elapsed": 0.048704,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "row_zero_is_the_bottom_of_the_file",
+      "status": "pass",
+      "elapsed": 0.046591,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_spreads_a_class_over_pages",
+      "status": "pass",
+      "elapsed": 0.045331,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_reuses_a_released_layer",
+      "status": "pass",
+      "elapsed": 0.04274,
+      "project": "render"
+    },
+    {
+      "suite": "Textures",
+      "case": "pager_out_of_pages_leaves_no_handle",
+      "status": "pass",
+      "elapsed": 0.045206,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "inline_data_rasterizes",
+      "status": "pass",
+      "elapsed": 0.046057,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "file_rasterizes",
+      "status": "pass",
+      "elapsed": 0.04859,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "zero_height_follows_the_width",
+      "status": "pass",
+      "elapsed": 0.070942,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "resize_rerasterizes",
+      "status": "pass",
+      "elapsed": 0.070943,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "removing_the_component_destroys_the_handle",
+      "status": "pass",
+      "elapsed": 0.04715,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "handle_reaches_a_pbr_slot",
+      "status": "pass",
+      "elapsed": 0.047541,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "texture_and_svg_is_an_error",
+      "status": "pass",
+      "elapsed": 0.04626,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "row_zero_is_the_bottom_of_the_image",
+      "status": "pass",
+      "elapsed": 0.04512,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "text_rasterizes",
+      "status": "pass",
+      "elapsed": 0.043983,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "mask_hides_half",
+      "status": "pass",
+      "elapsed": 0.047457,
+      "project": "render"
+    },
+    {
+      "suite": "Svg",
+      "case": "clip_path_keeps_the_clipped_half",
+      "status": "pass",
+      "elapsed": 0.046964,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "queues_a_job_instead_of_rasterizing",
+      "status": "pass",
+      "elapsed": 0.04708,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "previous_image_stays_while_resizing",
+      "status": "pass",
+      "elapsed": 0.053717,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "completion_uploads_on_the_main_thread",
+      "status": "pass",
+      "elapsed": 0.255267,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "new_set_supersedes_the_queued_job",
+      "status": "pass",
+      "elapsed": 0.051074,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "deleting_the_entity_cancels_the_job",
+      "status": "pass",
+      "elapsed": 0.042218,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "bands_split_a_large_image",
+      "status": "pass",
+      "elapsed": 0.074425,
+      "project": "render"
+    },
+    {
+      "suite": "SvgJobs",
+      "case": "nearest_texture_rasterizes_first",
+      "status": "pass",
+      "elapsed": 0.049689,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "component_defaults",
+      "status": "pass",
+      "elapsed": 0.032099,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "untiled_instance_is_the_identity",
+      "status": "pass",
+      "elapsed": 0.03282,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "transform_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.030973,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "box_projection_tiles_every_face",
+      "status": "pass",
+      "elapsed": 0.031805,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "cylinder_projection_tiles_the_circumference",
+      "status": "pass",
+      "elapsed": 0.031941,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "radial_projection_tiles_radius_and_arc",
+      "status": "pass",
+      "elapsed": 0.03204,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "meters_projection_stretches_the_mesh_uv",
+      "status": "pass",
+      "elapsed": 0.031283,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "fit_rounds_the_tile_count",
+      "status": "pass",
+      "elapsed": 0.030675,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "partial_tiles_keep_the_fraction",
+      "status": "pass",
+      "elapsed": 0.032121,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "min_tiles_raises_the_count",
+      "status": "pass",
+      "elapsed": 0.032417,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "wrap_mode_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.032736,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "mirror_wrap_folds_the_uv",
+      "status": "pass",
+      "elapsed": 0.032237,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "clamp_wrap_holds_the_range",
+      "status": "pass",
+      "elapsed": 0.031635,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.032436,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "scale_change_updates_the_tiling",
+      "status": "pass",
+      "elapsed": 0.032239,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_of_a_camera_facing_surface",
+      "status": "pass",
+      "elapsed": 0.005414,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_with_screen_y_up",
+      "status": "pass",
+      "elapsed": 0.005052,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_is_the_same_for_a_flipped_normal",
+      "status": "pass",
+      "elapsed": 0.005041,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "frame_follows_swapped_uv_axes",
+      "status": "pass",
+      "elapsed": 0.004683,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "flat_sample_keeps_the_normal",
+      "status": "pass",
+      "elapsed": 0.004772,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_u_tangent",
+      "status": "pass",
+      "elapsed": 0.004712,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "sample_leans_along_the_v_tangent",
+      "status": "pass",
+      "elapsed": 0.004696,
+      "project": "render"
+    },
+    {
+      "suite": "NormalMap",
+      "case": "degenerate_derivatives_keep_the_normal",
+      "status": "pass",
+      "elapsed": 0.005036,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_integrates_position",
+      "status": "pass",
+      "elapsed": 0.0121,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "angular_velocity_integrates_rotation",
+      "status": "pass",
+      "elapsed": 0.012048,
+      "project": "render"
+    },
+    {
+      "suite": "Movement",
+      "case": "velocity_marks_dynamic",
+      "status": "pass",
+      "elapsed": 0.012029,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "built_in_layers_are_registered",
+      "status": "pass",
+      "elapsed": 0.030327,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "registration_produces_the_ordered_command",
+      "status": "pass",
+      "elapsed": 0.03227,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "command_is_sent_once",
+      "status": "pass",
+      "elapsed": 0.032381,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "order_sorts_the_command",
+      "status": "pass",
+      "elapsed": 0.033821,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "unregistration_renumbers_and_resends",
+      "status": "pass",
+      "elapsed": 0.035012,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "material_pair_sets_the_layer_bit",
+      "status": "pass",
+      "elapsed": 0.033998,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "two_layers_set_two_bits",
+      "status": "pass",
+      "elapsed": 0.033638,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "removing_the_pair_clears_the_bit",
+      "status": "pass",
+      "elapsed": 0.033671,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.033571,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "dynamic_instance_gets_the_bit",
+      "status": "pass",
+      "elapsed": 0.034107,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "transparent_instance_keeps_the_bit",
+      "status": "pass",
+      "elapsed": 0.033195,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.032514,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "params_update_on_change",
+      "status": "pass",
+      "elapsed": 0.033712,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "settings_flag_reaches_the_view",
+      "status": "pass",
+      "elapsed": 0.034102,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "project_layer_gets_a_bit",
+      "status": "pass",
+      "elapsed": 0.034246,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "limit_is_an_error_logged_once",
+      "status": "pass",
+      "elapsed": 0.036545,
+      "project": "render"
+    },
+    {
+      "suite": "Layers",
+      "case": "scene_without_layers_keeps_the_flag_off",
+      "status": "pass",
+      "elapsed": 0.032579,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_entity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.03229,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blend_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.031944,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opacity_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.032814,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "full_opacity_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.031198,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "tint_alpha_stays_in_its_batch",
+      "status": "pass",
+      "elapsed": 0.031351,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_opaque_mode_blends_as_alpha",
+      "status": "pass",
+      "elapsed": 0.032169,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_mode_moves_to_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.032937,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "back_face_modes_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.031544,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "every_blend_mode_reaches_the_packet",
+      "status": "pass",
+      "elapsed": 0.031715,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_back_to_front",
+      "status": "pass",
+      "elapsed": 0.032753,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "static_entity_leaves_and_regains_its_slot",
+      "status": "pass",
+      "elapsed": 0.032254,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "sorted_entity_extracted_every_frame",
+      "status": "pass",
+      "elapsed": 0.031461,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "dynamic_transparent_leaves_the_dynamic_batches",
+      "status": "pass",
+      "elapsed": 0.032448,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "deleted_entity_leaves_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.031632,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "prefab_blend_mode_is_inherited",
+      "status": "pass",
+      "elapsed": 0.031646,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_scene_packet_is_unchanged",
+      "status": "pass",
+      "elapsed": 0.031977,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_zero_roughness_is_the_first_level",
+      "status": "pass",
+      "elapsed": 0.033189,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_full_roughness_is_the_last_level",
+      "status": "pass",
+      "elapsed": 0.032753,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_grows_with_roughness",
+      "status": "pass",
+      "elapsed": 0.032695,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_a_quarter_roughness_is_half_the_chain",
+      "status": "pass",
+      "elapsed": 0.031839,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_of_half_roughness_follows_the_curve",
+      "status": "pass",
+      "elapsed": 0.032221,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_level_clamps_roughness_to_the_chain",
+      "status": "pass",
+      "elapsed": 0.031564,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "blur_chain_keeps_its_coarsest_level_large",
+      "status": "pass",
+      "elapsed": 0.032369,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "opaque_view_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.033072,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "alpha_blended_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.032462,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "premultiplied_instance_requests_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.032727,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "additive_instance_does_not_request_the_blur_chain",
+      "status": "pass",
+      "elapsed": 0.032284,
+      "project": "render"
+    },
+    {
+      "suite": "Blending",
+      "case": "translucent_count_covers_the_alpha_blended_instances",
+      "status": "pass",
+      "elapsed": 0.031668,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "world_without_an_atmosphere_has_no_sky",
+      "status": "pass",
+      "elapsed": 0.030578,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "world_without_an_atmosphere_registers_no_shader",
+      "status": "pass",
+      "elapsed": 0.031988,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "atmosphere_draws_the_sky_of_every_view",
+      "status": "pass",
+      "elapsed": 0.033975,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "atmosphere_registers_the_shaders_that_compile",
+      "status": "pass",
+      "elapsed": 0.034621,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_direction_comes_from_the_referenced_light",
+      "status": "pass",
+      "elapsed": 0.034211,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_falls_back_to_the_first_directional_light",
+      "status": "pass",
+      "elapsed": 0.034567,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "sun_color_is_the_linear_light_color_times_its_intensity",
+      "status": "pass",
+      "elapsed": 0.033583,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "zero_values_take_the_defaults_of_the_medium",
+      "status": "pass",
+      "elapsed": 0.032144,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "rayleigh_scale_multiplies_the_scattering",
+      "status": "pass",
+      "elapsed": 0.033781,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "black_ground_albedo_takes_its_default",
+      "status": "pass",
+      "elapsed": 0.033732,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "negative_aerial_perspective_turns_the_haze_off",
+      "status": "pass",
+      "elapsed": 0.033203,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "tables_are_dirty_on_the_first_frame",
+      "status": "pass",
+      "elapsed": 0.032551,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "tables_stay_clean_when_nothing_changes",
+      "status": "pass",
+      "elapsed": 0.033003,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "changing_the_medium_makes_the_tables_dirty",
+      "status": "pass",
+      "elapsed": 0.032793,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "changing_the_disk_leaves_the_tables_alone",
+      "status": "pass",
+      "elapsed": 0.032675,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_sun_that_hardly_moves_keeps_the_sky_view",
+      "status": "pass",
+      "elapsed": 0.033989,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_sun_that_moves_renders_the_sky_view_again",
+      "status": "pass",
+      "elapsed": 0.033671,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "small_steps_of_the_sun_add_up_to_a_new_sky_view",
+      "status": "pass",
+      "elapsed": 0.033343,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "a_camera_that_rises_renders_the_sky_view_again",
+      "status": "pass",
+      "elapsed": 0.033521,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_source_marks_the_view",
+      "status": "pass",
+      "elapsed": 0.033501,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_generation_follows_the_sky_view",
+      "status": "pass",
+      "elapsed": 0.032261,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "environment_of_a_gradient_view_is_untouched",
+      "status": "pass",
+      "elapsed": 0.032225,
+      "project": "render"
+    },
+    {
+      "suite": "Sky",
+      "case": "removing_the_atmosphere_clears_the_sky",
+      "status": "pass",
+      "elapsed": 0.033783,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_opposite_the_sun_is_full",
+      "status": "pass",
+      "elapsed": 0.03448,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_at_the_sun_is_new",
+      "status": "pass",
+      "elapsed": 0.032862,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_moon_at_a_right_angle_is_half",
+      "status": "pass",
+      "elapsed": 0.034076,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_direction_comes_from_its_light",
+      "status": "pass",
+      "elapsed": 0.032589,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_disk_takes_its_angular_radius",
+      "status": "pass",
+      "elapsed": 0.032456,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_default_moon_disk_takes_the_default_radius",
+      "status": "pass",
+      "elapsed": 0.032171,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_a_moon_draws_none",
+      "status": "pass",
+      "elapsed": 0.032846,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_moon_radiance_comes_from_its_celestial_light",
+      "status": "pass",
+      "elapsed": 0.033144,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_stars_draws_none",
+      "status": "pass",
+      "elapsed": 0.031973,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_star_field_takes_the_defaults",
+      "status": "pass",
+      "elapsed": 0.032169,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_takes_its_own_values",
+      "status": "pass",
+      "elapsed": 0.033295,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_radiance_comes_from_its_celestial_light",
+      "status": "pass",
+      "elapsed": 0.033016,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "an_unrotated_star_field_keeps_the_axes_of_the_world",
+      "status": "pass",
+      "elapsed": 0.033287,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_rotated_star_field_turns_its_axes",
+      "status": "pass",
+      "elapsed": 0.033503,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_stands_in_the_dark",
+      "status": "pass",
+      "elapsed": 0.034348,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_field_is_gone_by_day",
+      "status": "pass",
+      "elapsed": 0.034817,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_fade_is_half_between_the_two_elevations",
+      "status": "pass",
+      "elapsed": 0.0338,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_star_fade_follows_the_elevations_of_the_field",
+      "status": "pass",
+      "elapsed": 0.033208,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sky_keeps_the_radiance_over_the_atmosphere",
+      "status": "pass",
+      "elapsed": 0.032679,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_air_takes_the_blue_out_of_a_low_sun",
+      "status": "pass",
+      "elapsed": 0.032564,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_sun_over_the_atmosphere_keeps_its_radiance",
+      "status": "pass",
+      "elapsed": 0.033697,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_world_without_an_atmosphere_keeps_its_light",
+      "status": "pass",
+      "elapsed": 0.033689,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_night_without_a_moon_leaves_the_view_dark",
+      "status": "pass",
+      "elapsed": 0.033498,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_full_moon_lights_the_view_after_sunset",
+      "status": "pass",
+      "elapsed": 0.032685,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_new_moon_leaves_the_night_dark",
+      "status": "pass",
+      "elapsed": 0.033121,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sun_outshines_the_moon_by_day",
+      "status": "pass",
+      "elapsed": 0.032314,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "the_sun_of_the_sky_is_the_light_of_the_view",
+      "status": "pass",
+      "elapsed": 0.03253,
+      "project": "render"
+    },
+    {
+      "suite": "Celestial",
+      "case": "a_camera_over_the_haze_keeps_more_of_the_sun",
+      "status": "pass",
+      "elapsed": 0.03369,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_overhead_at_noon_on_the_equator",
+      "status": "pass",
+      "elapsed": 0.020679,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_at_the_latitude_at_noon",
+      "status": "pass",
+      "elapsed": 0.020453,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_rises_in_the_east",
+      "status": "pass",
+      "elapsed": 0.020326,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_sets_in_the_west",
+      "status": "pass",
+      "elapsed": 0.019734,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_sun_stands_under_the_horizon_at_midnight",
+      "status": "pass",
+      "elapsed": 0.020076,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_solstice_tilts_the_sun_by_the_axis",
+      "status": "pass",
+      "elapsed": 0.019092,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_winter_solstice_tilts_the_sun_the_other_way",
+      "status": "pass",
+      "elapsed": 0.027068,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_north_offset_turns_the_compass",
+      "status": "pass",
+      "elapsed": 0.028786,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_day_without_a_date_is_the_solstice",
+      "status": "pass",
+      "elapsed": 0.031795,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "time_scale_advances_the_hour",
+      "status": "pass",
+      "elapsed": 0.02395,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_without_a_scale_holds_the_hour",
+      "status": "pass",
+      "elapsed": 0.027004,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_hour_wraps_into_the_next_day",
+      "status": "pass",
+      "elapsed": 0.029964,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_day_wraps_at_the_end_of_the_year",
+      "status": "pass",
+      "elapsed": 0.02792,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_negative_scale_runs_the_clock_backwards",
+      "status": "pass",
+      "elapsed": 0.027199,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_written_hour_jumps_the_sky_in_the_same_frame",
+      "status": "pass",
+      "elapsed": 0.026611,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_one_by_day",
+      "status": "pass",
+      "elapsed": 0.02496,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_zero_at_night",
+      "status": "pass",
+      "elapsed": 0.023937,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "daylight_is_half_at_the_horizon",
+      "status": "pass",
+      "elapsed": 0.021406,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_full_moon_stands_opposite_the_sun",
+      "status": "pass",
+      "elapsed": 0.021311,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_new_moon_stands_at_the_sun",
+      "status": "pass",
+      "elapsed": 0.022481,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_quarter_moon_stands_at_a_right_angle",
+      "status": "pass",
+      "elapsed": 0.021814,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_moon_phase_of_the_sky_follows_the_clock",
+      "status": "pass",
+      "elapsed": 0.034683,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_star_field_keeps_its_pole_over_the_hours",
+      "status": "pass",
+      "elapsed": 0.020938,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "the_star_field_turns_with_the_hour",
+      "status": "pass",
+      "elapsed": 0.020711,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_without_lights_of_its_own_takes_them_from_the_sky",
+      "status": "pass",
+      "elapsed": 0.021135,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_clock_that_names_its_own_lights_drives_those",
+      "status": "pass",
+      "elapsed": 0.020825,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_light_that_was_authored_without_a_rotation_gets_one",
+      "status": "pass",
+      "elapsed": 0.020682,
+      "project": "render"
+    },
+    {
+      "suite": "Clock",
+      "case": "a_world_without_an_atmosphere_still_runs_its_clock",
+      "status": "pass",
+      "elapsed": 0.020648,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_of_the_view_is_the_first_pass",
+      "status": "pass",
+      "elapsed": 0.034355,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_color_comes_from_the_sky",
+      "status": "pass",
+      "elapsed": 0.034758,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_low_sun_makes_the_fog_red",
+      "status": "pass",
+      "elapsed": 0.034501,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_night_fog_keeps_the_night_tint",
+      "status": "pass",
+      "elapsed": 0.034337,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_density_follows_the_world_scale",
+      "status": "pass",
+      "elapsed": 0.033537,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_intensity_scales_the_density",
+      "status": "pass",
+      "elapsed": 0.032781,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_falloff_follows_the_aerosol_layer",
+      "status": "pass",
+      "elapsed": 0.033336,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_fog_sits_at_the_sea_level_of_the_sky",
+      "status": "pass",
+      "elapsed": 0.034903,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_over_the_haze_sees_thinner_fog",
+      "status": "pass",
+      "elapsed": 0.034006,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_negative_fog_intensity_keeps_the_authored_fog",
+      "status": "pass",
+      "elapsed": 0.03438,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_world_without_an_atmosphere_keeps_the_authored_fog",
+      "status": "pass",
+      "elapsed": 0.034761,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_sky_leaves_the_framing_of_the_fog_alone",
+      "status": "pass",
+      "elapsed": 0.03476,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "the_environment_is_filtered_on_the_first_frame",
+      "status": "pass",
+      "elapsed": 0.032651,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_changed_medium_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.033277,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_small_step_of_the_sun_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.034153,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_large_step_of_the_sun_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.033501,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_moving_sun_filters_the_environment_less_often",
+      "status": "pass",
+      "elapsed": 0.035054,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_that_rises_a_little_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.034603,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_camera_that_climbs_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.033511,
+      "project": "render"
+    },
+    {
+      "suite": "Ibl",
+      "case": "a_gradient_environment_is_not_touched_by_the_sky",
+      "status": "pass",
+      "elapsed": 0.032818,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_world_without_weather_draws_a_clear_sky",
+      "status": "pass",
+      "elapsed": 0.033285,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_reaches_the_sky",
+      "status": "pass",
+      "elapsed": 0.034576,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_overcast_sits_between_the_two",
+      "status": "pass",
+      "elapsed": 0.034053,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_medium_stays_the_base_under_overcast",
+      "status": "pass",
+      "elapsed": 0.033779,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_sun_keeps_moving_under_overcast",
+      "status": "pass",
+      "elapsed": 0.033156,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_flattens_the_light_of_the_view",
+      "status": "pass",
+      "elapsed": 0.032899,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_overcast_lights_between_the_two",
+      "status": "pass",
+      "elapsed": 0.032679,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_filters_the_environment_again",
+      "status": "pass",
+      "elapsed": 0.031895,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_sliver_of_overcast_keeps_the_environment",
+      "status": "pass",
+      "elapsed": 0.034908,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_fog_raises_the_fog_density",
+      "status": "pass",
+      "elapsed": 0.034514,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_half_fog_sits_between_the_two",
+      "status": "pass",
+      "elapsed": 0.034607,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_fog_leaves_the_color_and_the_framing_alone",
+      "status": "pass",
+      "elapsed": 0.034678,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_rain_wets_the_material_layer",
+      "status": "pass",
+      "elapsed": 0.034712,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_world_without_weather_keeps_the_wetness_layer",
+      "status": "pass",
+      "elapsed": 0.033591,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_first_frame_snaps_to_the_weather",
+      "status": "pass",
+      "elapsed": 0.033591,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_new_target_is_eased_over_the_transition",
+      "status": "pass",
+      "elapsed": 0.035403,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_shorter_transition_moves_further",
+      "status": "pass",
+      "elapsed": 0.034824,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_transition_arrives_at_the_target",
+      "status": "pass",
+      "elapsed": 0.037054,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "a_write_of_one_amount_keeps_the_others",
+      "status": "pass",
+      "elapsed": 0.034687,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "an_amount_outside_the_range_is_held_inside_it",
+      "status": "pass",
+      "elapsed": 0.034495,
+      "project": "render"
+    },
+    {
+      "suite": "Weather",
+      "case": "the_overcast_flattens_the_fog_color",
+      "status": "pass",
+      "elapsed": 0.033258,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_plain_instance_has_no_shape",
+      "status": "pass",
+      "elapsed": 0.032515,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_border_sets_the_shape_bit",
+      "status": "pass",
+      "elapsed": 0.035074,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "radii_are_ratios_of_the_short_side",
+      "status": "pass",
+      "elapsed": 0.034372,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "widths_are_ratios_of_the_short_side",
+      "status": "pass",
+      "elapsed": 0.034169,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "the_half_extents_carry_the_aspect",
+      "status": "pass",
+      "elapsed": 0.033898,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_scale_moves_the_ratios",
+      "status": "pass",
+      "elapsed": 0.032191,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "the_border_color_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.031366,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_colorless_border_takes_the_rgb",
+      "status": "pass",
+      "elapsed": 0.034023,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_radius_change_re_extracts_the_instance",
+      "status": "pass",
+      "elapsed": 0.033414,
+      "project": "render"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "a_border_survives_the_sorted_pass",
+      "status": "pass",
+      "elapsed": 0.033641,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "the_include_is_generated_per_light",
+      "status": "pass",
+      "elapsed": 0.035124,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "params_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.03558,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "a_light_without_one_compiles_the_plain_variant",
+      "status": "pass",
+      "elapsed": 0.033006,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "the_sun_carries_its_modulator_bit",
+      "status": "pass",
+      "elapsed": 0.033842,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "a_point_light_carries_its_modulator_bit",
+      "status": "pass",
+      "elapsed": 0.033751,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "several_modulators_on_one_light_multiply",
+      "status": "pass",
+      "elapsed": 0.035436,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "a_disabled_modulator_is_not_registered",
+      "status": "pass",
+      "elapsed": 0.036299,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "a_broken_plugin_reports_and_keeps_the_pipeline",
+      "status": "pass",
+      "elapsed": 0.035007,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "changing_the_plugin_recomposes_the_mesh_shader",
+      "status": "pass",
+      "elapsed": 0.034574,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "the_overcast_drives_a_density_of_zero",
+      "status": "pass",
+      "elapsed": 0.03442,
+      "project": "render"
+    },
+    {
+      "suite": "Modulators",
+      "case": "a_written_density_is_kept",
+      "status": "pass",
+      "elapsed": 0.034272,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "an_entity_leaves_the_batch",
+      "status": "pass",
+      "elapsed": 0.032131,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "showing_it_again_takes_a_slot_back",
+      "status": "pass",
+      "elapsed": 0.032597,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "the_subtree_leaves_with_its_parent",
+      "status": "pass",
+      "elapsed": 0.033211,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_child_alone_leaves_its_parent_drawn",
+      "status": "pass",
+      "elapsed": 0.032719,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_dynamic_entity_leaves_the_frame",
+      "status": "pass",
+      "elapsed": 0.031874,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_transparent_entity_leaves_the_sorted_list",
+      "status": "pass",
+      "elapsed": 0.031507,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_point_light_leaves_the_packet",
+      "status": "pass",
+      "elapsed": 0.03172,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_sun_leaves_the_view",
+      "status": "pass",
+      "elapsed": 0.031011,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "an_instance_of_a_hidden_prefab_is_hidden",
+      "status": "pass",
+      "elapsed": 0.032925,
+      "project": "render"
+    },
+    {
+      "suite": "Hidden",
+      "case": "a_world_without_the_tag_resolves_nothing",
+      "status": "pass",
+      "elapsed": 0.032925,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "a_surface_view_takes_the_scaled_size",
+      "status": "pass",
+      "elapsed": 0.032712,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "an_unscaled_surface_view_keeps_the_window_size",
+      "status": "pass",
+      "elapsed": 0.03204,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "a_render_target_keeps_its_own_size",
+      "status": "pass",
+      "elapsed": 0.032269,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "the_surface_reports_the_size_it_renders_at",
+      "status": "pass",
+      "elapsed": 0.071272,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "a_scale_of_one_reports_the_window_size",
+      "status": "pass",
+      "elapsed": 0.067962,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "a_scale_below_one_is_the_full_resolution",
+      "status": "pass",
+      "elapsed": 0.079898,
+      "project": "render"
+    },
+    {
+      "suite": "Resolution",
+      "case": "the_capture_keeps_the_window_size",
+      "status": "pass",
+      "elapsed": 0.085502,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "an_entity_without_it_reads_the_neutral_values",
+      "status": "pass",
+      "elapsed": 0.033599,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "the_amounts_reach_the_packet",
+      "status": "pass",
+      "elapsed": 0.032404,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "the_detail_carries_the_seed_and_the_scale",
+      "status": "pass",
+      "elapsed": 0.032259,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "the_values_are_clamped_to_their_range",
+      "status": "pass",
+      "elapsed": 0.033935,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "a_change_reextracts_the_instance",
+      "status": "pass",
+      "elapsed": 0.03349,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "the_amounts_survive_a_slot_move",
+      "status": "pass",
+      "elapsed": 0.032743,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "an_instance_of_a_prefab_inherits_it",
+      "status": "pass",
+      "elapsed": 0.032556,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "a_dynamic_instance_carries_its_amounts",
+      "status": "pass",
+      "elapsed": 0.0336,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "a_transition_keeps_the_instance_extracted",
+      "status": "pass",
+      "elapsed": 0.033681,
+      "project": "render"
+    },
+    {
+      "suite": "Wear",
+      "case": "the_layers_of_the_shader_read_the_channel",
+      "status": "pass",
+      "elapsed": 0.034316,
+      "project": "render"
+    },
+    {
+      "suite": "Fini",
+      "case": "controller_then_ui_finishes_cleanly",
+      "status": "pass",
+      "elapsed": 0.05437,
+      "project": "render"
+    },
+    {
+      "suite": "Fini",
+      "case": "every_module_reverse_dependency_order_finishes_cleanly",
+      "status": "pass",
+      "elapsed": 0.06343,
+      "project": "render"
+    }
+  ],
+  "projects": [
+    {
+      "project": "render",
+      "pass": 415,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 7.100658
+    },
+    {
+      "project": "ui",
+      "pass": 211,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 1.832025
+    }
   ]
 }

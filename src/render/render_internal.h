@@ -95,6 +95,14 @@ typedef struct RenderGroup {
     ecs_entity_t target; /**< RenderTarget entity whose color the quad shows */
 } RenderGroup;
 
+/** An entity whose own opacity a group quad applies for it.
+ *
+ * The entity draws into the target of its group, which a quad then composites
+ * with that opacity, so the draw itself has to stay at full strength or the
+ * opacity reaches the frame twice.
+ */
+extern ECS_TAG_DECLARE(RenderGrouped);
+
 /** One registered material layer, kept in the order the layers are applied in */
 typedef struct box_layer_t {
     ecs_entity_t entity; /**< The layer entity */

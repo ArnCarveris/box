@@ -211,6 +211,27 @@ struct MeshOut {
 // Luminance weights the indirect fractions of a pixel are measured with.
 const MESH_LUMA: vec3<f32> = vec3(0.2126, 0.7152, 0.0722);
 
+// A view that shows a UI tree lights nothing: a node has to show the color it
+// was given, and the four percent the environment reflects off a dielectric
+// would lift its black to a grey. The stage hands the blend the albedo and the
+// emissive of the surface, encoded like the lit stage encodes, and reports no
+// indirect light for the passes that read the second attachment.
+fn unlit_shade(in: VertexOut, s: ptr<function, Surface>, blend: u32,
+    out_normal: ptr<function, vec3<f32>>,
+    out_indirect: ptr<function, vec3<f32>>) -> vec4<f32> {
+  let albedo = (*s).albedo;
+  var color = albedo + (*s).emissive;
+  if (u.gamma_encode > 0.5) {
+    color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
+  }
+
+  *out_normal = (*s).normal;
+  *out_indirect = vec3(0.0, 0.0, (*s).roughness);
+
+  return resolve(color, vec3(0.0), albedo, (*s).alpha, in.clip.xy,
+    (*s).roughness, (*s).normal, normalize(u.eye - in.world_pos), blend);
+}
+
 fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     out_indirect: ptr<function, vec3<f32>>) -> vec4<f32> {
   clip_fragment(in);
@@ -297,6 +318,10 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     mask = 0u;
   }
   apply_layers(&s, mask);
+  if (u.unlit != 0u) {
+    return unlit_shade(in, &s, blend, out_normal, out_indirect);
+  }
+
   let l = normalize(-u.sun_dir);
   let v = normalize(u.eye - in.world_pos);
   let sn = s.normal;
