@@ -48,9 +48,12 @@ done:
 /** Entity the overlay of the world is set on.
  *
  * The first view of the frame that does not draw a UI tree owns the panel,
- * because that is the only kind of view the renderer draws it for; a world
- * that lists only UI views, or none at all, keeps it on the singleton, which
- * every view falls back to.
+ * because that is the only kind of view the renderer fills it for. A world
+ * that lists no such view, be it because it lists none at all or because
+ * every one of them draws a UI tree, never puts one in the packet either: the
+ * renderer synthesizes a scene view of its own with no entity, which reads
+ * the panel from the FpsOverlay singleton directly, so that singleton is the
+ * target in that case rather than any of the UI views the world does list.
  *
  * @param world The world
  * @return The target view, or the FpsOverlay singleton when there is none
@@ -70,10 +73,6 @@ static ecs_entity_t box_fps_target(
                 if (!box_fps_view_is_ui(world, state, src->entity)) {
                     result = src->entity;
                 }
-            }
-
-            if (!result) {
-                result = box_render_primary_view(ECS_CONST_CAST(RenderState*, state));
             }
         }
     }

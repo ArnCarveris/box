@@ -207,6 +207,29 @@ void Fps_on_targets_the_scene_view_over_a_ui_view(void)
     test_assert(ecs_get(w, ui_view, FpsOverlay) == NULL);
 }
 
+void Fps_on_targets_the_singleton_when_every_view_is_ui(void)
+{
+    // ore_engine/fps_text
+    ECS_IMPORT(w, BoxRender);
+    ecs_entity_t layer = ecs_entity(w, { .name = "ui_layer" });
+    box_render_add_ui_layer(w, layer);
+    ecs_entity_t ui_view = ecs_entity(w, { .name = "ui_view" });
+    ecs_set(w, ui_view, View, { .layers = { layer } });
+
+    RenderState *state = box_render_state(w);
+    box_view_src_t *ui_src = ecs_vec_append_t(NULL, &state->view_list, box_view_src_t);
+    ui_src->entity = ui_view;
+
+    bool error = true;
+    char *out = box_command_run(w, session, "fps on", &error);
+    test_bool(error, false);
+    test_str(out, "fps overlay on\n");
+    ecs_os_free(out);
+
+    test_assert(ecs_singleton_get(w, FpsOverlay) != NULL);
+    test_assert(ecs_get(w, ui_view, FpsOverlay) == NULL);
+}
+
 void Fps_help_lists_the_command(void)
 {
     // monitoring/fps_command

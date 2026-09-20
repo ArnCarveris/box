@@ -36,6 +36,7 @@
                     "on_form_enables_the_overlay_on_the_target",
                     "off_form_disables_the_overlay_on_the_target",
                     "on_targets_the_scene_view_over_a_ui_view",
+                    "on_targets_the_singleton_when_every_view_is_ui",
                     "switching_keeps_the_panel_settings",
                     "first_call_starts_the_window_with_the_panel",
                     "window_falls_back_to_the_current_frame",
