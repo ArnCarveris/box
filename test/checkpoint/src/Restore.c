@@ -13,8 +13,7 @@ void Restore_last_checkpoint_is_restored(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -47,8 +46,7 @@ void Restore_named_checkpoint_is_restored(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -79,8 +77,7 @@ void Restore_every_script_is_restored(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "first" }),
         .code = "using box.transform\n\na {\n  Position: {1, 0, 0}\n}\n"
@@ -111,8 +108,7 @@ void Restore_entity_added_after_the_checkpoint_is_removed(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -141,8 +137,7 @@ void Restore_entity_deleted_after_the_checkpoint_is_back(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -170,8 +165,7 @@ void Restore_unowned_entity_is_left_alone_and_reported(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -201,8 +195,7 @@ void Restore_entity_handles_change(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -231,8 +224,7 @@ void Restore_kept_entity_keeps_its_script(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "session" }),
         .code = "using box.transform\n\nkeeper {\n  Position: {1, 0, 0}\n}\n"
@@ -266,8 +258,7 @@ void Restore_counters_survive_a_restore(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\nusing box.checkpoint\n\n"
@@ -297,8 +288,7 @@ void Restore_restore_without_a_checkpoint_fails(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -317,8 +307,7 @@ void Restore_unknown_name_fails(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -345,8 +334,7 @@ void Restore_corrupt_checkpoint_keeps_the_world(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "first" }),
         .code = "using box.transform\n\na {\n  Position: {1, 0, 0}\n}\n"
@@ -381,8 +369,7 @@ void Restore_corrupt_checkpoint_names_the_file(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -413,8 +400,7 @@ void Restore_command_restores_the_last_checkpoint(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -450,8 +436,7 @@ void Restore_command_takes_a_name(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -488,8 +473,7 @@ void Restore_command_reports_an_unknown_name(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"

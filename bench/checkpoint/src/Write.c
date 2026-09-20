@@ -13,8 +13,7 @@ void Write_scene_5000(bench_t *b)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     ecs_strbuf_appendstr(&buf, "using box.transform\n\n");
@@ -48,8 +47,7 @@ void Write_report_5000(bench_t *b)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     int32_t i;
     for (i = 0; i < BENCH_CHECKPOINT_ENTITIES; i ++) {
@@ -74,8 +72,7 @@ void Write_scene_500(bench_t *b)
 {
     // checkpoints/edit_perf
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     ecs_strbuf_appendstr(&buf, "using box.transform\n\n");
@@ -109,8 +106,7 @@ void Write_scene_50000(bench_t *b)
 {
     // checkpoints/edit_perf
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     ecs_strbuf_appendstr(&buf, "using box.transform\n\n");

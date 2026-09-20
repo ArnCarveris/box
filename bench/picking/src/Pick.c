@@ -59,7 +59,7 @@ void Pick_ray_from_a_camera(bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, -10});
     ecs_set(world, camera, Camera, {.fov = 60, .aspect_ratio = 1});
@@ -82,7 +82,7 @@ void Pick_pick_1m(bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, Box);
     bench_pick_build(world, BENCH_PICK_ROOTS);
 
     bench_set_items(b, 1);
@@ -102,7 +102,7 @@ void Pick_pick_miss_1m(bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, Box);
     bench_pick_build(world, BENCH_PICK_ROOTS);
 
     bench_set_items(b, 1);
@@ -122,7 +122,7 @@ void Pick_target_of_a_nested_hit(bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {0, 0, 0});
     ecs_add(world, root, RootBounds);
@@ -149,7 +149,7 @@ void Pick_raise_to_an_empty_chain(bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxPicking);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     int32_t i;
     for (i = 0; i < 8; i ++) {

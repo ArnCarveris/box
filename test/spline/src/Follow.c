@@ -12,7 +12,7 @@ void Follow_moves_by_speed_over_time(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -45,7 +45,7 @@ void Follow_offset_places_the_follower(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -71,7 +71,7 @@ void Follow_loops_at_the_end(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -101,7 +101,7 @@ void Follow_ping_pong_turns_around(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -139,7 +139,7 @@ void Follow_stops_at_the_end(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -168,7 +168,7 @@ void Follow_orientation_follows_the_tangent(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -206,7 +206,7 @@ void Follow_marks_the_entity_dynamic(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     ecs_entity_t e = ecs_new(w);
@@ -224,8 +224,7 @@ void Follow_a_light_follows_a_path(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
-    ECS_IMPORT(w, BoxLight);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -254,7 +253,7 @@ void Follow_negative_speed_travels_backwards(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -280,7 +279,7 @@ void Follow_without_a_spline_nothing_moves(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, FollowPath, {.spline = 0, .speed = 4});
@@ -301,7 +300,7 @@ void Follow_speed_is_the_same_on_a_curve(void)
 {
     // splines/spline_paths
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);

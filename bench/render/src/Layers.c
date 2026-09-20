@@ -15,7 +15,7 @@ void Layers_extract_10k_with_layers(bench_t *b)
 {
     // materials/material_layers
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -66,7 +66,7 @@ void Layers_extract_10k_two_views(bench_t *b)
 {
     // views/layers
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

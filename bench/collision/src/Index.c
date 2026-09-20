@@ -67,7 +67,7 @@ void Index_build_1m(bench_t *b)
     while (bench_iter(b)) {
         bench_pause(b);
         ecs_world_t *world = ecs_init();
-        ECS_IMPORT(world, BoxCollision);
+        ECS_IMPORT(world, Box);
         bench_index_build(world, BENCH_INDEX_ROOTS, 0);
         bench_resume(b);
 
@@ -84,7 +84,7 @@ void Index_ray_1m(bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     bench_index_build(world, BENCH_INDEX_ROOTS, 0);
     box_collision_update(world);
 
@@ -105,7 +105,7 @@ void Index_ray_miss_1m(bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     bench_index_build(world, BENCH_INDEX_ROOTS, 0);
     box_collision_update(world);
 
@@ -126,7 +126,7 @@ void Index_sphere_1m(bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     bench_index_build(world, BENCH_INDEX_ROOTS, 0);
     box_collision_update(world);
 
@@ -149,7 +149,7 @@ void Index_frustum_1m(bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     bench_index_build(world, BENCH_INDEX_ROOTS, 0);
     box_collision_update(world);
 
@@ -177,7 +177,7 @@ void Index_update_1k_movers_of_1m(bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     bench_index_build(world, BENCH_INDEX_ROOTS, BENCH_INDEX_MOVERS);
     box_collision_update(world);
 

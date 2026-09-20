@@ -12,7 +12,7 @@ void ArcLength_length_of_a_straight_line(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -34,7 +34,7 @@ void ArcLength_length_of_a_square_loop(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -56,7 +56,7 @@ void ArcLength_length_of_a_collinear_catmull_curve(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -76,7 +76,7 @@ void ArcLength_point_at_a_distance(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -107,7 +107,7 @@ void ArcLength_distance_of_a_parameter(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -132,7 +132,7 @@ void ArcLength_parameter_of_a_distance_round_trips(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -165,7 +165,7 @@ void ArcLength_distance_past_the_end_clamps(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -192,7 +192,7 @@ void ArcLength_loop_wraps_the_distance(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -226,7 +226,7 @@ void ArcLength_even_steps_along_a_curve(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);

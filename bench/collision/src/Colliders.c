@@ -19,7 +19,7 @@ void Colliders_resolve_1k_of_100k(bench_t *b)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *entities = ecs_os_malloc_n(ecs_entity_t, BENCH_COLLIDER_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_COLLIDER_COUNT; i ++) {

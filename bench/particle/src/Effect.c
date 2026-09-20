@@ -32,7 +32,7 @@ void Effect_play_100_effects(bench_t *b)
 {
     // ore_engine/one_shot_effects
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     ecs_entity_t effect = bench_effect_template(world);
 
     bench_set_items(b, BENCH_EFFECT_COUNT);
@@ -54,7 +54,7 @@ void Effect_update_100_playing_effects(bench_t *b)
 {
     // ore_engine/one_shot_effects
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     ecs_entity_t effect = bench_effect_template(world);
 
     int32_t i;

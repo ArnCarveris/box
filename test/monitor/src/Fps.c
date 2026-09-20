@@ -216,7 +216,7 @@ void Fps_overlay_defaults_are_enabled_in_a_corner(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     const FpsOverlay *o = ecs_ensure(world, e, FpsOverlay);
     test_bool(o->enabled, true);
@@ -231,7 +231,7 @@ void Fps_window_is_published_on_the_component(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f});
     int32_t i;
     for (i = 0; i < 10; i ++) {
@@ -249,7 +249,7 @@ void Fps_overlay_publishes_its_text(void)
 {
     // ore_engine/fps_text
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f,
         .corner = FpsBottomLeft});
     int32_t i;
@@ -280,7 +280,7 @@ void Fps_absent_overlay_publishes_nothing(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     int32_t i;
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0.02f);

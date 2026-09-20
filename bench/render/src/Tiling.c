@@ -18,7 +18,7 @@ void Tiling_extract_10k(bench_t *b)
 {
     // textures/tiling
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

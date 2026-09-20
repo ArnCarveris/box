@@ -19,7 +19,7 @@ void Mixed_childof_child_under_parent_node(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t node = ecs_new_w_parent(world, root, "node");
@@ -37,7 +37,7 @@ void Mixed_parent_child_under_childof_node(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t node = ecs_new_w_pair(world, EcsChildOf, root);
@@ -55,7 +55,7 @@ void Mixed_deep_chain_alternating(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t chain[5];
     int32_t i;
     for (i = 0; i < 5; i ++) {
@@ -83,7 +83,7 @@ void Mixed_scale_inherited_alternating(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Scale, {2, 2, 2});
@@ -103,7 +103,7 @@ void Mixed_reparent_childof_to_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -125,7 +125,7 @@ void Mixed_reparent_parent_to_childof(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -147,7 +147,7 @@ void Mixed_reparent_back_and_forth(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t pair_parent = ecs_new(world);
     ecs_set(world, pair_parent, Position, {10, 0, 0});
     ecs_entity_t comp_parent = ecs_new(world);
@@ -172,7 +172,7 @@ void Mixed_reparent_subtree_keeps_descendants(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -194,7 +194,7 @@ void Mixed_reparent_dynamic_node(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -221,7 +221,7 @@ void Mixed_dynamic_parent_root_childof_child(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_add(world, root, DynamicTransform);
     ecs_set(world, root, Position, {1, 0, 0});
@@ -242,7 +242,7 @@ void Mixed_dynamic_childof_node_under_parent_root(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {10, 0, 0});
     ecs_entity_t node = ecs_new_w_parent(world, root, "node");
@@ -265,7 +265,7 @@ void Mixed_dynamic_cascade_order_alternating(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t chain[5];
     int32_t i;
     for (i = 0; i < 5; i ++) {
@@ -294,7 +294,7 @@ void Mixed_dynamic_node_between_static_levels(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t mid = ecs_new_w_pair(world, EcsChildOf, root);
@@ -315,7 +315,7 @@ void Mixed_delete_parent_node_with_children(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t node = ecs_new_w_parent(world, root, "node");
@@ -341,7 +341,7 @@ void Mixed_only_changed_subtree_written(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t node = ecs_new_w_parent(world, root, "node");
@@ -369,7 +369,7 @@ void Mixed_manual_transform_between_storages(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t manual = ecs_new_w_parent(world, root, "manual");

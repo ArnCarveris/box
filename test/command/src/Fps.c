@@ -14,7 +14,7 @@ static ecs_entity_t session;
 void Fps_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     session = ecs_entity(w, { .name = "agent0" });
     ecs_add(w, session, Terminal);
 }
@@ -183,7 +183,7 @@ void Fps_unknown_state_is_an_error(void)
 void Fps_on_targets_the_scene_view_over_a_ui_view(void)
 {
     // ore_engine/fps_text
-    ECS_IMPORT(w, BoxRender);
+    ECS_IMPORT(w, Box);
     ecs_entity_t layer = ecs_entity(w, { .name = "ui_layer" });
     box_render_add_ui_layer(w, layer);
     ecs_entity_t ui_view = ecs_entity(w, { .name = "ui_view" });
@@ -210,7 +210,7 @@ void Fps_on_targets_the_scene_view_over_a_ui_view(void)
 void Fps_on_targets_the_singleton_when_every_view_is_ui(void)
 {
     // ore_engine/fps_text
-    ECS_IMPORT(w, BoxRender);
+    ECS_IMPORT(w, Box);
     ecs_entity_t layer = ecs_entity(w, { .name = "ui_layer" });
     box_render_add_ui_layer(w, layer);
     ecs_entity_t ui_view = ecs_entity(w, { .name = "ui_view" });

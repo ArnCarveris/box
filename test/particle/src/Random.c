@@ -137,7 +137,7 @@ void Random_the_color_range_reaches_the_block(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -163,7 +163,7 @@ void Random_an_emitter_without_a_variance_draws_one_color(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -185,7 +185,7 @@ void Random_a_color_variance_is_held_inside_the_channel(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

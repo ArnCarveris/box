@@ -35,8 +35,7 @@ void Textures_extract_1000_materials(bench_t *b)
     free(pixels);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxTexture);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

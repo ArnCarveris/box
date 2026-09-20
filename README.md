@@ -19,3 +19,17 @@ bake3 run box_app --local-env --cfg release                # open a window with 
 bake3 run box_app --local-env -- etc/scenes/capture.flecs  # run a scene (paths are relative to apps/box_app)
 bake3 run box_app --local-env -- --headless --frames 10    # headless run, exits after 10 frames
 ```
+
+## Using the framework
+
+An application creates a world and imports the `Box` module and nothing else:
+
+```c
+ecs_world_t *world = ecs_init();
+ECS_IMPORT(world, Box);
+```
+
+`Box` imports every module of the framework in one fixed order. Component ids are
+process globals that every world forces, so a world that imported the modules in
+another order would collide with the ids of the first; importing only `Box`, in
+applications, tests and benchmarks alike, keeps every world identical.

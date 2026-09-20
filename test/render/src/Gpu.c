@@ -18,7 +18,7 @@ void Gpu_timings_are_off_until_they_are_asked_for(void)
 {
     // monitoring/gpu_timings
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
@@ -54,7 +54,7 @@ void Gpu_enabled_timings_report_the_passes_of_a_frame(void)
 {
     // monitoring/gpu_timings
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
@@ -106,7 +106,7 @@ void Gpu_disabled_timings_stop_the_queries(void)
 {
     // monitoring/gpu_timings
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});

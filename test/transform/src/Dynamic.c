@@ -19,7 +19,7 @@ void Dynamic_dynamic_root_updates_each_frame(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
     ecs_set(world, e, Position, {1, 2, 3});
@@ -42,7 +42,7 @@ void Dynamic_dynamic_parent_static_child(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, DynamicTransform);
     ecs_set(world, parent, Position, {1, 0, 0});
@@ -64,7 +64,7 @@ void Dynamic_dynamic_grandparent_static_chain(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_add(world, root, DynamicTransform);
     ecs_set(world, root, Position, {0, 0, 1});
@@ -89,7 +89,7 @@ void Dynamic_dynamic_scale_inherited(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, DynamicTransform);
     ecs_set(world, parent, Position, {0, 0, 0});
@@ -111,7 +111,7 @@ void Dynamic_orientation_in_dynamic(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float a = 1.5707963f;
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
@@ -130,7 +130,7 @@ void Dynamic_dynamic_emits_no_events(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
     ecs_set(world, e, Position, {1, 2, 3});
@@ -153,7 +153,7 @@ void Dynamic_add_then_remove_dynamic(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 0, 0});
     const WorldTransform *wt = ecs_get(world, e, WorldTransform);
@@ -176,7 +176,7 @@ void Dynamic_manual_transform_not_written(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ManualTransform);
     ecs_add(world, e, DynamicTransform);
@@ -195,7 +195,7 @@ void Dynamic_deep_chain_cascade_order(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t chain[100];
     int32_t i;
     for (i = 0; i < 100; i ++) {
@@ -220,7 +220,7 @@ void Dynamic_static_sibling_not_updated_by_system(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t dynamic = ecs_new(world);
     ecs_add(world, dynamic, DynamicTransform);
     ecs_set(world, dynamic, Position, {1, 0, 0});

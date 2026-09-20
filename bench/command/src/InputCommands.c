@@ -14,7 +14,7 @@ void InputCommands_key_press_10(bench_t *b)
 {
     // input/input_commands
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, Box);
     ecs_entity_t session = ecs_entity(world, { .name = "bench" });
     ecs_add(world, session, Terminal);
     ecs_progress(world, 0.016f);
@@ -41,7 +41,7 @@ void InputCommands_action_list_100(bench_t *b)
 {
     // input/input_commands
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, Box);
     ecs_entity_t session = ecs_entity(world, { .name = "bench" });
     ecs_add(world, session, Terminal);
     ecs_entity_t map = ecs_lookup(world, "box.input.map");

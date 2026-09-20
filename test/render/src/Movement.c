@@ -11,7 +11,7 @@ void Movement_velocity_integrates_position(void)
 {
     // scene_core/render
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxMovement);
+    ECS_IMPORT(w, Box);
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {1, 2, 3});
     ecs_set(w, e, Velocity, {10, 0, -10});
@@ -27,7 +27,7 @@ void Movement_angular_velocity_integrates_rotation(void)
 {
     // scene_core/render
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxMovement);
+    ECS_IMPORT(w, Box);
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, AngularVelocity, {0, 2, 0});
     ecs_progress(w, 0.25f);
@@ -41,7 +41,7 @@ void Movement_velocity_marks_dynamic(void)
 {
     // scene_core/render
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxMovement);
+    ECS_IMPORT(w, Box);
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Velocity, {1, 0, 0});
     test_assert(ecs_has(w, e, Position));

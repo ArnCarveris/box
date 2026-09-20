@@ -60,7 +60,7 @@ void Follow_followers_10k(bench_t *b)
 {
     // splines/spline_paths
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t curve = box_bench_follow_scene(world, false);
     bench_set_items(b, BENCH_FOLLOWERS);
@@ -77,7 +77,7 @@ void Follow_followers_10k_oriented(bench_t *b)
 {
     // splines/spline_paths
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t curve = box_bench_follow_scene(world, true);
     bench_set_items(b, BENCH_FOLLOWERS);

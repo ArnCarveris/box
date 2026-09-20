@@ -614,11 +614,15 @@ static void box_view_overlay(
     ecs_entity_t e,
     box_view_t *v)
 {
-    if (!ecs_id(FpsOverlay)) {
+    if (!ecs_id(FpsOverlay) ||
+        ecs_lookup(world, "box.monitor.FpsOverlay") != ecs_id(FpsOverlay))
+    {
         goto done;
     }
 
-    const FpsOverlay *o = box_render_view_setting(world, e, ecs_id(FpsOverlay));
+    const FpsOverlay *o = e ?
+        box_render_view_setting(world, e, ecs_id(FpsOverlay)) :
+        ecs_singleton_get(world, FpsOverlay);
     if (!o || !o->enabled) {
         goto done;
     }

@@ -13,7 +13,7 @@ void Extract_no_block_without_an_emitter(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -30,7 +30,7 @@ void Extract_block_carries_the_world_transform(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -56,7 +56,7 @@ void Extract_block_carries_the_shape_and_the_spread(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -84,7 +84,7 @@ void Extract_block_carries_the_ranges_and_the_seed(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -117,7 +117,7 @@ void Extract_color_reaches_the_block_as_linear(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -138,7 +138,7 @@ void Extract_spawn_count_on_the_fixed_clock(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -166,7 +166,7 @@ void Extract_fractional_rate_accumulates_over_frames(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -194,7 +194,7 @@ void Extract_a_rate_of_zero_spawns_nothing(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -218,7 +218,7 @@ void Extract_spawn_is_clamped_to_the_maximum(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -243,7 +243,7 @@ void Extract_maximum_is_clamped_to_the_pool_ceiling(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -275,7 +275,7 @@ void Extract_the_pool_resets_when_the_maximum_changes(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -309,7 +309,7 @@ void Extract_first_counts_the_particles_spawned_before(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -337,7 +337,7 @@ void Extract_mesh_shape_samples_the_surface(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -380,7 +380,7 @@ void Extract_spline_shape_samples_the_curve(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -423,7 +423,7 @@ void Extract_a_shape_without_a_table_carries_no_points(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -446,7 +446,7 @@ void Extract_the_render_extract_fills_the_emitters(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 640;

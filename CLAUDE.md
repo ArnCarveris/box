@@ -23,6 +23,10 @@ doc comment on every type and member.
 
 ## Flecs rules that bit us
 
+- Import `Box` and nothing else, in applications, tests and benchmarks alike. Component
+  ids are process globals every world forces, so a world that imports modules in another
+  order collides with the ids of the first. A test whose subject is a minimal world may
+  import a subset, because every test case runs in its own process.
 - This flecs has no implicit defer mode. Inside an OnAdd or OnRemove observer
   the entity is mid table-move: structural changes to it (add, set of a missing
   component, remove) must go through `it->stage`, never `it->world`. Reads use

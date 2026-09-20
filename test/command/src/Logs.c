@@ -17,7 +17,7 @@ static void *log_out;
 void Logs_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     log_out = ecs_os_api.log_out_;
     ecs_os_api.log_out_ = fopen("/dev/null", "w");
     session = ecs_entity(w, { .name = "agent0" });

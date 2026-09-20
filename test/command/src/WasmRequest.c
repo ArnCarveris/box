@@ -14,7 +14,7 @@ static ecs_world_t *w;
 void WasmRequest_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     ecs_singleton_set(w, HttpServer, { .port = 27783 });
     test_assert(box_http_server(w) != NULL);
 }

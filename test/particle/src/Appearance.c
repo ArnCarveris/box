@@ -13,7 +13,7 @@ void Appearance_an_emitter_without_curves_writes_constants(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -39,7 +39,7 @@ void Appearance_the_size_and_opacity_curves_reach_the_block(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -67,7 +67,7 @@ void Appearance_the_gradient_reaches_the_block_as_linear(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -95,7 +95,7 @@ void Appearance_authored_curves_keep_the_other_defaults(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box.particle\n"
@@ -123,7 +123,7 @@ void Appearance_an_emitter_without_an_appearance_draws_circles(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -148,7 +148,7 @@ void Appearance_an_additive_sprite_reaches_the_block(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -171,7 +171,7 @@ void Appearance_a_sheet_and_its_frame_rate_reach_the_block(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -195,7 +195,7 @@ void Appearance_a_softness_sets_its_flag(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -216,7 +216,7 @@ void Appearance_a_texture_entity_binds_its_handle(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -239,7 +239,7 @@ void Appearance_a_texture_through_pbr_textures_binds_its_handle(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -265,7 +265,7 @@ void Appearance_a_texture_through_an_image_binds_its_handle(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -291,7 +291,7 @@ void Appearance_a_billboard_binds_the_mesh_of_its_entity(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -315,7 +315,7 @@ void Appearance_the_origin_of_an_emitter_sorts_its_pool(void)
 {
     // particles/appearance
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -427,7 +427,7 @@ void Appearance_the_stretch_of_a_streak_reaches_the_block(void)
 {
     // particles/rain
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -447,7 +447,7 @@ void Appearance_an_emitter_without_a_stretch_writes_none(void)
 {
     // particles/rain
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

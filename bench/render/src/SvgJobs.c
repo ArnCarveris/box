@@ -43,8 +43,7 @@ void SvgJobs_rasterize_1000_while_rendering(bench_t *b)
 {
     // responsiveness/svg_jobs
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxTexture);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

@@ -65,7 +65,7 @@ static void fan_build(
 void Shape_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     ECS_COMPONENT_DEFINE(w, Fan);
     box_packet_init(&packet);
     packet.width = 640;

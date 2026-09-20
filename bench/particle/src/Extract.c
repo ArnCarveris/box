@@ -29,7 +29,7 @@ void Extract_one_emitter(bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -55,7 +55,7 @@ void Extract_emitters_1k(bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -89,7 +89,7 @@ void Extract_mesh_shape_table(bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -132,7 +132,7 @@ void Extract_three_forces(bench_t *b)
 {
     // particles/dynamics
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -166,7 +166,7 @@ void Extract_collider_table(bench_t *b)
 {
     // particles/dynamics
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -202,7 +202,7 @@ void Extract_curves_and_appearance(bench_t *b)
 {
     // particles/appearance
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -246,7 +246,7 @@ void Extract_playback_and_bursts(bench_t *b)
 {
     // particles/control
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -282,7 +282,7 @@ void Extract_playback_1k(bench_t *b)
 {
     // particles/control
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -318,7 +318,7 @@ void Extract_budget_1k(bench_t *b)
 {
     // particles/scale
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -355,7 +355,7 @@ void Extract_cull_1k(bench_t *b)
 {
     // particles/scale
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -400,7 +400,7 @@ void Extract_rain_column(bench_t *b)
 {
     // particles/rain
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

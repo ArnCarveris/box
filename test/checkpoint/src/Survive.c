@@ -11,8 +11,7 @@ void Survive_render_slots_are_rebuilt(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\nusing box.geometry\n\n"
@@ -73,9 +72,7 @@ void Survive_collider_is_rebuilt(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\nusing box.geometry\n\n"
@@ -119,10 +116,7 @@ void Survive_root_bounds_are_rebuilt(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, ScriptSettings, { .enabled = false });
 
     test_assert(ecs_script(world, {
@@ -203,8 +197,7 @@ void Survive_controller_keeps_driving_the_entity(void)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\nusing box.controller\n\n"

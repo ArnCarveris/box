@@ -11,7 +11,7 @@ void Index_sphere_finds_collider(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {5, 0, 0});
@@ -31,7 +31,7 @@ void Index_sphere_misses_far_collider(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {50, 0, 0});
@@ -50,7 +50,7 @@ void Index_aabb_finds_collider(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -72,7 +72,7 @@ void Index_ray_finds_nearest(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t near = ecs_new(world);
     ecs_set(world, near, Position, {5, 0, 0});
@@ -96,7 +96,7 @@ void Index_ray_misses(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {5, 20, 0});
@@ -115,7 +115,7 @@ void Index_frustum_finds_inside(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t inside = ecs_new(world);
     ecs_set(world, inside, Position, {0, 0, 0});
@@ -143,7 +143,7 @@ void Index_insert_after_update(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_vec_t out;
     ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
@@ -164,7 +164,7 @@ void Index_remove_drops_from_index(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {1, 0, 0});
@@ -193,7 +193,7 @@ void Index_no_collider_not_in_index(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 0, 0});
@@ -215,7 +215,7 @@ void Index_move_updates_index(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -241,7 +241,7 @@ void Index_root_groups_children(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t root = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -271,7 +271,7 @@ void Index_nested_root_found(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t outer = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -305,7 +305,7 @@ void Index_dynamic_entity_found(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
@@ -326,7 +326,7 @@ void Index_dynamic_entity_moves_each_frame(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
@@ -351,7 +351,7 @@ void Index_disabled_index_finds_nothing(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 0, 0});
@@ -374,7 +374,7 @@ void Index_random_sphere_matches_brute_force(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     uint32_t seed = 12345;
     int32_t i;
@@ -430,7 +430,7 @@ void Index_random_aabb_matches_brute_force(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     uint32_t seed = 777;
     int32_t i;
@@ -485,7 +485,7 @@ void Index_random_ray_matches_brute_force(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     uint32_t seed = 99;
     int32_t i;
@@ -541,7 +541,7 @@ void Index_random_frustum_matches_brute_force(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     uint32_t seed = 4242;
     int32_t i;
@@ -607,7 +607,7 @@ void Index_many_inserts_and_removes(void)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t *entities = ecs_os_malloc_n(ecs_entity_t, 500);
     int32_t i;

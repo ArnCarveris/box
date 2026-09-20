@@ -29,7 +29,7 @@ void Extract_transitions_10k_x_10(bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     ECS_META_COMPONENT(world, BenchPair);
     ECS_META_COMPONENT(world, BenchQuad);
     ecs_add_id(world, ecs_id(PbrMaterial), Transitionable);
@@ -116,7 +116,7 @@ void Extract_no_transitions_10k(bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     ECS_META_COMPONENT(world, BenchPair);
     ECS_META_COMPONENT(world, BenchQuad);
 
@@ -167,7 +167,7 @@ void Extract_start_10k_transitions(bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     Transition *map = ecs_ensure(world, prefab, Transition);

@@ -19,7 +19,7 @@ static ecs_entity_t clock_entity;
 void Clock_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxSky);
+    ECS_IMPORT(w, Box);
     sun = ecs_new(w);
     ecs_set(w, sun, Rotation, {0, 0, 0});
     ecs_set(w, sun, DirectionalLight, {.intensity = 3});
@@ -294,7 +294,7 @@ void Clock_a_quarter_moon_stands_at_a_right_angle(void)
 void Clock_the_moon_phase_of_the_sky_follows_the_clock(void)
 {
     // sky/time_of_day
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 640;

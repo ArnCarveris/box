@@ -13,7 +13,7 @@ void Upload_mesh_100k(bench_t *b)
 {
     // meshes/mesh3
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Mesh3 *m = ecs_ensure(world, e, Mesh3);
@@ -68,7 +68,7 @@ void Upload_share_100k(bench_t *b)
 {
     // meshes/mesh3
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Mesh3 *m = ecs_ensure(world, e, Mesh3);

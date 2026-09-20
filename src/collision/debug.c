@@ -234,7 +234,9 @@ void box_collision_debug_extract(
     ecs_world_t *world,
     box_packet_t *p)
 {
-    if (!ecs_id(CollisionSettings) || !p->views.count) {
+    if (!ecs_id(CollisionSettings) || !p->views.count ||
+        ecs_lookup(world, "box.collision.CollisionSettings") != ecs_id(CollisionSettings))
+    {
         goto done;
     }
 

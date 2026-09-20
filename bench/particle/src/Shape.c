@@ -17,7 +17,7 @@ void Shape_resample_mesh_1k_triangles(bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t surface = ecs_new(world);
     Mesh3 *mesh = ecs_ensure(world, surface, Mesh3);
@@ -59,7 +59,7 @@ void Shape_resample_spline(bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxParticle);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t curve = ecs_new(world);
     Spline *spline = ecs_ensure(world, curve, Spline);

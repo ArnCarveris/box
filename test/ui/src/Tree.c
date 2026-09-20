@@ -12,7 +12,7 @@ static ecs_world_t *w;
 void Tree_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
 }
 
 void Tree_teardown(void)

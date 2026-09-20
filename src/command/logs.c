@@ -39,6 +39,9 @@ ECS_COMPONENT_DECLARE(LogBuffer);
 /** Buffer the log hook appends to, NULL when no world captures */
 static box_log_buffer_t *box_log_active;
 
+/** Worlds of the process that hold a log buffer, the lock lives while one does */
+static int32_t box_log_worlds = 0;
+
 /** Guards box_log_active and the buffer it points to */
 static ecs_os_mutex_t box_log_lock;
 
@@ -106,6 +109,10 @@ static void box_log_hook(
 
 /** Uninstall the log hook, close log.txt and free the captured messages.
  *
+ * One world of a process captures the log output, the first that imported the
+ * module; a second world keeps a buffer that stays empty, and the lock lives
+ * until the last world let go of its buffer.
+ *
  * @param buffer The capture state
  */
 static void box_log_buffer_fini(
@@ -118,13 +125,14 @@ static void box_log_buffer_fini(
     ecs_os_mutex_lock(box_log_lock);
     if (box_log_active == buffer) {
         box_log_active = NULL;
+        if (ecs_os_api.log_ == box_log_hook) {
+            ecs_os_api.log_ = box_log_prev;
+            box_log_prev = NULL;
+        }
     }
 
-    if (ecs_os_api.log_ == box_log_hook) {
-        ecs_os_api.log_ = box_log_prev;
-        box_log_prev = NULL;
-    }
-
+    box_log_worlds --;
+    bool last = box_log_worlds == 0;
     ecs_os_mutex_unlock(box_log_lock);
 
     if (buffer->file) {
@@ -137,8 +145,11 @@ static void box_log_buffer_fini(
     }
 
     ecs_os_free(buffer);
-    ecs_os_mutex_free(box_log_lock);
-    box_log_lock = 0;
+    if (last) {
+        ecs_os_mutex_free(box_log_lock);
+        box_log_lock = NULL;
+    }
+
 done:
     return;
 }
@@ -316,12 +327,13 @@ void box_logs_init(
     }
 
     ecs_os_mutex_lock(box_log_lock);
-    ecs_assert(box_log_active == NULL, ECS_INVALID_OPERATION,
-        "only one world can capture log output");
-    box_log_active = buffer;
-    if (ecs_os_api.log_ != box_log_hook) {
-        box_log_prev = ecs_os_api.log_;
-        ecs_os_api.log_ = box_log_hook;
+    box_log_worlds ++;
+    if (!box_log_active) {
+        box_log_active = buffer;
+        if (ecs_os_api.log_ != box_log_hook) {
+            box_log_prev = ecs_os_api.log_;
+            ecs_os_api.log_ = box_log_hook;
+        }
     }
 
     ecs_os_mutex_unlock(box_log_lock);

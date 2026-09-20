@@ -15,7 +15,7 @@ void Extract_static_1_changed(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -55,7 +55,7 @@ void Extract_static_100_changed(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -98,7 +98,7 @@ void Extract_static_1000_changed(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -141,7 +141,7 @@ void Extract_static_1000_changed_parent(bench_t *b)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -187,7 +187,7 @@ void Extract_dynamic_10k(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

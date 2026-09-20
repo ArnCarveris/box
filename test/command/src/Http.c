@@ -19,7 +19,7 @@ static ecs_http_server_t *srv;
 void Http_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     ecs_singleton_set(w, HttpServer, { .port = 27781 });
     srv = box_http_server(w);
     test_assert(srv != NULL);

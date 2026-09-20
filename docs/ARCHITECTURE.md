@@ -29,6 +29,7 @@ Two hard rules keep the concerns apart:
 |---|---|
 | `box.types` | `vec2/3/4`, `mat4`, `rgb` and math helpers |
 | `box.core` | `App` singleton, command line with the `AppOption` entities of an application, process folder, frame loop, CPU budget |
+| `box` | the module every application, test and benchmark imports and the only one: it imports every module below in one fixed order, so every world registers the same entities in the same sequence and the component ids the process globals cache hold in all of them |
 | `box.surface` | `Surface` component; setting it brings up a window or offscreen target; `resolution_scale` divides the pixels the scene is drawn at and reports them as `scaled_*`, and the renderer magnifies that image onto the window; `device_scale` is the framebuffer pixels per point a window reports and a headless run takes |
 | `box.transform` | `Position/Rotation/Scale/WorldTransform`, static vs dynamic propagation, AABB |
 | `box.geometry` | primitive shape components, mesh cache, shape registry; the level ladder of a parametric shape, whose mesh the reduction picks per frame from the projected error of the instance |

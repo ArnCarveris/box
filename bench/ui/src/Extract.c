@@ -67,7 +67,7 @@ void Extract_extract_10k_tree(bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -98,7 +98,7 @@ void Extract_walk_10k_tree(bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -128,7 +128,7 @@ void Extract_extract_10k_static_tree(bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

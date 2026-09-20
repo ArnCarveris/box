@@ -48,7 +48,7 @@ void App_stops_after_frames(void)
 {
     // engine_core/app
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->frames = 5;
     test_int(box_run(world), 0);
@@ -60,7 +60,7 @@ void App_stops_after_timeout(void)
 {
     // engine_core/app
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->timeout = 0.2;
     ecs_time_t start;
@@ -77,7 +77,7 @@ void App_stops_on_quit(void)
 {
     // engine_core/app
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     ECS_SYSTEM(world, QuitAfterTwo, EcsOnUpdate, 0);
     test_int(box_run(world), 0);
     test_int(ecs_singleton_get(world, App)->frame, 2);
@@ -88,7 +88,7 @@ void App_process_dir_created_and_removed(void)
 {
     // engine_core/app
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     const App *app = ecs_singleton_get(world, App);
     test_assert(app->process_dir != NULL);
     test_assert(strncmp(app->process_dir, "/tmp/box/", 9) == 0);
@@ -105,7 +105,7 @@ void App_cpu_budget_slows_loop(void)
 {
     // engine_core/app
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->frames = 200;
     app->cpu_budget = 0.1;
@@ -116,7 +116,7 @@ void App_cpu_budget_slows_loop(void)
     ecs_fini(world);
 
     world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
+    ECS_IMPORT(world, Box);
     app = ecs_singleton_ensure(world, App);
     app->frames = 200;
     ecs_os_get_time(&start);
@@ -131,8 +131,7 @@ void App_headless_default_budget_caps_busy_jobs(void)
 {
     // ore_engine/headless_cpu_cap
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     ECS_SYSTEM(world, SubmitBusyJobs, EcsOnUpdate, 0);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;

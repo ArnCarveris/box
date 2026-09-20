@@ -348,7 +348,9 @@ void box_effects_extract(
         goto done;
     }
 
-    if (!ecs_id(EffectState)) {
+    if (!ecs_id(EffectState) ||
+        ecs_lookup(world, "box.effects.EffectState") != ecs_id(EffectState))
+    {
         goto done;
     }
 

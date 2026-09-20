@@ -66,8 +66,7 @@ void Svg_setup(void)
     w = ecs_init();
     svg_log_prev = ecs_os_api.log_;
     ecs_os_api.log_ = svg_log;
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxTexture);
+    ECS_IMPORT(w, Box);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;

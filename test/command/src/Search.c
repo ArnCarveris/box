@@ -17,7 +17,7 @@ static ecs_entity_t tag;
 void Search_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
 
     point = ecs_struct(w, {
         .entity = ecs_entity(w, { .name = "Point" }),

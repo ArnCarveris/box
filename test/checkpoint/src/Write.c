@@ -24,8 +24,7 @@ void Write_writes_a_file_per_script(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = first }) != 0);
     test_assert(ecs_script(world, { .filename = second }) != 0);
 
@@ -60,8 +59,7 @@ void Write_values_are_updated(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
 
     ecs_entity_t a = ecs_lookup(world, "a");
@@ -98,8 +96,7 @@ void Write_layout_and_comments_are_preserved(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_set(world, ecs_lookup(world, "a"), Position, {0, 0, 1});
 
@@ -133,8 +130,7 @@ void Write_derived_components_are_left_out(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_progress(world, 0);
 
@@ -170,8 +166,7 @@ void Write_component_added_at_runtime_is_written(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_set(world, ecs_lookup(world, "a"), Rotation, {0, 1, 0});
 
@@ -197,8 +192,7 @@ void Write_script_without_a_file_uses_its_name(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -223,8 +217,7 @@ void Write_entity_without_a_statement_is_reported(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -257,8 +250,7 @@ void Write_template_body_entities_are_reported(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -300,8 +292,7 @@ void Write_checkpoint_reloads_into_the_same_state(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t s = ecs_script(world, { .filename = scene });
     test_assert(s != 0);
     ecs_set(world, ecs_lookup(world, "a"), Position, {7, 8, 9});

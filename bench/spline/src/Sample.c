@@ -17,7 +17,7 @@ void Sample_catmull_by_parameter(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);
@@ -51,7 +51,7 @@ void Sample_linear_by_parameter(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);
@@ -86,7 +86,7 @@ void Sample_bezier_by_parameter(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);
@@ -121,7 +121,7 @@ void Sample_catmull_by_distance(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);

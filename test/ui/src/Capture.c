@@ -11,7 +11,7 @@ static ecs_world_t *w;
 void Capture_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
     Surface *s = ecs_singleton_ensure(w, Surface);
     s->width = 960;
     s->height = 540;

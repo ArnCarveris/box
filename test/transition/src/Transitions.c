@@ -11,7 +11,7 @@ void Transitions_map_gives_an_entity_the_private_state(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"
@@ -29,7 +29,7 @@ void Transitions_entity_without_a_map_has_no_state(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Rgb, {10, 20, 30});
     test_assert(!ecs_has(world, e, TransitionState));
@@ -40,7 +40,7 @@ void Transitions_first_assignment_does_not_move(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"
@@ -65,7 +65,7 @@ void Transitions_assignment_starts_a_transition(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"
@@ -92,7 +92,7 @@ void Transitions_transition_reaches_the_target(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"
@@ -118,7 +118,7 @@ void Transitions_delay_holds_the_start_value(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -143,7 +143,7 @@ void Transitions_assignment_replaces_the_transition_in_flight(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -169,7 +169,7 @@ void Transitions_assigned_twice_in_a_frame_starts_from_the_displayed_value(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -192,7 +192,7 @@ void Transitions_linear_is_half_way_at_half_time(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -214,7 +214,7 @@ void Transitions_ease_in_lags_at_half_time(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -234,7 +234,7 @@ void Transitions_ease_out_leads_at_half_time(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -254,7 +254,7 @@ void Transitions_ease_in_out_is_symmetric(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -278,7 +278,7 @@ void Transitions_ease_is_half_way_at_half_time(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -300,7 +300,7 @@ void Transitions_prefab_map_is_inherited_by_an_instance(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -328,7 +328,7 @@ void Transitions_component_without_a_key_is_not_transitioned(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.material\n"
@@ -353,7 +353,7 @@ void Transitions_unsupported_component_has_no_layout(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_has(world, ecs_id(Position), TransitionType));
     test_assert(!ecs_has(world, ecs_id(WorldTransform), TransitionType));
 
@@ -375,7 +375,7 @@ void Transitions_color_bytes_are_interpolated(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"
@@ -400,7 +400,7 @@ void Transitions_transition_value_pair_is_published(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
         "using box.transition\n"
@@ -421,7 +421,7 @@ void Transitions_removing_the_map_removes_the_state(void)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransition);
+    ECS_IMPORT(world, Box);
     test_int(ecs_script_run(world, "test",
         "using box.material\n"
         "using box.transition\n"

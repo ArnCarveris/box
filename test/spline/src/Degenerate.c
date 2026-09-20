@@ -12,7 +12,7 @@ void Degenerate_no_points(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_ensure(w, e, Spline);
@@ -38,7 +38,7 @@ void Degenerate_a_single_point(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -67,7 +67,7 @@ void Degenerate_two_identical_points(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -97,7 +97,7 @@ void Degenerate_a_bezier_without_a_full_segment(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -125,7 +125,7 @@ void Degenerate_a_loop_of_two_points(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -155,7 +155,7 @@ void Degenerate_sampling_an_entity_without_a_spline(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     box_spline_sample_t sample;

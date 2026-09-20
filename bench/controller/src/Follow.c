@@ -13,7 +13,7 @@ void Follow_update_100_followers(bench_t *b)
 {
     // ore_engine/follow_camera
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, Box);
 
     int32_t i;
     for (i = 0; i < BENCH_FOLLOW_COUNT; i ++) {

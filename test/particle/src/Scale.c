@@ -40,7 +40,7 @@ void Scale_the_reach_covers_the_flight_of_a_particle(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, ParticleEmitter, {
@@ -61,7 +61,7 @@ void Scale_the_reach_covers_the_spawn_volume(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, ParticleEmitter, {
@@ -80,7 +80,7 @@ void Scale_the_reach_reaches_the_block(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -253,7 +253,7 @@ void Scale_the_maximum_budget_is_split_between_emitters(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -281,7 +281,7 @@ void Scale_an_emitter_under_the_budget_keeps_its_maximum(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -300,7 +300,7 @@ void Scale_the_spawn_budget_thins_the_next_frame(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -325,7 +325,7 @@ void Scale_a_culled_emitter_is_paused_and_spawns_nothing(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -358,7 +358,7 @@ void Scale_a_halved_emitter_steps_every_other_frame(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -399,7 +399,7 @@ void Scale_the_span_grows_with_the_particles_spawned(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -423,7 +423,7 @@ void Scale_the_span_is_capped_by_the_pool(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -447,7 +447,7 @@ void Scale_a_reset_puts_the_span_back(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -477,7 +477,7 @@ void Scale_the_stats_count_the_emitters_and_their_bytes(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -504,7 +504,7 @@ void Scale_the_stats_count_a_culled_emitter(void)
 {
     // particles/scale
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

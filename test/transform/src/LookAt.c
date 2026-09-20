@@ -11,7 +11,7 @@ void LookAt_target_in_front(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, LookAt, {0, 0, 10});
@@ -28,7 +28,7 @@ void LookAt_target_behind(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 5});
     ecs_set(world, e, LookAt, {0, 0, 0});
@@ -46,7 +46,7 @@ void LookAt_target_below(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 5, 0});
     ecs_set(world, e, LookAt, {0, 0, 0});
@@ -63,7 +63,7 @@ void LookAt_target_above(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, -5, 0});
     ecs_set(world, e, LookAt, {0, 0, 0});
@@ -80,7 +80,7 @@ void LookAt_target_to_the_side(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {3, 0, 0});
     ecs_set(world, e, LookAt, {0, 0, 0});
@@ -99,7 +99,7 @@ void LookAt_rotation_round_trips(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {2, 3, 4});
     ecs_set(world, e, LookAt, {-5, 1, 7});
@@ -123,7 +123,7 @@ void LookAt_follows_moving_entity(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, LookAt, {10, 0, 0});
@@ -144,7 +144,7 @@ void LookAt_child_of_translated_parent(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new(world);
@@ -165,7 +165,7 @@ void LookAt_dynamic_entity(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
     ecs_set(world, e, Position, {0, 0, 5});

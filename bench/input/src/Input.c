@@ -13,7 +13,7 @@ void Input_update_1000_events(bench_t *b)
 {
     // input/device_layer
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, Box);
     Surface *surface = ecs_singleton_ensure(world, Surface);
     surface->width = 1920;
     surface->height = 1080;

@@ -11,7 +11,7 @@ static ecs_world_t *w;
 void Layers_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxInput);
+    ECS_IMPORT(w, Box);
 }
 
 void Layers_teardown(void)

@@ -16,7 +16,7 @@ void Dynamic_propagate_subtree(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_SUBTREE_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_SUBTREE_COUNT; i ++) {

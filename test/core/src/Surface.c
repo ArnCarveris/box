@@ -12,8 +12,7 @@ static ecs_world_t* surface_world(
     int32_t frames)
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = frames;

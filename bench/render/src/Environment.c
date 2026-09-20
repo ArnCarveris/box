@@ -11,7 +11,7 @@ void Environment_extract(bench_t *b)
 {
     // lighting/ibl
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     ecs_entity_t camera = ecs_new(world);

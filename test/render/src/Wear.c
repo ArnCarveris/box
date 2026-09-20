@@ -16,7 +16,7 @@ static box_packet_t packet;
 void Wear_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;

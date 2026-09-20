@@ -30,8 +30,7 @@ void Incremental_instantiate_10k(bench_t *b)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->enabled = false;
     ecs_singleton_modified(world, ScriptSettings);
@@ -67,8 +66,7 @@ void Incremental_order_100k(bench_t *b)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0.0001;

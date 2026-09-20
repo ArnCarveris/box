@@ -13,7 +13,7 @@ void Camera_update_100_controllers(bench_t *b)
 {
     // controllers/camera_controller
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, Box);
 
     int32_t i;
     for (i = 0; i < BENCH_CONTROLLER_COUNT; i ++) {

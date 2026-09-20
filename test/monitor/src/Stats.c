@@ -31,7 +31,7 @@ void Stats_setting_the_component_imports_the_addon(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_lookup(world, "flecs.stats") == 0);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001});
     test_assert(ecs_lookup(world, "flecs.stats") != 0);
@@ -44,7 +44,7 @@ void Stats_collects_after_the_period(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001});
     int32_t i;
     for (i = 0; i < 5; i ++) {
@@ -65,7 +65,7 @@ void Stats_period_holds_back_the_collection(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 100.0});
     int32_t i;
     for (i = 0; i < 10; i ++) {
@@ -82,7 +82,7 @@ void Stats_entity_count_follows_the_world(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001});
     ecs_progress(world, 0.01f);
     ecs_progress(world, 0.01f);
@@ -103,7 +103,7 @@ void Stats_frame_time_window_is_averaged(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001, .history = 1});
     ECS_SYSTEM(world, BoxStatsBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -122,7 +122,7 @@ void Stats_slowest_systems_are_listed(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001});
     ECS_SYSTEM(world, BoxStatsBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -147,7 +147,7 @@ void Stats_removing_the_component_stops_collection(void)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, EcsStats, {.period_s = 0.001});
     ecs_progress(world, 0.01f);
     ecs_progress(world, 0.01f);

@@ -54,7 +54,7 @@ void Text_layout_1000_glyphs(bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_text_tree(world);
     char value[BENCH_TEXT_CHARS + 1];
     int32_t turn = 0;
@@ -89,7 +89,7 @@ void Text_layout_1000_glyphs_unchanged(bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_text_tree(world);
 
     box_ui_update(world);
@@ -111,7 +111,7 @@ void Text_measure_1000_glyphs(bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     char value[BENCH_TEXT_CHARS + 1];
     int32_t c;
     for (c = 0; c < BENCH_TEXT_CHARS; c ++) {

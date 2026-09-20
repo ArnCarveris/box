@@ -13,7 +13,7 @@ void Person_update_100_characters(bench_t *b)
 {
     // controllers/first_person
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, Box);
 
     int32_t i;
     for (i = 0; i < BENCH_PERSON_COUNT; i ++) {
@@ -54,7 +54,7 @@ void Person_walk_through_1m_colliders(bench_t *b)
 {
     // collision/controller_collision
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxController);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     int32_t i, j;

@@ -14,7 +14,7 @@ static ecs_world_t *w;
 void CommandScript_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
 }
 
 void CommandScript_teardown(void)

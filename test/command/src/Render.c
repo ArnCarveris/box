@@ -18,8 +18,7 @@ static ecs_entity_t session;
 void Render_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     session = ecs_entity(w, {
         .name = "agent0", .parent = ecs_lookup(w, "terminals")
     });

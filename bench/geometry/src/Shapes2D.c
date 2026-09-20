@@ -73,7 +73,7 @@ void Shapes2D_extract_1000_borders(bench_t *b)
 {
     // shapes_2d/primitives
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     ecs_entity_t entities[BENCH_SHAPES2D_RECTS];
     int32_t i;

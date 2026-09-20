@@ -12,7 +12,7 @@ void Instances_static_1m_renders_a_frame(void)
 {
     // culling/instance_cap
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 900, -900});
     ecs_set(w, cam, LookAt, {0, 0, 0});

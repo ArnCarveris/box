@@ -11,8 +11,7 @@ void Debug_off_emits_no_lines(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
@@ -37,8 +36,7 @@ void Debug_sphere_draws_three_circles(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugColliders
@@ -67,8 +65,7 @@ void Debug_box_draws_twelve_edges(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugColliders
@@ -97,8 +94,7 @@ void Debug_capsule_draws_two_circles_and_four_lines(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugColliders
@@ -127,8 +123,7 @@ void Debug_root_bounds_draw_a_box(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugBounds
@@ -158,8 +153,7 @@ void Debug_all_draws_colliders_and_bounds(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugAll
@@ -189,8 +183,7 @@ void Debug_collider_outside_the_view_is_skipped(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugColliders
@@ -219,8 +212,7 @@ void Debug_lines_are_cleared_between_packets(void)
 {
     // collision/debug_draw
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true,
         .debug = DebugColliders

@@ -60,7 +60,7 @@ static void bench_hierarchy_build_case(
     while (bench_iter(b)) {
         bench_pause(b);
         ecs_world_t *world = ecs_init();
-        ECS_IMPORT(world, BoxTransform);
+        ECS_IMPORT(world, Box);
         ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_HIERARCHY_COUNT);
         bench_resume(b);
 
@@ -87,7 +87,7 @@ static void bench_hierarchy_propagate_case(
     bool parent_component)
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_HIERARCHY_COUNT);
     bench_hierarchy_build(world, tree, BENCH_HIERARCHY_COUNT, parent_component);
     double tables = (double)ecs_get_world_info(world)->table_count;
@@ -137,7 +137,7 @@ void Hierarchy_dynamic_subtree_parent(bench_t *b)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_HIERARCHY_SUBTREE);
     bench_hierarchy_build(world, tree, BENCH_HIERARCHY_SUBTREE, true);
 

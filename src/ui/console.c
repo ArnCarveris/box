@@ -293,7 +293,7 @@ static void box_ui_console_open(
     Console *console,
     ConsoleImpl *impl)
 {
-    if (!ecs_id(Terminal)) {
+    if (!ecs_id(Terminal) || ecs_lookup(world, "box.command.Terminal") != ecs_id(Terminal)) {
         ecs_import_c(world, BoxCommandImport, "BoxCommand");
         console = ecs_get_mut(world, ecs_id(Console), Console);
         impl = box_ui_console_state(world);

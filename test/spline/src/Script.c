@@ -12,7 +12,7 @@ void Script_points_from_a_script(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box.spline\n"
@@ -41,8 +41,7 @@ void Script_position_function(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
-    ECS_IMPORT(w, BoxTransform);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box\n"
@@ -72,8 +71,7 @@ void Script_point_at_function(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
-    ECS_IMPORT(w, BoxTransform);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box\n"
@@ -112,8 +110,7 @@ void Script_length_function(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
-    ECS_IMPORT(w, BoxTransform);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box\n"

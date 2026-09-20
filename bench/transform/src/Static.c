@@ -16,7 +16,7 @@ void Static_set_leaf_position(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_TREE_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_TREE_COUNT; i ++) {
@@ -49,7 +49,7 @@ void Static_set_root_position(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_TREE_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_TREE_COUNT; i ++) {
@@ -82,7 +82,7 @@ void Static_reparent(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = ecs_os_malloc_n(ecs_entity_t, BENCH_TREE_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_TREE_COUNT; i ++) {

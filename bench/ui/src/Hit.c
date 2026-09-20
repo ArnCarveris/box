@@ -53,7 +53,7 @@ void Hit_hit_10k_tree(bench_t *b)
 {
     // ui/ui_events
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_hit_tree(world);
 
     box_ui_update(world);
@@ -72,7 +72,7 @@ void Hit_hit_10k_tree_beside_it(bench_t *b)
 {
     // ui/ui_events
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_hit_tree(world);
 
     box_ui_update(world);

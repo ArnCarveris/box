@@ -14,7 +14,7 @@ void Cache_hit(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_mesh_key_t key = { .kind = BoxShapeSphere, .i0 = 32, .smooth = true };
     vec3 bounds_min, bounds_max;
     int32_t i;

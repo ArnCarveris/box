@@ -17,6 +17,21 @@ typedef struct box_collider_local_t {
     vec3 half;         /**< Half extents, or radius in x and half length in y */
 } box_collider_local_t;
 
+/** Test whether the world registered the shapes of box.geometry.
+ *
+ * The cached id of a shape may belong to another world, so it counts only when
+ * the entity of that name in this world is the one the id names.
+ *
+ * @param world The world
+ * @return true when Sphere and the other shapes exist in this world
+ */
+static bool box_collision_has_shapes(
+    const ecs_world_t *world)
+{
+    return ecs_id(Sphere) != 0 &&
+        ecs_lookup(world, "box.geometry.Sphere") == ecs_id(Sphere);
+}
+
 /** Derive a collider from the primitive shape of an entity.
  *
  * @param world The world
@@ -35,7 +50,7 @@ static bool box_collider_of_shape(
 {
     bool result = true;
     center[0] = vec3_new(0, 0, 0);
-    if (!ecs_id(Sphere)) {
+    if (!box_collision_has_shapes(world)) {
         result = false;
         goto done;
     }
@@ -401,7 +416,7 @@ void box_collision_shapes_init(
     ecs_world_t *world,
     box_collision_state_t *state)
 {
-    if (state->shapes || !ecs_id(Sphere)) {
+    if (state->shapes || !box_collision_has_shapes(world)) {
         goto done;
     }
 

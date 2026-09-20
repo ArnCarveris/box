@@ -12,8 +12,7 @@ void Colliders_sphere_shape_derives_sphere(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Sphere, {16, true, 2});
@@ -35,8 +34,7 @@ void Colliders_ico_sphere_derives_sphere(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, IcoSphere, {2, true, 3});
@@ -55,8 +53,7 @@ void Colliders_box_shape_derives_box(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 4, 6});
@@ -77,8 +74,7 @@ void Colliders_rounded_box_derives_box(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, RoundedBox, {2, 2, 2, 0.2f, 3});
@@ -97,8 +93,7 @@ void Colliders_capsule_shape_derives_capsule(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Capsule, {16, true, 4, 0.5f});
@@ -118,8 +113,7 @@ void Colliders_other_shape_derives_aabb(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Cylinder, {16, true, 2, 1});
@@ -139,7 +133,7 @@ void Colliders_bounds_without_shape_give_aabb(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, AABB, {{0, 0, 0}, {2, 4, 6}});
@@ -160,7 +154,7 @@ void Colliders_empty_bounds_give_no_collider(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 2, 3});
@@ -175,7 +169,7 @@ void Colliders_no_collider_opts_out(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, NoCollider);
@@ -191,7 +185,7 @@ void Colliders_removing_no_collider_restores(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, NoCollider);
@@ -211,7 +205,7 @@ void Colliders_adding_no_collider_removes(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, AABB, {{0, 0, 0}, {2, 2, 2}});
@@ -230,8 +224,7 @@ void Colliders_sphere_override_wins_over_shape(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 2, 2});
@@ -252,8 +245,7 @@ void Colliders_box_override_wins_over_shape(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Sphere, {16, true, 1});
@@ -273,8 +265,7 @@ void Colliders_capsule_override_wins_over_shape(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Sphere, {16, true, 1});
@@ -295,7 +286,7 @@ void Colliders_scale_applied_to_sphere(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -314,7 +305,7 @@ void Colliders_scale_applied_to_box(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -335,7 +326,7 @@ void Colliders_scale_applied_to_capsule(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -355,7 +346,7 @@ void Colliders_rotation_turns_box_axes(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -376,7 +367,7 @@ void Colliders_move_updates_collider(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
@@ -396,8 +387,7 @@ void Colliders_shape_change_updates_collider(void)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Sphere, {16, true, 1});
@@ -417,9 +407,7 @@ void Colliders_rendered_bounds_derive_aabb(void)
 {
     // collision/aabb_modified
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});

@@ -12,7 +12,7 @@ void Sky_extract_steady(bench_t *b)
 {
     // sky/atmosphere
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     ecs_entity_t camera = ecs_new(world);
@@ -48,7 +48,7 @@ void Sky_extract_moving_sun(bench_t *b)
 {
     // sky/atmosphere
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     ecs_entity_t camera = ecs_new(world);
@@ -87,7 +87,7 @@ void Sky_extract_moon_and_stars(bench_t *b)
 {
     // sky/celestial
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     ecs_entity_t camera = ecs_new(world);
@@ -139,7 +139,7 @@ void Sky_advance_the_clock(bench_t *b)
 {
     // sky/time_of_day
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSky);
+    ECS_IMPORT(world, Box);
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {0, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 3});
@@ -179,7 +179,7 @@ void Sky_extract_sky_fog(bench_t *b)
 {
     // sky/sky_ibl
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     ecs_entity_t camera = ecs_new(world);

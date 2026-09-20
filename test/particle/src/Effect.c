@@ -13,7 +13,7 @@ static ecs_entity_t spark;
 void Effect_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     spark = ecs_entity(w, { .name = "Spark" });
     ecs_add_id(w, spark, EcsPrefab);
     ecs_set(w, spark, ParticleEmitter, {

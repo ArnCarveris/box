@@ -27,7 +27,7 @@ void Bake_invalidate_one_of_100k(bench_t *b)
 {
     // lighting/light_baking
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -89,7 +89,7 @@ void Bake_probe_count_100k(bench_t *b)
 {
     // lighting/bake_resolution
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -137,7 +137,7 @@ void Bake_churn_1000_of_100k(bench_t *b)
 {
     // lighting/bake_churn
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

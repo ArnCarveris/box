@@ -55,7 +55,7 @@ void Roots_idle_100k(bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *roots = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     ecs_entity_t *first = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     bench_roots_build(world, roots, first, false);
@@ -76,7 +76,7 @@ void Roots_update_1k_of_100k(bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *roots = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     ecs_entity_t *first = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     bench_roots_build(world, roots, first, false);
@@ -105,7 +105,7 @@ void Roots_move_1k_rigid_of_100k(bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *roots = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     ecs_entity_t *first = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_COUNT);
     bench_roots_build(world, roots, first, true);
@@ -133,7 +133,7 @@ void Roots_instantiate_1k(bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t *roots = ecs_os_malloc_n(ecs_entity_t, BENCH_ROOT_CHANGED);
 

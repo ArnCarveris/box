@@ -13,7 +13,7 @@ static ecs_world_t *w;
 void Codes_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxInput);
+    ECS_IMPORT(w, Box);
 }
 
 void Codes_teardown(void)

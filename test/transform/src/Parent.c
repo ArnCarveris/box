@@ -19,7 +19,7 @@ void Parent_child_of_moved_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -39,7 +39,7 @@ void Parent_set_component_parents_entity(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new(world);
@@ -57,7 +57,7 @@ void Parent_grandchild_of_moved_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float a = 1.5707963f;
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {1, 0, 0});
@@ -80,7 +80,7 @@ void Parent_scale_inherited_three_levels(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Scale, {2, 2, 2});
@@ -102,7 +102,7 @@ void Parent_child_set_does_not_move_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {5, 5, 5});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -119,7 +119,7 @@ void Parent_reparent_to_new_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -141,7 +141,7 @@ void Parent_remove_parent_makes_root(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 20, 30});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -161,7 +161,7 @@ void Parent_manual_transform_parent_propagates(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, ManualTransform);
     ecs_set(world, parent, WorldTransform, { .m = {{
@@ -179,7 +179,7 @@ void Parent_one_on_set_for_new_child(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -201,7 +201,7 @@ void Parent_only_changed_subtree_written(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {1, 0, 0});
     ecs_entity_t b = ecs_new_w_parent(world, a, "b");
@@ -226,7 +226,7 @@ void Parent_delete_parent_deletes_subtree(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {1, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -250,7 +250,7 @@ void Parent_deep_chain(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t chain[5];
     int32_t i;
     for (i = 0; i < 5; i ++) {
@@ -271,7 +271,7 @@ void Parent_dynamic_parent_static_child(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, DynamicTransform);
     ecs_set(world, parent, Position, {1, 0, 0});
@@ -292,7 +292,7 @@ void Parent_static_parent_dynamic_child(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -312,7 +312,7 @@ void Parent_dynamic_subtree_under_static_root(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {10, 0, 0});
     ecs_entity_t mover = ecs_new_w_parent(world, root, "mover");
@@ -335,7 +335,7 @@ void Parent_dynamic_node_between_static_levels(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {1, 0, 0});
     ecs_entity_t mid = ecs_new_w_parent(world, root, "mid");
@@ -358,7 +358,7 @@ void Parent_dynamic_emits_no_events(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, DynamicTransform);
     ecs_set(world, parent, Position, {1, 0, 0});
@@ -383,7 +383,7 @@ void Parent_add_then_remove_dynamic(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, root, "child");
@@ -406,7 +406,7 @@ void Parent_prefab_tree_instantiation(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t prefab = ecs_entity(world, { .name = "Tree" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Position, {1, 0, 0});
@@ -453,7 +453,7 @@ void Parent_lookat_under_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
@@ -473,7 +473,7 @@ void Parent_name_lookup_through_parent(void)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
     ecs_entity_t b = ecs_new_w_parent(world, a, "b");
     ecs_entity_t c = ecs_new_w_parent(world, b, "c");

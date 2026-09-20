@@ -56,7 +56,7 @@ void Layout_layout_10k_tree(bench_t *b)
 {
     // ui/layout
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_layout_tree(world);
 
     box_ui_update(world);
@@ -78,7 +78,7 @@ void Layout_layout_10k_unchanged(bench_t *b)
 {
     // ui/layout
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_layout_tree(world);
 
     box_ui_update(world);
@@ -139,7 +139,7 @@ void Layout_layout_one_moved_of_10k(bench_t *b)
 {
     // ui/layout_subtree
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_fixed_tree(world);
 
     box_ui_update(world);
@@ -209,7 +209,7 @@ void Layout_layout_10k_scrolled_tree(bench_t *b)
 {
     // ore_engine/ui_scroll
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_scrolled_tree(world);
 
     box_ui_update(world);
@@ -231,7 +231,7 @@ void Layout_layout_10k_scrolled_offset(bench_t *b)
 {
     // ore_engine/ui_scroll
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     ecs_entity_t *tree = bench_ui_scrolled_tree(world);
 
     box_ui_update(world);

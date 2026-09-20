@@ -15,7 +15,7 @@ void Effects_extract_chain(bench_t *b)
 {
     // effects/shader_graph
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

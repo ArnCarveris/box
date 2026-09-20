@@ -13,7 +13,7 @@ void Forces_an_emitter_without_forces_carries_none(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -35,7 +35,7 @@ void Forces_gravity_adds_to_the_acceleration_of_the_emitter(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -57,7 +57,7 @@ void Forces_wind_drag_and_turbulence_reach_the_block(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -82,7 +82,7 @@ void Forces_the_forces_of_the_world_reach_every_emitter(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -111,7 +111,7 @@ void Forces_a_referenced_entity_lends_its_forces(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -134,7 +134,7 @@ void Forces_the_three_sources_are_summed(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -160,7 +160,7 @@ void Forces_authored_forces_fall_at_the_gravity_of_earth(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box.particle\n"

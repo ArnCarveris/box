@@ -14,7 +14,7 @@ static box_packet_t packet;
 void Extract_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -490,8 +490,10 @@ void Extract_dynamic_parent_node_children_dynamic(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 0);
     test_int(packet.dynamic_instances.count, 2);
-    box_instance_t *inst = box_vec_at(&packet.dynamic_instances, 1);
-    test_flt(inst->transform[3], 11);
+    box_instance_t *first = box_vec_at(&packet.dynamic_instances, 0);
+    box_instance_t *second = box_vec_at(&packet.dynamic_instances, 1);
+    test_assert(first->transform[3] == 11 || second->transform[3] == 11);
+    test_assert(first->transform[3] == 10 || second->transform[3] == 10);
 }
 
 void Extract_mixed_tree_only_dynamic_reuploaded(void)

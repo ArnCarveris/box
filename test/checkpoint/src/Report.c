@@ -14,8 +14,7 @@ void Report_unowned_entity_is_reported(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -39,8 +38,7 @@ void Report_owned_entity_is_not_reported(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -61,8 +59,7 @@ void Report_entity_without_a_value_is_not_reported(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t tag = ecs_entity(world, { .name = "Marker" });
     ecs_entity_t e = ecs_entity(world, { .name = "marked" });
@@ -83,8 +80,7 @@ void Report_command_returns_the_folder(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -121,8 +117,7 @@ void Report_command_reports_an_unowned_entity(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -146,8 +141,7 @@ void Report_command_takes_a_name(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -177,8 +171,7 @@ void Report_a_script_under_a_module_is_not_checkpointed(void)
 {
     // ore_engine/ui_canonical
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_lookup(world, "box.ui.widgets_script") != 0);
     test_assert(ecs_lookup(world, "box.ui.widgets.Button") != 0);
 

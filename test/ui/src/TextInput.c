@@ -13,8 +13,7 @@ static ecs_entity_t element;
 void TextInput_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     Surface *s = ecs_singleton_ensure(w, Surface);
     s->width = 960;
     s->height = 540;

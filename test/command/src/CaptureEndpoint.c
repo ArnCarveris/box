@@ -17,8 +17,7 @@ static ecs_entity_t session;
 void CaptureEndpoint_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     ecs_singleton_set(w, HttpServer, { .port = 27791 });
     srv = box_http_server(w);
     test_assert(srv != NULL);

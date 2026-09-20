@@ -14,7 +14,7 @@ static ecs_entity_t leaf_tag;
 void Events_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
     Surface *s = ecs_singleton_ensure(w, Surface);
     s->width = 960;
     s->height = 540;

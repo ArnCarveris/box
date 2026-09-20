@@ -13,7 +13,7 @@ void Events_resume_100_waiters(bench_t *b)
 {
     // input/script_events
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, Box);
     ecs_script(world, { .code =
         "using flecs.script\n"
         "using box.input\n"

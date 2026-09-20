@@ -12,7 +12,7 @@ static ecs_world_t *w;
 void Layout_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
 }
 
 void Layout_teardown(void)

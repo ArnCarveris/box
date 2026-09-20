@@ -59,7 +59,7 @@ void Cpu_absent_monitor_is_not_sampled(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     int32_t i;
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0.01f);
@@ -73,7 +73,7 @@ void Cpu_sample_reports_the_cores(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, CpuMonitor);
     test_flt(ecs_singleton_get(world, CpuMonitor)->window_s, 1.0);
     ecs_progress(world, 0.01f);
@@ -88,7 +88,7 @@ void Cpu_busy_loop_raises_the_process_percent(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CpuMonitor, {.window_s = 0.02});
     ECS_SYSTEM(world, BoxTestIdle, EcsOnUpdate, 0);
     int32_t i;
@@ -113,7 +113,7 @@ void Cpu_system_percent_stays_in_range(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, CpuMonitor);
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -134,7 +134,7 @@ void Cpu_short_window_follows_the_load(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CpuMonitor, {.window_s = 0.005});
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -150,7 +150,7 @@ void Cpu_long_window_lags_the_load(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CpuMonitor, {.window_s = 1000.0});
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -166,7 +166,7 @@ void Cpu_removing_the_monitor_stops_sampling(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CpuMonitor, {.window_s = 0.005});
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     int32_t i;
@@ -192,8 +192,7 @@ void Cpu_budget_sleep_is_published(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, CpuMonitor);
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     App *app = ecs_singleton_ensure(world, App);
@@ -208,8 +207,7 @@ void Cpu_budget_slows_a_synthetic_load(void)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, CpuMonitor);
     ECS_SYSTEM(world, BoxTestBurn, EcsOnUpdate, 0);
     App *app = ecs_singleton_ensure(world, App);
@@ -222,8 +220,7 @@ void Cpu_budget_slows_a_synthetic_load(void)
     ecs_fini(world);
 
     world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, CpuMonitor);
     ECS_SYSTEM(world, BoxTestLoad, EcsOnUpdate, 0);
     app = ecs_singleton_ensure(world, App);

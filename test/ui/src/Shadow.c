@@ -12,7 +12,7 @@ static ecs_world_t *w;
 void Shadow_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
 }
 
 void Shadow_teardown(void)

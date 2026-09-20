@@ -15,7 +15,7 @@ void Modulators_extract_10k_plain_sun(bench_t *b)
 {
     // ore_engine/cloud_shadows
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -64,7 +64,7 @@ void Modulators_extract_10k_modulated_sun(bench_t *b)
 {
     // ore_engine/cloud_shadows
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

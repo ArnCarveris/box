@@ -13,7 +13,7 @@ static ecs_world_t *w;
 void Hit_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
+    ECS_IMPORT(w, Box);
 }
 
 void Hit_teardown(void)

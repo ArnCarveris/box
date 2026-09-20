@@ -35,7 +35,7 @@ static ecs_world_t* bench_debug_world(
     CollisionDebug debug)
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, CollisionSettings, {
         .margin = 0.25f, .dynamic = true, .enabled = true, .debug = debug
     });

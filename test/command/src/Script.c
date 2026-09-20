@@ -16,7 +16,7 @@ static char *path;
 void Script_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     ecs_entity(w, { .name = "Spin" });
     session = ecs_entity(w, { .name = "agent0" });
     ecs_add(w, session, Terminal);

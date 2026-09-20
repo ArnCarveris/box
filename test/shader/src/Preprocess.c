@@ -15,7 +15,7 @@ static box_shader_result_t result;
 void Preprocess_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     result.source = NULL;
     result.error = NULL;
 }

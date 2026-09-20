@@ -31,7 +31,7 @@ void Priority_higher_priority_runs_first(void)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     priority_count = 0;
 
     JobSettings *settings = ecs_singleton_ensure(world, JobSettings);
@@ -65,7 +65,7 @@ void Priority_near_the_eye_runs_first(void)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     priority_count = 0;
 
     JobSettings *settings = ecs_singleton_ensure(world, JobSettings);
@@ -101,7 +101,7 @@ void Priority_eye_is_taken_at_submit_time(void)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     priority_count = 0;
 
     JobSettings *settings = ecs_singleton_ensure(world, JobSettings);
@@ -135,7 +135,7 @@ void Priority_prioritize_near_off_keeps_submit_order(void)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     priority_count = 0;
 
     JobSettings *settings = ecs_singleton_ensure(world, JobSettings);
@@ -171,7 +171,7 @@ void Priority_single_worker_runs_in_priority_order(void)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     priority_count = 0;
     priority_gate = 0;
 

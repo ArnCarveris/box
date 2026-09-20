@@ -11,7 +11,7 @@ void View_extract_two_views(bench_t *b)
 {
     // views/view
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

@@ -15,7 +15,7 @@ static ecs_entity_t person;
 void Person_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxController);
+    ECS_IMPORT(w, Box);
     person = ecs_entity(w, { .name = "player" });
     ecs_add(w, person, FirstPersonController);
 }

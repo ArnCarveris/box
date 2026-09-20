@@ -14,7 +14,7 @@ void Table_build_64_segments(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);
@@ -47,7 +47,7 @@ void Table_rebuild_on_set(bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t e = ecs_new(world);
     Spline *s = ecs_ensure(world, e, Spline);

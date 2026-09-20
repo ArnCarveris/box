@@ -14,7 +14,7 @@ void Dispatch_help(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, Box);
     ecs_entity_t session = ecs_entity(world, { .name = "bench" });
     ecs_add(world, session, Terminal);
 
@@ -33,8 +33,7 @@ void Dispatch_ls_scope(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t scope = ecs_entity(world, { .name = "scene" });
     int32_t i;
     for (i = 0; i < BENCH_SCOPE_COUNT; i ++) {
@@ -63,7 +62,7 @@ void Dispatch_path_lookup(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, Box);
     ecs_entity(world, { .name = "one.two.three.four.five" });
     ecs_entity_t session = ecs_entity(world, { .name = "bench" });
     ecs_add(world, session, Terminal);
@@ -84,8 +83,7 @@ void Dispatch_set_expression(bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCommand);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t thing = ecs_entity(world, { .name = "thing" });
     ecs_add(world, thing, Position);
     ecs_entity_t session = ecs_entity(world, { .name = "bench" });

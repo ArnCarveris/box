@@ -12,7 +12,7 @@ void Cache_info_is_written_on_set(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -44,7 +44,7 @@ void Cache_table_is_rebuilt_when_the_points_change(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -79,7 +79,7 @@ void Cache_table_is_rebuilt_when_the_type_changes(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -106,7 +106,7 @@ void Cache_table_is_removed_with_the_spline(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -132,7 +132,7 @@ void Cache_instance_gets_its_own_table(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(w, EcsPrefab);
     Spline *s = ecs_ensure(w, prefab, Spline);
@@ -159,7 +159,7 @@ void Cache_deleting_the_curve_removes_it(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);

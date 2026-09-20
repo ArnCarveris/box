@@ -11,7 +11,7 @@ void Emitter_defaults_are_a_white_upward_stream(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_add(w, e, ParticleEmitter);
@@ -40,7 +40,7 @@ void Emitter_emitter_gets_a_transform_and_its_bookkeeping(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_add(w, e, ParticleEmitter);
@@ -60,7 +60,7 @@ void Emitter_authored_members_keep_the_other_defaults(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box.particle\n"
@@ -87,7 +87,7 @@ void Emitter_shaders_are_created_with_the_first_emitter(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_add(w, e, ParticleEmitter);
@@ -109,7 +109,7 @@ void Emitter_a_world_without_an_emitter_compiles_no_shader(void)
 {
     // particles/emitter
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_lookup(w, "box.particle.shaders.particle_sim"), 0);
 

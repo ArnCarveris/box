@@ -13,8 +13,7 @@ void Restore_scene_500(bench_t *b)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     ecs_strbuf_appendstr(&buf, "using box.transform\n\n");

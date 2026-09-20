@@ -12,7 +12,7 @@ void Playback_an_emitter_without_a_playback_plays(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -34,7 +34,7 @@ void Playback_a_playback_starts_out_playing(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -59,7 +59,7 @@ void Playback_stopping_ends_the_emission(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -81,7 +81,7 @@ void Playback_a_stopped_emitter_keeps_its_particles_moving(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -103,7 +103,7 @@ void Playback_pausing_freezes_the_pool(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -126,7 +126,7 @@ void Playback_playing_again_carries_on_from_the_pause(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -157,7 +157,7 @@ void Playback_the_clock_only_runs_while_the_emitter_plays(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -191,7 +191,7 @@ void Playback_starting_a_stopped_emitter_rewinds_its_clock(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -224,7 +224,7 @@ void Playback_a_pause_and_a_play_keep_the_clock(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -256,7 +256,7 @@ void Playback_reset_empties_the_pool_and_clears_the_trigger(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -290,7 +290,7 @@ void Playback_reset_rewinds_the_clock(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -317,7 +317,7 @@ void Playback_a_burst_without_a_time_goes_off_once(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -342,7 +342,7 @@ void Playback_a_burst_goes_off_at_its_time(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -376,7 +376,7 @@ void Playback_a_burst_repeats_on_its_period(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -403,7 +403,7 @@ void Playback_a_burst_repeats_while_the_emitter_plays(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -430,7 +430,7 @@ void Playback_a_burst_runs_alongside_the_rate(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -455,7 +455,7 @@ void Playback_a_burst_is_capped_by_the_pool(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -475,7 +475,7 @@ void Playback_a_burst_on_a_child_reaches_its_emitter(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -496,7 +496,7 @@ void Playback_two_schedules_of_an_emitter_add_up(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -518,7 +518,7 @@ void Playback_a_stopped_emitter_holds_its_schedule(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -546,7 +546,7 @@ void Playback_a_reset_replays_the_schedule(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -598,7 +598,7 @@ void Playback_the_script_functions_drive_the_playback(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, ParticleEmitter, {.max = 100, .rate = 60});
@@ -629,7 +629,7 @@ void Playback_a_script_function_answers_an_entity_without_an_emitter(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     ecs_bool_t ok = true;
@@ -648,7 +648,7 @@ void Playback_the_script_clock_reads_the_playback(void)
 {
     // particles/control
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

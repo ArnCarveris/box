@@ -25,7 +25,7 @@ void Reduce_select_10k_still(bench_t *b)
 {
     // lod/primitive_reduction
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_lod_ladder_t ladder;
     uint32_t handles[BOX_LOD_LEVELS];
@@ -100,7 +100,7 @@ void Reduce_select_10k_walk(bench_t *b)
 {
     // lod/primitive_reduction
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxGeometry);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     ecs_entity_t *field = ecs_os_malloc_n(ecs_entity_t, BENCH_FIELD_COUNT);
     ecs_entity_t camera;

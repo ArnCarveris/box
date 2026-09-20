@@ -13,8 +13,7 @@ static ecs_entity_t player;
 void Follow_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
-    ECS_IMPORT(w, BoxController);
+    ECS_IMPORT(w, Box);
     player = ecs_entity(w, { .name = "player" });
     ecs_set(w, player, Position, {0, 0, 0});
     camera = ecs_entity(w, { .name = "camera" });

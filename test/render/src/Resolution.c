@@ -15,7 +15,7 @@ static box_packet_t packet;
 void Resolution_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
+    ECS_IMPORT(w, Box);
     box_packet_init(&packet);
     packet.width = 960;
     packet.height = 540;
@@ -80,8 +80,7 @@ void Resolution_the_surface_reports_the_size_it_renders_at(void)
 {
     // ore_engine/resolution_scale
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = 2;
@@ -103,8 +102,7 @@ void Resolution_a_scale_of_one_reports_the_window_size(void)
 {
     // ore_engine/resolution_scale
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = 2;
@@ -124,8 +122,7 @@ void Resolution_a_scale_below_one_is_the_full_resolution(void)
 {
     // ore_engine/resolution_scale
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = 2;
@@ -147,8 +144,7 @@ void Resolution_the_capture_keeps_the_window_size(void)
     const char *path = "/tmp/box_test_resolution.png";
     remove(path);
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxSurface);
+    ECS_IMPORT(world, Box);
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
     app->frames = 3;

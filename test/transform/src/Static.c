@@ -19,7 +19,7 @@ void Static_position_only(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 2, 3});
     const WorldTransform *wt = ecs_get(world, e, WorldTransform);
@@ -37,7 +37,7 @@ void Static_scale_defaults_to_one(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, Scale);
     const Scale *s = ecs_get(world, e, Scale);
@@ -58,7 +58,7 @@ void Static_rotation_composition(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float x = 0.25f, y = 0.5f, z = -0.75f;
     float cx = cosf(x), sx = sinf(x);
     float cy = cosf(y), sy = sinf(y);
@@ -84,7 +84,7 @@ void Static_rotation_and_scale_composition(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float a = 1.5707963f;
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {1, 2, 3});
@@ -107,7 +107,7 @@ void Static_orientation_wins_over_rotation(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float a = 1.5707963f;
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Rotation, {a, 0, 0});
@@ -131,7 +131,7 @@ void Static_child_of_moved_parent(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new(world);
@@ -153,7 +153,7 @@ void Static_grandchild_of_moved_parent(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     float a = 1.5707963f;
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {1, 0, 0});
@@ -179,7 +179,7 @@ void Static_scale_inherited_three_levels(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Scale, {2, 2, 2});
@@ -205,7 +205,7 @@ void Static_child_set_does_not_move_parent(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {5, 5, 5});
     ecs_entity_t child = ecs_new(world);
@@ -225,7 +225,7 @@ void Static_reparent_to_new_parent(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t first = ecs_new(world);
     ecs_set(world, first, Position, {10, 0, 0});
     ecs_entity_t second = ecs_new(world);
@@ -248,7 +248,7 @@ void Static_remove_parent_makes_root(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 20, 30});
     ecs_entity_t child = ecs_new(world);
@@ -268,7 +268,7 @@ void Static_manual_transform_not_written(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, ManualTransform);
     ecs_set(world, e, WorldTransform, { .m = {{
@@ -286,7 +286,7 @@ void Static_manual_transform_parent_propagates(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_add(world, parent, ManualTransform);
     ecs_set(world, parent, WorldTransform, { .m = {{
@@ -305,7 +305,7 @@ void Static_one_on_set_per_entity(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t entities[1000];
     int32_t i;
     for (i = 0; i < 1000; i ++) {
@@ -334,7 +334,7 @@ void Static_deep_chain(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t chain[100];
     int32_t i;
     for (i = 0; i < 100; i ++) {
@@ -359,7 +359,7 @@ void Static_one_on_set_for_new_child(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {10, 0, 0});
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
@@ -381,7 +381,7 @@ void Static_delete_parent_deletes_subtree(void)
 {
     // scene_core/transform
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {1, 0, 0});
     ecs_entity_t child = ecs_new(world);

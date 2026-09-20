@@ -50,7 +50,7 @@ static void maybe_command(
 void Dispatch_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
 
     box_command_param_t probe_params[] = {
         { .name = "text", .type = ecs_id(ecs_string_t) },

@@ -33,8 +33,7 @@ static void BoxBenchTouch(
 static ecs_world_t* box_bench_world(void)
 {
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxTransform);
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     int32_t i;
     for (i = 0; i < BENCH_ENTITY_COUNT; i ++) {
         ecs_set(world, ecs_new(world), Position, {0, 0, 0});

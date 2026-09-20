@@ -47,7 +47,7 @@ void Job_submit_100k(bench_t *b)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     box_job_desc_t desc = {0};
     desc.run = bench_job_run;
     bench_set_items(b, BENCH_JOB_COUNT);
@@ -69,7 +69,7 @@ void Job_frame_drain(bench_t *b)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxJob);
+    ECS_IMPORT(world, Box);
     JobSettings *settings = ecs_singleton_ensure(world, JobSettings);
     settings->workers = BENCH_DRAIN_WORKERS;
     settings->budget_ms = 2.0;

@@ -14,7 +14,7 @@ void Folder_folder_is_under_the_process_folder(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
+    ECS_IMPORT(world, Box);
 
     char *folder = box_checkpoint_write(world, NULL, NULL);
     test_assert(folder != NULL);
@@ -36,8 +36,7 @@ void Folder_folder_is_removed_when_the_instance_stops(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -59,8 +58,7 @@ void Folder_repeated_checkpoints_get_their_own_folder(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
         .code = "using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n"
@@ -104,7 +102,7 @@ void Folder_named_checkpoint_uses_the_name(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
+    ECS_IMPORT(world, Box);
 
     char *folder = box_checkpoint_write(world, "before", NULL);
     test_assert(folder != NULL);
@@ -125,8 +123,7 @@ void Folder_dir_overrides_the_process_folder(void)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCheckpoint);
-    ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, Box);
 
     Checkpoint *cp = ecs_singleton_ensure(world, Checkpoint);
     cp->dir = ecs_os_strdup("/tmp/box_checkpoint_custom/nested");

@@ -13,7 +13,7 @@ void Collision_an_emitter_without_collision_hits_nothing(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -39,7 +39,7 @@ void Collision_the_ground_plane_reaches_the_block(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -66,7 +66,7 @@ void Collision_a_particle_that_dies_on_a_hit_says_so(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -87,7 +87,7 @@ void Collision_a_collider_in_reach_lands_in_the_table(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -119,7 +119,7 @@ void Collision_a_collider_out_of_reach_is_left_out(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -144,7 +144,7 @@ void Collision_an_emitter_does_not_collide_with_itself(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -167,7 +167,7 @@ void Collision_a_box_collider_is_written_as_its_world_bounds(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -198,7 +198,7 @@ void Collision_the_colliders_follow_the_spawn_points(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 
@@ -239,7 +239,7 @@ void Collision_the_colliders_are_capped(void)
 {
     // particles/dynamics
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxParticle);
+    ECS_IMPORT(w, Box);
     box_packet_t packet;
     box_packet_init(&packet);
 

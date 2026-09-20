@@ -10,7 +10,7 @@ void Roots_prefab_instance_is_root(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -25,7 +25,7 @@ void Roots_prefab_is_not_a_root(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t base = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
@@ -42,8 +42,7 @@ void Roots_template_instance_is_root(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
 
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
@@ -68,7 +67,7 @@ void Roots_manual_root_aggregates(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t root = ecs_new(world);
     ecs_add(world, root, RootBounds);
@@ -88,7 +87,7 @@ void Roots_empty_root_has_no_bounds(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -106,7 +105,7 @@ void Roots_aggregates_children(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -132,7 +131,7 @@ void Roots_aggregates_deep_hierarchy(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -157,7 +156,7 @@ void Roots_aggregates_parent_storage(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -178,7 +177,7 @@ void Roots_own_bounds_are_included(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -199,7 +198,7 @@ void Roots_child_added_updates_bounds(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -222,7 +221,7 @@ void Roots_child_removed_updates_bounds(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -246,7 +245,7 @@ void Roots_child_moved_updates_bounds(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -269,7 +268,7 @@ void Roots_reparent_out_of_root(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -293,7 +292,7 @@ void Roots_reparent_into_other_root(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t first = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -318,7 +317,7 @@ void Roots_nested_root_counts_once(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t outer = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -346,7 +345,7 @@ void Roots_local_bounds_are_root_space(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -368,7 +367,7 @@ void Roots_rigid_root_move_transforms_local_bounds(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -396,7 +395,7 @@ void Roots_rigid_root_child_change_reaggregates(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -419,7 +418,7 @@ void Roots_non_rigid_root_reaggregates_on_move(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
@@ -442,7 +441,7 @@ void Roots_deleted_root_is_forgotten(void)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxCollision);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);

@@ -52,7 +52,7 @@ void Systems_off_by_default(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, SystemMonitor);
     const SystemMonitor *m = ecs_singleton_get(world, SystemMonitor);
     test_bool(m->enabled, false);
@@ -67,7 +67,7 @@ void Systems_disabled_monitor_collects_nothing(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = false});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     int32_t i;
@@ -85,7 +85,7 @@ void Systems_slow_system_is_attributed_to_itself(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = true});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     int32_t i;
@@ -104,7 +104,7 @@ void Systems_frame_total_covers_the_systems(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = true});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     ECS_SYSTEM(world, BoxLateSystem, EcsPostUpdate, 0);
@@ -124,7 +124,7 @@ void Systems_phase_totals_are_kept_per_phase(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = true});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     ECS_SYSTEM(world, BoxLateSystem, EcsPostUpdate, 0);
@@ -155,7 +155,7 @@ void Systems_disabling_stops_collection(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = true});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     int32_t i;
@@ -179,7 +179,7 @@ void Systems_removing_the_monitor_stops_measurement(void)
 {
     // monitoring/system_monitor
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_set(world, SystemMonitor, {.enabled = true});
     ECS_SYSTEM(world, BoxSlowSystem, EcsOnUpdate, 0);
     int32_t i;

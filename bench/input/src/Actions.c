@@ -16,7 +16,7 @@ void Actions_resolve_100_bindings(bench_t *b)
 {
     // input/action_layer
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, Box);
     ecs_entity_t map = ecs_lookup(world, "box.input.map");
     int32_t i;
     for (i = 0; i < BENCH_ACTION_BINDINGS; i ++) {
@@ -53,7 +53,7 @@ void Actions_resolve_100_bindings_in_4_layers(bench_t *b)
 {
     // ore_engine/input_layers
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, Box);
     ecs_entity_t maps[BENCH_ACTION_LAYERS];
     int32_t i;
     for (i = 0; i < BENCH_ACTION_LAYERS; i ++) {

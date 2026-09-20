@@ -15,7 +15,7 @@ static ecs_world_t *w;
 void Terminal_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
 }
 
 void Terminal_teardown(void)

@@ -14,7 +14,7 @@ static ecs_entity_t session;
 void Complete_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxCommand);
+    ECS_IMPORT(w, Box);
     session = ecs_entity(w, { .name = "agent0" });
     ecs_add(w, session, Terminal);
 }

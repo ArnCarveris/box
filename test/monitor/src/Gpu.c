@@ -200,7 +200,7 @@ void Gpu_absent_component_is_not_published(void)
 {
     // monitoring/gpu_timings
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_progress(world, 0.016f);
     test_assert(ecs_singleton_get(world, GpuTimings) == NULL);
     ecs_fini(world);
@@ -210,7 +210,7 @@ void Gpu_a_world_without_a_renderer_reports_no_passes(void)
 {
     // monitoring/gpu_timings
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxMonitor);
+    ECS_IMPORT(world, Box);
     ecs_singleton_add(world, GpuTimings);
     ecs_progress(world, 0.016f);
     const GpuTimings *g = ecs_singleton_get(world, GpuTimings);

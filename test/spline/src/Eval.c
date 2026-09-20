@@ -12,7 +12,7 @@ void Eval_linear_endpoints(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -41,7 +41,7 @@ void Eval_linear_midpoint(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -76,7 +76,7 @@ void Eval_linear_tangent_and_normal(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -102,7 +102,7 @@ void Eval_catmull_passes_through_its_points(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -134,7 +134,7 @@ void Eval_catmull_midpoint_matches_the_analytic_value(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -162,7 +162,7 @@ void Eval_catmull_of_collinear_points_is_a_line(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -188,7 +188,7 @@ void Eval_bezier_endpoints(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -224,7 +224,7 @@ void Eval_bezier_midpoint_matches_the_analytic_value(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -251,7 +251,7 @@ void Eval_normal_is_perpendicular_to_a_vertical_tangent(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -274,7 +274,7 @@ void Eval_tension_changes_the_curve(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -306,7 +306,7 @@ void Eval_parameter_clamps_outside_the_range(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);
@@ -330,7 +330,7 @@ void Eval_loop_wraps_the_parameter(void)
 {
     // splines/spline_core
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t e = ecs_new(w);
     Spline *s = ecs_ensure(w, e, Spline);

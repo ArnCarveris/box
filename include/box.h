@@ -42,4 +42,23 @@
 #include "box/ui.h"
 #include "box/script.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Register the box module, which imports every module of the framework.
+ *
+ * An application or a test imports this module and no other one, so every
+ * world registers the modules in the same order and their component ids are
+ * the same in every world.
+ *
+ * @param world The world
+ */
+void BoxImport(
+    ecs_world_t *world);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

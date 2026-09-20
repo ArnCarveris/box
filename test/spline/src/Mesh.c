@@ -12,7 +12,7 @@ void Mesh_strip_without_a_profile(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -48,7 +48,7 @@ void Mesh_slices_follow_the_segment_count(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -74,7 +74,7 @@ void Mesh_default_slices_per_curve_segment(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -100,7 +100,7 @@ void Mesh_profile_is_swept_across_the_curve(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -144,7 +144,7 @@ void Mesh_normals_face_up_for_a_flat_strip(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -181,7 +181,7 @@ void Mesh_uvs_run_along_the_curve(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -213,7 +213,7 @@ void Mesh_a_loop_closes_the_sweep(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -246,7 +246,7 @@ void Mesh_closed_profile_sweeps_a_ring(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -287,7 +287,7 @@ void Mesh_smooth_shares_the_columns(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -328,7 +328,7 @@ void Mesh_the_mesh_follows_the_curve(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -362,7 +362,7 @@ void Mesh_the_mesh_follows_the_profile(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -399,7 +399,7 @@ void Mesh_bounds_come_from_the_curve(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -428,7 +428,7 @@ void Mesh_the_sweep_uses_the_curve_of_the_entity(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t road = ecs_new(w);
     ecs_set(w, road, SplineMesh, {.segments = 2, .width = 2, .height = 1});
@@ -453,7 +453,7 @@ void Mesh_a_sweep_without_a_curve_builds_nothing(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t road = ecs_new(w);
     ecs_set(w, road, SplineMesh, {.spline = ecs_new(w), .width = 2, .height = 1});
@@ -468,7 +468,7 @@ void Mesh_removing_the_sweep_removes_the_mesh(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -493,7 +493,7 @@ void Mesh_deleting_the_curve_removes_the_mesh(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -519,7 +519,7 @@ void Mesh_the_entity_stays_a_static_instance(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -547,7 +547,7 @@ void Mesh_two_sweeps_share_one_mesh(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     ecs_entity_t curve = ecs_new(w);
     Spline *s = ecs_ensure(w, curve, Spline);
@@ -576,7 +576,7 @@ void Mesh_a_sweep_from_a_script(void)
 {
     // splines/spline_roads
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxSpline);
+    ECS_IMPORT(w, Box);
 
     test_int(ecs_script_run(w, "test",
         "using box.spline\n"

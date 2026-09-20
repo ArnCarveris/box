@@ -13,8 +13,7 @@ static ecs_entity_t root;
 void WorldAnchor_setup(void)
 {
     w = ecs_init();
-    ECS_IMPORT(w, BoxUi);
-    ECS_IMPORT(w, BoxMovement);
+    ECS_IMPORT(w, Box);
     Surface *surface = ecs_singleton_ensure(w, Surface);
     surface->width = 960;
     surface->height = 540;

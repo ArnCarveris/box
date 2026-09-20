@@ -11,8 +11,7 @@ void Shadow_a_caster_the_view_misses_is_replaced_by_its_proxy(void)
 {
     // lod/cache_and_jobs
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[16];
     int32_t i;
@@ -62,8 +61,7 @@ void Shadow_a_small_shadow_threshold_keeps_the_caster_detailed(void)
 {
     // lod/cache_and_jobs
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[16];
     int32_t i;
@@ -113,8 +111,7 @@ void Shadow_a_world_without_a_sun_walks_the_view_alone(void)
 {
     // lod/cache_and_jobs
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[16];
     int32_t i;

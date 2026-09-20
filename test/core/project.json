@@ -8,6 +8,14 @@
     },
     "test": {
         "testsuites": [{
+            "id": "Modules",
+            "testcases": [
+                "every_module_lives_under_box",
+                "two_worlds_register_the_same_ids",
+                "the_module_imports_again_without_a_second_copy",
+                "two_live_worlds_share_the_process"
+            ]
+        }, {
             "id": "Args",
             "testcases": [
                 "no_args_defaults",
@@ -28,7 +36,8 @@
                 "an_unclaimed_option_still_fails",
                 "the_usage_text_lists_the_options_of_the_world",
                 "a_scene_still_loads_next_to_an_option",
-                "an_option_with_a_bad_value_fails"
+                "an_option_with_a_bad_value_fails",
+                "a_scene_loads_under_the_scenes_scope"
             ]
         }, {
             "id": "App",

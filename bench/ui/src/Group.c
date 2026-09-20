@@ -91,7 +91,7 @@ void Group_extract_ten_transparent_panels(bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -123,7 +123,7 @@ void Group_extract_ten_opaque_panels(bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;
@@ -155,7 +155,7 @@ void Group_ten_transparent_panels_unchanged(bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxUi);
+    ECS_IMPORT(world, Box);
     box_packet_t packet;
     box_packet_init(&packet);
     packet.width = 1920;

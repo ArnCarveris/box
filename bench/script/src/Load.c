@@ -30,7 +30,7 @@ void Load_scene_10k(bench_t *b)
     while (bench_iter(b)) {
         bench_pause(b);
         ecs_world_t *world = ecs_init();
-        ECS_IMPORT(world, BoxTransform);
+        ECS_IMPORT(world, Box);
         ecs_entity_t scene = ecs_entity(world, { .name = "scene" });
         bench_resume(b);
 
@@ -66,7 +66,7 @@ void Load_scene_50k(bench_t *b)
     while (bench_iter(b)) {
         bench_pause(b);
         ecs_world_t *world = ecs_init();
-        ECS_IMPORT(world, BoxTransform);
+        ECS_IMPORT(world, Box);
         ecs_entity_t scene = ecs_entity(world, { .name = "scene" });
         bench_resume(b);
 

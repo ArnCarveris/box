@@ -11,8 +11,7 @@ void Hierarchy_a_far_root_is_replaced_by_a_proxy(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[4];
     int32_t i;
@@ -74,8 +73,7 @@ void Hierarchy_a_near_root_draws_its_leaves(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[4];
     int32_t i;
@@ -124,8 +122,7 @@ void Hierarchy_the_traversal_leaves_the_entities_alone(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[4];
     int32_t i;
@@ -183,8 +180,7 @@ void Hierarchy_settings_off_draws_every_leaf(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[4];
     int32_t i;
@@ -229,8 +225,7 @@ void Hierarchy_turning_the_settings_off_shows_the_leaves_again(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     ecs_entity_t parts[4];
     int32_t i;
@@ -287,8 +282,7 @@ void Hierarchy_the_walk_reports_what_it_cost(void)
 {
     // lod/hierarchy_traversal
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     int32_t i;
 
@@ -341,8 +335,7 @@ void Hierarchy_a_detail_that_stops_contributing_is_pruned(void)
 {
     // lod/detail_pruning
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
 
     ecs_singleton_set(w, LodSettings, {
@@ -408,8 +401,7 @@ void Hierarchy_a_pinned_detail_survives_pruning(void)
 {
     // lod/detail_pruning
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
 
     ecs_singleton_set(w, LodSettings, {
@@ -472,8 +464,7 @@ void Hierarchy_the_walk_reports_what_it_pruned(void)
 {
     // lod/detail_pruning
     ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxCollision);
+    ECS_IMPORT(w, Box);
     box_packet_t p;
     int32_t i;
 

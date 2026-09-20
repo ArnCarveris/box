@@ -59,7 +59,7 @@ void Mesh_road_1000_points(bench_t *b)
 {
     // splines/spline_roads
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t curve = 0;
     ecs_entity_t road = bench_mesh_road(world, &curve);
@@ -78,7 +78,7 @@ void Mesh_road_1000_points_curve_edit(bench_t *b)
 {
     // splines/spline_roads
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, Box);
 
     ecs_entity_t curve = 0;
     ecs_entity_t road = bench_mesh_road(world, &curve);
