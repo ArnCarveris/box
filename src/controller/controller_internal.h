@@ -24,6 +24,10 @@ typedef struct ControllerActions {
     ecs_entity_t down;    /**< Move down */
     ecs_entity_t fast;    /**< Move faster while held */
     ecs_entity_t look;    /**< Turn with the cursor while held */
+    ecs_entity_t turn_left; /**< Turn the view left while held */
+    ecs_entity_t turn_right;/**< Turn the view right while held */
+    ecs_entity_t turn_up; /**< Turn the view up while held */
+    ecs_entity_t turn_down; /**< Turn the view down while held */
     ecs_entity_t jump;    /**< Jump when the character stands on the ground */
     ecs_entity_t crouch;  /**< Lower the eye while held */
     ecs_entity_t run;     /**< Walk at the run speed while held */
@@ -147,6 +151,26 @@ void box_controller_look(
     float *yaw,
     float *pitch);
 
+/** Test whether the cursor turns the view this frame.
+ *
+ * @param world The world
+ * @param actions The actions of the module
+ * @return Whether the cursor is captured or the Look action is held
+ */
+bool box_controller_looking(
+    ecs_world_t *world,
+    const ControllerActions *actions);
+
+/** The direction a view looks in, from its yaw and pitch.
+ *
+ * @param yaw Yaw of the view in radians
+ * @param pitch Pitch of the view in radians
+ * @return The normalized look direction
+ */
+vec3 box_controller_forward(
+    float yaw,
+    float pitch);
+
 /** Collect the direction the movement actions ask for, in world space.
  *
  * @param world The world
@@ -192,6 +216,23 @@ void box_controller_pose(
  * @param it Iterator over the camera controllers
  */
 void BoxCameraControllerUpdate(
+    ecs_iter_t *it);
+
+/** Face a newly added camera controller the way its Position already looks.
+ *
+ * @param it Iterator over the camera controllers that were just added
+ */
+void BoxCameraControllerOnAdd(
+    ecs_iter_t *it);
+
+/** Face a camera controller the way the pose its camera was just given looks.
+ *
+ * A script sets the Position, the LookAt or the Rotation of a camera after it
+ * adds the controller, which is why the add alone cannot aim it.
+ *
+ * @param it Iterator over the camera controllers whose camera was placed
+ */
+void BoxCameraControllerOnPlace(
     ecs_iter_t *it);
 
 /** Walk, jump and fly the characters that have a first person controller.

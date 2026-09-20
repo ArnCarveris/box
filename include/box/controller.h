@@ -24,16 +24,29 @@ extern "C" {
 /** Fly controller of a camera, driven by the Forward to Down and Fast actions.
  *
  * The system writes Position and Orientation every frame, and LookAt when the
- * entity has one. A sphere of the radius slides along the colliders of the
- * scene, which keeps the camera out of geometry, and the terrain entity is the
- * floor it falls back on. Pitch and yaw follow the Orientation convention, so a
- * positive pitch looks down, and a member that is zero or less takes its default.
+ * entity has one. Movement chases a target speed, smoothed at the
+ * acceleration rate while an action asks for it and at the deceleration rate
+ * once it stops, so it feels weighted instead of snapping to speed. The turn
+ * actions chase the angular speed the same way, at the angular acceleration
+ * and deceleration rates. While the Look action is held the turn follows the
+ * cursor delta directly, and it coasts to a stop at the angular deceleration
+ * once it is released instead of snapping still, with the yaw a third as fast
+ * while Fast is held in both cases. The wheel
+ * gives the camera a push along the view. A sphere of the radius slides along
+ * the colliders of the scene, which keeps the camera out of geometry, and the
+ * terrain entity is the floor it falls back on. Pitch and yaw follow the
+ * Orientation convention, so a positive pitch looks down, and a member that
+ * is zero or less takes its default.
  */
 ECS_STRUCT(CameraController, {
-    float speed;          /**< Units per second at full throttle, 10 by default */
-    float fast;           /**< Speed multiplier while Fast is held, 4 by default */
-    float acceleration;   /**< How fast the velocity follows the input, 8 by default */
+    float speed;          /**< Units per second at full throttle, 40 by default */
+    float fast;           /**< Speed multiplier while Fast is held, 5 by default */
+    float acceleration;   /**< How fast the velocity follows a held action, 6 by default */
+    float deceleration;   /**< How fast the velocity follows the stop, 18 by default */
     float sensitivity;    /**< Radians turned per point of cursor movement */
+    float angular_speed;  /**< Radians per second the turn actions reach, 1.5 by default */
+    float angular_acceleration;/**< How fast a turn follows a held action, 5 by default */
+    float angular_deceleration;/**< How fast a released turn coasts to a stop, 15 by default */
     ecs_entity_t terrain; /**< Entity the camera stays above, 0 for none */
     float clearance;      /**< Units kept above the bounds of the terrain */
     float radius;         /**< Radius it keeps free of scene geometry, 0.5 by default */
@@ -41,6 +54,7 @@ ECS_STRUCT(CameraController, {
     float yaw;            /**< Yaw in radians, written every frame */
     float pitch;          /**< Pitch in radians, written every frame */
     vec3 velocity;        /**< Velocity in units per second, written every frame */
+    vec2 angular_velocity;/**< Turn speed in radians per second, x pitch and y yaw */
 });
 
 /** First person controller of a character, driven by the same movement actions.

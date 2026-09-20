@@ -53,6 +53,32 @@ void BoxControllerImport(
         .callback = BoxCameraControllerUpdate
     });
 
+    ecs_observer(world, {
+        .query.terms = { { .id = ecs_id(CameraController), .inout = EcsInOut } },
+        .events = { EcsOnAdd },
+        .callback = BoxCameraControllerOnAdd
+    });
+
+    ecs_observer(world, {
+        .query.terms = {
+            { .id = ecs_id(CameraController), .inout = EcsInOut },
+            { .id = ecs_id(Position), .inout = EcsIn },
+            { .id = ecs_id(LookAt), .inout = EcsIn }
+        },
+        .events = { EcsOnSet },
+        .callback = BoxCameraControllerOnPlace
+    });
+
+    ecs_observer(world, {
+        .query.terms = {
+            { .id = ecs_id(CameraController), .inout = EcsInOut },
+            { .id = ecs_id(Rotation), .inout = EcsIn },
+            { .id = ecs_id(LookAt), .oper = EcsNot }
+        },
+        .events = { EcsOnSet },
+        .callback = BoxCameraControllerOnPlace
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxFirstPersonUpdate" }),
         .phase = EcsOnUpdate,

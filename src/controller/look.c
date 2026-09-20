@@ -13,13 +13,7 @@ float box_controller_value(
     return value > 0 ? value : fallback;
 }
 
-/** Test whether the cursor turns the view this frame.
- *
- * @param world The world
- * @param actions The actions of the module
- * @return Whether the cursor is captured or the Look action is held
- */
-static bool box_controller_looking(
+bool box_controller_looking(
     ecs_world_t *world,
     const ControllerActions *actions)
 {
@@ -102,6 +96,15 @@ void box_controller_ease(
     velocity->z += (target.z - velocity->z) * alpha;
 }
 
+vec3 box_controller_forward(
+    float yaw,
+    float pitch)
+{
+    float cp = cosf(pitch);
+
+    return vec3_new(sinf(yaw) * cp, -sinf(pitch), cosf(yaw) * cp);
+}
+
 void box_controller_pose(
     const Position *p,
     Orientation *o,
@@ -112,9 +115,9 @@ void box_controller_pose(
     o->yaw = yaw;
     o->pitch = pitch;
     if (look) {
-        float cp = cosf(pitch);
-        look->x = p->x + sinf(yaw) * cp;
-        look->y = p->y - sinf(pitch);
-        look->z = p->z + cosf(yaw) * cp;
+        vec3 forward = box_controller_forward(yaw, pitch);
+        look->x = p->x + forward.x;
+        look->y = p->y + forward.y;
+        look->z = p->z + forward.z;
     }
 }

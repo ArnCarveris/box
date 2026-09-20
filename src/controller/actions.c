@@ -88,6 +88,10 @@ void box_controller_actions_init(
         {"Down", "Move down", BoxKeyQ},
         {"Fast", "Move faster while held", BoxKeyShift},
         {"Look", "Turn with the cursor while held", BoxKeyMouseRight},
+        {"TurnLeft", "Turn the view left while held", BoxKeyLeft},
+        {"TurnRight", "Turn the view right while held", BoxKeyRight},
+        {"TurnUp", "Turn the view up while held", BoxKeyUp},
+        {"TurnDown", "Turn the view down while held", BoxKeyDown},
         {"Jump", "Jump from the ground", BoxKeySpace},
         {"Crouch", "Lower the eye while held", BoxKeyCtrl},
         {"Run", "Walk at the run speed while held", BoxKeyShift},
@@ -96,7 +100,7 @@ void box_controller_actions_init(
         {"ZoomOut", "Step the follow camera one preset further", BoxKeyMinus}
     };
 
-    ecs_entity_t created[14];
+    ecs_entity_t created[18];
     int32_t i, count = (int32_t)(sizeof(binds) / sizeof(binds[0]));
     for (i = 0; i < count; i ++) {
         created[i] = box_controller_action(
@@ -112,11 +116,15 @@ void box_controller_actions_init(
     actions->down = created[5];
     actions->fast = created[6];
     actions->look = created[7];
-    actions->jump = created[8];
-    actions->crouch = created[9];
-    actions->run = created[10];
-    actions->fly = created[11];
-    actions->zoom_in = created[12];
-    actions->zoom_out = created[13];
+    actions->turn_left = created[8];
+    actions->turn_right = created[9];
+    actions->turn_up = created[10];
+    actions->turn_down = created[11];
+    actions->jump = created[12];
+    actions->crouch = created[13];
+    actions->run = created[14];
+    actions->fly = created[15];
+    actions->zoom_in = created[16];
+    actions->zoom_out = created[17];
     ecs_singleton_modified(world, ControllerActions);
 }

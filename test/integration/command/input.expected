@@ -35,6 +35,10 @@ actions.Left	A	Strafe left
 actions.Look	MouseRight	Turn with the cursor while held
 actions.Right	D	Strafe right
 actions.Run	Shift	Walk at the run speed while held
+actions.TurnDown	Down	Turn the view down while held
+actions.TurnLeft	Left	Turn the view left while held
+actions.TurnRight	Right	Turn the view right while held
+actions.TurnUp	Up	Turn the view up while held
 actions.Up	E	Move up
 actions.ZoomIn	Equal	Step the follow camera one preset closer
 actions.ZoomOut	Minus	Step the follow camera one preset further
