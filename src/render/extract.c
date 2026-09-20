@@ -264,6 +264,37 @@ done:
     return result;
 }
 
+/** Extract every entity the dirty list holds and empty it.
+ *
+ * The list grows while it is walked, because extracting one entity can move
+ * the slot of another, and it grows again in the passes that follow the walk:
+ * a layer that lands on a prefab while the views are extracted requeues every
+ * instance. The sweep therefore runs once more after those passes, so an
+ * instance marked late is extracted in the frame it was marked in and none
+ * is left dirty for the check at the end.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param time The time the transitions of the entities are displayed at
+ * @param p The packet
+ */
+static void box_extract_dirty(
+    ecs_world_t *world,
+    RenderState *state,
+    double time,
+    box_packet_t *p)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&state->dirty); i ++) {
+        ecs_entity_t e = ecs_vec_get_t(&state->dirty, ecs_entity_t, i)[0];
+        if (ecs_is_alive(world, e) && ecs_has(world, e, RenderMesh)) {
+            box_extract_static(world, state, e, time, p);
+        }
+    }
+
+    ecs_vec_clear(&state->dirty);
+}
+
 void box_render_extract(
     ecs_world_t *world,
     box_packet_t *p)
@@ -293,15 +324,7 @@ void box_render_extract(
     }
 
     ecs_vec_clear(&state->transition_slow);
-
-    for (i = 0; i < ecs_vec_count(&state->dirty); i ++) {
-        ecs_entity_t e = ecs_vec_get_t(&state->dirty, ecs_entity_t, i)[0];
-        if (ecs_is_alive(world, e) && ecs_has(world, e, RenderMesh)) {
-            box_extract_static(world, state, e, time, p);
-        }
-    }
-
-    ecs_vec_clear(&state->dirty);
+    box_extract_dirty(world, state, time, p);
     if (!state->layer_used) {
         box_render_extract_dynamic(world, state, p, BOX_VIEW_LAYER_ALL,
             BOX_VIEW_LAYER_ALL, false);
@@ -320,6 +343,7 @@ void box_render_extract(
     box_particle_extract(world, p);
     box_render_extract_emitters(world, state, p);
     box_render_lod_capture(world, state, p);
+    box_extract_dirty(world, state, time, p);
     box_render_validate(world);
 }
 
