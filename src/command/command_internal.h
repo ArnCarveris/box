@@ -453,6 +453,7 @@ typedef struct HttpEndpoint {
     ecs_world_t *world;         /**< World the request handler operates on */
     char *reply;                /**< Reply of the last box_request_format call */
     bool started;               /**< The server thread accepts connections */
+    ecs_time_t clock;           /**< When the requests were last dequeued */
     int32_t next;               /**< Counter of the generated session names */
 } HttpEndpoint;
 

@@ -123,6 +123,7 @@
                     "exec_url_encoded_cmd",
                     "exec_post_body",
                     "exec_unknown_session",
+                    "a_connection_survives_a_burst_of_fast_frames",
                     "exec_error_gives_400",
                     "exec_without_cmd",
                     "resource_returns_file",

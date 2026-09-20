@@ -61,6 +61,7 @@ static void box_http_start(
         ecs_err("failed to start the command server on port %d", port);
     } else {
         ep->started = true;
+        ecs_os_get_time(&ep->clock);
         ecs_trace("command server listening on port %d", port);
     }
 }
@@ -142,6 +143,10 @@ static void box_http_app_on_set(
 
 /** Dequeue the requests that arrived since the last frame.
  *
+ * The server ages its connections and its cache by the time it is handed, so
+ * it gets the wall time since the last dequeue and not the frame delta, which
+ * a headless loop fixes at a sixtieth of a second however short the frame was.
+ *
  * @param it Iterator over the endpoint singleton
  */
 static void BoxHttpDequeue(
@@ -151,7 +156,8 @@ static void BoxHttpDequeue(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (ep[i].started) {
-            ecs_http_server_dequeue(ep[i].server, it->delta_time);
+            double elapsed = ecs_time_measure(&ep[i].clock);
+            ecs_http_server_dequeue(ep[i].server, (ecs_ftime_t)elapsed);
         }
     }
 }

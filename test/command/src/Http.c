@@ -8,6 +8,10 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../../src/command/command_internal.h"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 static ecs_world_t *w;
 static ecs_http_server_t *srv;
@@ -308,4 +312,46 @@ void Http_port_zero_stops_server(void)
     test_assert(box_http_server(w) != NULL);
     ecs_singleton_set(w, HttpServer, { .port = 0 });
     test_assert(box_http_server(w) == NULL);
+}
+
+void Http_a_connection_survives_a_burst_of_fast_frames(void)
+{
+    // ore_engine/headless_http_purge
+    ecs_singleton_set(w, HttpServer, { .port = 27791 });
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    test_assert(sock >= 0);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(27791);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    int32_t i, connected = -1;
+    for (i = 0; i < 50 && connected != 0; i ++) {
+        ecs_os_sleep(0, 20000000);
+        connected = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    }
+
+    test_int(connected, 0);
+    struct timeval tv = { 0, 100000 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    const char *req = "GET /terminal/new HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    test_assert(send(sock, req, strlen(req), 0) == (ssize_t)strlen(req));
+    ecs_os_sleep(0, 2000000);
+
+    for (i = 0; i < 1200; i ++) {
+        ecs_progress(w, 1.0f / 60.0f);
+    }
+
+    char buf[512];
+    ssize_t got = 0;
+    for (i = 0; i < 50 && got <= 0; i ++) {
+        ecs_progress(w, 1.0f / 60.0f);
+        got = recv(sock, buf, sizeof(buf) - 1, 0);
+    }
+
+    close(sock);
+    test_assert(got > 0);
+    buf[got] = '\0';
+    test_assert(strstr(buf, "HTTP/1.1 200") == buf);
 }
