@@ -10,8 +10,9 @@ void Order_nearest_to_the_camera_first(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -59,8 +60,9 @@ void Order_reorder_when_the_camera_moves(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -113,8 +115,9 @@ void Order_nearest_first_off_keeps_script_order(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -151,7 +154,9 @@ void Order_no_camera_keeps_script_order(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -182,8 +187,9 @@ void Order_instance_without_position_goes_first(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -216,8 +222,9 @@ void Order_world_position_orders_a_child_instance(void)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;

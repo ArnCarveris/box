@@ -10,8 +10,9 @@ void Async_a_waiter_in_a_manual_template_resumes(void)
 {
     // ore_engine/waiter_resume
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_assert(0 != ecs_script(world, { .code =
         "using flecs.script\n"
@@ -47,8 +48,9 @@ void Async_several_waiters_resume_on_one_action(void)
 {
     // ore_engine/waiter_resume
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxInput);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_assert(0 != ecs_script(world, { .code =
         "using flecs.script\n"

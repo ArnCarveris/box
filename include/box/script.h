@@ -32,7 +32,7 @@ ECS_STRUCT(ScriptSettings, {
     double reorder_distance;     /**< Camera movement that reorders the queue */
     int32_t reorder_interval;    /**< Frames after which the queue is reordered anyway */
     bool nearest_first;          /**< Expand the instances nearest to the camera first */
-    bool enabled;                /**< False expands every pending instance in one frame */
+    bool enabled;                /**< Load templates over frames, off by default */
 });
 
 /** Instantiation counters, written by the engine after every frame */

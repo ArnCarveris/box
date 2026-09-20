@@ -33,6 +33,9 @@ static void box_script_state_dtor(
 
 /** Mark a script template as manual so its instances are left pending.
  *
+ * A world that has not enabled the incremental loading leaves its templates to
+ * flecs, which expands an instance the moment it is declared.
+ *
  * @param it The iterator of the observer
  */
 static void box_script_on_script(
@@ -40,8 +43,13 @@ static void box_script_on_script(
 {
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     const EcsScript *script = ecs_field(it, EcsScript, 0);
+    const ScriptSettings *settings = ecs_singleton_get(world, ScriptSettings);
     ecs_entity_t *templates = ecs_os_alloca_n(ecs_entity_t, it->count);
     int32_t i, count = 0;
+    if (!settings || !settings->enabled) {
+        goto done;
+    }
+
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual)) {
@@ -52,6 +60,38 @@ static void box_script_on_script(
     for (i = 0; i < count; i ++) {
         ecs_add_id(world, templates[i], EcsScriptTemplateManual);
     }
+
+done:
+    return;
+}
+
+/** Settings observer: enabling the loading takes over the templates that exist.
+ *
+ * @param it The iterator of the observer
+ */
+static void box_script_on_settings(
+    ecs_iter_t *it)
+{
+    const ScriptSettings *settings = ecs_field(it, ScriptSettings, 0);
+    ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
+    if (!settings->enabled) {
+        goto done;
+    }
+
+    ecs_iter_t sit = ecs_each(world, EcsScript);
+    while (ecs_each_next(&sit)) {
+        const EcsScript *script = ecs_field(&sit, EcsScript, 0);
+        int32_t i;
+        for (i = 0; i < sit.count; i ++) {
+            ecs_entity_t e = sit.entities[i];
+            if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual)) {
+                ecs_add_id(world, e, EcsScriptTemplateManual);
+            }
+        }
+    }
+
+done:
+    return;
 }
 
 /** Mark the queue for a rebuild when an instance starts waiting.
@@ -104,7 +144,7 @@ void BoxScriptImport(
         .reorder_distance = 4.0,
         .reorder_interval = 30,
         .nearest_first = true,
-        .enabled = true
+        .enabled = false
     });
     ecs_singleton_ensure(world, ScriptStats);
     ecs_singleton_modified(world, ScriptStats);
@@ -120,6 +160,12 @@ void BoxScriptImport(
         .events = { EcsOnSet },
         .callback = box_script_on_script,
         .yield_existing = true
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ScriptSettings), .inout = EcsIn }},
+        .events = { EcsOnSet },
+        .callback = box_script_on_settings
     });
 
     ecs_observer(world, {

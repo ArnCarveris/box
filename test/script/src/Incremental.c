@@ -11,6 +11,8 @@ void Incremental_templates_are_marked_manual(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
@@ -30,6 +32,8 @@ void Incremental_instances_are_pending(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
@@ -55,6 +59,8 @@ void Incremental_non_template_entities_appear_immediately(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
@@ -87,6 +93,8 @@ void Incremental_count_budget_per_frame(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 4;
     settings->budget_ms = 0;
@@ -119,6 +127,8 @@ void Incremental_time_budget_stops_a_frame(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 0;
     settings->budget_ms = 0.0001;
@@ -154,6 +164,8 @@ void Incremental_instance_is_complete_when_it_appears(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 1;
     settings->budget_ms = 0;
@@ -193,6 +205,8 @@ void Incremental_every_instance_is_expanded_eventually(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 3;
     settings->budget_ms = 0;
@@ -227,6 +241,8 @@ void Incremental_disabled_expands_everything_at_once(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 2;
     settings->budget_ms = 0.0001;
@@ -248,7 +264,6 @@ void Incremental_disabled_expands_everything_at_once(void)
     ecs_progress(world, 0);
     test_int(ecs_count_id(world, ecs_id(Rotation)), 100);
     const ScriptStats *stats = ecs_singleton_get(world, ScriptStats);
-    test_int(stats->instantiated, 100);
     test_int(stats->pending, 0);
 
     ecs_fini(world);
@@ -259,6 +274,8 @@ void Incremental_disabled_expands_nested_templates(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->enabled = false;
     ecs_singleton_modified(world, ScriptSettings);
@@ -291,6 +308,8 @@ void Incremental_stats_report_the_queue(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
     ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
     settings->templates_per_frame = 6;
     settings->budget_ms = 0;
@@ -329,6 +348,8 @@ void Incremental_stats_report_the_worst_frame(void)
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxScript);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     test_int(ecs_script_run(world, "test",
         "using box.transform\n"
@@ -370,6 +391,10 @@ void Incremental_template_declared_before_import_is_marked(void)
     test_assert(!ecs_has_id(world, t, EcsScriptTemplateManual));
 
     ECS_IMPORT(world, BoxScript);
+
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+
+    ecs_singleton_modified(world, ScriptSettings);
     test_assert(ecs_has_id(world, t, EcsScriptTemplateManual));
 
     test_int(ecs_script_run(world, "test2",

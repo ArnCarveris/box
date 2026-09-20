@@ -19,7 +19,9 @@ void Reload_rewritten_file_is_reloaded(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -71,7 +73,9 @@ void Reload_parse_error_keeps_the_scene(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -126,7 +130,9 @@ void Reload_reloaded_instances_are_pending(void)
     fclose(file);
 
     ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
