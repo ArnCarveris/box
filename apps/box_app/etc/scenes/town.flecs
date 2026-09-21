@@ -3,7 +3,7 @@ using box.*
 
 $ {
   Console: {}
-  EnvironmentLight: {sky_color: {150, 178, 210}, ground_color: {60, 56, 50}, intensity: 1}
+  EnvironmentLight: {sky_color: {150, 178, 210}, ground_color: {60, 56, 50}, intensity: 0.25}
 }
 
 sun {
@@ -141,6 +141,7 @@ template Lantern {
     Position: {}
     Sphere: {radius: 0.25, segments: 16, smooth: true}
     Rgb: {241, 116, 91}
+    Emissive: {1, {241, 116, 91}}
   }
   for i in 0..3 {
     {

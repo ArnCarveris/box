@@ -1,17 +1,23 @@
 /**
  * @file transform/dynamic.c
- * @brief System that recomputes the world transform of dynamic entities.
+ * @brief The per frame world transform system and the observers that spread its tag.
  *
- * Entities with DynamicTransform on themselves or an ancestor are updated every
- * frame in PostUpdate, parents before children, without emitting events.
+ * DynamicTransform is kept on every descendant of the entity it was added to,
+ * the way flecs-engine keeps it: an entity that gets the tag hands it to its
+ * children, an entity that is placed under a parent that has it takes it, and
+ * an entity that loses it takes it from its children, unless its own parent
+ * still has it, in which case the tag comes back. Every query of the engine
+ * can then match the tag on the entity itself instead of walking up the
+ * hierarchy per entity, which also keeps the queries away from an Or over up
+ * traversed terms that a cached query resolves wrongly over a Parent tree.
  */
 
 #include <box.h>
 #include "transform_internal.h"
 
-/** Recompute the world transform of dynamic entities.
+/** Compose the world transform of every dynamic entity, parents first.
  *
- * @param it Iterator over the dynamic entities
+ * @param it Iterator over the dynamic entities of one table
  */
 static void BoxTransformDynamicUpdate(
     ecs_iter_t *it)
@@ -34,9 +40,144 @@ static void BoxTransformDynamicUpdate(
     }
 }
 
+/** Hand the tag to one child of an entity that has it.
+ *
+ * @param world The world
+ * @param child The child
+ * @param ctx The stage the tag is added through
+ */
+static void box_transform_tag_child(
+    ecs_world_t *world,
+    ecs_entity_t child,
+    void *ctx)
+{
+    (void)world;
+    ecs_add(ctx, child, DynamicTransform);
+}
+
+/** Take the tag from one child of an entity that lost it.
+ *
+ * @param world The world
+ * @param child The child
+ * @param ctx The stage the tag is removed through
+ */
+static void box_transform_untag_child(
+    ecs_world_t *world,
+    ecs_entity_t child,
+    void *ctx)
+{
+    (void)world;
+    ecs_remove(ctx, child, DynamicTransform);
+}
+
+/** Test whether the entities of an observer are on their way out of the world.
+ *
+ * @param it The observer iterator
+ * @return true when the destination table is the empty root table
+ */
+static bool box_transform_leaving(
+    const ecs_iter_t *it)
+{
+    return it->other_table && !ecs_table_get_type(it->other_table)->count;
+}
+
+/** OnAdd observer for DynamicTransform: the children get the tag too.
+ *
+ * @param it Iterator over the entities that got the tag
+ */
+static void BoxTransformOnDynamicAdd(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        box_hierarchy_children(it->world, it->entities[i], box_transform_tag_child,
+            it->stage);
+    }
+}
+
+/** OnRemove observer for DynamicTransform: the children lose the tag too.
+ *
+ * An entity whose parent still has the tag is a descendant of a dynamic
+ * entity, so the tag comes back instead. An entity that is being deleted
+ * takes its children with it and does nothing.
+ *
+ * @param it Iterator over the entities that lose the tag
+ */
+static void BoxTransformOnDynamicRemove(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    if (box_transform_leaving(it)) {
+        goto done;
+    }
+
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        ecs_entity_t parent = box_hierarchy_parent(world, e);
+        if (parent && ecs_has(world, parent, DynamicTransform)) {
+            ecs_add(it->stage, e, DynamicTransform);
+            continue;
+        }
+
+        box_hierarchy_children(world, e, box_transform_untag_child, it->stage);
+    }
+
+done:
+    return;
+}
+
+/** OnAdd observer for a parent in either storage: a dynamic parent hands down its tag.
+ *
+ * @param it Iterator over the entities that got a parent
+ */
+static void BoxTransformOnDynamicParent(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t e = it->entities[i];
+        ecs_entity_t parent = box_hierarchy_parent(world, e);
+        if (!parent || !ecs_has(world, parent, DynamicTransform)) {
+            continue;
+        }
+
+        if (ecs_has(world, e, DynamicTransform)) {
+            continue;
+        }
+
+        ecs_add(it->stage, e, DynamicTransform);
+    }
+}
+
 void box_transform_dynamic_init(
     ecs_world_t *world)
 {
+    ecs_observer(world, {
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnAdd },
+        .callback = BoxTransformOnDynamicAdd
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnRemove },
+        .callback = BoxTransformOnDynamicRemove
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
+        .events = { EcsOnAdd },
+        .callback = BoxTransformOnDynamicParent
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(EcsParent) }},
+        .events = { EcsOnSet },
+        .callback = BoxTransformOnDynamicParent
+    });
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxTransformDynamicUpdate" }),
         .phase = EcsPostUpdate,
@@ -48,8 +189,7 @@ void box_transform_dynamic_init(
             { .id = ecs_id(Orientation), .oper = EcsOptional, .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .oper = EcsOptional, .inout = EcsIn,
                 .src.id = EcsUp|EcsCascade, .trav = EcsChildOf },
-            { .id = DynamicTransform, .src.id = EcsSelf|EcsUp,
-                .trav = EcsChildOf, .inout = EcsInOutNone },
+            { .id = DynamicTransform, .inout = EcsInOutNone },
             { .id = ManualTransform, .oper = EcsNot, .inout = EcsInOutNone }
         },
         .callback = BoxTransformDynamicUpdate

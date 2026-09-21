@@ -484,3 +484,49 @@ void Parent_name_lookup_through_parent(void)
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Parent_tag_spreads_through_parent_component(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new_w_parent(world, root, "child");
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_entity_t grandchild = ecs_new_w_parent(world, child, "grandchild");
+    ecs_set(world, grandchild, Position, {1, 0, 0});
+    ecs_add(world, root, DynamicTransform);
+    test_assert(ecs_has(world, child, DynamicTransform));
+    test_assert(ecs_has(world, grandchild, DynamicTransform));
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    const WorldTransform *wt = ecs_get(world, grandchild, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 7) < 1e-4f);
+    ecs_remove(world, root, DynamicTransform);
+    test_assert(!ecs_has(world, child, DynamicTransform));
+    test_assert(!ecs_has(world, grandchild, DynamicTransform));
+    ecs_set(world, root, Position, {9, 0, 0});
+    wt = ecs_get(world, grandchild, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 11) < 1e-4f);
+    ecs_fini(world);
+}
+
+void Parent_tag_spreads_to_child_set_parent(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, DynamicTransform);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new(world);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_set(world, child, EcsParent, { root });
+    test_assert(ecs_has(world, child, DynamicTransform));
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    const WorldTransform *wt = ecs_get(world, child, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 6) < 1e-4f);
+    ecs_fini(world);
+}

@@ -4,8 +4,9 @@
  *
  * The box.transform module keeps WorldTransform equal to parent * T * R * S.
  * Static entities are updated by observers when their pose or parent changes,
- * entities with DynamicTransform on themselves or an ancestor are updated every
- * frame in PostUpdate.
+ * entities with DynamicTransform are updated every frame in PostUpdate. The tag
+ * spreads to every descendant of the entity it is added to and leaves them
+ * again when it is removed, so a query matches it on the entity itself.
  */
 
 #ifndef BOX_TRANSFORM_H
@@ -69,7 +70,7 @@ ECS_STRUCT(AABB, {
     vec3 max; /**< Maximum corner */
 });
 
-/** Transform is recomputed every frame instead of on change, applies to descendants */
+/** Transform is recomputed every frame instead of on change, kept on every descendant */
 extern ECS_TAG_DECLARE(DynamicTransform);
 
 /** The engine does not write WorldTransform, the application does */

@@ -707,3 +707,37 @@ void Extract_vertex_alpha_reaches_the_upload(void)
     free(cmd->vertices);
     free(cmd->indices);
 }
+
+void Extract_static_parent_tree_beside_dynamic_entity_stays_static(void)
+{
+    // scene_core/parent_hierarchy
+    ecs_entity_t camera = ecs_new(w);
+    ecs_add(w, camera, DynamicTransform);
+    ecs_set(w, camera, Position, {0, 5, -10});
+    ecs_entity_t root = ecs_new(w);
+    ecs_set(w, root, Position, {1, 0, 0});
+    ecs_set(w, root, Box, {1, 1, 1});
+    ecs_entity_t a = ecs_new_w_parent(w, root, "a");
+    ecs_set(w, a, Position, {1, 0, 0});
+    ecs_set(w, a, Box, {1, 1, 1});
+    ecs_entity_t b = ecs_new_w_parent(w, a, "b");
+    ecs_set(w, b, Position, {1, 0, 0});
+    ecs_set(w, b, Box, {1, 1, 1});
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
+    free(cmd->vertices);
+    free(cmd->indices);
+    test_int(packet.static_updates.count, 3);
+    test_int(packet.dynamic_instances.count, 0);
+    box_packet_reset(&packet);
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 0);
+    box_packet_reset(&packet);
+    ecs_progress(w, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.static_updates.count, 0);
+    test_int(packet.dynamic_instances.count, 0);
+}

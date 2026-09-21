@@ -394,7 +394,7 @@ void Shadows_static_delta_inside_a_cascade_marks_it_dirty(void)
     float inside[4] = { v->shadow_bounds[0], v->shadow_bounds[1], v->shadow_bounds[2], 0.5f };
     box_shadow_cache_delta(&cache, v, inside);
     test_bool(cache.dirty[0], true);
-    test_uint(box_shadow_cache_pick(&cache, v), 1u);
+    test_uint(box_shadow_cache_pick(&cache, v) & 1u, 1u);
 }
 
 void Shadows_static_delta_outside_a_cascade_keeps_it(void)
@@ -470,5 +470,102 @@ void Shadows_camera_rotation_marks_every_cascade(void)
         test_bool(cache.dirty[i], true);
     }
 
-    test_uint(box_shadow_cache_pick(&cache, v), 1u);
+    test_uint(box_shadow_cache_pick(&cache, v), 3u);
+}
+
+void Shadows_held_cascades_take_turns(void)
+{
+    // views/shadows
+    box_view_t v;
+    memset(&v, 0, sizeof(v));
+    v.shadow_cascades = 4;
+    box_shadow_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    uint32_t i;
+    for (i = 0; i < 4; i ++) {
+        cache.dirty[i] = true;
+        cache.valid[i] = true;
+    }
+
+    test_uint(box_shadow_cache_pick(&cache, &v), 0x3u);
+    box_shadow_cache_done(&cache, &v, 0);
+    box_shadow_cache_done(&cache, &v, 1);
+    for (i = 0; i < 4; i ++) {
+        cache.dirty[i] = true;
+    }
+
+    test_uint(box_shadow_cache_pick(&cache, &v), 0x5u);
+    box_shadow_cache_done(&cache, &v, 0);
+    box_shadow_cache_done(&cache, &v, 2);
+    for (i = 0; i < 4; i ++) {
+        cache.dirty[i] = true;
+    }
+
+    test_uint(box_shadow_cache_pick(&cache, &v), 0x9u);
+    box_shadow_cache_done(&cache, &v, 0);
+    box_shadow_cache_done(&cache, &v, 3);
+    for (i = 0; i < 4; i ++) {
+        cache.dirty[i] = true;
+    }
+
+    test_uint(box_shadow_cache_pick(&cache, &v), 0x3u);
+    cache.dirty[0] = false;
+    cache.dirty[1] = false;
+    test_uint(box_shadow_cache_pick(&cache, &v), 0xCu);
+    cache.dirty[3] = false;
+    test_uint(box_shadow_cache_pick(&cache, &v), 0x4u);
+}
+
+void Shadows_unheld_cascades_render_at_once(void)
+{
+    // views/shadows
+    box_view_t v;
+    memset(&v, 0, sizeof(v));
+    v.shadow_cascades = 4;
+    box_shadow_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    uint32_t i;
+    for (i = 0; i < 4; i ++) {
+        cache.dirty[i] = true;
+    }
+
+    cache.valid[0] = true;
+    cache.valid[1] = true;
+    cache.next = 1;
+    test_uint(box_shadow_cache_pick(&cache, &v), 0xFu);
+    cache.dirty[1] = false;
+    test_uint(box_shadow_cache_pick(&cache, &v), 0xDu);
+}
+
+void Shadows_held_cascade_keeps_its_matrix(void)
+{
+    // views/shadows
+    box_view_t v;
+    memset(&v, 0, sizeof(v));
+    v.shadow_cascades = 3;
+    v.shadow_matrix[0] = 1;
+    v.shadow_matrix[16] = 2;
+    v.shadow_matrix[32] = 3;
+    box_shadow_cache_t cache;
+    memset(&cache, 0, sizeof(cache));
+    test_assert(box_shadow_cache_matrix(&cache, &v, 0, 0) == v.shadow_matrix);
+    box_shadow_cache_done(&cache, &v, 0);
+    box_shadow_cache_done(&cache, &v, 1);
+    box_shadow_cache_done(&cache, &v, 2);
+    v.shadow_matrix[0] = 5;
+    v.shadow_matrix[16] = 6;
+    v.shadow_matrix[32] = 7;
+    box_shadow_cache_view(&cache, &v);
+    uint32_t i;
+    for (i = 0; i < 3; i ++) {
+        test_bool(cache.dirty[i], true);
+    }
+
+    uint32_t rebuild = box_shadow_cache_pick(&cache, &v);
+    test_uint(rebuild, 0x3u);
+    test_assert(box_shadow_cache_matrix(&cache, &v, 0, rebuild) == v.shadow_matrix);
+    test_assert(box_shadow_cache_matrix(&cache, &v, 1, rebuild) == v.shadow_matrix + 16);
+    const float *held = box_shadow_cache_matrix(&cache, &v, 2, rebuild);
+    test_assert(held == cache.matrix[2]);
+    test_assert(held[0] == 3);
 }

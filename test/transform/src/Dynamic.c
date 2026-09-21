@@ -235,3 +235,112 @@ void Dynamic_static_sibling_not_updated_by_system(void)
     test_assert(fabsf(dw->m.v[12] - 1) < 1e-4f);
     ecs_fini(world);
 }
+
+void Dynamic_tag_spreads_to_subtree(void)
+{
+    // scene_core/transform
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1, 0, 0});
+    test_assert(!ecs_has(world, child, DynamicTransform));
+    ecs_add(world, root, DynamicTransform);
+    test_assert(ecs_has(world, child, DynamicTransform));
+    test_assert(ecs_has(world, grandchild, DynamicTransform));
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    const WorldTransform *wt = ecs_get(world, grandchild, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 7) < 1e-4f);
+    ecs_fini(world);
+}
+
+void Dynamic_tag_spreads_to_reparented_child(void)
+{
+    // scene_core/transform
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, DynamicTransform);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new(world);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1, 0, 0});
+    test_assert(!ecs_has(world, child, DynamicTransform));
+    ecs_add_pair(world, child, EcsChildOf, root);
+    test_assert(ecs_has(world, child, DynamicTransform));
+    test_assert(ecs_has(world, grandchild, DynamicTransform));
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    const WorldTransform *wt = ecs_get(world, grandchild, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 7) < 1e-4f);
+    ecs_fini(world);
+}
+
+void Dynamic_tag_leaves_subtree_on_remove(void)
+{
+    // scene_core/transform
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, DynamicTransform);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1, 0, 0});
+    ecs_progress(world, 0);
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_remove(world, root, DynamicTransform);
+    test_assert(!ecs_has(world, child, DynamicTransform));
+    test_assert(!ecs_has(world, grandchild, DynamicTransform));
+    const WorldTransform *wt = ecs_get(world, grandchild, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 7) < 1e-4f);
+    ecs_set(world, root, Position, {9, 0, 0});
+    test_assert(fabsf(wt->m.v[12] - 11) < 1e-4f);
+    ecs_fini(world);
+}
+
+void Dynamic_child_tag_kept_under_dynamic_parent(void)
+{
+    // scene_core/transform
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, DynamicTransform);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_remove(world, child, DynamicTransform);
+    test_assert(ecs_has(world, child, DynamicTransform));
+    ecs_set(world, root, Position, {5, 0, 0});
+    ecs_progress(world, 0);
+    const WorldTransform *wt = ecs_get(world, child, WorldTransform);
+    test_assert(fabsf(wt->m.v[12] - 6) < 1e-4f);
+    ecs_fini(world);
+}
+
+void Dynamic_deleting_dynamic_parent_deletes_subtree(void)
+{
+    // scene_core/transform
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t root = ecs_new(world);
+    ecs_add(world, root, DynamicTransform);
+    ecs_set(world, root, Position, {1, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, child, Position, {1, 0, 0});
+    ecs_entity_t grandchild = ecs_new_w_pair(world, EcsChildOf, child);
+    ecs_set(world, grandchild, Position, {1, 0, 0});
+    ecs_progress(world, 0);
+    ecs_delete(world, root);
+    test_assert(!ecs_is_alive(world, root));
+    test_assert(!ecs_is_alive(world, child));
+    test_assert(!ecs_is_alive(world, grandchild));
+    ecs_progress(world, 0);
+    ecs_fini(world);
+}

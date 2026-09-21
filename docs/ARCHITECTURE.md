@@ -284,9 +284,15 @@ wetness material layer.
 Entities without `DynamicTransform` are static: their world transform is computed
 by an observer when a local component changes and uploaded once as a delta.
 Entities with `DynamicTransform` are re-transformed and re-uploaded every frame
-in a separate instance buffer. Materials follow the same split with
-`DynamicMaterial`. Shadows and culling structures are built on the static buffer
-and only patched for changed entries.
+in a separate instance buffer. The tag is kept on every descendant of the entity
+it was added to, the way flecs-engine keeps it: observers in `box.transform` hand
+it to the children of an entity that gets it, to an entity that is placed under a
+parent that has it, and take it from the children of an entity that loses it, so
+every query and every check of the engine matches the tag on the entity itself
+instead of walking up the hierarchy. Materials follow the same split with
+`DynamicMaterial`, which is still resolved through the ancestors. Shadows and
+culling structures are built on the static buffer and only patched for changed
+entries.
 
 ## Command interface
 

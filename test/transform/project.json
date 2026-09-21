@@ -54,7 +54,12 @@
                 "add_then_remove_dynamic",
                 "manual_transform_not_written",
                 "deep_chain_cascade_order",
-                "static_sibling_not_updated_by_system"
+                "static_sibling_not_updated_by_system",
+                "tag_spreads_to_subtree",
+                "tag_spreads_to_reparented_child",
+                "tag_leaves_subtree_on_remove",
+                "child_tag_kept_under_dynamic_parent",
+                "deleting_dynamic_parent_deletes_subtree"
             ]
         }, {
             "id": "Parent",
@@ -79,7 +84,9 @@
                 "add_then_remove_dynamic",
                 "prefab_tree_instantiation",
                 "lookat_under_parent",
-                "name_lookup_through_parent"
+                "name_lookup_through_parent",
+                "tag_spreads_through_parent_component",
+                "tag_spreads_to_child_set_parent"
             ]
         }, {
             "id": "Mixed",

@@ -2,9 +2,10 @@
  * @file transform/static.c
  * @brief Observers that keep the world transform of static entities up to date.
  *
- * A static entity has no DynamicTransform on itself or an ancestor. Its world
- * transform is written when its pose changes and when it is reparented, in
- * either hierarchy storage.
+ * A static entity has no DynamicTransform. The tag of a dynamic entity is kept
+ * on its descendants by dynamic.c, so a parent without it has no dynamic
+ * ancestor either. The world transform of a static entity is written when its
+ * pose changes and when it is reparented, in either hierarchy storage.
  */
 
 #include <box.h>
@@ -110,7 +111,7 @@ static bool box_transform_is_static(
     }
 
     ecs_entity_t parent = box_hierarchy_parent(world, e);
-    if (parent && box_hierarchy_ancestor_has(world, parent, DynamicTransform)) {
+    if (parent && ecs_has(world, parent, DynamicTransform)) {
         goto done;
     }
 

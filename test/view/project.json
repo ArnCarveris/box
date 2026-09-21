@@ -97,7 +97,10 @@
                     "world_without_a_sun_has_no_cascades",
                     "static_delta_inside_a_cascade_marks_it_dirty",
                     "static_delta_outside_a_cascade_keeps_it",
-                    "camera_rotation_marks_every_cascade"
+                    "camera_rotation_marks_every_cascade",
+                    "held_cascades_take_turns",
+                    "unheld_cascades_render_at_once",
+                    "held_cascade_keeps_its_matrix"
                 ],
                 "setup": true,
                 "teardown": true

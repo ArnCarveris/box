@@ -16,15 +16,8 @@ bool box_render_is_dynamic(
     ecs_world_t *world,
     ecs_entity_t e)
 {
-    bool result = false;
-    ecs_entity_t cur = e;
-    while (cur && !result) {
-        result = ecs_has_id(world, cur, DynamicTransform) ||
-            ecs_has_id(world, cur, DynamicMaterial);
-        cur = box_hierarchy_parent(world, cur);
-    }
-
-    return result;
+    return ecs_has_id(world, e, DynamicTransform) ||
+        box_hierarchy_ancestor_has(world, e, DynamicMaterial);
 }
 
 /** Write the world space bounds of an instance to its AABB component.
@@ -421,7 +414,7 @@ void box_render_extract_init(
             { .id = ecs_id(RenderMesh), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
             { .id = ecs_id(RenderInstance) },
-            { .id = DynamicTransform, .src.id = EcsSelf | EcsUp, .oper = EcsOr },
+            { .id = DynamicTransform, .oper = EcsOr },
             { .id = DynamicMaterial, .src.id = EcsSelf | EcsUp }
         },
         .cache_kind = EcsQueryCacheAuto

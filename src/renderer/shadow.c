@@ -9,6 +9,7 @@
  */
 
 #include "renderer_internal.h"
+#include <stddef.h>
 #include <string.h>
 
 /** Instances the caster buffer of a view starts out with */
@@ -525,7 +526,8 @@ static void box_shadow_dynamics(
     uint32_t cascade)
 {
     box_frustum_t frustum;
-    box_frustum_of_clip(view->shadow_matrix + cascade * 16, &frustum);
+    box_frustum_of_clip(box_shadow_cache_matrix(&r->v->shadow_cache, view, cascade,
+        r->v->shadow_rebuild), &frustum);
 
     uint32_t last = view->dynamic_first + view->dynamic_count;
     uint32_t i;
@@ -649,7 +651,8 @@ static void box_shadow_upload(
         box_cull_job_t *job = box_vec_at(&r->shadow_jobs, i);
         box_shadow_draw_t *draw = box_vec_at(&r->v->shadow_draws, job->draw);
         box_frustum_t frustum;
-        box_frustum_of_clip(view->shadow_matrix + draw->cascade * 16, &frustum);
+        box_frustum_of_clip(box_shadow_cache_matrix(&r->v->shadow_cache, view,
+            draw->cascade, r->v->shadow_rebuild), &frustum);
         box_cull_uniform_t uniform;
         memset(&uniform, 0, sizeof(uniform));
         memcpy(uniform.planes, frustum.planes, sizeof(uniform.planes));
@@ -663,7 +666,11 @@ static void box_shadow_upload(
     }
 }
 
-/** Upload the cascade matrices the shadow passes of the view read.
+/** Upload the matrix of every cascade to the shadow passes and to the view uniform.
+ *
+ * A cascade that keeps its layer this frame is drawn and sampled with the
+ * matrix that layer was rendered with, which replaces the matrix of the view
+ * the frame wrote into the uniform of the view before the pick.
  *
  * @param r The renderer
  * @param view The view being drawn
@@ -672,11 +679,17 @@ static void box_shadow_matrices(
     box_renderer_t *r,
     const box_view_t *view)
 {
+    box_gpu_view_t *v = r->v;
     uint32_t i;
     for (i = 0; i < view->shadow_cascades; i ++) {
-        wgpuQueueWriteBuffer(r->gpu_queue, r->v->shadow_uniform,
-            (uint64_t)i * BOX_CULL_UNIFORM_STRIDE, view->shadow_matrix + i * 16,
-            16 * sizeof(float));
+        const float *m = box_shadow_cache_matrix(&v->shadow_cache, view, i, v->shadow_rebuild);
+        wgpuQueueWriteBuffer(r->gpu_queue, v->shadow_uniform,
+            (uint64_t)i * BOX_CULL_UNIFORM_STRIDE, m, 16 * sizeof(float));
+        if (m != view->shadow_matrix + i * 16) {
+            wgpuQueueWriteBuffer(r->gpu_queue, v->view_buffer,
+                offsetof(box_view_t, shadow_matrix) + (uint64_t)i * 16 * sizeof(float), m,
+                16 * sizeof(float));
+        }
     }
 }
 
@@ -695,9 +708,9 @@ void box_shadow_prepare(
     }
 
     box_shadow_textures(r, view);
-    box_shadow_matrices(r, view);
     box_shadow_invalidate(r, view, p);
     v->shadow_rebuild = box_shadow_cache_pick(&v->shadow_cache, view);
+    box_shadow_matrices(r, view);
 
     uint32_t i;
     for (i = 0; i < view->shadow_cascades; i ++) {

@@ -6,7 +6,11 @@
  * has to be rendered again when the matrix of the cascade changed or when a
  * static caster inside the volume the cascade collects casters from moved. The
  * volume is the sphere of the cascade extruded towards the light, which the
- * light frustum of the cascade covers.
+ * light frustum of the cascade covers. A frame renders the nearest dirty layer
+ * and at most one more held layer, taking turns between the cascades so none
+ * of them starves while the camera keeps moving, and a cascade that keeps its
+ * layer is drawn and sampled with the matrix that layer was rendered with, so
+ * its shadows stay in place until its turn comes.
  */
 
 #ifndef BOX_RENDERER_SHADOW_H
@@ -21,6 +25,7 @@ typedef struct box_shadow_cache_t {
     bool dirty[BOX_SHADOW_CASCADE_MAX];       /**< The static layer must be rendered again */
     bool valid[BOX_SHADOW_CASCADE_MAX];       /**< The static layer holds a rendering */
     bool stale[BOX_SHADOW_CASCADE_MAX];       /**< The working layer differs from the static one */
+    uint32_t next;                            /**< Cascade the next held rebuild looks at first */
 } box_shadow_cache_t;
 
 /** Check whether two cascade matrices hold the same values.
@@ -117,12 +122,15 @@ static inline void box_shadow_cache_all(
     }
 }
 
-/** The cascades whose static layer is rendered this frame, nearest first.
+/** The cascades whose static layer is rendered this frame.
  *
  * A cascade that never held a rendering is rendered as soon as it is dirty, so
- * the first frame of a scene fills every layer; after that at most one cascade
- * with a cached layer is rendered per frame and the others keep drawing with
- * the layer they hold, however many of them the frame made dirty.
+ * the first frame of a scene fills every layer. After that the nearest dirty
+ * cascade is rendered every frame, since it is the cheapest and the one the
+ * eye is on, and one more held cascade is rendered in turn, the first dirty one
+ * from the one after the last turn, so a camera that keeps every cascade dirty
+ * refreshes the far ones as well instead of starving them. The others keep
+ * drawing with the layer they hold.
  *
  * @param c The cache
  * @param v The view of this frame
@@ -133,25 +141,54 @@ static inline uint32_t box_shadow_cache_pick(
     const box_view_t *v)
 {
     uint32_t result = 0;
-    bool spent = false;
+    uint32_t count = v->shadow_cascades;
+    uint32_t nearest = count;
     uint32_t i;
-    for (i = 0; i < v->shadow_cascades; i ++) {
+    for (i = 0; i < count; i ++) {
         if (!c->dirty[i]) {
             continue;
         }
 
         if (!c->valid[i]) {
             result |= 1u << i;
-            continue;
-        }
-
-        if (!spent) {
+        } else if (nearest == count) {
+            nearest = i;
             result |= 1u << i;
-            spent = true;
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        uint32_t cascade = (c->next + i) % count;
+        if (cascade != nearest && c->dirty[cascade] && c->valid[cascade]) {
+            result |= 1u << cascade;
+            break;
         }
     }
 
     return result;
+}
+
+/** The matrix a cascade is drawn and sampled with this frame.
+ *
+ * A cascade that renders its layer this frame, or never rendered one, takes the
+ * matrix of the view. A cascade that keeps the layer it holds takes the matrix
+ * that layer was rendered with, so the shadows it casts stay where they are.
+ *
+ * @param c The cache
+ * @param v The view of this frame
+ * @param cascade Index of the cascade
+ * @param rebuild The cascades the frame renders, from box_shadow_cache_pick
+ * @return Sixteen floats
+ */
+static inline const float* box_shadow_cache_matrix(
+    const box_shadow_cache_t *c,
+    const box_view_t *v,
+    uint32_t cascade,
+    uint32_t rebuild)
+{
+    bool held = c->valid[cascade] && !(rebuild & (1u << cascade));
+
+    return held ? c->matrix[cascade] : v->shadow_matrix + cascade * 16;
 }
 
 /** Record that the static layer of a cascade was rendered with its matrix.
@@ -169,6 +206,7 @@ static inline void box_shadow_cache_done(
     c->dirty[cascade] = false;
     c->valid[cascade] = true;
     c->stale[cascade] = true;
+    c->next = (cascade + 1) % v->shadow_cascades;
 }
 
 #endif

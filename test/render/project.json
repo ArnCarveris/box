@@ -43,7 +43,8 @@
                     "tinted_opaque_entity_stays_static",
                     "primitive_vertices_are_white",
                     "vertex_color_is_kept_beside_the_instance_color",
-                    "vertex_alpha_reaches_the_upload"
+                    "vertex_alpha_reaches_the_upload",
+                    "static_parent_tree_beside_dynamic_entity_stays_static"
                 ],
                 "setup": true,
                 "teardown": true
