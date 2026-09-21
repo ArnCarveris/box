@@ -166,6 +166,7 @@ void box_render_release_slot(
     ecs_assert(ecs_vec_get_t(&batch->entities, ecs_entity_t, (int32_t)inst->slot)[0] == e,
         ECS_INTERNAL_ERROR, NULL);
     batch->count_dirty = true;
+    batch->removed = true;
     if (!ecs_vec_count(&batch->groups)) {
         int32_t last = ecs_vec_count(&batch->entities) - 1;
         ecs_entity_t *slots = ecs_vec_first_t(&batch->entities, ecs_entity_t);

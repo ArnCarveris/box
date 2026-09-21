@@ -108,6 +108,7 @@ static void box_extract_static(
     }
 
     box_batch_t *batch = ecs_vec_get_t(&state->batches, box_batch_t, (int32_t)mesh->handle);
+    bool added = !has_slot;
     if (!has_slot) {
         box_render_take_slot(world, batch, e, inst);
     } else if (state->layer_used) {
@@ -119,6 +120,7 @@ static void box_extract_static(
     update->mesh = mesh->handle;
     update->slot = inst->slot;
     update->transition = BOX_UPDATE_STILL;
+    update->flags = added ? BOX_STATIC_UPDATE_ADDED : 0;
     box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
         state->textured, state->tiled, state->shaped, state->worn, state->clipped,
         state->layered ? state : NULL, transition, time, inst->depth, &update->data);
@@ -158,7 +160,9 @@ static void box_extract_counts(
             box_static_count_t *count = box_vec_push(&p->static_counts);
             count->mesh = (uint32_t)i;
             count->count = (uint32_t)ecs_vec_count(&batch->entities);
+            count->flags = batch->removed ? BOX_STATIC_COUNT_REMOVED : 0;
             batch->count_dirty = false;
+            batch->removed = false;
         }
     }
 }

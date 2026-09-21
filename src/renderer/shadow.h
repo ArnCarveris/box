@@ -26,6 +26,8 @@ typedef struct box_shadow_cache_t {
     bool valid[BOX_SHADOW_CASCADE_MAX];       /**< The static layer holds a rendering */
     bool stale[BOX_SHADOW_CASCADE_MAX];       /**< The working layer differs from the static one */
     uint32_t next;                            /**< Cascade the next held rebuild looks at first */
+    uint32_t caster_mask;
+    uint32_t strict_layers;
 } box_shadow_cache_t;
 
 /** Check whether two cascade matrices hold the same values.
@@ -80,9 +82,15 @@ static inline void box_shadow_cache_view(
     box_shadow_cache_t *c,
     const box_view_t *v)
 {
+    bool caster_changed = c->caster_mask != v->caster_mask ||
+        c->strict_layers != v->strict_layers;
+    c->caster_mask = v->caster_mask;
+    c->strict_layers = v->strict_layers;
     uint32_t i;
     for (i = 0; i < v->shadow_cascades; i ++) {
-        if (!c->valid[i] || !box_shadow_matrix_equal(c->matrix[i], v->shadow_matrix + i * 16)) {
+        if (caster_changed || !c->valid[i] ||
+            !box_shadow_matrix_equal(c->matrix[i], v->shadow_matrix + i * 16))
+        {
             c->dirty[i] = true;
         }
     }

@@ -1173,8 +1173,11 @@ typedef struct box_static_update_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t slot;          /**< Instance slot */
     uint32_t transition;    /**< Transition the slot starts, BOX_UPDATE_STILL for none */
+    uint32_t flags;
     box_instance_t data;    /**< New instance data */
 } box_static_update_t;
+
+#define BOX_STATIC_UPDATE_ADDED (1u)
 
 /** Transition of an instance update that starts none.
  *
@@ -1203,7 +1206,10 @@ typedef struct box_static_group_t {
 typedef struct box_static_count_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t count;         /**< Instances in use */
+    uint32_t flags;
 } box_static_count_t;
+
+#define BOX_STATIC_COUNT_REMOVED (1u)
 
 /** One instance the sorted pass draws after the opaque batches.
  *

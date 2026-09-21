@@ -37,6 +37,7 @@ typedef struct box_batch_t {
     ecs_vec_t groups;    /**< box_slot_group_t, empty while no slot joined a layer */
     bool count_dirty;    /**< Instance count changed since the last packet */
     bool groups_dirty;   /**< Group ranges changed since the last packet */
+    bool removed;
 } box_batch_t;
 
 /** Where an entity's instance lives */

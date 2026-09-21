@@ -285,26 +285,36 @@ done:
  * @param view The view being drawn
  * @param p The packet
  */
-static void box_shadow_invalidate(
+static bool box_shadow_invalidate(
     box_renderer_t *r,
     const box_view_t *view,
     const box_packet_t *p)
 {
     box_gpu_view_t *v = r->v;
     box_shadow_cache_view(&v->shadow_cache, view);
-    if (p->static_counts.count) {
-        box_shadow_cache_all(&v->shadow_cache, view);
-        goto done;
+    bool additions = p->static_updates.count != 0;
+    bool rebuild = p->mesh_destroy.count != 0 || p->static_groups.count != 0;
+    uint32_t i;
+    for (i = 0; i < p->static_counts.count; i ++) {
+        box_static_count_t *c = box_vec_at(&p->static_counts, i);
+        if (c->flags & BOX_STATIC_COUNT_REMOVED) {
+            rebuild = true;
+        }
     }
 
-    uint32_t i;
     for (i = 0; i < p->static_updates.count; i ++) {
         box_static_update_t *u = box_vec_at(&p->static_updates, i);
-        box_shadow_cache_delta(&v->shadow_cache, view, u->data.bounds);
+        if (!(u->flags & BOX_STATIC_UPDATE_ADDED)) {
+            rebuild = true;
+        }
     }
 
-done:
-    return;
+    if (rebuild) {
+        box_shadow_cache_all(&v->shadow_cache, view);
+        additions = false;
+    }
+
+    return additions;
 }
 
 /** Collect the slot ranges of a mesh that cast the shadows of a view.
@@ -512,6 +522,58 @@ static void box_shadow_statics(
     }
 }
 
+static bool box_shadow_additions(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    uint32_t cascade)
+{
+    box_frustum_t frustum;
+    box_frustum_of_clip(view->shadow_matrix + cascade * 16, &frustum);
+    bool result = false;
+    uint32_t mesh;
+    for (mesh = 0; mesh < r->meshes.count; mesh ++) {
+        box_gpu_mesh_t *m = box_vec_at(&r->meshes, mesh);
+        if (!m->alive) {
+            continue;
+        }
+
+        uint32_t stage = r->v->shadow_staging.count;
+        uint32_t kept = 0;
+        uint32_t i;
+        for (i = 0; i < p->static_updates.count; i ++) {
+            box_static_update_t *u = box_vec_at(&p->static_updates, i);
+            if (u->mesh != mesh || !(u->flags & BOX_STATIC_UPDATE_ADDED) ||
+                !box_view_casts(view, box_instance_layers(&u->data)) ||
+                !box_instance_caster(&u->data) ||
+                !box_frustum_sphere(&frustum, u->data.bounds, u->data.bounds[3]))
+            {
+                continue;
+            }
+
+            *(box_instance_t*)box_vec_push(&r->v->shadow_staging) = u->data;
+            kept ++;
+        }
+
+        if (!kept) {
+            continue;
+        }
+
+        box_shadow_draw_t *draw = box_vec_push(&r->v->shadow_draws);
+        draw->mesh = mesh;
+        draw->first = 0;
+        draw->args = BOX_CULL_NO_ARGS;
+        draw->cascade = cascade;
+        draw->statics = 1;
+        draw->stage = stage;
+        draw->count = kept;
+        draw->limit = kept;
+        result = true;
+    }
+
+    return result;
+}
+
 /** Build the caster draws of the dynamic and sorted instances of one cascade.
  *
  * @param r The renderer
@@ -703,12 +765,13 @@ void box_shadow_prepare(
     box_vec_clear(&v->shadow_staging);
     box_vec_clear(&r->shadow_jobs);
     v->shadow_rebuild = 0;
+    v->shadow_patch = 0;
     if (!view->shadow_cascades) {
         goto done;
     }
 
     box_shadow_textures(r, view);
-    box_shadow_invalidate(r, view, p);
+    bool additions = box_shadow_invalidate(r, view, p);
     v->shadow_rebuild = box_shadow_cache_pick(&v->shadow_cache, view);
     box_shadow_matrices(r, view);
 
@@ -717,6 +780,10 @@ void box_shadow_prepare(
         if (v->shadow_rebuild & (1u << i)) {
             r->shadow_rebuilds ++;
             box_shadow_statics(r, view, i);
+        } else if (additions && v->shadow_cache.valid[i] && !v->shadow_cache.dirty[i] &&
+            box_shadow_additions(r, view, p, i))
+        {
+            v->shadow_patch |= 1u << i;
         }
 
         box_shadow_dynamics(r, view, p, i);
@@ -918,6 +985,9 @@ void box_shadow_record(
         if (v->shadow_rebuild & (1u << i)) {
             box_shadow_pass(r, i, 1, v->shadow_cached[i], true, encoder);
             box_shadow_cache_done(&v->shadow_cache, view, i);
+        } else if (v->shadow_patch & (1u << i)) {
+            box_shadow_pass(r, i, 1, v->shadow_cached[i], false, encoder);
+            v->shadow_cache.stale[i] = true;
         }
     }
 

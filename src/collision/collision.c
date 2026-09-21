@@ -138,12 +138,12 @@ void BoxCollisionImport(
 
     box_render_lod_roots(world, ecs_id(RootBounds));
 
-    ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "BoxCollisionUpdate" }),
-        .phase = EcsOnStore,
-        .query.terms = {{ .id = ecs_id(CollisionState) }},
-        .callback = BoxCollisionUpdate,
-        .ctx = state,
-        .immediate = true
-    });
+    // ecs_system(world, {
+    //     .entity = ecs_entity(world, { .name = "BoxCollisionUpdate" }),
+    //     .phase = EcsOnStore,
+    //     .query.terms = {{ .id = ecs_id(CollisionState) }},
+    //     .callback = BoxCollisionUpdate,
+    //     .ctx = state,
+    //     .immediate = true
+    // });
 }

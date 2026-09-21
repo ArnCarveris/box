@@ -363,6 +363,7 @@ typedef struct box_gpu_view_t {
     uint32_t shadow_count;           /**< Cascades the shadow textures hold */
     box_shadow_cache_t shadow_cache; /**< State of the cached static layers */
     uint32_t shadow_rebuild;         /**< Cascades whose static layer this frame renders */
+    uint32_t shadow_patch;
     WGPUBuffer shadow_uniform;       /**< Cascade matrix of every shadow pass of the view */
     WGPUBindGroup shadow_group;      /**< Uniform bind group of the shadow pass */
     WGPUBuffer shadow_instances;     /**< Caster instances the shadow culling compacted */

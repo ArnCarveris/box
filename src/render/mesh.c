@@ -51,6 +51,7 @@ uint32_t box_render_mesh_create(
     ecs_vec_init_t(NULL, &batch->groups, box_slot_group_t, 0);
     batch->count_dirty = false;
     batch->groups_dirty = false;
+    batch->removed = false;
 
     box_mesh_cmd_t *cmd = ecs_vec_append_t(NULL, &state->pending_meshes, box_mesh_cmd_t);
     cmd->handle = handle;
