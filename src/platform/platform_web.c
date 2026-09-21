@@ -421,6 +421,14 @@ bool box_window_should_close(
     return false;
 }
 
+bool box_window_occluded(
+    const box_window_t *w)
+{
+    (void)w;
+
+    return false;
+}
+
 void box_window_size(
     const box_window_t *w,
     int32_t *px_width,

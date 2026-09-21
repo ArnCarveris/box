@@ -26,6 +26,9 @@ static int32_t box_window_count = 0;
 #ifdef __APPLE__
 void* box_macos_metal_layer(
     void *ns_window);
+
+bool box_macos_window_occluded(
+    void *ns_window);
 #endif
 
 /** Report an event to the sink of a window, when it has one.
@@ -304,6 +307,17 @@ bool box_window_should_close(
     const box_window_t *w)
 {
     return glfwWindowShouldClose(w->window);
+}
+
+bool box_window_occluded(
+    const box_window_t *w)
+{
+    bool result = glfwGetWindowAttrib(w->window, GLFW_ICONIFIED) != 0;
+#ifdef __APPLE__
+    result = result || box_macos_window_occluded(glfwGetCocoaWindow(w->window));
+#endif
+
+    return result;
 }
 
 void box_window_size(

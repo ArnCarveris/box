@@ -187,6 +187,11 @@ static void BoxSurfacePoll(
                 &s[i].point_width, &s[i].point_height);
             s[i].device_scale = s[i].point_height > 0 ?
                 (float)s[i].actual_height / (float)s[i].point_height : 1.0f;
+            s[i].occluded = box_window_occluded(impl[i].window);
+            if (s[i].occluded) {
+                ecs_os_sleep(0, BOX_SURFACE_OCCLUDED_NS);
+            }
+
             if (box_window_should_close(impl[i].window)) {
                 ecs_quit(it->world);
             }

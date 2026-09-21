@@ -10,6 +10,9 @@
 #include "../platform/platform.h"
 #include "../renderer/renderer.h"
 
+/** Nanoseconds a frame sleeps while the window is occluded, ten frames per second */
+#define BOX_SURFACE_OCCLUDED_NS (100 * 1000 * 1000)
+
 /** Runtime objects behind a Surface */
 typedef struct SurfaceImpl {
     box_window_t *window;       /**< Window, NULL when headless */

@@ -144,6 +144,18 @@ void box_window_set_cursor_captured(
 int32_t box_platform_key_from_native(
     int32_t native);
 
+/** Check whether the window is hidden from the user.
+ *
+ * A minimized window, one another window covers completely or one on a
+ * different desktop is occluded; the surface polls this to pace the frame
+ * loop down while nothing it draws can be seen.
+ *
+ * @param w The window
+ * @return true when the window is occluded
+ */
+bool box_window_occluded(
+    const box_window_t *w);
+
 /** Get the CAMetalLayer backing the window on macOS.
  *
  * @param w The window

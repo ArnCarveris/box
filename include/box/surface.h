@@ -80,6 +80,7 @@ ECS_STRUCT(Surface, {
     bool vsync;             /**< Present with vertical sync */
     bool keep_source_textures; /**< Keep the pixels of a loaded texture in memory */
     bool cursor_captured;   /**< Lock the cursor to the window and hide it */
+    bool occluded;          /**< The window is minimized or covered, written by the engine */
     Anisotropy anisotropy;  /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;        /**< Largest dimension a texture is scaled to */
     TextureCompression texture_compression; /**< Reserved, no compression is applied */

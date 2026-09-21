@@ -26,4 +26,17 @@ void* box_macos_metal_layer(
     return (__bridge void*)layer;
 }
 
+/** Check whether a window is hidden from the user.
+ *
+ * @param ns_window The NSWindow
+ * @return true when the occlusion state of the window lacks the visible bit
+ */
+bool box_macos_window_occluded(
+    void *ns_window)
+{
+    NSWindow *window = (__bridge NSWindow*)ns_window;
+
+    return ([window occlusionState] & NSWindowOcclusionStateVisible) == 0;
+}
+
 #endif

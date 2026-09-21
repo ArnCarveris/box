@@ -326,6 +326,9 @@ int box_parse_args(
         } else if (!strcmp(arg, "--port") && value) {
             app->port = atoi(value);
             i ++;
+        } else if (!strcmp(arg, "--explorer")) {
+            ecs_singleton_set(world, EcsRest, {});
+            ECS_IMPORT(world, FlecsStats);
         } else if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
             ecs_singleton_modified(world, App);
             box_print_usage(world, argv[0]);

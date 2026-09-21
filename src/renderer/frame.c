@@ -795,6 +795,8 @@ void box_frame_render(
 
     WGPUTexture present = box_frame_target(r);
     if (!present) {
+        box_bake_state_apply(&r->bake, p);
+        wgpuQueueSubmit(r->gpu_queue, 0, NULL);
         goto done;
     }
 
