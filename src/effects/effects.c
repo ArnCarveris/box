@@ -102,12 +102,6 @@ static void box_tonemap_ctor(
     }
 }
 
-/** Bloom constructor: a wide, subtle pyramid without a knee.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
 static void box_bloom_ctor(
     void *ptr,
     int32_t count,
@@ -117,10 +111,17 @@ static void box_bloom_ctor(
     Bloom *bloom = ptr;
     int32_t i;
     for (i = 0; i < count; i ++) {
-        bloom[i].intensity = 0.08f;
-        bloom[i].radius = 0.7f;
-        bloom[i].knee = 0.0f;
-        bloom[i].firefly_clamp = 8.0f;
+        bloom[i].intensity = 0.3f;
+        bloom[i].low_frequency_boost = 0.7f;
+        bloom[i].low_frequency_boost_curvature = 0.95f;
+        bloom[i].high_pass_frequency = 1.0f;
+        bloom[i].prefilter.threshold = 1.0f;
+        bloom[i].prefilter.threshold_softness = 0.0f;
+        bloom[i].max_mip_dimension = 512;
+        bloom[i].firefly_clamp = 12.0f;
+        bloom[i].temporal = 0.0f;
+        bloom[i].karis = true;
+        bloom[i].full_res_first_mip = true;
     }
 }
 
@@ -350,6 +351,7 @@ void BoxEffectsImport(
     ECS_META_COMPONENT(world, AutoExposure);
     ECS_META_COMPONENT(world, ToneMapOperator);
     ECS_META_COMPONENT(world, ToneMapping);
+    ECS_META_COMPONENT(world, BloomPrefilter);
     ECS_META_COMPONENT(world, Bloom);
     ECS_META_COMPONENT(world, Gtao);
     ECS_META_COMPONENT(world, Ssr);

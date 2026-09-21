@@ -485,35 +485,59 @@ void Effects_exposure_pass_declares_its_input(void)
 
 void Effects_bloom_pyramid_stops_above_the_minimum(void)
 {
-    // effects/bloom
-    test_uint(box_bloom_chain(1280, 720), 6);
-    test_uint(box_bloom_chain(1920, 1080), 7);
-    test_uint(box_bloom_chain(641, 361), 5);
-    test_uint(box_bloom_chain(16, 16), 1);
+    test_uint(box_bloom_chain(640, 360), 7);
+    test_uint(box_bloom_chain(960, 540), 8);
+    test_uint(box_bloom_chain(321, 181), 6);
+    test_uint(box_bloom_chain(8, 8), 2);
     test_uint(box_bloom_chain(1, 1), 1);
-    test_uint(box_bloom_chain(8192, 8192), BOX_BLOOM_LEVELS_MAX);
+    test_uint(box_bloom_chain(1, 8), 2);
+    test_uint(box_bloom_chain(16384, 16384), BOX_BLOOM_LEVELS_MAX);
 }
 
-void Effects_bloom_levels_follow_the_radius(void)
+void Effects_bloom_size_follows_resolution_settings(void)
 {
-    // effects/bloom
-    test_uint(box_bloom_levels(1280, 720, 1.0f), 6);
-    test_uint(box_bloom_levels(1280, 720, 0.5f), 4);
-    test_uint(box_bloom_levels(1280, 720, 0.0f), 1);
-    test_uint(box_bloom_levels(1280, 720, -3.0f), 1);
-    test_uint(box_bloom_levels(1280, 720, 4.0f), 6);
-    test_uint(box_bloom_levels(16, 16, 1.0f), 1);
+    uint32_t width, height;
+    box_bloom_size(1920, 1080, 512, true, &width, &height);
+    test_uint(width, 960);
+    test_uint(height, 540);
+    box_bloom_size(1920, 1080, 512, false, &width, &height);
+    test_uint(width, 512);
+    test_uint(height, 288);
+    box_bloom_size(641, 361, 512, true, &width, &height);
+    test_uint(width, 321);
+    test_uint(height, 181);
+    box_bloom_size(641, 361, 0, false, &width, &height);
+    test_uint(width, 8);
+    test_uint(height, 5);
+    box_bloom_size(0, 0, 512, true, &width, &height);
+    test_uint(width, 1);
+    test_uint(height, 1);
 }
 
 void Effects_karis_weight_falls_with_the_luminance(void)
 {
-    // effects/bloom
     test_flt(box_bloom_karis(0.0f), 1.0f);
     test_flt(box_bloom_karis(-2.0f), 1.0f);
-    test_flt(box_bloom_karis(1.0f), 0.5f);
-    test_flt(box_bloom_karis(3.0f), 0.25f);
+    test_flt(box_bloom_karis(4.0f), 0.5f);
+    test_flt(box_bloom_karis(12.0f), 0.25f);
     test_assert(box_bloom_karis(100.0f) < box_bloom_karis(10.0f));
     test_assert(box_bloom_karis(100.0f) > 0.0f);
+}
+
+void Effects_bloom_boosts_low_frequencies(void)
+{
+    float params[4] = { 0.3f, 0.7f, 0.95f, 1.0f };
+    test_flt(box_bloom_blend(params, 0, 7), 0.3f);
+    test_flt(box_bloom_blend(params, 6, 7), 0.79f);
+    test_assert(box_bloom_blend(params, 1, 7) > 0.7f);
+    params[1] = 0;
+    test_flt(box_bloom_blend(params, 6, 7), 0.3f);
+    params[3] = 0.5f;
+    test_flt(box_bloom_blend(params, 6, 7), 0);
+    params[2] = 1;
+    params[3] = 0;
+    test_assert(isfinite(box_bloom_blend(params, 0, 7)));
+    test_flt(box_bloom_blend(params, 6, 7), 0);
 }
 
 void Effects_builtin_bloom_is_off_by_default(void)
@@ -532,10 +556,17 @@ void Effects_builtin_bloom_is_off_by_default(void)
 
     const Bloom *params = ecs_get(w, bloom, Bloom);
     test_assert(params != NULL);
-    test_flt(params->intensity, 0.08f);
-    test_flt(params->radius, 0.7f);
-    test_flt(params->knee, 0.0f);
-    test_flt(params->firefly_clamp, 8.0f);
+    test_flt(params->intensity, 0.3f);
+    test_flt(params->low_frequency_boost, 0.7f);
+    test_flt(params->low_frequency_boost_curvature, 0.95f);
+    test_flt(params->high_pass_frequency, 1.0f);
+    test_flt(params->prefilter.threshold, 1.0f);
+    test_flt(params->prefilter.threshold_softness, 0.0f);
+    test_uint(params->max_mip_dimension, 512);
+    test_flt(params->firefly_clamp, 12.0f);
+    test_flt(params->temporal, 0.0f);
+    test_bool(params->karis, true);
+    test_bool(params->full_res_first_mip, true);
 
     box_render_extract(w, &packet);
     test_int(packet.effects.count, 0);
@@ -584,20 +615,22 @@ void Effects_bloom_parameters_reach_the_pass(void)
     ecs_entity_t bloom = ecs_lookup(w, "box.effects.stack.bloom");
     ecs_get_mut(w, bloom, Effect)->enabled = true;
     ecs_modified(w, bloom, Effect);
-    ecs_set(w, bloom, Bloom, { .intensity = 0.3f, .radius = 0.5f, .knee = 1.25f,
-        .firefly_clamp = 12.0f });
+    ecs_set(w, bloom, Bloom, {
+        .intensity = 0.3f, .low_frequency_boost = 0.6f,
+        .low_frequency_boost_curvature = 0.9f, .high_pass_frequency = 0.8f,
+        .prefilter = { 1.25f, 0.5f }, .max_mip_dimension = 256,
+        .firefly_clamp = 12.0f, .temporal = 0.7f, .karis = true,
+        .full_res_first_mip = true });
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
     box_effect_t *pass = box_vec_at(&packet.effects, 0);
     test_int(pass->inputs, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID);
     test_int(packet.view.effect_inputs, BOX_EFFECT_COLOR | BOX_EFFECT_PYRAMID);
-    test_flt(pass->params[0], 0.3f);
-    test_flt(pass->params[1], 0.5f);
-    test_flt(pass->params[2], 1.25f);
-    test_flt(pass->params[3], 12.0f);
-    test_uint(box_bloom_chain(packet.view.width, packet.view.height), 5);
-    test_uint(box_bloom_levels(packet.view.width, packet.view.height, pass->params[1]), 3);
+    const float expected[] = { 0.3f, 0.6f, 0.9f, 0.8f, 1.25f, 0.5f, 256, 12, 0.7f, 1, 1 };
+    for (int i = 0; i < 11; i ++) {
+        test_flt(pass->params[i], expected[i]);
+    }
 }
 
 void Effects_fog_integrates_a_level_ray(void)

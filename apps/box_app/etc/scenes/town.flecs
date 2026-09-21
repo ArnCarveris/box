@@ -18,6 +18,21 @@ camera {
   CameraController: {speed: 14}
 }
 
+box { effects { stack {
+  gtao {
+    Effect: {enabled: true}
+    Gtao: {radius: 2.5, slices: 4, steps: 10, power: 2, temporal: true, half_res: true}
+  }
+//   tonemap {
+//     Effect: {enabled: true}
+//     ToneMapping: {white: 1, dither: true}
+//   }
+  bloom {
+    Effect: {enabled: true}
+    Bloom: {}
+  }
+} } }
+
 const timber: Rgb = {91, 65, 57}
 const roofTile: Rgb = {66, 83, 99}
 const cream: Rgb = {248, 230, 196}
@@ -141,7 +156,7 @@ template Lantern {
     Position: {}
     Sphere: {radius: 0.25, segments: 16, smooth: true}
     Rgb: {241, 116, 91}
-    Emissive: {1, {241, 116, 91}}
+    Emissive: {10, {241, 116, 91}}
   }
   for i in 0..3 {
     {

@@ -299,7 +299,7 @@ box { effects { stack {
   }
   bloom {
     Effect: {enabled: true}
-    Bloom: {intensity: 0.14, radius: 1, knee: 0, firefly_clamp: 8}
+    Bloom: {intensity: 0.14, firefly_clamp: 8}
   }
   auto_exposure {
     Effect: {enabled: true}

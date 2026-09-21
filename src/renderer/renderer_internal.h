@@ -329,6 +329,14 @@ typedef struct box_gpu_view_t {
     uint32_t bloom_levels;           /**< Levels its pyramid holds, 0 until it has one */
     uint32_t bloom_width;            /**< Width of the finest level of its pyramid */
     uint32_t bloom_height;           /**< Height of the finest level of its pyramid */
+    WGPUBuffer bloom_uniform;
+    WGPUTexture bloom_history[2];
+    WGPUTextureView bloom_history_view[2];
+    uint32_t bloom_history_index;
+    uint32_t bloom_history_frame;
+    uint32_t bloom_history_slot;
+    bool bloom_history_valid;
+
     WGPUTexture gtao_raw;            /**< Occlusion and view depth the trace pass wrote */
     WGPUTextureView gtao_raw_view;   /**< View of that texture */
     WGPUTexture gtao_hist[2];        /**< Accumulated occlusion of this frame and the last */
@@ -541,7 +549,8 @@ struct box_renderer_t {
     WGPUBindGroupLayout pyramid_layout;     /**< Uniform, source level and sampler */
     WGPURenderPipeline pyramid_first;  /**< Karis weighted downsample of the image */
     WGPURenderPipeline pyramid_down;   /**< Thirteen tap downsample of a level into the next */
-    WGPURenderPipeline pyramid_up;     /**< Eight tap tent upsample, mixed into the level above */
+    WGPURenderPipeline pyramid_up;
+    WGPURenderPipeline pyramid_history;
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
     WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
@@ -1589,6 +1598,7 @@ WGPUTextureView box_bloom_build(
     box_renderer_t *r,
     const box_effect_t *fx,
     uint32_t slot,
+    uint32_t frame,
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder);
 

@@ -82,12 +82,22 @@ ECS_STRUCT(ToneMapping, {
     ToneMapOperator curve; /**< Display transform of the pass, the neutral curve by default */
 });
 
-/** Wide kernel bloom gathered from a mip pyramid of the image */
+ECS_STRUCT(BloomPrefilter, {
+    float threshold;
+    float threshold_softness;
+});
+
 ECS_STRUCT(Bloom, {
-    float intensity;     /**< Fraction of the pyramid mixed into the image */
-    float radius;        /**< 0 to 1, levels of the pyramid that feed back */
-    float knee;          /**< Soft knee luminance, 0 lets every texel bloom */
-    float firefly_clamp; /**< Luminance a texel is clamped to on the first downsample */
+    float intensity;
+    float low_frequency_boost;
+    float low_frequency_boost_curvature;
+    float high_pass_frequency;
+    BloomPrefilter prefilter;
+    uint32_t max_mip_dimension;
+    float firefly_clamp;
+    float temporal;
+    bool karis;
+    bool full_res_first_mip;
 });
 
 /** Horizon based ambient occlusion of the indirect diffuse light of a pixel.

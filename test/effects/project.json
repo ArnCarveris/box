@@ -23,7 +23,20 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Bloom",
+                "testcases": [
+                    "history_survives_frames_and_resizes",
+                    "growing_effect_stack_rebinds_uniforms",
+                    "history_is_separate_for_each_view"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
+    },
+    "lang.c": {
+        "c-standard": "c11"
     }
 }

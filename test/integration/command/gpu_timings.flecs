@@ -76,7 +76,7 @@ box { effects { stack {
   }
   bloom {
     Effect: {enabled: true}
-    Bloom: {intensity: 0.22, radius: 1, knee: 0, firefly_clamp: 8}
+    Bloom: {intensity: 0.22, firefly_clamp: 8}
   }
   tonemap {
     Effect: {enabled: true}

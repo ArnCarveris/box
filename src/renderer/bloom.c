@@ -1,39 +1,13 @@
-/**
- * @file renderer/bloom.c
- * @brief Progressive pyramid of the image a post process pass reads.
- *
- * The pyramid is the filter pair of the blurred background copy: a thirteen tap
- * downsample walks the levels and an eight tap tent upsample mixes them back
- * up, which is how a kernel that spans the image costs a handful of small
- * passes. The first downsample decodes the image, weights its taps by the Karis
- * average and clamps a firefly, so the levels hold linear light that a single
- * bright texel cannot take over.
- */
-
 #include "renderer_internal.h"
 
-/** Format every level of the pyramid holds, which keeps light past white */
 #define BOX_BLOOM_FORMAT (WGPUTextureFormat_RGBA16Float)
 
-/** Blend of an upsample pass: half the tent of the level below, half what is there */
 static const WGPUBlendState box_bloom_mix = {
     .color = { WGPUBlendOperation_Add, WGPUBlendFactor_Constant,
-        WGPUBlendFactor_OneMinusConstant },
-    .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_One, WGPUBlendFactor_Zero }
+        WGPUBlendFactor_One },
+    .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_One }
 };
 
-/** Weight an upsample pass gives the tent of the level below it */
-#define BOX_BLOOM_MIX_WEIGHT (0.5)
-
-/** Create one full screen pipeline of the pyramid.
- *
- * @param r The renderer
- * @param module The module holding every entry point
- * @param layout The pipeline layout
- * @param entry Name of the fragment entry point
- * @param blend Blend state of the pass, NULL when it replaces its target
- * @return The pipeline
- */
 static WGPURenderPipeline box_bloom_pipeline(
     box_renderer_t *r,
     WGPUShaderModule module,
@@ -69,7 +43,7 @@ static WGPURenderPipeline box_bloom_pipeline(
 void box_bloom_init(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry entries[3] = {
+    WGPUBindGroupLayoutEntry entries[4] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Fragment,
@@ -89,9 +63,16 @@ void box_bloom_init(
             .binding = 2,
             .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        }, {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 3, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = entries };
     r->pyramid_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
     WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
@@ -105,6 +86,7 @@ void box_bloom_init(
         r->pyramid_first = box_bloom_pipeline(r, module, layout, "fs_first", NULL);
         r->pyramid_down = box_bloom_pipeline(r, module, layout, "fs_down", NULL);
         r->pyramid_up = box_bloom_pipeline(r, module, layout, "fs_up", &box_bloom_mix);
+        r->pyramid_history = box_bloom_pipeline(r, module, layout, "fs_history", NULL);
         wgpuShaderModuleRelease(module);
     }
 
@@ -117,16 +99,31 @@ void box_bloom_fini(
     if (r->pyramid_first) wgpuRenderPipelineRelease(r->pyramid_first);
     if (r->pyramid_down) wgpuRenderPipelineRelease(r->pyramid_down);
     if (r->pyramid_up) wgpuRenderPipelineRelease(r->pyramid_up);
+    if (r->pyramid_history) wgpuRenderPipelineRelease(r->pyramid_history);
     if (r->pyramid_layout) wgpuBindGroupLayoutRelease(r->pyramid_layout);
     r->pyramid_first = NULL;
     r->pyramid_down = NULL;
     r->pyramid_up = NULL;
     r->pyramid_layout = NULL;
+    r->pyramid_history = NULL;
+}
+
+static void box_bloom_history_fini(box_gpu_view_t *v)
+{
+    for (uint32_t i = 0; i < 2; i ++) {
+        if (v->bloom_history_view[i]) wgpuTextureViewRelease(v->bloom_history_view[i]);
+        if (v->bloom_history[i]) wgpuTextureRelease(v->bloom_history[i]);
+        v->bloom_history_view[i] = NULL;
+        v->bloom_history[i] = NULL;
+    }
+    v->bloom_history_valid = false;
+    v->bloom_history_index = 0;
 }
 
 void box_bloom_view_fini(
     box_gpu_view_t *v)
 {
+    box_bloom_history_fini(v);
     uint32_t level;
     for (level = 0; level < BOX_BLOOM_LEVELS_MAX; level ++) {
         if (v->bloom_mips[level]) wgpuTextureViewRelease(v->bloom_mips[level]);
@@ -141,42 +138,32 @@ void box_bloom_view_fini(
     if (v->bloom) wgpuTextureRelease(v->bloom);
     v->bloom_view = NULL;
     v->bloom = NULL;
+    v->bloom_uniform = NULL;
     v->bloom_levels = 0;
     v->bloom_width = 0;
     v->bloom_height = 0;
 }
 
-/** Create the bind group a pass of the pyramid reads a texture through.
- *
- * @param r The renderer
- * @param source The texture the pass samples
- * @return The bind group
- */
 static WGPUBindGroup box_bloom_group(
     box_renderer_t *r,
-    WGPUTextureView source)
+    WGPUTextureView source,
+    WGPUTextureView history)
 {
-    WGPUBindGroupEntry entries[3] = {
+    WGPUBindGroupEntry entries[4] = {
         { .binding = 0, .buffer = r->effect_uniform, .size = sizeof(box_effect_uniform_t) },
         { .binding = 1, .textureView = source },
-        { .binding = 2, .sampler = r->effect_sampler }
+        { .binding = 2, .sampler = r->effect_sampler },
+        { .binding = 3, .textureView = history ? history : source }
     };
     WGPUBindGroupDescriptor desc = {
         .layout = r->pyramid_layout,
-        .entryCount = 3,
+        .entryCount = 4,
         .entries = entries
     };
 
     return wgpuDeviceCreateBindGroup(r->device, &desc);
 }
 
-/** Create the pyramid of the current view for a size and a level count.
- *
- * @param r The renderer
- * @param width Width of the image the pyramid is built from
- * @param height Height of that image
- * @param levels Levels the pyramid holds
- */
 static void box_bloom_resize(
     box_renderer_t *r,
     uint32_t width,
@@ -184,9 +171,10 @@ static void box_bloom_resize(
     uint32_t levels)
 {
     box_bloom_view_fini(r->v);
-    r->v->bloom_width = width / 2 ? width / 2 : 1;
-    r->v->bloom_height = height / 2 ? height / 2 : 1;
+    r->v->bloom_width = width;
+    r->v->bloom_height = height;
     r->v->bloom_levels = levels;
+    r->v->bloom_uniform = r->effect_uniform;
 
     WGPUTextureDescriptor desc = {
         .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
@@ -221,32 +209,23 @@ static void box_bloom_resize(
     });
 
     for (level = 1; level < levels; level ++) {
-        r->v->bloom_down[level] = box_bloom_group(r, r->v->bloom_mips[level - 1]);
-        r->v->bloom_up[level - 1] = box_bloom_group(r, r->v->bloom_mips[level]);
+        r->v->bloom_down[level] = box_bloom_group(r, r->v->bloom_mips[level - 1], NULL);
+        r->v->bloom_up[level - 1] = box_bloom_group(r, r->v->bloom_mips[level], NULL);
     }
 }
 
-/** Record one pass of the pyramid over one of its levels.
- *
- * @param r The renderer
- * @param encoder The command encoder
- * @param pipeline The pipeline of the pass
- * @param group The texture the pass samples
- * @param level The level the pass writes
- * @param slot Index of the effect pass, which is its uniform slot
- * @param mix The pass mixes into the level instead of replacing it
- */
 static void box_bloom_pass(
     box_renderer_t *r,
     WGPUCommandEncoder encoder,
     WGPURenderPipeline pipeline,
     WGPUBindGroup group,
-    uint32_t level,
+    WGPUTextureView target,
     uint32_t slot,
-    bool mix)
+    bool mix,
+    float blend)
 {
     WGPURenderPassColorAttachment color = {
-        .view = r->v->bloom_mips[level],
+        .view = target,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
         .loadOp = mix ? WGPULoadOp_Load : WGPULoadOp_Clear,
         .storeOp = WGPUStoreOp_Store
@@ -255,8 +234,7 @@ static void box_bloom_pass(
     WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "bloom");
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     if (mix) {
-        WGPUColor weight = { BOX_BLOOM_MIX_WEIGHT, BOX_BLOOM_MIX_WEIGHT, BOX_BLOOM_MIX_WEIGHT,
-            BOX_BLOOM_MIX_WEIGHT };
+        WGPUColor weight = { blend, blend, blend, blend };
         wgpuRenderPassEncoderSetBlendConstant(pass, &weight);
     }
 
@@ -267,43 +245,88 @@ static void box_bloom_pass(
     wgpuRenderPassEncoderRelease(pass);
 }
 
+static WGPUTextureView box_bloom_history(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    uint32_t slot,
+    uint32_t frame)
+{
+    box_gpu_view_t *v = r->v;
+    if (!v->bloom_history[0]) {
+        WGPUTextureDescriptor desc = {
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { v->bloom_width, v->bloom_height, 1 },
+            .format = BOX_BLOOM_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1
+        };
+        for (uint32_t i = 0; i < 2; i ++) {
+            v->bloom_history[i] = wgpuDeviceCreateTexture(r->device, &desc);
+            v->bloom_history_view[i] = wgpuTextureCreateView(v->bloom_history[i], NULL);
+        }
+    }
+    bool valid = v->bloom_history_valid && v->bloom_history_slot == slot &&
+        v->bloom_history_frame + 1 == frame;
+    uint32_t next = 1 - v->bloom_history_index;
+    WGPUBindGroup group = box_bloom_group(r, v->bloom_mips[0],
+        valid ? v->bloom_history_view[v->bloom_history_index] : v->bloom_mips[0]);
+    box_bloom_pass(r, encoder, r->pyramid_history, group,
+        v->bloom_history_view[next], slot, false, 0);
+    wgpuBindGroupRelease(group);
+    v->bloom_history_index = next;
+    v->bloom_history_frame = frame;
+    v->bloom_history_slot = slot;
+    v->bloom_history_valid = true;
+    return v->bloom_history_view[next];
+}
+
 WGPUTextureView box_bloom_build(
     box_renderer_t *r,
     const box_effect_t *fx,
     uint32_t slot,
+    uint32_t frame,
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder)
 {
-    WGPUTextureView result = NULL;
-    if (!r->pyramid_first || !r->pyramid_down || !r->pyramid_up || !src) {
-        goto done;
-    }
-
-    uint32_t levels = box_bloom_levels(src->width, src->height, fx->params[1]);
-    uint32_t width = src->width / 2 ? src->width / 2 : 1;
-    uint32_t height = src->height / 2 ? src->height / 2 : 1;
-    if (r->v->bloom_levels != levels || r->v->bloom_width != width ||
-        r->v->bloom_height != height)
+    if (!r->pyramid_first || !r->pyramid_down || !r->pyramid_up ||
+        !r->pyramid_history || !src)
     {
-        box_bloom_resize(r, src->width, src->height, levels);
+        return NULL;
     }
-
-    WGPUBindGroup first = box_bloom_group(r, src->view);
-    box_bloom_pass(r, encoder, r->pyramid_first, first, 0, slot, false);
-
-    uint32_t level;
-    for (level = 1; level < levels; level ++) {
-        box_bloom_pass(r, encoder, r->pyramid_down, r->v->bloom_down[level], level, slot,
-            false);
+    if (fx->params[0] <= 0) {
+        box_bloom_history_fini(r->v);
+        return NULL;
     }
-
-    for (level = levels - 1; level > 0; level --) {
-        box_bloom_pass(r, encoder, r->pyramid_up, r->v->bloom_up[level - 1], level - 1, slot,
-            true);
+    uint32_t width, height;
+    box_bloom_size(src->width, src->height, fx->params[6], fx->params[10] > 0.5f,
+        &width, &height);
+    uint32_t levels = box_bloom_chain(width, height);
+    if (r->v->bloom_levels != levels || r->v->bloom_width != width ||
+        r->v->bloom_height != height || r->v->bloom_uniform != r->effect_uniform)
+    {
+        box_bloom_resize(r, width, height, levels);
     }
-
+    float first_step[2] = { 0.5f / (float)width, 0.5f / (float)height };
+    wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
+        (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE + 12 * sizeof(float),
+        first_step, sizeof(first_step));
+    WGPUBindGroup first = box_bloom_group(r, src->view, NULL);
+    box_bloom_pass(r, encoder, r->pyramid_first, first, r->v->bloom_mips[0],
+        slot, false, 0);
+    for (uint32_t level = 1; level < levels; level ++) {
+        box_bloom_pass(r, encoder, r->pyramid_down, r->v->bloom_down[level],
+            r->v->bloom_mips[level], slot, false, 0);
+    }
+    for (uint32_t level = levels - 1; level > 0; level --) {
+        box_bloom_pass(r, encoder, r->pyramid_up, r->v->bloom_up[level - 1],
+            r->v->bloom_mips[level - 1], slot, true,
+            box_bloom_blend(fx->params, level, levels));
+    }
     wgpuBindGroupRelease(first);
-    result = r->v->bloom_view;
-done:
-    return result;
+    if (fx->params[8] > 0) {
+        return box_bloom_history(r, encoder, slot, frame);
+    }
+    box_bloom_history_fini(r->v);
+    return r->v->bloom_view;
 }

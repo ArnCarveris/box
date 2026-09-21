@@ -691,7 +691,7 @@ void box_effect_run(
         }
 
         if (fx->inputs & BOX_EFFECT_PYRAMID) {
-            pyramid = box_bloom_build(r, fx, slot, src, encoder);
+            pyramid = box_bloom_build(r, fx, slot, p->frame, src, encoder);
         }
 
         if (fx->inputs & BOX_EFFECT_OCCLUSION) {
