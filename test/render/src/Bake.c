@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include <math.h>
 #include "../../../src/render/render_internal.h"
+#include "../../../src/renderer/renderer.h"
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -1280,4 +1281,30 @@ void Bake_equal_distances_still_fill_the_budget(void)
     test_int(box_bake_state_take(&state, 8), 8);
     test_int(state.dirty.count, 48);
     box_bake_state_fini(&state);
+}
+
+void Bake_budget_can_skip_a_mesh(void)
+{
+    ecs_singleton_set(w, BakeSettings, {.enabled = true, .budget = 1});
+    ecs_entity_t near = ecs_new(w);
+    ecs_set(w, near, Position, {0, 0, 2});
+    ecs_set(w, near, Box, {1, 1, 1});
+    ecs_entity_t far = ecs_new(w);
+    ecs_set(w, far, Position, {0, 0, 20});
+    ecs_set(w, far, Sphere, {.radius = 1, .segments = 8});
+    ecs_progress(w, 0);
+
+    box_renderer_t *renderer = box_renderer_create(
+        &(box_renderer_desc_t){ .width = 64, .height = 64 });
+    test_assert(renderer != NULL);
+    box_packet_t *p = box_renderer_acquire(renderer);
+    test_assert(p != NULL);
+    p->width = 64;
+    p->height = 64;
+    box_render_extract(w, p);
+    box_renderer_submit(renderer, p);
+
+    test_int(box_renderer_frames(renderer), 1);
+    test_int(box_renderer_errors(renderer), 0);
+    box_renderer_destroy(renderer);
 }

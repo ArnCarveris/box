@@ -1416,7 +1416,7 @@ static bool box_bake_mesh_grow(
         result = true;
     }
 
-    if (jobs > m->job_capacity) {
+    if (!m->probe_jobs || jobs > m->job_capacity) {
         uint32_t grown = m->job_capacity ? m->job_capacity * 2 : BOX_BAKE_CAPACITY;
         grown = grown < jobs ? jobs : grown;
         if (m->probe_jobs) wgpuBufferRelease(m->probe_jobs);

@@ -147,7 +147,8 @@
                     "unlit_move_defers_the_descriptor_upload",
                     "new_light_flushes_the_deferred_descriptors",
                     "budget_takes_the_nearest_of_many_probes",
-                    "equal_distances_still_fill_the_budget"
+                    "equal_distances_still_fill_the_budget",
+                    "budget_can_skip_a_mesh"
                 ],
                 "setup": true,
                 "teardown": true
