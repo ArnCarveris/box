@@ -122,7 +122,7 @@
 #define BOX_CULL_NO_ARGS (0xFFFFFFFFu)
 
 /** Byte stride between two occlusion uniforms, the alignment a dynamic offset needs */
-#define BOX_HIZ_UNIFORM_STRIDE (256)
+#define BOX_HIZ_UNIFORM_STRIDE (512)
 
 /** Counters the occlusion pass keeps: instances tested and instances found hidden */
 #define BOX_HIZ_STAT_WORDS (2)
@@ -170,6 +170,8 @@ typedef struct box_cull_uniform_t {
     uint32_t arg;    /**< Index of the draw arguments the dispatch counts into */
     uint32_t caster; /**< The dispatch keeps the shadow casters of the range only */
     uint32_t pad[3]; /**< Padding to the 16 byte GPU stride */
+    float clip[16];
+    float pixels[4];
 } box_cull_uniform_t;
 
 /** Frustum, matrices and pyramid extent of one dispatch of the occlusion pass */
@@ -179,6 +181,7 @@ typedef struct box_hiz_uniform_t {
     float planes[BOX_FRUSTUM_PLANES][4]; /**< Planes of the frustum of the view */
     uint32_t range[4];  /**< First slot, instances, first visible slot and argument index */
     uint32_t screen[4]; /**< Pyramid width, height, levels and the mode of the dispatch */
+    float pixels[4];
 } box_hiz_uniform_t;
 
 /** Bind group of the occlusion dispatches of one mesh in one view */

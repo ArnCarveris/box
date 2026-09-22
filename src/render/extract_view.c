@@ -547,22 +547,20 @@ done:
     return;
 }
 
-/** Copy the culling settings of a view into it, the view first and the singleton after.
- *
- * @param world The world
- * @param v The view to fill
- */
 static void box_view_cull(
-    ecs_world_t *world,
-    ecs_entity_t e,
+    const View *view,
     box_view_t *v)
 {
-    const CullSettings *s = box_render_view_setting(world, e, ecs_id(CullSettings));
-    v->cull_enabled = !s || s->enabled ? 1u : 0u;
-    v->cull_threshold = s && s->gpu_threshold > 0 ?
+    const CullSettings *s = &view->culling;
+    bool configured = s->enabled || s->gpu_threshold || s->occlusion ||
+        s->hiz_levels || s->min_dimension_px;
+    v->cull_enabled = !configured || s->enabled ? 1u : 0u;
+    v->cull_threshold = s->gpu_threshold > 0 ?
         (uint32_t)s->gpu_threshold : BOX_CULL_GPU_THRESHOLD;
-    v->occlusion = v->cull_enabled && (!s || s->occlusion) ? 1u : 0u;
-    v->hiz_levels = s && s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
+    v->min_dimension_px = s->min_dimension_px > 0.0f ?
+        s->min_dimension_px : 0.0f;
+    v->occlusion = v->cull_enabled && (!configured || s->occlusion) ? 1u : 0u;
+    v->hiz_levels = s->hiz_levels > 0 ? (uint32_t)s->hiz_levels : 0u;
 }
 
 /** Copy the LOD settings of a view into it, the view first and the singleton after.
@@ -688,7 +686,7 @@ static void box_view_fill(
     box_view_layers(world, state, src->entity, ui, v);
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
-    box_view_cull(world, src->entity, v);
+    box_view_cull(ecs_get(world, src->entity, View), v);
     box_view_lod(world, src->entity, v);
     if (!ui) {
         box_view_overlay(world, src->entity, v);

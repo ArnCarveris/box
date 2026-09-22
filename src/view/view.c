@@ -20,6 +20,11 @@ static void box_bake_ctor(
     int32_t count,
     const ecs_type_info_t *ti);
 
+static void box_cull_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
+
 static void box_view_ctor(
     void *ptr,
     int32_t count,
@@ -35,6 +40,7 @@ static void box_view_ctor(
         memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
         box_shadow_ctor(&v[i].shadows, 1, NULL);
         box_bake_ctor(&v[i].bake, 1, NULL);
+        box_cull_ctor(&v[i].culling, 1, NULL);
         v[i].effects = (ecs_vec_t){0};
         v[i].material_layers = (ecs_vec_t){0};
         v[i].clear.r = BOX_VIEW_CLEAR_R;
@@ -64,8 +70,9 @@ static void box_cull_ctor(
     for (i = 0; i < count; i ++) {
         s[i].enabled = true;
         s[i].gpu_threshold = BOX_CULL_GPU_THRESHOLD;
-        s[i].occlusion = false;
+        s[i].occlusion = true;
         s[i].hiz_levels = BOX_CULL_HIZ_LEVELS;
+        s[i].min_dimension_px = 0.0f;
     }
 }
 
@@ -159,7 +166,6 @@ void BoxViewImport(
     ECS_TAG_DEFINE(world, Layer);
 
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
-    ecs_set_hooks(world, CullSettings, { .ctor = box_cull_ctor });
     ecs_set_hooks(world, ShadowSettings, { .ctor = box_shadow_ctor });
     ecs_set_hooks(world, BakeSettings, { .ctor = box_bake_ctor });
     ecs_set_hooks(world, LodSettings, { .ctor = box_lod_ctor });

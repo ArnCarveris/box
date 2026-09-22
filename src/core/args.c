@@ -353,7 +353,7 @@ int box_parse_args(
         } else {
             ecs_singleton_modified(world, App);
             if (!ecs_script(world, {
-                .entity = box_scene_entity(world, arg), .filename = arg }))
+                .entity = box_scene_entity(world, arg), .filename = arg, .ir = true }))
             {
                 ecs_err("failed to load scene '%s'", arg);
                 goto error;

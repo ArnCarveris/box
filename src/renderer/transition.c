@@ -110,6 +110,9 @@ static void box_transition_transform(
     }
 
     out->bounds[3] = sqrtf(radius);
+    out->half_extent[0] = extent.x;
+    out->half_extent[1] = extent.y;
+    out->half_extent[2] = extent.z;
 }
 
 /** Write the linear albedo and opacity of the instance.

@@ -14,6 +14,7 @@
                 "id": "View",
                 "testcases": [
                     "defaults_of_a_new_view",
+                    "script_sets_culling",
                     "camera_fills_the_view",
                     "views_render_in_priority_order",
                     "world_without_a_view_does_not_render",
@@ -115,8 +116,8 @@
                     "static_instance_carries_its_bounds",
                     "dynamic_instance_carries_its_bounds",
                     "bounds_refresh_when_the_entity_changes",
-                    "settings_fall_back_to_the_singleton",
-                    "settings_of_a_view_override_the_singleton",
+                    "settings_belong_to_the_view",
+                    "two_views_have_independent_settings",
                     "view_without_settings_culls_by_default",
                     "sorted_draws_behind_the_camera_are_culled",
                     "disabled_culling_keeps_every_sorted_draw"
@@ -138,7 +139,7 @@
                     "pyramid_keeps_a_sphere_in_front_of_a_wall",
                     "pyramid_keeps_a_sphere_that_straddles_a_wall",
                     "a_clamped_rectangle_is_never_hidden",
-                    "settings_fall_back_to_the_singleton",
+                    "settings_belong_to_the_view",
                     "view_without_settings_occludes_by_default",
                     "disabled_culling_disables_occlusion"
                 ],

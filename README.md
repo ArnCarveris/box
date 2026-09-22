@@ -42,6 +42,12 @@ registers them, in execution order, with the view. Shadows, effects, and
 material layers are configured independently for every view. The first rendered
 view supplies the light-baking settings for the shared scene bake.
 
+`View.culling.min_dimension_px` sets a per-view minimum projected size for static
+instances. An instance is culled when either its projected width or height is
+smaller than the threshold, measured in the pixels of the view's render target.
+The default is zero, which disables this size check. It applies to static
+batches selected for GPU culling by `View.culling.gpu_threshold`.
+
 ```flecs
 using box.*
 
@@ -55,6 +61,7 @@ post {
 view {
   View: {
     camera: camera,
+    culling: {enabled: true, gpu_threshold: 2048, occlusion: true},
     shadows: {enabled: true, resolution: 2048, max_distance: 200},
     bake: {enabled: true, budget: 16384, probe_spacing: 1},
     effects: [

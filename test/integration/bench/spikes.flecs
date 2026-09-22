@@ -8,8 +8,6 @@ using box.texture
 using box.view
 using box.script
 
-$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
-
 $ { ScriptSettings: {enabled: true, templates_per_frame: 256, budget_ms: 1, nearest_first: true} }
 
 $ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
@@ -108,6 +106,7 @@ icons {
 view {
   box.view.View: {
     camera: camera,
+    culling: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0},
     bake: {enabled: true, probe_spacing: 4, probe_max: 2}
   }
 }

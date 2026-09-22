@@ -767,6 +767,9 @@ void box_render_fill_instance(
     }
 
     box_render_instance_bounds(mesh, &m, out->bounds);
+    out->half_extent[0] = (mesh->bounds_max.x - mesh->bounds_min.x) * 0.5f;
+    out->half_extent[1] = (mesh->bounds_max.y - mesh->bounds_min.y) * 0.5f;
+    out->half_extent[2] = (mesh->bounds_max.z - mesh->bounds_min.z) * 0.5f;
 }
 
 void box_render_instance_init(

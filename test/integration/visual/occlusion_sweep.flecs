@@ -6,8 +6,6 @@ using box.light
 using box.view
 using box.movement
 
-$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
-
 $ { EnvironmentLight: {sky_color: {140, 165, 210}, ground_color: {60, 56, 52}, intensity: 2} }
 
 camera {
@@ -48,4 +46,4 @@ behind {
   }
 }
 
-view { box.view.View: {camera: camera, bake: {enabled: false}} }
+view { box.view.View: {camera: camera, culling: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0}, bake: {enabled: false}} }

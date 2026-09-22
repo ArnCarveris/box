@@ -8,3 +8,6 @@
   if (!in_frustum(center, radius)) {
     return;
   }
+  if (!large_enough(base, center, c.clip, c.pixels)) {
+    return;
+  }

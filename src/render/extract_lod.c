@@ -571,6 +571,9 @@ static void box_render_lod_box(
     inst->transform[3] = center.x;
     inst->transform[7] = center.y;
     inst->transform[11] = center.z;
+    inst->half_extent[0] = 0.5f;
+    inst->half_extent[1] = 0.5f;
+    inst->half_extent[2] = 0.5f;
     memcpy(inst->color, n->color, sizeof(inst->color));
     inst->params[0] = n->material[0];
     inst->params[1] = n->material[1];
@@ -642,6 +645,9 @@ static void box_render_lod_part(
     inst->uv_transform[0] = 1.0f;
     inst->uv_transform[1] = 1.0f;
     box_render_instance_bounds(&mesh, &m, inst->bounds);
+    inst->half_extent[0] = (part->max.x - part->min.x) * 0.5f;
+    inst->half_extent[1] = (part->max.y - part->min.y) * 0.5f;
+    inst->half_extent[2] = (part->max.z - part->min.z) * 0.5f;
 }
 
 /** Pixels one world unit of a node covers in the view the walk belongs to.

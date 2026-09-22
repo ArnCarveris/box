@@ -6,6 +6,7 @@ struct Hiz {
   planes: array<vec4<f32>, FRUSTUM_PLANES>,
   range: vec4<u32>,
   screen: vec4<u32>,
+  pixels: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> c: Hiz;
@@ -19,6 +20,8 @@ struct Hiz {
 const WORDS: u32 = u32(INSTANCE_WORDS);
 const BOUNDS: u32 = u32(INSTANCE_BOUNDS);
 const ARGS: u32 = u32(CULL_ARG_WORDS);
+
+#include "screen_size.wgsl"
 
 struct Rect {
   lo: vec2<f32>,

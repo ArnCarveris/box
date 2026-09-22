@@ -183,7 +183,7 @@ void Frustum_bounds_refresh_when_the_entity_changes(void)
     test_assert(fabsf(update->data.bounds[3] - 2.0f * sqrtf(3.0f)) < 1e-4f);
 }
 
-void Frustum_settings_fall_back_to_the_singleton(void)
+void Frustum_settings_belong_to_the_view(void)
 {
     // culling/frustum_culling
     ecs_entity_t cam = ecs_new(w);
@@ -193,7 +193,10 @@ void Frustum_settings_fall_back_to_the_singleton(void)
     ecs_add(w, e, View);
     ecs_get_mut(w, e, View)->camera = cam;
     ecs_modified(w, e, View);
-    ecs_singleton_set(w, CullSettings, {.enabled = false, .gpu_threshold = 64});
+    View *settings = ecs_get_mut(w, e, View);
+    settings->culling.enabled = false;
+    settings->culling.gpu_threshold = 64;
+    ecs_modified(w, e, View);
     box_render_extract(w, &packet);
 
     test_int(packet.views.count, 1);
@@ -202,7 +205,7 @@ void Frustum_settings_fall_back_to_the_singleton(void)
     test_uint(v->cull_threshold, 64);
 }
 
-void Frustum_settings_of_a_view_override_the_singleton(void)
+void Frustum_two_views_have_independent_settings(void)
 {
     // culling/frustum_culling
     ecs_entity_t cam = ecs_new(w);
@@ -212,14 +215,25 @@ void Frustum_settings_of_a_view_override_the_singleton(void)
     ecs_add(w, e, View);
     ecs_get_mut(w, e, View)->camera = cam;
     ecs_modified(w, e, View);
-    ecs_singleton_set(w, CullSettings, {.enabled = false, .gpu_threshold = 64});
-    ecs_set(w, e, CullSettings, {.enabled = true, .gpu_threshold = 512});
+    View *settings = ecs_get_mut(w, e, View);
+    settings->culling.gpu_threshold = 512;
+    ecs_modified(w, e, View);
+    ecs_entity_t other = ecs_new(w);
+    ecs_add(w, other, View);
+    settings = ecs_get_mut(w, other, View);
+    settings->camera = cam;
+    settings->culling.enabled = false;
+    settings->culling.gpu_threshold = 64;
+    ecs_modified(w, other, View);
     box_render_extract(w, &packet);
 
-    test_int(packet.views.count, 1);
+    test_int(packet.views.count, 2);
     box_view_t *v = box_vec_at(&packet.views, 0);
     test_uint(v->cull_enabled, 1);
     test_uint(v->cull_threshold, 512);
+    v = box_vec_at(&packet.views, 1);
+    test_uint(v->cull_enabled, 0);
+    test_uint(v->cull_threshold, 64);
 }
 
 void Frustum_view_without_settings_culls_by_default(void)
@@ -273,7 +287,10 @@ void Frustum_disabled_culling_keeps_every_sorted_draw(void)
     ecs_set(w, cam, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(w);
     ecs_set(w, view, View, {.camera = cam, .enabled = true});
-    ecs_singleton_set(w, CullSettings, {.enabled = false});
+    View *settings = ecs_get_mut(w, view, View);
+    settings->culling.enabled = false;
+    settings->culling.gpu_threshold = BOX_CULL_GPU_THRESHOLD;
+    ecs_modified(w, view, View);
 
     ecs_entity_t front = ecs_new(w);
     ecs_set(w, front, Position, {0, 0, 0});

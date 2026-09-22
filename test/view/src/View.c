@@ -37,6 +37,9 @@ void View_defaults_of_a_new_view(void)
     test_bool(v->enabled, true);
     test_bool(v->shadows.enabled, true);
     test_int(v->shadows.cascades, BOX_SHADOW_CASCADES);
+    test_bool(v->culling.enabled, true);
+    test_int(v->culling.gpu_threshold, BOX_CULL_GPU_THRESHOLD);
+    test_bool(v->culling.occlusion, true);
     test_int(ecs_vec_count(&v->effects), 0);
     test_int(ecs_vec_count(&v->material_layers), 0);
     test_uint(v->camera, 0);
@@ -45,6 +48,43 @@ void View_defaults_of_a_new_view(void)
     test_flt(v->clear_alpha, 1.0f);
     test_int(v->clear.r, BOX_VIEW_CLEAR_R);
     test_assert(ecs_has(w, e, ViewImpl));
+}
+
+void View_script_sets_culling(void)
+{
+    test_int(ecs_script_run(w, "culling",
+        "using box.*\n"
+        "camera { Camera: {fov: 60} }\n"
+        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, occlusion: true, hiz_levels: 3, min_dimension_px: 2}} }\n"
+        "disabled_view { View: {camera: camera, culling: {enabled: false}} }\n", NULL), 0);
+    ecs_entity_t e = ecs_lookup(w, "view");
+    test_assert(e != 0);
+    const View *settings = ecs_get(w, e, View);
+    test_assert(settings != NULL);
+    test_bool(settings->culling.enabled, true);
+    test_int(settings->culling.gpu_threshold, 16);
+    test_bool(settings->culling.occlusion, true);
+    test_int(settings->culling.hiz_levels, 3);
+    test_flt(settings->culling.min_dimension_px, 2);
+    ecs_entity_t disabled = ecs_lookup(w, "disabled_view");
+    test_assert(disabled != 0);
+    const View *disabled_settings = ecs_get(w, disabled, View);
+    test_assert(disabled_settings != NULL);
+    test_bool(disabled_settings->culling.enabled, false);
+    test_int(ecs_script_run(w, "overlay",
+        "using box.view\n"
+        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, occlusion: false, hiz_levels: 3, min_dimension_px: 2}} }\n", NULL), 0);
+    settings = ecs_get(w, e, View);
+    test_bool(settings->culling.occlusion, false);
+    box_render_extract(w, &packet);
+    test_int(packet.views.count, 2);
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    test_uint(v->cull_threshold, 16);
+    test_uint(v->occlusion, 0);
+    test_uint(v->hiz_levels, 3);
+    test_flt(v->min_dimension_px, 2);
+    v = box_vec_at(&packet.views, 1);
+    test_uint(v->cull_enabled, 0);
 }
 
 void View_camera_fills_the_view(void)

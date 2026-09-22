@@ -305,13 +305,16 @@ typedef struct box_instance_t {
     uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
     uint32_t layer_data[BOX_LAYER_DATA_WORDS];
     float clip[4];                   /**< World space clip rectangle: min x, min y, max x, max y */
+    float half_extent[3];
 } box_instance_t;
 
 /** 32 bit words one instance takes in a GPU instance buffer */
-#define BOX_INSTANCE_WORDS (45)
+#define BOX_INSTANCE_WORDS (48)
 
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
+
+#define BOX_INSTANCE_HALF_EXTENT (45)
 
 /** Word the tiling, blend, back face, caster and layer modes of an instance sit in */
 #define BOX_INSTANCE_MODE (30)
@@ -461,6 +464,7 @@ typedef struct box_view_t {
     uint32_t dynamic_count; /**< Dynamic batches of the view */
     uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
     uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
+    float min_dimension_px;
     uint32_t occlusion;     /**< Compute culled static batches are tested against a depth pyramid */
     uint32_t hiz_levels;    /**< Levels of that pyramid, 0 for the whole chain */
     uint32_t strict_layers; /**< A view that lists layers draws its members only */

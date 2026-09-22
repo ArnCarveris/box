@@ -394,6 +394,10 @@ void box_hiz_upload(
         uniform.screen[1] = box_hiz_half(r->v->height);
         uniform.screen[2] = r->v->hiz_levels;
         uniform.screen[3] = 0;
+        uniform.pixels[0] = (float)view->width;
+        uniform.pixels[1] = (float)view->height;
+        uniform.pixels[2] = view->min_dimension_px;
+        uniform.pixels[3] = 0.0f;
         wgpuQueueWriteBuffer(r->gpu_queue, r->hiz_uniform,
             (uint64_t)job->slot * BOX_HIZ_UNIFORM_STRIDE, &uniform, sizeof(uniform));
     }

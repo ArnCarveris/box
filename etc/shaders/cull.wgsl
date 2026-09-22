@@ -8,6 +8,8 @@ struct Cull {
   pad0: u32,
   pad1: u32,
   pad2: u32,
+  clip: mat4x4<f32>,
+  pixels: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> c: Cull;
@@ -20,6 +22,8 @@ const BOUNDS: u32 = u32(INSTANCE_BOUNDS);
 const MODE: u32 = u32(INSTANCE_MODE);
 const NOCAST: u32 = 1u << u32(MODE_NOCAST_SHIFT);
 const ARGS: u32 = u32(CULL_ARG_WORDS);
+
+#include "include/screen_size.wgsl"
 
 fn visible(center: vec3<f32>, radius: f32) -> bool {
   var result = true;
@@ -44,6 +48,9 @@ fn cs_main(@builtin(global_invocation_id) id: vec3<u32>) {
   let center = vec3<f32>(bitcast<f32>(src[base + BOUNDS]),
     bitcast<f32>(src[base + BOUNDS + 1u]), bitcast<f32>(src[base + BOUNDS + 2u]));
   if (!visible(center, bitcast<f32>(src[base + BOUNDS + 3u]))) {
+    return;
+  }
+  if (!large_enough(base, center, c.clip, c.pixels)) {
     return;
   }
   let index = atomicAdd(&args[c.arg * ARGS + 1u], 1u);

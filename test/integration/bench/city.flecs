@@ -6,8 +6,6 @@ using box.light
 using box.view
 
 
-$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
-
 $ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
 
 sun {
@@ -45,4 +43,4 @@ blocks {
   }
 }
 
-view { box.view.View: {camera: camera, bake: {enabled: false}} }
+view { box.view.View: {camera: camera, culling: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0}, bake: {enabled: false}} }

@@ -16,8 +16,6 @@ $ { ScriptSettings: {enabled: false} }
 
 $ { LodSettings: {enabled: true, quality: 1, error_px: 1, hysteresis: 0.25} }
 
-$ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: false, hiz_levels: 0} }
-
 $ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
 
 sun {
@@ -106,4 +104,4 @@ camera {
   Velocity: {0, 0, 30}
 }
 
-view { box.view.View: {camera: camera, bake: {enabled: false}} }
+view { box.view.View: {camera: camera, culling: {enabled: true, gpu_threshold: 2048, occlusion: false, hiz_levels: 0}, bake: {enabled: false}} }

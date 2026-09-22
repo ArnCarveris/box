@@ -68,6 +68,14 @@ ECS_STRUCT(ViewMaterialLayer, {
     bool enabled;
 });
 
+ECS_STRUCT(CullSettings, {
+    bool enabled;
+    int32_t gpu_threshold;
+    bool occlusion;
+    int32_t hiz_levels;
+    float min_dimension_px;
+});
+
 ECS_STRUCT(View, {
     ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
     ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
@@ -75,6 +83,7 @@ ECS_STRUCT(View, {
     ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
     ShadowSettings shadows;
     BakeSettings bake;
+    CullSettings culling;
     ecs_vec(ViewEffect) effects;
     ecs_vec(ViewMaterialLayer) material_layers;
     rgb clear;            /**< Color the target is cleared to */
@@ -113,14 +122,6 @@ extern ECS_TAG_DECLARE(Layer);
 
 /** Fraction of the last cascade the shadows fade out over */
 #define BOX_SHADOW_FADE (0.2f)
-
-/** Frustum and occlusion culling of a view, with the singleton as its default */
-ECS_STRUCT(CullSettings, {
-    bool enabled;          /**< Instances outside the view frustum are skipped, default true */
-    int32_t gpu_threshold; /**< Static instances a batch needs before a compute pass culls it */
-    bool occlusion;        /**< Compute culled batches are occlusion culled, default false */
-    int32_t hiz_levels;    /**< Levels of the depth pyramid, 0 for the whole chain */
-});
 
 /** Static instances a batch needs before the renderer culls it in a compute pass */
 #define BOX_CULL_GPU_THRESHOLD (2048)

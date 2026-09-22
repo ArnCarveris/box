@@ -21,8 +21,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCENE = os.path.join(ROOT, "test", "integration", "visual", "occlusion_sweep.flecs")
 HARNESS = ("using box.surface\n$ { Surface: {width: %d, height: %d, "
            "write_to_file: \"%s\", write_nth: 1} }\n")
-OVERLAY = ("using box.view\n$ { CullSettings: {enabled: true, gpu_threshold: 2048, "
-           "occlusion: false, hiz_levels: 0} }\n")
+OVERLAY = ("using box.view\nview { View: {camera: camera, culling: "
+           "{enabled: true, gpu_threshold: 2048, occlusion: false, hiz_levels: 0}} }\n")
 
 
 def write_temp(text, suffix=".flecs"):

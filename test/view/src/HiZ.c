@@ -252,7 +252,7 @@ void HiZ_a_clamped_rectangle_is_never_hidden(void)
     test_bool(box_hiz_visible(&p, &near_plane), true);
 }
 
-void HiZ_settings_fall_back_to_the_singleton(void)
+void HiZ_settings_belong_to_the_view(void)
 {
     // culling/hi_z
     ecs_entity_t cam = ecs_new(w);
@@ -262,7 +262,10 @@ void HiZ_settings_fall_back_to_the_singleton(void)
     ecs_add(w, e, View);
     ecs_get_mut(w, e, View)->camera = cam;
     ecs_modified(w, e, View);
-    ecs_singleton_set(w, CullSettings, {.enabled = true, .occlusion = false, .hiz_levels = 5});
+    View *settings = ecs_get_mut(w, e, View);
+    settings->culling.occlusion = false;
+    settings->culling.hiz_levels = 5;
+    ecs_modified(w, e, View);
     box_render_extract(w, &packet);
 
     test_int(packet.views.count, 1);
@@ -295,7 +298,10 @@ void HiZ_disabled_culling_disables_occlusion(void)
     ecs_set(w, cam, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(w);
     ecs_set(w, view, View, {.camera = cam, .enabled = true});
-    ecs_singleton_set(w, CullSettings, {.enabled = false, .occlusion = true});
+    View *settings = ecs_get_mut(w, view, View);
+    settings->culling.enabled = false;
+    settings->culling.occlusion = true;
+    ecs_modified(w, view, View);
     box_render_extract(w, &packet);
 
     test_int(packet.views.count, 1);

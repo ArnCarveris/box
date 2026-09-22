@@ -55,7 +55,8 @@
                 "-DCMAKE_C_FLAGS=-DFLECS_SCRIPT_MATH -DFLECS_SCRIPT_PLATFORM -DFLECS_CREATE_MEMBER_ENTITIES",
                 "-DFLECS_SHARED=OFF",
                 "-DFLECS_STATIC=ON",
-                "-DFLECS_TESTS=OFF"
+                "-DFLECS_TESTS=OFF",
+                "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON"
             ]
         },
         "stb": {

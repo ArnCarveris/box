@@ -505,8 +505,11 @@ static void box_cull_write(
  */
 static void box_cull_upload(
     box_renderer_t *r,
+    const box_view_t *view,
     const box_frustum_t *f)
 {
+    float clip[16];
+    box_frustum_mul(view->proj, view->view, clip);
     uint32_t i;
     for (i = 0; i < r->v->draws.count; i ++) {
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, i);
@@ -523,7 +526,12 @@ static void box_cull_upload(
         box_cull_job_t *job = box_vec_at(&r->cull_jobs, i);
         box_cull_draw_t *draw = box_vec_at(&r->v->draws, job->draw);
         box_cull_uniform_t uniform;
+        memset(&uniform, 0, sizeof(uniform));
         memcpy(uniform.planes, f->planes, sizeof(uniform.planes));
+        memcpy(uniform.clip, clip, sizeof(uniform.clip));
+        uniform.pixels[0] = (float)view->width;
+        uniform.pixels[1] = (float)view->height;
+        uniform.pixels[2] = view->min_dimension_px;
         uniform.first = job->first;
         uniform.count = job->count;
         uniform.base = draw->first;
@@ -612,7 +620,7 @@ void box_cull_view(
     uint32_t total = box_cull_reserve(r, box_device_instances(r, true));
     box_cull_grow(r, total ? total : 1);
     box_cull_write(r);
-    box_cull_upload(r, &frustum);
+    box_cull_upload(r, view, &frustum);
     box_hiz_upload(r, view, &frustum);
     r->v->culled = true;
 done:
