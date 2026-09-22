@@ -12,8 +12,8 @@ sun {
 }
 
 camera {
-  Position: {-12.8, 9.455, 25.806}
-  LookAt: {-12.366, 9.044, 25}
+  Position: {3.6279451847, 52.3829040527, 218.9676513672}
+  LookAt: {3.6352291107, 52.0839233398, 218.0134124756}
   Camera: {fov: 55}
   CameraController: {speed: 14}
 }
@@ -24,7 +24,10 @@ post {
   }
 }
 
-view { View: {camera: camera, effects: [{effect: post.gtao, enabled: true}]} }
+view {
+  View: {camera: camera, effects: [{effect: post.gtao, enabled: true}]}
+  CullSettings: {enabled: true, occlusion: true}
+}
 
 const timber: Rgb = {91, 65, 57}
 const roofTile: Rgb = {66, 83, 99}
@@ -1048,4 +1051,4 @@ template Town {
   }
 }
 
-Town sakura_machi(rows: 4, columns: 4, seed: 42)
+Town sakura_machi(rows: 40, columns: 40, seed: 42)
