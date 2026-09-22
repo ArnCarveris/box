@@ -12,8 +12,8 @@ sun {
 }
 
 camera {
-  Position: {14, 7, -18}
-  LookAt: {0, 1, 0}
+  Position: {-12.8, 9.455, 25.806}
+  LookAt: {-12.366, 9.044, 25}
   Camera: {fov: 55}
   CameraController: {speed: 14}
 }
@@ -567,6 +567,7 @@ template VendingMachine {
     Position: {-0.09, 1.22, 0.38}
     Box: {0.74, 0.91, 0.05}
     Rgb: {220, 242, 234}
+    Emissive: {2, {220, 242, 234}}
   }
   for row in 0..3 {
     for col in 0..4 {
@@ -660,7 +661,7 @@ template Shopfront {
       Rgb: cream
     }
   }
-  Lantern() { Position: {-width / 2 - 0.1, 1.68, 0.62} }
+  Lantern() { Position: {-width / 2 + 0.1, 1.48, 0.62} }
   Planter(blossoms: true) { Position: {-width * 0.34, 0, 0.7} }
 }
 
@@ -1014,7 +1015,11 @@ template Town {
           roofColor: tileColor, shop: shop) {
           Position: {-0.3, 0.1, -0.35}
         }
-        VendingMachine(color: accents[rng.u(4)]) { Position: {2.45, 0.1, 1.6} }
+
+        if rng.f(1) > 0.6 {
+          VendingMachine(color: accents[rng.u(4)]) { Position: {2.45, 0.1, 1.6} }
+        }
+
         Planter() { Position: {2.52, 0.1, 2.45} }
         CherryTree() { Position: {2.35, 0.1, -2.35} }
       }

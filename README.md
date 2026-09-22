@@ -38,8 +38,9 @@ applications, tests and benchmarks alike, keeps every world identical.
 
 Rendering requires an explicit `View`. The built-in effects and material layers
 are prefab definitions: an application instantiates the effects it needs and
-registers them, in execution order, with the view. Shadows, effects, and material
-layers are configured independently for every view.
+registers them, in execution order, with the view. Shadows, effects, and
+material layers are configured independently for every view. The first rendered
+view supplies the light-baking settings for the shared scene bake.
 
 ```flecs
 using box.*
@@ -55,6 +56,7 @@ view {
   View: {
     camera: camera,
     shadows: {enabled: true, resolution: 2048, max_distance: 200},
+    bake: {enabled: true, budget: 16384, probe_spacing: 1},
     effects: [
       {effect: post.bloom, enabled: true},
       {effect: post.tonemap, enabled: true}

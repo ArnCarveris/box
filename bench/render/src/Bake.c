@@ -33,12 +33,12 @@ void Bake_invalidate_one_of_100k(bench_t *b)
     packet.width = 1920;
     packet.height = 1080;
 
-    ecs_singleton_set(world, BakeSettings, {.enabled = true});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, -160});
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .enabled = true});
+    ecs_set(world, view, View, {
+        .camera = camera, .bake = {.enabled = true}, .enabled = true});
 
     int32_t i;
     for (i = 0; i < BENCH_STATIC_LIGHTS; i ++) {

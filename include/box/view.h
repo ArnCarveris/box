@@ -47,6 +47,17 @@ ECS_STRUCT(ShadowSettings, {
     float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
 });
 
+ECS_STRUCT(BakeSettings, {
+    bool enabled;
+    int32_t budget;
+    float probe_spacing;
+    int32_t probe_max;
+    int32_t x;
+    int32_t y;
+    int32_t z;
+    int32_t steps;
+});
+
 ECS_STRUCT(ViewEffect, {
     ecs_entity_t effect;
     bool enabled;
@@ -63,6 +74,7 @@ ECS_STRUCT(View, {
     ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
     ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
     ShadowSettings shadows;
+    BakeSettings bake;
     ecs_vec(ViewEffect) effects;
     ecs_vec(ViewMaterialLayer) material_layers;
     rgb clear;            /**< Color the target is cleared to */

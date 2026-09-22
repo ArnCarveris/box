@@ -7,8 +7,6 @@ using box.camera
 using box.light
 using box.view
 
-$ { BakeSettings: {enabled: false} }
-
 $ { LodSettings: {enabled: false} }
 
 $ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: true, hiz_levels: 0} }
@@ -93,4 +91,4 @@ city {
   }
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: false}} }

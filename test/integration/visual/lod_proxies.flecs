@@ -14,8 +14,6 @@ using box.light
 using box.view
 using box.job
 
-$ { BakeSettings: {enabled: false} }
-
 $ { JobSettings: {workers: -1, budget_ms: 0} }
 
 $ { LodSettings: {enabled: true, quality: 1, error_px: 8, hysteresis: 0.25} }
@@ -133,4 +131,4 @@ rigs {
   }
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: false}} }

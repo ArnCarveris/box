@@ -5,7 +5,6 @@ using box.camera
 using box.light
 
 $ {
-  BakeSettings: {enabled: true}
   EnvironmentLight: {sky_color: {40, 50, 70}, ground_color: {30, 26, 22}, intensity: 0.35}
 }
 
@@ -122,4 +121,4 @@ lights {
   }
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: true}} }

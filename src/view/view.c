@@ -15,6 +15,11 @@ static void box_shadow_ctor(
     int32_t count,
     const ecs_type_info_t *ti);
 
+static void box_bake_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
+
 static void box_view_ctor(
     void *ptr,
     int32_t count,
@@ -29,6 +34,7 @@ static void box_view_ctor(
         memset(v[i].layers, 0, sizeof(v[i].layers));
         memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
         box_shadow_ctor(&v[i].shadows, 1, NULL);
+        box_bake_ctor(&v[i].bake, 1, NULL);
         v[i].effects = (ecs_vec_t){0};
         v[i].material_layers = (ecs_vec_t){0};
         v[i].clear.r = BOX_VIEW_CLEAR_R;
@@ -113,6 +119,26 @@ static void box_shadow_ctor(
     }
 }
 
+static void box_bake_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)ti;
+    BakeSettings *s = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        s[i].enabled = true;
+        s[i].budget = BOX_BAKE_BUDGET;
+        s[i].probe_spacing = BOX_BAKE_SPACING;
+        s[i].probe_max = BOX_BAKE_PROBE_MAX;
+        s[i].x = BOX_BAKE_GRID_X;
+        s[i].y = BOX_BAKE_GRID_Y;
+        s[i].z = BOX_BAKE_GRID_Z;
+        s[i].steps = BOX_BAKE_STEPS;
+    }
+}
+
 void BoxViewImport(
     ecs_world_t *world)
 {
@@ -123,6 +149,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, RenderTarget);
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, ShadowSettings);
+    ECS_META_COMPONENT(world, BakeSettings);
     ECS_META_COMPONENT(world, ViewEffect);
     ECS_META_COMPONENT(world, ViewMaterialLayer);
     ECS_META_COMPONENT(world, View);
@@ -134,6 +161,7 @@ void BoxViewImport(
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
     ecs_set_hooks(world, CullSettings, { .ctor = box_cull_ctor });
     ecs_set_hooks(world, ShadowSettings, { .ctor = box_shadow_ctor });
+    ecs_set_hooks(world, BakeSettings, { .ctor = box_bake_ctor });
     ecs_set_hooks(world, LodSettings, { .ctor = box_lod_ctor });
     ecs_set_hooks(world, RenderTarget, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ViewImpl, { .ctor = flecs_default_ctor });

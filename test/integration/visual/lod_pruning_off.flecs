@@ -10,8 +10,6 @@ using box.light
 using box.view
 using box.lod
 
-$ { BakeSettings: {enabled: false} }
-
 $ { LodSettings: {enabled: true, quality: 1, error_px: 1.5, hysteresis: 0.25} }
 
 $ { EnvironmentLight: {sky_color: {120, 140, 175}, ground_color: {45, 43, 40}, intensity: 1} }
@@ -105,4 +103,4 @@ tower_far {
   LodPin
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: false}} }

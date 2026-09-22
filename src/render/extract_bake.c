@@ -32,8 +32,9 @@ void box_render_extract_bake(
     RenderState *state,
     box_packet_t *p)
 {
-    const BakeSettings *s = box_render_view_setting(world, box_render_primary_view(state),
-        ecs_id(BakeSettings));
+    ecs_entity_t primary = box_render_primary_view(state);
+    const View *view = primary ? ecs_get(world, primary, View) : NULL;
+    const BakeSettings *s = view ? &view->bake : NULL;
     p->bake.enabled = s && s->enabled ? 1u : 0u;
     p->bake.budget = s && s->budget > 0 ? (uint32_t)s->budget : BOX_BAKE_BUDGET;
     p->bake.spacing = s && s->probe_spacing > 0 ? s->probe_spacing : BOX_BAKE_SPACING;

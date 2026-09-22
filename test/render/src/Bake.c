@@ -11,6 +11,15 @@
 
 static ecs_world_t *w;
 static box_packet_t packet;
+static ecs_entity_t view;
+
+static void Bake_set_settings(
+    BakeSettings value)
+{
+    View *settings = ecs_get_mut(w, view, View);
+    settings->bake = value;
+    ecs_modified(w, view, View);
+}
 
 void Bake_setup(void)
 {
@@ -22,8 +31,10 @@ void Bake_setup(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t view = ecs_new(w);
-    ecs_set(w, view, View, {.camera = cam, .enabled = true});
+    view = ecs_new(w);
+    ecs_add(w, view, View);
+    ecs_get_mut(w, view, View)->camera = cam;
+    ecs_modified(w, view, View);
 }
 
 void Bake_teardown(void)
@@ -76,7 +87,7 @@ void Bake_light_under_dynamic_parent_is_dynamic(void)
 void Bake_static_lights_are_listed_unculled(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t behind = ecs_new(w);
     ecs_set(w, behind, Position, {0, 0, -20});
     ecs_set(w, behind, PointLight, {.intensity = 2, .range = 2});
@@ -91,7 +102,7 @@ void Bake_static_lights_are_listed_unculled(void)
 void Bake_dynamic_light_not_in_bake_lights(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_add(w, e, DynamicTransform);
     ecs_set(w, e, Position, {0, 0, 5});
@@ -104,7 +115,7 @@ void Bake_dynamic_light_not_in_bake_lights(void)
 void Bake_bake_lights_empty_when_disabled(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = false});
+    Bake_set_settings((BakeSettings){.enabled = false});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, PointLight, {.intensity = 2, .range = 10});
@@ -131,7 +142,7 @@ void Bake_settings_defaults(void)
 void Bake_settings_override(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {
+    Bake_set_settings((BakeSettings){
         .enabled = true, .budget = 8, .x = 16, .y = 4, .z = 16, .steps = 12});
     box_render_extract(w, &packet);
     test_int(packet.bake.enabled, 1);
@@ -145,7 +156,7 @@ void Bake_settings_override(void)
 void Bake_emissive_static_is_an_emitter(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {1, 2, 3});
     ecs_set(w, e, Box, {2, 2, 2});
@@ -166,7 +177,7 @@ void Bake_emissive_static_is_an_emitter(void)
 void Bake_emissive_dynamic_is_not_an_emitter(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_add(w, e, DynamicTransform);
     ecs_set(w, e, Position, {1, 2, 3});
@@ -180,7 +191,7 @@ void Bake_emissive_dynamic_is_not_an_emitter(void)
 void Bake_emitters_empty_when_disabled(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = false});
+    Bake_set_settings((BakeSettings){.enabled = false});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {1, 2, 3});
     ecs_set(w, e, Box, {2, 2, 2});
@@ -193,7 +204,7 @@ void Bake_emitters_empty_when_disabled(void)
 void Bake_static_instance_is_flagged_baked(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -214,7 +225,7 @@ void Bake_static_instance_is_flagged_baked(void)
 void Bake_toggle_requeues_every_instance(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = false});
+    Bake_set_settings((BakeSettings){.enabled = false});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -229,7 +240,7 @@ void Bake_toggle_requeues_every_instance(void)
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 0);
 
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     box_packet_reset(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -415,7 +426,7 @@ void Bake_emitter_lights_a_probe(void)
 void Bake_moved_instance_marks_its_probe(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -444,7 +455,7 @@ void Bake_moved_instance_marks_its_probe(void)
 void Bake_moved_instance_marks_only_its_neighbourhood(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t light = ecs_new(w);
     ecs_set(w, light, Position, {0, 0, 0});
     ecs_set(w, light, PointLight, {.intensity = 5, .range = 8});
@@ -482,7 +493,7 @@ void Bake_moved_instance_marks_only_its_neighbourhood(void)
 void Bake_moved_light_marks_the_probes_in_range(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t light = ecs_new(w);
     ecs_set(w, light, Position, {0, 0, 5});
     ecs_set(w, light, PointLight, {.intensity = 5, .range = 6});
@@ -517,7 +528,7 @@ void Bake_moved_light_marks_the_probes_in_range(void)
 void Bake_budget_limits_the_probes_per_frame(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     for (i = 0; i < 20; i ++) {
         ecs_entity_t e = ecs_new(w);
@@ -544,7 +555,7 @@ void Bake_budget_limits_the_probes_per_frame(void)
 void Bake_nearest_probes_are_baked_first(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t near = ecs_new(w);
     ecs_set(w, near, Position, {0, 0, 4});
     ecs_set(w, near, Box, {1, 1, 1});
@@ -570,7 +581,7 @@ void Bake_nearest_probes_are_baked_first(void)
 void Bake_disabled_settings_drop_the_probes(void)
 {
     // lighting/light_baking
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -586,7 +597,7 @@ void Bake_disabled_settings_drop_the_probes(void)
     box_packet_reset(&packet);
     packet.width = 640;
     packet.height = 480;
-    ecs_singleton_set(w, BakeSettings, {.enabled = false});
+    Bake_set_settings((BakeSettings){.enabled = false});
     box_render_extract(w, &packet);
     box_bake_state_apply(&state, &packet);
     test_assert(!state.enabled);
@@ -598,7 +609,7 @@ void Bake_disabled_settings_drop_the_probes(void)
 void Bake_baking_is_enabled_by_default(void)
 {
     // lighting/bake_resolution
-    const BakeSettings *s = ecs_singleton_get(w, BakeSettings);
+    const BakeSettings *s = &ecs_get(w, view, View)->bake;
     test_assert(s != NULL);
     test_bool(s->enabled, true);
     test_int(s->budget, BOX_BAKE_BUDGET);
@@ -662,7 +673,7 @@ void Bake_grid_dims_clamped_to_the_maximum(void)
 void Bake_large_instance_gets_a_probe_grid(void)
 {
     // lighting/bake_resolution
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 5});
     ecs_set(w, e, Box, {4, 0.5f, 4});
@@ -694,7 +705,7 @@ void Bake_large_instance_gets_a_probe_grid(void)
 void Bake_pool_reuses_the_probes_of_a_removed_instance(void)
 {
     // lighting/bake_resolution
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t big = ecs_new(w);
     ecs_set(w, big, Position, {0, 0, 5});
     ecs_set(w, big, Box, {4, 0.5f, 4});
@@ -785,7 +796,7 @@ void Bake_grid_probe_sits_on_the_bounds(void)
 void Bake_grid_probe_follows_the_instance_scale(void)
 {
     // lighting/bake_resolution
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {2, 0, 6});
     ecs_set(w, e, Box, {4, 0.5f, 2});
@@ -946,7 +957,7 @@ void Bake_trilinear_sample_mixes_the_corners(void)
 void Bake_move_without_static_light_marks_only_itself(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     ecs_entity_t moved = 0;
     for (i = 0; i < 9; i ++) {
@@ -978,7 +989,7 @@ void Bake_move_without_static_light_marks_only_itself(void)
 void Bake_move_near_static_light_marks_neighbours(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t light = ecs_new(w);
     ecs_set(w, light, Position, {0, 0, 5});
     ecs_set(w, light, PointLight, {.intensity = 5, .range = 6});
@@ -1014,7 +1025,7 @@ void Bake_move_near_static_light_marks_neighbours(void)
 void Bake_move_invalidates_the_old_and_the_new_position(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t here_light = ecs_new(w);
     ecs_set(w, here_light, Position, {0, 0, 5});
     ecs_set(w, here_light, PointLight, {.intensity = 5, .range = 4});
@@ -1069,7 +1080,7 @@ void Bake_move_invalidates_the_old_and_the_new_position(void)
 void Bake_move_keeps_the_pool_layout(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     ecs_entity_t big = ecs_new(w);
     ecs_set(w, big, Position, {0, 0, 5});
     ecs_set(w, big, Box, {4, 0.5f, 4});
@@ -1120,7 +1131,7 @@ void Bake_move_keeps_the_pool_layout(void)
 void Bake_unlit_move_defers_the_descriptor_upload(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     ecs_entity_t moved = 0;
     for (i = 0; i < 9; i ++) {
@@ -1162,7 +1173,7 @@ void Bake_unlit_move_defers_the_descriptor_upload(void)
 void Bake_new_light_flushes_the_deferred_descriptors(void)
 {
     // lighting/bake_churn
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     ecs_entity_t moved = 0;
     for (i = 0; i < 9; i ++) {
@@ -1218,7 +1229,7 @@ void Bake_new_light_flushes_the_deferred_descriptors(void)
 void Bake_budget_takes_the_nearest_of_many_probes(void)
 {
     // responsiveness/acquire_stall
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     ecs_entity_t last = 0;
     for (i = 0; i < 200; i ++) {
@@ -1263,7 +1274,7 @@ void Bake_budget_takes_the_nearest_of_many_probes(void)
 void Bake_equal_distances_still_fill_the_budget(void)
 {
     // responsiveness/acquire_stall
-    ecs_singleton_set(w, BakeSettings, {.enabled = true});
+    Bake_set_settings((BakeSettings){.enabled = true});
     int32_t i;
     for (i = 0; i < 64; i ++) {
         ecs_entity_t e = ecs_new(w);
@@ -1287,7 +1298,7 @@ void Bake_equal_distances_still_fill_the_budget(void)
 
 void Bake_budget_can_skip_a_mesh(void)
 {
-    ecs_singleton_set(w, BakeSettings, {.enabled = true, .budget = 1});
+    Bake_set_settings((BakeSettings){.enabled = true, .budget = 1});
     ecs_entity_t near = ecs_new(w);
     ecs_set(w, near, Position, {0, 0, 2});
     ecs_set(w, near, Box, {1, 1, 1});

@@ -48,7 +48,6 @@ void BoxLightImport(
     ECS_META_COMPONENT(world, SpotLight);
     ECS_META_COMPONENT(world, EnvironmentLight);
     ECS_META_COMPONENT(world, ClusterSettings);
-    ECS_META_COMPONENT(world, BakeSettings);
     ECS_META_COMPONENT(world, LightModulator);
     ECS_TAG_DEFINE(world, LightModulatorParams);
 
@@ -61,17 +60,6 @@ void BoxLightImport(
     ecs_add_pair(world, ecs_id(DirectionalLight), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(PointLight), EcsWith, ecs_id(WorldTransform));
     ecs_add_pair(world, ecs_id(SpotLight), EcsWith, ecs_id(WorldTransform));
-
-    ecs_singleton_set(world, BakeSettings, {
-        .enabled = true,
-        .budget = BOX_BAKE_BUDGET,
-        .probe_spacing = BOX_BAKE_SPACING,
-        .probe_max = BOX_BAKE_PROBE_MAX,
-        .x = BOX_BAKE_GRID_X,
-        .y = BOX_BAKE_GRID_Y,
-        .z = BOX_BAKE_GRID_Z,
-        .steps = BOX_BAKE_STEPS
-    });
 
     ecs_singleton_set(world, ClusterSettings, {
         .x = BOX_CLUSTER_X,

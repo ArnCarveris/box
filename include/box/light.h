@@ -85,18 +85,6 @@ ECS_STRUCT(EnvironmentLight, {
     ecs_entity_t source; /**< Reserved for a cubemap or sky entity, 0 for now */
 });
 
-/** GPU bake of static lights and emissive surfaces into per instance probes, a singleton */
-ECS_STRUCT(BakeSettings, {
-    bool enabled;          /**< Static instances read baked probes instead of the static lights */
-    int32_t budget;        /**< Probes rebaked per frame, zero takes the default */
-    float probe_spacing;   /**< World units between two probes, zero takes the default */
-    int32_t probe_max;     /**< Probes an instance gets on one axis, zero takes the default */
-    int32_t x;             /**< Occupancy voxels across the scene, zero takes the default */
-    int32_t y;             /**< Occupancy voxels up the scene, zero takes the default */
-    int32_t z;             /**< Occupancy voxels through the scene, zero takes the default */
-    int32_t steps;         /**< Ray march samples per visibility test, zero takes the default */
-});
-
 /** Froxel grid the renderer assigns point and spot lights to, a singleton */
 ECS_STRUCT(ClusterSettings, {
     int32_t x;          /**< Clusters across the view, default 16 */

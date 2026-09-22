@@ -14,8 +14,6 @@ using box.script
 
 $ { ScriptSettings: {enabled: false} }
 
-$ { BakeSettings: {enabled: false} }
-
 $ { LodSettings: {enabled: true, quality: 1, error_px: 1, hysteresis: 0.25} }
 
 $ { CullSettings: {enabled: true, gpu_threshold: 2048, occlusion: false, hiz_levels: 0} }
@@ -108,4 +106,4 @@ camera {
   Velocity: {0, 0, 30}
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: false}} }

@@ -345,7 +345,6 @@ typedef struct box_emitter_t {
     float range;        /**< Distance at which the emitted light reaches zero */
 } box_emitter_t;
 
-/** Settings of the baked lighting pass, copied from the BakeSettings singleton */
 typedef struct box_bake_t {
     uint32_t enabled;   /**< Static instances read baked probes instead of the static lights */
     uint32_t budget;    /**< Probes rebaked per frame */
