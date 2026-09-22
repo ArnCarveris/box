@@ -141,6 +141,19 @@ def compare_baseline(name, png, update):
     return result
 
 
+def visual_scripts(scene):
+    sources_path = os.path.splitext(scene)[0] + ".sources"
+    sources = []
+    if os.path.isfile(sources_path):
+        base = os.path.dirname(sources_path)
+        with open(sources_path) as f:
+            for path in f.read().splitlines():
+                path = path.strip()
+                if path:
+                    sources.append(os.path.abspath(os.path.join(base, path)))
+    return [*sources, os.path.abspath(scene)]
+
+
 def run_visual(scenes, out, env, frames, width, height, update=False):
     os.makedirs(out, exist_ok=True)
     results = []
@@ -152,7 +165,7 @@ def run_visual(scenes, out, env, frames, width, height, update=False):
                           % (width, height, png))
             harness_path = harness.name
         proc = bake(["run", "box_app", env_flag(env), "--cfg", "release", "--",
-                     "--headless", "--frames", str(frames), harness_path, os.path.abspath(scene)])
+                     "--headless", "--frames", str(frames), harness_path, *visual_scripts(scene)])
         os.unlink(harness_path)
         rendered = proc.returncode == 0 and os.path.isfile(png)
         cmp = compare_baseline(name, png, update) if rendered else {"ok": False, "status": "missing"}

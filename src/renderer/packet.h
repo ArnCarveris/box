@@ -137,23 +137,14 @@
 /** Shader slot of the pass that writes the motion vectors of a view */
 #define BOX_SHADER_MOTION (12)
 
-/** Shader slot of the histogram and adaptation passes of the auto exposure */
-#define BOX_SHADER_EXPOSURE (13)
-
-/** Shader slot of the downsample and upsample passes of the bloom pyramid */
-#define BOX_SHADER_PYRAMID (14)
-
-/** Ambient occlusion trace and resolve passes the occlusion input runs */
-#define BOX_SHADER_GTAO (15)
-
 /** Shader slot of the pass that draws the rectangles of the frame rate panel */
-#define BOX_SHADER_OVERLAY (16)
+#define BOX_SHADER_OVERLAY (13)
 
 /** Shader slot of the pass that draws the debug line list */
-#define BOX_SHADER_LINES (17)
+#define BOX_SHADER_LINES (14)
 
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (18)
+#define BOX_SHADER_BUILTIN_MAX (15)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -176,32 +167,19 @@
 /** The pass reads the motion vectors of the view */
 #define BOX_EFFECT_MOTION (8u)
 
-/** The frame blurs the image the pass reads into a pyramid and binds it */
-#define BOX_EFFECT_PYRAMID (16u)
-
-/** The frame adapts the exposure of the view from the parameters of the pass */
-#define BOX_EFFECT_EXPOSURE (32u)
-
-/** The frame traces the ambient occlusion of the view and binds it for the pass */
-#define BOX_EFFECT_OCCLUSION (64u)
-
 /** The pass reads the display transform lookup cube the engine ships */
-#define BOX_EFFECT_LUT (128u)
+#define BOX_EFFECT_TEXTURE (16u)
 
-/** Float of the tone mapping parameter block that names its display transform */
-#define BOX_EFFECT_TONE_CURVE (2)
+#define BOX_EFFECT_TEXTURE_MAX (8u)
 
-/** Bins of the log luminance histogram the exposure pass builds */
-#define BOX_EXPOSURE_BINS (256)
+#define BOX_EFFECT_TEXTURE_NONE UINT32_MAX
 
-/** Texels one workgroup of the histogram pass covers on each axis */
-#define BOX_EXPOSURE_GROUP (16)
-
-/** Log2 luminance the first histogram bin above black starts at */
-#define BOX_EXPOSURE_MIN_LOG (-10.0f)
-
-/** Stops the histogram bins above black cover */
-#define BOX_EXPOSURE_LOG_RANGE (16.0f)
+#define BOX_EFFECT_SETUP_NONE (0u)
+#define BOX_EFFECT_SETUP_COMPUTE (1u)
+#define BOX_EFFECT_SETUP_MIP_CHAIN (2u)
+#define BOX_EFFECT_SETUP_TEMPORAL (3u)
+#define BOX_EFFECT_TEXTURE_RG16 (0u)
+#define BOX_EFFECT_TEXTURE_RGBA16 (1u)
 
 /** Shader handle of a shader that has none yet, which asks for a new one */
 #define BOX_SHADER_NONE (0xFFFFFFFFu)
@@ -284,27 +262,16 @@
 /** Bit that says the 2D shape of an instance is a soft fill instead of a border */
 #define BOX_MODE_SOFT_SHIFT (4)
 
-/** Bit that says the wear words of an instance hold per entity layer amounts */
-#define BOX_MODE_WEAR_SHIFT (5)
+#define BOX_MODE_LAYER_DATA_SHIFT (5)
 
 /** Bit that says the clip words of an instance hold a clip rectangle */
 #define BOX_MODE_CLIP_SHIFT (6)
 
-/** Words the per entity material layer amounts of an instance take.
- *
- * The first holds the dust, grime, edge and wetness amounts as unsigned bytes,
- * the second the burn and scratch amounts, the noise seed and the feature scale;
- * every one of them is a factor of what the scene set on the layer, so an
- * instance without the component leaves both words at zero and the shader reads
- * the neutral one instead.
- */
-#define BOX_WEAR_WORDS (2)
+#define BOX_LAYER_DATA_WORDS (2)
 
-/** Steps of one unit the feature scale byte of a wear word holds */
-#define BOX_WEAR_SCALE_STEP (64.0f)
+#define BOX_LAYER_DATA_SCALE_STEP (64.0f)
 
-/** Largest feature scale a wear word can hold, which is a full byte of steps */
-#define BOX_WEAR_SCALE_MAX (255.0f / BOX_WEAR_SCALE_STEP)
+#define BOX_LAYER_DATA_SCALE_MAX (255.0f / BOX_LAYER_DATA_SCALE_STEP)
 
 /** Words the packed 2D shape parameters of an instance take.
  *
@@ -334,7 +301,7 @@ typedef struct box_instance_t {
     uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
     float bounds[4];       /**< World space bounding sphere: center xyz and radius */
     uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
-    uint32_t wear[BOX_WEAR_WORDS];   /**< Packed per entity layer amounts, zero without them */
+    uint32_t layer_data[BOX_LAYER_DATA_WORDS];
     float clip[4];                   /**< World space clip rectangle: min x, min y, max x, max y */
 } box_instance_t;
 
@@ -351,7 +318,7 @@ typedef struct box_instance_t {
 #define BOX_INSTANCE_SHAPE (35)
 
 /** Word the packed per entity layer amounts of an instance start at */
-#define BOX_INSTANCE_WEAR (39)
+#define BOX_INSTANCE_LAYER_DATA (39)
 
 /** Word the clip rectangle of an instance starts at */
 #define BOX_INSTANCE_CLIP (41)
@@ -599,6 +566,14 @@ typedef struct box_mesh_cmd_t {
 /** One post process pass of a view, in the order the chain runs them */
 typedef struct box_effect_t {
     uint32_t shader;  /**< Shader handle of the pass */
+    uint32_t texture;
+    uint32_t setup_shader;
+    uint32_t setup_kind;
+    uint32_t setup_format;
+    int32_t setup_parameter[4];
+    uint32_t setup_workgroup_size;
+    uint32_t setup_buffer_size[2];
+    float setup_initial[4];
     uint32_t inputs;  /**< BOX_EFFECT bits of the inputs the pass declared */
     float scale;      /**< Resolution scale of its output, 1 for the view size */
     float params[BOX_EFFECT_PARAM_MAX]; /**< Uniform block of its parameter component */
@@ -626,15 +601,6 @@ static inline void box_effect_size(
     *out_height = h ? h : 1;
 }
 
-/** Whether the scene passes of a view render into the float scene target.
- *
- * A view with a chain draws the mesh, transparent and glass passes into a
- * pooled RGBA16F target so what they push past white reaches the tone map at
- * the end of the chain; a view without one keeps the direct 8 bit path.
- *
- * @param v The view
- * @return True when the scene passes write a float target
- */
 static inline bool box_view_hdr(
     const box_view_t *v)
 {
@@ -695,10 +661,11 @@ static inline float box_effect_encode_flag(
 }
 
 /** Display transform lookup cube to upload, the renderer owns the texel array */
-typedef struct box_lut_cmd_t {
+typedef struct box_effect_texture_cmd_t {
+    uint32_t handle;
     uint32_t dim;     /**< Texels along one edge of the cube */
     uint32_t *texels; /**< dim cubed RGB9E5 texels, freed by the renderer */
-} box_lut_cmd_t;
+} box_effect_texture_cmd_t;
 
 /** WGSL module to compile, the renderer takes ownership of the source */
 typedef struct box_shader_cmd_t {
@@ -947,20 +914,7 @@ static inline uint32_t box_instance_layers(
     return inst->uv_mode >> BOX_MODE_LAYER_SHIFT;
 }
 
-/** Write the per entity material layer amounts of an instance into its wear words.
- *
- * Every amount is a factor of what the scene set on its layer and is clamped to
- * zero to one; the seed is clamped the same way and the feature scale counts in
- * steps of one over BOX_WEAR_SCALE_STEP, so a scale of one is exact. The mode
- * bit is what tells the shader the words hold anything, so an instance without
- * the components keeps them at zero and reads the neutral values.
- *
- * @param inst The instance
- * @param amounts Dust, grime, edge, wetness, burn and scratch
- * @param seed Noise offset of every layer of the instance
- * @param scale Feature size multiplier of every layer of the instance
- */
-static inline void box_instance_set_wear(
+static inline void box_instance_set_layer_data(
     box_instance_t *inst,
     const float *amounts,
     float seed,
@@ -973,47 +927,41 @@ static inline void box_instance_set_wear(
     }
 
     packed[6] = seed;
-    inst->wear[0] = 0;
-    inst->wear[1] = 0;
+    inst->layer_data[0] = 0;
+    inst->layer_data[1] = 0;
     for (i = 0; i < 7; i ++) {
         float v = packed[i] < 0.0f ? 0.0f : packed[i];
         uint32_t byte = (uint32_t)(v > 1.0f ? 255.0f : v * 255.0f + 0.5f);
-        inst->wear[i >> 2] |= byte << ((i & 3) * 8);
+        inst->layer_data[i >> 2] |= byte << ((i & 3) * 8);
     }
 
-    float steps = scale < 0.0f ? 0.0f : scale * BOX_WEAR_SCALE_STEP + 0.5f;
+    float steps = scale < 0.0f ? 0.0f : scale * BOX_LAYER_DATA_SCALE_STEP + 0.5f;
     uint32_t scale_byte = (uint32_t)(steps > 255.0f ? 255.0f : steps);
 
-    inst->wear[1] |= scale_byte << 24;
-    inst->uv_mode |= 1u << BOX_MODE_WEAR_SHIFT;
+    inst->layer_data[1] |= scale_byte << 24;
+    inst->uv_mode |= 1u << BOX_MODE_LAYER_DATA_SHIFT;
 }
 
-/** Check whether the wear words of an instance hold per entity layer amounts.
- *
- * @param inst The instance
- * @return True when the instance carries them
- */
-static inline bool box_instance_worn(
+static inline bool box_instance_has_layer_data(
     const box_instance_t *inst)
 {
-    return (inst->uv_mode & (1u << BOX_MODE_WEAR_SHIFT)) != 0;
+    return (inst->uv_mode & (1u << BOX_MODE_LAYER_DATA_SHIFT)) != 0;
 }
 
 /** Read one of the per entity layer values of an instance back.
  *
  * @param inst The instance
  * @param index 0 to 5 the amounts, 6 the seed and 7 the feature scale
- * @return The value, the neutral one when the instance carries no wear
  */
-static inline float box_instance_wear(
+static inline float box_instance_layer_data(
     const box_instance_t *inst,
     uint32_t index)
 {
     float result = index == 6 ? 0.0f : 1.0f;
-    if (box_instance_worn(inst)) {
-        uint32_t byte = (inst->wear[index >> 2] >> ((index & 3) * 8)) & 0xFFu;
+    if (box_instance_has_layer_data(inst)) {
+        uint32_t byte = (inst->layer_data[index >> 2] >> ((index & 3) * 8)) & 0xFFu;
         result = index == 7 ?
-            (float)byte / BOX_WEAR_SCALE_STEP : (float)byte / 255.0f;
+            (float)byte / BOX_LAYER_DATA_SCALE_STEP : (float)byte / 255.0f;
     }
 
     return result;
@@ -1442,7 +1390,7 @@ typedef struct box_packet_t {
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
     box_vec_t texture_destroy;               /**< uint32_t handles */
     box_vec_t shader_create;                 /**< box_shader_cmd_t of the shaders that changed */
-    box_vec_t lut_create;                    /**< box_lut_cmd_t of the lookup cubes to upload */
+    box_vec_t effect_texture_create;
     uint32_t layer_count;                    /**< Layers the scene has registered */
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     uint32_t modulator_count;                /**< Light modulators the scene has registered */
@@ -1492,7 +1440,7 @@ static inline void box_packet_init(
     box_vec_init(&p->texture_create, sizeof(box_texture_cmd_t));
     box_vec_init(&p->texture_destroy, sizeof(uint32_t));
     box_vec_init(&p->shader_create, sizeof(box_shader_cmd_t));
-    box_vec_init(&p->lut_create, sizeof(box_lut_cmd_t));
+    box_vec_init(&p->effect_texture_create, sizeof(box_effect_texture_cmd_t));
     box_vec_init(&p->static_updates, sizeof(box_static_update_t));
     box_vec_init(&p->static_counts, sizeof(box_static_count_t));
     box_vec_init(&p->static_groups, sizeof(box_static_group_t));
@@ -1546,7 +1494,7 @@ static inline void box_packet_reset(
     box_vec_clear(&p->texture_create);
     box_vec_clear(&p->texture_destroy);
     box_vec_clear(&p->shader_create);
-    box_vec_clear(&p->lut_create);
+    box_vec_clear(&p->effect_texture_create);
     box_vec_clear(&p->static_updates);
     box_vec_clear(&p->static_counts);
     box_vec_clear(&p->static_groups);
@@ -1579,7 +1527,7 @@ static inline void box_packet_fini(
     box_vec_fini(&p->texture_create);
     box_vec_fini(&p->texture_destroy);
     box_vec_fini(&p->shader_create);
-    box_vec_fini(&p->lut_create);
+    box_vec_fini(&p->effect_texture_create);
     box_vec_fini(&p->static_updates);
     box_vec_fini(&p->static_counts);
     box_vec_fini(&p->static_groups);

@@ -15,11 +15,4 @@
 void box_tint_init(
     ecs_world_t *world);
 
-/** Create the built in layer entities under box.material.layers.
- *
- * @param world The world
- */
-void box_material_layers_init(
-    ecs_world_t *world);
-
 #endif

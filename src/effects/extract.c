@@ -9,7 +9,6 @@
  */
 
 #include "effects_internal.h"
-#include "../sky/sky_internal.h"
 
 /** Order two effects by their order and then by their entity.
  *
@@ -183,6 +182,7 @@ static void box_effect_params(
     ecs_world_t *world,
     EffectState *state,
     ecs_entity_t e,
+    ecs_entity_t component,
     float *out)
 {
     memset(out, 0, BOX_EFFECT_PARAM_MAX * sizeof(float));
@@ -194,6 +194,10 @@ static void box_effect_params(
     int32_t i;
     for (i = 0; i < type->count; i ++) {
         ecs_id_t id = type->array[i];
+        if (component && id != component) {
+            continue;
+        }
+
         if (id & ECS_ID_FLAGS_MASK || id == ecs_id(Effect)) {
             continue;
         }
@@ -262,25 +266,53 @@ static void box_effect_append(
 
     box_effect_t *pass = box_vec_push(&p->effects);
     pass->shader = impl->handle;
+    pass->setup_shader = BOX_SHADER_NONE;
+    pass->setup_kind = EffectSetupNone;
+    pass->setup_format = EffectTextureRg16Float;
+    memset(pass->setup_parameter, -1, sizeof(pass->setup_parameter));
+    pass->setup_workgroup_size = 1;
+    pass->setup_buffer_size[0] = 0;
+    pass->setup_buffer_size[1] = 0;
+    memset(pass->setup_initial, 0, sizeof(pass->setup_initial));
+    const EffectSetup *setup = fx->setup ? ecs_get(world, fx->setup, EffectSetup) : NULL;
+    const ShaderImpl *setup_impl = setup && setup->shader ?
+        ecs_get(world, setup->shader, ShaderImpl) : NULL;
+    if (setup && setup_impl && setup_impl->assigned) {
+        pass->setup_shader = setup_impl->handle;
+        pass->setup_kind = setup->kind;
+        pass->setup_format = setup->format;
+        pass->setup_parameter[0] = setup->parameter0;
+        pass->setup_parameter[1] = setup->parameter1;
+        pass->setup_parameter[2] = setup->parameter2;
+        pass->setup_parameter[3] = setup->parameter3;
+        pass->setup_workgroup_size = setup->workgroup_size > 0 ?
+            (uint32_t)setup->workgroup_size : 1;
+        pass->setup_buffer_size[0] = setup->buffer0_size > 0 ?
+            (uint32_t)setup->buffer0_size : 0;
+        pass->setup_buffer_size[1] = setup->buffer1_size > 0 ?
+            (uint32_t)setup->buffer1_size : 0;
+        pass->setup_initial[0] = setup->initial.x;
+        pass->setup_initial[1] = setup->initial.y;
+        pass->setup_initial[2] = setup->initial.z;
+        pass->setup_initial[3] = setup->initial.w;
+    }
     pass->scale = fx->scale > 0.0f ? fx->scale : 1.0f;
     pass->inputs = fx->color ? BOX_EFFECT_COLOR : 0u;
     pass->inputs |= fx->depth ? BOX_EFFECT_DEPTH : 0u;
     pass->inputs |= fx->normals ? BOX_EFFECT_NORMALS : 0u;
     pass->inputs |= fx->motion ? BOX_EFFECT_MOTION : 0u;
-    pass->inputs |= fx->pyramid ? BOX_EFFECT_PYRAMID : 0u;
-    pass->inputs |= fx->exposure ? BOX_EFFECT_EXPOSURE : 0u;
-    pass->inputs |= fx->occlusion ? BOX_EFFECT_OCCLUSION : 0u;
-    box_effect_params(world, state, e, pass->params);
-    if (ecs_has(world, e, Fog)) {
-        box_sky_fog(world, v, pass->params);
-    }
-
-    const ToneMapping *tone = ecs_get(world, e, ToneMapping);
-    if (tone && tone->curve == ToneMapTony) {
-        if (box_effect_lut(state, p)) {
-            pass->inputs |= BOX_EFFECT_LUT;
-        } else {
-            pass->params[BOX_EFFECT_TONE_CURVE] = (float)ToneMapNeutral;
+    box_effect_params(world, state, e, fx->params, pass->params);
+    const EffectTexture *texture = fx->texture ?
+        ecs_get(world, fx->texture, EffectTexture) : NULL;
+    bool use_texture = texture && (texture->parameter < 0 ||
+        (texture->parameter < BOX_EFFECT_PARAM_MAX &&
+        pass->params[texture->parameter] == texture->value));
+    pass->texture = BOX_EFFECT_TEXTURE_NONE;
+    if (use_texture) {
+        int32_t handle = box_effect_texture(world, state, fx->texture, p);
+        if (handle >= 0) {
+            pass->texture = (uint32_t)handle;
+            pass->inputs |= BOX_EFFECT_TEXTURE;
         }
     }
 

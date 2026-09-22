@@ -112,8 +112,6 @@ static void box_shader_rebuild(
     case BOX_SHADER_BAKE_GRID:
     case BOX_SHADER_BAKE: box_bake_fini(r); box_bake_init(r); break;
     case BOX_SHADER_BLUR: box_transparent_fini(r); box_transparent_init(r); break;
-    case BOX_SHADER_EXPOSURE:
-    case BOX_SHADER_PYRAMID:
     case BOX_SHADER_MOTION: box_effect_fini(r); box_effect_init(r); break;
     case BOX_SHADER_OVERLAY: box_overlay_fini(r); box_overlay_init(r); break;
     case BOX_SHADER_LINES: box_lines_fini(r); break;

@@ -22,7 +22,6 @@ atmosphere {
   Atmosphere: {
     sun: sun
     sun_disk_intensity: 30
-    fog_intensity: 2
     world_units_per_km: 150
     ground_albedo: {90, 95, 85}
     night_tint: {40, 60, 120}

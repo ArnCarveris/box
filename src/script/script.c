@@ -5,8 +5,22 @@
 
 #define BOX_SCRIPT_IMPL
 #include "script_internal.h"
+#include "../shader/shader_internal.h"
 
 ECS_COMPONENT_DECLARE(ScriptState);
+
+ecs_entity_t box_script_load(
+    ecs_world_t *world,
+    const char *path)
+{
+    char resolved[BOX_SHADER_PATH_MAX];
+    if (!box_shader_resolve(path, resolved, sizeof(resolved))) {
+        ecs_err("box.script: %s: file not found", path);
+        return 0;
+    }
+
+    return ecs_script(world, { .filename = resolved });
+}
 
 /** Free the instantiation state of a world.
  *

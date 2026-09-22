@@ -9,8 +9,7 @@
 #include <string.h>
 #include "../../../src/shader/shader_internal.h"
 
-/** Effect shaders the engine registers next to the builtin slots */
-#define SHADER_EFFECT_COUNT (7)
+#define SHADER_LIBRARY_COUNT (14)
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -81,6 +80,8 @@ void Shader_setup(void)
     shader_log_prev = ecs_os_api.log_;
     ecs_os_api.log_ = shader_log;
     ECS_IMPORT(w, Box);
+    test_assert(box_script_load(w, BOX_EFFECTS_BUILTINS) != 0);
+    test_assert(box_script_load(w, BOX_MATERIAL_LAYERS_BUILTINS) != 0);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -117,7 +118,7 @@ void Shader_builtin_mesh_shader_reaches_the_packet(void)
     // effects/shader_component
     box_render_extract(w, &packet);
 
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + SHADER_EFFECT_COUNT);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + SHADER_LIBRARY_COUNT);
     const char *source = shader_source(BOX_SHADER_MESH);
     test_assert(source != NULL);
     test_assert(strstr(source, "@vertex fn vs_main") != NULL);
@@ -166,7 +167,7 @@ void Shader_unchanged_shader_is_sent_once(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Shader, { .path = "etc/simple.wgsl" });
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + SHADER_EFFECT_COUNT + 1);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + SHADER_LIBRARY_COUNT + 1);
     shader_drain();
 
     box_render_extract(w, &packet);

@@ -163,7 +163,7 @@ typedef struct RenderState {
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
     bool hide_used;           /**< A Hidden tag exists, so instances resolve their visibility */
-    bool worn;                /**< A Wear exists, so instances pack their layer amounts */
+    bool layer_data;
     bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
     bool clipped;             /**< A clip rectangle exists, so instances resolve their clip */
     bool transitioned;        /**< A transition exists, so instances resolve displayed values */
@@ -668,7 +668,6 @@ void box_render_instance_bounds(
  * @param tiled The world holds tiling components, so the uv transform is derived
  * @param shaped The world holds 2D shapes, so the shape words are derived
  * @param clipped The world holds clip rectangles, so the clip words are derived
- * @param worn The world holds a Wear, so the per entity layer amounts are packed
  * @param layers The registry when a material enables a layer, NULL when none does
  * @param transition The transitions of the entity, NULL when it has none
  * @param time The time the transitions are displayed at
@@ -684,7 +683,7 @@ void box_render_fill_instance(
     bool textured,
     bool tiled,
     bool shaped,
-    bool worn,
+    bool layer_data,
     bool clipped,
     const RenderState *layers,
     const TransitionState *transition,

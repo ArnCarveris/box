@@ -115,8 +115,7 @@
                     "extract_steady",
                     "extract_moving_sun",
                     "extract_moon_and_stars",
-                    "advance_the_clock",
-                    "extract_sky_fog"
+                    "advance_the_clock"
                 ]
             },
             {
@@ -134,9 +133,9 @@
                 ]
             },
             {
-                "id": "Wear",
+                "id": "LayerData",
                 "benchcases": [
-                    "extract_10k_with_wear"
+                    "extract_10k_with_layer_data"
                 ]
             }
         ]

@@ -1,20 +1,3 @@
-/**
- * @file render/extract_transition.c
- * @brief Writes the transitions of a static instance onto the frame packet.
- *
- * A transition reaches the renderer once, on the frame it starts. The command
- * carries the values the author assigned, the context the instance is composed
- * from and one record per channel that is still moving, which is everything the
- * renderer thread needs to compute the value of every later frame on its own.
- * An entity whose transitions cannot be expressed that way, because two records
- * move the same channel, keeps being extracted by the game side instead. So
- * does an entity whose only moving transition is on a component the renderer
- * has no channel for, such as Wear, which is what makes such a transition work
- * on a static instance: it costs one extraction per frame while it runs and
- * nothing after. A transition that moves both kinds at once keeps the renderer
- * records and leaves the other component to the frames the entity is extracted.
- */
-
 #include "render_internal.h"
 
 /** Channel of the instance a transitioned component feeds.

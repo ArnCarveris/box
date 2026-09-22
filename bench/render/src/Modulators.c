@@ -13,7 +13,6 @@
 
 void Modulators_extract_10k_plain_sun(bench_t *b)
 {
-    // ore_engine/cloud_shadows
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     box_packet_t packet;
@@ -62,7 +61,6 @@ void Modulators_extract_10k_plain_sun(bench_t *b)
 
 void Modulators_extract_10k_modulated_sun(bench_t *b)
 {
-    // ore_engine/cloud_shadows
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     box_packet_t packet;
@@ -71,13 +69,14 @@ void Modulators_extract_10k_modulated_sun(bench_t *b)
     packet.height = 1080;
 
     ecs_entity_t plugin = ecs_new(world);
-    ecs_set(world, plugin, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
+    ecs_set(world, plugin, Shader, {.path = "bench/render/etc/modulator.wgsl"});
+    ecs_entity_t params = ecs_id(LayerParams);
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {1.0f, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 3});
-    ecs_set(world, sun, LightModulator, {.shader = plugin, .enabled = true});
-    ecs_set(world, sun, CloudShadows, {
-        .scale = 24, .speed = 2, .density = 0.6f, .softness = 0.4f});
+    ecs_set(world, sun, LightModulator, {
+        .shader = plugin, .params = params, .enabled = true});
+    ecs_set(world, sun, LayerParams, {.a = {24, 2, 0.6f, 0.4f}});
 
     ecs_entity_t *scene = ecs_os_malloc_n(ecs_entity_t, BENCH_MODULATOR_COUNT);
     int32_t i;

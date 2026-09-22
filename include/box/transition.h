@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 /** Number of floats a single transitioned value is made of */
-#define BOX_TRANSITION_MAX (4)
+#define BOX_TRANSITION_MAX (8)
 
 /** Curve the progress of a transition follows between its start and its end */
 ECS_ENUM(TimingFunction, {

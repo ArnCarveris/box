@@ -8,8 +8,6 @@
 
 #include <box.h>
 #include "../shader/shader_internal.h"
-#include "../renderer/gtao.h"
-#include "../renderer/ssr.h"
 
 /** One entry of the effect stack while it is being ordered */
 typedef struct box_effect_src_t {
@@ -29,8 +27,10 @@ typedef struct EffectState {
     bool layout_raw[BOX_EFFECT_LAYOUT_MAX];    /**< The component is floats end to end */
     int32_t layout_size[BOX_EFFECT_LAYOUT_MAX]; /**< Bytes such a component copies */
     int32_t layout_count; /**< Entries of that table in use */
-    bool lut_sent;        /**< The display transform cube reached a packet */
-    bool lut_failed;      /**< The cube could not be read, which was logged once */
+    ecs_entity_t texture_entity[BOX_EFFECTS_MAX];
+    bool texture_sent[BOX_EFFECTS_MAX];
+    bool texture_failed[BOX_EFFECTS_MAX];
+    int32_t texture_count;
 } EffectState;
 
 extern ECS_COMPONENT_DECLARE(EffectState);
@@ -44,8 +44,10 @@ extern ECS_COMPONENT_DECLARE(EffectState);
  * @param p The packet
  * @return true when the renderer has the cube
  */
-bool box_effect_lut(
+int32_t box_effect_texture(
+    ecs_world_t *world,
     EffectState *state,
+    ecs_entity_t texture,
     box_packet_t *p);
 
 /** Build the effect chain of one view into a packet.

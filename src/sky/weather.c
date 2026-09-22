@@ -1,28 +1,7 @@
-/**
- * @file sky/weather.c
- * @brief Blends the overcast, fog and rain of a world on top of its atmosphere.
- *
- * The three amounts of a Weather are targets. This file eases the amounts the
- * frame is drawn with toward them over the transition of the component, so a
- * weather written from a command arrives over a second instead of between two
- * frames, and hands the rain to the wetness material layer. The sky, the light
- * of the view and the fog read the blended amounts while they are extracted,
- * which is what keeps the atmosphere itself the base of all three.
- *
- * The amounts those three read are not quite the amounts of the weather: a rain
- * greys the sky and thickens the air it falls through, so it is added to the
- * overcast and the fog of the world on the way out. `Weather.current` keeps the
- * three amounts as they were asked for, which is what a scene reads back.
- */
-
 #include "sky_internal.h"
 #include <math.h>
 
 ECS_COMPONENT_DECLARE(WeatherBlend);
-ECS_COMPONENT_DECLARE(CloudShadowsBlend);
-
-/** Path of the material layer the rain of a world wets */
-#define BOX_WEATHER_WETNESS "box.material.layers.wetness"
 
 /** Hold an amount between a clear zero and a full one.
  *
@@ -75,11 +54,9 @@ static void box_weather_step(
     float delta)
 {
     float overcast = box_weather_clamp(w->overcast);
-    float fog = box_weather_clamp(w->fog);
     float rain = box_weather_clamp(w->rain);
     if (!b->started) {
         b->amounts.overcast = overcast;
-        b->amounts.fog = fog;
         b->amounts.rain = rain;
         b->started = true;
         goto done;
@@ -87,7 +64,6 @@ static void box_weather_step(
 
     b->amounts.overcast = box_weather_ease(b->amounts.overcast, overcast,
         w->transition, delta);
-    b->amounts.fog = box_weather_ease(b->amounts.fog, fog, w->transition, delta);
     b->amounts.rain = box_weather_ease(b->amounts.rain, rain, w->transition, delta);
 done:
     w->current = b->amounts;
@@ -106,86 +82,6 @@ static float box_weather_raise(
     return box_weather_clamp(amount + raise);
 }
 
-/** Hand the rain of a world to the wetness material layer.
- *
- * The layer is a registration of the material module, so a world that never
- * imported it keeps its weather and only misses the wet surfaces.
- *
- * @param world The world
- * @param rain Part of the rain that falls on the world
- */
-static void box_weather_wetness(
-    ecs_world_t *world,
-    float rain)
-{
-    ecs_entity_t e = ecs_lookup(world, BOX_WEATHER_WETNESS);
-    LayerParams *params = e ? ecs_get_mut(world, e, LayerParams) : NULL;
-    if (!params) {
-        goto done;
-    }
-
-    params->a.w = rain;
-done:
-    return;
-}
-
-/** Hand the overcast of a world to every cloud deck that follows it.
- *
- * The deck is a light modulator of the light module, so a world that never
- * registered one keeps its weather and only misses the moving shadows.
- *
- * @param world The world
- * @param overcast Part of the sky the cloud deck of the weather covers
- */
-static void box_weather_clouds(
-    ecs_world_t *world,
-    float overcast)
-{
-    const SkyState *state = ecs_singleton_get(world, SkyState);
-    if (!state || !state->clouds) {
-        goto done;
-    }
-
-    ecs_iter_t it = ecs_query_iter(world, state->clouds);
-    while (ecs_query_next(&it)) {
-        CloudShadows *clouds = ecs_field(&it, CloudShadows, 0);
-        CloudShadowsBlend *blend = ecs_field(&it, CloudShadowsBlend, 1);
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            if (!blend[i].automatic) {
-                continue;
-            }
-
-            clouds[i].density = overcast;
-            blend[i].written = overcast;
-        }
-    }
-
-done:
-    return;
-}
-
-/** A cloud deck was written: a density of zero hands it back to the weather.
- *
- * @param it Iterator over the cloud decks that were set
- */
-static void box_weather_clouds_set(
-    ecs_iter_t *it)
-{
-    CloudShadows *clouds = ecs_field(it, CloudShadows, 0);
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        CloudShadowsBlend *blend = ecs_get_mut(it->world, it->entities[i],
-            CloudShadowsBlend);
-        if (!blend) {
-            continue;
-        }
-
-        blend->automatic = clouds[i].density <= 0.0f ||
-            (blend->automatic && clouds[i].density == blend->written);
-    }
-}
-
 /** Blend every weather of the world and drive what the amounts reach.
  *
  * @param it The system iterator
@@ -199,9 +95,6 @@ static void BoxSkyWeatherUpdate(
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         box_weather_step(&w[i], &b[i], it->delta_time);
-        box_weather_wetness(it->world, b[i].amounts.rain);
-        box_weather_clouds(it->world, box_weather_raise(b[i].amounts.overcast,
-            b[i].amounts.rain * BOX_WEATHER_RAIN_OVERCAST));
     }
 }
 
@@ -223,7 +116,6 @@ bool box_sky_weather(
             *out = w[0].current;
             out->overcast = box_weather_raise(out->overcast,
                 out->rain * BOX_WEATHER_RAIN_OVERCAST);
-            out->fog = box_weather_raise(out->fog, out->rain * BOX_WEATHER_RAIN_FOG);
             result = true;
         }
 
@@ -237,13 +129,6 @@ done:
 void box_sky_weather_init(
     ecs_world_t *world)
 {
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(CloudShadows), .inout = EcsIn }},
-        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
-        .events = { EcsOnSet },
-        .callback = box_weather_clouds_set
-    });
-
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxSkyWeatherUpdate" }),
         .phase = EcsOnUpdate,

@@ -9,8 +9,7 @@
 #include <string.h>
 #include "../../../src/render/render_internal.h"
 
-/** Effect shaders the engine registers next to the builtin slots */
-#define LAYER_EFFECT_SHADERS (7)
+#define LAYER_SHADER_COUNT (4)
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -43,6 +42,7 @@ void Layers_setup(void)
     layer_log_prev = ecs_os_api.log_;
     ecs_os_api.log_ = layer_log;
     ECS_IMPORT(w, Box);
+    test_assert(box_script_load(w, BOX_MATERIAL_LAYERS_BUILTINS) != 0);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -80,7 +80,7 @@ void Layers_built_in_layers_are_registered(void)
 
     const MaterialLayer *layer = ecs_get(w, dust, MaterialLayer);
     test_assert(layer != NULL);
-    test_assert(layer->wgsl != NULL);
+    test_assert(layer->shader != 0);
     test_int(layer->order, 10);
     const LayerParams *params = ecs_get(w, dust, LayerParams);
     test_assert(params != NULL);
@@ -106,7 +106,7 @@ void Layers_registration_produces_the_ordered_command(void)
 
     test_int(layers[0].order, 0);
     test_int(layers[3].order, 30);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_EFFECT_SHADERS);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_SHADER_COUNT);
     box_shader_cmd_t *cmd = box_vec_at(&packet.shader_create, 0);
     test_uint(cmd->handle, BOX_SHADER_MESH);
     test_assert(strstr(cmd->source, "fn layer_3(") != NULL);
@@ -121,7 +121,7 @@ void Layers_command_is_sent_once(void)
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_EFFECT_SHADERS);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_SHADER_COUNT);
 
     uint32_t i;
     for (i = 0; i < packet.shader_create.count; i ++) {
@@ -138,7 +138,7 @@ void Layers_order_sorts_the_command(void)
 {
     // materials/material_layers
     ecs_entity_t mine = ecs_new(w);
-    ecs_set(w, mine, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).albedo = p.a.rgb;\n"),
+    ecs_set(w, mine, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
         .order = -5 });
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
@@ -160,14 +160,14 @@ void Layers_unregistration_renumbers_and_resends(void)
 {
     // materials/material_layers
     ecs_entity_t mine = ecs_new(w);
-    ecs_set(w, mine, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).albedo = p.a.rgb;\n"),
+    ecs_set(w, mine, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
         .order = -5 });
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
     box_render_extract(w, &packet);
-    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_EFFECT_SHADERS);
+    test_int(packet.shader_create.count, BOX_SHADER_BUILTIN_MAX + LAYER_SHADER_COUNT);
     test_int(box_instance_layers(&((box_static_update_t*)box_vec_at(&packet.static_updates,
         0))->data), 1u << 2);
 
@@ -358,7 +358,7 @@ void Layers_project_layer_gets_a_bit(void)
 {
     // materials/material_layers
     ecs_entity_t mine = ecs_new(w);
-    ecs_set(w, mine, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).albedo = p.a.rgb;\n"),
+    ecs_set(w, mine, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
         .order = 100 });
     ecs_set(w, mine, LayerParams, { .a = {1, 0, 0, 1} });
     ecs_entity_t e = ecs_new(w);
@@ -373,8 +373,7 @@ void Layers_project_layer_gets_a_bit(void)
     test_int(layers[4].order, 100);
     box_shader_cmd_t *cmd = box_vec_at(&packet.shader_create, 0);
     test_assert(strstr(cmd->source,
-        "fn layer_4(s: ptr<function, Surface>, p: LayerParams) {\n"
-        "(*s).albedo = p.a.rgb;\n") != NULL);
+        "fn layer_4(s: ptr<function, Surface>, p: LayerParams)") != NULL);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
     test_int(box_instance_layers(&u->data), 1u << 4);
     test_flt(packet.layer_params[4].a[0], 1.0f);
@@ -386,7 +385,7 @@ void Layers_limit_is_an_error_logged_once(void)
     int32_t i;
     for (i = 0; i < 13; i ++) {
         ecs_entity_t extra = ecs_new(w);
-        ecs_set(w, extra, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).alpha = p.a.w;\n"),
+        ecs_set(w, extra, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
             .order = 100 + i });
     }
 
@@ -407,7 +406,7 @@ void Layers_limit_is_an_error_logged_once(void)
 
     box_packet_reset(&packet);
     ecs_entity_t extra = ecs_new(w);
-    ecs_set(w, extra, MaterialLayer, { .wgsl = ecs_os_strdup("(*s).alpha = p.a.w;\n"),
+    ecs_set(w, extra, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
         .order = 200 });
     box_render_extract(w, &packet);
     test_int(packet.layer_count, BOX_LAYER_MAX);

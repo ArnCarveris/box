@@ -1,8 +1,3 @@
-/**
- * @file Ibl.c
- * @brief Tests for the environment and the fog the atmosphere drives.
- */
-
 #include <box.h>
 #include <box/sky.h>
 #include <bake_test.h>
@@ -13,7 +8,6 @@ static ecs_world_t *w;
 static box_packet_t packet;
 static ecs_entity_t sun;
 static ecs_entity_t atmosphere;
-static ecs_entity_t fog;
 
 void Ibl_setup(void)
 {
@@ -31,9 +25,6 @@ void Ibl_setup(void)
     atmosphere = ecs_new(w);
     ecs_set(w, atmosphere, Atmosphere, {.sun = sun});
     ecs_singleton_set(w, EnvironmentLight, {.intensity = 1, .source = atmosphere});
-    fog = ecs_lookup(w, "box.effects.stack.fog");
-    ecs_get_mut(w, fog, Effect)->enabled = true;
-    ecs_modified(w, fog, Effect);
 }
 
 void Ibl_teardown(void)
@@ -45,159 +36,6 @@ void Ibl_teardown(void)
 
     box_packet_fini(&packet);
     ecs_fini(w);
-}
-
-void Ibl_the_fog_of_the_view_is_the_first_pass(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-
-    test_int(packet.effects.count, 1);
-    test_int(packet.view.effect_count, 1);
-}
-
-void Ibl_the_fog_color_comes_from_the_sky(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_assert(pass->params[0] > 0.0f);
-    test_assert(pass->params[1] > 0.0f);
-    test_assert(pass->params[2] > 0.0f);
-}
-
-void Ibl_a_low_sun_makes_the_fog_red(void)
-{
-    // sky/sky_ibl
-    ecs_set(w, sun, Rotation, {asinf(0.9f), 0, 0});
-    box_render_extract(w, &packet);
-    const box_effect_t *high = box_vec_at(&packet.effects, 0);
-    float high_ratio = high->params[2] / high->params[0];
-
-    box_packet_reset(&packet);
-    ecs_set(w, sun, Rotation, {asinf(0.02f), 0, 0});
-    box_render_extract(w, &packet);
-    const box_effect_t *low = box_vec_at(&packet.effects, 0);
-    float low_ratio = low->params[2] / low->params[0];
-
-    test_assert(low_ratio < high_ratio * 0.5f);
-}
-
-void Ibl_a_night_fog_keeps_the_night_tint(void)
-{
-    // sky/sky_ibl
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun,
-        .night_tint = {0, 0, 255}, .night_intensity = 0.5f});
-    ecs_set(w, sun, Rotation, {-0.5f, 0, 0});
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_assert(pass->params[0] < 1e-4f);
-    test_assert(fabsf(pass->params[2] - 0.5f) < 1e-3f);
-}
-
-void Ibl_the_fog_density_follows_the_world_scale(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-    float wide = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun, .world_units_per_km = 500});
-    box_render_extract(w, &packet);
-    float narrow = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    test_assert(wide > 0.0f);
-    test_assert(fabsf(narrow - wide * 2.0f) < wide * 0.01f);
-}
-
-void Ibl_the_fog_intensity_scales_the_density(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-    float one = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun, .fog_intensity = 4});
-    box_render_extract(w, &packet);
-    float four = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    test_assert(fabsf(four - one * 4.0f) < one * 0.01f);
-}
-
-void Ibl_the_fog_falloff_follows_the_aerosol_layer(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-    float expect = 1.0f / (BOX_SKY_MIE_KM * BOX_SKY_UNITS_PER_KM);
-
-    test_assert(fabsf(pass->params[4] - expect) < expect * 1e-3f);
-}
-
-void Ibl_the_fog_sits_at_the_sea_level_of_the_sky(void)
-{
-    // sky/sky_ibl
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun, .sea_level_y = 12});
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_flt(pass->params[7], 12.0f);
-}
-
-void Ibl_a_camera_over_the_haze_sees_thinner_fog(void)
-{
-    // sky/sky_ibl
-    box_render_extract(w, &packet);
-    float low = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun, .ground_altitude_km = 6});
-    box_render_extract(w, &packet);
-    float high = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    test_assert(high < low * 0.6f);
-}
-
-void Ibl_a_negative_fog_intensity_keeps_the_authored_fog(void)
-{
-    // sky/sky_ibl
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun, .fog_intensity = -1});
-    ecs_set(w, fog, Fog, {.color = {0.25f, 0.5f, 0.75f}, .density = 0.125f,
-        .falloff = 0.5f, .start = 3, .max_opacity = 0.5f, .height = 7});
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_flt(pass->params[0], 0.25f);
-    test_flt(pass->params[1], 0.5f);
-    test_flt(pass->params[2], 0.75f);
-    test_flt(pass->params[3], 0.125f);
-    test_flt(pass->params[4], 0.5f);
-    test_flt(pass->params[7], 7.0f);
-}
-
-void Ibl_a_world_without_an_atmosphere_keeps_the_authored_fog(void)
-{
-    // sky/sky_ibl
-    ecs_delete(w, atmosphere);
-    ecs_set(w, fog, Fog, {.color = {0.25f, 0.5f, 0.75f}, .density = 0.125f});
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_flt(pass->params[0], 0.25f);
-    test_flt(pass->params[3], 0.125f);
-}
-
-void Ibl_the_sky_leaves_the_framing_of_the_fog_alone(void)
-{
-    // sky/sky_ibl
-    ecs_set(w, fog, Fog, {.start = 9, .max_opacity = 0.25f});
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-
-    test_flt(pass->params[5], 9.0f);
-    test_flt(pass->params[6], 0.25f);
 }
 
 void Ibl_the_environment_is_filtered_on_the_first_frame(void)

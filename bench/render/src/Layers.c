@@ -21,8 +21,14 @@ void Layers_extract_10k_with_layers(bench_t *b)
     packet.width = 1920;
     packet.height = 1080;
 
-    ecs_entity_t dust = ecs_lookup(world, "box.material.layers.dust");
-    ecs_entity_t grime = ecs_lookup(world, "box.material.layers.grime");
+    ecs_entity_t shader = ecs_new(world);
+    ecs_set(world, shader, Shader, {.path = "bench/render/etc/layer.wgsl"});
+    ecs_entity_t first = ecs_new(world);
+    ecs_set(world, first, MaterialLayer, {.shader = shader, .order = 0});
+    ecs_set(world, first, LayerParams, {.a = {1, 1, 1, 1}});
+    ecs_entity_t second = ecs_new(world);
+    ecs_set(world, second, MaterialLayer, {.shader = shader, .order = 1});
+    ecs_set(world, second, LayerParams, {.a = {1, 1, 1, 1}});
     ecs_entity_t *scene = ecs_os_malloc_n(ecs_entity_t, BENCH_LAYER_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_LAYER_COUNT; i ++) {
@@ -32,9 +38,9 @@ void Layers_extract_10k_with_layers(bench_t *b)
         ecs_set(world, scene[i], Position, {x, 0, z});
         ecs_set(world, scene[i], Box, {1, 1, 1});
         ecs_add_id(world, scene[i], DynamicTransform);
-        ecs_add_pair(world, scene[i], MaterialLayerOn, dust);
+        ecs_add_pair(world, scene[i], MaterialLayerOn, first);
         if (i % 2) {
-            ecs_add_pair(world, scene[i], MaterialLayerOn, grime);
+            ecs_add_pair(world, scene[i], MaterialLayerOn, second);
         }
     }
 

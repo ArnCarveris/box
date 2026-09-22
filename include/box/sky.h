@@ -1,25 +1,3 @@
-/**
- * @file box/sky.h
- * @brief Physically based atmosphere drawn behind the scene, with aerial perspective.
- *
- * An Atmosphere entity describes a planet and the medium around it: the
- * Rayleigh and Mie layers, the ozone and aerosol absorption, the ground albedo
- * and the sun the sky is lit by. The renderer precomputes a transmittance and a
- * multiple scattering table from those parameters, renders a sky view table for
- * the sun direction of the frame and draws the result where the depth target of
- * a view is empty, so the sky is the background of every view of the world.
- *
- * The same tables shade the geometry of the view through an aerial perspective
- * table, which is why distance haze and the sky cannot drift apart, and an
- * `EnvironmentLight` whose `source` names the atmosphere entity prefilters its
- * image based lighting from the sky instead of from its two colors.
- *
- * A `Weather` blends overcast, fog and rain on top of that atmosphere without
- * replacing it, so the sun of a world keeps moving behind an overcast sky. The
- * rain of that weather greys and thickens the air with it and drives a column
- * of drops that follows the camera, which a `Rain` gives the shape of.
- */
-
 #ifndef BOX_SKY_H
 #define BOX_SKY_H
 
@@ -85,8 +63,6 @@ ECS_STRUCT(Atmosphere, {
     float aerial_perspective_distance_km; /**< Distance the haze table reaches, 0 takes 32 */
     float aerial_perspective_intensity;   /**< Density of that haze, 0 takes 1, below 0 is none */
 
-    float fog_intensity; /**< Fog the sky drives, 0 takes 1, below 0 leaves it authored */
-
     float sea_level_y;        /**< World height the ground altitude is measured from */
     float world_units_per_km; /**< World units in one kilometer, 0 takes 1000 */
     float ground_altitude_km; /**< Altitude of the sea level plane over the planet */
@@ -140,37 +116,13 @@ ECS_STRUCT(TimeOfDay, {
     float daylight; /**< Written every frame: 0 in the dark, 1 with the sun up */
 });
 
-/** Amounts of the three weather states a frame is drawn with
- *
- * The three are independent: a world can be overcast without fog and foggy
- * without rain, and every amount runs from a clear zero to a full one.
- */
 ECS_STRUCT(WeatherAmounts, {
     float overcast; /**< Part of the sky the cloud deck covers */
-    float fog;      /**< Part of the fog the air is thickened by */
     float rain;     /**< Part of the rain that falls on the world */
 });
 
-/** Weather of a world, blended on top of the atmosphere
- *
- * The three amounts are targets an agent, a script or a command writes, and
- * `current` is what the frame is drawn with: it eases toward the targets over
- * `transition` seconds, so a weather that is set from a command arrives over a
- * second instead of between two frames. The first frame of a weather snaps,
- * which is what makes a scene that starts overcast overcast in its first
- * capture.
- *
- * Overcast blends the sky and the light of the body that lights the view
- * toward a flat grey, fog raises the density of the fog the sky drives and
- * rain falls as a column of drops around the camera, drives the amount of the
- * wetness material layer and adds to the overcast and the fog of the world, so
- * a rain that arrives greys and thickens the air it falls through. The
- * atmosphere stays the base under all three, so the sun keeps moving behind
- * the clouds.
- */
 ECS_STRUCT(Weather, {
     float overcast;   /**< Cloud deck the sky is blended toward, 0 to 1 */
-    float fog;        /**< Fog the air is thickened by, 0 to 1 */
     float rain;       /**< Rain that falls on the world, 0 to 1 */
     float transition; /**< Seconds an amount eases over, 0 takes four */
 
@@ -232,14 +184,8 @@ ECS_STRUCT(Rain, {
 /** Part of the direct light a full overcast leaves on the scene */
 #define BOX_WEATHER_OVERCAST_LIGHT (0.45f)
 
-/** Density the sky driven fog is multiplied by at full fog */
-#define BOX_WEATHER_FOG_GAIN (14.0f)
-
 /** Overcast a full rain adds to the sky of a world on top of its own */
 #define BOX_WEATHER_RAIN_OVERCAST (0.6f)
-
-/** Fog a full rain adds to the air of a world on top of its own */
-#define BOX_WEATHER_RAIN_FOG (0.35f)
 
 /** Rain under which a world keeps no emitter at all */
 #define BOX_RAIN_EPSILON (0.001f)
@@ -333,20 +279,6 @@ ECS_STRUCT(Rain, {
 
 /** Ground albedo channel of an atmosphere that names none */
 #define BOX_SKY_GROUND_ALBEDO (77)
-
-/** Part of the sunlight a medium scatters that reaches the camera as fog
- *
- * The estimate is the single scattering of a horizontal ray, which the sky
- * itself gathers over many bounces, so the fog is scaled by what the rest of
- * them add.
- */
-#define BOX_SKY_FOG_GAIN (3.0f)
-
-/** Rayleigh phase function at a right angle to the sun, three over sixteen pi */
-#define BOX_SKY_FOG_RAYLEIGH_PHASE (0.0597f)
-
-/** Aerosol phase function at that angle for the default anisotropy */
-#define BOX_SKY_FOG_MIE_PHASE (0.0136f)
 
 /** Radians the sun may move before the environment of a view is filtered again */
 #define BOX_SKY_ENV_EPSILON (0.015f)

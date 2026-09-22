@@ -116,9 +116,9 @@ void box_view_release(
     box_gpu_view_t *v)
 {
     box_transparent_view_fini(v);
-    box_exposure_view_fini(v);
-    box_bloom_view_fini(v);
-    box_gtao_view_fini(v);
+    box_effect_compute_view_fini(v);
+    box_effect_mip_view_fini(v);
+    box_effect_temporal_view_fini(v);
     box_lights_view_fini(v);
     box_cull_view_fini(v);
     box_hiz_view_fini(v);

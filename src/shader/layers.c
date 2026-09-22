@@ -13,6 +13,42 @@
 /** Longest generated line, the dispatch of one layer */
 #define BOX_SHADER_LINE_MAX (128)
 
+#define BOX_LAYER_MACRO_MAX (512)
+
+static void box_shader_layer_body(
+    ecs_world_t *world,
+    const MaterialLayer *layer,
+    int32_t index,
+    ecs_strbuf_t *buf)
+{
+    if (layer && layer->shader) {
+        box_shader_result_t result = { NULL, NULL };
+        const Shader *component = ecs_get(world, layer->shader, Shader);
+        if (component && component->path && component->path[0]) {
+            const char *extra = component->macros ? component->macros : "";
+            char macros[BOX_LAYER_MACRO_MAX];
+            snprintf(macros, sizeof(macros),
+                "BOX_LAYER_SPLICE=1,BOX_LAYER_INDEX=%d,box_material_layer=layer_%d%s%s",
+                index, index, extra[0] ? "," : "", extra);
+            box_shader_preprocess(NULL, component->path, macros, &result);
+        }
+
+        if (result.source) {
+            ecs_strbuf_appendstr(buf, result.source);
+            ecs_strbuf_appendstr(buf, "\n");
+            box_shader_result_fini(&result);
+            return;
+        }
+
+        box_shader_result_fini(&result);
+    }
+
+    char line[BOX_SHADER_LINE_MAX];
+    snprintf(line, sizeof(line),
+        "fn layer_%d(s: ptr<function, Surface>, p: LayerParams) {}\n", index);
+    ecs_strbuf_appendstr(buf, line);
+}
+
 char* box_shader_layers_wgsl(
     ecs_world_t *world)
 {
@@ -27,11 +63,7 @@ char* box_shader_layers_wgsl(
     int32_t i;
     for (i = 0; i < count; i ++) {
         const MaterialLayer *layer = ecs_get(world, layers[i].entity, MaterialLayer);
-        snprintf(line, sizeof(line),
-            "fn layer_%d(s: ptr<function, Surface>, p: LayerParams) {\n", i);
-        ecs_strbuf_appendstr(&buf, line);
-        ecs_strbuf_appendstr(&buf, layer && layer->wgsl ? layer->wgsl : "");
-        ecs_strbuf_appendstr(&buf, "\n}\n");
+        box_shader_layer_body(world, layer, i, &buf);
     }
 
     ecs_strbuf_appendstr(&buf, "fn apply_layers(s: ptr<function, Surface>, mask: u32) {\n");

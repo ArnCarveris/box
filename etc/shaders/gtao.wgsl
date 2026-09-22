@@ -11,14 +11,14 @@ const AO_TOLERANCE: f32 = 0.08;
 // texel it traced next to the occlusion, so a texel of another surface is
 // weighted away instead of bleeding across the silhouette.
 fn gtao_upsample(uv: vec2<f32>, dist: f32) -> f32 {
-  let size = vec2<f32>(textureDimensions(fx_ao, 0));
+  let size = vec2<f32>(textureDimensions(fx_setup0, 0));
   let texel = vec2(1.0) / max(size, vec2(1.0));
   var sum = 0.0;
   var weight = 0.0;
   for (var y = 0; y < 2; y = y + 1) {
     for (var x = 0; x < 2; x = x + 1) {
       let offset = (vec2(f32(x), f32(y)) - vec2(0.5)) * texel;
-      let tap = textureSampleLevel(fx_ao, fx_sampler, uv + offset, 0.0);
+      let tap = textureSampleLevel(fx_setup0, fx_sampler, uv + offset, 0.0);
       var w = 0.0001;
       if (tap.y > 0.0) {
         w = 1.0 / (1.0 + abs(tap.y - dist) / max(dist * AO_TOLERANCE, 0.01));

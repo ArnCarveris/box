@@ -1,3 +1,8 @@
+#define EXPOSURE_BINS 256
+#define EXPOSURE_GROUP 16
+#define EXPOSURE_MIN_LOG -10.0
+#define EXPOSURE_LOG_RANGE 16.0
+
 #include "include/fx_params.wgsl"
 
 @group(0) @binding(0) var<uniform> fx: Effect;
@@ -7,10 +12,23 @@
 
 var<workgroup> bins: array<atomic<u32>, EXPOSURE_BINS>;
 
+fn fx_exposure_bin(luma: f32) -> u32 {
+  if (luma < 0.00001) {
+    return 0u;
+  }
+  let t = (log2(luma) - EXPOSURE_MIN_LOG) / EXPOSURE_LOG_RANGE;
+  return u32(clamp(t, 0.0, 1.0) * f32(EXPOSURE_BINS - 2) + 1.5);
+}
+
+fn fx_exposure_luma(bin: f32) -> f32 {
+  let t = (bin - 1.0) / f32(EXPOSURE_BINS - 2);
+  return exp2(t * EXPOSURE_LOG_RANGE + EXPOSURE_MIN_LOG);
+}
+
 // One workgroup covers a EXPOSURE_GROUP square of texels and holds a histogram
 // of its own, so the global one is touched once per bin per workgroup.
 @compute @workgroup_size(EXPOSURE_GROUP, EXPOSURE_GROUP)
-fn cs_histogram(@builtin(global_invocation_id) gid: vec3<u32>,
+fn cs_first(@builtin(global_invocation_id) gid: vec3<u32>,
                 @builtin(local_invocation_index) index: u32) {
   atomicStore(&bins[index], 0u);
   workgroupBarrier();
@@ -33,7 +51,7 @@ fn cs_histogram(@builtin(global_invocation_id) gid: vec3<u32>,
 // next frame reads as its starting point. The histogram is cleared here so the
 // frame that fills it does not need a pass of its own.
 @compute @workgroup_size(1)
-fn cs_average() {
+fn cs_second() {
   let speed_up = fx.params[0].x;
   let speed_down = fx.params[0].y;
   let min_ev = fx.params[0].z;

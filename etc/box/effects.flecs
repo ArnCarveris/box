@@ -1,0 +1,101 @@
+module box.effects
+
+using box.shader
+using box.types
+
+struct ColorGrade(exposure: f32, saturation: f32)
+struct AutoExposure(speed_up: f32, speed_down: f32, min_ev: f32, max_ev: f32,
+  target: f32, compensation: f32, pinned: bool)
+enum ToneMapOperator(ToneMapNeutral, ToneMapTony)
+struct ToneMapping(white: f32, dither: bool, curve: ToneMapOperator)
+struct BloomPrefilter(threshold: f32, threshold_softness: f32)
+struct Bloom(intensity: f32, low_frequency_boost: f32,
+  low_frequency_boost_curvature: f32, high_pass_frequency: f32,
+  prefilter: BloomPrefilter, max_mip_dimension: u32, firefly_clamp: f32,
+  temporal: f32, karis: bool, full_res_first_mip: bool)
+struct Gtao(radius: f32, slices: f32, steps: f32, power: f32, temporal: bool,
+  half_res: bool)
+struct Ssr(steps: f32, thickness: f32, max_roughness: f32, intensity: f32,
+  fade: f32)
+struct Fog(color: vec3, density: f32, falloff: f32, start: f32,
+  max_opacity: f32, height: f32)
+
+shaders {
+  color_grade { Shader: {path: "etc/shaders/color_grade.wgsl"} }
+  gtao { Shader: {path: "etc/shaders/gtao.wgsl"} }
+  ssr { Shader: {path: "etc/shaders/ssr.wgsl"} }
+  fog { Shader: {path: "etc/shaders/fog.wgsl"} }
+  auto_exposure { Shader: {path: "etc/shaders/auto_exposure.wgsl"} }
+  bloom { Shader: {path: "etc/shaders/bloom.wgsl"} }
+  tonemap { Shader: {path: "etc/shaders/tonemap.wgsl"} }
+  luminance { Shader: {path: "etc/shaders/exposure.wgsl"} }
+  filter_chain { Shader: {path: "etc/shaders/pyramid.wgsl"} }
+  temporal_filter { Shader: {path: "etc/shaders/gtao_trace.wgsl"} }
+}
+
+setups {
+  luminance {
+    EffectSetup: {shader: shaders.luminance, kind: EffectSetupCompute,
+      workgroup_size: 16, buffer0_size: 1024, buffer1_size: 16,
+      initial: {0, 1, 0, 0}}
+  }
+  filter_chain {
+    EffectSetup: {shader: shaders.filter_chain, kind: EffectSetupMipChain,
+      format: EffectTextureRgba16Float, parameter0: 0, parameter1: 6,
+      parameter2: 8, parameter3: 10}
+  }
+  temporal_filter {
+    EffectSetup: {shader: shaders.temporal_filter, kind: EffectSetupTemporal,
+      format: EffectTextureRg16Float, parameter0: 5}
+  }
+}
+
+textures {
+  display_transform {
+    EffectTexture: {path: "etc/shaders/lut/tony_mc_mapface.lut", parameter: 2, value: 1}
+  }
+}
+
+stack {
+  color_grade {
+    Effect: {shader: shaders.color_grade, params: ColorGrade, order: 100,
+      scale: 1, enabled: false, color: true}
+    ColorGrade: {exposure: 0, saturation: 1}
+  }
+  gtao {
+    Effect: {shader: shaders.gtao, params: Gtao, order: 600,
+      scale: 1, enabled: false, color: true, depth: true, normals: true,
+      motion: true, setup: setups.temporal_filter}
+    Gtao: {radius: 1, slices: 2, steps: 4, power: 1, temporal: true, half_res: true}
+  }
+  ssr {
+    Effect: {shader: shaders.ssr, params: Ssr, order: 650,
+      scale: 1, enabled: false, color: true, depth: true, normals: true}
+    Ssr: {steps: 24, thickness: 0.4, max_roughness: 0.6, intensity: 1, fade: 0.12}
+  }
+  fog {
+    Effect: {shader: shaders.fog, params: Fog, order: 700,
+      scale: 1, enabled: false, color: true, depth: true}
+    Fog: {color: {0.55, 0.6, 0.68}, density: 0.02, falloff: 0.1,
+      start: 0, max_opacity: 1, height: 0}
+  }
+  auto_exposure {
+    Effect: {shader: shaders.auto_exposure, params: AutoExposure,
+      order: 800, scale: 1, enabled: false, color: true, setup: setups.luminance}
+    AutoExposure: {speed_up: 1, speed_down: 1, min_ev: -4, max_ev: 4,
+      target: 0.18, compensation: 0, pinned: false}
+  }
+  bloom {
+    Effect: {shader: shaders.bloom, params: Bloom, order: 850,
+      scale: 1, enabled: false, color: true, setup: setups.filter_chain}
+    Bloom: {intensity: 0.3, low_frequency_boost: 0.7,
+      low_frequency_boost_curvature: 0.95, high_pass_frequency: 1,
+      prefilter: {threshold: 1, threshold_softness: 0}, max_mip_dimension: 512,
+      firefly_clamp: 12, temporal: 0, karis: true, full_res_first_mip: true}
+  }
+  tonemap {
+    Effect: {shader: shaders.tonemap, params: ToneMapping, order: 900,
+      scale: 1, enabled: false, color: true, texture: textures.display_transform}
+    ToneMapping: {white: 1, dither: true, curve: ToneMapNeutral}
+  }
+}

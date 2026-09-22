@@ -137,7 +137,7 @@ fn ao_horizon(best: f32, uv: vec2<f32>, p: vec3<f32>, v: vec3<f32>, radius: f32)
   return max(best, mix(-1.0, dot(delta / len, v), fade));
 }
 
-@fragment fn fs_trace(in: AoOut) -> @location(0) vec4<f32> {
+@fragment fn fs_first(in: AoOut) -> @location(0) vec4<f32> {
   let uv = in.uv;
   let depth = ao_depth(uv);
   if (depth <= 0.0) {
@@ -222,7 +222,7 @@ fn ao_plane_weight(tap_uv: vec2<f32>, center: vec3<f32>, normal: vec3<f32>,
   return 1.0 / (1.0 + off * off);
 }
 
-@fragment fn fs_resolve(in: AoOut) -> @location(0) vec4<f32> {
+@fragment fn fs_second(in: AoOut) -> @location(0) vec4<f32> {
   let size = vec2<i32>(textureDimensions(ao_raw_tex, 0));
   let c = clamp(vec2<i32>(in.pos.xy), vec2(0, 0), size - vec2(1, 1));
   let texel = vec2(1.0) / ao_extent();

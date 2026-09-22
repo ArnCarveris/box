@@ -132,20 +132,12 @@ ECS_STRUCT(PbrTextures, {
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_MATERIAL_LAYER_MAX (16)
 
-/** Body of a WGSL function that changes a surface, registered as a scene layer.
- *
- * The source is the body of `fn layer(s: ptr<function, Surface>, p: LayerParams)`,
- * so it writes `(*s).albedo`, `(*s).roughness`, `(*s).metallic`, `(*s).normal`,
- * `(*s).emissive` and `(*s).alpha`, and reads `(*s).world_pos`,
- * `(*s).local` (the position in the mesh bounds, 0 to 1 on each axis) and
- * `(*s).geo_normal` (the world normal before normal mapping). The parameters
- * come from the LayerParams of the same entity and `box_noise(p: vec3<f32>)`
- * returns hash based value noise in 0 to 1.
- */
 ECS_STRUCT(MaterialLayer, {
-    char *wgsl;    /**< Body of the layer function */
-    int32_t order; /**< Application order, the lowest runs first */
+    ecs_entity_t shader;
+    int32_t order;
 });
+
+#define BOX_MATERIAL_LAYERS_BUILTINS "etc/box/material_layers.flecs"
 
 /** Scene global parameters of a material layer, read as p.a and p.b by its body */
 ECS_STRUCT(LayerParams, {
@@ -153,41 +145,15 @@ ECS_STRUCT(LayerParams, {
     vec4 b; /**< Second parameter vector */
 });
 
-/** Per entity amounts of the material layers box ships.
- *
- * Every amount is a factor of what the scene set on its layer, so the component
- * says how dusty, grimy, chipped or wet this one entity is without a material
- * of its own. A missing component and a component the constructor left alone
- * are the same thing: the layers run exactly as the scene set them. Setting a
- * channel to zero keeps that layer off the entity, which is how glass or rock
- * opts out of a layer its material enables. The component is inherited by the
- * instances of a prefab, applies to the entity it sits on rather than to its
- * children, and is transitionable, so a wall that takes damage eases into being
- * grimier instead of jumping there.
- */
-ECS_STRUCT(Wear, {
-    float dust;    /**< Factor of the dust layer amount, 1 leaves it as the scene set it */
-    float grime;   /**< Factor of the grime layer amount */
-    float edge;    /**< Factor of the edge wear layer amount */
-    float wet;     /**< Factor of the wetness layer amount */
-});
-
-/** The rest of the per entity layer channel: two spare amounts and the noise.
- *
- * `burn` and `scratch` are amounts no layer of box reads; they are the channel
- * a project layer takes its per entity amount from, which is how a burn driven
- * by health or a scratch driven by use reaches a body. `seed` moves the noise
- * of every layer of the entity, so two copies of a prefab wear differently, and
- * `scale` multiplies the feature frequency of every layer. A layer samples its
- * noise in world metres, so the feature size already survives an instance
- * scale; this is the knob that changes it for one entity. Like Wear it is
- * inherited by instances and transitionable.
- */
-ECS_STRUCT(WearDetail, {
-    float burn;    /**< Factor a project burn layer reads, box ships none */
-    float scratch; /**< Factor a project scratch layer reads, box ships none */
-    float seed;    /**< Offsets the noise of every layer, so two copies differ */
-    float scale;   /**< Multiplies the feature frequency of every layer, 1 keeps it */
+ECS_STRUCT(MaterialLayerData, {
+    float amount0;
+    float amount1;
+    float amount2;
+    float amount3;
+    float amount4;
+    float amount5;
+    float seed;
+    float scale;
 });
 
 /** Whether views apply material layers at all, a singleton that defaults to enabled */

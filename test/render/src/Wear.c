@@ -17,6 +17,7 @@ void Wear_setup(void)
 {
     w = ecs_init();
     ECS_IMPORT(w, Box);
+    test_assert(box_script_load(w, BOX_MATERIAL_LAYERS_BUILTINS) != 0);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -39,14 +40,14 @@ void Wear_an_entity_without_it_reads_the_neutral_values(void)
     free(cmd->vertices);
     free(cmd->indices);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_bool(box_instance_worn(&u->data), false);
-    test_int(u->data.wear[0], 0);
-    test_int(u->data.wear[1], 0);
-    test_flt(box_instance_wear(&u->data, 0), 1);
-    test_flt(box_instance_wear(&u->data, 5), 1);
-    test_flt(box_instance_wear(&u->data, 6), 0);
-    test_flt(box_instance_wear(&u->data, 7), 1);
-    test_bool(box_render_state(w)->worn, false);
+    test_bool(box_instance_has_layer_data(&u->data), false);
+    test_int(u->data.layer_data[0], 0);
+    test_int(u->data.layer_data[1], 0);
+    test_flt(box_instance_layer_data(&u->data, 0), 1);
+    test_flt(box_instance_layer_data(&u->data, 5), 1);
+    test_flt(box_instance_layer_data(&u->data, 6), 0);
+    test_flt(box_instance_layer_data(&u->data, 7), 1);
+    test_bool(box_render_state(w)->layer_data, false);
 }
 
 void Wear_the_amounts_reach_the_packet(void)
@@ -55,21 +56,22 @@ void Wear_the_amounts_reach_the_packet(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
-    ecs_set(w, e, Wear, {.dust = 1, .grime = 0.6f, .edge = 0.2f, .wet = 0});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 1, .amount1 = 0.6f,
+        .amount2 = 0.2f, .amount3 = 0, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
     free(cmd->indices);
-    test_bool(box_render_state(w)->worn, true);
+    test_bool(box_render_state(w)->layer_data, true);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_bool(box_instance_worn(&u->data), true);
-    test_flt(box_instance_wear(&u->data, 0), 1);
-    test_assert(fabsf(box_instance_wear(&u->data, 1) - 0.6f) < 0.01f);
-    test_assert(fabsf(box_instance_wear(&u->data, 2) - 0.2f) < 0.01f);
-    test_flt(box_instance_wear(&u->data, 3), 0);
-    test_flt(box_instance_wear(&u->data, 4), 1);
-    test_flt(box_instance_wear(&u->data, 6), 0);
-    test_flt(box_instance_wear(&u->data, 7), 1);
+    test_bool(box_instance_has_layer_data(&u->data), true);
+    test_flt(box_instance_layer_data(&u->data, 0), 1);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 1) - 0.6f) < 0.01f);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 2) - 0.2f) < 0.01f);
+    test_flt(box_instance_layer_data(&u->data, 3), 0);
+    test_flt(box_instance_layer_data(&u->data, 4), 1);
+    test_flt(box_instance_layer_data(&u->data, 6), 0);
+    test_flt(box_instance_layer_data(&u->data, 7), 1);
 }
 
 void Wear_the_detail_carries_the_seed_and_the_scale(void)
@@ -78,18 +80,20 @@ void Wear_the_detail_carries_the_seed_and_the_scale(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
-    ecs_set(w, e, WearDetail, {.burn = 0.5f, .scratch = 0, .seed = 0.8f, .scale = 2});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 1, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 0.5f, .amount5 = 0,
+        .seed = 0.8f, .scale = 2});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
     free(cmd->indices);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_bool(box_instance_worn(&u->data), true);
-    test_flt(box_instance_wear(&u->data, 0), 1);
-    test_assert(fabsf(box_instance_wear(&u->data, 4) - 0.5f) < 0.01f);
-    test_flt(box_instance_wear(&u->data, 5), 0);
-    test_assert(fabsf(box_instance_wear(&u->data, 6) - 0.8f) < 0.01f);
-    test_assert(fabsf(box_instance_wear(&u->data, 7) - 2.0f) < 0.02f);
+    test_bool(box_instance_has_layer_data(&u->data), true);
+    test_flt(box_instance_layer_data(&u->data, 0), 1);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 4) - 0.5f) < 0.01f);
+    test_flt(box_instance_layer_data(&u->data, 5), 0);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 6) - 0.8f) < 0.01f);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 7) - 2.0f) < 0.02f);
 }
 
 void Wear_the_values_are_clamped_to_their_range(void)
@@ -98,16 +102,17 @@ void Wear_the_values_are_clamped_to_their_range(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
-    ecs_set(w, e, Wear, {.dust = 4, .grime = -1, .edge = 1, .wet = 1});
-    ecs_set(w, e, WearDetail, {.burn = 1, .scratch = 1, .seed = 0, .scale = 40});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 4, .amount1 = -1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1,
+        .seed = 0, .scale = 40});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
     free(cmd->indices);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_flt(box_instance_wear(&u->data, 0), 1);
-    test_flt(box_instance_wear(&u->data, 1), 0);
-    test_assert(fabsf(box_instance_wear(&u->data, 7) - BOX_WEAR_SCALE_MAX) < 1e-6f);
+    test_flt(box_instance_layer_data(&u->data, 0), 1);
+    test_flt(box_instance_layer_data(&u->data, 1), 0);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 7) - BOX_LAYER_DATA_SCALE_MAX) < 1e-6f);
 }
 
 void Wear_a_change_reextracts_the_instance(void)
@@ -116,7 +121,8 @@ void Wear_a_change_reextracts_the_instance(void)
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
-    ecs_set(w, e, Wear, {.dust = 1, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 1, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
@@ -127,11 +133,12 @@ void Wear_a_change_reextracts_the_instance(void)
     test_int(packet.static_updates.count, 0);
 
     box_packet_reset(&packet);
-    ecs_set(w, e, Wear, {.dust = 0, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 0, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_flt(box_instance_wear(&u->data, 0), 0);
+    test_flt(box_instance_layer_data(&u->data, 0), 0);
 }
 
 void Wear_the_amounts_survive_a_slot_move(void)
@@ -143,7 +150,8 @@ void Wear_the_amounts_survive_a_slot_move(void)
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {2, 0, 0});
     ecs_set(w, b, Box, {1, 1, 1});
-    ecs_set(w, b, Wear, {.dust = 0, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, b, MaterialLayerData, {.amount0 = 0, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
@@ -157,8 +165,8 @@ void Wear_the_amounts_survive_a_slot_move(void)
     test_int(packet.static_updates.count, 1);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
     test_int(u->slot, 0);
-    test_bool(box_instance_worn(&u->data), true);
-    test_flt(box_instance_wear(&u->data, 0), 0);
+    test_bool(box_instance_has_layer_data(&u->data), true);
+    test_flt(box_instance_layer_data(&u->data, 0), 0);
 }
 
 void Wear_an_instance_of_a_prefab_inherits_it(void)
@@ -167,7 +175,8 @@ void Wear_an_instance_of_a_prefab_inherits_it(void)
     ecs_entity_t prefab = ecs_new(w);
     ecs_add_id(w, prefab, EcsPrefab);
     ecs_set(w, prefab, Box, {1, 1, 1});
-    ecs_set(w, prefab, Wear, {.dust = 0.25f, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, prefab, MaterialLayerData, {.amount0 = 0.25f, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
 
     ecs_entity_t e = ecs_new(w);
     ecs_add_pair(w, e, EcsIsA, prefab);
@@ -177,8 +186,8 @@ void Wear_an_instance_of_a_prefab_inherits_it(void)
     free(cmd->vertices);
     free(cmd->indices);
     box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
-    test_bool(box_instance_worn(&u->data), true);
-    test_assert(fabsf(box_instance_wear(&u->data, 0) - 0.25f) < 0.01f);
+    test_bool(box_instance_has_layer_data(&u->data), true);
+    test_assert(fabsf(box_instance_layer_data(&u->data, 0) - 0.25f) < 0.01f);
 }
 
 void Wear_a_dynamic_instance_carries_its_amounts(void)
@@ -188,15 +197,16 @@ void Wear_a_dynamic_instance_carries_its_amounts(void)
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
     ecs_add_id(w, e, DynamicTransform);
-    ecs_set(w, e, Wear, {.dust = 0.5f, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 0.5f, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     box_mesh_cmd_t *cmd = box_vec_at(&packet.mesh_create, 0);
     free(cmd->vertices);
     free(cmd->indices);
     test_int(packet.dynamic_instances.count, 1);
     box_instance_t *data = box_vec_at(&packet.dynamic_instances, 0);
-    test_bool(box_instance_worn(data), true);
-    test_assert(fabsf(box_instance_wear(data, 0) - 0.5f) < 0.01f);
+    test_bool(box_instance_has_layer_data(data), true);
+    test_assert(fabsf(box_instance_layer_data(data, 0) - 0.5f) < 0.01f);
 }
 
 void Wear_a_transition_keeps_the_instance_extracted(void)
@@ -210,8 +220,9 @@ void Wear_a_transition_keeps_the_instance_extracted(void)
         "e {\n"
         "  Position: {0, 0, 0}\n"
         "  Box: {1, 1, 1}\n"
-        "  Wear: {dust: 0}\n"
-        "  Transition: [Wear: {duration: 1}]\n"
+        "  MaterialLayerData: {amount0: 0, amount1: 1, amount2: 1, amount3: 1, "
+        "amount4: 1, amount5: 1, scale: 1}\n"
+        "  Transition: [MaterialLayerData: {duration: 1}]\n"
         "}\n", NULL), 0);
     ecs_entity_t e = ecs_lookup(w, "e");
     test_assert(e != 0);
@@ -225,7 +236,8 @@ void Wear_a_transition_keeps_the_instance_extracted(void)
     }
 
     box_packet_reset(&packet);
-    ecs_set(w, e, Wear, {.dust = 1, .grime = 1, .edge = 1, .wet = 1});
+    ecs_set(w, e, MaterialLayerData, {.amount0 = 1, .amount1 = 1,
+        .amount2 = 1, .amount3 = 1, .amount4 = 1, .amount5 = 1, .scale = 1});
     box_render_extract(w, &packet);
     test_int(packet.static_updates.count, 1);
     test_int(packet.transitions.count, 0);
@@ -249,11 +261,8 @@ void Wear_the_layers_of_the_shader_read_the_channel(void)
 
     box_shader_cmd_t *shader = box_vec_at(&packet.shader_create, 0);
     test_uint(shader->handle, BOX_SHADER_MESH);
-    test_assert(strstr(shader->source, "(*s).wear.dust") != NULL);
-    test_assert(strstr(shader->source, "(*s).wear.grime") != NULL);
-    test_assert(strstr(shader->source, "(*s).wear.edge") != NULL);
-    test_assert(strstr(shader->source, "(*s).wear.wet") != NULL);
-    test_assert(strstr(shader->source, "fn wear_noise(") != NULL);
+    test_assert(strstr(shader->source, "material_layer_amount") != NULL);
+    test_assert(strstr(shader->source, "material_layer_noise") != NULL);
     uint32_t i;
     for (i = 0; i < packet.shader_create.count; i ++) {
         free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);

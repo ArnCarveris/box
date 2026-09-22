@@ -66,7 +66,7 @@ struct VertexIn {
   @location(12) bounds_pos: vec4<f32>,
   @location(13) vertex_color: vec4<f32>,
   @location(14) shape: vec4<u32>,
-  @location(15) wear: vec2<u32>,
+  @location(15) layer_data: vec2<u32>,
   @location(16) clip_rect: vec4<f32>,
 };
 
@@ -130,7 +130,7 @@ fn clip_fragment(in: VertexOut) {
     length(vec3(in.row0.z, in.row1.z, in.row2.z)));
   out.local_normal = in.normal;
   out.uv_xform = in.uv_xform;
-  out.uv_mode = vec4(in.uv_mode, u32(in.params.w), in.wear.x, in.wear.y);
+  out.uv_mode = vec4(in.uv_mode, u32(in.params.w), in.layer_data.x, in.layer_data.y);
   out.bounds_pos = in.bounds_pos.xyz;
   out.vertex_color = in.vertex_color;
   out.clip_rect = in.clip_rect;
@@ -312,7 +312,8 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   s.geo_normal = gn;
   s.world_pos = in.world_pos;
   s.local = in.bounds_pos;
-  s.wear = wear_unpack((in.uv_mode.x & WEAR_BIT) != 0u, in.uv_mode.z, in.uv_mode.w);
+  s.layer_data = material_layer_data_unpack(
+    (in.uv_mode.x & LAYER_DATA_BIT) != 0u, in.uv_mode.z, in.uv_mode.w);
   var mask = in.uv_mode.x >> u32(MODE_LAYER_SHIFT);
   if (u.layers_enabled == 0u) {
     mask = 0u;

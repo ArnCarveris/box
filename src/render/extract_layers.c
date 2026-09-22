@@ -171,6 +171,27 @@ static void box_layer_on_change(
     }
 }
 
+static void box_layer_on_shader(
+    ecs_iter_t *it)
+{
+    RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
+    if (!state) {
+        return;
+    }
+
+    const box_layer_t *entries = ecs_vec_first_t(&state->layers, box_layer_t);
+    int32_t i, j, count = ecs_vec_count(&state->layers);
+    for (i = 0; i < it->count; i ++) {
+        for (j = 0; j < count; j ++) {
+            const MaterialLayer *layer = ecs_get(it->world, entries[j].entity,
+                MaterialLayer);
+            if (layer && layer->shader == it->entities[i]) {
+                state->layers_dirty = true;
+            }
+        }
+    }
+}
+
 /** A material enabled or disabled a layer, so its instances resolve a new mask.
  *
  * @param it Iterator over the changed material entities
@@ -218,5 +239,12 @@ void box_render_layers_init(
         .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = box_layer_on_material
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(ShaderStatus), .inout = EcsIn }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
+        .events = { EcsOnSet },
+        .callback = box_layer_on_shader
     });
 }

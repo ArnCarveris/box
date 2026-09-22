@@ -167,16 +167,12 @@ static void box_render_on_hidden(
     }
 }
 
-/** A Wear exists, so extract packs the layer amounts of changed entities.
- *
- * @param it Iterator over the entities that gained the component
- */
-static void box_render_on_worn(
+static void box_render_on_layer_data(
     ecs_iter_t *it)
 {
     RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
     if (state) {
-        state->worn = true;
+        state->layer_data = true;
     }
 }
 
@@ -649,53 +645,24 @@ done:
     return result;
 }
 
-/** Pack the per entity layer amounts of an entity into the wear words.
- *
- * The two components are read on their own, so an entity that only says how
- * burnt it is keeps the noise of its layers where the scene put it and the
- * other way around.
- *
- * @param world The world
- * @param e The entity
- * @param transition The transitions of the entity, NULL when it has none
- * @param time The time the transitions are displayed at
- * @param out The instance to fill
- */
-static void box_render_fill_wear(
+static void box_render_fill_layer_data(
     ecs_world_t *world,
     ecs_entity_t e,
     const TransitionState *transition,
     double time,
     box_instance_t *out)
 {
-    Wear wear_value;
-    WearDetail detail_value;
-    const Wear *wear = box_render_displayed(transition, ecs_id(Wear), time,
-        ecs_get(world, e, Wear), &wear_value, sizeof(Wear));
-    const WearDetail *detail = box_render_displayed(transition, ecs_id(WearDetail),
-        time, ecs_get(world, e, WearDetail), &detail_value, sizeof(WearDetail));
-    if (!wear && !detail) {
+    MaterialLayerData displayed;
+    const MaterialLayerData *data = box_render_displayed(transition,
+        ecs_id(MaterialLayerData), time, ecs_get(world, e, MaterialLayerData),
+        &displayed, sizeof(MaterialLayerData));
+    if (!data) {
         goto done;
     }
 
-    float amounts[6] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-    float seed = 0.0f;
-    float scale = 1.0f;
-    if (wear) {
-        amounts[0] = wear->dust;
-        amounts[1] = wear->grime;
-        amounts[2] = wear->edge;
-        amounts[3] = wear->wet;
-    }
-
-    if (detail) {
-        amounts[4] = detail->burn;
-        amounts[5] = detail->scratch;
-        seed = detail->seed;
-        scale = detail->scale;
-    }
-
-    box_instance_set_wear(out, amounts, seed, scale);
+    float amounts[6] = { data->amount0, data->amount1, data->amount2,
+        data->amount3, data->amount4, data->amount5 };
+    box_instance_set_layer_data(out, amounts, data->seed, data->scale);
 done:
     return;
 }
@@ -709,7 +676,7 @@ void box_render_fill_instance(
     bool textured,
     bool tiled,
     bool shaped,
-    bool worn,
+    bool layer_data,
     bool clipped,
     const RenderState *layers,
     const TransitionState *transition,
@@ -779,9 +746,9 @@ void box_render_fill_instance(
         box_render_fill_shape(world, e, mesh, &m, out);
     }
 
-    memset(out->wear, 0, sizeof(out->wear));
-    if (worn) {
-        box_render_fill_wear(world, e, transition, time, out);
+    memset(out->layer_data, 0, sizeof(out->layer_data));
+    if (layer_data) {
+        box_render_fill_layer_data(world, e, transition, time, out);
     }
 
     memset(out->clip, 0, sizeof(out->clip));
@@ -814,8 +781,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(TextureWrap));
     box_render_watch(world, ecs_id(RenderShape2D));
     box_render_watch(world, ecs_id(RenderClip));
-    box_render_watch(world, ecs_id(Wear));
-    box_render_watch(world, ecs_id(WearDetail));
+    box_render_watch(world, ecs_id(MaterialLayerData));
     box_render_watch_flag(world, ecs_id(TransitionState), box_render_on_transitioned);
     box_render_watch_tiling(world, ecs_id(TextureTransform));
     box_render_watch_tiling(world, ecs_id(TextureTiling));
@@ -827,8 +793,7 @@ void box_render_instance_init(
     box_render_watch_flag(world, Hidden, box_render_on_hidden);
     box_render_watch_flag(world, ecs_id(RenderShape2D), box_render_on_shaped);
     box_render_watch_flag(world, ecs_id(RenderClip), box_render_on_clipped);
-    box_render_watch_flag(world, ecs_id(Wear), box_render_on_worn);
-    box_render_watch_flag(world, ecs_id(WearDetail), box_render_on_worn);
+    box_render_watch_flag(world, ecs_id(MaterialLayerData), box_render_on_layer_data);
 
     ecs_observer(world, {
         .query.terms = {{ .id = NoShadow }},
@@ -860,6 +825,5 @@ void box_render_instance_init(
         .callback = box_render_on_remove
     });
 
-    ecs_add_id(world, ecs_id(Wear), Transitionable);
-    ecs_add_id(world, ecs_id(WearDetail), Transitionable);
+    ecs_add_id(world, ecs_id(MaterialLayerData), Transitionable);
 }

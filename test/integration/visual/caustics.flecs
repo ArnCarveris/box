@@ -23,7 +23,7 @@ camera {
 sun {
   Rotation: {1.05, -0.25, 0}
   DirectionalLight: {intensity: 1.6}
-  LightModulator: {shader: plugins.caustics}
+  LightModulator: {shader: plugins.caustics, params: Caustics}
   Caustics: {scale: 1.6, speed: 1.5, intensity: 1.4, depth: 4}
 }
 

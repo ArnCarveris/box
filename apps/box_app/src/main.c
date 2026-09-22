@@ -29,6 +29,13 @@ int main(
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    if (!box_script_load(world, BOX_EFFECTS_BUILTINS) ||
+        !box_script_load(world, BOX_MATERIAL_LAYERS_BUILTINS) ||
+        !box_script_load(world, BOX_LIGHT_MODULATORS_BUILTINS))
+    {
+        goto error;
+    }
+
     ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
     ecs_singleton_modified(world, ScriptSettings);
 

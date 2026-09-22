@@ -13,11 +13,6 @@
  * that reprojects the depth with the view projection of the previous frame. An
  * input no pass asked for binds a one texel dummy instead of a target.
  *
- * Two inputs are work the frame does for a pass: the pyramid input blurs the
- * image the pass reads through the mip chain of bloom.c and the exposure input
- * measures it with the compute passes of exposure.c. The targets between two
- * passes are float ones, so a pass that brightens the image keeps what it
- * pushed past white for the pass that maps it back onto the display.
  */
 
 #include "renderer_internal.h"
@@ -160,7 +155,7 @@ static void box_effect_layout(
             .visibility = WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_ReadOnlyStorage,
-                .minBindingSize = sizeof(box_exposure_state_t)
+                .minBindingSize = sizeof(box_effect_storage_t)
             }
         }, {
             .binding = 7,
@@ -239,7 +234,7 @@ static void box_effect_dummies(
         .mipLevelCount = 1,
         .sampleCount = 1
     };
-    box_lut_init(r);
+    box_effect_texture_init(r);
     r->effect_cube_dummy = wgpuDeviceCreateTexture(r->device, &cube_desc);
     WGPUTextureViewDescriptor cube_view = {
         .format = BOX_EFFECT_HDR_FORMAT,
@@ -318,9 +313,9 @@ void box_effect_init(
     box_effect_layout(r);
     box_effect_dummies(r);
     box_effect_motion_pipeline(r);
-    box_exposure_init(r);
-    box_bloom_init(r);
-    box_gtao_init(r);
+    box_effect_compute_init(r);
+    box_effect_mip_init(r);
+    box_effect_temporal_init(r);
 
     WGPUSamplerDescriptor sampler_desc = {
         .addressModeU = WGPUAddressMode_ClampToEdge,
@@ -344,6 +339,27 @@ void box_effect_invalidate(
     box_renderer_t *r,
     uint32_t handle)
 {
+    if (r->setup_compute_shader == handle) {
+        if (r->setup_compute_first) wgpuComputePipelineRelease(r->setup_compute_first);
+        if (r->setup_compute_second) wgpuComputePipelineRelease(r->setup_compute_second);
+        r->setup_compute_first = NULL;
+        r->setup_compute_second = NULL;
+        r->setup_compute_shader = BOX_SHADER_NONE;
+    }
+    if (r->setup_mip_shader == handle) {
+        for (uint32_t i = 0; i < 4; i ++) {
+            if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
+            r->setup_mip_pipeline[i] = NULL;
+        }
+        r->setup_mip_shader = BOX_SHADER_NONE;
+    }
+    if (r->setup_temporal_shader == handle) {
+        if (r->setup_temporal_first) wgpuRenderPipelineRelease(r->setup_temporal_first);
+        if (r->setup_temporal_second) wgpuRenderPipelineRelease(r->setup_temporal_second);
+        r->setup_temporal_first = NULL;
+        r->setup_temporal_second = NULL;
+        r->setup_temporal_shader = BOX_SHADER_NONE;
+    }
     if (handle >= r->effect_pipelines.count) {
         goto done;
     }
@@ -546,8 +562,6 @@ done:
  * @param dst The render target view the pass writes
  * @param encoder The command encoder
  * @param hdr The pass writes an intermediate target instead of the view target
- * @param pyramid Blurred pyramid of the image, NULL when the pass asked for none
- * @param ao Ambient occlusion of the view, NULL when the pass asked for none
  */
 static void box_effect_pass(
     box_renderer_t *r,
@@ -558,8 +572,8 @@ static void box_effect_pass(
     WGPUTextureView dst,
     WGPUCommandEncoder encoder,
     bool hdr,
-    WGPUTextureView pyramid,
-    WGPUTextureView ao)
+    WGPUTextureView setup0,
+    WGPUTextureView setup1)
 {
     WGPURenderPipeline pipeline = box_effect_pipeline(r, fx->shader, hdr);
     if (!pipeline) {
@@ -576,13 +590,13 @@ static void box_effect_pass(
             r->effect_normal->view : r->effect_dummy_view },
         { .binding = 5, .textureView = r->effect_motion ?
             r->effect_motion->view : r->effect_dummy_view },
-        { .binding = 6, .buffer = box_exposure_buffer(r),
-            .size = sizeof(box_exposure_state_t) },
-        { .binding = 7, .textureView = pyramid ? pyramid : r->effect_dummy_view },
-        { .binding = 8, .textureView = ao ? ao : r->effect_dummy_view },
+        { .binding = 6, .buffer = box_effect_storage(r, fx),
+            .size = fx->setup_buffer_size[1] ? fx->setup_buffer_size[1] : 16 },
+        { .binding = 7, .textureView = setup0 ? setup0 : r->effect_dummy_view },
+        { .binding = 8, .textureView = setup1 ? setup1 : r->effect_dummy_view },
         { .binding = 9, .textureView = box_environment_specular(r) },
-        { .binding = 10, .textureView = (fx->inputs & BOX_EFFECT_LUT) ?
-            box_lut_view(r) : r->lut_dummy_view }
+        { .binding = 10, .textureView = (fx->inputs & BOX_EFFECT_TEXTURE) ?
+            box_effect_texture_view(r, fx->texture) : r->effect_texture_dummy_view }
     };
     WGPUBindGroupDescriptor group_desc = {
         .layout = r->effect_layout,
@@ -684,21 +698,17 @@ void box_effect_run(
         }
 
         box_effect_uniform_write(r, view, p, fx, slot, width, height, last);
-        WGPUTextureView pyramid = NULL;
-        WGPUTextureView ao = NULL;
-        if (fx->inputs & BOX_EFFECT_EXPOSURE) {
-            box_exposure_dispatch(r, slot, src, encoder);
+        WGPUTextureView setup0 = NULL;
+        WGPUTextureView setup1 = NULL;
+        if (fx->setup_kind == BOX_EFFECT_SETUP_COMPUTE) {
+            box_effect_compute_run(r, fx, slot, src, encoder);
+        } else if (fx->setup_kind == BOX_EFFECT_SETUP_MIP_CHAIN) {
+            setup0 = box_effect_mip_run(r, fx, slot, p->frame, src, encoder);
+        } else if (fx->setup_kind == BOX_EFFECT_SETUP_TEMPORAL) {
+            setup0 = box_effect_temporal_run(r, fx, slot, encoder);
         }
 
-        if (fx->inputs & BOX_EFFECT_PYRAMID) {
-            pyramid = box_bloom_build(r, fx, slot, p->frame, src, encoder);
-        }
-
-        if (fx->inputs & BOX_EFFECT_OCCLUSION) {
-            ao = box_gtao_build(r, fx, slot, encoder);
-        }
-
-        box_effect_pass(r, fx, slot, i, src, out, encoder, !last, pyramid, ao);
+        box_effect_pass(r, fx, slot, i, src, out, encoder, !last, setup0, setup1);
         if (src != r->effect_scene) {
             box_effect_release(src);
         }
@@ -722,9 +732,9 @@ void box_effect_run(
 void box_effect_fini(
     box_renderer_t *r)
 {
-    box_exposure_fini(r);
-    box_bloom_fini(r);
-    box_gtao_fini(r);
+    box_effect_compute_fini(r);
+    box_effect_mip_fini(r);
+    box_effect_temporal_fini(r);
     uint32_t i;
     for (i = 0; i < r->effect_pipelines.count; i ++) {
         box_gpu_effect_t *entry = box_vec_at(&r->effect_pipelines, i);
@@ -752,7 +762,7 @@ void box_effect_fini(
     if (r->effect_depth_dummy) wgpuTextureRelease(r->effect_depth_dummy);
     if (r->effect_cube_dummy_view) wgpuTextureViewRelease(r->effect_cube_dummy_view);
     if (r->effect_cube_dummy) wgpuTextureRelease(r->effect_cube_dummy);
-    box_lut_fini(r);
+    box_effect_texture_fini(r);
     if (r->effect_pipeline_layout) wgpuPipelineLayoutRelease(r->effect_pipeline_layout);
     if (r->effect_layout) wgpuBindGroupLayoutRelease(r->effect_layout);
     r->motion_pipeline = NULL;

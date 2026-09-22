@@ -49,6 +49,10 @@ ECS_STRUCT(ScriptStats, {
 void BoxScriptImport(
     ecs_world_t *world);
 
+ecs_entity_t box_script_load(
+    ecs_world_t *world,
+    const char *path);
+
 #ifdef __cplusplus
 }
 #endif

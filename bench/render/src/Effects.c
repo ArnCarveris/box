@@ -21,13 +21,17 @@ void Effects_extract_chain(bench_t *b)
     packet.width = 1920;
     packet.height = 1080;
 
-    ecs_entity_t shader = ecs_lookup(world, "box.effects.shaders.color_grade");
+    ecs_entity_t shader = ecs_new(world);
+    ecs_set(world, shader, Shader, {.path = "etc/shaders/overlay.wgsl"});
+    ecs_entity_t params = ecs_id(LayerParams);
     int32_t i;
     for (i = 0; i < BENCH_EFFECT_COUNT; i ++) {
         ecs_entity_t e = ecs_new(world);
-        ecs_set(world, e, Effect, { .shader = shader, .order = BENCH_EFFECT_COUNT - i,
-            .enabled = true, .color = true, .depth = i % 2 == 0, .scale = 1 });
-        ecs_set(world, e, ColorGrade, { .exposure = (float)i, .saturation = 1 });
+        ecs_set(world, e, Effect, { .shader = shader, .params = params,
+            .order = BENCH_EFFECT_COUNT - i, .enabled = true, .color = true,
+            .depth = i % 2 == 0, .scale = 1 });
+        ecs_set(world, e, LayerParams, {
+            .a = {(float)i, 1, 0, 0}, .b = {0, 0, 0, 0} });
     }
 
     box_render_extract(world, &packet);

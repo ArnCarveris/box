@@ -7,17 +7,34 @@
 #include <bake_test.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "../../../src/render/render_internal.h"
 
 static ecs_world_t *w;
 static box_packet_t packet;
 static ecs_entity_t tonemap;
+static ecs_entity_t tonemap_params;
+
+static void tonemap_set(
+    float white,
+    bool dither,
+    int32_t curve)
+{
+    void *ptr = ecs_ensure_id(w, tonemap, tonemap_params, (size_t)ecs_get_type_info(w, tonemap_params)->size);
+    ecs_value_t value = { .type = tonemap_params, .ptr = ptr };
+    char expr[128];
+    snprintf(expr, sizeof(expr), "{white: %g, dither: %s, curve: %d}",
+        white, dither ? "true" : "false", curve);
+    test_assert(ecs_expr_run(w, expr, &value, NULL) != NULL);
+    ecs_modified_id(w, tonemap, tonemap_params);
+}
 
 void ToneMap_setup(void)
 {
     w = ecs_init();
     ECS_IMPORT(w, Box);
+    test_assert(box_script_load(w, BOX_EFFECTS_BUILTINS) != 0);
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -25,6 +42,7 @@ void ToneMap_setup(void)
     ecs_set(w, cam, Position, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
     tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    tonemap_params = ecs_lookup(w, "box.effects.ToneMapping");
 }
 
 void ToneMap_teardown(void)
@@ -34,8 +52,8 @@ void ToneMap_teardown(void)
         free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
 
-    for (i = 0; i < packet.lut_create.count; i ++) {
-        free(((box_lut_cmd_t*)box_vec_at(&packet.lut_create, i))->texels);
+    for (i = 0; i < packet.effect_texture_create.count; i ++) {
+        free(((box_effect_texture_cmd_t*)box_vec_at(&packet.effect_texture_create, i))->texels);
     }
 
     box_packet_fini(&packet);
@@ -46,23 +64,22 @@ void ToneMap_the_neutral_curve_is_the_default(void)
 {
     // ore_engine/tonemap_operators
     test_assert(tonemap != 0);
-    ecs_set(w, tonemap, ToneMapping, {.white = 1, .dither = true});
+    tonemap_set(1, true, 0);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
     box_effect_t *pass = box_vec_at(&packet.effects, 0);
-    test_flt(pass->params[BOX_EFFECT_TONE_CURVE], (float)ToneMapNeutral);
-    test_assert(!(pass->inputs & BOX_EFFECT_LUT));
-    test_int(packet.lut_create.count, 0);
+    test_flt(pass->params[2], 0);
+    test_assert(!(pass->inputs & BOX_EFFECT_TEXTURE));
+    test_int(packet.effect_texture_create.count, 0);
 }
 
 void ToneMap_the_curve_reaches_the_parameter_block(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 2, .dither = true, .curve = ToneMapTony});
+    tonemap_set(2, true, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
@@ -71,35 +88,33 @@ void ToneMap_the_curve_reaches_the_parameter_block(void)
     box_effect_t *pass = box_vec_at(&packet.effects, 0);
     test_flt(pass->params[0], 2);
     test_flt(pass->params[1], 1);
-    test_flt(pass->params[BOX_EFFECT_TONE_CURVE], (float)ToneMapTony);
+    test_flt(pass->params[2], 1);
 }
 
 void ToneMap_the_tony_pass_reads_the_lookup(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 1, .dither = false, .curve = ToneMapTony});
+    tonemap_set(1, false, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
     box_effect_t *pass = box_vec_at(&packet.effects, 0);
-    test_assert((pass->inputs & BOX_EFFECT_LUT) != 0);
-    test_assert((packet.view.effect_inputs & BOX_EFFECT_LUT) != 0);
+    test_assert((pass->inputs & BOX_EFFECT_TEXTURE) != 0);
+    test_assert((packet.view.effect_inputs & BOX_EFFECT_TEXTURE) != 0);
 }
 
 void ToneMap_the_cube_reaches_the_packet_once(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 1, .dither = false, .curve = ToneMapTony});
+    tonemap_set(1, false, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
-    test_int(packet.lut_create.count, 1);
-    box_lut_cmd_t *cmd = box_vec_at(&packet.lut_create, 0);
+    test_int(packet.effect_texture_create.count, 1);
+    box_effect_texture_cmd_t *cmd = box_vec_at(&packet.effect_texture_create, 0);
     test_int(cmd->dim, 48);
     test_assert(cmd->texels != NULL);
     free(cmd->texels);
@@ -107,20 +122,19 @@ void ToneMap_the_cube_reaches_the_packet_once(void)
 
     box_packet_reset(&packet);
     box_render_extract(w, &packet);
-    test_int(packet.lut_create.count, 0);
+    test_int(packet.effect_texture_create.count, 0);
 }
 
 void ToneMap_the_lookup_maps_black_to_black(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 1, .dither = false, .curve = ToneMapTony});
+    tonemap_set(1, false, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
-    test_int(packet.lut_create.count, 1);
-    box_lut_cmd_t *cmd = box_vec_at(&packet.lut_create, 0);
+    test_int(packet.effect_texture_create.count, 1);
+    box_effect_texture_cmd_t *cmd = box_vec_at(&packet.effect_texture_create, 0);
     float dim = (float)cmd->dim;
     float uv = 0.0f * ((dim - 1.0f) / dim) + 0.5f / dim;
     int32_t c = (int32_t)(uv * dim);
@@ -137,14 +151,13 @@ void ToneMap_the_lookup_maps_black_to_black(void)
 void ToneMap_the_lookup_rises_with_the_stimulus(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 1, .dither = false, .curve = ToneMapTony});
+    tonemap_set(1, false, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
-    test_int(packet.lut_create.count, 1);
-    box_lut_cmd_t *cmd = box_vec_at(&packet.lut_create, 0);
+    test_int(packet.effect_texture_create.count, 1);
+    box_effect_texture_cmd_t *cmd = box_vec_at(&packet.effect_texture_create, 0);
     float dim = (float)cmd->dim;
     const float stimulus[4] = { 0.05f, 0.18f, 1.0f, 8.0f };
     float mapped[4];
@@ -169,14 +182,13 @@ void ToneMap_the_lookup_rises_with_the_stimulus(void)
 void ToneMap_the_lookup_desaturates_a_bright_color(void)
 {
     // ore_engine/tonemap_operators
-    ecs_set(w, tonemap, ToneMapping, {
-        .white = 1, .dither = false, .curve = ToneMapTony});
+    tonemap_set(1, false, 1);
     ecs_get_mut(w, tonemap, Effect)->enabled = true;
     ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
-    test_int(packet.lut_create.count, 1);
-    box_lut_cmd_t *cmd = box_vec_at(&packet.lut_create, 0);
+    test_int(packet.effect_texture_create.count, 1);
+    box_effect_texture_cmd_t *cmd = box_vec_at(&packet.effect_texture_create, 0);
     float dim = (float)cmd->dim;
     const float stimulus[3] = { 8.0f, 0.0f, 0.0f };
     int32_t coord[3];

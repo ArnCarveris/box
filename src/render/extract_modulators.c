@@ -95,7 +95,8 @@ static void box_modulator_rebuild(
             entry->entity = it.entities[i];
             entry->light = light;
             entry->shader = m->shader;
-            entry->params = box_modulator_params_id(world, it.entities[i]);
+            entry->params = m->params ? m->params :
+                box_modulator_params_id(world, it.entities[i]);
         }
     }
 

@@ -28,8 +28,8 @@ box { effects { stack {
 //     ToneMapping: {white: 1, dither: true}
 //   }
   bloom {
-    Effect: {enabled: true}
-    Bloom: {}
+    // Effect: {enabled: true}
+    // Bloom: {}
   }
 } } }
 
@@ -156,7 +156,7 @@ template Lantern {
     Position: {}
     Sphere: {radius: 0.25, segments: 16, smooth: true}
     Rgb: {241, 116, 91}
-    Emissive: {10, {241, 116, 91}}
+    Emissive: {2, {241, 116, 91}}
   }
   for i in 0..3 {
     {
@@ -1050,4 +1050,4 @@ template Town {
   }
 }
 
-Town sakura_machi(rows: 40, columns: 40, seed: 42)
+Town sakura_machi(rows: 4, columns: 4, seed: 42)

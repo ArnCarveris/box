@@ -1,8 +1,3 @@
-/**
- * @file Weather.c
- * @brief Tests for the overcast, fog and rain a Weather blends over the sky.
- */
-
 #include <box.h>
 #include <box/sky.h>
 #include <bake_test.h>
@@ -13,8 +8,6 @@ static ecs_world_t *w;
 static box_packet_t packet;
 static ecs_entity_t sun;
 static ecs_entity_t atmosphere;
-static ecs_entity_t fog;
-static ecs_entity_t wetness;
 
 void Weather_setup(void)
 {
@@ -32,10 +25,6 @@ void Weather_setup(void)
     atmosphere = ecs_new(w);
     ecs_set(w, atmosphere, Atmosphere, {.sun = sun});
     ecs_singleton_set(w, EnvironmentLight, {.intensity = 1, .source = atmosphere});
-    fog = ecs_lookup(w, "box.effects.stack.fog");
-    ecs_get_mut(w, fog, Effect)->enabled = true;
-    ecs_modified(w, fog, Effect);
-    wetness = ecs_lookup(w, "box.material.layers.wetness");
 }
 
 void Weather_teardown(void)
@@ -179,90 +168,14 @@ void Weather_a_sliver_of_overcast_keeps_the_environment(void)
     test_uint(packet.view.env_generation, first);
 }
 
-void Weather_the_fog_raises_the_fog_density(void)
-{
-    // weather/states
-    box_render_extract(w, &packet);
-    float clear = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_singleton_set(w, Weather, {.fog = 1});
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    float thick = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    test_assert(clear > 0.0f);
-    test_assert(fabsf(thick - clear * BOX_WEATHER_FOG_GAIN) < clear * 0.01f);
-}
-
-void Weather_a_half_fog_sits_between_the_two(void)
-{
-    // weather/states
-    box_render_extract(w, &packet);
-    float clear = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_singleton_set(w, Weather, {.fog = 0.5f});
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    float half = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-    float expect = clear * (1.0f + 0.5f * (BOX_WEATHER_FOG_GAIN - 1.0f));
-
-    test_assert(fabsf(half - expect) < clear * 0.01f);
-}
-
-void Weather_the_fog_leaves_the_color_and_the_framing_alone(void)
-{
-    // weather/states
-    box_render_extract(w, &packet);
-    const box_effect_t *pass = box_vec_at(&packet.effects, 0);
-    float color[3] = { pass->params[0], pass->params[1], pass->params[2] };
-    float falloff = pass->params[4];
-
-    box_packet_reset(&packet);
-    ecs_singleton_set(w, Weather, {.fog = 1});
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    const box_effect_t *thick = box_vec_at(&packet.effects, 0);
-
-    test_assert(fabsf(thick->params[0] - color[0]) < 1e-6f);
-    test_assert(fabsf(thick->params[1] - color[1]) < 1e-6f);
-    test_assert(fabsf(thick->params[2] - color[2]) < 1e-6f);
-    test_assert(fabsf(thick->params[4] - falloff) < 1e-6f);
-}
-
-void Weather_the_rain_wets_the_material_layer(void)
-{
-    // weather/states
-    ecs_singleton_set(w, Weather, {.rain = 0.6f});
-    ecs_progress(w, 0);
-    const LayerParams *params = ecs_get(w, wetness, LayerParams);
-
-    test_assert(params != NULL);
-    test_assert(fabsf(params->a.w - 0.6f) < 1e-5f);
-}
-
-void Weather_a_world_without_weather_keeps_the_wetness_layer(void)
-{
-    // weather/states
-    const LayerParams *before = ecs_get(w, wetness, LayerParams);
-    float authored = before->a.w;
-    ecs_progress(w, 0);
-    const LayerParams *params = ecs_get(w, wetness, LayerParams);
-
-    test_assert(authored > 0.0f);
-    test_assert(fabsf(params->a.w - authored) < 1e-6f);
-}
-
 void Weather_the_first_frame_snaps_to_the_weather(void)
 {
     // weather/states
-    ecs_singleton_set(w, Weather, {.overcast = 1, .fog = 1, .rain = 1, .transition = 10});
+    ecs_singleton_set(w, Weather, {.overcast = 1, .rain = 1, .transition = 10});
     ecs_progress(w, 1.0f / 60.0f);
     const Weather *weather = ecs_singleton_get(w, Weather);
 
     test_assert(weather->current.overcast == 1.0f);
-    test_assert(weather->current.fog == 1.0f);
     test_assert(weather->current.rain == 1.0f);
 }
 
@@ -316,41 +229,22 @@ void Weather_a_write_of_one_amount_keeps_the_others(void)
     // weather/states
     ecs_singleton_set(w, Weather, {.overcast = 1, .transition = 1});
     ecs_progress(w, 0);
-    ecs_singleton_set(w, Weather, {.overcast = 1, .fog = 1, .transition = 1});
+    ecs_singleton_set(w, Weather, {.overcast = 1, .rain = 1, .transition = 1});
     ecs_progress(w, 1.0f / 60.0f);
     const Weather *weather = ecs_singleton_get(w, Weather);
 
     test_assert(weather->current.overcast == 1.0f);
-    test_assert(weather->current.fog > 0.0f);
-    test_assert(weather->current.fog < 0.1f);
+    test_assert(weather->current.rain > 0.0f);
+    test_assert(weather->current.rain < 0.1f);
 }
 
 void Weather_an_amount_outside_the_range_is_held_inside_it(void)
 {
     // weather/states
-    ecs_singleton_set(w, Weather, {.overcast = 5, .fog = -2});
+    ecs_singleton_set(w, Weather, {.overcast = 5, .rain = -2});
     ecs_progress(w, 0);
     const Weather *weather = ecs_singleton_get(w, Weather);
 
     test_assert(weather->current.overcast == 1.0f);
-    test_assert(weather->current.fog == 0.0f);
-}
-
-void Weather_the_overcast_flattens_the_fog_color(void)
-{
-    // weather/states
-    box_render_extract(w, &packet);
-    const box_effect_t *clear = box_vec_at(&packet.effects, 0);
-    float tint = fabsf(clear->params[2] - clear->params[0]);
-    float red = clear->params[0];
-
-    box_packet_reset(&packet);
-    ecs_singleton_set(w, Weather, {.overcast = 1});
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    const box_effect_t *grey = box_vec_at(&packet.effects, 0);
-
-    test_assert(tint > red * 0.02f);
-    test_assert(fabsf(grey->params[1] - grey->params[0]) < 1e-6f);
-    test_assert(fabsf(grey->params[2] - grey->params[0]) < 1e-6f);
+    test_assert(weather->current.rain == 0.0f);
 }

@@ -13,10 +13,10 @@
 #include "bake.h"
 #include "shadow.h"
 #include "blur.h"
-#include "bloom.h"
-#include "exposure.h"
-#include "gtao.h"
-#include "lut.h"
+#include "effect_mip.h"
+#include "effect_compute.h"
+#include "effect_temporal.h"
+#include "effect_texture.h"
 #include "hiz.h"
 #include "overlay.h"
 #include "upscale.h"
@@ -45,12 +45,6 @@
 /** Format of the motion vector target, which holds a signed uv delta per texel */
 #define BOX_EFFECT_MOTION_FORMAT (WGPUTextureFormat_RG16Float)
 
-/** Format the passes of a chain hand their image to the next pass in.
- *
- * Every target between two passes is a float one, so a pass that brightens the
- * image keeps what it pushed past white for the tone map at the end of the
- * chain; the last pass writes the target of the view in its own format.
- */
 #define BOX_EFFECT_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
 
 /** Target formats a pass is compiled for: the view format and the float one */
@@ -63,9 +57,6 @@
  * other two, which is what a pass changing the indirect light of a pixel needs.
  */
 #define BOX_EFFECT_NORMAL_FORMAT (WGPUTextureFormat_RGBA16Float)
-
-/** Format the ambient occlusion passes keep their occlusion and view depth in */
-#define BOX_GTAO_FORMAT (WGPUTextureFormat_RG16Float)
 
 /** Bytes between the uniforms of two environment passes */
 #define BOX_ENV_STRIDE (256)
@@ -319,32 +310,34 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
     uint32_t scene_mips_count;       /**< Levels its blur chain holds */
     WGPUTextureFormat scene_format;  /**< Format of that copy, which follows the scene target */
-    WGPUBuffer exposure_state;       /**< Adapted exposure of the view, kept between frames */
-    WGPUBuffer exposure_hist;        /**< Log luminance histogram its compute pass fills */
-    WGPUTexture bloom;               /**< Pyramid of the image a bloom pass of the view reads */
-    WGPUTextureView bloom_view;      /**< View of its finest level, which the pass samples */
-    WGPUTextureView bloom_mips[BOX_BLOOM_LEVELS_MAX]; /**< Attachment view of one level */
-    WGPUBindGroup bloom_down[BOX_BLOOM_LEVELS_MAX]; /**< Downsample source, the finer level */
-    WGPUBindGroup bloom_up[BOX_BLOOM_LEVELS_MAX];   /**< Upsample source, the coarser level */
-    uint32_t bloom_levels;           /**< Levels its pyramid holds, 0 until it has one */
-    uint32_t bloom_width;            /**< Width of the finest level of its pyramid */
-    uint32_t bloom_height;           /**< Height of the finest level of its pyramid */
-    WGPUBuffer bloom_uniform;
-    WGPUTexture bloom_history[2];
-    WGPUTextureView bloom_history_view[2];
-    uint32_t bloom_history_index;
-    uint32_t bloom_history_frame;
-    uint32_t bloom_history_slot;
-    bool bloom_history_valid;
-
-    WGPUTexture gtao_raw;            /**< Occlusion and view depth the trace pass wrote */
-    WGPUTextureView gtao_raw_view;   /**< View of that texture */
-    WGPUTexture gtao_hist[2];        /**< Accumulated occlusion of this frame and the last */
-    WGPUTextureView gtao_hist_view[2]; /**< View of each of them */
-    uint32_t gtao_width;             /**< Width the occlusion textures were created for */
-    uint32_t gtao_height;            /**< Height the occlusion textures were created for */
-    uint32_t gtao_slot;              /**< History entry this frame writes */
-    bool gtao_valid;                 /**< The other entry holds the occlusion of a frame */
+    WGPUBuffer setup_compute_state;
+    WGPUBuffer setup_compute_work;
+    uint32_t setup_compute_size[2];
+    WGPUTexture setup_mip;
+    WGPUTextureView setup_mip_view;
+    WGPUTextureView setup_mip_mips[BOX_EFFECT_MIP_LEVELS_MAX];
+    WGPUBindGroup setup_mip_down[BOX_EFFECT_MIP_LEVELS_MAX];
+    WGPUBindGroup setup_mip_up[BOX_EFFECT_MIP_LEVELS_MAX];
+    uint32_t setup_mip_levels;
+    uint32_t setup_mip_width;
+    uint32_t setup_mip_height;
+    WGPUTextureFormat setup_mip_format;
+    WGPUBuffer setup_mip_uniform;
+    WGPUTexture setup_mip_history[2];
+    WGPUTextureView setup_mip_history_view[2];
+    uint32_t setup_mip_history_index;
+    uint32_t setup_mip_history_frame;
+    uint32_t setup_mip_history_slot;
+    bool setup_mip_history_valid;
+    WGPUTexture setup_temporal_work;
+    WGPUTextureView setup_temporal_work_view;
+    WGPUTexture setup_temporal_hist[2];
+    WGPUTextureView setup_temporal_hist_view[2];
+    uint32_t setup_temporal_width;
+    uint32_t setup_temporal_height;
+    WGPUTextureFormat setup_temporal_format;
+    uint32_t setup_temporal_slot;
+    bool setup_temporal_valid;
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
@@ -453,12 +446,9 @@ typedef struct box_effect_uniform_t {
 } box_effect_uniform_t;
 
 /** Adapted exposure of a view, which its compute passes keep between frames */
-typedef struct box_exposure_state_t {
-    float ev;      /**< Exposure in stops */
-    float scale;   /**< Multiplier the exposure asks for */
-    float average; /**< Average luminance the histogram measured */
-    float pad;     /**< Padding to the 16 byte GPU stride */
-} box_exposure_state_t;
+typedef struct box_effect_storage_t {
+    float value[4];
+} box_effect_storage_t;
 
 /** Uniform block the overlay pass reads */
 typedef struct box_overlay_uniform_t {
@@ -537,21 +527,21 @@ struct box_renderer_t {
     WGPUTextureView effect_depth_dummy_view; /**< View of that texture */
     WGPUTexture effect_cube_dummy;   /**< One texel cubemap bound when a view has no environment */
     WGPUTextureView effect_cube_dummy_view; /**< Cube view of that texture */
-    WGPUTexture lut_texture;         /**< Display transform lookup cube, once one was uploaded */
-    WGPUTextureView lut_view;        /**< 3D view of that cube, NULL until it arrives */
-    WGPUTexture lut_dummy;           /**< One texel cube bound while no pass asked for one */
-    WGPUTextureView lut_dummy_view;  /**< 3D view of that texture */
-    WGPUBindGroupLayout gtao_layout; /**< Depth, normals, motion and history of the AO passes */
-    WGPURenderPipeline gtao_trace;   /**< Horizon search over the depth of the view */
-    WGPURenderPipeline gtao_resolve; /**< Bilateral denoise and temporal accumulation */
-    WGPUComputePipeline exposure_histogram; /**< Log luminance histogram of the image */
-    WGPUComputePipeline exposure_average;   /**< Weighted average and the adaptation step */
-    WGPUBindGroupLayout exposure_layout;    /**< Uniform, image, histogram and state */
-    WGPUBindGroupLayout pyramid_layout;     /**< Uniform, source level and sampler */
-    WGPURenderPipeline pyramid_first;  /**< Karis weighted downsample of the image */
-    WGPURenderPipeline pyramid_down;   /**< Thirteen tap downsample of a level into the next */
-    WGPURenderPipeline pyramid_up;
-    WGPURenderPipeline pyramid_history;
+    WGPUTexture effect_texture[BOX_EFFECT_TEXTURE_MAX];
+    WGPUTextureView effect_texture_view[BOX_EFFECT_TEXTURE_MAX];
+    WGPUTexture effect_texture_dummy;
+    WGPUTextureView effect_texture_dummy_view;
+    WGPUBindGroupLayout setup_temporal_layout;
+    WGPURenderPipeline setup_temporal_first;
+    WGPURenderPipeline setup_temporal_second;
+    uint32_t setup_temporal_shader;
+    WGPUComputePipeline setup_compute_first;
+    WGPUComputePipeline setup_compute_second;
+    WGPUBindGroupLayout setup_compute_layout;
+    uint32_t setup_compute_shader;
+    WGPUBindGroupLayout setup_mip_layout;
+    WGPURenderPipeline setup_mip_pipeline[4];
+    uint32_t setup_mip_shader;
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
     WGPUBuffer motion_uniform;       /**< Matrices of the motion pass */
@@ -1480,78 +1470,36 @@ void box_effect_run(
     WGPUCommandEncoder encoder,
     WGPUTextureView dst);
 
-/** Create the compute pipelines of the automatic exposure.
- *
- * @param r The renderer
- */
-void box_exposure_init(
+void box_effect_compute_init(
     box_renderer_t *r);
 
-/** Release the pipelines of the automatic exposure.
- *
- * @param r The renderer
- */
-void box_exposure_fini(
+void box_effect_compute_fini(
     box_renderer_t *r);
 
-/** Release the buffers the exposure of one view keeps.
- *
- * @param v The view
- */
-void box_exposure_view_fini(
+void box_effect_compute_view_fini(
     box_gpu_view_t *v);
 
-/** Buffer holding the adapted exposure of the current view, created on demand.
- *
- * @param r The renderer
- * @return The buffer, which starts at an exposure of one
- */
-WGPUBuffer box_exposure_buffer(
-    box_renderer_t *r);
-
-/** Measure the image of a pass and adapt the exposure of its view.
- *
- * @param r The renderer
- * @param slot Index of the pass in the packet, which is its uniform slot
- * @param src The image the histogram is built from
- * @param encoder The command encoder
- */
-void box_exposure_dispatch(
+WGPUBuffer box_effect_storage(
     box_renderer_t *r,
+    const box_effect_t *fx);
+
+void box_effect_compute_run(
+    box_renderer_t *r,
+    const box_effect_t *fx,
     uint32_t slot,
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder);
 
-/** Create the layout and the pipelines of the ambient occlusion passes.
- *
- * @param r The renderer
- */
-void box_gtao_init(
+void box_effect_temporal_init(
     box_renderer_t *r);
 
-/** Release the pipelines of the ambient occlusion passes.
- *
- * @param r The renderer
- */
-void box_gtao_fini(
+void box_effect_temporal_fini(
     box_renderer_t *r);
 
-/** Release the occlusion textures of one view.
- *
- * @param v The view
- */
-void box_gtao_view_fini(
+void box_effect_temporal_view_fini(
     box_gpu_view_t *v);
 
-/** Trace, denoise and accumulate the ambient occlusion of the current view.
- *
- * @param r The renderer
- * @param fx The pass that asked for the occlusion input
- * @param slot Index of the pass in the packet, which is its uniform slot
- * @param encoder The command encoder
- * @return The texture holding the occlusion, NULL when the passes are missing
- */
-WGPUTextureView box_gtao_build(
+WGPUTextureView box_effect_temporal_run(
     box_renderer_t *r,
     const box_effect_t *fx,
     uint32_t slot,
@@ -1565,25 +1513,17 @@ WGPUTextureView box_gtao_build(
 WGPUTextureView box_environment_specular(
     box_renderer_t *r);
 
-/** Create the pipelines of the bloom pyramid.
- *
- * @param r The renderer
- */
-void box_bloom_init(
+void box_effect_mip_init(
     box_renderer_t *r);
 
-/** Release the pipelines of the bloom pyramid.
- *
- * @param r The renderer
- */
-void box_bloom_fini(
+void box_effect_mip_fini(
     box_renderer_t *r);
 
 /** Release the pyramid of one view.
  *
  * @param v The view
  */
-void box_bloom_view_fini(
+void box_effect_mip_view_fini(
     box_gpu_view_t *v);
 
 /** Fill the pyramid of the current view from the image of a pass.
@@ -1595,7 +1535,7 @@ void box_bloom_view_fini(
  * @param encoder The command encoder
  * @return The view of the finest level, NULL when the pyramid could not be built
  */
-WGPUTextureView box_bloom_build(
+WGPUTextureView box_effect_mip_run(
     box_renderer_t *r,
     const box_effect_t *fx,
     uint32_t slot,

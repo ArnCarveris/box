@@ -98,7 +98,7 @@ WGPURenderPipeline box_frame_pipeline(
         { .format = WGPUVertexFormat_Uint32x4,
             .offset = offset + BOX_INSTANCE_SHAPE * sizeof(uint32_t), .shaderLocation = 14 },
         { .format = WGPUVertexFormat_Uint32x2,
-            .offset = offset + BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 },
+            .offset = offset + BOX_INSTANCE_LAYER_DATA * sizeof(uint32_t), .shaderLocation = 15 },
         { .format = WGPUVertexFormat_Float32x4,
             .offset = offset + BOX_INSTANCE_CLIP * sizeof(uint32_t), .shaderLocation = 16 }
     };
@@ -250,7 +250,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         { .format = WGPUVertexFormat_Uint32x4,
             .offset = BOX_INSTANCE_SHAPE * sizeof(uint32_t), .shaderLocation = 14 },
         { .format = WGPUVertexFormat_Uint32x2,
-            .offset = BOX_INSTANCE_WEAR * sizeof(uint32_t), .shaderLocation = 15 },
+            .offset = BOX_INSTANCE_LAYER_DATA * sizeof(uint32_t), .shaderLocation = 15 },
         { .format = WGPUVertexFormat_Float32x4,
             .offset = BOX_INSTANCE_CLIP * sizeof(uint32_t), .shaderLocation = 16 }
     };
@@ -783,7 +783,7 @@ void box_frame_render(
 
     box_layers_apply(r, p);
     box_modulators_apply(r, p);
-    box_lut_apply(r, p);
+    box_effect_texture_apply(r, p);
     box_texture_apply(r, p);
     box_target_apply(r, p);
     box_scene_apply(r, p);

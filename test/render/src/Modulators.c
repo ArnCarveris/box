@@ -15,6 +15,8 @@
 static ecs_world_t *w;
 static box_packet_t packet;
 static ecs_entity_t sun;
+static ecs_entity_t cloud_params;
+static ecs_entity_t caustics_params;
 static int32_t modulator_errors;
 static ecs_os_api_log_t modulator_log_prev;
 
@@ -55,6 +57,18 @@ static const char* modulator_mesh_source(void)
     return result;
 }
 
+static void set_modulator_params(
+    ecs_entity_t e,
+    ecs_entity_t type,
+    float a,
+    float b,
+    float c,
+    float d)
+{
+    float value[4] = {a, b, c, d};
+    ecs_set_id(w, e, type, sizeof(value), value);
+}
+
 void Modulators_setup(void)
 {
     modulator_errors = 0;
@@ -62,6 +76,9 @@ void Modulators_setup(void)
     modulator_log_prev = ecs_os_api.log_;
     ecs_os_api.log_ = modulator_log;
     ECS_IMPORT(w, Box);
+    test_assert(box_script_load(w, BOX_LIGHT_MODULATORS_BUILTINS) != 0);
+    cloud_params = ecs_lookup(w, "box.light.CloudShadows");
+    caustics_params = ecs_lookup(w, "box.light.Caustics");
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -90,14 +107,14 @@ void Modulators_the_include_is_generated_per_light(void)
     // ore_engine/cloud_shadows
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.scale = 30, .density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 30, 0, 0.5f, 0);
 
     ecs_entity_t lamp = ecs_new(w);
     ecs_set(w, lamp, Position, {0, 2, 5});
     ecs_set(w, lamp, PointLight, {.intensity = 4, .range = 20});
-    ecs_set(w, lamp, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, lamp, CloudShadows, {.scale = 10, .density = 0.25f});
+    ecs_set(w, lamp, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(lamp, cloud_params, 10, 0, 0.25f, 0);
 
     box_render_extract(w, &packet);
 
@@ -115,9 +132,8 @@ void Modulators_params_reach_the_packet(void)
     // ore_engine/cloud_shadows
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {
-        .scale = 30, .speed = 6, .density = 0.5f, .softness = 0.2f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 30, 6, 0.5f, 0.2f);
 
     box_render_extract(w, &packet);
 
@@ -151,8 +167,8 @@ void Modulators_the_sun_carries_its_modulator_bit(void)
     // ore_engine/cloud_shadows
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     box_render_extract(w, &packet);
 
     test_int(packet.view.sun_modulator, 1);
@@ -166,8 +182,8 @@ void Modulators_a_point_light_carries_its_modulator_bit(void)
     ecs_entity_t lamp = ecs_new(w);
     ecs_set(w, lamp, Position, {0, 2, 5});
     ecs_set(w, lamp, PointLight, {.intensity = 4, .range = 20});
-    ecs_set(w, lamp, LightModulator, {.shader = caustics, .enabled = true});
-    ecs_set(w, lamp, Caustics, {.scale = 2, .intensity = 1.5f});
+    ecs_set(w, lamp, LightModulator, {.shader = caustics, .params = caustics_params, .enabled = true});
+    set_modulator_params(lamp, caustics_params, 2, 0, 1.5f, 0);
     box_render_extract(w, &packet);
 
     test_int(packet.lights.count, 1);
@@ -185,11 +201,11 @@ void Modulators_several_modulators_on_one_light_multiply(void)
     ecs_entity_t caustics = ecs_new(w);
     ecs_set(w, caustics, Shader, {.path = "etc/shaders/light/caustics.wgsl"});
 
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     ecs_entity_t second = ecs_new_w_pair(w, EcsChildOf, sun);
-    ecs_set(w, second, LightModulator, {.shader = caustics, .enabled = true});
-    ecs_set(w, second, Caustics, {.intensity = 2});
+    ecs_set(w, second, LightModulator, {.shader = caustics, .params = caustics_params, .enabled = true});
+    set_modulator_params(second, caustics_params, 0, 0, 2, 0);
 
     box_render_extract(w, &packet);
 
@@ -206,8 +222,8 @@ void Modulators_a_disabled_modulator_is_not_registered(void)
     // ore_engine/cloud_shadows
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     box_render_extract(w, &packet);
     test_int(packet.modulator_count, 1);
 
@@ -217,7 +233,7 @@ void Modulators_a_disabled_modulator_is_not_registered(void)
     }
 
     box_vec_clear(&packet.shader_create);
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = false});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = false});
     box_render_extract(w, &packet);
 
     test_int(packet.modulator_count, 0);
@@ -238,8 +254,8 @@ void Modulators_a_broken_plugin_reports_and_keeps_the_pipeline(void)
 
     ecs_entity_t broken = ecs_new(w);
     ecs_set(w, broken, Shader, {.path = (char*)path});
-    ecs_set(w, sun, LightModulator, {.shader = broken, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = broken, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     box_render_extract(w, &packet);
 
     const ShaderStatus *status = ecs_get(w, broken, ShaderStatus);
@@ -261,8 +277,8 @@ void Modulators_changing_the_plugin_recomposes_the_mesh_shader(void)
     // ore_engine/cloud_shadows
     ecs_entity_t plugin = ecs_new(w);
     ecs_set(w, plugin, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = plugin, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.density = 0.5f});
+    ecs_set(w, sun, LightModulator, {.shader = plugin, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     box_render_extract(w, &packet);
     test_assert(strstr(modulator_mesh_source(), "let deck = box_modulator_fbm(") != NULL);
 
@@ -289,14 +305,14 @@ void Modulators_the_overcast_drives_a_density_of_zero(void)
     ecs_set(w, atmosphere, Atmosphere, {.sun = sun});
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.scale = 30});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 30, 0, 0, 0);
     ecs_singleton_set(w, Weather, {.overcast = 0.75f});
     ecs_progress(w, 0);
     box_render_extract(w, &packet);
 
-    const CloudShadows *deck = ecs_get(w, sun, CloudShadows);
-    test_assert(fabsf(deck->density - 0.75f) < 1e-5f);
+    const float *deck = ecs_get_id(w, sun, cloud_params);
+    test_assert(fabsf(deck[2] - 0.75f) < 1e-5f);
     test_assert(fabsf(packet.modulator_params[0].v[2] - 0.75f) < 1e-5f);
 }
 
@@ -307,13 +323,13 @@ void Modulators_a_written_density_is_kept(void)
     ecs_set(w, atmosphere, Atmosphere, {.sun = sun});
     ecs_entity_t clouds = ecs_new(w);
     ecs_set(w, clouds, Shader, {.path = "etc/shaders/light/clouds.wgsl"});
-    ecs_set(w, sun, LightModulator, {.shader = clouds, .enabled = true});
-    ecs_set(w, sun, CloudShadows, {.scale = 30, .density = 0.2f});
+    ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
+    set_modulator_params(sun, cloud_params, 30, 0, 0.2f, 0);
     ecs_singleton_set(w, Weather, {.overcast = 0.75f});
     ecs_progress(w, 0);
     box_render_extract(w, &packet);
 
-    const CloudShadows *deck = ecs_get(w, sun, CloudShadows);
-    test_assert(fabsf(deck->density - 0.2f) < 1e-5f);
+    const float *deck = ecs_get_id(w, sun, cloud_params);
+    test_assert(fabsf(deck[2] - 0.2f) < 1e-5f);
     test_assert(fabsf(packet.modulator_params[0].v[2] - 0.2f) < 1e-5f);
 }

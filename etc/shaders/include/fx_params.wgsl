@@ -48,23 +48,6 @@ fn fx_luma(c: vec3<f32>) -> f32 {
   return dot(max(c, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722));
 }
 
-// Bin of the log luminance histogram a luminance lands in; bin zero holds every
-// texel below the range, the rest spread EXPOSURE_LOG_RANGE stops.
-fn fx_exposure_bin(luma: f32) -> u32 {
-  if (luma < 0.00001) {
-    return 0u;
-  }
-
-  let t = (log2(luma) - EXPOSURE_MIN_LOG) / EXPOSURE_LOG_RANGE;
-  return u32(clamp(t, 0.0, 1.0) * f32(EXPOSURE_BINS - 2) + 1.5);
-}
-
-// Luminance a bin of the histogram stands for, the inverse of the mapping.
-fn fx_exposure_luma(bin: f32) -> f32 {
-  let t = (bin - 1.0) / f32(EXPOSURE_BINS - 2);
-  return exp2(t * EXPOSURE_LOG_RANGE + EXPOSURE_MIN_LOG);
-}
-
 // Ordered 8 by 8 Bayer threshold of a pixel, zero to one.
 fn fx_bayer(p: vec2<u32>) -> f32 {
   let x = p.x & 7u;

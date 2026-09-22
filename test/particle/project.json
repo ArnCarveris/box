@@ -207,10 +207,7 @@
                     "a_rain_that_clears_stops_the_emitter",
                     "the_first_frame_of_a_rain_fills_the_column",
                     "the_rain_raises_the_overcast_of_the_sky",
-                    "the_rain_raises_the_fog_of_the_air",
-                    "the_rain_wets_the_material_layers",
-                    "the_weather_keeps_the_amounts_it_was_asked_for",
-                    "a_world_without_the_particle_module_still_wets_and_greys"
+                    "the_weather_keeps_the_amounts_it_was_asked_for"
                 ]
             },
             {

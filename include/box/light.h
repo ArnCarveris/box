@@ -66,24 +66,11 @@ ECS_STRUCT(SpotLight, {
  */
 ECS_STRUCT(LightModulator, {
     ecs_entity_t shader; /**< Shader entity of the plugin, without one it is skipped */
+    ecs_entity_t params;
     bool enabled;        /**< The modulator runs, default true */
 });
 
-/** Parameters of the cloud shadow plugin, `etc/shaders/light/clouds.wgsl` */
-ECS_STRUCT(CloudShadows, {
-    float scale;    /**< World units one cell of the deck covers, 0 takes 40 */
-    float speed;    /**< World units the deck drifts per second, 0 takes 4 */
-    float density;  /**< Light the deck takes at its thickest, 0 takes the overcast */
-    float softness; /**< Width of the edge between cloud and gap, 0 takes 0.35 */
-});
-
-/** Parameters of the caustics plugin, `etc/shaders/light/caustics.wgsl` */
-ECS_STRUCT(Caustics, {
-    float scale;     /**< World units one cell of the pattern covers, 0 takes 2 */
-    float speed;     /**< Rate the pattern animates at, 0 takes 1 */
-    float intensity; /**< Brightness of a band over the plain light, 0 takes 1 */
-    float depth;     /**< World height of the water surface the pattern falls through */
-});
+#define BOX_LIGHT_MODULATORS_BUILTINS "etc/box/light_modulators.flecs"
 
 /** Environment light that lights the scene from every direction, a singleton
  *

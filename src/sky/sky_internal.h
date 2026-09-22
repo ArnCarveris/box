@@ -42,25 +42,10 @@ typedef struct WeatherBlend {
 
 extern ECS_COMPONENT_DECLARE(WeatherBlend);
 
-/** Whether the density of a cloud deck belongs to the weather or to its author
- *
- * A CloudShadows left at a zero density follows the overcast of the world, so
- * a scene that asks for clouds and for weather gets one deck instead of two
- * settings that drift apart. Remembering what was written last is what tells a
- * density an author assigned from the one of the previous frame.
- */
-typedef struct CloudShadowsBlend {
-    float written;  /**< Density the weather wrote last */
-    bool automatic; /**< The density follows the overcast of the weather */
-} CloudShadowsBlend;
-
-extern ECS_COMPONENT_DECLARE(CloudShadowsBlend);
-
 /** Module wide registry of the atmosphere, stored as a singleton */
 typedef struct SkyState {
     ecs_query_t *atmospheres; /**< Entities holding an Atmosphere component */
     ecs_query_t *weathers;    /**< Entities holding a Weather component */
-    ecs_query_t *clouds;      /**< Entities holding a CloudShadows the weather may drive */
     ecs_query_t *cameras;     /**< Entities holding a Camera, whose first one the rain follows */
     ecs_entity_t rain;        /**< Emitter of the rain, created the first time a world rains */
     ecs_entity_t lut_shader;  /**< Shader entity of the table passes */
@@ -205,24 +190,6 @@ void box_sky_bodies(
  */
 void box_sky_time_init(
     ecs_world_t *world);
-
-/** Write the fog the atmosphere of a world drives into a parameter block.
- *
- * The color is the single scattering of a horizontal ray through the medium at
- * the camera, lit by the body that lights the view, and the density is the
- * extinction of that medium per world unit, falling off with the scale height
- * of its aerosol layer, so the fog, the aerial perspective and the sky agree.
- * The fog amount of the weather of the world multiplies that density.
- *
- * @param world The world
- * @param v The view the fog is seen from
- * @param out The parameters of the fog pass, color first and density after
- * @return true when an atmosphere drives the fog of this world
- */
-bool box_sky_fog(
-    ecs_world_t *world,
-    const box_view_t *v,
-    float *out);
 
 /** Copy the atmosphere of a world into a packet and mark what must be rendered.
  *

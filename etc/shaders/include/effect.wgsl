@@ -11,8 +11,8 @@
 @group(0) @binding(4) var fx_normal: texture_2d<f32>;
 @group(0) @binding(5) var fx_motion: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> fx_exposure: Exposure;
-@group(0) @binding(7) var fx_pyramid: texture_2d<f32>;
-@group(0) @binding(8) var fx_ao: texture_2d<f32>;
+@group(0) @binding(7) var fx_setup0: texture_2d<f32>;
+@group(0) @binding(8) var fx_setup1: texture_2d<f32>;
 @group(0) @binding(9) var fx_env: texture_cube<f32>;
 @group(0) @binding(10) var fx_lut: texture_3d<f32>;
 
@@ -53,11 +53,6 @@ fn fx_indirect(uv: vec2<f32>) -> vec3<f32> {
   return vec3(texel.z, gb_specular(texel.w), gb_roughness(texel.w));
 }
 
-// Ambient occlusion the frame gathered for this pass, one where it gathered none.
-fn fx_ao_sample(uv: vec2<f32>) -> f32 {
-  return textureSampleLevel(fx_ao, fx_sampler, uv, 0.0).x;
-}
-
 // Prefiltered environment of the view at a roughness, which a reflection pass
 // falls back to when its march finds nothing.
 fn fx_env_sample(dir: vec3<f32>, roughness: f32) -> vec3<f32> {
@@ -87,11 +82,6 @@ fn fx_view_depth(uv: vec2<f32>) -> f32 {
   let size = vec2<i32>(textureDimensions(fx_depth, 0));
   let c = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0, 0), size - vec2(1, 1));
   return textureLoad(fx_depth, c, 0);
-}
-
-// Blurred pyramid of the image the pass reads, in linear light.
-fn fx_pyramid_sample(uv: vec2<f32>) -> vec3<f32> {
-  return textureSampleLevel(fx_pyramid, fx_sampler, uv, 0.0).rgb;
 }
 
 // Multiplier the adapted exposure of the view asks for, one until a pass with

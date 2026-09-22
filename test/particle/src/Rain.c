@@ -359,71 +359,6 @@ void Rain_the_rain_raises_the_overcast_of_the_sky(void)
     ecs_fini(w);
 }
 
-void Rain_the_rain_raises_the_fog_of_the_air(void)
-{
-    // particles/rain
-    ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxParticle);
-    box_packet_t packet;
-    box_packet_init(&packet);
-    packet.width = 640;
-    packet.height = 480;
-    ecs_entity_t cam = ecs_new(w);
-    ecs_set(w, cam, Position, {0, 2, 0});
-    ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t sun = ecs_new(w);
-    ecs_set(w, sun, Rotation, {1.0f, 0, 0});
-    ecs_set(w, sun, DirectionalLight, {.intensity = 3});
-    ecs_entity_t atmosphere = ecs_new(w);
-    ecs_set(w, atmosphere, Atmosphere, {.sun = sun});
-    ecs_entity_t fog = ecs_lookup(w, "box.effects.stack.fog");
-    ecs_get_mut(w, fog, Effect)->enabled = true;
-    ecs_modified(w, fog, Effect);
-
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    float clear = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-
-    box_packet_reset(&packet);
-    ecs_singleton_set(w, Weather, {.rain = 1});
-    ecs_progress(w, 0);
-    box_render_extract(w, &packet);
-    float wet = ((const box_effect_t*)box_vec_at(&packet.effects, 0))->params[3];
-    float expect = clear * (1.0f + BOX_WEATHER_RAIN_FOG * (BOX_WEATHER_FOG_GAIN - 1.0f));
-
-    test_assert(clear > 0.0f);
-    test_assert(fabsf(wet - expect) < clear * 0.01f);
-
-    uint32_t i;
-    for (i = 0; i < packet.shader_create.count; i ++) {
-        free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
-    }
-
-    box_packet_fini(&packet);
-    ecs_fini(w);
-}
-
-void Rain_the_rain_wets_the_material_layers(void)
-{
-    // particles/rain
-    ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ECS_IMPORT(w, BoxParticle);
-    ecs_entity_t cam = ecs_new(w);
-    ecs_set(w, cam, Position, {0, 2, 0});
-    ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t wetness = ecs_lookup(w, "box.material.layers.wetness");
-    ecs_singleton_set(w, Weather, {.rain = 0.75f});
-
-    ecs_progress(w, 1.0f / 60.0f);
-    ecs_progress(w, 1.0f / 60.0f);
-
-    test_flt(ecs_get(w, wetness, LayerParams)->a.w, 0.75f);
-
-    ecs_fini(w);
-}
-
 void Rain_the_weather_keeps_the_amounts_it_was_asked_for(void)
 {
     // particles/rain
@@ -440,28 +375,6 @@ void Rain_the_weather_keeps_the_amounts_it_was_asked_for(void)
 
     test_flt(weather->current.rain, 1);
     test_flt(weather->current.overcast, 0);
-    test_flt(weather->current.fog, 0);
-
-    ecs_fini(w);
-}
-
-void Rain_a_world_without_the_particle_module_still_wets_and_greys(void)
-{
-    // particles/rain
-    ecs_world_t *w = ecs_init();
-    ECS_IMPORT(w, BoxGeometry);
-    ecs_entity_t cam = ecs_new(w);
-    ecs_set(w, cam, Position, {0, 2, 0});
-    ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t wetness = ecs_lookup(w, "box.material.layers.wetness");
-    ecs_singleton_set(w, Weather, {.rain = 1});
-
-    ecs_progress(w, 1.0f / 60.0f);
-    ecs_progress(w, 1.0f / 60.0f);
-
-    test_uint(ecs_lookup(w, "box.sky.rain"), 0);
-    test_flt(ecs_get(w, wetness, LayerParams)->a.w, 1);
-    test_flt(ecs_singleton_get(w, Weather)->current.rain, 1);
 
     ecs_fini(w);
 }
