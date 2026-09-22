@@ -72,6 +72,12 @@ static bool box_ui_terminal_equal(
     return end - begin == length && !strncmp(&text[begin], value, (size_t)length);
 }
 
+static bool box_ui_terminal_operator(
+    char ch)
+{
+    return strchr("(){}[]<>:,.?!=+*/|~-$\\", ch) != NULL;
+}
+
 static void box_ui_terminal_name(
     const char *text,
     uint8_t *styles,
@@ -84,22 +90,24 @@ static void box_ui_terminal_name(
 
     if (text[begin] == '(') {
         box_ui_terminal_span(styles, begin, end, BoxTerminalType);
-        return;
-    }
-
-    int32_t i, dot = -1;
-    for (i = begin; i < end; i ++) {
-        if (text[i] == '.') {
-            dot = i;
-        }
-    }
-
-    int32_t last = dot >= begin ? dot + 1 : begin;
-    if (last < end && isupper((unsigned char)text[last])) {
-        box_ui_terminal_span(styles, begin, last, BoxTerminalMuted);
-        box_ui_terminal_span(styles, last, end, BoxTerminalType);
     } else {
-        box_ui_terminal_span(styles, begin, end, BoxTerminalPath);
+        int32_t dot = -1;
+        for (int32_t i = begin; i < end; i ++) {
+            if (text[i] == '.') {
+                dot = i;
+            }
+        }
+
+        int32_t last = dot >= begin ? dot + 1 : begin;
+        box_ui_terminal_span(styles, begin, end,
+            last < end && isupper((unsigned char)text[last]) ?
+                BoxTerminalType : BoxTerminalPath);
+    }
+
+    for (int32_t i = begin; i < end; i ++) {
+        if (box_ui_terminal_operator(text[i])) {
+            box_ui_terminal_span(styles, i, i + 1, BoxTerminalMuted);
+        }
     }
 }
 
@@ -192,7 +200,7 @@ static void box_ui_terminal_value(
             }
 
             if (colon < end && text[colon] == ':') {
-                box_ui_terminal_span(styles, start, i, BoxTerminalMuted);
+                box_ui_terminal_span(styles, start, i, BoxTerminalText);
             } else if (box_ui_terminal_equal(text, start, i, "true") ||
                 box_ui_terminal_equal(text, start, i, "false") ||
                 box_ui_terminal_equal(text, start, i, "null"))
@@ -206,7 +214,17 @@ static void box_ui_terminal_value(
                 box_ui_terminal_span(styles, start, i, BoxTerminalPath);
             }
 
+            for (int32_t j = start; j < i; j ++) {
+                if (box_ui_terminal_operator(text[j])) {
+                    box_ui_terminal_span(styles, j, j + 1, BoxTerminalMuted);
+                }
+            }
+
             continue;
+        }
+
+        if (box_ui_terminal_operator(ch)) {
+            box_ui_terminal_span(styles, i, i + 1, BoxTerminalMuted);
         }
 
         i ++;
@@ -287,6 +305,8 @@ static void box_ui_terminal_line(
 
     if (split >= word && word > begin) {
         box_ui_terminal_span(styles, begin, word, BoxTerminalAccent);
+        box_ui_terminal_value(text, styles, word, split);
+        box_ui_terminal_span(styles, split + 1, split + 2, BoxTerminalMuted);
         box_ui_terminal_span(styles, split + 3, end, BoxTerminalMuted);
         i = word;
         while (i < split) {
@@ -308,7 +328,11 @@ static void box_ui_terminal_line(
             }
 
             if (colon < split && text[colon] == ':' && close < split) {
-                box_ui_terminal_span(styles, i + 1, colon, BoxTerminalMuted);
+                box_ui_terminal_span(styles, i, i + 1, BoxTerminalMuted);
+                box_ui_terminal_span(styles, colon, colon + 1,
+                    BoxTerminalMuted);
+                box_ui_terminal_span(styles, close, close + 1,
+                    BoxTerminalMuted);
                 box_ui_terminal_span(styles, colon + 1, close, BoxTerminalType);
                 i = close + 1;
             } else {
@@ -329,6 +353,7 @@ static void box_ui_terminal_line(
 
     if (colon > begin) {
         box_ui_terminal_name(text, styles, begin, colon);
+        box_ui_terminal_span(styles, colon, colon + 1, BoxTerminalMuted);
         box_ui_terminal_value(text, styles, colon + 1, end);
         return;
     }
@@ -794,6 +819,10 @@ static void box_ui_console_scrollback(
         ecs_strbuf_append(&buf, "$ %s\n", entry->line);
         meta->result = ecs_strbuf_written(&buf);
         ecs_strbuf_appendstr(&buf, result);
+        int32_t result_length = (int32_t)strlen(result);
+        if (result_length && result[result_length - 1] != '\n') {
+            ecs_strbuf_appendch(&buf, '\n');
+        }
         meta->end = ecs_strbuf_written(&buf);
         meta->error = entry->error;
         ecs_strbuf_appendch(&buf, '\n');
@@ -803,7 +832,10 @@ static void box_ui_console_scrollback(
     int32_t count = s->count;
     int32_t length = ecs_strbuf_written(&buf);
     char *value = ecs_strbuf_get(&buf);
-    uint8_t *styles = ecs_os_calloc((ecs_size_t)length);
+    if (!value) {
+        value = ecs_os_strdup("");
+    }
+    uint8_t *styles = length ? ecs_os_calloc((ecs_size_t)length) : NULL;
     for (i = 0; i < entry_count; i ++) {
         box_ui_terminal_entry_t *meta = &entries[i];
         int32_t command = meta->begin + 2;
@@ -815,8 +847,9 @@ static void box_ui_console_scrollback(
         }
 
         box_ui_terminal_span(styles, meta->begin, meta->begin + 1,
-            BoxTerminalAccent);
+            BoxTerminalMuted);
         box_ui_terminal_span(styles, command, command_end, BoxTerminalAccent);
+        box_ui_terminal_value(value, styles, command_end, meta->result - 1);
         box_ui_terminal_output(value, styles, meta->result, meta->end,
             meta->error);
     }

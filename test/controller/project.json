@@ -33,6 +33,7 @@
                     "the_turn_actions_follow_the_angular_smoothing_curve",
                     "sprint_scales_the_turn_action_yaw",
                     "the_wheel_gives_an_impulse_along_the_view",
+                    "the_wheel_is_ignored_while_the_ui_holds_the_mouse",
                     "the_turn_coasts_to_a_stop_after_the_button_releases",
                     "the_angular_velocity_zeroes_at_the_pitch_clamp",
                     "the_controller_starts_facing_an_authored_lookat",

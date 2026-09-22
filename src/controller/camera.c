@@ -252,7 +252,9 @@ static void box_camera_wheel(
     CameraController *cc)
 {
     const Input *in = ecs_singleton_get(world, Input);
-    float scroll = in ? in->mouse.scroll_delta.y : 0.0f;
+    float scroll = in && !box_ui_mouse_captured(world)
+        ? in->mouse.scroll_delta.y
+        : 0.0f;
     if (scroll == 0.0f) {
         goto done;
     }

@@ -289,6 +289,21 @@ void Shell_set_component_value(void)
     test_int(ptr[1], 20);
 }
 
+void Shell_set_partial_component_value(void)
+{
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_set_id(w, e, point, sizeof(ecs_i32_t) * 2,
+        ((ecs_i32_t[]){10, 20}));
+
+    char *out = box_command_run(w, session, "set thing Point {y: 30}", NULL);
+    test_str(out, "thing");
+    ecs_os_free(out);
+
+    const int32_t *ptr = ecs_get_id(w, e, point);
+    test_int(ptr[0], 10);
+    test_int(ptr[1], 30);
+}
+
 void Shell_set_invalid_value(void)
 {
     // command/shell
@@ -347,6 +362,18 @@ void Shell_clear_removes_components(void)
     ecs_os_free(out);
     test_assert(!ecs_has_id(w, e, tag));
     test_assert(ecs_lookup(w, "thing") == 0);
+}
+
+void Shell_clear_without_a_path_clears_the_console(void)
+{
+    ecs_os_free(box_command_run(w, session, "pwd", NULL));
+    ecs_os_free(box_command_run(w, session, "pwd", NULL));
+    test_int(ecs_get(w, session, TerminalSession)->count, 2);
+
+    char *out = box_command_run(w, session, "clear", NULL);
+    test_str(out, "");
+    ecs_os_free(out);
+    test_int(ecs_get(w, session, TerminalSession)->count, 0);
 }
 
 void Shell_has_component(void)

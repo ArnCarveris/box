@@ -591,8 +591,17 @@ static void box_shell_set(
         goto done;
     }
 
-    ecs_expr_eval_desc_t desc = { .type = type };
     ecs_value_t parsed = ecs_value_new(world, type);
+    const void *current = ecs_get_id(world, e, id);
+    if (current) {
+        ecs_value_t existing = {
+            .type = type,
+            .ptr = ECS_CONST_CAST(void*, current)
+        };
+        ecs_value_copy(world, &parsed, &existing);
+    }
+
+    ecs_expr_eval_desc_t desc = { .type = type };
     int prev = ecs_log_set_level(-4);
     const char *end = ecs_expr_run(world, value, &parsed, &desc);
     ecs_log_set_level(prev);
@@ -709,6 +718,21 @@ static void box_shell_clear(
     ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
     const char *path = *(char**)argv[1].ptr;
     ecs_entity_t e = 0;
+    if (!path) {
+        TerminalSession *state = ecs_get_mut(world, session, TerminalSession);
+        int32_t i;
+        for (i = 0; i < BOX_COMMAND_LOG_MAX; i ++) {
+            ecs_os_free(state->ring[i].line);
+            ecs_os_free(state->ring[i].result);
+            state->ring[i].line = NULL;
+            state->ring[i].result = NULL;
+        }
+
+        state->count = 0;
+        *(char**)result->ptr = ecs_os_strdup("");
+        return;
+    }
+
     char *out = box_shell_target(world, session, path, &e);
     if (out) {
         goto done;
@@ -885,7 +909,8 @@ void box_shell_init(
         query, 2, box_shell_get);
 
     box_command_register(world, "clear",
-        "Remove every component of an entity", path, 1, box_shell_clear);
+        "Clear the console or remove every component of an entity",
+        path_opt, 1, box_shell_clear);
 
     box_command_register(world, "has",
         "Test a component id or a query expression on an entity", id, 2,

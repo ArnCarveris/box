@@ -397,6 +397,27 @@ void Camera_the_wheel_gives_an_impulse_along_the_view(void)
     test_flt(ecs_get(w, camera, CameraController)->velocity.z, 3.0f);
 }
 
+void Camera_the_wheel_is_ignored_while_the_ui_holds_the_mouse(void)
+{
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_get_mut(w, root, Ui)->height = 360;
+    ecs_modified(w, root, Ui);
+    ecs_set(w, ecs_new_w_pair(w, EcsChildOf, root), Rect, {120, 60});
+    ecs_progress(w, 0.1f);
+
+    box_input_inject(w, &(InputEvent){
+        .kind = InputMouseMove, .value = {320, 180} });
+    ecs_progress(w, 0.1f);
+    test_bool(box_ui_mouse_captured(w), true);
+
+    box_input_inject(w, &(InputEvent){
+        .kind = InputScroll, .value = {0, 1.0f} });
+    ecs_progress(w, 0.1f);
+
+    test_flt(ecs_get(w, camera, CameraController)->velocity.z, 0);
+}
+
 void Camera_the_turn_coasts_to_a_stop_after_the_button_releases(void)
 {
     // ore_engine/camera_controller_port

@@ -273,8 +273,11 @@ static void box_dispatch_exec(
         result = ecs_os_strdup("");
     }
 
+    bool clear = count == 1 && !strcmp(tokens[0], "clear");
     ecs_os_free(buffer);
-    box_terminal_log(world, session, line, result, error);
+    if (!clear) {
+        box_terminal_log(world, session, line, result, error);
+    }
 
     TerminalOutput *out = ecs_ensure(world, session, TerminalOutput);
     ecs_os_free(out->result);

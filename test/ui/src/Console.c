@@ -228,6 +228,31 @@ void Console_scrollback_shows_the_session_log(void)
     test_assert(strstr(text->value, "$ man capture") != NULL);
 }
 
+void Console_scrollback_ends_each_output_with_a_newline(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    Console_run("pwd");
+    Console_run("pwd");
+
+    const Text *text = ecs_get(w, Console_log(), Text);
+    test_str(text->value, "$ pwd\n/\n\n$ pwd\n/\n\n");
+}
+
+void Console_clear_command_empties_the_scrollback(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    Console_run("pwd");
+    test_assert(ecs_get(w, Console_log(), Text)->value[0] != '\0');
+    Console_run("clear");
+
+    const Text *text = ecs_get(w, Console_log(), Text);
+    test_assert(text == NULL || text->value == NULL || text->value[0] == '\0');
+}
+
 void Console_input_is_anchored_to_the_bottom(void)
 {
     ecs_singleton_set(w, Console, { .open = true });
@@ -241,39 +266,6 @@ void Console_input_is_anchored_to_the_bottom(void)
     test_assert(anchor != NULL);
     test_int(anchor->h, AlignLeft);
     test_int(anchor->v, VAlignBottom);
-}
-
-void Console_scrollback_uses_the_inspector_palette(void)
-{
-    ecs_singleton_set(w, Console, { .open = true });
-    ecs_progress(w, 0);
-
-    const TerminalColors *colors = ecs_get(w, Console_log(), TerminalColors);
-    test_assert(colors != NULL);
-    test_uint(colors->text.r, 255);
-    test_uint(colors->text.g, 255);
-    test_uint(colors->text.b, 255);
-    test_uint(colors->muted.r, 133);
-    test_uint(colors->muted.g, 132);
-    test_uint(colors->muted.b, 124);
-    test_uint(colors->accent.r, 57);
-    test_uint(colors->accent.g, 135);
-    test_uint(colors->accent.b, 229);
-    test_uint(colors->error.r, 214);
-    test_uint(colors->error.g, 58);
-    test_uint(colors->error.b, 42);
-    test_uint(colors->path.r, 79);
-    test_uint(colors->path.g, 194);
-    test_uint(colors->path.b, 180);
-    test_uint(colors->type.r, 183);
-    test_uint(colors->type.g, 140);
-    test_uint(colors->type.b, 235);
-    test_uint(colors->number.r, 110);
-    test_uint(colors->number.g, 207);
-    test_uint(colors->number.b, 139);
-    test_uint(colors->string.r, 221);
-    test_uint(colors->string.g, 167);
-    test_uint(colors->string.b, 95);
 }
 
 void Console_background_uses_backdrop_blur(void)

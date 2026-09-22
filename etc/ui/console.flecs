@@ -34,14 +34,14 @@ console {
       Scroll: {y: Auto}
       ConsoleLog: {lines: 12}
       TerminalColors: {
-        text: {255, 255, 255},
-        muted: {133, 132, 124},
-        accent: {57, 135, 229},
-        error: {214, 58, 42},
-        path: {79, 194, 180},
-        type: {183, 140, 235},
-        number: {110, 207, 139},
-        string: {221, 167, 95}
+        text: {211, 217, 224},
+        muted: {125, 133, 144},
+        accent: {255, 123, 114},
+        error: {255, 123, 114},
+        path: {211, 217, 224},
+        type: {211, 217, 224},
+        number: {92, 203, 150},
+        string: {92, 203, 150}
       }
       Text: {value: "", align: Left}
       Rgb: {255, 255, 255}
@@ -56,7 +56,7 @@ console {
 
       marker {
         Text: {value: "$"}
-        Rgb: {120, 210, 160}
+        Rgb: {125, 133, 144}
       }
 
       input {
@@ -64,7 +64,7 @@ console {
         Fill: {width: 1}
         TextInput: {focused: true, history: true, complete: true}
         Text: {value: ""}
-        Rgb: {238, 244, 255}
+        Rgb: {211, 217, 224}
       }
     }
   }
