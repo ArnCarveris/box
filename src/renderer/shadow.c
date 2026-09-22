@@ -226,13 +226,15 @@ void box_shadow_frame(
         goto done;
     }
 
-    if (r->shadow_cull_uniform) wgpuBufferRelease(r->shadow_cull_uniform);
-    if (r->shadow_args) wgpuBufferRelease(r->shadow_args);
-    r->shadow_cull_uniform = box_shadow_buffer(r,
+    WGPUBuffer uniform = box_shadow_buffer(r,
         WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
         (uint64_t)jobs * BOX_CULL_UNIFORM_STRIDE);
-    r->shadow_args = box_shadow_buffer(r, WGPUBufferUsage_Indirect | WGPUBufferUsage_Storage |
+    WGPUBuffer args = box_shadow_buffer(r, WGPUBufferUsage_Indirect | WGPUBufferUsage_Storage |
         WGPUBufferUsage_CopyDst, (uint64_t)jobs * BOX_CULL_ARG_WORDS * sizeof(uint32_t));
+    if (r->shadow_cull_uniform) wgpuBufferRelease(r->shadow_cull_uniform);
+    if (r->shadow_args) wgpuBufferRelease(r->shadow_args);
+    r->shadow_cull_uniform = uniform;
+    r->shadow_args = args;
     r->shadow_uniform_capacity = jobs;
 done:
     return;
@@ -673,10 +675,11 @@ static void box_shadow_grow(
     }
 
     uint32_t grown = doubled > limit ? limit : (uint32_t)doubled;
-    if (r->v->shadow_instances) wgpuBufferRelease(r->v->shadow_instances);
-    r->v->shadow_instances = box_shadow_buffer(r, WGPUBufferUsage_Vertex |
+    WGPUBuffer instances = box_shadow_buffer(r, WGPUBufferUsage_Vertex |
         WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
         (uint64_t)grown * sizeof(box_instance_t));
+    if (r->v->shadow_instances) wgpuBufferRelease(r->v->shadow_instances);
+    r->v->shadow_instances = instances;
     r->v->shadow_capacity = grown;
 done:
     return;
