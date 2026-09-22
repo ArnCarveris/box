@@ -59,6 +59,15 @@ static float box_render_alpha(
     return opacity ? opacity->value : 1.0f;
 }
 
+static float box_render_backdrop(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    const BackdropBlur *blur = ecs_get(world, e, BackdropBlur);
+
+    return blur ? blur->radius : 0.0f;
+}
+
 bool box_render_is_transparent(
     ecs_world_t *world,
     const RenderState *state,
@@ -71,7 +80,8 @@ bool box_render_is_transparent(
     }
 
     if (!result && state->translucent) {
-        result = box_render_alpha(world, e) < 1.0f;
+        result = box_render_alpha(world, e) < 1.0f ||
+            box_render_backdrop(world, e) > 0.0f;
     }
 
     return result;
@@ -322,7 +332,10 @@ void box_render_extract_transparent(
         entry->blend = box_render_blend_mode(world, e);
         entry->back = box_render_back_mode(world, e);
         entry->group = box_render_group_handle(world, e);
-        if (entry->blend == BOX_BLEND_OPAQUE && entry->data.color[3] < 1.0f) {
+        bool backdrop = box_render_backdrop(world, e) > 0.0f;
+        if (entry->blend == BOX_BLEND_OPAQUE &&
+            (entry->data.color[3] < 1.0f || backdrop))
+        {
             entry->blend = BOX_BLEND_ALPHA;
         }
 
@@ -332,7 +345,7 @@ void box_render_extract_transparent(
 
         bool glass = entry->blend == BOX_BLEND_ALPHA ||
             entry->blend == BOX_BLEND_PREMULTIPLIED;
-        if (glass && !v->plain_blend) {
+        if (glass && (!v->plain_blend || backdrop)) {
             v->translucent_count ++;
         }
 

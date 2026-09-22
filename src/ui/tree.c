@@ -653,11 +653,12 @@ void box_ui_tree_init(
     ecs_id_t placed[] = {
         ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor),
         ecs_id(Text), ecs_id(Font), ecs_id(Rgb), ecs_id(BoxShadow),
-        ecs_id(Opacity), ecs_id(Fill), ecs_id(Scroll), ecs_id(WorldAnchor)
+        ecs_id(Opacity), ecs_id(Fill), ecs_id(Scroll), ecs_id(WorldAnchor),
+        ecs_id(TerminalColors)
     };
 
     int32_t i;
-    for (i = 0; i < 12; i ++) {
+    for (i = 0; i < 13; i ++) {
         ecs_observer(world, {
             .query.terms = {
                 { .id = placed[i], .inout = EcsInOutNone },

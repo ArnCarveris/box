@@ -93,6 +93,7 @@ struct VertexOut {
 // Bit of the mode word that says the instance carries a clip rectangle, which
 // is BOX_MODE_CLIP_SHIFT of the packet.
 const MESH_CLIP_BIT: u32 = 0x40u;
+const MESH_BACKDROP_BIT: u32 = 0x80u;
 
 // Drop a fragment the clip rectangle of its instance leaves out. The rectangle
 // is axis aligned in the plane a UI tree is laid out in, so the test is the
@@ -228,8 +229,11 @@ fn unlit_shade(in: VertexOut, s: ptr<function, Surface>, blend: u32,
   *out_normal = (*s).normal;
   *out_indirect = vec3(0.0, 0.0, (*s).roughness);
 
-  return resolve(color, vec3(0.0), albedo, (*s).alpha, in.clip.xy,
-    (*s).roughness, (*s).normal, normalize(u.eye - in.world_pos), blend);
+  let backdrop = select(0.0, in.params.w,
+    (in.uv_mode.x & MESH_BACKDROP_BIT) != 0u);
+  return resolve(color, vec3(0.0), albedo, (*s).alpha, in.color.a,
+    in.clip.xy, (*s).roughness, (*s).normal,
+    normalize(u.eye - in.world_pos), blend, backdrop);
 }
 
 fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
@@ -362,8 +366,10 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     spec = pow(max(spec, vec3(0.0)), vec3(1.0 / 2.2));
   }
   *out_normal = sn;
-  return resolve(color, spec, s.albedo, s.alpha, in.clip.xy, roughness, sn, v,
-    blend);
+  let backdrop = select(0.0, in.params.w,
+    (in.uv_mode.x & MESH_BACKDROP_BIT) != 0u);
+  return resolve(color, spec, s.albedo, s.alpha, in.color.a, in.clip.xy,
+    roughness, sn, v, blend, backdrop);
 }
 
 // A subtree that composites as one image is drawn by a quad that shows the

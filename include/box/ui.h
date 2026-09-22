@@ -390,6 +390,17 @@ ECS_STRUCT(ConsoleLog, {
     int32_t lines; /**< Lines of the session log the element shows, 0 for the default */
 });
 
+ECS_STRUCT(TerminalColors, {
+    Rgb text;
+    Rgb muted;
+    Rgb accent;
+    Rgb error;
+    Rgb path;
+    Rgb type;
+    Rgb number;
+    Rgb string;
+});
+
 /** Order in the frame a created UI view renders at, after the views of a scene */
 #define BOX_UI_PRIORITY (1000)
 

@@ -282,6 +282,7 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, TextInput);
     ECS_META_COMPONENT(world, Console);
     ECS_META_COMPONENT(world, ConsoleLog);
+    ECS_META_COMPONENT(world, TerminalColors);
     ECS_COMPONENT_DEFINE(world, UiImpl);
     ECS_COMPONENT_DEFINE(world, UiNode);
     ECS_COMPONENT_DEFINE(world, UiState);
@@ -322,6 +323,7 @@ void BoxUiImport(
     ecs_set_hooks(world, TextInput, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Console, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, ConsoleLog, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, TerminalColors, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, TextImpl, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, UiFonts, {
         .ctor = flecs_default_ctor,

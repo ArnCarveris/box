@@ -339,6 +339,10 @@
                     "closed_overlay_is_not_drawn",
                     "submitted_line_runs_on_the_session",
                     "scrollback_shows_the_session_log",
+                    "input_is_anchored_to_the_bottom",
+                    "scrollback_uses_the_inspector_palette",
+                    "background_uses_backdrop_blur",
+                    "terminal_colors_are_configurable",
                     "submitted_line_fires_the_line_action",
                     "script_is_loaded_once",
                     "script_awaits_the_console_action"

@@ -64,11 +64,25 @@ fn glass_tint(albedo: vec3<f32>) -> vec3<f32> {
 // view does, skips all of that and hands the blend the plain source over
 // contribution of the fragment, premultiplied by its coverage.
 fn resolve(color: vec3<f32>, spec: vec3<f32>, albedo: vec3<f32>, alpha: f32,
-    frag: vec2<f32>, roughness: f32, n: vec3<f32>, v: vec3<f32>,
-    blend: u32) -> vec4<f32> {
+    opacity: f32, frag: vec2<f32>, roughness: f32, n: vec3<f32>, v: vec3<f32>,
+    blend: u32, backdrop: f32) -> vec4<f32> {
   var rgb = color;
   var a = alpha;
-  if ((blend == 1u || blend == 2u) && u.plain_blend != 0u) {
+  if ((blend == 1u || blend == 2u) && backdrop > 0.0) {
+    let dims = vec2<f32>(textureDimensions(scene_tex, 0));
+    let levels = f32(textureNumLevels(scene_tex)) - 1.0;
+    let uv = frag / dims;
+    let level = clamp(log2(max(backdrop, 1.0)), 0.0, levels);
+    let bg = textureSampleLevel(scene_tex, scene_samp, uv, level).rgb;
+    let pane_alpha = clamp(opacity, 0.0, 1.0);
+    let coverage = clamp(alpha / max(pane_alpha, 1e-6), 0.0, 1.0);
+    var own = rgb * pane_alpha;
+    if (blend == 2u) {
+      own = rgb;
+    }
+    rgb = (own + bg * (1.0 - pane_alpha)) * coverage;
+    a = coverage;
+  } else if ((blend == 1u || blend == 2u) && u.plain_blend != 0u) {
     if (blend == 1u) {
       rgb = rgb * a;
     }

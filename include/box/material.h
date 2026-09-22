@@ -33,6 +33,10 @@ ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
 });
 
+ECS_STRUCT(BackdropBlur, {
+    float radius;
+});
+
 /** Color the surface mixes toward, composed with the tints down the hierarchy */
 ECS_STRUCT(Tint, {
     uint8_t r;  /**< Red of the tint color */

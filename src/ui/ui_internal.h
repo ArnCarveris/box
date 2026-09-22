@@ -180,6 +180,7 @@ typedef struct box_ui_quad_t {
     const box_ui_glyph_t *glyph; /**< Glyph of the atlas the quad shows */
     float x;                     /**< Logical pixels from the left of the box to the bitmap */
     float y;                     /**< Logical pixels from the top of the box to the bitmap */
+    int32_t byte;
 } box_ui_quad_t;
 
 /** Size a string takes when it is laid out in a box */
@@ -258,6 +259,8 @@ typedef struct ConsoleImpl {
     int32_t shown;        /**< Lines of the session log the scrollback shows */
     bool loaded;          /**< The console script was loaded */
     bool open;            /**< The console was open after the last update */
+    uint8_t *styles;
+    int32_t style_count;
 } ConsoleImpl;
 
 /** Quad the shadow pass drew for an element, added with BoxShadow */
@@ -702,6 +705,12 @@ void box_ui_console_update(
  */
 void box_ui_console_sync(
     ecs_world_t *world);
+
+Rgb box_ui_console_color(
+    const ecs_world_t *world,
+    ecs_entity_t element,
+    int32_t byte,
+    Rgb fallback);
 
 /** Register the components, the hooks and the observers of the console.
  *

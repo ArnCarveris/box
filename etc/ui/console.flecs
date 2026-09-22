@@ -12,25 +12,43 @@ using box.ui
 console {
   Ui: {height: 0}
 
+  backdrop {
+    Anchor: {h: Left, v: Top}
+    Layout: {}
+    Fill: {width: 0.5, height: 1}
+    Rect: {}
+    Rgb: {0, 0, 0}
+    Opacity: {0.65}
+    BackdropBlur: {radius: 32}
+  }
+
   panel {
     Anchor: {h: Left, v: Top}
     Layout: {direction: Column, padding: 14, spacing: 8, h: Left, v: Top}
     Fill: {width: 0.5, height: 1}
-    Rect: {}
-    Rgb: {0, 0, 0}
-    Opacity: {0.75}
-    Font: {size: 14}
+    Font: {size: 18}
 
     scrollback {
       Layout: {}
       Fill: {width: 1, height: 0.9}
       Scroll: {y: Auto}
       ConsoleLog: {lines: 12}
+      TerminalColors: {
+        text: {255, 255, 255},
+        muted: {133, 132, 124},
+        accent: {57, 135, 229},
+        error: {214, 58, 42},
+        path: {79, 194, 180},
+        type: {183, 140, 235},
+        number: {110, 207, 139},
+        string: {221, 167, 95}
+      }
       Text: {value: "", align: Left}
-      Rgb: {170, 192, 225}
+      Rgb: {255, 255, 255}
     }
 
     prompt {
+      Anchor: {h: Left, v: Bottom}
       Layout: {direction: Row, height: 24, padding: 4, spacing: 8, h: Left, v: Middle}
       Fill: {width: 1}
       Border: {radius: 6}

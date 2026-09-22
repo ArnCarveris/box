@@ -9,6 +9,48 @@
 
 static ecs_world_t *w;
 
+static ecs_entity_t Console_log(void)
+{
+    ecs_iter_t it = ecs_each(w, ConsoleLog);
+    ecs_entity_t result = 0;
+    while (ecs_each_next(&it) && !result) {
+        if (it.count) {
+            result = it.entities[0];
+        }
+    }
+
+    return result;
+}
+
+static bool Console_has_color(
+    ecs_entity_t log,
+    Rgb color)
+{
+    ecs_iter_t it = ecs_children(w, log);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const Emissive *emissive = ecs_get(w, it.entities[i], Emissive);
+            if (ecs_has_id(w, it.entities[i], UiGlyph) && emissive &&
+                emissive->color.r == color.r && emissive->color.g == color.g &&
+                emissive->color.b == color.b)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static void Console_run(
+    const char *line)
+{
+    ecs_entity_t session = ecs_singleton_get(w, Console)->session;
+    ecs_set(w, session, TerminalInput, { .line = ecs_os_strdup(line) });
+    ecs_progress(w, 0);
+}
+
 void Console_setup(void)
 {
     w = ecs_init();
@@ -184,6 +226,102 @@ void Console_scrollback_shows_the_session_log(void)
     const Text *text = ecs_get(w, log, Text);
     test_assert(text != NULL);
     test_assert(strstr(text->value, "$ man capture") != NULL);
+}
+
+void Console_input_is_anchored_to_the_bottom(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    ecs_entity_t root = ecs_singleton_get(w, Console)->root;
+    ecs_entity_t panel = ecs_lookup_child(w, root, "panel");
+    ecs_entity_t prompt = ecs_lookup_child(w, panel, "prompt");
+    const Anchor *anchor = ecs_get(w, prompt, Anchor);
+
+    test_assert(anchor != NULL);
+    test_int(anchor->h, AlignLeft);
+    test_int(anchor->v, VAlignBottom);
+}
+
+void Console_scrollback_uses_the_inspector_palette(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    const TerminalColors *colors = ecs_get(w, Console_log(), TerminalColors);
+    test_assert(colors != NULL);
+    test_uint(colors->text.r, 255);
+    test_uint(colors->text.g, 255);
+    test_uint(colors->text.b, 255);
+    test_uint(colors->muted.r, 133);
+    test_uint(colors->muted.g, 132);
+    test_uint(colors->muted.b, 124);
+    test_uint(colors->accent.r, 57);
+    test_uint(colors->accent.g, 135);
+    test_uint(colors->accent.b, 229);
+    test_uint(colors->error.r, 214);
+    test_uint(colors->error.g, 58);
+    test_uint(colors->error.b, 42);
+    test_uint(colors->path.r, 79);
+    test_uint(colors->path.g, 194);
+    test_uint(colors->path.b, 180);
+    test_uint(colors->type.r, 183);
+    test_uint(colors->type.g, 140);
+    test_uint(colors->type.b, 235);
+    test_uint(colors->number.r, 110);
+    test_uint(colors->number.g, 207);
+    test_uint(colors->number.b, 139);
+    test_uint(colors->string.r, 221);
+    test_uint(colors->string.g, 167);
+    test_uint(colors->string.b, 95);
+}
+
+void Console_background_uses_backdrop_blur(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    ecs_entity_t root = ecs_singleton_get(w, Console)->root;
+    ecs_entity_t backdrop = ecs_lookup_child(w, root, "backdrop");
+    const BackdropBlur *blur = ecs_get(w, backdrop, BackdropBlur);
+
+    test_assert(blur != NULL);
+    test_assert(blur->radius > 0.0f);
+}
+
+void Console_terminal_colors_are_configurable(void)
+{
+    ecs_singleton_set(w, Console, { .open = true });
+    ecs_progress(w, 0);
+
+    ecs_entity_t log = Console_log();
+    TerminalColors colors = {
+        .text = {1, 2, 3},
+        .muted = {4, 5, 6},
+        .accent = {7, 8, 9},
+        .error = {10, 11, 12},
+        .path = {13, 14, 15},
+        .type = {16, 17, 18},
+        .number = {19, 20, 21},
+        .string = {22, 23, 24}
+    };
+    ecs_set_ptr(w, log, TerminalColors, &colors);
+
+    ecs_entity_t styled = ecs_entity(w, { .name = "styled" });
+    ecs_set(w, styled, Position, {42, 5, 1});
+    Console_run("pwd");
+    Console_run("cat actions.Console");
+    Console_run("cat styled");
+    Console_run("not_a_command");
+
+    test_bool(Console_has_color(log, colors.text), true);
+    test_bool(Console_has_color(log, colors.muted), true);
+    test_bool(Console_has_color(log, colors.accent), true);
+    test_bool(Console_has_color(log, colors.error), true);
+    test_bool(Console_has_color(log, colors.path), true);
+    test_bool(Console_has_color(log, colors.type), true);
+    test_bool(Console_has_color(log, colors.number), true);
+    test_bool(Console_has_color(log, colors.string), true);
 }
 
 void Console_submitted_line_fires_the_line_action(void)

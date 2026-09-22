@@ -8,6 +8,7 @@
 #include <math.h>
 #include "../../../src/render/render_internal.h"
 #include "../../../src/renderer/blur.h"
+#include "../../../src/ui/ui_internal.h"
 
 static ecs_world_t *w;
 static box_packet_t packet;
@@ -461,6 +462,31 @@ void Blending_additive_instance_does_not_request_the_blur_chain(void)
     box_render_extract(w, &packet);
     test_int(packet.view.transparent_count, 1);
     test_int(packet.view.translucent_count, 0);
+}
+
+void Blending_backdrop_blur_requests_the_chain_in_a_plain_view(void)
+{
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_get_mut(w, root, Ui)->height = 480;
+    ecs_modified(w, root, Ui);
+    ecs_entity_t pane = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, pane, Rect, {200, 100});
+    ecs_set(w, pane, Opacity, {0.8f});
+    ecs_set(w, pane, BackdropBlur, {16.0f});
+    box_ui_update(w);
+    box_render_extract(w, &packet);
+
+    test_int(packet.views.count, 2);
+    box_view_t *view = box_vec_at(&packet.views, 1);
+    test_uint(view->plain_blend, 1);
+    test_uint(view->transparent_count, 1);
+    test_uint(view->translucent_count, 1);
+    box_transparent_t *draw = box_vec_at(&packet.transparent,
+        view->transparent_first);
+    test_uint(draw->blend, BOX_BLEND_ALPHA);
+    test_flt(draw->data.params[3], 16.0f);
+    test_assert(draw->data.uv_mode & (1u << BOX_MODE_BACKDROP_SHIFT));
 }
 
 void Blending_translucent_count_covers_the_alpha_blended_instances(void)

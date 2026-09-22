@@ -741,6 +741,12 @@ void box_render_fill_instance(
     }
 
     box_render_fill_uv(world, e, mesh, &m, tiled, out);
+    const BackdropBlur *backdrop = ecs_get(world, e, BackdropBlur);
+    if (backdrop && backdrop->radius > 0.0f) {
+        out->params[3] = backdrop->radius;
+        out->uv_mode |= 1u << BOX_MODE_BACKDROP_SHIFT;
+    }
+
     memset(out->shape, 0, sizeof(out->shape));
     if (shaped) {
         box_render_fill_shape(world, e, mesh, &m, out);
@@ -770,6 +776,7 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(WorldTransform));
     box_render_watch(world, ecs_id(Rgb));
     box_render_watch(world, ecs_id(Opacity));
+    box_render_watch(world, ecs_id(BackdropBlur));
     box_render_watch(world, ecs_id(ActualTint));
     box_render_watch(world, ecs_id(PbrMaterial));
     box_render_watch(world, ecs_id(Emissive));
@@ -789,6 +796,7 @@ void box_render_instance_init(
     box_render_watch_flag(world, ecs_id(BlendMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(BackFaceMode), box_render_on_blended);
     box_render_watch_flag(world, ecs_id(Opacity), box_render_on_translucent);
+    box_render_watch_flag(world, ecs_id(BackdropBlur), box_render_on_translucent);
     box_render_watch_flag(world, NoShadow, box_render_on_shadowless);
     box_render_watch_flag(world, Hidden, box_render_on_hidden);
     box_render_watch_flag(world, ecs_id(RenderShape2D), box_render_on_shaped);

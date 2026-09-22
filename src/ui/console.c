@@ -24,6 +24,7 @@
 #include "ui_internal.h"
 #include "../command/command_internal.h"
 #include "../shader/shader_internal.h"
+#include <ctype.h>
 
 ECS_COMPONENT_DECLARE(ConsoleImpl);
 
@@ -37,6 +38,379 @@ static ConsoleImpl* box_ui_console_state(
 {
     return ecs_id(ConsoleImpl) ?
         ecs_get_mut(world, ecs_id(ConsoleImpl), ConsoleImpl) : NULL;
+}
+
+typedef enum box_terminal_style_t {
+    BoxTerminalText,
+    BoxTerminalMuted,
+    BoxTerminalAccent,
+    BoxTerminalError,
+    BoxTerminalPath,
+    BoxTerminalType,
+    BoxTerminalNumber,
+    BoxTerminalString
+} box_terminal_style_t;
+
+static void box_ui_terminal_span(
+    uint8_t *styles,
+    int32_t begin,
+    int32_t end,
+    box_terminal_style_t style)
+{
+    if (end > begin) {
+        memset(&styles[begin], style, (size_t)(end - begin));
+    }
+}
+
+static bool box_ui_terminal_equal(
+    const char *text,
+    int32_t begin,
+    int32_t end,
+    const char *value)
+{
+    int32_t length = (int32_t)strlen(value);
+    return end - begin == length && !strncmp(&text[begin], value, (size_t)length);
+}
+
+static void box_ui_terminal_name(
+    const char *text,
+    uint8_t *styles,
+    int32_t begin,
+    int32_t end)
+{
+    if (begin >= end) {
+        return;
+    }
+
+    if (text[begin] == '(') {
+        box_ui_terminal_span(styles, begin, end, BoxTerminalType);
+        return;
+    }
+
+    int32_t i, dot = -1;
+    for (i = begin; i < end; i ++) {
+        if (text[i] == '.') {
+            dot = i;
+        }
+    }
+
+    int32_t last = dot >= begin ? dot + 1 : begin;
+    if (last < end && isupper((unsigned char)text[last])) {
+        box_ui_terminal_span(styles, begin, last, BoxTerminalMuted);
+        box_ui_terminal_span(styles, last, end, BoxTerminalType);
+    } else {
+        box_ui_terminal_span(styles, begin, end, BoxTerminalPath);
+    }
+}
+
+static bool box_ui_terminal_number_start(
+    const char *text,
+    int32_t i,
+    int32_t end)
+{
+    if (isdigit((unsigned char)text[i])) {
+        return true;
+    }
+
+    return i + 1 < end && (text[i] == '-' || text[i] == '.') &&
+        isdigit((unsigned char)text[i + 1]);
+}
+
+static bool box_ui_terminal_path(
+    const char *text,
+    int32_t begin,
+    int32_t end)
+{
+    if (begin >= end || !(isalpha((unsigned char)text[begin]) ||
+        text[begin] == '_' || text[begin] == '#' || text[begin] == '/'))
+    {
+        return false;
+    }
+
+    int32_t i;
+    for (i = begin + 1; i < end; i ++) {
+        if (!(isalnum((unsigned char)text[i]) || text[i] == '_' ||
+            text[i] == '#' || text[i] == '.' || text[i] == '/' ||
+            text[i] == '\\' || text[i] == '-'))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void box_ui_terminal_value(
+    const char *text,
+    uint8_t *styles,
+    int32_t begin,
+    int32_t end)
+{
+    int32_t i = begin;
+    while (i < end) {
+        char ch = text[i];
+        if (ch == '"' || ch == '\'') {
+            char quote = ch;
+            int32_t start = i ++;
+            while (i < end) {
+                if (text[i] == '\\' && i + 1 < end) {
+                    i += 2;
+                } else if (text[i ++] == quote) {
+                    break;
+                }
+            }
+
+            box_ui_terminal_span(styles, start, i, BoxTerminalString);
+            continue;
+        }
+
+        if (box_ui_terminal_number_start(text, i, end)) {
+            int32_t start = i ++;
+            while (i < end && (isdigit((unsigned char)text[i]) ||
+                text[i] == '.' || text[i] == 'e' || text[i] == 'E' ||
+                text[i] == '+' || text[i] == '-'))
+            {
+                i ++;
+            }
+
+            box_ui_terminal_span(styles, start, i, BoxTerminalNumber);
+            continue;
+        }
+
+        if (isalpha((unsigned char)ch) || ch == '_' || ch == '#' || ch == '/') {
+            int32_t start = i ++;
+            while (i < end && (isalnum((unsigned char)text[i]) ||
+                text[i] == '_' || text[i] == '#' || text[i] == '.' ||
+                text[i] == '/' || text[i] == '\\' || text[i] == '-'))
+            {
+                i ++;
+            }
+
+            int32_t colon = i;
+            while (colon < end && (text[colon] == ' ' || text[colon] == '\t')) {
+                colon ++;
+            }
+
+            if (colon < end && text[colon] == ':') {
+                box_ui_terminal_span(styles, start, i, BoxTerminalMuted);
+            } else if (box_ui_terminal_equal(text, start, i, "true") ||
+                box_ui_terminal_equal(text, start, i, "false") ||
+                box_ui_terminal_equal(text, start, i, "null"))
+            {
+                box_ui_terminal_span(styles, start, i, BoxTerminalNumber);
+            } else if (isupper((unsigned char)text[start])) {
+                box_ui_terminal_span(styles, start, i, BoxTerminalType);
+            } else if (memchr(&text[start], '.', (size_t)(i - start)) ||
+                text[start] == '/')
+            {
+                box_ui_terminal_span(styles, start, i, BoxTerminalPath);
+            }
+
+            continue;
+        }
+
+        i ++;
+    }
+}
+
+static bool box_ui_terminal_level(
+    const char *text,
+    int32_t begin,
+    int32_t end,
+    box_terminal_style_t *style)
+{
+    if (box_ui_terminal_equal(text, begin, end, "fatal") ||
+        box_ui_terminal_equal(text, begin, end, "error"))
+    {
+        style[0] = BoxTerminalError;
+        return true;
+    }
+
+    if (box_ui_terminal_equal(text, begin, end, "warning")) {
+        style[0] = BoxTerminalString;
+        return true;
+    }
+
+    if (box_ui_terminal_equal(text, begin, end, "info")) {
+        style[0] = BoxTerminalAccent;
+        return true;
+    }
+
+    if (box_ui_terminal_equal(text, begin, end, "debug") ||
+        box_ui_terminal_equal(text, begin, end, "trace"))
+    {
+        style[0] = BoxTerminalMuted;
+        return true;
+    }
+
+    return false;
+}
+
+static void box_ui_terminal_line(
+    const char *text,
+    uint8_t *styles,
+    int32_t begin,
+    int32_t end)
+{
+    int32_t i, tab = -1;
+    for (i = begin; i < end; i ++) {
+        if (text[i] == '\t') {
+            tab = i;
+            break;
+        }
+    }
+
+    if (tab >= 0) {
+        box_terminal_style_t level;
+        if (box_ui_terminal_level(text, begin, tab, &level)) {
+            box_ui_terminal_span(styles, begin, tab, level);
+        } else {
+            box_ui_terminal_span(styles, begin, tab, BoxTerminalPath);
+        }
+
+        box_ui_terminal_value(text, styles, tab + 1, end);
+        return;
+    }
+
+    int32_t split = -1;
+    for (i = begin; i + 2 < end; i ++) {
+        if (text[i] == ' ' && text[i + 1] == '-' && text[i + 2] == ' ') {
+            split = i;
+            break;
+        }
+    }
+
+    int32_t word = begin;
+    while (word < end && !isspace((unsigned char)text[word])) {
+        word ++;
+    }
+
+    if (split >= word && word > begin) {
+        box_ui_terminal_span(styles, begin, word, BoxTerminalAccent);
+        box_ui_terminal_span(styles, split + 3, end, BoxTerminalMuted);
+        i = word;
+        while (i < split) {
+            if (text[i] != '<' && text[i] != '[') {
+                i ++;
+                continue;
+            }
+
+            int32_t colon = i + 1;
+            while (colon < split && text[colon] != ':' && text[colon] != '>' &&
+                text[colon] != ']')
+            {
+                colon ++;
+            }
+
+            int32_t close = colon + 1;
+            while (close < split && text[close] != '>' && text[close] != ']') {
+                close ++;
+            }
+
+            if (colon < split && text[colon] == ':' && close < split) {
+                box_ui_terminal_span(styles, i + 1, colon, BoxTerminalMuted);
+                box_ui_terminal_span(styles, colon + 1, close, BoxTerminalType);
+                i = close + 1;
+            } else {
+                i ++;
+            }
+        }
+
+        return;
+    }
+
+    int32_t colon = -1;
+    for (i = begin; i < word; i ++) {
+        if (text[i] == ':') {
+            colon = i;
+            break;
+        }
+    }
+
+    if (colon > begin) {
+        box_ui_terminal_name(text, styles, begin, colon);
+        box_ui_terminal_value(text, styles, colon + 1, end);
+        return;
+    }
+
+    if ((word == end && box_ui_terminal_path(text, begin, end)) ||
+        (begin < end && text[begin] == '(' && text[end - 1] == ')' && word == end) ||
+        (word == end && memchr(&text[begin], '.', (size_t)(end - begin))))
+    {
+        box_ui_terminal_name(text, styles, begin, end);
+        return;
+    }
+
+    box_ui_terminal_value(text, styles, begin, end);
+}
+
+static void box_ui_terminal_output(
+    const char *text,
+    uint8_t *styles,
+    int32_t begin,
+    int32_t end,
+    bool error)
+{
+    if (error) {
+        box_ui_terminal_span(styles, begin, end, BoxTerminalError);
+        return;
+    }
+
+    int32_t line = begin;
+    while (line < end) {
+        int32_t next = line;
+        while (next < end && text[next] != '\n') {
+            next ++;
+        }
+
+        box_ui_terminal_line(text, styles, line, next);
+        line = next + 1;
+    }
+}
+
+static Rgb box_ui_terminal_color(
+    const TerminalColors *colors,
+    box_terminal_style_t style)
+{
+    switch (style) {
+    case BoxTerminalMuted:
+        return colors->muted;
+    case BoxTerminalAccent:
+        return colors->accent;
+    case BoxTerminalError:
+        return colors->error;
+    case BoxTerminalPath:
+        return colors->path;
+    case BoxTerminalType:
+        return colors->type;
+    case BoxTerminalNumber:
+        return colors->number;
+    case BoxTerminalString:
+        return colors->string;
+    case BoxTerminalText:
+        return colors->text;
+    }
+
+    return colors->text;
+}
+
+Rgb box_ui_console_color(
+    const ecs_world_t *world,
+    ecs_entity_t element,
+    int32_t byte,
+    Rgb fallback)
+{
+    const TerminalColors *colors = ecs_get(world, element, TerminalColors);
+    const ConsoleImpl *impl = ecs_id(ConsoleImpl) ?
+        ecs_get(world, ecs_id(ConsoleImpl), ConsoleImpl) : NULL;
+    if (!colors || !impl || element != impl->log || byte < 0 ||
+        byte >= impl->style_count)
+    {
+        return fallback;
+    }
+
+    return box_ui_terminal_color(colors,
+        (box_terminal_style_t)impl->styles[byte]);
 }
 
 /** Register the actions and the map that open the console with the grave key.
@@ -399,20 +773,60 @@ static void box_ui_console_scrollback(
         lines = BOX_COMMAND_LOG_MAX;
     }
 
+    typedef struct box_ui_terminal_entry_t {
+        int32_t begin;
+        int32_t result;
+        int32_t end;
+        bool error;
+    } box_ui_terminal_entry_t;
+
+    box_ui_terminal_entry_t entries[BOX_COMMAND_LOG_MAX];
+    int32_t entry_count = 0;
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     int32_t i = box_ring_begin(s->count, lines, BOX_COMMAND_LOG_MAX);
     for (; i < s->count; i ++) {
         const box_command_entry_t *entry =
             &s->ring[box_ring_slot(i, BOX_COMMAND_LOG_MAX)];
+        const char *result = entry->result ? entry->result : "";
+        box_ui_terminal_entry_t *meta = &entries[entry_count ++];
 
-        ecs_strbuf_append(&buf, "$ %s\n%s\n", entry->line,
-            entry->result ? entry->result : "");
+        meta->begin = ecs_strbuf_written(&buf);
+        ecs_strbuf_append(&buf, "$ %s\n", entry->line);
+        meta->result = ecs_strbuf_written(&buf);
+        ecs_strbuf_appendstr(&buf, result);
+        meta->end = ecs_strbuf_written(&buf);
+        meta->error = entry->error;
+        ecs_strbuf_appendch(&buf, '\n');
     }
 
     ecs_entity_t element = impl->log;
     int32_t count = s->count;
-    ecs_set(world, element, Text, { .value = ecs_strbuf_get(&buf) });
-    box_ui_console_state(world)->shown = count;
+    int32_t length = ecs_strbuf_written(&buf);
+    char *value = ecs_strbuf_get(&buf);
+    uint8_t *styles = ecs_os_calloc((ecs_size_t)length);
+    for (i = 0; i < entry_count; i ++) {
+        box_ui_terminal_entry_t *meta = &entries[i];
+        int32_t command = meta->begin + 2;
+        int32_t command_end = command;
+        while (command_end < meta->result - 1 &&
+            !isspace((unsigned char)value[command_end]))
+        {
+            command_end ++;
+        }
+
+        box_ui_terminal_span(styles, meta->begin, meta->begin + 1,
+            BoxTerminalAccent);
+        box_ui_terminal_span(styles, command, command_end, BoxTerminalAccent);
+        box_ui_terminal_output(value, styles, meta->result, meta->end,
+            meta->error);
+    }
+
+    ecs_set(world, element, Text, { .value = value });
+    impl = box_ui_console_state(world);
+    ecs_os_free(impl->styles);
+    impl->styles = styles;
+    impl->style_count = length;
+    impl->shown = count;
 done:
     return;
 }
@@ -510,6 +924,7 @@ static void box_ui_console_dtor(
     int32_t i;
     for (i = 0; i < count; i ++) {
         ecs_vec_fini_t(NULL, &impl[i].captured, ecs_entity_t);
+        ecs_os_free(impl[i].styles);
     }
 }
 

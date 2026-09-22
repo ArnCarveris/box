@@ -267,6 +267,8 @@
 /** Bit that says the clip words of an instance hold a clip rectangle */
 #define BOX_MODE_CLIP_SHIFT (6)
 
+#define BOX_MODE_BACKDROP_SHIFT (7)
+
 #define BOX_LAYER_DATA_WORDS (2)
 
 #define BOX_LAYER_DATA_SCALE_STEP (64.0f)

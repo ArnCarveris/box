@@ -357,6 +357,7 @@
                     "alpha_blended_instance_requests_the_blur_chain",
                     "premultiplied_instance_requests_the_blur_chain",
                     "additive_instance_does_not_request_the_blur_chain",
+                    "backdrop_blur_requests_the_chain_in_a_plain_view",
                     "translucent_count_covers_the_alpha_blended_instances"
                 ],
                 "setup": true,

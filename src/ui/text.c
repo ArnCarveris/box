@@ -223,8 +223,10 @@ void box_ui_text_run(
     };
 
     const char *cur = text->value ? text->value : "";
+    const char *value = cur;
     ecs_vec_clear(&fonts->quads);
     while (cur[0] && !atlas->failed) {
+        const char *byte = cur;
         int32_t cp = box_ui_utf8(&cur);
         const box_ui_glyph_t *glyph = NULL;
         if (cp == '\n') {
@@ -255,6 +257,7 @@ void box_ui_text_run(
             quad->glyph = glyph;
             quad->x = run.pen + glyph->bearing_x;
             quad->y = (float)run.lines * run.height + atlas->ascent + glyph->top;
+            quad->byte = (int32_t)(byte - value);
         }
 
         run.pen += glyph->advance;
@@ -343,7 +346,8 @@ static uint64_t box_ui_text_print(
     const UiPlace *p,
     const Text *text,
     const box_ui_atlas_t *atlas,
-    Rgb color)
+    Rgb color,
+    const TerminalColors *terminal)
 {
     const char *value = text->value ? text->value : "";
     float box[3] = { p->width, p->height, box_ui_text_wrap_width(p) };
@@ -356,6 +360,9 @@ static uint64_t box_ui_text_print(
     hash = box_ui_hash(hash, box, (int32_t)sizeof(box));
     hash = box_ui_hash(hash, &p->scroll, (int32_t)sizeof(Scroll));
     hash = box_ui_hash(hash, &color, (int32_t)sizeof(Rgb));
+    if (terminal) {
+        hash = box_ui_hash(hash, terminal, (int32_t)sizeof(TerminalColors));
+    }
 
     return hash;
 }
@@ -514,11 +521,14 @@ static void box_ui_text_element(
             ecs_add_pair(world, e, EcsIsA, atlas->prefab);
         }
 
+        Rgb glyph_color = box_ui_console_color(
+            world, p->e, quad->byte, color);
         const Emissive *shown = ecs_get(world, e, Emissive);
-        if (!shown || shown->strength != 1.0f || shown->color.r != color.r ||
-            shown->color.g != color.g || shown->color.b != color.b)
+        if (!shown || shown->strength != 1.0f || shown->color.r != glyph_color.r ||
+            shown->color.g != glyph_color.g || shown->color.b != glyph_color.b)
         {
-            ecs_set(world, e, Emissive, { .strength = 1.0f, .color = color });
+            ecs_set(world, e, Emissive, {
+                .strength = 1.0f, .color = glyph_color });
         }
 
         box_ui_text_quad(world, e, p, atlas, quad);
@@ -549,12 +559,13 @@ void box_ui_text_build(
         const Text *text = ecs_get(world, place.e, Text);
         box_ui_atlas_t *atlas = box_ui_atlas_of(world, place.e);
         const Rgb *rgb = ecs_get(world, place.e, Rgb);
+        const TerminalColors *terminal = ecs_get(world, place.e, TerminalColors);
         Rgb color = rgb ? rgb[0] : (Rgb){ 255, 255, 255 };
         if (!text || atlas->failed || !atlas->prefab) {
             continue;
         }
 
-        uint64_t hash = box_ui_text_print(&place, text, atlas, color);
+        uint64_t hash = box_ui_text_print(&place, text, atlas, color, terminal);
         const TextImpl *impl = ecs_get(world, place.e, TextImpl);
         if (impl && impl->hash == hash) {
             continue;

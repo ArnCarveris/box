@@ -140,6 +140,7 @@ void BoxMaterialImport(
 
     ECS_META_COMPONENT(world, Rgb);
     ECS_META_COMPONENT(world, Opacity);
+    ECS_META_COMPONENT(world, BackdropBlur);
     ECS_META_COMPONENT(world, Tint);
     ECS_META_COMPONENT(world, ActualTint);
     ECS_META_COMPONENT(world, PbrMaterial);
@@ -171,6 +172,7 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(TextureTiling), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(TextureWrap), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Rgb), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(BackdropBlur), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Tint), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(PbrMaterial), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(Emissive), EcsOnInstantiate, EcsInherit);
