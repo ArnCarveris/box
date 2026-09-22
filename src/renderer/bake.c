@@ -23,6 +23,25 @@
 /** Jobs the first selection pass of a frame orders by distance */
 #define BOX_BAKE_ORDER_RUN (64)
 
+#define BOX_BAKE_SPATIAL_CELL (16.0f)
+
+typedef struct box_bake_ref_t {
+    uint32_t mesh;
+    uint32_t slot;
+} box_bake_ref_t;
+
+typedef struct box_bake_bucket_t {
+    int32_t coord[3];
+    box_vec_t refs;
+    uint32_t visit;
+    bool used;
+} box_bake_bucket_t;
+
+typedef struct box_bake_change_t {
+    box_probe_desc_t old_desc;
+    box_probe_desc_t new_desc;
+} box_bake_change_t;
+
 box_bake_mesh_t* box_bake_state_mesh(
     box_bake_state_t *s,
     uint32_t mesh)
@@ -35,6 +54,7 @@ box_bake_mesh_t* box_bake_state_mesh(
         box_vec_init(&entry->jobs, sizeof(box_bake_slot_t));
         entry->upload_lo = UINT32_MAX;
         entry->stale_lo = UINT32_MAX;
+        entry->layout_lo = UINT32_MAX;
     }
 
     return box_vec_at(&s->meshes, mesh);
@@ -49,6 +69,11 @@ void box_bake_state_init(
     box_vec_init(&s->lights, sizeof(box_light_t));
     box_vec_init(&s->emitters, sizeof(box_emitter_t));
     box_vec_init(&s->changed, sizeof(box_bake_sphere_t));
+    box_vec_init(&s->spatial, sizeof(box_bake_bucket_t));
+    box_vec_init(&s->occupancy_counts, sizeof(uint32_t));
+    box_vec_init(&s->occupancy_bits, sizeof(uint32_t));
+    box_vec_init(&s->occupancy_changes, sizeof(box_bake_change_t));
+    s->occupancy_lo = UINT32_MAX;
     s->grid_dirty = true;
 }
 
@@ -68,6 +93,16 @@ void box_bake_state_fini(
     box_vec_fini(&s->lights);
     box_vec_fini(&s->emitters);
     box_vec_fini(&s->changed);
+    for (i = 0; i < s->spatial.count; i ++) {
+        box_bake_bucket_t *bucket = box_vec_at(&s->spatial, i);
+        if (bucket->used) {
+            box_vec_fini(&bucket->refs);
+        }
+    }
+    box_vec_fini(&s->spatial);
+    box_vec_fini(&s->occupancy_counts);
+    box_vec_fini(&s->occupancy_bits);
+    box_vec_fini(&s->occupancy_changes);
 }
 
 /** Drop every probe, the dirty set and the previous inputs.
@@ -87,6 +122,7 @@ static void box_bake_reset(
         m->upload_hi = 0;
         m->stale_lo = UINT32_MAX;
         m->stale_hi = 0;
+        m->layout_lo = UINT32_MAX;
         m->probe_count = 0;
         m->pool_dirty = false;
     }
@@ -95,7 +131,22 @@ static void box_bake_reset(
     box_vec_clear(&s->lights);
     box_vec_clear(&s->emitters);
     box_vec_clear(&s->changed);
+    for (i = 0; i < s->spatial.count; i ++) {
+        box_bake_bucket_t *bucket = box_vec_at(&s->spatial, i);
+        if (bucket->used) {
+            box_vec_fini(&bucket->refs);
+        }
+    }
+    box_vec_clear(&s->spatial);
+    box_vec_clear(&s->occupancy_counts);
+    box_vec_clear(&s->occupancy_bits);
+    box_vec_clear(&s->occupancy_changes);
+    memset(&s->grid, 0, sizeof(s->grid));
     s->probe_count = 0;
+    s->spatial_count = 0;
+    s->spatial_visit = 0;
+    s->occupancy_lo = UINT32_MAX;
+    s->occupancy_hi = 0;
     s->has_bounds = false;
     s->grid_dirty = true;
 }
@@ -117,6 +168,314 @@ static void box_bake_copy(
     }
 
     dst->count = src->count;
+}
+
+static uint32_t box_bake_spatial_hash(
+    int32_t x,
+    int32_t y,
+    int32_t z)
+{
+    uint32_t result = (uint32_t)x * 73856093u;
+    result ^= (uint32_t)y * 19349663u;
+    result ^= (uint32_t)z * 83492791u;
+
+    return result;
+}
+
+static void box_bake_spatial_grow(
+    box_bake_state_t *s,
+    uint32_t capacity)
+{
+    box_vec_t next;
+    box_vec_init(&next, sizeof(box_bake_bucket_t));
+    box_vec_reserve(&next, capacity);
+    next.count = capacity;
+    memset(next.data, 0, (size_t)capacity * sizeof(box_bake_bucket_t));
+
+    uint32_t i;
+    for (i = 0; i < s->spatial.count; i ++) {
+        box_bake_bucket_t *src = box_vec_at(&s->spatial, i);
+        if (!src->used) {
+            continue;
+        }
+
+        uint32_t slot = box_bake_spatial_hash(
+            src->coord[0], src->coord[1], src->coord[2]) & (capacity - 1u);
+        box_bake_bucket_t *dst = box_vec_at(&next, slot);
+        while (dst->used) {
+            slot = (slot + 1u) & (capacity - 1u);
+            dst = box_vec_at(&next, slot);
+        }
+
+        *dst = *src;
+    }
+
+    box_vec_fini(&s->spatial);
+    s->spatial = next;
+}
+
+static box_bake_bucket_t* box_bake_spatial_bucket(
+    box_bake_state_t *s,
+    const int32_t coord[3],
+    bool create)
+{
+    if (!s->spatial.count) {
+        if (!create) {
+            return NULL;
+        }
+
+        box_bake_spatial_grow(s, 64);
+    }
+
+    if (create && (s->spatial_count + 1u) * 10u > s->spatial.count * 7u) {
+        box_bake_spatial_grow(s, s->spatial.count * 2u);
+    }
+
+    uint32_t mask = s->spatial.count - 1u;
+    uint32_t slot = box_bake_spatial_hash(coord[0], coord[1], coord[2]) & mask;
+    box_bake_bucket_t *bucket = box_vec_at(&s->spatial, slot);
+    while (bucket->used) {
+        if (bucket->coord[0] == coord[0] && bucket->coord[1] == coord[1] &&
+            bucket->coord[2] == coord[2])
+        {
+            return bucket;
+        }
+
+        slot = (slot + 1u) & mask;
+        bucket = box_vec_at(&s->spatial, slot);
+    }
+
+    if (!create) {
+        return NULL;
+    }
+
+    bucket->coord[0] = coord[0];
+    bucket->coord[1] = coord[1];
+    bucket->coord[2] = coord[2];
+    box_vec_init(&bucket->refs, sizeof(box_bake_ref_t));
+    bucket->used = true;
+    s->spatial_count ++;
+
+    return bucket;
+}
+
+static void box_bake_spatial_range(
+    const box_probe_desc_t *d,
+    int32_t first[3],
+    int32_t last[3])
+{
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        first[axis] = (int32_t)floorf(
+            (d->position[axis] - d->extent[axis]) / BOX_BAKE_SPATIAL_CELL);
+        last[axis] = (int32_t)floorf(
+            (d->position[axis] + d->extent[axis]) / BOX_BAKE_SPATIAL_CELL);
+    }
+}
+
+static void box_bake_spatial_insert(
+    box_bake_state_t *s,
+    uint32_t mesh,
+    uint32_t slot,
+    const box_probe_desc_t *d)
+{
+    if (d->extent[3] == 0) {
+        return;
+    }
+
+    int32_t first[3];
+    int32_t last[3];
+    box_bake_spatial_range(d, first, last);
+    int32_t z;
+    for (z = first[2]; z <= last[2]; z ++) {
+        int32_t y;
+        for (y = first[1]; y <= last[1]; y ++) {
+            int32_t x;
+            for (x = first[0]; x <= last[0]; x ++) {
+                int32_t coord[3] = { x, y, z };
+                box_bake_bucket_t *bucket = box_bake_spatial_bucket(s, coord, true);
+                box_bake_ref_t *ref = box_vec_push(&bucket->refs);
+                ref->mesh = mesh;
+                ref->slot = slot;
+            }
+        }
+    }
+}
+
+static void box_bake_spatial_remove(
+    box_bake_state_t *s,
+    uint32_t mesh,
+    uint32_t slot,
+    const box_probe_desc_t *d)
+{
+    if (d->extent[3] == 0 || !s->spatial.count) {
+        return;
+    }
+
+    int32_t first[3];
+    int32_t last[3];
+    box_bake_spatial_range(d, first, last);
+    int32_t z;
+    for (z = first[2]; z <= last[2]; z ++) {
+        int32_t y;
+        for (y = first[1]; y <= last[1]; y ++) {
+            int32_t x;
+            for (x = first[0]; x <= last[0]; x ++) {
+                int32_t coord[3] = { x, y, z };
+                box_bake_bucket_t *bucket = box_bake_spatial_bucket(s, coord, false);
+                if (!bucket) {
+                    continue;
+                }
+
+                uint32_t i;
+                for (i = 0; i < bucket->refs.count; i ++) {
+                    box_bake_ref_t *ref = box_vec_at(&bucket->refs, i);
+                    if (ref->mesh == mesh && ref->slot == slot) {
+                        *ref = *(box_bake_ref_t*)box_vec_at(
+                            &bucket->refs, bucket->refs.count - 1u);
+                        bucket->refs.count --;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void box_bake_occupancy_change(
+    box_bake_state_t *s,
+    const box_probe_desc_t *old_desc,
+    const box_probe_desc_t *new_desc)
+{
+    box_bake_change_t *change = box_vec_push(&s->occupancy_changes);
+    memset(change, 0, sizeof(box_bake_change_t));
+    if (old_desc) {
+        change->old_desc = *old_desc;
+    }
+    if (new_desc) {
+        change->new_desc = *new_desc;
+    }
+}
+
+static bool box_bake_voxel_range(
+    const box_voxel_grid_t *grid,
+    const box_probe_desc_t *d,
+    uint32_t first[3],
+    uint32_t last[3])
+{
+    if (d->extent[3] == 0) {
+        return false;
+    }
+
+    int axis;
+    for (axis = 0; axis < 3; axis ++) {
+        float lo = d->position[axis] - d->extent[axis];
+        float hi = d->position[axis] + d->extent[axis];
+        float end = grid->min[axis] + grid->cell[axis] * (float)grid->dim[axis];
+        if (hi < grid->min[axis] || lo >= end) {
+            return false;
+        }
+
+        float a = floorf((lo - grid->min[axis]) / grid->cell[axis]);
+        float b = floorf((hi - grid->min[axis]) / grid->cell[axis]);
+        float limit = (float)grid->dim[axis] - 1.0f;
+        a = a < 0 ? 0 : (a > limit ? limit : a);
+        b = b < 0 ? 0 : (b > limit ? limit : b);
+        first[axis] = (uint32_t)a;
+        last[axis] = (uint32_t)b;
+    }
+
+    return true;
+}
+
+static void box_bake_occupancy_desc(
+    box_bake_state_t *s,
+    const box_probe_desc_t *d,
+    bool add)
+{
+    uint32_t first[3];
+    uint32_t last[3];
+    if (!box_bake_voxel_range(&s->grid, d, first, last)) {
+        return;
+    }
+
+    uint32_t *counts = s->occupancy_counts.data;
+    uint32_t *bits = s->occupancy_bits.data;
+    uint32_t z;
+    for (z = first[2]; z <= last[2]; z ++) {
+        uint32_t y;
+        for (y = first[1]; y <= last[1]; y ++) {
+            uint32_t x;
+            for (x = first[0]; x <= last[0]; x ++) {
+                uint32_t index = x + y * s->grid.dim[0] +
+                    z * s->grid.dim[0] * s->grid.dim[1];
+                uint32_t word = index >> 5u;
+                uint32_t bit = 1u << (index & 31u);
+                bool changed = false;
+                if (add) {
+                    changed = counts[index] == 0;
+                    counts[index] ++;
+                    bits[word] |= bit;
+                } else {
+                    assert(counts[index]);
+                    counts[index] --;
+                    changed = counts[index] == 0;
+                    if (changed) {
+                        bits[word] &= ~bit;
+                    }
+                }
+
+                if (changed) {
+                    s->occupancy_lo = word < s->occupancy_lo ? word : s->occupancy_lo;
+                    s->occupancy_hi = word + 1u > s->occupancy_hi ? word + 1u : s->occupancy_hi;
+                    s->grid_dirty = true;
+                }
+            }
+        }
+    }
+}
+
+static void box_bake_occupancy_rebuild(
+    box_bake_state_t *s)
+{
+    uint32_t cells = s->grid.dim[0] * s->grid.dim[1] * s->grid.dim[2];
+    uint32_t words = box_voxel_words(&s->grid);
+    box_vec_reserve(&s->occupancy_counts, cells);
+    box_vec_reserve(&s->occupancy_bits, words);
+    s->occupancy_counts.count = cells;
+    s->occupancy_bits.count = words;
+    memset(s->occupancy_counts.data, 0, (size_t)cells * sizeof(uint32_t));
+    memset(s->occupancy_bits.data, 0, (size_t)words * sizeof(uint32_t));
+    s->occupancy_lo = 0;
+    s->occupancy_hi = words;
+    s->grid_dirty = true;
+
+    uint32_t mesh;
+    for (mesh = 0; mesh < s->meshes.count; mesh ++) {
+        box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
+        uint32_t slot;
+        for (slot = 0; slot < m->descs.count; slot ++) {
+            box_bake_occupancy_desc(s, box_vec_at(&m->descs, slot), true);
+        }
+    }
+}
+
+static void box_bake_occupancy_apply(
+    box_bake_state_t *s,
+    bool rebuild)
+{
+    if (rebuild) {
+        box_bake_occupancy_rebuild(s);
+    } else {
+        uint32_t i;
+        for (i = 0; i < s->occupancy_changes.count; i ++) {
+            box_bake_change_t *change = box_vec_at(&s->occupancy_changes, i);
+            box_bake_occupancy_desc(s, &change->old_desc, false);
+            box_bake_occupancy_desc(s, &change->new_desc, true);
+        }
+    }
+
+    box_vec_clear(&s->occupancy_changes);
 }
 
 /** Check whether two world points lie closer together than a distance.
@@ -330,9 +689,14 @@ static void box_bake_layout(
     uint32_t mesh)
 {
     box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
+    uint32_t slot = m->layout_lo < m->descs.count ? m->layout_lo : m->descs.count;
     uint32_t base = 0;
-    uint32_t slot;
-    for (slot = 0; slot < m->descs.count; slot ++) {
+    if (slot) {
+        const box_probe_desc_t *before = box_vec_at(&m->descs, slot - 1u);
+        base = before->grid[0] + box_probe_count(before);
+    }
+
+    for (; slot < m->descs.count; slot ++) {
         box_probe_desc_t *d = box_vec_at(&m->descs, slot);
         uint32_t count = box_probe_count(d);
         if (count && d->grid[0] != base) {
@@ -346,6 +710,7 @@ static void box_bake_layout(
     }
 
     m->probe_count = base;
+    m->layout_lo = UINT32_MAX;
     m->pool_dirty = false;
 }
 
@@ -390,6 +755,7 @@ static void box_bake_respace(
         }
 
         m->pool_dirty = true;
+        m->layout_lo = 0;
         m->upload_lo = 0;
         m->upload_hi = m->descs.count;
     }
@@ -479,12 +845,16 @@ static void box_bake_apply_counts(
                 continue;
             }
 
+            box_bake_spatial_remove(s, c->mesh, slot, d);
+            box_bake_occupancy_change(s, d, NULL);
+
             if (box_bake_reaches(p, d->position, d->position[3])) {
                 box_bake_push_sphere(s, d->position, s->influence + d->position[3]);
                 s->grid_dirty = true;
             }
 
             m->pool_dirty = true;
+            m->layout_lo = c->count < m->layout_lo ? c->count : m->layout_lo;
         }
 
         while (m->descs.count < c->count) {
@@ -520,6 +890,7 @@ static void box_bake_apply_updates(
         box_probe_desc_t *cur = box_vec_at(&m->descs, u->slot);
         next.grid[0] = cur->grid[0];
         if (memcmp(cur, &next, sizeof(box_probe_desc_t))) {
+            box_probe_desc_t old = *cur;
             bool lit = box_bake_reaches(p, next.position, next.position[3]);
             if (cur->extent[3] != 0) {
                 lit = lit || box_bake_reaches(p, cur->position, cur->position[3]);
@@ -536,8 +907,14 @@ static void box_bake_apply_updates(
 
             bool grid_same = cur->extent[3] != 0 &&
                 !memcmp(cur->grid, next.grid, sizeof(cur->grid));
-            m->pool_dirty |= box_probe_count(cur) != box_probe_count(&next);
+            if (box_probe_count(cur) != box_probe_count(&next)) {
+                m->pool_dirty = true;
+                m->layout_lo = u->slot < m->layout_lo ? u->slot : m->layout_lo;
+            }
+            box_bake_spatial_remove(s, u->mesh, u->slot, &old);
+            box_bake_occupancy_change(s, &old, &next);
             *cur = next;
+            box_bake_spatial_insert(s, u->mesh, u->slot, cur);
             box_bake_bounds_add(s, &next);
             box_bake_touch(m, u->slot, lit || !grid_same);
         }
@@ -614,86 +991,6 @@ static void box_bake_diff_emitters(
     }
 }
 
-/** Order two changed regions by the x coordinate of their center.
- *
- * @param a The first region
- * @param b The second region
- * @return -1, 0 or 1 as the first center is smaller, equal or larger
- */
-static int box_bake_sphere_cmp(
-    const void *a,
-    const void *b)
-{
-    const box_bake_sphere_t *x = a;
-    const box_bake_sphere_t *y = b;
-    int result = 0;
-    if (x->center[0] < y->center[0]) {
-        result = -1;
-    } else if (x->center[0] > y->center[0]) {
-        result = 1;
-    }
-
-    return result;
-}
-
-/** First region of a sorted array whose center reaches a coordinate.
- *
- * @param spheres The regions, sorted by the x coordinate of their center
- * @param count Regions in the array
- * @param x The coordinate
- * @return The index of the first region, count when none does
- */
-static uint32_t box_bake_sphere_first(
-    const box_bake_sphere_t *spheres,
-    uint32_t count,
-    float x)
-{
-    uint32_t lo = 0;
-    uint32_t hi = count;
-    while (lo < hi) {
-        uint32_t mid = lo + (hi - lo) / 2;
-        if (spheres[mid].center[0] < x) {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-
-    return lo;
-}
-
-/** Test a probe against the regions that changed this frame near it.
- *
- * @param spheres The regions, sorted by the x coordinate of their center
- * @param count Regions in the array
- * @param first Index of the first region the probe can reach
- * @param d The probe descriptor
- * @return true when a changed region reaches the probe
- */
-static bool box_bake_touched(
-    const box_bake_sphere_t *spheres,
-    uint32_t count,
-    uint32_t first,
-    const box_probe_desc_t *d)
-{
-    bool result = false;
-    uint32_t i;
-    for (i = first; i < count && !result; i ++) {
-        const box_bake_sphere_t *sphere = &spheres[i];
-        float reach = sphere->radius + d->position[3];
-        float dx = sphere->center[0] - d->position[0];
-        if (dx > reach) {
-            break;
-        }
-
-        float dy = sphere->center[1] - d->position[1];
-        float dz = sphere->center[2] - d->position[2];
-        result = dx * dx + dy * dy + dz * dz <= reach * reach;
-    }
-
-    return result;
-}
-
 /** Queue every probe a changed region reaches and drop the regions.
  *
  * @param s The state
@@ -706,31 +1003,59 @@ static void box_bake_mark_changed(
     }
 
     box_bake_flush(s);
-
-    box_bake_sphere_t *spheres = s->changed.data;
-    uint32_t count = s->changed.count;
-    qsort(spheres, count, sizeof(box_bake_sphere_t), box_bake_sphere_cmp);
-
-    float widest = 0;
-    uint32_t i;
-    for (i = 0; i < count; i ++) {
-        widest = spheres[i].radius > widest ? spheres[i].radius : widest;
+    s->spatial_visit ++;
+    if (!s->spatial_visit) {
+        uint32_t bucket_index;
+        for (bucket_index = 0; bucket_index < s->spatial.count; bucket_index ++) {
+            ((box_bake_bucket_t*)box_vec_at(&s->spatial, bucket_index))->visit = 0;
+        }
+        s->spatial_visit = 1;
     }
 
-    uint32_t mesh;
-    for (mesh = 0; mesh < s->meshes.count; mesh ++) {
-        box_bake_mesh_t *m = box_vec_at(&s->meshes, mesh);
-        uint32_t slot;
-        for (slot = 0; slot < m->descs.count; slot ++) {
-            const box_probe_desc_t *d = box_vec_at(&m->descs, slot);
-            if (d->extent[3] == 0) {
-                continue;
-            }
+    uint32_t i;
+    for (i = 0; i < s->changed.count; i ++) {
+        const box_bake_sphere_t *sphere = box_vec_at(&s->changed, i);
+        int32_t first[3];
+        int32_t last[3];
+        int axis;
+        for (axis = 0; axis < 3; axis ++) {
+            first[axis] = (int32_t)floorf(
+                (sphere->center[axis] - sphere->radius) / BOX_BAKE_SPATIAL_CELL);
+            last[axis] = (int32_t)floorf(
+                (sphere->center[axis] + sphere->radius) / BOX_BAKE_SPATIAL_CELL);
+        }
 
-            float reach = widest + d->position[3];
-            uint32_t first = box_bake_sphere_first(spheres, count, d->position[0] - reach);
-            if (box_bake_touched(spheres, count, first, d)) {
-                box_bake_mark(s, mesh, slot);
+        int32_t z;
+        for (z = first[2]; z <= last[2]; z ++) {
+            int32_t y;
+            for (y = first[1]; y <= last[1]; y ++) {
+                int32_t x;
+                for (x = first[0]; x <= last[0]; x ++) {
+                    int32_t coord[3] = { x, y, z };
+                    box_bake_bucket_t *bucket = box_bake_spatial_bucket(s, coord, false);
+                    if (!bucket) {
+                        continue;
+                    }
+
+                    if (bucket->visit == s->spatial_visit) {
+                        continue;
+                    }
+                    bucket->visit = s->spatial_visit;
+
+                    uint32_t r;
+                    for (r = 0; r < bucket->refs.count; r ++) {
+                        const box_bake_ref_t *ref = box_vec_at(&bucket->refs, r);
+                        box_bake_mesh_t *m = box_bake_state_mesh(s, ref->mesh);
+                        if (ref->slot >= m->descs.count) {
+                            continue;
+                        }
+
+                        const box_probe_desc_t *d = box_vec_at(&m->descs, ref->slot);
+                        if (d->extent[3] != 0) {
+                            box_bake_mark(s, ref->mesh, ref->slot);
+                        }
+                    }
+                }
             }
         }
     }
@@ -745,13 +1070,14 @@ done:
  * @param s The state
  * @param p The packet
  */
-static void box_bake_update_grid(
+static bool box_bake_update_grid(
     box_bake_state_t *s,
     const box_packet_t *p)
 {
     uint32_t dim[3] = { p->bake.x, p->bake.y, p->bake.z };
-    bool rebuild = !s->grid.dim[0] || dim[0] != s->grid.dim[0] ||
+    bool fresh = !s->grid.dim[0] || dim[0] != s->grid.dim[0] ||
         dim[1] != s->grid.dim[1] || dim[2] != s->grid.dim[2];
+    bool rebuild = fresh;
     int axis;
     for (axis = 0; axis < 3 && !rebuild; axis ++) {
         float hi = s->grid.min[axis] + s->grid.cell[axis] * (float)s->grid.dim[axis];
@@ -759,23 +1085,35 @@ static void box_bake_update_grid(
     }
 
     if (!s->has_bounds || !rebuild) {
-        goto done;
+        return false;
     }
 
     float min[3];
     float max[3];
     for (axis = 0; axis < 3; axis ++) {
-        float pad = (s->bounds_max[axis] - s->bounds_min[axis]) * BOX_BAKE_PADDING;
-        pad = pad > BOX_BAKE_EPSILON ? pad : BOX_BAKE_EPSILON;
-        min[axis] = s->bounds_min[axis] - pad;
-        max[axis] = s->bounds_max[axis] + pad;
+        if (fresh) {
+            float pad = (s->bounds_max[axis] - s->bounds_min[axis]) * BOX_BAKE_PADDING;
+            pad = pad > BOX_BAKE_EPSILON ? pad : BOX_BAKE_EPSILON;
+            min[axis] = s->bounds_min[axis] - pad;
+            max[axis] = s->bounds_max[axis] + pad;
+        } else {
+            min[axis] = s->grid.min[axis];
+            max[axis] = min[axis] + s->grid.cell[axis] * (float)s->grid.dim[axis];
+            float center = (min[axis] + max[axis]) * 0.5f;
+            float size = max[axis] - min[axis];
+            while (s->bounds_min[axis] < min[axis] || s->bounds_max[axis] > max[axis]) {
+                size *= 2.0f;
+                min[axis] = center - size * 0.5f;
+                max[axis] = center + size * 0.5f;
+            }
+        }
     }
 
     box_voxel_grid_build(min, max, dim, &s->grid);
     s->grid_dirty = true;
     box_bake_mark_all(s);
-done:
-    return;
+
+    return true;
 }
 
 /** Count the probes in the pool of every mesh.
@@ -827,7 +1165,8 @@ void box_bake_state_apply(
     box_bake_diff_lights(s, p);
     box_bake_diff_emitters(s, p);
     box_bake_mark_changed(s);
-    box_bake_update_grid(s, p);
+    bool grid_rebuilt = box_bake_update_grid(s, p);
+    box_bake_occupancy_apply(s, grid_rebuilt);
     box_bake_copy(&s->lights, &p->bake_lights);
     box_bake_copy(&s->emitters, &p->emitters);
     box_bake_count(s);
@@ -1199,16 +1538,6 @@ static void box_bake_layouts(
     WGPUBindGroupLayoutDescriptor bake_desc = { .entryCount = 4, .entries = bake_entries };
     r->bake_layout = wgpuDeviceCreateBindGroupLayout(r->device, &bake_desc);
 
-    WGPUBindGroupLayoutEntry grid_entries[2] = {
-        bake_entries[0], {
-            .binding = 1,
-            .visibility = WGPUShaderStage_Compute,
-            .buffer = { .type = WGPUBufferBindingType_Storage }
-        }
-    };
-    WGPUBindGroupLayoutDescriptor grid_desc = { .entryCount = 2, .entries = grid_entries };
-    r->grid_layout = wgpuDeviceCreateBindGroupLayout(r->device, &grid_desc);
-
     WGPUBindGroupLayoutEntry mesh_entries[4] = {
         {
             .binding = 0,
@@ -1234,9 +1563,6 @@ static void box_bake_layouts(
     WGPUBindGroupLayoutDescriptor mesh_desc = { .entryCount = 4, .entries = mesh_entries };
     r->bake_mesh_layout = wgpuDeviceCreateBindGroupLayout(r->device, &mesh_desc);
 
-    WGPUBindGroupLayoutDescriptor grid_mesh_desc = { .entryCount = 2, .entries = mesh_entries };
-    r->grid_mesh_layout = wgpuDeviceCreateBindGroupLayout(r->device, &grid_mesh_desc);
-
     WGPUBindGroupLayoutEntry probe_entries[2] = {
         {
             .binding = 0,
@@ -1260,7 +1586,6 @@ static void box_bake_groups(
     box_renderer_t *r)
 {
     if (r->bake_group) wgpuBindGroupRelease(r->bake_group);
-    if (r->grid_group) wgpuBindGroupRelease(r->grid_group);
 
     uint64_t occupancy_size = (uint64_t)r->occupancy_words * sizeof(uint32_t);
     WGPUBindGroupEntry bake_entries[4] = {
@@ -1277,17 +1602,6 @@ static void box_bake_groups(
         .entries = bake_entries
     };
     r->bake_group = wgpuDeviceCreateBindGroup(r->device, &bake_desc);
-
-    WGPUBindGroupEntry grid_entries[2] = {
-        bake_entries[0],
-        { .binding = 1, .buffer = r->occupancy, .size = occupancy_size }
-    };
-    WGPUBindGroupDescriptor grid_desc = {
-        .layout = r->grid_layout,
-        .entryCount = 2,
-        .entries = grid_entries
-    };
-    r->grid_group = wgpuDeviceCreateBindGroup(r->device, &grid_desc);
 }
 
 /** Grow the global light, emitter and occupancy buffers for a packet.
@@ -1327,6 +1641,8 @@ static bool box_bake_grow(
         if (r->occupancy) wgpuBufferRelease(r->occupancy);
         r->occupancy = box_bake_buffer(r, storage, (uint64_t)words * sizeof(uint32_t));
         r->occupancy_words = words;
+        r->bake.occupancy_lo = 0;
+        r->bake.occupancy_hi = words;
         r->bake.grid_dirty = true;
         result = true;
     }
@@ -1365,6 +1681,23 @@ static void box_bake_upload(
         wgpuQueueWriteBuffer(r->gpu_queue, r->bake_emitters, 0, p->emitters.data,
             (size_t)p->emitters.count * sizeof(box_emitter_t));
     }
+}
+
+static void box_bake_upload_occupancy(
+    box_renderer_t *r)
+{
+    box_bake_state_t *s = &r->bake;
+    if (s->occupancy_lo < s->occupancy_hi) {
+        uint32_t first = s->occupancy_lo;
+        uint32_t count = s->occupancy_hi - first;
+        wgpuQueueWriteBuffer(r->gpu_queue, r->occupancy,
+            (uint64_t)first * sizeof(uint32_t), box_vec_at(&s->occupancy_bits, first),
+            (size_t)count * sizeof(uint32_t));
+    }
+
+    s->occupancy_lo = UINT32_MAX;
+    s->occupancy_hi = 0;
+    s->grid_dirty = false;
 }
 
 /** Create or grow the probe buffers of one mesh.
@@ -1445,7 +1778,6 @@ static void box_bake_mesh_groups(
     box_gpu_mesh_t *m)
 {
     if (m->bake_group) wgpuBindGroupRelease(m->bake_group);
-    if (m->grid_group) wgpuBindGroupRelease(m->grid_group);
     if (m->probe_group) wgpuBindGroupRelease(m->probe_group);
 
     uint64_t probe_size = (uint64_t)m->probe_capacity * BOX_BAKE_PROBE_SIZE;
@@ -1463,13 +1795,6 @@ static void box_bake_mesh_groups(
         .entries = entries
     };
     m->bake_group = wgpuDeviceCreateBindGroup(r->device, &bake_desc);
-
-    WGPUBindGroupDescriptor grid_desc = {
-        .layout = r->grid_mesh_layout,
-        .entryCount = 2,
-        .entries = entries
-    };
-    m->grid_group = wgpuDeviceCreateBindGroup(r->device, &grid_desc);
 
     WGPUBindGroupEntry probe_entries[2] = {
         { .binding = 0, .buffer = m->probes, .size = probe_size },
@@ -1538,26 +1863,22 @@ static void box_bake_meshes(
  */
 static void box_bake_pass(
     box_renderer_t *r,
-    WGPUCommandEncoder encoder,
-    WGPUComputePipeline pipeline,
-    WGPUBindGroup globals,
-    bool bake)
+    WGPUCommandEncoder encoder)
 {
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-    wgpuComputePassEncoderSetPipeline(pass, pipeline);
-    wgpuComputePassEncoderSetBindGroup(pass, 0, globals, 0, NULL);
+    wgpuComputePassEncoderSetPipeline(pass, r->bake_pipeline);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, r->bake_group, 0, NULL);
 
     uint32_t i;
     for (i = 0; i < r->bake.meshes.count && i < r->meshes.count; i ++) {
         box_bake_mesh_t *entry = box_vec_at(&r->bake.meshes, i);
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, i);
-        uint32_t count = bake ? entry->jobs.count : entry->descs.count;
+        uint32_t count = entry->jobs.count;
         if (!m->alive || !m->bake_group || !count) {
             continue;
         }
 
-        wgpuComputePassEncoderSetBindGroup(pass, 1, bake ? m->bake_group : m->grid_group,
-            0, NULL);
+        wgpuComputePassEncoderSetBindGroup(pass, 1, m->bake_group, 0, NULL);
         wgpuComputePassEncoderDispatchWorkgroups(pass,
             (count + BOX_BAKE_GROUP - 1) / BOX_BAKE_GROUP, 1, 1);
     }
@@ -1605,8 +1926,6 @@ void box_bake_init(
     r->probe_dummy_group = wgpuDeviceCreateBindGroup(r->device, &dummy_desc);
 
     box_bake_groups(r);
-    r->grid_pipeline = box_bake_pipeline(r, BOX_SHADER_BAKE_GRID, "cs_grid", r->grid_layout,
-        r->grid_mesh_layout);
     r->bake_pipeline = box_bake_pipeline(r, BOX_SHADER_BAKE, "cs_bake", r->bake_layout,
         r->bake_mesh_layout);
 }
@@ -1632,14 +1951,11 @@ void box_bake_update(
     box_bake_meshes(r);
 
     if (r->bake.grid_dirty) {
-        wgpuCommandEncoderClearBuffer(encoder, r->occupancy, 0,
-            (uint64_t)r->occupancy_words * sizeof(uint32_t));
-        box_bake_pass(r, encoder, r->grid_pipeline, r->grid_group, false);
-        r->bake.grid_dirty = false;
+        box_bake_upload_occupancy(r);
     }
 
     if (taken) {
-        box_bake_pass(r, encoder, r->bake_pipeline, r->bake_group, true);
+        box_bake_pass(r, encoder);
     }
 
 done:
@@ -1664,14 +1980,12 @@ void box_bake_mesh_release(
     box_gpu_mesh_t *m)
 {
     if (m->bake_group) wgpuBindGroupRelease(m->bake_group);
-    if (m->grid_group) wgpuBindGroupRelease(m->grid_group);
     if (m->probe_group) wgpuBindGroupRelease(m->probe_group);
     if (m->probe_descs) wgpuBufferRelease(m->probe_descs);
     if (m->probes) wgpuBufferRelease(m->probes);
     if (m->probe_jobs) wgpuBufferRelease(m->probe_jobs);
     if (m->probe_info) wgpuBufferRelease(m->probe_info);
     m->bake_group = NULL;
-    m->grid_group = NULL;
     m->probe_group = NULL;
     m->probe_descs = NULL;
     m->probes = NULL;
@@ -1687,15 +2001,11 @@ void box_bake_fini(
 {
     box_bake_state_fini(&r->bake);
     if (r->bake_group) wgpuBindGroupRelease(r->bake_group);
-    if (r->grid_group) wgpuBindGroupRelease(r->grid_group);
     if (r->probe_dummy_group) wgpuBindGroupRelease(r->probe_dummy_group);
     if (r->bake_layout) wgpuBindGroupLayoutRelease(r->bake_layout);
-    if (r->grid_layout) wgpuBindGroupLayoutRelease(r->grid_layout);
     if (r->bake_mesh_layout) wgpuBindGroupLayoutRelease(r->bake_mesh_layout);
-    if (r->grid_mesh_layout) wgpuBindGroupLayoutRelease(r->grid_mesh_layout);
     if (r->probe_layout) wgpuBindGroupLayoutRelease(r->probe_layout);
     if (r->bake_pipeline) wgpuComputePipelineRelease(r->bake_pipeline);
-    if (r->grid_pipeline) wgpuComputePipelineRelease(r->grid_pipeline);
     if (r->bake_uniform) wgpuBufferRelease(r->bake_uniform);
     if (r->bake_lights) wgpuBufferRelease(r->bake_lights);
     if (r->bake_emitters) wgpuBufferRelease(r->bake_emitters);
@@ -1703,15 +2013,11 @@ void box_bake_fini(
     if (r->probe_dummy) wgpuBufferRelease(r->probe_dummy);
     if (r->desc_dummy) wgpuBufferRelease(r->desc_dummy);
     r->bake_group = NULL;
-    r->grid_group = NULL;
     r->probe_dummy_group = NULL;
     r->bake_layout = NULL;
-    r->grid_layout = NULL;
     r->bake_mesh_layout = NULL;
-    r->grid_mesh_layout = NULL;
     r->probe_layout = NULL;
     r->bake_pipeline = NULL;
-    r->grid_pipeline = NULL;
     r->bake_uniform = NULL;
     r->bake_lights = NULL;
     r->bake_emitters = NULL;

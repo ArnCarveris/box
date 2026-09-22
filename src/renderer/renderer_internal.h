@@ -381,7 +381,6 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer probe_info;           /**< box_bake_info_t of the mesh */
     WGPUBindGroup probe_group;       /**< Probes and descriptors the mesh shader reads */
     WGPUBindGroup bake_group;        /**< Probe buffers of the bake pass */
-    WGPUBindGroup grid_group;        /**< Probe descriptors of the occupancy pass */
     box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
     bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
     box_vec_t transition_index;      /**< uint32_t entry per slot, BOX_TRANSITION_NONE for none */
@@ -597,16 +596,12 @@ struct box_renderer_t {
     uint32_t occupancy_words;        /**< Words the occupancy buffer holds */
     WGPUBindGroupLayout bake_layout; /**< Uniform, lights, emitters and occupancy */
     WGPUBindGroup bake_group;        /**< Global bind group of the bake pass */
-    WGPUBindGroupLayout grid_layout; /**< Uniform and writable occupancy */
-    WGPUBindGroup grid_group;        /**< Global bind group of the occupancy pass */
     WGPUBindGroupLayout bake_mesh_layout; /**< Per mesh layout of the bake pass */
-    WGPUBindGroupLayout grid_mesh_layout; /**< Per mesh layout of the occupancy pass */
     WGPUBindGroupLayout probe_layout; /**< Probe and descriptor layout the mesh shader reads */
     WGPUBuffer probe_dummy;          /**< Zero probe bound by dynamic draws */
     WGPUBuffer desc_dummy;           /**< Zero descriptor bound by dynamic draws */
     WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
     WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
-    WGPUComputePipeline grid_pipeline; /**< Occupancy fill pass */
     box_gpu_texpage_t texpage[BOX_TEXTURE_PAGES]; /**< Array textures of the texture pager */
     WGPUSampler texture_sampler;     /**< Sampler of every page, with the anisotropy setting */
     uint64_t texture_layout;         /**< Hash of the page layout the bind group was built for */

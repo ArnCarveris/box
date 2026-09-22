@@ -309,6 +309,7 @@ typedef struct box_bake_mesh_t {
     uint32_t upload_hi;   /**< Descriptor past the last one changed */
     uint32_t stale_lo;    /**< First descriptor parked because no light reaches it */
     uint32_t stale_hi;    /**< Descriptor past the last parked one */
+    uint32_t layout_lo;
     bool pool_dirty;      /**< The pool must be laid out again */
 } box_bake_mesh_t;
 
@@ -319,6 +320,10 @@ typedef struct box_bake_state_t {
     box_vec_t lights;      /**< box_light_t static lights of the previous packet */
     box_vec_t emitters;    /**< box_emitter_t of the previous packet */
     box_vec_t changed;     /**< box_bake_sphere_t regions invalidated this frame */
+    box_vec_t spatial;
+    box_vec_t occupancy_counts;
+    box_vec_t occupancy_bits;
+    box_vec_t occupancy_changes;
     box_voxel_grid_t grid; /**< Grid the occupancy pass covers */
     float bounds_min[3];   /**< World minimum of the static scene */
     float bounds_max[3];   /**< World maximum of the static scene */
@@ -327,6 +332,10 @@ typedef struct box_bake_state_t {
     float spacing;         /**< World units between two probes of an instance */
     uint32_t probe_max;    /**< Probes an instance gets on one axis */
     uint32_t probe_count;  /**< Probes over every mesh */
+    uint32_t spatial_count;
+    uint32_t spatial_visit;
+    uint32_t occupancy_lo;
+    uint32_t occupancy_hi;
     bool has_bounds;       /**< A static instance contributed to the bounds */
     bool grid_dirty;       /**< The occupancy grid must be filled again */
     bool enabled;          /**< Baking was enabled by the previous packet */
