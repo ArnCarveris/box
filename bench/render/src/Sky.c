@@ -18,6 +18,8 @@ void Sky_extract_steady(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 2, -10});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {1.0f, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 3});
@@ -54,6 +56,8 @@ void Sky_extract_moving_sun(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 2, -10});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {1.0f, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 3});
@@ -93,6 +97,8 @@ void Sky_extract_moon_and_stars(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 2, -10});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Rotation, {1.0f, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 3});

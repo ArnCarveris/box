@@ -125,3 +125,5 @@ posts {
     PbrMaterial: {roughness: 0.6}
   }
 }
+
+view { box.view.View: {camera: camera} }

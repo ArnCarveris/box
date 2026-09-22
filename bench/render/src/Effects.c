@@ -24,15 +24,23 @@ void Effects_extract_chain(bench_t *b)
     ecs_entity_t shader = ecs_new(world);
     ecs_set(world, shader, Shader, {.path = "etc/shaders/overlay.wgsl"});
     ecs_entity_t params = ecs_id(LayerParams);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *settings = ecs_get_mut(world, view, View);
+    settings->camera = camera;
     int32_t i;
     for (i = 0; i < BENCH_EFFECT_COUNT; i ++) {
         ecs_entity_t e = ecs_new(world);
         ecs_set(world, e, Effect, { .shader = shader, .params = params,
-            .order = BENCH_EFFECT_COUNT - i, .enabled = true, .color = true,
-            .depth = i % 2 == 0, .scale = 1 });
+            .color = true, .depth = i % 2 == 0, .scale = 1 });
         ecs_set(world, e, LayerParams, {
             .a = {(float)i, 1, 0, 0}, .b = {0, 0, 0, 0} });
+        ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
+            (ViewEffect){.effect = e, .enabled = true};
     }
+    ecs_modified(world, view, View);
 
     box_render_extract(world, &packet);
     uint32_t cmd;

@@ -100,3 +100,5 @@ subtractive {
   PbrMaterial: {roughness: 0.05}
   BlendMode: {Subtractive}
 }
+
+view { box.view.View: {camera: camera} }

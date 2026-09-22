@@ -85,7 +85,7 @@ glow {
   Emissive: {strength: 8, color: {255, 120, 40}}
 }
 
-box { effects { stack { tonemap {
-  Effect: {enabled: true}
+post_effects { tonemap : box.effects.tonemap {
   ToneMapping: {white: 1, dither: true}
-} } } }
+} }
+view { box.view.View: {camera: camera, effects: [{effect: post_effects.tonemap, enabled: true}]} }

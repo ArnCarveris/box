@@ -1,34 +1,9 @@
 /**
  * @file effects/extract.c
  * @brief Builds the ordered effect chain of a view and copies its parameters.
- *
- * The chain of a view is the list its View spells out, or every effect of the
- * world when it lists none. Only enabled effects with a compiled shader reach the
- * packet, so a disabled effect costs the renderer nothing and the inputs of the
- * view are the union of what its passes declared.
  */
 
 #include "effects_internal.h"
-
-/** Order two effects by their order and then by their entity.
- *
- * @param a The first effect
- * @param b The second effect
- * @return Negative when a runs first, positive when b does, zero when equal
- */
-static int box_effect_compare(
-    const void *a,
-    const void *b)
-{
-    const box_effect_src_t *l = a;
-    const box_effect_src_t *r = b;
-    int result = (l->order > r->order) - (l->order < r->order);
-    if (!result) {
-        result = (l->entity > r->entity) - (l->entity < r->entity);
-    }
-
-    return result;
-}
 
 /** Read one reflected scalar as the float the shader block holds.
  *
@@ -251,7 +226,9 @@ static void box_effect_append(
     box_view_t *v)
 {
     const Effect *fx = ecs_get(world, e, Effect);
-    if (!fx || !fx->enabled || !fx->shader) {
+    if (!fx || !fx->shader || ecs_has_id(world, e, EcsPrefab) ||
+        ecs_has_id(world, e, EcsDisabled))
+    {
         goto done;
     }
 
@@ -322,51 +299,6 @@ done:
     return;
 }
 
-/** Collect the effects a view runs into the scratch stack, ordered.
- *
- * @param world The world
- * @param state The registry
- * @param e The View entity, 0 for the view a world without views gets
- */
-static void box_effect_collect(
-    ecs_world_t *world,
-    EffectState *state,
-    ecs_entity_t e)
-{
-    ecs_vec_clear(&state->stack);
-    const View *view = e ? ecs_get(world, e, View) : NULL;
-    if (view && view->effect_list[0]) {
-        int32_t i;
-        for (i = 0; i < BOX_EFFECTS_MAX && view->effect_list[i]; i ++) {
-            ecs_entity_t fx = view->effect_list[i];
-            const Effect *effect = ecs_get(world, fx, Effect);
-            if (!effect) {
-                continue;
-            }
-
-            box_effect_src_t *src = ecs_vec_append_t(NULL, &state->stack, box_effect_src_t);
-            src->entity = fx;
-            src->order = effect->order;
-        }
-    } else {
-        ecs_iter_t it = ecs_query_iter(world, state->effects);
-        while (ecs_query_next(&it)) {
-            Effect *effect = ecs_field(&it, Effect, 0);
-            int32_t i;
-            for (i = 0; i < it.count; i ++) {
-                box_effect_src_t *src =
-                    ecs_vec_append_t(NULL, &state->stack, box_effect_src_t);
-                src->entity = it.entities[i];
-                src->order = effect[i].order;
-            }
-        }
-    }
-
-    int32_t count = ecs_vec_count(&state->stack);
-    qsort(ecs_vec_first_t(&state->stack, box_effect_src_t), (size_t)count,
-        sizeof(box_effect_src_t), box_effect_compare);
-}
-
 void box_effects_extract(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -376,7 +308,8 @@ void box_effects_extract(
     v->effect_first = p->effects.count;
     v->effect_count = 0;
     v->effect_inputs = 0;
-    if (!v->effects) {
+    const View *view = ecs_get(world, e, View);
+    if (!view) {
         goto done;
     }
 
@@ -387,15 +320,17 @@ void box_effects_extract(
     }
 
     EffectState *state = ecs_get_mut(world, ecs_id(EffectState), EffectState);
-    if (!state || !state->effects || !state->enabled) {
+    if (!state) {
         goto done;
     }
 
-    box_effect_collect(world, state, e);
+    int32_t count = ecs_vec_count(&view->effects);
+    const ViewEffect *effects = ecs_vec_first_t(&view->effects, ViewEffect);
     int32_t i;
-    for (i = 0; i < ecs_vec_count(&state->stack); i ++) {
-        box_effect_append(world, state,
-            ecs_vec_get_t(&state->stack, box_effect_src_t, i)->entity, p, v);
+    for (i = 0; i < count && v->effect_count < BOX_EFFECTS_MAX; i ++) {
+        if (effects[i].effect && effects[i].enabled) {
+            box_effect_append(world, state, effects[i].effect, p, v);
+        }
     }
 
 done:

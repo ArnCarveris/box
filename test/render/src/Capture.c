@@ -37,7 +37,7 @@ void Capture_component_consumed_by_extract(void)
     test_assert(!ecs_has(w, cam, Capture));
 }
 
-void Capture_camera_becomes_the_view(void)
+void Capture_explicit_view_uses_capture_camera(void)
 {
     // command/capture
     ecs_entity_t a = ecs_new(w);
@@ -46,6 +46,8 @@ void Capture_camera_becomes_the_view(void)
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {0, 0, 9});
     ecs_set(w, b, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = b, .enabled = true});
     ecs_set(w, b, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_b.png")});
     box_render_extract(w, &packet);
     test_bool(packet.has_view, true);
@@ -59,14 +61,19 @@ void Capture_two_cameras_over_two_frames(void)
     ecs_entity_t a = ecs_new(w);
     ecs_set(w, a, Position, {-3, 0, 0});
     ecs_set(w, a, Camera, {.fov = 60});
+    ecs_entity_t view_a = ecs_new(w);
+    ecs_set(w, view_a, View, {.camera = a, .enabled = true});
     ecs_set(w, a, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_a.png")});
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {7, 0, 0});
     ecs_set(w, b, Camera, {.fov = 60});
+    ecs_entity_t view_b = ecs_new(w);
+    ecs_set(w, view_b, View, {.camera = b, .enabled = true});
     ecs_set(w, b, Capture, {.path = ecs_os_strdup("/tmp/box_test_capture_b.png")});
     box_render_extract(w, &packet);
     test_str(packet.capture_path, "/tmp/box_test_capture_a.png");
     test_flt(packet.view.eye[0], -3);
+    test_uint(packet.capture_view, 0);
     test_assert(!ecs_has(w, a, Capture));
     test_assert(ecs_has(w, b, Capture));
 
@@ -75,7 +82,8 @@ void Capture_two_cameras_over_two_frames(void)
     packet.height = 32;
     box_render_extract(w, &packet);
     test_str(packet.capture_path, "/tmp/box_test_capture_b.png");
-    test_flt(packet.view.eye[0], 7);
+    test_flt(packet.view.eye[0], -3);
+    test_uint(packet.capture_view, 1);
     test_assert(!ecs_has(w, b, Capture));
 }
 
@@ -110,6 +118,8 @@ void Capture_active_camera_is_the_first_camera(void)
     ecs_entity_t a = ecs_new(w);
     ecs_set(w, a, Position, {0, 0, -5});
     ecs_set(w, a, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = a, .enabled = true});
     ecs_entity_t b = ecs_new(w);
     ecs_set(w, b, Position, {0, 0, -9});
     ecs_set(w, b, Camera, {.fov = 60});
@@ -124,7 +134,7 @@ void Capture_active_camera_without_camera_entity(void)
     // command/capture
     test_assert(box_render_active_camera(w) == 0);
     box_render_extract(w, &packet);
-    test_bool(packet.has_view, true);
+    test_bool(packet.has_view, false);
 }
 
 void Capture_removed_after_a_deferred_extract(void)

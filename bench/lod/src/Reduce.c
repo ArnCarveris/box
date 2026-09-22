@@ -41,6 +41,8 @@ void Reduce_select_10k_still(bench_t *b)
     camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 0});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_singleton_set(world, LodSettings, {
         .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
     });
@@ -113,6 +115,8 @@ void Reduce_select_10k_walk(bench_t *b)
     camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 0});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_singleton_set(world, LodSettings, {
         .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
     });

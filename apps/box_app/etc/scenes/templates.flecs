@@ -2,6 +2,7 @@ using box.transform
 using box.geometry
 using box.material
 using box.camera
+using box.view
 using box.light
 
 template Pillar {
@@ -31,6 +32,8 @@ camera {
   LookAt: {0, 2, 0}
   Camera: {fov: 60}
 }
+
+view { View: {camera: camera} }
 
 sun {
   Rotation: {0.9, -0.6, 0}

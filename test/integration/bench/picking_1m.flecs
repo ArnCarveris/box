@@ -65,3 +65,5 @@ camera {
   Camera: {fov: 65}
   Velocity: {0, 0, 10}
 }
+
+view { box.view.View: {camera: camera} }

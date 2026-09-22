@@ -29,6 +29,17 @@ void Layers_extract_10k_with_layers(bench_t *b)
     ecs_entity_t second = ecs_new(world);
     ecs_set(world, second, MaterialLayer, {.shader = shader, .order = 1});
     ecs_set(world, second, LayerParams, {.a = {1, 1, 1, 1}});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *settings = ecs_get_mut(world, view, View);
+    settings->camera = camera;
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = first, .enabled = true};
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = second, .enabled = true};
+    ecs_modified(world, view, View);
     ecs_entity_t *scene = ecs_os_malloc_n(ecs_entity_t, BENCH_LAYER_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_LAYER_COUNT; i ++) {

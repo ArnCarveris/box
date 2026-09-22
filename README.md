@@ -34,12 +34,41 @@ process globals that every world forces, so a world that imported the modules in
 another order would collide with the ids of the first; importing only `Box`, in
 applications, tests and benchmarks alike, keeps every world identical.
 
-## Bloom
+## Views and effects
 
-Enable bloom on `box.effects.stack.bloom` with `Effect: {enabled: true}` and
-`Bloom: {}`. Bloom uses the flecs-engine additive pyramid and defaults to an
-intensity of 0.3, a threshold of 1, and a low-frequency boost of 0.7. Enable
-`box.effects.stack.tonemap` to map the resulting HDR highlights to the display.
+Rendering requires an explicit `View`. The built-in effects and material layers
+are prefab definitions: an application instantiates the effects it needs and
+registers them, in execution order, with the view. Shadows, effects, and material
+layers are configured independently for every view.
+
+```flecs
+using box.*
+
+post {
+  bloom : box.effects.bloom {
+    Bloom: {intensity: 0.3}
+  }
+  tonemap : box.effects.tonemap {}
+}
+
+view {
+  View: {
+    camera: camera,
+    shadows: {enabled: true, resolution: 2048, max_distance: 200},
+    effects: [
+      {effect: post.bloom, enabled: true},
+      {effect: post.tonemap, enabled: true}
+    ],
+    material_layers: [
+      {layer: box.material.layers.dust, enabled: true}
+    ]
+  }
+}
+```
+
+Bloom uses the flecs-engine additive pyramid and defaults to an intensity of 0.3,
+a threshold of 1, and a low-frequency boost of 0.7. Tonemapping maps the resulting
+HDR highlights to the display.
 
 `Bloom.prefilter` contains `threshold` and `threshold_softness`. Set the threshold
 to zero for thresholdless bloom. `low_frequency_boost` and

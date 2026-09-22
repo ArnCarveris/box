@@ -44,3 +44,5 @@ behind {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

@@ -107,3 +107,5 @@ camera {
   Camera: {fov: 60, far_: 8000}
   Velocity: {0, 0, 30}
 }
+
+view { box.view.View: {camera: camera} }

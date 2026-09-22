@@ -121,3 +121,5 @@ coarse_ball : prefabs.Ball {
   Position: {10.5, 1.2, 4.2}
   WearDetail: {scale: 0.3}
 }
+
+view { box.view.View: {camera: camera} }

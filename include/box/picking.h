@@ -166,7 +166,6 @@ void box_picking_set_through(
  * world without a View renders.
  *
  * @param world The world
- * @param view The view entity, 0 for the camera a world without views renders
  * @param cursor Normalized position in the image of the view
  * @param origin Receives the origin of the ray in world space
  * @param dir Receives the normalized direction of the ray in world space
@@ -199,7 +198,6 @@ ecs_entity_t box_picking_target(
  * result does not depend on the order the index visits them.
  *
  * @param world The world
- * @param view The view entity, 0 for the camera a world without views renders
  * @param cursor Normalized position in the image of the view
  * @param out Receives the hit, which is zeroed when the ray hit nothing
  * @return true when the ray hit a collider

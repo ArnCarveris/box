@@ -56,46 +56,44 @@ textures {
   }
 }
 
-stack {
-  color_grade {
-    Effect: {shader: shaders.color_grade, params: ColorGrade, order: 100,
-      scale: 1, enabled: false, color: true}
+prefab color_grade {
+    Effect: {shader: shaders.color_grade, params: ColorGrade,
+      scale: 1, color: true}
     ColorGrade: {exposure: 0, saturation: 1}
-  }
-  gtao {
-    Effect: {shader: shaders.gtao, params: Gtao, order: 600,
-      scale: 1, enabled: false, color: true, depth: true, normals: true,
+}
+prefab gtao {
+    Effect: {shader: shaders.gtao, params: Gtao,
+      scale: 1, color: true, depth: true, normals: true,
       motion: true, setup: setups.temporal_filter}
     Gtao: {radius: 1, slices: 2, steps: 4, power: 1, temporal: true, half_res: true}
-  }
-  ssr {
-    Effect: {shader: shaders.ssr, params: Ssr, order: 650,
-      scale: 1, enabled: false, color: true, depth: true, normals: true}
+}
+prefab ssr {
+    Effect: {shader: shaders.ssr, params: Ssr,
+      scale: 1, color: true, depth: true, normals: true}
     Ssr: {steps: 24, thickness: 0.4, max_roughness: 0.6, intensity: 1, fade: 0.12}
-  }
-  fog {
-    Effect: {shader: shaders.fog, params: Fog, order: 700,
-      scale: 1, enabled: false, color: true, depth: true}
+}
+prefab fog {
+    Effect: {shader: shaders.fog, params: Fog,
+      scale: 1, color: true, depth: true}
     Fog: {color: {0.55, 0.6, 0.68}, density: 0.02, falloff: 0.1,
       start: 0, max_opacity: 1, height: 0}
-  }
-  auto_exposure {
+}
+prefab auto_exposure {
     Effect: {shader: shaders.auto_exposure, params: AutoExposure,
-      order: 800, scale: 1, enabled: false, color: true, setup: setups.luminance}
+      scale: 1, color: true, setup: setups.luminance}
     AutoExposure: {speed_up: 1, speed_down: 1, min_ev: -4, max_ev: 4,
       target: 0.18, compensation: 0, pinned: false}
-  }
-  bloom {
-    Effect: {shader: shaders.bloom, params: Bloom, order: 850,
-      scale: 1, enabled: false, color: true, setup: setups.filter_chain}
+}
+prefab bloom {
+    Effect: {shader: shaders.bloom, params: Bloom,
+      scale: 1, color: true, setup: setups.filter_chain}
     Bloom: {intensity: 0.3, low_frequency_boost: 0.7,
       low_frequency_boost_curvature: 0.95, high_pass_frequency: 1,
       prefilter: {threshold: 1, threshold_softness: 0}, max_mip_dimension: 512,
       firefly_clamp: 12, temporal: 0, karis: true, full_res_first_mip: true}
-  }
-  tonemap {
-    Effect: {shader: shaders.tonemap, params: ToneMapping, order: 900,
-      scale: 1, enabled: false, color: true, texture: textures.display_transform}
+}
+prefab tonemap {
+    Effect: {shader: shaders.tonemap, params: ToneMapping,
+      scale: 1, color: true, texture: textures.display_transform}
     ToneMapping: {white: 1, dither: true, curve: ToneMapNeutral}
-  }
 }

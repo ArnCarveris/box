@@ -1,9 +1,6 @@
 /**
  * @file render/extract_view.c
  * @brief Builds the view array of a packet: one entry per view that renders.
- *
- * A world without View entities gets one view from the active camera, so the
- * packet a scene produces is the same as before views existed.
  */
 
 #include "render_internal.h"
@@ -47,7 +44,6 @@ const void* box_render_view_setting(
  *
  * @param world The world
  * @param state The registry
- * @param e The View entity, 0 for the view a world without views gets
  * @return True when the view lists the layer of a UI tree
  */
 static bool box_view_is_ui(
@@ -223,7 +219,6 @@ static void box_view_targets(
 /** Fill the target, clear color and size of a view from its component.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param p The packet
  * @param v The view to fill
  */
@@ -246,8 +241,7 @@ static void box_view_target(
     v->clear[1] = box_srgb_to_linear(view->clear.g);
     v->clear[2] = box_srgb_to_linear(view->clear.b);
     v->clear[3] = view->clear_alpha;
-    v->shadows = view->shadows ? 1u : 0u;
-    v->effects = view->effects ? 1u : 0u;
+    v->shadows = view->shadows.enabled ? 1u : 0u;
     v->priority = view->priority;
     if (!view->target) {
         goto done;
@@ -474,7 +468,6 @@ done:
  *
  * @param world The world
  * @param state The registry
- * @param e The View entity, 0 for the view a world without views gets
  * @param index Index of the view in the packet
  * @param ui The view draws a UI tree
  * @param v The view to fill
@@ -524,7 +517,6 @@ static void box_view_environment(
  *
  * @param world The world
  * @param state The registry
- * @param e The View entity, 0 for the view a world without views gets
  * @param ui The view draws a UI tree
  * @param v The view to fill
  */
@@ -558,7 +550,6 @@ done:
 /** Copy the culling settings of a view into it, the view first and the singleton after.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param v The view to fill
  */
 static void box_view_cull(
@@ -581,7 +572,6 @@ static void box_view_cull(
  * of the two because a coarser caster hardly shows in a shadow.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param v The view to fill
  */
 static void box_view_lod(
@@ -608,7 +598,6 @@ static void box_view_lod(
  * matches the text box.monitor lays out in points on any display.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param v The view to fill
  */
 static void box_view_overlay(
@@ -696,8 +685,6 @@ static void box_view_fill(
     box_view_t *v = box_vec_push(&p->views);
     bool ui = box_view_is_ui(world, state, src->entity);
     memset(v, 0, sizeof(box_view_t));
-    v->shadows = 1;
-    v->effects = 1;
     box_view_layers(world, state, src->entity, ui, v);
     box_view_target(world, src->entity, p, v);
     box_view_camera(world, src->camera, v);
@@ -737,11 +724,28 @@ static void box_view_fill(
 
     v->dynamic_count = p->dynamic_batches.count - v->dynamic_first;
 
-    const MaterialLayerSettings *settings =
-        box_render_view_setting(world, src->entity, ecs_id(MaterialLayerSettings));
-    const View *view = src->entity ? ecs_get(world, src->entity, View) : NULL;
-    bool enabled = !settings || settings->enabled;
-    v->layers_enabled = enabled && (!view || view->material_layers) ? 1u : 0u;
+    const View *view = ecs_get(world, src->entity, View);
+    int32_t layer_count = 0;
+    const box_layer_t *layers = box_render_layers(world, &layer_count);
+    int32_t selected_count = ecs_vec_count(&view->material_layers);
+    const ViewMaterialLayer *selected = ecs_vec_first_t(
+        &view->material_layers, ViewMaterialLayer);
+    int32_t slot;
+    for (slot = 0; slot < selected_count &&
+        v->material_layer_count < BOX_LAYER_MAX; slot ++)
+    {
+        if (!selected[slot].layer || !selected[slot].enabled) {
+            continue;
+        }
+
+        int32_t layer;
+        for (layer = 0; layer < layer_count; layer ++) {
+            if (layers[layer].entity == selected[slot].layer) {
+                v->material_layers[v->material_layer_count ++] = (uint32_t)layer;
+                break;
+            }
+        }
+    }
 
     if (src->entity) {
         ViewImpl *impl = ecs_get_mut(world, src->entity, ViewImpl);
@@ -792,67 +796,6 @@ ecs_entity_t box_render_primary_view(
     return result;
 }
 
-/** Check whether a view of the frame draws something other than a UI tree.
- *
- * @param world The world
- * @param state The registry
- * @return True when a collected view draws the scene
- */
-static bool box_view_has_scene(
-    ecs_world_t *world,
-    RenderState *state)
-{
-    bool result = false;
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&state->view_list) && !result; i ++) {
-        const box_view_src_t *src = ecs_vec_get_t(&state->view_list, box_view_src_t, i);
-
-        result = !box_view_is_ui(world, state, src->entity);
-    }
-
-    return result;
-}
-
-/** Camera the synthesized view of the frame renders, never one of a UI view.
- *
- * @param world The world
- * @param state The registry
- * @return The camera, 0 when the world holds none
- */
-static ecs_entity_t box_view_scene_camera(
-    ecs_world_t *world,
-    RenderState *state)
-{
-    ecs_entity_t result = 0;
-    if (!state->ui_mask) {
-        result = box_render_active_camera(world);
-        goto done;
-    }
-
-    ecs_iter_t it = ecs_query_iter(world, state->cameras);
-    while (ecs_query_next(&it)) {
-        int32_t i;
-        for (i = 0; i < it.count; i ++) {
-            bool used = false;
-            int32_t v;
-            for (v = 0; v < ecs_vec_count(&state->view_list) && !used; v ++) {
-                const box_view_src_t *src =
-                    ecs_vec_get_t(&state->view_list, box_view_src_t, v);
-
-                used = src->camera == it.entities[i] &&
-                    box_view_is_ui(world, state, src->entity);
-            }
-
-            if (!used && !result) {
-                result = it.entities[i];
-            }
-        }
-    }
-
-done:
-    return result;
-}
-
 void box_render_extract_views(
     ecs_world_t *world,
     RenderState *state,
@@ -863,11 +806,6 @@ void box_render_extract_views(
     p->capture_view = BOX_VIEW_NONE;
     int32_t count = ecs_vec_count(&state->view_list);
     int32_t index = 0;
-    if (!box_view_has_scene(world, state)) {
-        box_view_src_t src = {0};
-        src.camera = capture ? capture : box_view_scene_camera(world, state);
-        box_view_fill(world, state, &src, index ++, p);
-    }
 
     int32_t i;
     for (i = 0; i < count; i ++) {

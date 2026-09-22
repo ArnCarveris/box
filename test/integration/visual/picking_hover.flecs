@@ -75,3 +75,5 @@ terminals {
     TerminalInput: {line: "mouse.sweep 0,270 480,270 2 2"}
   }
 }
+
+view { box.view.View: {camera: camera} }

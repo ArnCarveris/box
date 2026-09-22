@@ -152,6 +152,11 @@ void Order_depth_reaches_the_instance_of_the_packet(void)
 void Order_depth_orders_the_sorted_draws_of_the_view(void)
 {
     // ui/ui_view
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ecs_entity_t scene = ecs_new(w);
+    ecs_set(w, scene, View, {.camera = camera, .enabled = true});
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
     ecs_get_mut(w, root, Ui)->height = 540;

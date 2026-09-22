@@ -75,3 +75,5 @@ panel {
   PbrMaterial: {metallic: 0.9, roughness: 1}
   PbrTextures: {roughness: textures.rough}
 }
+
+view { box.view.View: {camera: camera} }

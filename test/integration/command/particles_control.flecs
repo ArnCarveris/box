@@ -48,3 +48,5 @@ terminals {
     CommandScript: {path: "../../test/integration/command/particles_control.cmd"}
   }
 }
+
+view { box.view.View: {camera: camera} }

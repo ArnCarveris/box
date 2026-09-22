@@ -330,6 +330,8 @@ void Extract_camera_fills_view(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 90});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     box_render_extract(w, &packet);
     test_bool(packet.has_view, true);
     test_flt(packet.view.eye[2], -5);
@@ -340,13 +342,12 @@ void Extract_camera_fills_view(void)
     test_assert(fabsf(packet.view.proj[14] - 0.1f) < 1e-6f);
 }
 
-void Extract_default_camera_without_entity(void)
+void Extract_world_without_view_has_no_view(void)
 {
     // scene_core/render
     box_render_extract(w, &packet);
-    test_bool(packet.has_view, true);
-    test_assert(packet.view.eye[2] < 0);
-    test_assert(packet.view.sun_intensity > 0);
+    test_bool(packet.has_view, false);
+    test_int(packet.views.count, 0);
 }
 
 void Extract_sun_from_directional_light(void)
@@ -356,6 +357,10 @@ void Extract_sun_from_directional_light(void)
     ecs_set(w, sun, Rotation, {3.14159265f / 2, 0, 0});
     ecs_set(w, sun, DirectionalLight, {.intensity = 7});
     ecs_set(w, sun, Rgb, {255, 0, 0});
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     box_render_extract(w, &packet);
     test_flt(packet.view.sun_intensity, 7);
     test_assert(fabsf(packet.view.sun_dir[1] + 1) < 1e-4f);

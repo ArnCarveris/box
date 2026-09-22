@@ -88,3 +88,5 @@ halted {
   ParticlePlayback: {state: ParticleStopped}
   ParticleAppearance: { shape: ParticleCircle, blend: ParticleAdditive }
 }
+
+view { box.view.View: {camera: camera} }

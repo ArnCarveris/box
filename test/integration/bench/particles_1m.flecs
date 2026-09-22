@@ -50,3 +50,5 @@ fountain {
     seed: 21
   }
 }
+
+view { box.view.View: {camera: camera} }

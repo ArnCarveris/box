@@ -240,6 +240,12 @@ void Group_composite_reaches_the_packet_with_its_target(void)
     packet.width = 960;
     packet.height = 540;
 
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ecs_entity_t scene_view = ecs_new(w);
+    ecs_set(w, scene_view, View, {.camera = camera, .enabled = true});
+
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
     ecs_get_mut(w, root, Ui)->height = 540;

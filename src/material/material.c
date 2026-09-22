@@ -120,25 +120,6 @@ static void box_texture_tiling_ctor(
     }
 }
 
-/** MaterialLayerSettings constructor enabling the layers.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_layer_settings_ctor(
-    void *ptr,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    (void)ti;
-    MaterialLayerSettings *s = ptr;
-    int32_t i;
-    for (i = 0; i < count; i ++) {
-        s[i].enabled = true;
-    }
-}
-
 float box_srgb_to_linear(
     uint8_t value)
 {
@@ -172,7 +153,6 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, TextureTiling);
     ECS_META_COMPONENT(world, MaterialLayer);
     ECS_META_COMPONENT(world, LayerParams);
-    ECS_META_COMPONENT(world, MaterialLayerSettings);
     ECS_META_COMPONENT(world, MaterialLayerData);
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);
@@ -185,7 +165,6 @@ void BoxMaterialImport(
     ecs_set_hooks(world, TextureTiling, { .ctor = box_texture_tiling_ctor });
     ecs_set_hooks(world, MaterialLayer, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, LayerParams, { .ctor = flecs_default_ctor });
-    ecs_set_hooks(world, MaterialLayerSettings, { .ctor = box_layer_settings_ctor });
     ecs_set_hooks(world, MaterialLayerData, { .ctor = box_material_layer_data_ctor });
 
     ecs_add_pair(world, ecs_id(TextureTransform), EcsOnInstantiate, EcsInherit);
@@ -198,6 +177,8 @@ void BoxMaterialImport(
     ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(BlendMode), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, ecs_id(BackFaceMode), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(MaterialLayer), EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, ecs_id(LayerParams), EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, DynamicMaterial, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, NoShadow, EcsOnInstantiate, EcsInherit);
     ecs_add_pair(world, MaterialLayerOn, EcsOnInstantiate, EcsInherit);

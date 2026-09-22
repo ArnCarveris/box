@@ -76,3 +76,5 @@ scaling {
 glowing {
   Emissive: {strength: 8, color: {255, 180, 60}}
 }
+
+view { box.view.View: {camera: camera} }

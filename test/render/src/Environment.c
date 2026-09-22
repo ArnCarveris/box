@@ -21,6 +21,8 @@ void Environment_setup(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 }
 
 void Environment_teardown(void)

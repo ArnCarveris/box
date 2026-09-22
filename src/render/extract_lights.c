@@ -27,7 +27,6 @@
 /** Copy the cluster settings of a view into it, filling in defaults.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param v The view to fill
  */
 static void box_light_settings(

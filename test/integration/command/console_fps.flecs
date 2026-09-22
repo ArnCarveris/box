@@ -68,3 +68,5 @@ terminals {
     TerminalInput: {line: "key.type \"fps\n\""}
   }
 }
+
+view { box.view.View: {camera: camera} }

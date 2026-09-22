@@ -74,3 +74,5 @@ ui {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

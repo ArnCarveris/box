@@ -60,3 +60,5 @@ effects {
 const small = box.particle.burst_at(effects.Spark, {-4.5, 1.2, 0}, 0.6)
 const plain = box.particle.burst_at(effects.Spark, {0, 1.4, 0}, 1)
 const large = box.particle.burst_at(effects.Spark, {4.5, 1.8, 0}, 1.8)
+
+view { box.view.View: {camera: camera} }

@@ -129,3 +129,5 @@ row_badge {
     PbrTextures: {albedo: icons.badge_1024}
   }
 }
+
+view { box.view.View: {camera: camera} }

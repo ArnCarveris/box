@@ -88,3 +88,5 @@ runners {
     Rgb: {120, 205, 255}
   }
 }
+
+view { box.view.View: {camera: camera} }

@@ -24,6 +24,8 @@ void Lights_extract_1000_moving(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 20, -60});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_entity_t *lights = ecs_os_malloc_n(ecs_entity_t, BENCH_LIGHT_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_LIGHT_COUNT; i ++) {
@@ -73,6 +75,8 @@ void Lights_extract_1000_culled(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 20, -60});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_entity_t *lights = ecs_os_malloc_n(ecs_entity_t, BENCH_LIGHT_COUNT);
     int32_t i;
     for (i = 0; i < BENCH_LIGHT_COUNT; i ++) {

@@ -17,6 +17,8 @@ void Environment_extract(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 2, -10});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
     ecs_singleton_set(world, EnvironmentLight, {
         .sky_color = {110, 160, 235},
         .ground_color = {150, 110, 70},

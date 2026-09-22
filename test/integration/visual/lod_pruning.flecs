@@ -102,3 +102,5 @@ tower_far {
   Position: {-6, 0, 260}
   Frame: {}
 }
+
+view { box.view.View: {camera: camera} }

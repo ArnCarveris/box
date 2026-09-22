@@ -133,3 +133,5 @@ vertex_alpha {
   }
   PbrMaterial: {metallic: 0.7, roughness: 0.9}
 }
+
+view { box.view.View: {camera: camera} }

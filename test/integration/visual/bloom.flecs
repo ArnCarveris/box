@@ -75,7 +75,7 @@ spark {
   Emissive: {strength: 200, color: {255, 255, 255}}
 }
 
-box { effects { stack { bloom {
-  Effect: {enabled: true}
+post_effects { bloom : box.effects.bloom {
   Bloom: {intensity: 0.22, firefly_clamp: 8}
-} } } }
+} }
+view { box.view.View: {camera: camera, effects: [{effect: post_effects.bloom, enabled: true}]} }

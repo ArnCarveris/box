@@ -10,12 +10,11 @@ ECS_COMPONENT_DECLARE(ViewImpl);
 ECS_COMPONENT_DECLARE(RenderTargetImpl);
 ECS_TAG_DECLARE(Layer);
 
-/** View constructor: everything a view draws is on and the view is enabled.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
+static void box_shadow_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
+
 static void box_view_ctor(
     void *ptr,
     int32_t count,
@@ -29,16 +28,15 @@ static void box_view_ctor(
         v[i].target = 0;
         memset(v[i].layers, 0, sizeof(v[i].layers));
         memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
-        memset(v[i].effect_list, 0, sizeof(v[i].effect_list));
+        box_shadow_ctor(&v[i].shadows, 1, NULL);
+        v[i].effects = (ecs_vec_t){0};
+        v[i].material_layers = (ecs_vec_t){0};
         v[i].clear.r = BOX_VIEW_CLEAR_R;
         v[i].clear.g = BOX_VIEW_CLEAR_G;
         v[i].clear.b = BOX_VIEW_CLEAR_B;
         v[i].clear_alpha = 1.0f;
         v[i].priority = 0;
         v[i].strict_layers = false;
-        v[i].shadows = true;
-        v[i].effects = true;
-        v[i].material_layers = true;
         v[i].enabled = true;
     }
 }
@@ -103,6 +101,7 @@ static void box_shadow_ctor(
     ShadowSettings *s = ptr;
     int32_t i;
     for (i = 0; i < count; i ++) {
+        s[i].enabled = true;
         s[i].cascades = BOX_SHADOW_CASCADES;
         s[i].resolution = BOX_SHADOW_RESOLUTION;
         s[i].max_distance = BOX_SHADOW_DISTANCE;
@@ -122,9 +121,11 @@ void BoxViewImport(
     ECS_IMPORT(world, BoxCamera);
 
     ECS_META_COMPONENT(world, RenderTarget);
-    ECS_META_COMPONENT(world, View);
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, ShadowSettings);
+    ECS_META_COMPONENT(world, ViewEffect);
+    ECS_META_COMPONENT(world, ViewMaterialLayer);
+    ECS_META_COMPONENT(world, View);
     ECS_META_COMPONENT(world, LodSettings);
     ECS_COMPONENT_DEFINE(world, ViewImpl);
     ECS_COMPONENT_DEFINE(world, RenderTargetImpl);

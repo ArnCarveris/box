@@ -35,9 +35,10 @@ void View_defaults_of_a_new_view(void)
     ecs_add(w, e, View);
     const View *v = ecs_get(w, e, View);
     test_bool(v->enabled, true);
-    test_bool(v->shadows, true);
-    test_bool(v->effects, true);
-    test_bool(v->material_layers, true);
+    test_bool(v->shadows.enabled, true);
+    test_int(v->shadows.cascades, BOX_SHADOW_CASCADES);
+    test_int(ecs_vec_count(&v->effects), 0);
+    test_int(ecs_vec_count(&v->material_layers), 0);
     test_uint(v->camera, 0);
     test_uint(v->target, 0);
     test_int(v->priority, 0);
@@ -96,32 +97,15 @@ void View_views_render_in_priority_order(void)
     test_int(((box_view_t*)box_vec_at(&packet.views, 0))->priority, -3);
 }
 
-void View_synthesized_view_matches_an_explicit_one(void)
+void View_world_without_a_view_does_not_render(void)
 {
     // views/view
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {1, 2, -6});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t sun = ecs_new(w);
-    ecs_set(w, sun, Rotation, {0.9f, -0.6f, 0});
-    ecs_set(w, sun, DirectionalLight, {.intensity = 3});
     box_render_extract(w, &packet);
-    test_int(packet.views.count, 1);
-    test_bool(packet.has_view, true);
-    box_view_t implicit = *(box_view_t*)box_vec_at(&packet.views, 0);
-
-    ecs_entity_t e = ecs_new(w);
-    ecs_add(w, e, View);
-    View *e_v = ecs_get_mut(w, e, View);
-    e_v->camera = cam;
-    e_v->priority = 0;
-    ecs_modified(w, e, View);
-    box_packet_reset(&packet);
-    packet.width = 640;
-    packet.height = 480;
-    box_render_extract(w, &packet);
-    box_view_t *explicit_view = box_vec_at(&packet.views, 0);
-    test_int(memcmp(&implicit, explicit_view, BOX_VIEW_UNIFORM_SIZE), 0);
+    test_int(packet.views.count, 0);
+    test_bool(packet.has_view, false);
 }
 
 void View_disabled_view_is_skipped(void)
@@ -164,7 +148,7 @@ void View_view_without_camera_is_skipped(void)
     ecs_set(w, cam, Camera, {.fov = 60});
     ecs_log_set_level(-4);
     box_render_extract(w, &packet);
-    test_int(packet.views.count, 1);
+    test_int(packet.views.count, 0);
     test_bool(ecs_get(w, e, ViewImpl)->warned, true);
     box_packet_reset(&packet);
     packet.width = 640;
@@ -191,8 +175,8 @@ void View_view_with_a_dead_camera_is_skipped(void)
     ecs_log_set_level(-4);
     box_render_extract(w, &packet);
     ecs_log_set_level(0);
-    test_int(packet.views.count, 1);
-    test_bool(packet.has_view, true);
+    test_int(packet.views.count, 0);
+    test_bool(packet.has_view, false);
     test_bool(ecs_get(w, e, ViewImpl)->extracted, false);
 }
 
@@ -367,7 +351,7 @@ void View_cluster_settings_fall_back_to_the_singleton(void)
     test_int(v->cluster.max_lights, BOX_CLUSTER_MAX_LIGHTS);
 }
 
-void View_material_layers_toggle_reaches_the_view(void)
+void View_material_layer_list_reaches_the_view(void)
 {
     // views/view
     ecs_entity_t cam_a = ecs_new(w);
@@ -388,12 +372,19 @@ void View_material_layers_toggle_reaches_the_view(void)
     b_v->camera = cam_b;
     b_v->priority = 1;
     ecs_modified(w, b, View);
+    ecs_entity_t layer = ecs_new(w);
+    ecs_set(w, layer, MaterialLayer, {0});
     a_v = ecs_get_mut(w, a, View);
-    a_v->material_layers = false;
+    ecs_vec_append_t(NULL, &a_v->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){ .layer = layer, .enabled = false };
     ecs_modified(w, a, View);
+    b_v = ecs_get_mut(w, b, View);
+    ecs_vec_append_t(NULL, &b_v->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){ .layer = layer, .enabled = true };
+    ecs_modified(w, b, View);
     box_render_extract(w, &packet);
-    test_int(((box_view_t*)box_vec_at(&packet.views, 0))->layers_enabled, 0);
-    test_int(((box_view_t*)box_vec_at(&packet.views, 1))->layers_enabled, 1);
+    test_int(((box_view_t*)box_vec_at(&packet.views, 0))->material_layer_count, 0);
+    test_int(((box_view_t*)box_vec_at(&packet.views, 1))->material_layer_count, 1);
 }
 
 void View_clear_color_of_a_view_is_linear(void)

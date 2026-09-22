@@ -58,3 +58,5 @@ player {
   FirstPersonController: {}
   Camera: {fov: 65}
 }
+
+view { box.view.View: {camera: player} }

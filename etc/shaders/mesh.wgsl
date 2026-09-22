@@ -314,10 +314,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   s.local = in.bounds_pos;
   s.layer_data = material_layer_data_unpack(
     (in.uv_mode.x & LAYER_DATA_BIT) != 0u, in.uv_mode.z, in.uv_mode.w);
-  var mask = in.uv_mode.x >> u32(MODE_LAYER_SHIFT);
-  if (u.layers_enabled == 0u) {
-    mask = 0u;
-  }
+  let mask = in.uv_mode.x >> u32(MODE_LAYER_SHIFT);
   apply_layers(&s, mask);
   if (u.unlit != 0u) {
     return unlit_shade(in, &s, blend, out_normal, out_indirect);

@@ -10,19 +10,19 @@ layer_shaders {
 }
 
 layers {
-  edge_wear {
+  prefab edge_wear {
     MaterialLayer: {shader: layer_shaders.edge_wear, order: 0}
     LayerParams: {a: {0.78, 0.76, 0.72, 1}, b: {0.08, 0.25, 6, 0}}
   }
-  dust {
+  prefab dust {
     MaterialLayer: {shader: layer_shaders.dust, order: 10}
     LayerParams: {a: {0.72, 0.68, 0.58, 0.85}, b: {6, 0.95, 1.5, 0}}
   }
-  grime {
+  prefab grime {
     MaterialLayer: {shader: layer_shaders.grime, order: 20}
     LayerParams: {a: {0.12, 0.11, 0.09, 1}, b: {4, 0.9, 0, 0}}
   }
-  wetness {
+  prefab wetness {
     MaterialLayer: {shader: layer_shaders.wetness, order: 30}
     LayerParams: {a: {0.05, 0, 0, 0.9}, b: {3, 0, 0.35, 0}}
   }

@@ -51,3 +51,5 @@ terminals {
 $ {
   Console: {open: true}
 }
+
+view { box.view.View: {camera: camera} }

@@ -138,3 +138,5 @@ parent_under_childof {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

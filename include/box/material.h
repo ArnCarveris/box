@@ -156,11 +156,6 @@ ECS_STRUCT(MaterialLayerData, {
     float scale;
 });
 
-/** Whether views apply material layers at all, a singleton that defaults to enabled */
-ECS_STRUCT(MaterialLayerSettings, {
-    bool enabled; /**< Layers registered by the scene are applied */
-});
-
 /** Enables a registered layer on a material as (MaterialLayerOn, layer), inherited */
 extern ECS_TAG_DECLARE(MaterialLayerOn);
 

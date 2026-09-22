@@ -190,3 +190,5 @@ panel_5 {
   PbrMaterial: {roughness: 1}
   BlendMode: {AlphaBlend}
 }
+
+view { box.view.View: {camera: camera} }

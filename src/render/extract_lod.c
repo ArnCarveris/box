@@ -1723,10 +1723,6 @@ static bool box_render_lod_shadow(
         goto done;
     }
 
-    if (!src->entity) {
-        v->shadows = 1;
-    }
-
     bool sun = box_render_view_sun(world, state, v);
     box_render_extract_shadows(world, src->entity, sun, v);
     if (!v->shadow_cascades) {
@@ -1824,15 +1820,6 @@ static int32_t box_render_lod_views(
         }
     }
 
-    if (!count) {
-        box_view_src_t src = { .camera = box_render_active_camera(world) };
-
-        made = box_render_lod_view(world, state, &src, p, view);
-        for (j = 0; j < made; j ++) {
-            ecs_vec_append_t(NULL, &lod->views, box_render_lod_view_t)[0] = view[j];
-        }
-    }
-
     return ecs_vec_count(&lod->views);
 }
 
@@ -1840,7 +1827,6 @@ static int32_t box_render_lod_views(
  *
  * @param world The world
  * @param lod The state
- * @param e The view entity, 0 for the view a world without views gets
  * @param stats What the walk cost
  */
 static void box_render_lod_publish(

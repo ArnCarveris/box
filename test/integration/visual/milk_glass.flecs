@@ -78,3 +78,5 @@ clear {
   PbrMaterial: {roughness: 0}
   BlendMode: {AlphaBlend}
 }
+
+view { box.view.View: {camera: camera} }

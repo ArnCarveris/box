@@ -47,3 +47,5 @@ panels {
     PbrTextures: {albedo: icons.large}
   }
 }
+
+view { box.view.View: {camera: camera} }

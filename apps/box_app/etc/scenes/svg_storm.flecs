@@ -2,6 +2,7 @@ using box.transform
 using box.geometry
 using box.material
 using box.camera
+using box.view
 using box.light
 using box.texture
 using box.script
@@ -30,6 +31,8 @@ camera {
   LookAt: {0, 0, 0}
   Camera: {fov: 60}
 }
+
+view { View: {camera: camera} }
 
 sun {
   Rotation: {0.3, 0.2, 0}

@@ -91,13 +91,15 @@ pillar {
   PbrMaterial: {roughness: 0.9}
 }
 
-box { effects { stack {
-  gtao {
-    Effect: {enabled: false}
+post_effects {
+  gtao : box.effects.gtao {
     Gtao: {radius: 2.5, slices: 4, steps: 10, power: 2, temporal: true, half_res: true}
   }
-  tonemap {
-    Effect: {enabled: true}
+  tonemap : box.effects.tonemap {
     ToneMapping: {white: 1, dither: true}
   }
-} } }
+}
+view { box.view.View: {camera: camera, effects: [
+  {effect: post_effects.gtao, enabled: false},
+  {effect: post_effects.tonemap, enabled: true}
+]} }

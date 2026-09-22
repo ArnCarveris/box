@@ -30,7 +30,7 @@
                     "bounds_written_in_the_delta",
                     "bounds_cover_a_rotated_instance",
                     "camera_fills_view",
-                    "default_camera_without_entity",
+                    "world_without_view_has_no_view",
                     "sun_from_directional_light",
                     "mesh_shared_between_same_shapes",
                     "different_segments_different_mesh",
@@ -157,7 +157,7 @@
                 "id": "Capture",
                 "testcases": [
                     "component_consumed_by_extract",
-                    "camera_becomes_the_view",
+                    "explicit_view_uses_capture_camera",
                     "two_cameras_over_two_frames",
                     "overrides_write_to_file",
                     "write_to_file_kept_without_component",
@@ -318,7 +318,8 @@
                     "transparent_instance_keeps_the_bit",
                     "params_reach_the_packet",
                     "params_update_on_change",
-                    "settings_flag_reaches_the_view",
+                    "view_layer_list_reaches_the_packet",
+                    "view_layer_list_preserves_order",
                     "project_layer_gets_a_bit",
                     "limit_is_an_error_logged_once",
                     "scene_without_layers_keeps_the_flag_off"

@@ -18,8 +18,10 @@ const ShadowSettings* box_render_shadow_settings(
     ecs_entity_t e,
     ShadowSettings *out)
 {
-    const ShadowSettings *set = box_render_view_setting(world, e, ecs_id(ShadowSettings));
+    const View *view = e ? ecs_get(world, e, View) : NULL;
+    const ShadowSettings *set = view ? &view->shadows : NULL;
     ShadowSettings s = {
+        .enabled = true,
         .cascades = BOX_SHADOW_CASCADES,
         .resolution = BOX_SHADOW_RESOLUTION,
         .max_distance = BOX_SHADOW_DISTANCE,

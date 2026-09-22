@@ -1,22 +1,3 @@
-/**
- * @file box/effects.h
- * @brief Post process effects: entities with a shader, an order and declared inputs.
- *
- * An effect is an entity with an Effect component that names a Shader entity and
- * declares which inputs its pass reads. The passes of a view run after the
- * transparent pass and before the capture, each reading what the pass before it
- * wrote and the last one writing the image of the view.
- *
- * A View that lists effects in `effect_list` runs those, a View that lists none
- * runs every enabled effect of the world in `order`, and `View.effects` turns the
- * whole chain off. Enabling or disabling an effect entity, changing its order or
- * changing the list of a view reconfigures the chain on the next frame.
- *
- * The parameters of an effect come from the first other reflected struct on its
- * entity, copied into the uniform block the shader reads as `fx.params`, so a
- * project adds a parameter component without touching the renderer.
- */
-
 #ifndef BOX_EFFECTS_H
 #define BOX_EFFECTS_H
 
@@ -70,9 +51,7 @@ ECS_STRUCT(Effect, {
     ecs_entity_t params;
     ecs_entity_t setup;
     ecs_entity_t texture;
-    int32_t order;       /**< Order in the chain, the lowest runs first */
     float scale;         /**< Resolution scale of its output, 0 and 1 are the view size */
-    bool enabled;        /**< The pass runs, default true */
     bool color;          /**< The pass reads the image so far, default true */
     bool depth;          /**< The pass reads the depth target of the view */
     bool normals;        /**< The pass reads the world normals of the view */
@@ -81,7 +60,6 @@ ECS_STRUCT(Effect, {
 
 #define BOX_EFFECTS_BUILTINS "etc/box/effects.flecs"
 
-/** Effects a view can chain, which the effect_list of a View spells out */
 #define BOX_EFFECTS_MAX (8)
 
 /** Register the box.effects module.

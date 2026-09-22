@@ -67,3 +67,5 @@ for i in 0..10000 {
     BenchQuad: {1, 1, 1, 1}
   }
 }
+
+view { box.view.View: {camera: camera} }

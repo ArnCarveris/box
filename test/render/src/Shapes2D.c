@@ -188,6 +188,10 @@ void Shapes2D_a_radius_change_re_extracts_the_instance(void)
 void Shapes2D_a_border_survives_the_sorted_pass(void)
 {
     // shapes_2d/primitives
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(w);
 
     ecs_set(w, e, Position, {0, 0, 0});

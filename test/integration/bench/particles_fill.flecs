@@ -86,3 +86,5 @@ haze {
     shape: ParticleSprite, blend: ParticleAdditive, texture: puff, softness: 1.2
   }
 }
+
+view { box.view.View: {camera: camera} }

@@ -111,9 +111,7 @@ static void box_ui_group_create(
         .clear_alpha = 0,
         .priority = priority,
         .strict_layers = true,
-        .shadows = false,
-        .effects = false,
-        .material_layers = true,
+        .shadows = { .enabled = false },
         .enabled = true
     });
 

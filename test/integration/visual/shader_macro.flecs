@@ -53,3 +53,5 @@ box {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

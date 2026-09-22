@@ -173,3 +173,5 @@ debris {
     shape: ParticleBillboard, blend: ParticleAlpha, mesh: star
   }
 }
+
+view { box.view.View: {camera: camera} }

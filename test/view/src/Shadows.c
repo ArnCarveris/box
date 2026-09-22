@@ -271,10 +271,9 @@ void Shadows_casters_respect_shadow_layers(void)
     test_bool(box_view_casts(v, 0), true);
 }
 
-void Shadows_settings_fall_back_to_the_singleton(void)
+void Shadows_settings_belong_to_the_view(void)
 {
     // views/shadows
-    ecs_singleton_set(w, ShadowSettings, {.cascades = 2, .max_distance = 50});
     ecs_entity_t sun = ecs_new(w);
     ecs_set(w, sun, Rotation, {0.9f, -0.6f, 0});
     ecs_set(w, sun, DirectionalLight, {.intensity = 3});
@@ -283,7 +282,10 @@ void Shadows_settings_fall_back_to_the_singleton(void)
     ecs_set(w, cam, Camera, {.fov = 60, .near_ = 0.5f, .far_ = 500});
     ecs_entity_t view = ecs_new(w);
     ecs_add(w, view, View);
-    ecs_get_mut(w, view, View)->camera = cam;
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    settings->shadows.cascades = 2;
+    settings->shadows.max_distance = 50;
     ecs_modified(w, view, View);
     box_render_extract(w, &packet);
 
@@ -292,7 +294,11 @@ void Shadows_settings_fall_back_to_the_singleton(void)
     test_flt(v->shadow_distance, 50.0f);
     test_int(v->shadow_resolution, BOX_SHADOW_RESOLUTION);
 
-    ecs_set(w, view, ShadowSettings, {.cascades = 3, .resolution = 512});
+    settings = ecs_get_mut(w, view, View);
+    settings->shadows.cascades = 3;
+    settings->shadows.resolution = 512;
+    settings->shadows.max_distance = BOX_SHADOW_DISTANCE;
+    ecs_modified(w, view, View);
     box_packet_reset(&packet);
     packet.width = 640;
     packet.height = 480;
@@ -307,10 +313,16 @@ void Shadows_settings_are_clamped(void)
 {
     // views/shadows
     ecs_entity_t view = ecs_new(w);
-    ecs_set(w, view, ShadowSettings, {
-        .cascades = 9, .resolution = 0, .filter_size = 99, .split_lambda = 5.0f,
-        .fade = -1.0f, .depth_bias = -2.0f, .max_distance = 0
-    });
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->shadows.cascades = 9;
+    settings->shadows.resolution = 0;
+    settings->shadows.filter_size = 99;
+    settings->shadows.split_lambda = 5.0f;
+    settings->shadows.fade = -1.0f;
+    settings->shadows.depth_bias = -2.0f;
+    settings->shadows.max_distance = 0;
+    ecs_modified(w, view, View);
 
     ShadowSettings s;
     box_render_shadow_settings(w, view, &s);
@@ -337,7 +349,7 @@ void Shadows_view_without_shadows_has_no_cascades(void)
     ecs_get_mut(w, view, View)->camera = cam;
     ecs_modified(w, view, View);
     View *settings = ecs_get_mut(w, view, View);
-    settings->shadows = false;
+    settings->shadows.enabled = false;
     ecs_modified(w, view, View);
     box_render_extract(w, &packet);
 

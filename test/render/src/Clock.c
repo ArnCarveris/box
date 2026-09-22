@@ -302,6 +302,8 @@ void Clock_the_moon_phase_of_the_sky_follows_the_clock(void)
     ecs_entity_t camera = ecs_new(w);
     ecs_set(w, camera, Position, {0, 0, 0});
     ecs_set(w, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = camera, .enabled = true});
     ecs_set(w, clock_entity, TimeOfDay, {
         .day_of_year = 81, .hour = 0, .latitude = 40, .moon_position_offset = 12});
     ecs_progress(w, 0);

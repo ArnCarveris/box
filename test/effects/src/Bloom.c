@@ -8,6 +8,7 @@ static ecs_world_t *w;
 static box_renderer_t *renderer;
 static ecs_entity_t bloom;
 static ecs_entity_t bloom_params;
+static ecs_entity_t bloom_view;
 
 static void bloom_set(
     float temporal)
@@ -33,10 +34,16 @@ void Bloom_setup(void)
     ecs_entity_t cam = ecs_entity(w, { .name = "camera" });
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
-    bloom = ecs_lookup(w, "box.effects.stack.bloom");
+    ecs_entity_t definition = ecs_lookup(w, "box.effects.bloom");
+    bloom = ecs_new_w_pair(w, EcsIsA, definition);
     bloom_params = ecs_lookup(w, "box.effects.Bloom");
-    ecs_get_mut(w, bloom, Effect)->enabled = true;
-    ecs_modified(w, bloom, Effect);
+    bloom_view = ecs_new(w);
+    ecs_add(w, bloom_view, View);
+    View *settings = ecs_get_mut(w, bloom_view, View);
+    settings->camera = cam;
+    ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
+        (ViewEffect){.effect = bloom, .enabled = true};
+    ecs_modified(w, bloom_view, View);
     bloom_set(0.8f);
     renderer = box_renderer_create(&(box_renderer_desc_t){ .width = 64, .height = 32 });
     test_assert(renderer != NULL);
@@ -93,9 +100,12 @@ void Bloom_growing_effect_stack_rebinds_uniforms(void)
 {
     box_gpu_view_t *v = bloom_frame(1, 64, 32);
     test_assert(v->setup_mip_uniform == renderer->effect_uniform);
-    ecs_entity_t tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
+    ecs_entity_t definition = ecs_lookup(w, "box.effects.tonemap");
+    ecs_entity_t tonemap = ecs_new_w_pair(w, EcsIsA, definition);
+    View *settings = ecs_get_mut(w, bloom_view, View);
+    ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
+        (ViewEffect){.effect = tonemap, .enabled = true};
+    ecs_modified(w, bloom_view, View);
     v = bloom_frame(2, 64, 32);
     test_assert(renderer->effect_uniform_slots >= 2);
     test_assert(v->setup_mip_uniform == renderer->effect_uniform);
@@ -108,13 +118,12 @@ void Bloom_history_is_separate_for_each_view(void)
     ecs_entity_t cam = ecs_entity(w, { .name = "second_camera" });
     ecs_set(w, cam, Position, {0, 0, -10});
     ecs_set(w, cam, Camera, {.fov = 60});
-    ecs_entity_t first_view = ecs_new(w);
-    ecs_add(w, first_view, View);
-    ecs_get_mut(w, first_view, View)->camera = ecs_lookup(w, "camera");
-    ecs_modified(w, first_view, View);
     ecs_entity_t second_view = ecs_new(w);
     ecs_add(w, second_view, View);
-    ecs_get_mut(w, second_view, View)->camera = cam;
+    View *settings = ecs_get_mut(w, second_view, View);
+    settings->camera = cam;
+    ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
+        (ViewEffect){.effect = bloom, .enabled = true};
     ecs_modified(w, second_view, View);
     bloom_frame(1, 64, 32);
     test_int(renderer->views.count, 2);

@@ -58,3 +58,5 @@ terminals {
     CommandScript: {path: "../../test/integration/command/render.cmd"}
   }
 }
+
+view { box.view.View: {camera: scene.camera} }

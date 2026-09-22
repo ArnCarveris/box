@@ -23,6 +23,8 @@ void Gpu_timings_are_off_until_they_are_asked_for(void)
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 55});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0.5f, 0});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -59,6 +61,8 @@ void Gpu_enabled_timings_report_the_passes_of_a_frame(void)
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 55});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t sun = ecs_new(w);
     ecs_set(w, sun, Rotation, {0.9f, -0.6f, 0});
     ecs_set(w, sun, DirectionalLight, {.intensity = 1});
@@ -111,6 +115,8 @@ void Gpu_disabled_timings_stop_the_queries(void)
     ecs_set(w, cam, Position, {0, 4, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 55});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0.5f, 0});
     ecs_set(w, e, Box, {1, 1, 1});

@@ -70,3 +70,5 @@ terminals {
     TerminalInput: {line: "mouse.move 480,440"}
   }
 }
+
+view { box.view.View: {camera: camera} }

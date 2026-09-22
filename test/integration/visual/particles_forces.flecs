@@ -81,3 +81,5 @@ sparks {
   ParticleForces: {gravity: {0, -200, 0}}
   ParticleCollision: {ground: true, height: 0, reach: 6, bounce: 0.2, friction: 0.55}
 }
+
+view { box.view.View: {camera: camera} }

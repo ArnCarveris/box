@@ -283,30 +283,32 @@ arch {
   PbrMaterial: {roughness: 0.7}
 }
 
-box { effects { stack {
-  gtao {
-    Effect: {enabled: false}
+post_effects {
+  gtao : box.effects.gtao {
     Gtao: {radius: 2.5, slices: 4, steps: 10, power: 2, temporal: true, half_res: true}
   }
-  ssr {
-    Effect: {enabled: false}
+  ssr : box.effects.ssr {
     Ssr: {steps: 32, thickness: 0.5, max_roughness: 0.6, intensity: 1, fade: 0.12}
   }
-  fog {
-    Effect: {enabled: false}
+  fog : box.effects.fog {
     Fog: {color: {0.58, 0.63, 0.72}, density: 0.03, falloff: 0.22, start: 6,
           max_opacity: 0.92, height: 1}
   }
-  bloom {
-    Effect: {enabled: false}
+  bloom : box.effects.bloom {
     Bloom: {intensity: 0.14, firefly_clamp: 8}
   }
-  auto_exposure {
-    Effect: {enabled: false}
+  auto_exposure : box.effects.auto_exposure {
     AutoExposure: {speed_up: 400, speed_down: 400, min_ev: -3, max_ev: 4, target: 0.18}
   }
-  tonemap {
-    Effect: {enabled: false}
+  tonemap : box.effects.tonemap {
     ToneMapping: {white: 1, dither: true}
   }
-} } }
+}
+view { box.view.View: {camera: camera, effects: [
+  {effect: post_effects.gtao, enabled: false},
+  {effect: post_effects.ssr, enabled: false},
+  {effect: post_effects.fog, enabled: false},
+  {effect: post_effects.bloom, enabled: false},
+  {effect: post_effects.auto_exposure, enabled: false},
+  {effect: post_effects.tonemap, enabled: false}
+]} }

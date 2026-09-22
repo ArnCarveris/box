@@ -73,7 +73,7 @@ lamp {
   Emissive: {strength: 1.5, color: {255, 190, 120}}
 }
 
-box { effects { stack { auto_exposure {
-  Effect: {enabled: true}
+post_effects { auto_exposure : box.effects.auto_exposure {
   AutoExposure: {speed_up: 400, speed_down: 400, min_ev: -4, max_ev: 6, target: 0.25}
-} } } }
+} }
+view { box.view.View: {camera: camera, effects: [{effect: post_effects.auto_exposure, enabled: true}]} }

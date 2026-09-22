@@ -81,3 +81,5 @@ tower_right {
   Position: {6.5, 0, 4}
   Tower: {}
 }
+
+view { box.view.View: {camera: camera} }

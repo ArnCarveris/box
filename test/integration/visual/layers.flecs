@@ -107,3 +107,5 @@ all_ball : prefabs.Ball {
   (MaterialLayerOn, box.material.layers.grime)
   (MaterialLayerOn, box.material.layers.wetness)
 }
+
+view { box.view.View: {camera: camera} }

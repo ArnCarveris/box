@@ -66,15 +66,24 @@ char* box_shader_layers_wgsl(
         box_shader_layer_body(world, layer, i, &buf);
     }
 
-    ecs_strbuf_appendstr(&buf, "fn apply_layers(s: ptr<function, Surface>, mask: u32) {\n");
+    ecs_strbuf_appendstr(&buf,
+        "fn apply_layers(s: ptr<function, Surface>, mask: u32) {\n"
+        "  for (var slot = 0u; slot < u.material_layer_count; slot++) {\n"
+        "    let packed = u.material_layers[slot / 4u];\n"
+        "    let index = packed[slot % 4u];\n"
+        "    switch index {\n");
     for (i = 0; i < count; i ++) {
         snprintf(line, sizeof(line),
-            "  if ((mask & %uu) != 0u) { layer_%d(s, layer_params.p[%d]); }\n",
-            1u << i, i, i);
+            "      case %du: { if ((mask & %uu) != 0u) { layer_%d(s, layer_params.p[%d]); } }\n",
+            i, 1u << i, i, i);
         ecs_strbuf_appendstr(&buf, line);
     }
 
-    ecs_strbuf_appendstr(&buf, "}\n");
+    ecs_strbuf_appendstr(&buf,
+        "      default: {}\n"
+        "    }\n"
+        "  }\n"
+        "}\n");
 
     return ecs_strbuf_get(&buf);
 }

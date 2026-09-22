@@ -113,9 +113,7 @@ static ecs_entity_t box_ui_create_view(
         .clear_alpha = 1.0f,
         .priority = priority,
         .strict_layers = true,
-        .shadows = false,
-        .effects = false,
-        .material_layers = true,
+        .shadows = { .enabled = false },
         .enabled = true
     });
 

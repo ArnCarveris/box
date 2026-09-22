@@ -75,6 +75,10 @@ void Material_new_child_inherits_tint(void)
 void Material_instance_color_uses_tint_and_opacity(void)
 {
     // scene_core/material
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t parent = ecs_new(w);
     ecs_set(w, parent, Tint, {255, 0, 255, 128});
     ecs_entity_t e = ecs_new_w_pair(w, EcsChildOf, parent);

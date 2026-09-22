@@ -41,7 +41,15 @@ void ToneMap_setup(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
-    tonemap = ecs_lookup(w, "box.effects.stack.tonemap");
+    ecs_entity_t definition = ecs_lookup(w, "box.effects.tonemap");
+    tonemap = ecs_new_w_pair(w, EcsIsA, definition);
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
+        (ViewEffect){.effect = tonemap, .enabled = true};
+    ecs_modified(w, view, View);
     tonemap_params = ecs_lookup(w, "box.effects.ToneMapping");
 }
 
@@ -65,8 +73,6 @@ void ToneMap_the_neutral_curve_is_the_default(void)
     // ore_engine/tonemap_operators
     test_assert(tonemap != 0);
     tonemap_set(1, true, 0);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
@@ -80,8 +86,6 @@ void ToneMap_the_curve_reaches_the_parameter_block(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(2, true, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
@@ -95,8 +99,6 @@ void ToneMap_the_tony_pass_reads_the_lookup(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(1, false, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effects.count, 1);
@@ -109,8 +111,6 @@ void ToneMap_the_cube_reaches_the_packet_once(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(1, false, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effect_texture_create.count, 1);
@@ -129,8 +129,6 @@ void ToneMap_the_lookup_maps_black_to_black(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(1, false, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effect_texture_create.count, 1);
@@ -152,8 +150,6 @@ void ToneMap_the_lookup_rises_with_the_stimulus(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(1, false, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effect_texture_create.count, 1);
@@ -183,8 +179,6 @@ void ToneMap_the_lookup_desaturates_a_bright_color(void)
 {
     // ore_engine/tonemap_operators
     tonemap_set(1, false, 1);
-    ecs_get_mut(w, tonemap, Effect)->enabled = true;
-    ecs_modified(w, tonemap, Effect);
     box_render_extract(w, &packet);
 
     test_int(packet.effect_texture_create.count, 1);

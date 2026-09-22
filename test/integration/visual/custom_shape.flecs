@@ -58,3 +58,5 @@ pillar {
   Rgb: {170, 170, 175}
   PbrMaterial: {roughness: 0.8}
 }
+
+view { box.view.View: {camera: camera} }

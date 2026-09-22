@@ -54,12 +54,12 @@
                     "view_follows_the_points_of_the_surface",
                     "scale_divides_the_height_of_the_surface",
                     "view_renders_after_the_view_of_the_scene",
-                    "scene_view_is_synthesized_next_to_a_ui_view",
+                    "explicit_scene_view_renders_next_to_a_ui_view",
                     "scene_view_hides_the_tree",
                     "ui_view_draws_the_tree_only",
                     "ui_view_has_no_sun_no_lights_and_a_flat_environment",
                     "two_trees_reach_their_own_view",
-                    "existing_scene_view_is_not_synthesized_twice"
+                    "explicit_scene_view_is_not_duplicated"
                 ],
                 "setup": true,
                 "teardown": true

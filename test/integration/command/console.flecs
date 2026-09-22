@@ -74,3 +74,5 @@ terminals {
     TerminalInput: {line: "key.type \"man capture\n\""}
   }
 }
+
+view { box.view.View: {camera: camera} }

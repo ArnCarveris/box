@@ -42,13 +42,16 @@ $ { Weather: {overcast: 1} }
 
 $ { EnvironmentLight: {intensity: 1, source: atmosphere} }
 
-box { effects { stack {
-  fog { Effect: {enabled: true} }
-  tonemap {
-    Effect: {enabled: true}
+post_effects {
+  fog : box.effects.fog {}
+  tonemap : box.effects.tonemap {
     ToneMapping: {white: 1.2, dither: false}
   }
-} } }
+}
+view { box.view.View: {camera: camera, effects: [
+  {effect: post_effects.fog, enabled: true},
+  {effect: post_effects.tonemap, enabled: true}
+]} }
 
 ground {
   Position: {0, -0.5, 0}

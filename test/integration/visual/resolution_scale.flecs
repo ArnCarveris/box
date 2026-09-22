@@ -87,3 +87,5 @@ ui {
     Rgb: {200, 225, 240}
   }
 }
+
+view { box.view.View: {camera: camera} }

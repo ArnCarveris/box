@@ -6,3 +6,5 @@ camera {
   LookAt: {0, 1, 0}
   Camera: {fov: 55}
 }
+
+view { box.view.View: {camera: camera} }

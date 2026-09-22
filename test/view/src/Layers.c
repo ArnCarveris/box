@@ -446,6 +446,8 @@ void Layers_scene_without_layers_keeps_its_packet(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t light = ecs_new(w);
     ecs_set(w, light, Position, {0, 2, 0});
     ecs_set(w, light, PointLight, {.intensity = 1, .range = 8});

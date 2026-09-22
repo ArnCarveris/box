@@ -93,3 +93,5 @@ city {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

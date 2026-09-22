@@ -188,7 +188,6 @@ done:
  * threshold of zero, which holds every shape it draws at its authored level.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param camera The camera the view renders
  * @param viewport_px Height of the surface in pixels
  * @param out Receives the view
@@ -261,13 +260,6 @@ static int32_t box_mesh_lod_views(
         }
 
         enabled = enabled || view.threshold > 0.0f;
-        ecs_vec_append_t(NULL, &state->views, box_mesh_lod_view_t)[0] = view;
-    }
-
-    if (!count && box_mesh_lod_view(world, 0, box_render_active_camera(world),
-        viewport_px, &view))
-    {
-        enabled = view.threshold > 0.0f;
         ecs_vec_append_t(NULL, &state->views, box_mesh_lod_view_t)[0] = view;
     }
 

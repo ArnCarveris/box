@@ -104,3 +104,5 @@ tower_far {
   Frame: {}
   LodPin
 }
+
+view { box.view.View: {camera: camera} }

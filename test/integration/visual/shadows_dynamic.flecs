@@ -118,3 +118,5 @@ movers {
     }
   }
 }
+
+view { box.view.View: {camera: camera} }

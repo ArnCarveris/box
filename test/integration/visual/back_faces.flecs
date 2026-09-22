@@ -122,3 +122,5 @@ culled_right {
   PbrTextures: {albedo: textures.checker}
   BackFaceMode: {BackFaceCull}
 }
+
+view { box.view.View: {camera: camera} }

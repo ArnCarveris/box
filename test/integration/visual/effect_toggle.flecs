@@ -44,7 +44,8 @@ cylinder {
   Rgb: {90, 210, 130}
 }
 
-grade {
-  Effect: {shader: box.effects.shaders.color_grade, order: 100, scale: 1, enabled: true, color: true}
+grade : box.effects.color_grade {
   ColorGrade: {exposure: 0.7, saturation: 1.8}
 }
+
+view { box.view.View: {camera: camera, effects: [{effect: grade, enabled: true}]} }

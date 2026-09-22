@@ -111,3 +111,5 @@ lamps {
     Hidden
   }
 }
+
+view { box.view.View: {camera: camera} }

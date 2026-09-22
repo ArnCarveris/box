@@ -37,6 +37,8 @@ void Bake_invalidate_one_of_100k(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, -160});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
 
     int32_t i;
     for (i = 0; i < BENCH_STATIC_LIGHTS; i ++) {
@@ -98,6 +100,8 @@ void Bake_probe_count_100k(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, -160});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
 
     int32_t i;
     for (i = 0; i < BENCH_STATIC_LIGHTS; i ++) {
@@ -146,6 +150,8 @@ void Bake_churn_1000_of_100k(bench_t *b)
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, -160});
     ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .enabled = true});
 
     ecs_entity_t sun = ecs_new(world);
     ecs_set(world, sun, Position, {0, 100, 0});

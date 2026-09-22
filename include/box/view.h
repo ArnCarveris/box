@@ -2,20 +2,6 @@
  * @file box/view.h
  * @brief View and render target components: what a frame draws and where.
  *
- * A View binds a camera to a target and carries the toggles of the frame it
- * produces. Views render in priority order, lowest first, and a world without
- * any View renders the active camera into the surface as before.
- *
- * ClusterSettings, EnvironmentLight and MaterialLayerSettings are read from the
- * View entity first and from their singleton when the view does not carry them,
- * so a singleton is the default of every view and a component on a view
- * overrides it for that view only. BakeSettings follows the same rule through
- * the first view of the frame, because the probe bake is shared by every view.
- *
- * CullSettings and ShadowSettings follow the same rule: a view without one culls
- * and shadows with the settings of the singleton, and a world without either
- * uses the defaults.
- *
  * LodSettings follows it too and holds the screen space error thresholds the
  * LOD selection of the view measures against, with a more aggressive threshold
  * for its shadow passes.
@@ -49,44 +35,8 @@ ECS_STRUCT(RenderTarget, {
     int32_t height;  /**< Height in pixels */
 });
 
-/** Binds a camera to a render target and decides what the frame draws */
-ECS_STRUCT(View, {
-    ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
-    ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
-    ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
-    ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
-    ecs_entity_t effect_list[8];   /**< Effects the view runs, empty runs the global stack */
-    rgb clear;            /**< Color the target is cleared to */
-    float clear_alpha;    /**< Alpha the target is cleared to */
-    int32_t priority;     /**< Order in the frame, lower renders first */
-    bool strict_layers;   /**< A view with layers draws only members, default false */
-    bool shadows;         /**< The view casts and receives shadows, default true */
-    bool effects;         /**< The view runs its post process effects, default true */
-    bool material_layers; /**< The view applies material layers, default true */
-    bool enabled;         /**< The view is rendered, default true */
-});
-
-/** Entries of the layer lists of a view, which the ECS_STRUCT above spells out */
-#define BOX_VIEW_LAYER_MAX (8)
-
-/** Membership of an entity or a light in a layer, given as the pair (Layer, layer).
- *
- * The relationship fragments, so a view finds the entities of a layer without
- * testing every entity, and it is not exclusive, so an entity may hold more than
- * one pair. It is inherited on instantiation, so an instance of a prefab joins
- * the layers of that prefab.
- */
-extern ECS_TAG_DECLARE(Layer);
-
-/** Cascaded shadow maps of a view, with the singleton as its default.
- *
- * The cascades split the camera frustum between its near plane and max_distance,
- * split_lambda blending a logarithmic split with a uniform one. depth_bias and
- * normal_offset are given in texels of the cascade, so they hold their meaning
- * at any resolution. A value of zero takes the default of cascades, resolution,
- * max_distance and filter_size; a bias of zero is a bias of zero.
- */
 ECS_STRUCT(ShadowSettings, {
+    bool enabled;
     int32_t cascades;    /**< Cascades of the shadow map, default 4, at most 4 */
     int32_t resolution;  /**< Edge of one cascade in texels, default 2048 */
     float max_distance;  /**< View distance the shadows reach, default 200 */
@@ -96,6 +46,34 @@ ECS_STRUCT(ShadowSettings, {
     int32_t filter_size; /**< PCF taps per axis, default 3, at most 7 */
     float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
 });
+
+ECS_STRUCT(ViewEffect, {
+    ecs_entity_t effect;
+    bool enabled;
+});
+
+ECS_STRUCT(ViewMaterialLayer, {
+    ecs_entity_t layer;
+    bool enabled;
+});
+
+ECS_STRUCT(View, {
+    ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
+    ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
+    ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
+    ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
+    ShadowSettings shadows;
+    ecs_vec(ViewEffect) effects;
+    ecs_vec(ViewMaterialLayer) material_layers;
+    rgb clear;            /**< Color the target is cleared to */
+    float clear_alpha;    /**< Alpha the target is cleared to */
+    int32_t priority;     /**< Order in the frame, lower renders first */
+    bool strict_layers;   /**< A view with layers draws only members, default false */
+    bool enabled;         /**< The view is rendered, default true */
+});
+
+#define BOX_VIEW_LAYER_MAX (8)
+extern ECS_TAG_DECLARE(Layer);
 
 /** Cascades a view splits its shadow map into by default */
 #define BOX_SHADOW_CASCADES (4)

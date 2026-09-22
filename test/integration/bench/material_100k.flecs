@@ -34,3 +34,5 @@ for i in 0..10000 {
     Emissive: {strength: 1, color: {255, 100, 0}}
   }
 }
+
+view { box.view.View: {camera: camera} }

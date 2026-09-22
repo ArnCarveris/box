@@ -68,13 +68,15 @@ sphere {
   PbrMaterial: {roughness: 0.15, metallic: 0.9}
 }
 
-box { effects { stack {
-  ssr {
-    Effect: {enabled: true}
+post_effects {
+  ssr : box.effects.ssr {
     Ssr: {steps: 32, thickness: 0.5, max_roughness: 0.6, intensity: 1, fade: 0.12}
   }
-  tonemap {
-    Effect: {enabled: true}
+  tonemap : box.effects.tonemap {
     ToneMapping: {white: 1, dither: true}
   }
-} } }
+}
+view { box.view.View: {camera: camera, effects: [
+  {effect: post_effects.ssr, enabled: true},
+  {effect: post_effects.tonemap, enabled: true}
+]} }

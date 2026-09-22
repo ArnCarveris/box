@@ -271,32 +271,6 @@ static ecs_entity_t box_render_cmd_view(
     return result;
 }
 
-/** Keep the scene on the surface while the temporary view of a render exists.
- *
- * A world without views renders its active camera into the surface, which the
- * temporary view of a render would take over. The session gets a view of its
- * own for the active camera, which is deleted with the last render.
- *
- * @param world The world
- * @param s The session state
- */
-static void box_render_cmd_keep_surface(
-    ecs_world_t *world,
-    TerminalSession *s)
-{
-    ecs_entity_t camera = box_render_active_camera(world);
-    if (s->view || !camera || ecs_count_id(world, ecs_id(View))) {
-        goto done;
-    }
-
-    s->view = ecs_new(world);
-    View *view = ecs_ensure(world, s->view, View);
-    view->camera = camera;
-    ecs_modified(world, s->view, View);
-done:
-    return;
-}
-
 /** Delete the temporary entities of a render and release its path.
  *
  * @param world The world
@@ -409,11 +383,6 @@ static void box_render_cmd_tick(
         ecs_vec_remove_t(&s->renders, box_render_job_t, i);
     }
 
-    if (s->view && !ecs_vec_count(&s->renders)) {
-        ecs_delete(world, s->view);
-        s->view = 0;
-    }
-
 }
 
 /** Advance the renders of every session once per frame.
@@ -463,7 +432,6 @@ static char* box_render_cmd_start(
     job.light = ecs_new(world);
     ecs_set(world, job.light, DirectionalLight, { .intensity = BOX_RENDER_CMD_LIGHT });
     ecs_add_pair(world, job.light, Layer, job.layer);
-    box_render_cmd_keep_surface(world, s);
     job.view = box_render_cmd_view(world, &job);
 
     char *result = flecs_asprintf("render_%d_%d.png", app->frame, s->render_count ++);

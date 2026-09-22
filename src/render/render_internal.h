@@ -120,7 +120,7 @@ typedef struct box_modulator_t {
 
 /** One view of the frame, in the order the views are rendered */
 typedef struct box_view_src_t {
-    ecs_entity_t entity;  /**< The View entity, 0 for the view a world without views gets */
+    ecs_entity_t entity;
     ecs_entity_t camera;  /**< Camera the view renders */
     int32_t priority;     /**< Order in the frame, lower renders first */
 } box_view_src_t;
@@ -993,7 +993,6 @@ void box_render_extract_dynamic(
  * @param world The world
  * @param state The registry
  * @param p The packet
- * @param e The View entity, 0 for the view a world without views gets
  * @param v The view to fill
  * @param bake The view also collects the unculled static lights of the bake
  */
@@ -1008,7 +1007,6 @@ void box_render_extract_lights(
 /** Component of a view entity, or its singleton when the view does not carry it.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param id The component
  * @return The component, NULL when neither the view nor the world has it
  */
@@ -1056,7 +1054,6 @@ void box_render_extract_views(
  * result without testing it again.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param out The settings to fill
  * @return The filled settings
  */
@@ -1101,7 +1098,6 @@ void box_render_shadow_corners(
  * cascade count at zero, which is what a frame without a shadow pass reads.
  *
  * @param world The world
- * @param e The View entity, 0 for the view a world without views gets
  * @param sun The world holds a directional light
  * @param v The view to fill
  */

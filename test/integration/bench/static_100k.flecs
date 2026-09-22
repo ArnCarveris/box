@@ -33,3 +33,5 @@ for i in 0..10000 {
     Rgb: {255, 200, 50}
   }
 }
+
+view { box.view.View: {camera: camera} }

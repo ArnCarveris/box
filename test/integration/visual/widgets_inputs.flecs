@@ -52,3 +52,5 @@ ui {
       width: 200, height: 96)
   }
 }
+
+view { box.view.View: {camera: camera} }

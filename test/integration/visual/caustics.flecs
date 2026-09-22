@@ -68,3 +68,5 @@ ball {
   Rgb: {206, 198, 182}
   PbrMaterial: {roughness: 0.55}
 }
+
+view { box.view.View: {camera: camera} }

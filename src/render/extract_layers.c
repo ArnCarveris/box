@@ -223,6 +223,7 @@ void box_render_layers_init(
     RenderState *state = ecs_singleton_ensure(world, RenderState);
     state->layer_query = ecs_query(world, {
         .terms = {{ .id = ecs_id(MaterialLayer), .inout = EcsIn }},
+        .flags = EcsQueryMatchPrefab,
         .cache_kind = EcsQueryCacheAuto
     });
     state->layer_query_entity = state->layer_query->entity;

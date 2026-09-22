@@ -27,9 +27,21 @@ void UiView_teardown(void)
     ecs_fini(w);
 }
 
+static ecs_entity_t ui_view_scene(
+    ecs_entity_t camera)
+{
+    ecs_entity_t result = ecs_new(w);
+    ecs_set(w, result, View, {.camera = camera, .enabled = true});
+    return result;
+}
+
 void UiView_camera_is_orthographic_in_logical_pixels(void)
 {
     // ui/ui_view
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
     ecs_get_mut(w, root, Ui)->height = 540;
@@ -49,6 +61,10 @@ void UiView_camera_is_orthographic_in_logical_pixels(void)
 void UiView_view_follows_a_new_height(void)
 {
     // ui/ui_view
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
     ecs_get_mut(w, root, Ui)->height = 540;
@@ -129,12 +145,13 @@ void UiView_view_renders_after_the_view_of_the_scene(void)
     test_flt(((box_view_t*)box_vec_at(&packet.views, 0))->eye[2], -8);
 }
 
-void UiView_scene_view_is_synthesized_next_to_a_ui_view(void)
+void UiView_explicit_scene_view_renders_next_to_a_ui_view(void)
 {
     // ui/ui_view
     ecs_entity_t camera = ecs_new(w);
     ecs_set(w, camera, Position, {0, 2, -6});
     ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
     ecs_get_mut(w, root, Ui)->height = 540;
@@ -155,6 +172,7 @@ void UiView_scene_view_hides_the_tree(void)
     ecs_entity_t camera = ecs_new(w);
     ecs_set(w, camera, Position, {0, 0, -8});
     ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t prop = ecs_new(w);
     ecs_set(w, prop, Position, {0, 0, 0});
     ecs_set(w, prop, Box, {1, 1, 1});
@@ -183,6 +201,7 @@ void UiView_ui_view_draws_the_tree_only(void)
     ecs_entity_t camera = ecs_new(w);
     ecs_set(w, camera, Position, {0, 0, -8});
     ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t prop = ecs_new(w);
     ecs_set(w, prop, Position, {3, 0, 0});
     ecs_set(w, prop, Box, {1, 1, 1});
@@ -224,6 +243,10 @@ void UiView_ui_view_has_no_sun_no_lights_and_a_flat_environment(void)
     ecs_entity_t lamp = ecs_new(w);
     ecs_set(w, lamp, Position, {0, 0, 0});
     ecs_set(w, lamp, PointLight, {.intensity = 5, .range = 20});
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
 
     ecs_entity_t root = ecs_new(w);
     ecs_add(w, root, Ui);
@@ -248,6 +271,10 @@ void UiView_ui_view_has_no_sun_no_lights_and_a_flat_environment(void)
 void UiView_two_trees_reach_their_own_view(void)
 {
     // ui/ui_view
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Position, {0, 0, -8});
+    ecs_set(w, camera, Camera, {.fov = 60});
+    ui_view_scene(camera);
     ecs_entity_t first = ecs_new(w);
     ecs_add(w, first, Ui);
     ecs_get_mut(w, first, Ui)->height = 540;
@@ -279,7 +306,7 @@ void UiView_two_trees_reach_their_own_view(void)
     test_int(shown, 1);
 }
 
-void UiView_existing_scene_view_is_not_synthesized_twice(void)
+void UiView_explicit_scene_view_is_not_duplicated(void)
 {
     // ui/ui_view
     ecs_entity_t camera = ecs_new(w);

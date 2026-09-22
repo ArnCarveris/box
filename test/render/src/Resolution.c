@@ -33,6 +33,9 @@ void Resolution_teardown(void)
 void Resolution_a_surface_view_takes_the_scaled_size(void)
 {
     // ore_engine/resolution_scale
+    ecs_entity_t cam = box_render_active_camera(w);
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     packet.scaled_width = 480;
     packet.scaled_height = 270;
     box_render_extract(w, &packet);
@@ -47,6 +50,9 @@ void Resolution_a_surface_view_takes_the_scaled_size(void)
 void Resolution_an_unscaled_surface_view_keeps_the_window_size(void)
 {
     // ore_engine/resolution_scale
+    ecs_entity_t cam = box_render_active_camera(w);
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     box_render_extract(w, &packet);
     box_view_t *v = box_vec_at(&packet.views, 0);
     test_int(v->width, 960);

@@ -35,8 +35,9 @@ void Tree_root_gets_a_view_a_camera_and_a_layer(void)
     test_assert(view->camera != 0);
     test_assert(view->layers[0] != 0);
     test_bool(view->strict_layers, true);
-    test_bool(view->shadows, false);
-    test_bool(view->effects, false);
+    test_bool(view->shadows.enabled, false);
+    test_int(ecs_vec_count(&view->effects), 0);
+    test_int(ecs_vec_count(&view->material_layers), 0);
     test_bool(view->enabled, true);
     test_int(view->priority, BOX_UI_PRIORITY);
     test_assert(ecs_has(w, view->camera, Camera));

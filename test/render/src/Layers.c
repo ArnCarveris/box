@@ -278,6 +278,10 @@ void Layers_dynamic_instance_gets_the_bit(void)
 void Layers_transparent_instance_keeps_the_bit(void)
 {
     // materials/material_layers
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
@@ -332,15 +336,26 @@ void Layers_params_update_on_change(void)
     test_flt(packet.layer_params[1].b[2], 0.7f);
 }
 
-void Layers_settings_flag_reaches_the_view(void)
+void Layers_view_layer_list_reaches_the_packet(void)
 {
     // materials/material_layers
+    ecs_entity_t dust = ecs_lookup(w, "box.material.layers.dust");
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = dust, .enabled = true};
+    ecs_modified(w, view, View);
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {0, 0, 0});
     ecs_set(w, e, Box, {1, 1, 1});
-    ecs_add_pair(w, e, MaterialLayerOn, ecs_lookup(w, "box.material.layers.dust"));
+    ecs_add_pair(w, e, MaterialLayerOn, dust);
     box_render_extract(w, &packet);
-    test_int(packet.view.layers_enabled, 1);
+    test_int(packet.view.material_layer_count, 1);
+    test_uint(packet.view.material_layers[0], 1);
 
     uint32_t i;
     for (i = 0; i < packet.shader_create.count; i ++) {
@@ -348,10 +363,33 @@ void Layers_settings_flag_reaches_the_view(void)
     }
 
     box_packet_reset(&packet);
-    ecs_singleton_set(w, MaterialLayerSettings, { false });
+    settings = ecs_get_mut(w, view, View);
+    ecs_vec_first_t(&settings->material_layers, ViewMaterialLayer)[0].enabled = false;
+    ecs_modified(w, view, View);
     box_render_extract(w, &packet);
-    test_int(packet.view.layers_enabled, 0);
+    test_int(packet.view.material_layer_count, 0);
     test_int(packet.layer_count, 4);
+}
+
+void Layers_view_layer_list_preserves_order(void)
+{
+    ecs_entity_t dust = ecs_lookup(w, "box.material.layers.dust");
+    ecs_entity_t wetness = ecs_lookup(w, "box.material.layers.wetness");
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    View *settings = ecs_get_mut(w, view, View);
+    settings->camera = cam;
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = wetness, .enabled = true};
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = dust, .enabled = true};
+    ecs_modified(w, view, View);
+    box_render_extract(w, &packet);
+    test_int(packet.view.material_layer_count, 2);
+    test_uint(packet.view.material_layers[0], 3);
+    test_uint(packet.view.material_layers[1], 1);
 }
 
 void Layers_project_layer_gets_a_bit(void)

@@ -277,6 +277,8 @@ void HiZ_view_without_settings_occludes_by_default(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     box_render_extract(w, &packet);
 
     test_int(packet.views.count, 1);
@@ -291,6 +293,8 @@ void HiZ_disabled_culling_disables_occlusion(void)
     ecs_entity_t cam = ecs_new(w);
     ecs_set(w, cam, Position, {0, 0, -5});
     ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
     ecs_singleton_set(w, CullSettings, {.enabled = false, .occlusion = true});
     box_render_extract(w, &packet);
 

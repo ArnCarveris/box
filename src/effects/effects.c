@@ -7,12 +7,6 @@
 
 ECS_COMPONENT_DECLARE(EffectState);
 
-/** Effect constructor: an effect is enabled, reads the color and runs full size.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
 static void box_effect_ctor(
     void *ptr,
     int32_t count,
@@ -26,9 +20,7 @@ static void box_effect_ctor(
         fx[i].params = 0;
         fx[i].setup = 0;
         fx[i].texture = 0;
-        fx[i].order = 0;
         fx[i].scale = 1.0f;
-        fx[i].enabled = true;
         fx[i].color = true;
         fx[i].depth = false;
         fx[i].normals = false;
@@ -51,57 +43,6 @@ static void box_effect_texture_ctor(
     }
 }
 
-/** Registry destructor releasing the scratch stack.
- *
- * The query belongs to an entity of the module, so the world releases it.
- *
- * @param ptr The component
- * @param count Number of components
- * @param ti Type info
- */
-static void box_effect_state_dtor(
-    void *ptr,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    (void)ti;
-    EffectState *state = ptr;
-    int32_t i;
-    for (i = 0; i < count; i ++) {
-        ecs_vec_fini_t(NULL, &state[i].stack, box_effect_src_t);
-    }
-}
-
-/** Recount the effects that can run after one of them changed.
- *
- * A world whose effects are all off skips the chain of every view, which is what
- * a scene that runs no post process pays for the feature.
- *
- * @param it Iterator over the changed effects
- */
-static void box_effect_on_change(
-    ecs_iter_t *it)
-{
-    EffectState *state = ecs_get_mut(it->world, ecs_id(EffectState), EffectState);
-    if (!state || !state->effects) {
-        goto done;
-    }
-
-    int32_t count = 0;
-    ecs_iter_t eit = ecs_query_iter(it->world, state->effects);
-    while (ecs_query_next(&eit)) {
-        Effect *fx = ecs_field(&eit, Effect, 0);
-        int32_t i;
-        for (i = 0; i < eit.count; i ++) {
-            count += fx[i].enabled && fx[i].shader ? 1 : 0;
-        }
-    }
-
-    state->enabled = count;
-done:
-    return;
-}
-
 void BoxEffectsImport(
     ecs_world_t *world)
 {
@@ -118,25 +59,9 @@ void BoxEffectsImport(
 
     ecs_set_hooks(world, Effect, { .ctor = box_effect_ctor });
     ecs_set_hooks(world, EffectTexture, { .ctor = box_effect_texture_ctor });
-    ecs_set_hooks(world, EffectState, {
-        .ctor = flecs_default_ctor,
-        .dtor = box_effect_state_dtor
-    });
-
-    ecs_query_t *query = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "query" }),
-        .terms = {{ .id = ecs_id(Effect), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
-    });
+    ecs_set_hooks(world, EffectState, { .ctor = flecs_default_ctor });
 
     EffectState *state = ecs_singleton_ensure(world, EffectState);
-    ecs_vec_init_t(NULL, &state->stack, box_effect_src_t, 0);
-    state->effects = query;
-
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(Effect) }},
-        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
-        .events = { EcsOnSet, EcsOnRemove },
-        .callback = box_effect_on_change
-    });
+    (void)state;
+    ecs_add_pair(world, ecs_id(Effect), EcsOnInstantiate, EcsInherit);
 }

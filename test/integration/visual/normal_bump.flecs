@@ -41,3 +41,5 @@ bumped {
   PbrMaterial: {metallic: 0, roughness: 0.55}
   PbrTextures: {normal: textures.bump}
 }
+
+view { box.view.View: {camera: camera} }

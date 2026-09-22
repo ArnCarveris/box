@@ -118,3 +118,5 @@ terminals {
     Agent
   }
 }
+
+view { box.view.View: {camera: camera} }

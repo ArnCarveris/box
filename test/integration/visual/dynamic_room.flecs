@@ -121,3 +121,5 @@ lights {
     Rgb: {190, 210, 255}
   }
 }
+
+view { box.view.View: {camera: camera} }

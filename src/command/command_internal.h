@@ -99,7 +99,6 @@ typedef struct TerminalSession {
     box_command_entry_t ring[BOX_COMMAND_LOG_MAX];  /**< Last executed lines */
     int32_t count;                                  /**< Lines executed so far */
     ecs_vec_t renders;                              /**< box_render_job_t of pending renders */
-    ecs_entity_t view;                              /**< View that keeps the scene on the surface */
     int32_t render_count;                           /**< Renders started, numbers their files */
 } TerminalSession;
 

@@ -2,6 +2,7 @@ using box.transform
 using box.geometry
 using box.material
 using box.camera
+using box.view
 using box.controller
 using box.light
 using box.ui
@@ -16,6 +17,8 @@ camera {
   Camera: {fov: 50}
   CameraController: {}
 }
+
+view { View: {camera: camera} }
 
 sun {
   Rotation: {0.9, -0.6, 0}

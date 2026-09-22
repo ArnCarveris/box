@@ -127,3 +127,5 @@ spline_stream {
     seed: 16
   }
 }
+
+view { box.view.View: {camera: camera} }

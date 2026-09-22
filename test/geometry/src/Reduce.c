@@ -12,6 +12,7 @@
 static ecs_world_t *w;
 static box_packet_t packet;
 static ecs_entity_t camera;
+static ecs_entity_t view;
 
 void Reduce_setup(void)
 {
@@ -23,6 +24,8 @@ void Reduce_setup(void)
     camera = ecs_new(w);
     ecs_set(w, camera, Position, {0, 0, 0});
     ecs_set(w, camera, Camera, {.fov = 60});
+    view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = camera, .enabled = true});
     ecs_singleton_set(w, LodSettings, {
         .enabled = true, .quality = 1, .error_px = 2, .hysteresis = 0.25f
     });
@@ -155,6 +158,19 @@ void Reduce_a_world_without_settings_keeps_the_authored_mesh(void)
     ecs_set(w, e, Position, {0, 0, 60});
     ecs_set(w, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
     expected = box_mesh_cache_get(w, &key, &min, &max);
+    box_render_extract(w, &packet);
+    test_uint(ecs_get(w, e, RenderMesh)->handle, expected);
+}
+
+void Reduce_a_world_without_a_view_keeps_the_authored_mesh(void)
+{
+    ecs_delete(w, view);
+    ecs_entity_t e = ecs_new(w);
+    box_mesh_key_t key = { .kind = BoxShapeSphere, .i0 = 32, .smooth = true };
+    vec3 min, max;
+    ecs_set(w, e, Position, {0, 0, 60});
+    ecs_set(w, e, Sphere, {.segments = 32, .smooth = true, .radius = 1});
+    uint32_t expected = box_mesh_cache_get(w, &key, &min, &max);
     box_render_extract(w, &packet);
     test_uint(ecs_get(w, e, RenderMesh)->handle, expected);
 }

@@ -178,3 +178,5 @@ image_region {
   PbrTextures: {albedo: textures.checker}
   PbrMaterial: {roughness: 0.7}
 }
+
+view { box.view.View: {camera: camera} }

@@ -132,3 +132,5 @@ rigs {
     Rig: {}
   }
 }
+
+view { box.view.View: {camera: camera} }

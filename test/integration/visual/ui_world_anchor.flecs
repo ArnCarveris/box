@@ -112,3 +112,5 @@ ui {
     Rgb: {255, 0, 255}
   }
 }
+
+view { box.view.View: {camera: camera} }

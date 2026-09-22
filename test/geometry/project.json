@@ -164,6 +164,7 @@
                     "a_shape_at_its_floor_never_reduces",
                     "settings_that_are_off_keep_the_authored_mesh",
                     "a_world_without_settings_keeps_the_authored_mesh",
+                    "a_world_without_a_view_keeps_the_authored_mesh",
                     "a_view_without_settings_holds_the_finest_level",
                     "a_receding_camera_coarsens_the_level",
                     "the_band_holds_a_level_over_a_frame",

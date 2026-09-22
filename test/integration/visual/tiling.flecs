@@ -140,3 +140,5 @@ modes {
     TextureTiling: {meters_x: 1, meters_y: 1, fit: true, shape: TilingBox}
   }
 }
+
+view { box.view.View: {camera: camera} }

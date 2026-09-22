@@ -75,7 +75,7 @@ ridge_c {
   Rgb: {150, 155, 140}
 }
 
-box { effects { stack { tonemap {
-  Effect: {enabled: true}
+post_effects { tonemap : box.effects.tonemap {
   ToneMapping: {white: 1.2, dither: false}
-} } } }
+} }
+view { box.view.View: {camera: camera, effects: [{effect: post_effects.tonemap, enabled: true}]} }

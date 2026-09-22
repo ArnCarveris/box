@@ -19,6 +19,11 @@ void Blending_setup(void)
     box_packet_init(&packet);
     packet.width = 640;
     packet.height = 480;
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -10});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 }
 
 void Blending_teardown(void)
@@ -477,4 +482,3 @@ void Blending_translucent_count_covers_the_alpha_blended_instances(void)
     test_int(packet.view.transparent_count, 3);
     test_int(packet.view.translucent_count, 2);
 }
-

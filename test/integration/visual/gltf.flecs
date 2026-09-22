@@ -41,3 +41,5 @@ sphere {
   Rgb: {220, 220, 225}
   PbrMaterial: {roughness: 0.35}
 }
+
+view { box.view.View: {camera: camera} }

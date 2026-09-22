@@ -421,10 +421,11 @@ typedef struct box_view_t {
     box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
     uint32_t light_count;   /**< Lights of the view in the packet light array */
     uint32_t env_generation; /**< Changes when the extracted environment changes */
-    uint32_t layers_enabled; /**< The view applies the registered material layers */
+    uint32_t material_layer_count;
     uint32_t plain_blend;   /**< Blended fragments composite source over, without the glass model */
     uint32_t sun_modulator; /**< Modulator slots of the sun, one bit each, 0 for none */
     float frame_time;       /**< Seconds since the world started, for an animated modulator */
+    uint32_t material_layers[BOX_LAYER_MAX];
     float shadow_matrix[BOX_SHADOW_CASCADE_MAX * 16]; /**< World to clip of every cascade */
     float shadow_split[4];  /**< View depth a cascade ends at, the last is the distance */
     float shadow_offset[4]; /**< World offset along the normal of a cascade, its texel size */
@@ -446,7 +447,6 @@ typedef struct box_view_t {
     uint32_t transparent_count; /**< Sorted draws of the view */
     uint32_t translucent_count; /**< Sorted draws of the view that read the background copy */
     uint32_t shadows;       /**< The view casts and receives shadows */
-    uint32_t effects;       /**< The view runs its post process effects */
     uint32_t effect_first;  /**< First pass of its chain in the packet effect array */
     uint32_t effect_count;  /**< Passes of its chain */
     uint32_t effect_inputs; /**< BOX_EFFECT bits the passes of its chain need */

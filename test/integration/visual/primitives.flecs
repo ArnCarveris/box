@@ -104,3 +104,5 @@ glow {
   Rgb: {40, 40, 40}
   Emissive: {strength: 4, color: {255, 120, 40}}
 }
+
+view { box.view.View: {camera: camera} }

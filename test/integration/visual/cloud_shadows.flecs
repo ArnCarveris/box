@@ -64,3 +64,5 @@ wall {
   Rgb: {172, 166, 152}
   PbrMaterial: {roughness: 0.9}
 }
+
+view { box.view.View: {camera: camera} }
