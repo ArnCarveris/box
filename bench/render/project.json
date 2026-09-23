@@ -145,6 +145,13 @@
                     "record_2000_shapes_counted",
                     "record_2000_shapes_all_details"
                 ]
+            },
+            {
+                "id": "UiDraw",
+                "benchcases": [
+                    "record_1560_glyphs",
+                    "changing_panel_next_to_2000_casters"
+                ]
             }
         ]
     }

@@ -407,6 +407,13 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "DrawCost",
+                "testcases": [
+                    "sorted_pass_sets_its_pipeline_once",
+                    "changing_element_keeps_the_scene_shadows_cached"
+                ]
             }
         ]
     }
