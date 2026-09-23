@@ -165,7 +165,7 @@ static void box_shader_update(
     }
 
     char resolved[BOX_SHADER_PATH_MAX];
-    if (!box_shader_resolve(shader->path, resolved, sizeof(resolved))) {
+    if (!box_locate(shader->path, resolved, sizeof(resolved))) {
         ecs_err("box.shader: %s: file not found", shader->path);
         box_shader_status(world, e, "file not found");
         goto done;

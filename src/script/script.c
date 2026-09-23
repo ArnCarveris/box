@@ -14,7 +14,7 @@ ecs_entity_t box_script_load(
     const char *path)
 {
     char resolved[BOX_SHADER_PATH_MAX];
-    if (!box_shader_resolve(path, resolved, sizeof(resolved))) {
+    if (!box_locate(path, resolved, sizeof(resolved))) {
         ecs_err("box.script: %s: file not found", path);
         return 0;
     }

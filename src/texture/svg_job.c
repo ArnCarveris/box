@@ -344,7 +344,7 @@ static box_svg_image_t* box_svg_image_new(
     ecs_vec_init_t(NULL, &result->tasks, box_svg_task_t*, 0);
     if (svg->file && svg->file[0]) {
         char path[BOX_SHADER_PATH_MAX];
-        box_shader_resolve(svg->file, path, sizeof(path));
+        box_locate(svg->file, path, sizeof(path));
         result->file = ecs_os_strdup(path);
     } else {
         result->data = ecs_os_strdup(svg->data);

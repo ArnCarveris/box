@@ -10,7 +10,7 @@ void box_ui_widgets_load(
     ecs_world_t *world)
 {
     char resolved[1024];
-    if (!box_shader_resolve(BOX_UI_WIDGETS, resolved, sizeof(resolved))) {
+    if (!box_locate(BOX_UI_WIDGETS, resolved, sizeof(resolved))) {
         ecs_warn("box.ui: no widget library at '%s'", BOX_UI_WIDGETS);
         goto done;
     }

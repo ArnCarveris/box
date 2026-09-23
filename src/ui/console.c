@@ -562,7 +562,7 @@ static void box_ui_console_load(
     ConsoleImpl *impl)
 {
     char resolved[1024];
-    if (!box_shader_resolve(BOX_UI_CONSOLE, resolved, sizeof(resolved))) {
+    if (!box_locate(BOX_UI_CONSOLE, resolved, sizeof(resolved))) {
         ecs_err("box.ui: no console script at '%s'", BOX_UI_CONSOLE);
         goto done;
     }

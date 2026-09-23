@@ -591,6 +591,18 @@
                     "controller_then_ui_finishes_cleanly",
                     "every_module_reverse_dependency_order_finishes_cleanly"
                 ]
+            },
+            {
+                "id": "RenderCache",
+                "setup": true,
+                "teardown": true,
+                "testcases": [
+                    "clusters_reuse_unchanged_inputs",
+                    "clusters_invalidate_changed_inputs",
+                    "clusters_keep_views_separate",
+                    "solid_slots_follow_material_changes",
+                    "solid_slots_survive_mirror_limit_and_removal"
+                ]
             }
         ]
     }

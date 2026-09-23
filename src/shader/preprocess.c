@@ -402,9 +402,9 @@ static void box_pp_include(
 
     char resolved[BOX_SHADER_PATH_MAX];
     const char *logical = path;
-    if (!box_shader_resolve(path, resolved, sizeof(resolved))) {
+    if (!box_locate(path, resolved, sizeof(resolved))) {
         logical = name;
-        if (!box_shader_resolve(name, resolved, sizeof(resolved))) {
+        if (!box_locate(name, resolved, sizeof(resolved))) {
             box_pp_error(pp, f->path, f->line, "include not found");
             goto done;
         }
@@ -690,7 +690,7 @@ void box_shader_preprocess(
     box_pp_macros(&pp, macros);
     char resolved[BOX_SHADER_PATH_MAX];
     char *text = NULL;
-    if (box_shader_resolve(path, resolved, sizeof(resolved))) {
+    if (box_locate(path, resolved, sizeof(resolved))) {
         text = box_shader_read(resolved);
     }
 

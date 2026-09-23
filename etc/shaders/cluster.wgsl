@@ -3,7 +3,7 @@
 
 @group(0) @binding(0) var<uniform> u: View;
 @group(0) @binding(1) var<storage, read> lights: array<Light>;
-@group(0) @binding(2) var<storage, read_write> clusters: array<vec2<u32>>;
+@group(0) @binding(2) var<storage, read_write> clusters: array<vec4<u32>>;
 @group(0) @binding(3) var<storage, read_write> light_indices: array<u32>;
 
 fn slice_depth(slice: f32) -> f32 {
@@ -30,15 +30,21 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 min(min(cy.x, cy.y), min(cy.z, cy.w)), z0);
   let hi = vec3(max(max(cx.x, cx.y), max(cx.z, cx.w)),
                 max(max(cy.x, cy.y), max(cy.z, cy.w)), z1);
-  let base = cluster * u.cluster_max;
+  let base = cluster * u.cluster_max * 2u;
+  let dynamic_base = base + u.cluster_max;
+  var dynamic_count = 0u;
   var count = 0u;
   for (var i = 0u; i < u.light_count && count < u.cluster_max; i = i + 1u) {
     let p = (u.view * vec4(lights[i].position, 1.0)).xyz;
     let d = p - clamp(p, lo, hi);
     if (dot(d, d) <= lights[i].range * lights[i].range) {
       light_indices[base + count] = i;
+      if (lights[i].is_static == 0u) {
+        light_indices[dynamic_base + dynamic_count] = i;
+        dynamic_count += 1u;
+      }
       count = count + 1u;
     }
   }
-  clusters[cluster] = vec2(base, count);
+  clusters[cluster] = vec4(base, count, dynamic_base, dynamic_count);
 }

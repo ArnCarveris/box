@@ -5,7 +5,7 @@
 
 @group(0) @binding(0) var<uniform> u: View;
 @group(1) @binding(0) var<storage, read> lights: array<Light>;
-@group(1) @binding(1) var<storage, read> clusters: array<vec2<u32>>;
+@group(1) @binding(1) var<storage, read> clusters: array<vec4<u32>>;
 @group(1) @binding(2) var<storage, read> light_indices: array<u32>;
 @group(2) @binding(0) var env_irradiance: texture_cube<f32>;
 @group(2) @binding(1) var env_specular: texture_cube<f32>;
@@ -35,6 +35,8 @@ struct LightModulatorBlock {
 
 #include "generated/light_modulators.wgsl"
 
+override box_solid: bool = false;
+
 struct VertexIn {
   @location(0) pos: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -63,9 +65,9 @@ struct VertexOut {
   @location(0) world_pos: vec3<f32>,
   @location(1) normal: vec3<f32>,
   @location(2) uv: vec2<f32>,
-  @location(3) color: vec4<f32>,
-  @location(4) emissive: vec4<f32>,
-  @location(5) params: vec4<f32>,
+  @location(3) @interpolate(flat) color: vec4<f32>,
+  @location(4) @interpolate(flat) emissive: vec4<f32>,
+  @location(5) @interpolate(flat) params: vec4<f32>,
   @location(6) @interpolate(flat) shape: vec4<u32>,
   @location(7) @interpolate(flat) scale_handedness: vec4<f32>,
   @location(8) @interpolate(flat) textures: vec2<u32>,
@@ -88,7 +90,7 @@ const MESH_BACKDROP_BIT: u32 = 0x80u;
 // world position of the fragment against its four edges and an instance without
 // one pays a single bit test.
 fn clip_fragment(in: VertexOut) {
-  if ((in.uv_mode.x & MESH_CLIP_BIT) != 0u) {
+  if (!box_solid && (in.uv_mode.x & MESH_CLIP_BIT) != 0u) {
     if (in.world_pos.x < in.clip_rect.x || in.world_pos.x > in.clip_rect.z ||
         in.world_pos.y < in.clip_rect.y || in.world_pos.y > in.clip_rect.w) {
       discard;
@@ -175,12 +177,10 @@ fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
     metallic: f32, roughness: f32, skip_static: bool) -> vec3<f32> {
   var sum = vec3<f32>(0.0);
   let vp = (u.view * vec4(world_pos, 1.0)).xyz;
-  let entry = clusters[cluster_index(vp)];
+  let cluster = clusters[cluster_index(vp)];
+  let entry = select(cluster.xy, cluster.zw, skip_static);
   for (var i = 0u; i < entry.y; i = i + 1u) {
     let lt = lights[light_indices[entry.x + i]];
-    if (skip_static && lt.is_static != 0u) {
-      continue;
-    }
     let delta = lt.position - world_pos;
     let dist = length(delta);
     let l = delta / max(dist, 1e-4);
@@ -282,7 +282,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     let texel = tex_sample(slot_albedo, uv, ddx, ddy);
     albedo = albedo * srgb_to_linear(texel.rgb);
     if (blend == 0u) {
-      if (texel.a < 0.5) {
+      if (!box_solid && texel.a < 0.5) {
         discard;
       }
     } else {
@@ -307,7 +307,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     let border = unpack4x8unorm(in.shape.z);
     albedo = mix(albedo, srgb_to_linear(border.rgb), shape.y);
     alpha = alpha * shape.x * mix(1.0, border.a, shape.y);
-    if (blend == 0u && shape.x < 0.5) {
+    if (!box_solid && blend == 0u && shape.x < 0.5) {
       discard;
     }
   }
@@ -347,7 +347,10 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   let parts = environment_parts(sn, v, s.albedo, metallic, roughness);
   let env = parts.diffuse + parts.specular;
   let is_baked = in.params.z > 0.5;
-  let shadow = shadow_factor(in.world_pos, gn);
+  var shadow = 1.0;
+  if (dot(sn, l) > 0.0 && u.sun_intensity != 0.0) {
+    shadow = shadow_factor(in.world_pos, gn);
+  }
   var spec = vec3<f32>(0.0);
   if ((blend == 1u || blend == 2u) && u.plain_blend == 0u) {
     spec = glass_specular(sn, v, l, s.albedo, metallic, roughness, sun, shadow);

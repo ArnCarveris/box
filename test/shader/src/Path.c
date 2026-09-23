@@ -53,7 +53,7 @@ void Path_bake_home_holds_the_engine_shaders(void)
     setenv("BAKE_HOME", "etc/bake_home", 1);
     box_shader_path_init();
 
-    test_bool(box_shader_resolve("etc/fixture/engine.wgsl", resolved,
+    test_bool(box_locate("etc/fixture/engine.wgsl", resolved,
         sizeof(resolved)), true);
     test_str(resolved, "etc/bake_home/etc/box/fixture/engine.wgsl");
 }
@@ -65,7 +65,7 @@ void Path_source_tree_answers_when_the_bake_home_is_empty(void)
     setenv("BAKE_HOME", "etc/no_home", 1);
     box_shader_path_init();
 
-    test_bool(box_shader_resolve("etc/shaders/mesh.wgsl", resolved,
+    test_bool(box_locate("etc/shaders/mesh.wgsl", resolved,
         sizeof(resolved)), true);
     test_assert(strstr(resolved, "/etc/shaders/mesh.wgsl") != NULL);
     test_assert(strstr(resolved, "no_home") == NULL);
@@ -80,7 +80,7 @@ void Path_global_bake_home_is_used_without_the_variable(void)
     setenv("HOME", "etc/home", 1);
     box_shader_path_init();
 
-    test_bool(box_shader_resolve("etc/fixture/home.wgsl", resolved,
+    test_bool(box_locate("etc/fixture/home.wgsl", resolved,
         sizeof(resolved)), true);
     test_str(resolved, "etc/home/bake3/etc/box/fixture/home.wgsl");
 }
@@ -92,7 +92,7 @@ void Path_working_directory_is_searched_before_the_bake_home(void)
     setenv("BAKE_HOME", "etc/bake_home", 1);
     box_shader_path_init();
 
-    test_bool(box_shader_resolve("etc/fixture/both.wgsl", resolved,
+    test_bool(box_locate("etc/fixture/both.wgsl", resolved,
         sizeof(resolved)), true);
     test_str(resolved, "etc/fixture/both.wgsl");
 }

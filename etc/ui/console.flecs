@@ -18,8 +18,8 @@ console {
     Fill: {width: 0.5, height: 1}
     Rect: {}
     Rgb: {0, 0, 0}
-    Opacity: {0.65}
-    BackdropBlur: {radius: 32}
+    Opacity: {0.9}
+    BackdropBlur: {radius: 64}
   }
 
   panel {

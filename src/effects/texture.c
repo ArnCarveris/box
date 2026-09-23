@@ -19,7 +19,7 @@ static bool box_effect_texture_load(
 {
     bool result = false;
     char resolved[BOX_SHADER_PATH_MAX];
-    if (!path || !box_shader_resolve(path, resolved, sizeof(resolved))) {
+    if (!path || !box_locate(path, resolved, sizeof(resolved))) {
         ecs_err("box.effects: %s: file not found", path ? path : "");
         goto done;
     }

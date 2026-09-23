@@ -386,7 +386,6 @@ void BoxUiImport(
     box_ui_shadow_init(world);
     box_ui_group_init(world);
     box_ui_world_init(world);
-    box_ui_widgets_load(world);
     box_ui_scroll_init(world);
     box_ui_hit_init(world);
     box_ui_text_input_init(world);

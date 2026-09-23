@@ -56,6 +56,7 @@ static void box_scene_mesh_release(
     if (m->statics) wgpuBufferRelease(m->statics);
     box_vec_fini(&m->groups);
     box_vec_fini(&m->mirror);
+    box_vec_fini(&m->cutout_slots);
     box_vec_fini(&m->transition_index);
     box_vec_fini(&m->transition_slots);
     memset(m, 0, sizeof(box_gpu_mesh_t));
@@ -142,6 +143,15 @@ void box_scene_mirror(
     uint32_t slot,
     const box_instance_t *data)
 {
+    m->cutout_slots.size = sizeof(uint8_t);
+    while (m->cutout_slots.count <= slot) {
+        *(uint8_t*)box_vec_push(&m->cutout_slots) = 0;
+    }
+    uint8_t *cutout = box_vec_at(&m->cutout_slots, slot);
+    m->cutout_count -= *cutout;
+    *cutout = (data->textures[0] & 0xFFFFu) != 0 ||
+        (data->uv_mode & ((1u << BOX_MODE_CLIP_SHIFT) | (1u << BOX_MODE_SHAPE_SHIFT))) != 0;
+    m->cutout_count += *cutout;
     if (!m->mirror_valid) {
         goto done;
     }
@@ -287,6 +297,9 @@ void box_scene_apply(
         }
 
         m->static_count = c->count > m->static_capacity ? m->static_capacity : c->count;
+        while (m->cutout_slots.count > m->static_count) {
+            m->cutout_count -= *(uint8_t*)box_vec_at(&m->cutout_slots, --m->cutout_slots.count);
+        }
         while (m->transition_index.count > m->static_count) {
             box_transition_stop(r, m, m->transition_index.count - 1);
             m->transition_index.count --;
@@ -392,6 +405,7 @@ void box_scene_draw(
             continue;
         }
 
+        wgpuRenderPassEncoderSetPipeline(pass, box_frame_opaque_pipeline(r, !m->cutout_count));
         wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, i, true), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
@@ -407,6 +421,7 @@ void box_scene_draw(
             continue;
         }
 
+        wgpuRenderPassEncoderSetPipeline(pass, box_frame_opaque_pipeline(r, false));
         wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, b->mesh, false), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->dynamics,

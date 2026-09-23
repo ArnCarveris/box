@@ -10,6 +10,24 @@
 
 #define BOX_IMPL
 #include <box.h>
+#include "../ui/ui_internal.h"
+#include "../command/command_internal.h"
+
+static void box_generate_hooks(ecs_world_t *world, ecs_entity_t parent) {
+    ecs_iter_t it = ecs_children(world, parent);
+    while (ecs_children_next(&it)) {
+        if (ecs_table_has_id(world, it.table, ecs_id(EcsComponent))) {
+            for (int i = 0; i < it.count; i ++) {
+                ecs_set_rtt_compare(world, it.entities[i]);
+                ecs_set_rtt_equals(world, it.entities[i]);
+            }
+        }
+        
+        for (int i = 0; i < it.count; i ++) {
+            box_generate_hooks(world, it.entities[i]);
+        }
+    }
+}
 
 void BoxImport(
     ecs_world_t *world)
@@ -46,4 +64,8 @@ void BoxImport(
     ECS_IMPORT(world, BoxScript);
     ECS_IMPORT(world, BoxCheckpoint);
     ECS_IMPORT(world, BoxCommand);
+
+    box_generate_hooks(world, ecs_id(Box));
+
+    box_ui_widgets_load(world);
 }

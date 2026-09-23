@@ -41,14 +41,32 @@ fn in_frustum(center: vec3<f32>, radius: f32) -> bool {
   return result;
 }
 
-fn project(m: mat4x4<f32>, center: vec3<f32>, radius: f32) -> Rect {
+fn project(m: mat4x4<f32>, base: u32, center: vec3<f32>, radius: f32) -> Rect {
+  let half = vec3<f32>(bitcast<f32>(src[base + u32(INSTANCE_HALF_EXTENT)]),
+    bitcast<f32>(src[base + u32(INSTANCE_HALF_EXTENT) + 1u]),
+    bitcast<f32>(src[base + u32(INSTANCE_HALF_EXTENT) + 2u]));
+  var x = vec3(radius, 0.0, 0.0);
+  var y = vec3(0.0, radius, 0.0);
+  var z = vec3(0.0, 0.0, radius);
+  if (any(half != vec3(0.0))) {
+    x = vec3(bitcast<f32>(src[base]), bitcast<f32>(src[base + 4u]),
+      bitcast<f32>(src[base + 8u])) * half.x;
+    y = vec3(bitcast<f32>(src[base + 1u]), bitcast<f32>(src[base + 5u]),
+      bitcast<f32>(src[base + 9u])) * half.y;
+    z = vec3(bitcast<f32>(src[base + 2u]), bitcast<f32>(src[base + 6u]),
+      bitcast<f32>(src[base + 10u])) * half.z;
+  }
+  let origin = m * vec4(center, 1.0);
+  let dx = m * vec4(x, 0.0);
+  let dy = m * vec4(y, 0.0);
+  let dz = m * vec4(z, 0.0);
   var lo = vec2(1.0, 1.0);
   var hi = vec2(0.0, 0.0);
   var depth = 0.0;
   var crossed = false;
   for (var i = 0u; i < 8u; i = i + 1u) {
-    let corner = vec3(f32(i & 1u), f32((i >> 1u) & 1u), f32((i >> 2u) & 1u));
-    let clip = m * vec4(center + (corner * 2.0 - 1.0) * radius, 1.0);
+    let clip = origin + select(-dx, dx, (i & 1u) != 0u) +
+      select(-dy, dy, (i & 2u) != 0u) + select(-dz, dz, (i & 4u) != 0u);
     if (clip.w <= 1e-6) {
       crossed = true;
     } else {
@@ -65,7 +83,7 @@ fn project(m: mat4x4<f32>, center: vec3<f32>, radius: f32) -> Rect {
     depth = 1.0;
   }
   return Rect(clamp(lo, vec2(0.0), vec2(1.0)), clamp(hi, vec2(0.0), vec2(1.0)),
-    min(depth, 1.0), crossed);
+    min(depth + max(depth * 1e-5, 1e-7), 1.0), crossed);
 }
 
 fn level_of(r: Rect) -> u32 {
@@ -90,8 +108,8 @@ fn texels(r: Rect, level: u32) -> vec4<u32> {
   return vec4(a.x, a.y, b.x, b.y);
 }
 
-fn shown_now(center: vec3<f32>, radius: f32) -> bool {
-  let r = project(c.clip, center, radius);
+fn shown_now(base: u32, center: vec3<f32>, radius: f32) -> bool {
+  let r = project(c.clip, base, center, radius);
   var result = true;
   if (!r.clamped) {
     let level = level_of(r);
@@ -105,8 +123,8 @@ fn shown_now(center: vec3<f32>, radius: f32) -> bool {
   return result;
 }
 
-fn shown_before(center: vec3<f32>, radius: f32) -> bool {
-  let r = project(c.prev, center, radius);
+fn shown_before(base: u32, center: vec3<f32>, radius: f32) -> bool {
+  let r = project(c.prev, base, center, radius);
   var result = true;
   if (!r.clamped) {
     let level = level_of(r);

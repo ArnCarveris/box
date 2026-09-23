@@ -383,6 +383,9 @@ void box_device_fini(
     for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
         if (r->pipeline[slot]) wgpuRenderPipelineRelease(r->pipeline[slot]);
         if (r->normal_pipeline[slot]) wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
+        for (uint32_t normal = 0; normal < 2; normal ++) {
+            if (r->solid_pipeline[slot][normal]) wgpuRenderPipelineRelease(r->solid_pipeline[slot][normal]);
+        }
     }
 
     if (r->mesh_layout) wgpuPipelineLayoutRelease(r->mesh_layout);

@@ -122,9 +122,9 @@ static void box_lights_groups(
     if (r->v->light_group) wgpuBindGroupRelease(r->v->light_group);
 
     uint64_t light_size = (uint64_t)r->v->light_capacity * sizeof(box_light_t);
-    uint64_t cluster_size = (uint64_t)box_cluster_count(&r->v->grid) * 2 * sizeof(uint32_t);
+    uint64_t cluster_size = (uint64_t)box_cluster_count(&r->v->grid) * 4 * sizeof(uint32_t);
     uint64_t index_size = (uint64_t)box_cluster_count(&r->v->grid) *
-        r->v->grid.max_lights * sizeof(uint32_t);
+        r->v->grid.max_lights * 2 * sizeof(uint32_t);
 
     WGPUBindGroupEntry compute_entries[4] = {
         { .binding = 0, .buffer = r->v->view_buffer, .size = BOX_VIEW_UNIFORM_SIZE },
@@ -187,9 +187,9 @@ static void box_lights_grid(
     r->v->grid = *grid;
     uint32_t count = box_cluster_count(grid);
     r->v->clusters = box_lights_buffer(r, WGPUBufferUsage_Storage,
-        (uint64_t)count * 2 * sizeof(uint32_t));
+        (uint64_t)count * 4 * sizeof(uint32_t));
     r->v->light_indices = box_lights_buffer(r, WGPUBufferUsage_Storage,
-        (uint64_t)count * grid->max_lights * sizeof(uint32_t));
+        (uint64_t)count * grid->max_lights * 2 * sizeof(uint32_t));
 }
 
 void box_lights_init(
@@ -202,6 +202,7 @@ void box_lights_init(
 void box_lights_view_init(
     box_renderer_t *r)
 {
+    box_vec_init(&r->v->light_snapshot, sizeof(box_light_t));
     box_lights_grow(r, 0);
 }
 
@@ -219,6 +220,7 @@ void box_lights_view_fini(
     v->clusters = NULL;
     v->light_indices = NULL;
     v->light_capacity = 0;
+    box_vec_fini(&v->light_snapshot);
     memset(&v->grid, 0, sizeof(box_cluster_t));
 }
 
@@ -247,11 +249,24 @@ void box_lights_update(
         box_lights_groups(r);
     }
 
-    if (view->light_count) {
-        wgpuQueueWriteBuffer(r->gpu_queue, r->v->lights, 0,
-            box_vec_at(&p->lights, view->light_first),
-            (size_t)view->light_count * sizeof(box_light_t));
+    box_vec_t *snapshot = &r->v->light_snapshot;
+    const void *lights = view->light_count ? box_vec_at(&p->lights, view->light_first) : NULL;
+    size_t bytes = (size_t)view->light_count * sizeof(box_light_t);
+    bool changed = snapshot->count != view->light_count ||
+        (bytes && memcmp(snapshot->data, lights, bytes));
+    r->v->cluster_dirty = rebuild || changed ||
+        grid->near_ != r->v->grid.near_ || grid->far_ != r->v->grid.far_ ||
+        memcmp(r->v->cluster_view, view->view, sizeof(r->v->cluster_view)) ||
+        memcmp(r->v->cluster_proj, view->proj, sizeof(r->v->cluster_proj));
+    if ((changed || rebuild) && bytes) {
+        wgpuQueueWriteBuffer(r->gpu_queue, r->v->lights, 0, lights, bytes);
+        box_vec_reserve(snapshot, view->light_count);
+        memcpy(snapshot->data, lights, bytes);
     }
+    snapshot->count = view->light_count;
+    r->v->grid = *grid;
+    memcpy(r->v->cluster_view, view->view, sizeof(r->v->cluster_view));
+    memcpy(r->v->cluster_proj, view->proj, sizeof(r->v->cluster_proj));
 }
 
 void box_lights_dispatch(
@@ -259,7 +274,7 @@ void box_lights_dispatch(
     const box_view_t *view,
     WGPUCommandEncoder encoder)
 {
-    if (!r->v->cluster_group) {
+    if (!r->v->cluster_group || !r->v->cluster_dirty) {
         goto done;
     }
 

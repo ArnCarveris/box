@@ -236,7 +236,7 @@ void box_shader_path_init(void)
     box_shader_find_exe(box_shader_exe_dir, sizeof(box_shader_exe_dir));
 }
 
-bool box_shader_resolve(
+bool box_locate(
     const char *path,
     char *out,
     size_t size)

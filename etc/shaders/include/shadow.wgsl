@@ -6,7 +6,24 @@
 fn shadow_lookup(index: u32, world: vec3<f32>, gn: vec3<f32>) -> f32 {
   let p = u.shadow_matrix[index] * vec4(world + gn * u.shadow_offset[index], 1.0);
   let uv = p.xy * vec2(0.5, -0.5) + vec2(0.5);
+  if (any(uv < vec2(0.0)) || any(uv > vec2(1.0)) || p.z < 0.0 || p.z > 1.0) {
+    return 1.0;
+  }
   let depth = p.z + u.shadow_bias[index];
+  if (u.shadow_filter == 3u) {
+    let texel = uv / u.shadow_texel - vec2(0.5);
+    let base = floor(texel);
+    let f = fract(texel);
+    let a = vec2(2.0) - f;
+    let b = vec2(1.0) + f;
+    let lo = (base - vec2(0.5) + vec2(1.0) / a) * u.shadow_texel;
+    let hi = (base + vec2(1.5) + f / b) * u.shadow_texel;
+    let s00 = textureSampleCompareLevel(shadow_map, shadow_samp, lo, index, depth);
+    let s10 = textureSampleCompareLevel(shadow_map, shadow_samp, vec2(hi.x, lo.y), index, depth);
+    let s01 = textureSampleCompareLevel(shadow_map, shadow_samp, vec2(lo.x, hi.y), index, depth);
+    let s11 = textureSampleCompareLevel(shadow_map, shadow_samp, hi, index, depth);
+    return (s00 * a.x * a.y + s10 * b.x * a.y + s01 * a.x * b.y + s11 * b.x * b.y) / 9.0;
+  }
   var sum = 0.0;
   var taps = 0.0;
   let half_size = i32(u.shadow_filter) / 2;
@@ -18,12 +35,7 @@ fn shadow_lookup(index: u32, world: vec3<f32>, gn: vec3<f32>) -> f32 {
       taps = taps + 1.0;
     }
   }
-  var result = sum / max(taps, 1.0);
-  let outside = any(uv < vec2(0.0)) || any(uv > vec2(1.0)) || p.z < 0.0 || p.z > 1.0;
-  if (outside) {
-    result = 1.0;
-  }
-  return result;
+  return sum / max(taps, 1.0);
 }
 
 fn shadow_factor(world: vec3<f32>, gn: vec3<f32>) -> f32 {

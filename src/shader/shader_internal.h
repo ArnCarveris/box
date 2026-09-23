@@ -80,7 +80,7 @@ void box_shader_path_init(void);
  * @param size Bytes of the output buffer
  * @return true when a readable file was found
  */
-bool box_shader_resolve(
+bool box_locate(
     const char *path,
     char *out,
     size_t size);

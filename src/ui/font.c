@@ -134,7 +134,7 @@ static void box_ui_font_open(
 {
     char resolved[BOX_SHADER_PATH_MAX];
     const char *path = atlas->path;
-    if (!box_shader_resolve(path, resolved, sizeof(resolved))) {
+    if (!box_locate(path, resolved, sizeof(resolved))) {
         ecs_err("box.ui: no font at '%s'", path);
         atlas->failed = true;
         goto done;

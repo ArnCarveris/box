@@ -709,6 +709,8 @@ void box_cull_draw(
             continue;
         }
 
+        wgpuRenderPassEncoderSetPipeline(pass,
+            box_frame_opaque_pipeline(r, draw->baked && !m->cutout_count));
         wgpuRenderPassEncoderSetBindGroup(pass, 3,
             box_bake_group(r, draw->mesh, draw->baked != 0), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);

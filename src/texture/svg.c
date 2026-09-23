@@ -67,7 +67,7 @@ static void box_svg_load_font(
     resvg_options *opts)
 {
     char path[BOX_SHADER_PATH_MAX];
-    if (!box_shader_resolve(BOX_SVG_FONT, path, sizeof(path))) {
+    if (!box_locate(BOX_SVG_FONT, path, sizeof(path))) {
         ecs_warn("svg: no fallback font at '%s', text needs a system font", BOX_SVG_FONT);
         goto done;
     }

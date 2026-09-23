@@ -66,7 +66,7 @@ static const WGPUBlendState box_frame_cover_blend = {
     .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_Zero }
 };
 
-WGPURenderPipeline box_frame_pipeline(
+static WGPURenderPipeline box_frame_pipeline_create(
     box_renderer_t *r,
     uint64_t stride,
     uint64_t offset,
@@ -74,7 +74,8 @@ WGPURenderPipeline box_frame_pipeline(
     bool depth_write,
     const WGPUBlendState *blend,
     bool hdr,
-    uint32_t normals)
+    uint32_t normals,
+    bool solid)
 {
     WGPUVertexAttribute vertex_attrs[8] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
@@ -135,7 +136,12 @@ WGPURenderPipeline box_frame_pipeline(
     };
     const char *entries[] = { "fs_main", "fs_normal", "fs_cover", "fs_group",
         "fs_group_cover" };
+    WGPUConstantEntry constant = {
+        .key = { .data = "box_solid", .length = WGPU_STRLEN }, .value = 1.0
+    };
     WGPUFragmentState fragment = {
+        .constantCount = solid ? 1 : 0,
+        .constants = solid ? &constant : NULL,
         .module = r->mesh_shader,
         .entryPoint = { .data = entries[normals], .length = WGPU_STRLEN },
         .targetCount = lone ? 1u : 2u,
@@ -171,6 +177,20 @@ WGPURenderPipeline box_frame_pipeline(
     return wgpuDeviceCreateRenderPipeline(r->device, &desc);
 }
 
+WGPURenderPipeline box_frame_pipeline(
+    box_renderer_t *r,
+    uint64_t stride,
+    uint64_t offset,
+    WGPUCullMode cull,
+    bool depth_write,
+    const WGPUBlendState *blend,
+    bool hdr,
+    uint32_t normals)
+{
+    return box_frame_pipeline_create(r, stride, offset, cull,
+        depth_write, blend, hdr, normals, false);
+}
+
 void box_frame_resources(
     box_renderer_t *r)
 {
@@ -198,6 +218,7 @@ void box_frame_init(
     box_hiz_init(r);
 
     r->mesh_shader = box_shader_module(r, BOX_SHADER_MESH);
+    r->solid_supported = strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
 
     WGPUBindGroupLayout group_layouts[4] = {
         r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
@@ -231,86 +252,8 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         goto done;
     }
 
-    WGPUVertexAttribute vertex_attrs[8] = {
-        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
-        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
-        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
-            .shaderLocation = 12 },
-        { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
-            .shaderLocation = 13 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
-    };
-    WGPUVertexAttribute instance_attrs[12] = {
-        { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 16, .shaderLocation = 4 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 32, .shaderLocation = 5 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 48, .shaderLocation = 6 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 64, .shaderLocation = 7 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 80, .shaderLocation = 8 },
-        { .format = WGPUVertexFormat_Uint32x2, .offset = 96, .shaderLocation = 9 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = 104, .shaderLocation = 10 },
-        { .format = WGPUVertexFormat_Uint32, .offset = 120, .shaderLocation = 11 },
-        { .format = WGPUVertexFormat_Uint32x4,
-            .offset = BOX_INSTANCE_SHAPE * sizeof(uint32_t), .shaderLocation = 14 },
-        { .format = WGPUVertexFormat_Uint32x2,
-            .offset = BOX_INSTANCE_LAYER_DATA * sizeof(uint32_t), .shaderLocation = 15 },
-        { .format = WGPUVertexFormat_Float32x4,
-            .offset = BOX_INSTANCE_CLIP * sizeof(uint32_t), .shaderLocation = 16 }
-    };
-    WGPUVertexBufferLayout layouts[2] = {
-        {
-            .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
-            .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 8,
-            .attributes = vertex_attrs
-        }, {
-            .arrayStride = sizeof(box_instance_t),
-            .stepMode = WGPUVertexStepMode_Instance,
-            .attributeCount = 12,
-            .attributes = instance_attrs
-        }
-    };
-    WGPUColorTargetState targets[2] = {
-        { .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
-            .writeMask = WGPUColorWriteMask_All },
-        { .format = BOX_EFFECT_NORMAL_FORMAT, .writeMask = WGPUColorWriteMask_All }
-    };
-    WGPUFragmentState fragment = {
-        .module = r->mesh_shader,
-        .entryPoint = { .data = "fs_normal", .length = WGPU_STRLEN },
-        .targetCount = 2,
-        .targets = targets
-    };
-    WGPUDepthStencilState depth = {
-        .format = WGPUTextureFormat_Depth32Float,
-        .depthWriteEnabled = WGPUOptionalBool_True,
-        .depthCompare = WGPUCompareFunction_Greater,
-        .stencilFront = { .compare = WGPUCompareFunction_Always },
-        .stencilBack = { .compare = WGPUCompareFunction_Always },
-        .stencilReadMask = 0xFFFFFFFF,
-        .stencilWriteMask = 0xFFFFFFFF
-    };
-    WGPURenderPipelineDescriptor desc = {
-        .layout = r->mesh_layout,
-        .vertex = {
-            .module = r->mesh_shader,
-            .entryPoint = { .data = "vs_main", .length = WGPU_STRLEN },
-            .bufferCount = 2,
-            .buffers = layouts
-        },
-        .fragment = &fragment,
-        .depthStencil = &depth,
-        .primitive = {
-            .topology = WGPUPrimitiveTopology_TriangleList,
-            .cullMode = WGPUCullMode_Back,
-            .frontFace = WGPUFrontFace_CW
-        },
-        .multisample = { .count = 1, .mask = 0xFFFFFFFF }
-    };
-    r->normal_pipeline[slot] = wgpuDeviceCreateRenderPipeline(r->device, &desc);
+    r->normal_pipeline[slot] = box_frame_pipeline(r, sizeof(box_instance_t), 0,
+        WGPUCullMode_Back, true, NULL, hdr, BOX_NORMALS_WRITE);
 done:
     return r->normal_pipeline[slot];
 }
@@ -334,6 +277,24 @@ static WGPURenderPipeline box_frame_mesh_pipeline(
     return r->pipeline[slot];
 }
 
+WGPURenderPipeline box_frame_opaque_pipeline(
+    box_renderer_t *r,
+    bool solid)
+{
+    bool hdr = r->effect_scene != NULL;
+    bool normals = r->effect_normal != NULL;
+    if (!solid || !r->solid_supported) {
+        return normals ? box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr);
+    }
+    WGPURenderPipeline *pipeline = &r->solid_pipeline[hdr][normals];
+    if (!*pipeline) {
+        *pipeline = box_frame_pipeline_create(r, sizeof(box_instance_t), 0,
+            WGPUCullMode_Back, true, NULL, hdr,
+            normals ? BOX_NORMALS_WRITE : BOX_NORMALS_NONE, true);
+    }
+    return *pipeline;
+}
+
 bool box_frame_rebuild(
     box_renderer_t *r)
 {
@@ -350,6 +311,7 @@ bool box_frame_rebuild(
         WGPUCullMode_Back, true, NULL, false, BOX_NORMALS_NONE);
     result = pipeline != NULL && !r->device_error;
     if (result) {
+        r->solid_supported = strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
         box_transparent_reset(r);
         wgpuShaderModuleRelease(previous);
         uint32_t slot;
@@ -362,6 +324,12 @@ bool box_frame_rebuild(
                 wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
             }
 
+            for (uint32_t normal = 0; normal < 2; normal ++) {
+                if (r->solid_pipeline[slot][normal]) {
+                    wgpuRenderPipelineRelease(r->solid_pipeline[slot][normal]);
+                    r->solid_pipeline[slot][normal] = NULL;
+                }
+            }
             r->pipeline[slot] = NULL;
             r->normal_pipeline[slot] = NULL;
         }

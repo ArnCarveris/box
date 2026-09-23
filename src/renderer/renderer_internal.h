@@ -292,6 +292,10 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup cluster_group;     /**< View, lights and grid of its compute pass */
     WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads for it */
     box_cluster_t grid;              /**< Grid its cluster buffers were built for */
+    box_vec_t light_snapshot;
+    float cluster_view[16];
+    float cluster_proj[16];
+    bool cluster_dirty;
     bool scene_needed;               /**< A sorted draw of the view samples the copy */
     WGPUTexture scene;               /**< Copy of the opaque image of the view */
     WGPUTextureView scene_view;      /**< View of its whole blur chain */
@@ -367,6 +371,8 @@ typedef struct box_gpu_mesh_t {
     box_vec_t groups;                /**< box_static_group_t, empty when no slot has a layer */
     box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
     bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
+    box_vec_t cutout_slots;
+    uint32_t cutout_count;
     box_vec_t transition_index;      /**< uint32_t entry per slot, BOX_TRANSITION_NONE for none */
     box_vec_t transition_slots;      /**< uint32_t slots of the mesh that carry a transition */
     bool transition_sorted;          /**< The slots are in ascending order, so uploads coalesce */
@@ -494,6 +500,8 @@ struct box_renderer_t {
     uint32_t effect_run_count;       /**< Passes in that list */
     bool shader_failed;              /**< A shader did not compile and was already reported */
     bool initialized;                /**< The pipelines were built from the builtin sources */
+    WGPURenderPipeline solid_pipeline[BOX_EFFECT_FORMATS][2];
+    bool solid_supported;
     WGPURenderPipeline normal_pipeline[BOX_EFFECT_FORMATS]; /**< Mesh pipeline writing normals */
     box_vec_t effect_pipelines;      /**< box_gpu_effect_t indexed by shader handle */
     WGPUBindGroupLayout effect_layout;  /**< Uniforms, inputs and sampler of an effect pass */
@@ -811,6 +819,8 @@ WGPUBindGroup box_environment_scene_group(
  * @param normals One of the BOX_NORMALS constants, what it writes there
  * @return The pipeline
  */
+WGPURenderPipeline box_frame_opaque_pipeline(box_renderer_t *r, bool solid);
+
 WGPURenderPipeline box_frame_pipeline(
     box_renderer_t *r,
     uint64_t stride,
