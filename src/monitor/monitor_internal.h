@@ -31,6 +31,8 @@ typedef struct box_cpu_monitor_t {
 /** Collection state of the statistics mirror, owned by its collecting system */
 typedef struct box_stats_monitor_t {
     double elapsed;                           /**< Seconds since the last collection */
+    int32_t frames;                           /**< Frames since the last collection */
+    bool imported;                            /**< The mirror imported the stats addon */
     double frame_ms[BOX_MONITOR_HISTORY_MAX]; /**< Frame times of the retained window */
     int32_t count;                            /**< Frame times in the window */
     int32_t next;                             /**< Slot the next frame time takes */
@@ -185,18 +187,24 @@ void box_stats_panels_init(
 void box_fps_monitor_init(
     ecs_world_t *world);
 
-/** Insert a system and its time into a list that keeps the slowest entries.
+/** Insert a system into a list that keeps the entries with the highest average.
  *
  * @param top The list, slowest first
  * @param count Entries of the list
- * @param system The system to insert
- * @param time_ms Milliseconds the system spent
+ * @param entry The system and its times
  */
 void box_monitor_top(
     SystemTime *top,
     int32_t count,
-    ecs_entity_t system,
-    double time_ms);
+    const SystemTime *entry);
+
+/** Whether the flecs stats addon is imported and its monitors run.
+ *
+ * @param world The world
+ * @return true when the addon collects
+ */
+bool box_monitor_stats_active(
+    const ecs_world_t *world);
 
 /** Frames a spike report keeps, worst first */
 #define BOX_SPIKE_MAX (8)

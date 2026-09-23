@@ -319,7 +319,7 @@ done:
     return;
 }
 
-/** Print the SystemMonitor singleton.
+/** Print the EcsStats singleton: the slowest systems of the last second.
  *
  * @param world The world
  * @param buf The output
@@ -328,21 +328,29 @@ static void box_stats_print_systems(
     ecs_world_t *world,
     ecs_strbuf_t *buf)
 {
-    const SystemMonitor *s = ecs_singleton_get(world, SystemMonitor);
+    const EcsStats *s = ecs_singleton_get(world, EcsStats);
     if (!s) {
         goto done;
     }
 
-    box_stats_line(buf, "systems", s->system_count);
-    ecs_strbuf_append(buf, "%-20s %.3f ms\n", "frame", s->frame_ms);
+    box_stats_line(buf, "systems ran", s->systems_ran);
+    ecs_strbuf_append(buf, "%-20s %.0f\n", "fps", s->fps);
+    ecs_strbuf_append(buf, "%-20s %.3f ms\n", "frame", s->frame_time_avg_ms);
+    ecs_strbuf_append(buf, "%-20s %.3f ms\n", "in systems", s->system_time_ms);
+    box_stats_row(buf, "system", "min ms", "avg ms", "max ms", "");
     int32_t i;
     for (i = 0; i < BOX_MONITOR_TOP; i ++) {
-        if (!s->slowest[i].system) {
+        const SystemTime *t = &s->slowest[i];
+        if (!t->system) {
             continue;
         }
 
-        const char *name = ecs_get_name(world, s->slowest[i].system);
-        ecs_strbuf_append(buf, "%-20s %.3f ms\n", name ? name : "", s->slowest[i].time_ms);
+        char a[24], b[24], c[24];
+        ecs_os_snprintf(a, sizeof(a), "%.3f", t->min_ms);
+        ecs_os_snprintf(b, sizeof(b), "%.3f", t->time_ms);
+        ecs_os_snprintf(c, sizeof(c), "%.3f", t->max_ms);
+        const char *name = ecs_get_name(world, t->system);
+        box_stats_row(buf, name ? name : "", a, b, c, "");
     }
 
 done:
@@ -360,7 +368,8 @@ static const box_stats_cmd_panel_t box_stats_panels[] = {
         box_stats_print_bindgroup },
     { "buffer", "live buffers and uploads per usage", box_stats_print_buffer },
     { "compute", "dispatches and workgroups per compute pass", box_stats_print_compute },
-    { "systems", "the ten slowest ECS systems of the frame", box_stats_print_systems }
+    { "systems", "min, average and max time of the ten slowest ECS systems over the last second",
+        box_stats_print_systems }
 };
 
 /** Panels the command switches */

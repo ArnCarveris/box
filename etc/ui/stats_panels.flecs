@@ -314,14 +314,15 @@ template ComputePanel : StatsPanel {
   StatCells total(name: "total", a: "{s.dispatches}", b: "{s.workgroups}", header: true)
 }
 
-// The ten systems that spent the most time in the last frame, slowest first,
-// and what every system of the frame added up to.
+// The ten ECS systems that spent the most time per frame over the last second,
+// slowest first, with the cheapest, average and most expensive frame of each.
 template SystemsPanel : StatsPanel {
   prop title = "Systems"
+  prop width: f32 = table_width
 
-  const s = SystemMonitor[SystemMonitor]
+  const s = EcsStats[EcsStats]
 
-  StatRow total(label: "{s.system_count} systems", value: "{s.frame_ms:.3} ms", width: width)
+  StatCells header(name: "system", a: "min", b: "avg", c: "max", header: true)
   rows {
     Layout: {direction: Column, spacing: 2, h: Left}
 
@@ -329,10 +330,13 @@ template SystemsPanel : StatsPanel {
       const entry = s.slowest[i]
       if entry.system != 0 {
         "system_{i}" {
-          StatRow: {label: entry.system.name(), value: "{entry.time_ms:.3} ms", width: width,
-            dim: true}
+          StatCells: {name: entry.system.name(), a: "{entry.min_ms:.3}", b: "{entry.time_ms:.3}",
+            c: "{entry.max_ms:.3}"}
         }
       }
     }
   }
+
+  StatCells total(name: "{s.systems_ran} systems, {s.fps:.0} fps, frame {s.frame_time_avg_ms:.2} ms",
+    name_width: width, cell_width: 0, header: true)
 }

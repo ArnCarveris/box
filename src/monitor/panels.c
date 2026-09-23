@@ -18,7 +18,6 @@ typedef struct box_stats_panel_t {
     const char *name;       /**< Name of the exported mut variable */
     ecs_entity_t component; /**< Singleton the panel reads */
     bool owned;             /**< The panel added the singleton, so hiding it removes it */
-    bool enable;            /**< The singleton collects while its enabled field is set */
 } box_stats_panel_t;
 
 /** Load a script into a named child of box.monitor.
@@ -54,8 +53,8 @@ done:
 /** Add or remove the singleton of a panel when its variable changes.
  *
  * A singleton that existed before the panel showed belongs to someone else and
- * stays when the panel hides. A singleton that collects while enabled is
- * enabled when the panel adds it.
+ * stays when the panel hides. An added singleton is marked modified with its
+ * defaults, so a source that starts on set starts.
  *
  * @param it Iterator over the variable
  */
@@ -69,10 +68,8 @@ static void BoxStatsPanelVisible(
     bool present = ecs_has_id(it->world, panel->component, panel->component);
     if (visible && !present) {
         ecs_add_id(it->world, panel->component, panel->component);
+        ecs_modified_id(it->world, panel->component, panel->component);
         panel->owned = true;
-        if (panel->enable) {
-            ecs_singleton_set(it->world, SystemMonitor, { .enabled = true });
-        }
     } else if (!visible && present && panel->owned) {
         ecs_remove_id(it->world, panel->component, panel->component);
         panel->owned = false;
@@ -102,7 +99,7 @@ void box_stats_panels_init(
         { .name = "bindgroup", .component = ecs_id(BindGroupStats) },
         { .name = "buffer", .component = ecs_id(BufferStats) },
         { .name = "compute", .component = ecs_id(ComputeStats) },
-        { .name = "systems", .component = ecs_id(SystemMonitor), .enable = true }
+        { .name = "systems", .component = ecs_id(EcsStats) }
     };
 
     bool loaded = box_stats_script(world, BOX_MONITOR_STATS_TEMPLATES, "stats_templates");

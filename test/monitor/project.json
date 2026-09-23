@@ -33,7 +33,12 @@
                     "entity_count_follows_the_world",
                     "frame_time_window_is_averaged",
                     "slowest_systems_are_listed",
-                    "removing_the_component_stops_collection"
+                    "removing_the_component_stops_collection",
+                    "slowest_covers_min_avg_max",
+                    "collection_marks_the_component_modified",
+                    "removing_the_component_disables_the_addon",
+                    "setting_it_again_enables_the_addon",
+                    "addon_monitors_are_not_listed"
                 ]
             },
             {
@@ -125,7 +130,7 @@
                     "tables_end_with_their_total",
                     "buffer_panel_shows_the_used_classes",
                     "a_surface_world_publishes_the_details",
-                    "systems_panel_enables_the_monitor",
+                    "systems_panel_imports_the_stats_addon",
                     "systems_panel_lists_ten_at_most"
                 ]
             }

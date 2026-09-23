@@ -169,3 +169,140 @@ void Stats_removing_the_component_stops_collection(void)
     test_int(s->entity_count, 0);
     ecs_fini(world);
 }
+
+void Stats_slowest_covers_min_avg_max(void)
+{
+    // monitoring/stats_systems
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, EcsStats, {.period_s = 0.05});
+    ECS_SYSTEM(world, BoxStatsBurn, EcsOnUpdate, 0);
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0.01f);
+    }
+
+    const EcsStats *s = ecs_singleton_get(world, EcsStats);
+    const SystemTime *burn = NULL;
+    for (i = 0; i < BOX_MONITOR_TOP; i ++) {
+        if (s->slowest[i].system == BoxStatsBurn) {
+            burn = &s->slowest[i];
+        }
+    }
+
+    test_assert(burn != NULL);
+    test_assert(burn->max_ms > 0.0);
+    test_assert(burn->min_ms <= burn->time_ms);
+    test_assert(burn->time_ms <= burn->max_ms);
+    test_assert(burn->min_ms > 0.0);
+    ecs_fini(world);
+}
+
+static int32_t stats_sets;
+
+static void BoxStatsCountSet(
+    ecs_iter_t *it)
+{
+    (void)it;
+    stats_sets ++;
+}
+
+void Stats_collection_marks_the_component_modified(void)
+{
+    // monitoring/stats_systems
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(EcsStats) }},
+        .events = { EcsOnSet },
+        .callback = BoxStatsCountSet
+    });
+    stats_sets = 0;
+    ecs_singleton_set(world, EcsStats, {.period_s = 1.0});
+    test_int(stats_sets, 1);
+    ecs_progress(world, 0.5f);
+    test_int(stats_sets, 1);
+    ecs_progress(world, 0.5f);
+    test_int(stats_sets, 2);
+    ecs_progress(world, 0.5f);
+    test_int(stats_sets, 2);
+    ecs_progress(world, 0.5f);
+    test_int(stats_sets, 3);
+    ecs_fini(world);
+}
+
+void Stats_removing_the_component_disables_the_addon(void)
+{
+    // monitoring/stats_systems
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, EcsStats, {.period_s = 0.01});
+    ECS_SYSTEM(world, BoxStatsBurn, EcsOnUpdate, 0);
+    ecs_entity_t module = ecs_lookup(world, "flecs.stats");
+    test_assert(module != 0);
+    ecs_progress(world, 0.02f);
+    ecs_progress(world, 0.02f);
+    const EcsWorldSummary *summary = ecs_get(world, EcsWorld, EcsWorldSummary);
+    test_assert(summary != NULL);
+    int64_t frames = summary->frame_count;
+    test_assert(frames > 0);
+    test_assert(ecs_system_get(world, BoxStatsBurn)->time_spent > 0);
+
+    ecs_singleton_remove(world, EcsStats);
+    test_bool(ecs_has_id(world, module, EcsDisabled), true);
+    ecs_ftime_t spent = ecs_system_get(world, BoxStatsBurn)->time_spent;
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0.02f);
+    }
+
+    test_int(ecs_get(world, EcsWorld, EcsWorldSummary)->frame_count, frames);
+    test_flt(ecs_system_get(world, BoxStatsBurn)->time_spent, spent);
+    ecs_fini(world);
+}
+
+void Stats_setting_it_again_enables_the_addon(void)
+{
+    // monitoring/stats_systems
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, EcsStats, {.period_s = 0.01});
+    ecs_entity_t module = ecs_lookup(world, "flecs.stats");
+    ecs_progress(world, 0.02f);
+    ecs_singleton_remove(world, EcsStats);
+    test_bool(ecs_has_id(world, module, EcsDisabled), true);
+    int64_t frames = ecs_get(world, EcsWorld, EcsWorldSummary)->frame_count;
+
+    ecs_singleton_set(world, EcsStats, {.period_s = 0.01});
+    test_bool(ecs_has_id(world, module, EcsDisabled), false);
+    ecs_progress(world, 0.02f);
+    ecs_progress(world, 0.02f);
+    test_assert(ecs_get(world, EcsWorld, EcsWorldSummary)->frame_count > frames);
+    test_assert(ecs_singleton_get(world, EcsStats)->collections >= 1);
+    ecs_fini(world);
+}
+
+void Stats_addon_monitors_are_not_listed(void)
+{
+    // monitoring/stats_systems
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, EcsStats, {.period_s = 0.05});
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0.01f);
+    }
+
+    const EcsStats *s = ecs_singleton_get(world, EcsStats);
+    ecs_entity_t addon = ecs_lookup(world, "flecs.stats");
+    test_assert(s->slowest[0].system != 0);
+    for (i = 0; i < BOX_MONITOR_TOP; i ++) {
+        ecs_entity_t parent = s->slowest[i].system;
+        while (parent) {
+            test_assert(parent != addon);
+            parent = ecs_get_parent(world, parent);
+        }
+    }
+
+    ecs_fini(world);
+}

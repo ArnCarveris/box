@@ -50,12 +50,11 @@ static void box_stats_ctor(
 void box_monitor_top(
     SystemTime *top,
     int32_t count,
-    ecs_entity_t system,
-    double time_ms)
+    const SystemTime *entry)
 {
     int32_t i, slot = -1;
     for (i = 0; i < count; i ++) {
-        if (time_ms > top[i].time_ms) {
+        if (entry->time_ms > top[i].time_ms) {
             slot = i;
             break;
         }
@@ -69,10 +68,17 @@ void box_monitor_top(
         top[i] = top[i - 1];
     }
 
-    top[slot].system = system;
-    top[slot].time_ms = time_ms;
+    top[slot] = *entry;
 done:
     return;
+}
+
+bool box_monitor_stats_active(
+    const ecs_world_t *world)
+{
+    ecs_entity_t module = ecs_lookup(world, "flecs.stats");
+
+    return module && !ecs_has_id(world, module, EcsDisabled);
 }
 
 void BoxMonitorImport(

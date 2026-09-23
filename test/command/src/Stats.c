@@ -37,7 +37,8 @@ void Stats_lists_the_panels(void)
         "bindgroup  off  bind group sets and changes per pass and slot\n"
         "buffer     off  live buffers and uploads per usage\n"
         "compute    off  dispatches and workgroups per compute pass\n"
-        "systems    off  the ten slowest ECS systems of the frame\n");
+        "systems    off  min, average and max time of the ten slowest ECS systems over the"
+        " last second\n");
     ecs_os_free(out);
 }
 
@@ -266,28 +267,37 @@ void Stats_systems_prints_the_slowest_systems(void)
     // monitoring/stats_systems
     bool error = true;
     ecs_os_free(box_command_run(w, session, "stats systems", &error));
-    const SystemMonitor *live = ecs_singleton_get(w, SystemMonitor);
-    test_assert(live != NULL);
-    test_bool(live->enabled, true);
+    test_assert(ecs_singleton_get(w, EcsStats) != NULL);
+    test_assert(ecs_lookup(w, "flecs.stats") != 0);
 
-    SystemMonitor *s = ecs_singleton_ensure(w, SystemMonitor);
-    s->frame_ms = 1.5;
-    s->system_count = 2;
+    EcsStats *s = ecs_singleton_ensure(w, EcsStats);
+    s->systems_ran = 2;
+    s->fps = 50.0;
+    s->frame_time_avg_ms = 20.0;
+    s->system_time_ms = 1.5;
     s->slowest[0].system = ecs_lookup(w, "box.monitor.BoxCollectSystems");
     s->slowest[0].time_ms = 1.0;
+    s->slowest[0].min_ms = 0.5;
+    s->slowest[0].max_ms = 2.0;
     s->slowest[1].system = ecs_lookup(w, "box.monitor.BoxPublishFps");
     s->slowest[1].time_ms = 0.5;
-    ecs_singleton_modified(w, SystemMonitor);
+    s->slowest[1].min_ms = 0.25;
+    s->slowest[1].max_ms = 0.75;
+    ecs_singleton_modified(w, EcsStats);
 
     char *out = box_command_run(w, session, "stats systems", &error);
     test_bool(error, false);
     test_str(out,
-        "systems              2\n"
-        "frame                1.500 ms\n"
-        "BoxCollectSystems    1.000 ms\n"
-        "BoxPublishFps        0.500 ms\n");
+        "systems ran          2\n"
+        "fps                  50\n"
+        "frame                20.000 ms\n"
+        "in systems           1.500 ms\n"
+        "system                       min ms     avg ms     max ms           \n"
+        "BoxCollectSystems             0.500      1.000      2.000           \n"
+        "BoxPublishFps                 0.250      0.500      0.750           \n");
     ecs_os_free(out);
 
     ecs_os_free(box_command_run(w, session, "stats systems off", &error));
-    test_assert(ecs_singleton_get(w, SystemMonitor) == NULL);
+    test_assert(ecs_singleton_get(w, EcsStats) == NULL);
+    test_bool(ecs_has_id(w, ecs_lookup(w, "flecs.stats"), EcsDisabled), true);
 }

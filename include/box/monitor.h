@@ -57,10 +57,12 @@ ECS_STRUCT(CpuMonitor, {
     double budget_sleep_ms;  /**< Milliseconds the CPU budget slept last frame */
 });
 
-/** A system and the time it spent in one frame */
+/** A system and the time it spent per frame over the window of its list */
 ECS_STRUCT(SystemTime, {
     ecs_entity_t system; /**< The system that ran */
-    double time_ms;      /**< Milliseconds it spent */
+    double time_ms;      /**< Milliseconds it spent per frame on average */
+    double min_ms;       /**< Milliseconds of its cheapest frame in the window */
+    double max_ms;       /**< Milliseconds of its most expensive frame in the window */
 });
 
 /** A pipeline phase and the time its systems spent in one frame */
@@ -72,8 +74,12 @@ ECS_STRUCT(PhaseTime, {
 /** Flecs statistics mirrored into fields while the singleton exists.
  *
  * Setting the component imports the flecs stats addon and starts collection;
- * removing it stops collection. Values are refreshed every period_s seconds and
- * frame_time_avg_ms averages the last history frame times.
+ * removing it stops collection and disables the monitors of the addon again
+ * when this component imported it.
+ *
+ * Values are refreshed every period_s seconds, which marks the component
+ * modified. The slowest list covers the frames of the last period, at most the
+ * sixty samples the addon keeps, with the average, minimum and maximum per frame.
  */
 ECS_STRUCT(EcsStats, {
     double period_s;          /**< Seconds between two collections, default 1 */
@@ -87,7 +93,7 @@ ECS_STRUCT(EcsStats, {
     double system_time_ms;    /**< Milliseconds the last frame spent in systems */
     double merge_time_ms;     /**< Milliseconds the last frame spent merging */
     double fps;               /**< Frames per second at the last collection */
-    SystemTime slowest[10];   /**< Slowest systems of the period, slowest first */
+    SystemTime slowest[10];   /**< Slowest systems of the period by average, slowest first */
 });
 
 /** Per system and per phase frame timings, collected while enabled.

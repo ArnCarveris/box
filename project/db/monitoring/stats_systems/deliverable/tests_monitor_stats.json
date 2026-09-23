@@ -1,0 +1,23 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-23T23:30:40Z",
+  "pass": 12,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.197644,
+  "tests": [
+    {"suite": "Stats", "case": "setting_the_component_imports_the_addon", "status": "pass", "elapsed": 0.090584},
+    {"suite": "Stats", "case": "collects_after_the_period", "status": "pass", "elapsed": 0.094028},
+    {"suite": "Stats", "case": "period_holds_back_the_collection", "status": "pass", "elapsed": 0.095251},
+    {"suite": "Stats", "case": "entity_count_follows_the_world", "status": "pass", "elapsed": 0.094370},
+    {"suite": "Stats", "case": "frame_time_window_is_averaged", "status": "pass", "elapsed": 0.113861},
+    {"suite": "Stats", "case": "slowest_systems_are_listed", "status": "pass", "elapsed": 0.177165},
+    {"suite": "Stats", "case": "removing_the_component_stops_collection", "status": "pass", "elapsed": 0.094875},
+    {"suite": "Stats", "case": "slowest_covers_min_avg_max", "status": "pass", "elapsed": 0.142831},
+    {"suite": "Stats", "case": "collection_marks_the_component_modified", "status": "pass", "elapsed": 0.078902},
+    {"suite": "Stats", "case": "removing_the_component_disables_the_addon", "status": "pass", "elapsed": 0.103499},
+    {"suite": "Stats", "case": "setting_it_again_enables_the_addon", "status": "pass", "elapsed": 0.074846},
+    {"suite": "Stats", "case": "addon_monitors_are_not_listed", "status": "pass", "elapsed": 0.074631}
+  ]
+}

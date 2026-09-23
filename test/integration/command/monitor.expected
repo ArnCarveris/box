@@ -17,11 +17,12 @@ BoxSampleCpu
 BoxShowStatsBindGroupStats
 BoxShowStatsBufferStats
 BoxShowStatsComputeStats
+BoxShowStatsEcsStats
 BoxShowStatsGpuTimings
 BoxShowStatsPassStats
 BoxShowStatsPipelineStats
 BoxShowStatsRendererStats
-BoxShowStatsSystemMonitor
+BoxStatsOnRemove
 BoxStatsOnSet
 BoxSystemMonitorOnRemove
 BoxSystemMonitorOnSet

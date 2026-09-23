@@ -1,282 +1,366 @@
 {
   "project": "all",
-  "timestamp": "2026-09-23T23:17:57Z",
-  "pass": 39,
+  "timestamp": "2026-09-23T23:30:41Z",
+  "pass": 51,
   "fail": 0,
   "empty": 0,
-  "elapsed": 6.575673,
+  "elapsed": 0.805635,
   "tests": [
+    {
+      "suite": "Stats",
+      "case": "setting_the_component_imports_the_addon",
+      "status": "pass",
+      "elapsed": 0.090584,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "collects_after_the_period",
+      "status": "pass",
+      "elapsed": 0.094028,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "period_holds_back_the_collection",
+      "status": "pass",
+      "elapsed": 0.095251,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "entity_count_follows_the_world",
+      "status": "pass",
+      "elapsed": 0.09437,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "frame_time_window_is_averaged",
+      "status": "pass",
+      "elapsed": 0.113861,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "slowest_systems_are_listed",
+      "status": "pass",
+      "elapsed": 0.177165,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "removing_the_component_stops_collection",
+      "status": "pass",
+      "elapsed": 0.094875,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "slowest_covers_min_avg_max",
+      "status": "pass",
+      "elapsed": 0.142831,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "collection_marks_the_component_modified",
+      "status": "pass",
+      "elapsed": 0.078902,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "removing_the_component_disables_the_addon",
+      "status": "pass",
+      "elapsed": 0.103499,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "setting_it_again_enables_the_addon",
+      "status": "pass",
+      "elapsed": 0.074846,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "addon_monitors_are_not_listed",
+      "status": "pass",
+      "elapsed": 0.074631,
+      "project": "monitor"
+    },
     {
       "suite": "StatsPanels",
       "case": "panels_are_hidden_by_default",
       "status": "pass",
-      "elapsed": 0.804349,
+      "elapsed": 0.088125,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "templates_are_loaded",
       "status": "pass",
-      "elapsed": 1.186429,
+      "elapsed": 0.0869,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "showing_a_panel_adds_its_singleton",
       "status": "pass",
-      "elapsed": 1.353075,
+      "elapsed": 0.090467,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "gpu_panel_adds_gpu_timings",
       "status": "pass",
-      "elapsed": 1.039578,
+      "elapsed": 0.087511,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "hiding_keeps_a_singleton_added_elsewhere",
       "status": "pass",
-      "elapsed": 1.013367,
+      "elapsed": 0.087359,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "removing_the_singleton_stops_counting",
       "status": "pass",
-      "elapsed": 1.318417,
+      "elapsed": 0.085494,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "renderer_panel_shows_the_counts",
       "status": "pass",
-      "elapsed": 1.694479,
+      "elapsed": 0.115666,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "gpu_panel_lists_the_passes",
       "status": "pass",
-      "elapsed": 0.677237,
+      "elapsed": 0.088745,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "panels_stack_in_one_column",
       "status": "pass",
-      "elapsed": 3.237523,
+      "elapsed": 0.131905,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "a_surface_world_publishes_the_counts",
       "status": "pass",
-      "elapsed": 1.538935,
+      "elapsed": 0.121942,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "detail_panels_add_their_singletons",
       "status": "pass",
-      "elapsed": 1.589106,
+      "elapsed": 0.087768,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "counting_asks_for_what_the_singletons_need",
       "status": "pass",
-      "elapsed": 1.467772,
+      "elapsed": 0.080799,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "pass_panel_lists_the_passes",
       "status": "pass",
-      "elapsed": 1.447621,
+      "elapsed": 0.082673,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "tables_end_with_their_total",
       "status": "pass",
-      "elapsed": 1.568905,
+      "elapsed": 0.091874,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "buffer_panel_shows_the_used_classes",
       "status": "pass",
-      "elapsed": 1.34644,
+      "elapsed": 0.080924,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "a_surface_world_publishes_the_details",
       "status": "pass",
-      "elapsed": 1.693156,
+      "elapsed": 0.103682,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
-      "case": "systems_panel_enables_the_monitor",
+      "case": "systems_panel_imports_the_stats_addon",
       "status": "pass",
-      "elapsed": 1.652629,
+      "elapsed": 0.123884,
       "project": "monitor"
     },
     {
       "suite": "StatsPanels",
       "case": "systems_panel_lists_ten_at_most",
       "status": "pass",
-      "elapsed": 1.144066,
+      "elapsed": 0.079635,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "off_by_default",
       "status": "pass",
-      "elapsed": 0.742804,
+      "elapsed": 0.09178,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "disabled_monitor_collects_nothing",
       "status": "pass",
-      "elapsed": 0.884488,
+      "elapsed": 0.111372,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "slow_system_is_attributed_to_itself",
       "status": "pass",
-      "elapsed": 0.750997,
+      "elapsed": 0.1224,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "frame_total_covers_the_systems",
       "status": "pass",
-      "elapsed": 1.021128,
+      "elapsed": 0.133804,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "phase_totals_are_kept_per_phase",
       "status": "pass",
-      "elapsed": 1.002063,
+      "elapsed": 0.134939,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "disabling_stops_collection",
       "status": "pass",
-      "elapsed": 0.851373,
+      "elapsed": 0.132036,
       "project": "monitor"
     },
     {
       "suite": "Systems",
       "case": "removing_the_monitor_stops_measurement",
       "status": "pass",
-      "elapsed": 0.926944,
+      "elapsed": 0.132782,
       "project": "monitor"
     },
     {
       "suite": "Stats",
       "case": "lists_the_panels",
       "status": "pass",
-      "elapsed": 0.778013,
+      "elapsed": 0.093761,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "naming_a_panel_shows_it",
       "status": "pass",
-      "elapsed": 0.882146,
+      "elapsed": 0.09881,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "naming_a_shown_panel_prints_its_counts",
       "status": "pass",
-      "elapsed": 0.977459,
+      "elapsed": 0.099518,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "gpu_prints_the_passes",
       "status": "pass",
-      "elapsed": 0.811015,
+      "elapsed": 0.095768,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "off_hides_the_panel",
       "status": "pass",
-      "elapsed": 0.782633,
+      "elapsed": 0.094379,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "off_hides_every_panel",
       "status": "pass",
-      "elapsed": 0.87571,
+      "elapsed": 0.09878,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "unknown_panel_is_an_error",
       "status": "pass",
-      "elapsed": 0.748221,
+      "elapsed": 0.093185,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "unknown_state_is_an_error",
       "status": "pass",
-      "elapsed": 1.006203,
+      "elapsed": 0.093691,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "help_lists_the_command",
       "status": "pass",
-      "elapsed": 0.800696,
+      "elapsed": 0.080397,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "pass_prints_a_row_per_pass",
       "status": "pass",
-      "elapsed": 0.752136,
+      "elapsed": 0.081984,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "bindgroup_prints_the_redundant_sets",
       "status": "pass",
-      "elapsed": 0.713124,
+      "elapsed": 0.082408,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "buffer_skips_the_unused_classes",
       "status": "pass",
-      "elapsed": 0.745313,
+      "elapsed": 0.081872,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "off_hides_the_detail_panels",
       "status": "pass",
-      "elapsed": 0.594,
+      "elapsed": 0.079285,
       "project": "command"
     },
     {
       "suite": "Stats",
       "case": "systems_prints_the_slowest_systems",
       "status": "pass",
-      "elapsed": 0.650675,
+      "elapsed": 0.081501,
       "project": "command"
     }
   ],
@@ -286,21 +370,28 @@
       "pass": 14,
       "fail": 0,
       "empty": 0,
-      "elapsed": 1.556633
+      "elapsed": 0.180454
+    },
+    {
+      "project": "monitor",
+      "pass": 12,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.197644
     },
     {
       "project": "monitor",
       "pass": 18,
       "fail": 0,
       "empty": 0,
-      "elapsed": 3.997107
+      "elapsed": 0.292489
     },
     {
       "project": "monitor",
       "pass": 7,
       "fail": 0,
       "empty": 0,
-      "elapsed": 1.021933
+      "elapsed": 0.135048
     }
   ]
 }

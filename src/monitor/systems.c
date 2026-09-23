@@ -71,7 +71,8 @@ static void box_system_attribute(
     double ms = (double)(total - last) * 1e-6;
     m->frame_ms += ms;
     m->system_count ++;
-    box_monitor_top(m->slowest, BOX_MONITOR_TOP, system, ms);
+    SystemTime entry = { .system = system, .time_ms = ms, .min_ms = ms, .max_ms = ms };
+    box_monitor_top(m->slowest, BOX_MONITOR_TOP, &entry);
     box_system_phase(world, m, system, ms);
 done:
     return;
@@ -132,7 +133,7 @@ static void box_system_monitor_on_remove(
     ecs_iter_t *it)
 {
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
-    if (!ecs_lookup(world, "flecs.stats")) {
+    if (!box_monitor_stats_active(world)) {
         ecs_measure_system_time(world, false);
     }
 }

@@ -464,34 +464,41 @@ void StatsPanels_a_surface_world_publishes_the_details(void)
     ecs_fini(world);
 }
 
-void StatsPanels_systems_panel_enables_the_monitor(void)
+void StatsPanels_systems_panel_imports_the_stats_addon(void)
 {
     // monitoring/stats_systems
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    test_assert(ecs_lookup(world, "flecs.stats") == 0);
     ecs_mut_var_set_t(world, "box.monitor.stats.systems", ecs_bool_t, {true});
-    const SystemMonitor *m = ecs_singleton_get(world, SystemMonitor);
-    test_assert(m != NULL);
-    test_bool(m->enabled, true);
+    const EcsStats *s = ecs_singleton_get(world, EcsStats);
+    test_assert(s != NULL);
+    test_flt(s->period_s, 1.0);
+    ecs_entity_t module = ecs_lookup(world, "flecs.stats");
+    test_assert(module != 0);
+    test_bool(ecs_has_id(world, module, EcsDisabled), false);
     test_assert(ecs_lookup(world, "box.monitor.stats.panel.screen.stack.systems_stats") != 0);
 
     int32_t i;
-    for (i = 0; i < 3; i ++) {
+    for (i = 0; i < 70; i ++) {
         ecs_progress(world, 0.02f);
     }
 
-    m = ecs_singleton_get(world, SystemMonitor);
-    test_assert(m->system_count > 0);
-    test_assert(m->slowest[0].system != 0);
+    s = ecs_singleton_get(world, EcsStats);
+    test_assert(s->collections >= 1);
+    test_assert(s->slowest[0].system != 0);
+    test_assert(s->slowest[0].max_ms >= s->slowest[0].time_ms);
+    test_assert(s->slowest[0].time_ms >= s->slowest[0].min_ms);
     ecs_entity_t rows = ecs_lookup(world,
         "box.monitor.stats.panel.screen.stack.systems_stats.rows");
     ecs_entity_t first = ecs_lookup_child(world, rows, "system_0");
     test_assert(first != 0);
-    const Text *name = ecs_get(world, ecs_lookup_child(world, first, "name"), Text);
-    test_str(name->value, ecs_get_name(world, m->slowest[0].system));
+    const Text *name = ecs_get(world, ecs_lookup_child(world, first, "name_cell"), Text);
+    test_str(name->value, ecs_get_name(world, s->slowest[0].system));
 
     ecs_mut_var_set_t(world, "box.monitor.stats.systems", ecs_bool_t, {false});
-    test_assert(ecs_singleton_get(world, SystemMonitor) == NULL);
+    test_assert(ecs_singleton_get(world, EcsStats) == NULL);
+    test_bool(ecs_has_id(world, module, EcsDisabled), true);
     ecs_fini(world);
 }
 
@@ -501,31 +508,34 @@ void StatsPanels_systems_panel_lists_ten_at_most(void)
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     ecs_mut_var_set_t(world, "box.monitor.stats.systems", ecs_bool_t, {true});
-    SystemMonitor *m = ecs_singleton_ensure(world, SystemMonitor);
-    m->enabled = true;
-    m->frame_ms = 5.5;
-    m->system_count = 12;
+    EcsStats *s = ecs_singleton_ensure(world, EcsStats);
+    s->systems_ran = 12;
+    s->fps = 60.0;
+    s->system_time_ms = 2.5;
+    s->frame_time_avg_ms = 5.5;
     int32_t i;
     for (i = 0; i < BOX_MONITOR_TOP; i ++) {
-        m->slowest[i].system = ecs_lookup(world, "box.monitor.BoxPublishFps");
-        m->slowest[i].time_ms = 1.0 / (double)(i + 1);
+        s->slowest[i].system = ecs_lookup(world, "box.monitor.BoxPublishFps");
+        s->slowest[i].time_ms = 1.0 / (double)(i + 1);
+        s->slowest[i].min_ms = 0.5 / (double)(i + 1);
+        s->slowest[i].max_ms = 2.0 / (double)(i + 1);
     }
 
-    ecs_singleton_modified(world, SystemMonitor);
+    ecs_singleton_modified(world, EcsStats);
     ecs_entity_t panel = ecs_lookup(world,
         "box.monitor.stats.panel.screen.stack.systems_stats");
     ecs_entity_t total = ecs_lookup_child(world, panel, "total");
-    test_str(ecs_get(world, ecs_lookup_child(world, total, "name"), Text)->value,
-        "12 systems");
-    test_str(ecs_get(world, ecs_lookup_child(world, total, "amount"), Text)->value,
-        "5.500 ms");
+    test_str(ecs_get(world, ecs_lookup_child(world, total, "name_cell"), Text)->value,
+        "12 systems, 60 fps, frame 5.50 ms");
+    test_str(ecs_get(world, ecs_lookup_child(world, total, "b_cell"), Text)->value, "");
     ecs_entity_t rows = ecs_lookup_child(world, panel, "rows");
     test_assert(ecs_lookup_child(world, rows, "system_9") != 0);
     test_assert(ecs_lookup_child(world, rows, "system_10") == 0);
     ecs_entity_t last = ecs_lookup_child(world, rows, "system_9");
-    test_str(ecs_get(world, ecs_lookup_child(world, last, "name"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup_child(world, last, "name_cell"), Text)->value,
         "BoxPublishFps");
-    test_str(ecs_get(world, ecs_lookup_child(world, last, "amount"), Text)->value,
-        "0.100 ms");
+    test_str(ecs_get(world, ecs_lookup_child(world, last, "a_cell"), Text)->value, "0.050");
+    test_str(ecs_get(world, ecs_lookup_child(world, last, "b_cell"), Text)->value, "0.100");
+    test_str(ecs_get(world, ecs_lookup_child(world, last, "c_cell"), Text)->value, "0.200");
     ecs_fini(world);
 }
