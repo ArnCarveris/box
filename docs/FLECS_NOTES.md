@@ -36,6 +36,19 @@ It would help if restarting the blocks of an instance either cancelled the
 futures of the old tasks (so a source sees `is_cancelled`) or re-delivered a
 resolved value to the restarted block.
 
+## A reactive template must not move the entity whose event it reacts to
+
+A template body with `if this?[Hovered] { Tint: hover }` adds `Tint` when the
+tag arrives and removes it when the tag goes. The reactivity runs from the
+OnAdd or OnRemove event of `Hovered`, while flecs is still moving the entity
+between tables, and the nested add or remove fails on
+`assert(record->table == dst_table)` in `flecs_move_entity`. A conditional
+that only changes the value of a component that exists in every branch is fine.
+
+Workaround: the editor templates keep `Tint` in every branch and switch its
+value. It would help if script reactivity deferred a structural change it makes
+to the entity whose event it handles.
+
 ## Interpolating an entity into a string yields its path
 
 `"n_{r.entity}"` gives `n_scene.ball` for a child entity, and a name with a dot

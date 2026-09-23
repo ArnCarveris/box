@@ -2,15 +2,13 @@
  * @file picking/pick.c
  * @brief Picks under the cursor once per frame and raises the events it implies.
  *
- * The update runs immediately on the world, so a hover that re-evaluates a
- * template restarts its tasks before the press of the same frame is raised.
- *
  * The pick of a frame is one ray query per view that renders into the surface,
  * and only while the cursor moves: a still cursor answers from the hit the last
  * query left behind, so a frame that changes nothing costs no query.
  *
- * A press that found no waiter is kept while the button is held, so a handler
- * whose task restarted in that frame, as a hover does to a template, still gets it.
+ * The update runs immediately on the world, so a hover that re-evaluates a
+ * template restarts its tasks before the press of the same frame is raised, and
+ * a press that found no waiter is kept while the button is held for the task.
  */
 
 #include "picking_internal.h"

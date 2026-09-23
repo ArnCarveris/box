@@ -3,8 +3,11 @@
  * @brief The inspector model: the fields of the selection, their assignment and the bound inputs.
  *
  * The fields are rebuilt every frame from the reflection data of the selected
- * entity and published only when their text changed. A bound text input that
- * submitted a line assigns it through the meta cursor of the component.
+ * entity and published only when their text changed.
+ *
+ * A bound text input that submitted a line assigns it through the meta cursor
+ * of the component, in place and followed by modified, which a template prop
+ * with a replace hook allows.
  */
 
 #include "editor_internal.h"
@@ -414,7 +417,7 @@ static void box_editor_id_fields(
         bool editable = !box_editor_engine_written(world, id) &&
             box_editor_editable(world, e, id);
         box_editor_field(inspector, id, NULL, name, FieldHeader, "", editable);
-        void *ptr = ecs_get_mut_id(world, e, id);
+        void *ptr = ECS_CONST_CAST(void*, ecs_get_id(world, e, id));
         ecs_meta_cursor_t cur = ecs_meta_cursor(world, id, ptr);
         box_editor_members(world, inspector, &cur, id, "", 0, editable);
     } else if (meta) {
@@ -508,9 +511,9 @@ bool box_editor_assign(
         goto done;
     }
 
-    void *ptr = ecs_get_mut_id(world, e, component);
+    void *ptr = ECS_CONST_CAST(void*, ecs_get_id(world, e, component));
     ecs_meta_cursor_t cur = ecs_meta_cursor(world, component, ptr);
-    if (member && member[0] && ecs_meta_dotmember(&cur, member)) {
+    if (member && member[0] && (ecs_meta_push(&cur) || ecs_meta_dotmember(&cur, member))) {
         goto done;
     }
 

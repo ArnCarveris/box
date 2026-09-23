@@ -14,27 +14,30 @@ using box.collision
 using box.editor
 using box.editor.HandleMode
 
-const red: Tint = {226, 74, 74, 255}
-const green: Tint = {74, 200, 96, 255}
-const blue: Tint = {84, 132, 240, 255}
-const white: Tint = {220, 224, 230, 255}
+const red: Rgb = {226, 74, 74}
+const green: Rgb = {74, 200, 96}
+const blue: Rgb = {84, 132, 240}
+const white: Rgb = {220, 224, 230}
 const hover: Tint = {255, 235, 120, 255}
+const plain: Tint = {255, 255, 255, 0}
 const half = 1.5707963
 
-// A part of a gizmo that can be dragged, colored by its axis and lit up under the cursor.
-// The color is a Tint, which reaches the shapes below the handle.
+// A part of a gizmo that can be dragged, lit up under the cursor by a Tint that
+// reaches the shapes below it. The shapes carry the color of their axis. The
+// Tint is always there and only changes value, so a hover moves no table.
 template Handle {
   prop mode: HandleMode = HandleMove
   prop axes: i32 = 1
-  prop color: Tint = {255, 255, 255, 255}
+  prop color: Rgb = {255, 255, 255}
 
   Pickable
   GizmoHandle: {mode: mode, axes: axes}
+  Rgb: color
 
   if this?[Hovered] {
     Tint: hover
   } else {
-    Tint: color
+    Tint: plain
   }
 
   async {
@@ -59,11 +62,13 @@ template MoveGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: red
       CapsuleCollider: {radius: 0.07, height: 0.7}
     }
     tip {
       Position: {0, 0.9, 0}
       Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: red
       SphereCollider: {radius: 0.12}
     }
   }
@@ -72,11 +77,13 @@ template MoveGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: green
       CapsuleCollider: {radius: 0.07, height: 0.7}
     }
     tip {
       Position: {0, 0.9, 0}
       Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: green
       SphereCollider: {radius: 0.12}
     }
   }
@@ -86,11 +93,13 @@ template MoveGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: blue
       CapsuleCollider: {radius: 0.07, height: 0.7}
     }
     tip {
       Position: {0, 0.9, 0}
       Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: blue
       SphereCollider: {radius: 0.12}
     }
   }
@@ -121,6 +130,7 @@ template RotateGizmo {
     Rotation: {0, 0, half}
     ring {
       Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: red
       BoxCollider: {half: {0.84, 0.04, 0.84}}
     }
   }
@@ -128,6 +138,7 @@ template RotateGizmo {
   Handle y(mode: HandleRotate, axes: 2, color: green) {
     ring {
       Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: green
       BoxCollider: {half: {0.84, 0.04, 0.84}}
     }
   }
@@ -136,6 +147,7 @@ template RotateGizmo {
     Rotation: {half, 0, 0}
     ring {
       Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: blue
       BoxCollider: {half: {0.84, 0.04, 0.84}}
     }
   }
@@ -153,11 +165,13 @@ template ScaleGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: red
       CapsuleCollider: {radius: 0.07, height: 0.8}
     }
     tip {
       Position: {0, 0.9, 0}
       Box: {0.14, 0.14, 0.14}
+      Rgb: red
     }
   }
 
@@ -165,11 +179,13 @@ template ScaleGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: green
       CapsuleCollider: {radius: 0.07, height: 0.8}
     }
     tip {
       Position: {0, 0.9, 0}
       Box: {0.14, 0.14, 0.14}
+      Rgb: green
     }
   }
 
@@ -178,11 +194,13 @@ template ScaleGizmo {
     shaft {
       Position: {0, 0.45, 0}
       Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: blue
       CapsuleCollider: {radius: 0.07, height: 0.8}
     }
     tip {
       Position: {0, 0.9, 0}
       Box: {0.14, 0.14, 0.14}
+      Rgb: blue
     }
   }
 
@@ -217,10 +235,14 @@ template PointHandle {
 
   if this?[Hovered] {
     Tint: hover
-  } else if handle.index == point {
-    Tint: {255, 160, 40, 255}
   } else {
-    Tint: white
+    Tint: plain
+  }
+
+  if handle.index == point {
+    Rgb: {255, 160, 40}
+  } else {
+    Rgb: white
   }
 
   async {

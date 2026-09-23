@@ -88,8 +88,9 @@ ECS_STRUCT(Layout, {
  *
  * A row or a column places its children in child order; a child with an Order
  * goes before every child with a higher value and after every child with a
- * lower one, children without one counting as zero. Rows a script builds from
- * a list in one order and adds to in another are kept in the order of the list.
+ * lower one, children without one counting as zero.
+ *
+ * Rows a script builds from a list and adds to later keep the order of the list.
  */
 ECS_STRUCT(Order, {
     int32_t value; /**< Place among the siblings, lower first */

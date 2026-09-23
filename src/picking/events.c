@@ -4,8 +4,10 @@
  *
  * Raising an event walks the parent chain of the hit and stops at the first
  * entity with a waiter. The action of a click walks the same chain, so a widget
- * fires the action a key binding fires. A press nobody waited for resolves the
- * first waiter on its entity that registers while the button is still held.
+ * fires the action a key binding fires.
+ *
+ * A press nobody waited for resolves the first waiter on its entity that
+ * registers while the button is still held.
  */
 
 #include "picking_internal.h"

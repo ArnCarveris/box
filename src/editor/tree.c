@@ -4,8 +4,10 @@
  *
  * The rows are rebuilt when the selection or the expansion changed and every
  * BOX_EDITOR_TREE_INTERVAL frames otherwise, so the tree follows a scene that
- * changes without walking it every frame. Only expanded nodes are walked, and
- * nameless systems, queries and observers, the machinery of the engine, are skipped.
+ * changes without walking it every frame.
+ *
+ * Only expanded nodes are walked, and nameless systems, queries and observers,
+ * the machinery of the engine, are skipped.
  */
 
 #include "editor_internal.h"
@@ -96,6 +98,8 @@ EditorKind box_editor_kind(
         result = KindQuery;
     } else if (component) {
         result = component->size ? KindComponent : KindTag;
+    } else if (ecs_id_in_use(world, e)) {
+        result = KindTag;
     } else if (ecs_has_id(world, e, EcsPrefab)) {
         result = KindPrefab;
     } else if (box_editor_is_root(world, e)) {
