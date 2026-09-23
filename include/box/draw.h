@@ -66,6 +66,8 @@ ecs_entity_t box_draw(
 
 /** Get the layer the overlay instances are drawn in.
  *
+ * The layer is registered with the renderer on the first overlay draw.
+ *
  * @param world The world
  * @return The layer entity
  */

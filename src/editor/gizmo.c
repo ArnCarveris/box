@@ -19,6 +19,9 @@
 /** Smallest scale a drag leaves */
 #define BOX_EDITOR_SCALE_MIN (0.01f)
 
+/** Smallest cosine between the cursor ray and a rotation plane that reads the angle from it */
+#define BOX_EDITOR_GRAZING (0.25f)
+
 /** Rotation about an arbitrary axis.
  *
  * @param axis The axis, normalized
@@ -459,7 +462,7 @@ bool box_editor_pull(
         vec3 point;
         float angle;
         if (box_editor_plane_point(origin, dir, grab->origin, grab->normal, &point) &&
-            fabsf(vec3_dot(dir, grab->normal)) > 0.05f)
+            fabsf(vec3_dot(dir, grab->normal)) > BOX_EDITOR_GRAZING)
         {
             angle = box_editor_plane_angle(grab, single, point) - grab->angle;
         } else {

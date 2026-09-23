@@ -45,6 +45,9 @@ static bool box_draw_is_template(
 
 /** Create the view that draws the overlay layer over the scene.
  *
+ * The layer is registered as a UI layer here, on the first overlay draw, so a
+ * world that never draws an overlay keeps its layer registry empty.
+ *
  * @param world The world
  * @param state The module state
  */
@@ -56,6 +59,7 @@ static void box_draw_overlay_view(
         goto done;
     }
 
+    box_render_add_ui_layer(world, state->overlay);
     ecs_entity_t module = ecs_lookup(world, "box.draw");
     ecs_entity_t view = ecs_entity(world, {
         .name = "overlay_view", .parent = module
@@ -316,7 +320,6 @@ void BoxDrawImport(
     ecs_set_scope(world, module);
     ecs_entity_t scope = ecs_entity(world, { .name = "instances" });
     ecs_entity_t overlay = ecs_entity(world, { .name = "overlay" });
-    box_render_add_ui_layer(world, overlay);
 
     DrawState *state = ecs_singleton_ensure(world, DrawState);
     ecs_map_init(&state->instances, NULL);
