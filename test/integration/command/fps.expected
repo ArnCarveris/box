@@ -1,11 +1,11 @@
 $ fps on
-fps overlay on
+fps panel on
 
 $ fps
 0 fps, mean 0.00 ms, worst 0.00 ms
 
 $ fps off
-fps overlay off
+fps panel off
 
 $ fps nope
 expected 'on' or 'off', got 'nope'

@@ -2,10 +2,9 @@
  * @file picking/events.c
  * @brief Raises the pick events of the frame as script events a task can await.
  *
- * A waiter holds the entity a handler listens on, so raising an event walks the
- * parent chain of the hit and stops at the first entity that has one. The
- * action of a click walks that same chain, which is how a widget fires the
- * action a key binding fires.
+ * Raising an event walks the parent chain of the hit and stops at the first
+ * entity with a waiter. The action of a click walks the same chain, so a widget
+ * fires the action a key binding fires.
  */
 
 #include "picking_internal.h"

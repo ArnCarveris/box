@@ -28,7 +28,8 @@ static ecs_entity_t bench_effect_template(
     return effect;
 }
 
-void Effect_play_100_effects(bench_t *b)
+void Effect_play_100_effects(
+    bench_t *b)
 {
     // ore_engine/one_shot_effects
     ecs_world_t *world = ecs_init();
@@ -50,7 +51,8 @@ void Effect_play_100_effects(bench_t *b)
     ecs_fini(world);
 }
 
-void Effect_update_100_playing_effects(bench_t *b)
+void Effect_update_100_playing_effects(
+    bench_t *b)
 {
     // ore_engine/one_shot_effects
     ecs_world_t *world = ecs_init();

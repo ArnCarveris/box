@@ -2,22 +2,11 @@
  * @file ui/tree.c
  * @brief Detects the nodes of a UI tree and gives them their draw order.
  *
- * The walk of a tree is a pre-order walk, so a node is numbered after its
- * parent and after the subtrees of its earlier siblings. The number becomes the
- * depth bias of its instance, which is what draws a child over its parent. The
- * walk leaves the nodes it found in the places of the registry, which the
- * layout pass reads instead of walking the tree a second time.
+ * The pre-order walk numbers each node for its depth bias and leaves the nodes in the
+ * places of the registry for layout. A walked tree drops the cached pick hit.
  *
- * A tree that was walked drops the cached hit of the picking module, because an
- * element that appeared, moved or grew changes what a still cursor points at
- * and a pick only runs again on its own while the cursor moves.
- *
- * A change that only asks for a new layout is marked on the node it was made
- * on. The walk resolves such a mark to the nearest ancestor whose box the
- * change cannot resize and lays out that subtree alone, so one moved node of a
- * large tree costs its own branch instead of everything the root holds. A
- * change of the structure of a tree still walks and numbers all of it, because
- * the place of every node after the new one moves with it.
+ * A layout-only change lays out the subtree of the nearest ancestor whose box it
+ * cannot resize; a structural change walks the whole tree.
  */
 
 #include "ui_internal.h"
@@ -84,10 +73,8 @@ done:
 
 /** True when the box of a node is worked out from the boxes of its children.
  *
- * Such a node changes size when a node below it does, which moves it and its
- * siblings in the layout of its parent, so a change below it is laid out from
- * that parent on. A Rect the layout wrote itself is the content size of the
- * last pass, not a box of its own, so it does not end the walk.
+ * A change below such a node is laid out from its parent on. A Rect the layout wrote
+ * itself, or a node that grows, does not count as a box of its own.
  *
  * @param world The world
  * @param e The node
@@ -98,8 +85,9 @@ static bool box_ui_content_sized(
     ecs_entity_t e)
 {
     const Layout *l = ecs_get(world, e, Layout);
-    bool result = false;
-    if (l) {
+    const UiState *state = ecs_singleton_get(world, UiState);
+    bool result = state && state->grows && ecs_has(world, e, Grow);
+    if (l && !result) {
         const Rect *r = ecs_has_id(world, e, UiContentRect) ?
             NULL : ecs_get(world, e, Rect);
         float width = l->width != 0 ? l->width : (r ? r->width : 0);
@@ -113,11 +101,8 @@ static bool box_ui_content_sized(
 
 /** Node the layout of a change has to start at.
  *
- * The change can resize the node it was made on, which moves the children of
- * the node that places them, so the pass starts at the parent of the changed
- * node. It walks further up while that parent is sized by its content, because
- * its own box changes with it, and stops at the first ancestor with a box of
- * its own. The root of the tree ends the walk and is laid out as a whole.
+ * Starts at the parent of the changed node and walks up while that parent is sized by
+ * its content, stopping at the first ancestor with a box of its own or at the root.
  *
  * @param world The world
  * @param e The changed node
@@ -349,10 +334,8 @@ static int32_t box_ui_collect(
 
 /** Number the collected nodes of a tree and join them to its layer.
  *
- * The bias of a node is a step per place of the walk, so a node is drawn over
- * everything before it. A shadow quad is the one node that goes the other way:
- * it belongs to the element that casts it and is drawn part of a step behind
- * it, which leaves it over everything that comes before that element.
+ * The bias is one step per place of the walk, so a node draws over everything before
+ * it. A shadow quad is drawn part of a step behind the element that casts it.
  *
  * @param world The world
  * @param e The root of the tree
@@ -582,10 +565,8 @@ done:
 
 /** Layout observer: a node that was sized, moved or pinned needs a new layout.
  *
- * The observer is matched with UiNode, so it hears the nodes of a tree only and
- * the entities of the scene around them cost nothing. A component set on an
- * entity before it joins a tree is picked up by the walk that adds it. A Rect
- * an author sets is a box of its own again, whatever the layout wrote before.
+ * Matched with UiNode, so only tree nodes are observed. A Rect set by an author is a
+ * box of its own again, whatever the layout wrote before.
  *
  * @param it Iterator over the nodes that changed
  */
@@ -609,6 +590,18 @@ static void box_ui_on_layout(
 
 done:
     return;
+}
+
+/** Grow observer: count the elements that grow so a world without one pays none.
+ *
+ * @param it Iterator over the elements that gained or lost their Grow
+ */
+static void box_ui_on_grow(
+    ecs_iter_t *it)
+{
+    UiState *state = box_ui_state(it->world);
+
+    state->grows += it->event == EcsOnAdd ? it->count : -it->count;
 }
 
 /** Tree observer: count the trees of the world so a world without one pays none.
@@ -648,11 +641,17 @@ void box_ui_tree_init(
         ecs_id(Position), ecs_id(Rect), ecs_id(Layout), ecs_id(Anchor),
         ecs_id(Text), ecs_id(Font), ecs_id(Rgb), ecs_id(BoxShadow),
         ecs_id(Opacity), ecs_id(Fill), ecs_id(Scroll), ecs_id(WorldAnchor),
-        ecs_id(TerminalColors)
+        ecs_id(TerminalColors), ecs_id(Grow)
     };
 
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Grow), .inout = EcsInOutNone }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = box_ui_on_grow
+    });
+
     int32_t i;
-    for (i = 0; i < 13; i ++) {
+    for (i = 0; i < 14; i ++) {
         ecs_observer(world, {
             .query.terms = {
                 { .id = placed[i], .inout = EcsInOutNone },

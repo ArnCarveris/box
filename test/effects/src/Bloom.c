@@ -1,3 +1,8 @@
+/**
+ * @file Bloom.c
+ * @brief Tests for bloom history and uniform bindings across frames and views.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <stdio.h>
@@ -13,7 +18,8 @@ static ecs_entity_t bloom_view;
 static void bloom_set(
     float temporal)
 {
-    void *ptr = ecs_ensure_id(w, bloom, bloom_params, (size_t)ecs_get_type_info(w, bloom_params)->size);
+    void *ptr = ecs_ensure_id(w, bloom, bloom_params,
+        (size_t)ecs_get_type_info(w, bloom_params)->size);
     ecs_value_t value = { .type = bloom_params, .ptr = ptr };
     char expr[256];
     snprintf(expr, sizeof(expr),
@@ -56,7 +62,10 @@ void Bloom_teardown(void)
     ecs_fini(w);
 }
 
-static box_gpu_view_t *bloom_frame(uint32_t frame, uint32_t width, uint32_t height)
+static box_gpu_view_t *bloom_frame(
+    uint32_t frame,
+    uint32_t width,
+    uint32_t height)
 {
     box_packet_t *p = box_renderer_acquire(renderer);
     test_assert(p != NULL);
@@ -66,6 +75,7 @@ static box_gpu_view_t *bloom_frame(uint32_t frame, uint32_t width, uint32_t heig
     p->frame = frame;
     box_renderer_submit(renderer, p);
     test_assert(renderer->views.count > 0);
+
     return box_vec_at(&renderer->views, 0);
 }
 

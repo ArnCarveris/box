@@ -1,3 +1,8 @@
+/**
+ * @file Ibl.c
+ * @brief Tests for when the image based lighting environment is filtered again.
+ */
+
 #include <box.h>
 #include <box/sky.h>
 #include <bake_test.h>

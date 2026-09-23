@@ -314,6 +314,7 @@ void Wear_dust_stays_on_upward_faces_when_mirrored(void)
                 for (uint32_t i = 0; i < frame->views.count; i ++) {
                     ((box_view_t*)box_vec_at(&frame->views, i))->unlit = true;
                 }
+
                 const char *path = "/tmp/box_test_dust_faces.png";
                 snprintf(frame->capture_path, BOX_CAPTURE_PATH_MAX, "%s", path);
                 box_renderer_submit(renderer, frame);
@@ -324,10 +325,12 @@ void Wear_dust_stays_on_upward_faces_when_mirrored(void)
                 test_int(height, 96);
                 remove(path);
             }
+
             int changed = 0;
             for (int i = 0; i < 96 * 96 * 4; i ++) {
                 changed += abs(pixels[0][i] - pixels[1][i]) > 8;
             }
+
             stbi_image_free(pixels[0]);
             stbi_image_free(pixels[1]);
             if (above) {
@@ -337,6 +340,7 @@ void Wear_dust_stays_on_upward_faces_when_mirrored(void)
             }
         }
     }
+
     test_int(box_renderer_errors(renderer), 0);
     box_renderer_destroy(renderer);
 }

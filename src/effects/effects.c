@@ -1,5 +1,6 @@
 /**
  * @file effects/effects.c
+ * @brief Registers the effects module: its components, hooks and registry.
  */
 
 #define BOX_EFFECTS_IMPL
@@ -7,6 +8,12 @@
 
 ECS_COMPONENT_DECLARE(EffectState);
 
+/** Construct Effect components: no shader, unit scale and the color input only.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti The type info
+ */
 static void box_effect_ctor(
     void *ptr,
     int32_t count,
@@ -28,6 +35,12 @@ static void box_effect_ctor(
     }
 }
 
+/** Construct EffectTexture components that apply regardless of any parameter.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti The type info
+ */
 static void box_effect_texture_ctor(
     void *ptr,
     int32_t count,

@@ -59,6 +59,12 @@ static float box_render_alpha(
     return opacity ? opacity->value : 1.0f;
 }
 
+/** Backdrop blur radius of an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The radius, 0 when the component is not present
+ */
 static float box_render_backdrop(
     ecs_world_t *world,
     ecs_entity_t e)

@@ -12,7 +12,8 @@
 /** Children per node of the static tree */
 #define BENCH_TREE_FANOUT (8)
 
-void Static_set_leaf_position(bench_t *b)
+void Static_set_leaf_position(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -45,7 +46,8 @@ void Static_set_leaf_position(bench_t *b)
     ecs_fini(world);
 }
 
-void Static_set_root_position(bench_t *b)
+void Static_set_root_position(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -78,7 +80,8 @@ void Static_set_root_position(bench_t *b)
     ecs_fini(world);
 }
 
-void Static_reparent(bench_t *b)
+void Static_reparent(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();

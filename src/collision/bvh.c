@@ -2,10 +2,9 @@
  * @file collision/bvh.c
  * @brief Dynamic bounding volume hierarchy over boxes with a user value.
  *
- * Nodes live in one vector with a free list, so a proxy keeps its index for as
- * long as it exists. A leaf is inserted next to the sibling that grows the tree
- * least, the path back to the root is refitted and rotated, and a leaf that
- * still fits in its enlarged box is moved without touching the tree.
+ * Nodes live in one vector with a free list, so a proxy keeps its index while it
+ * exists. A leaf is inserted next to the sibling that grows the tree least and
+ * the path to the root is refitted and rotated.
  */
 
 #include "collision_internal.h"

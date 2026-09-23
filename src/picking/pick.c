@@ -76,10 +76,8 @@ static ecs_entity_t box_pick_raise(
 
 /** Move the Hovered tag to the entity the cursor points at.
  *
- * A raise that finds no waiter leaves the hover missed for this entity, so a
- * waiter that registers later in the same hover resolves on its next update
- * instead of waiting for a hit that will never change again. One delivery
- * clears the miss, so a handler that awaits hover again keeps single shot.
+ * A raise without a waiter marks the hover missed, so a waiter registered later
+ * in the same hover resolves on its next update. One delivery clears the miss.
  *
  * @param it Iterator of the system, whose stage carries the change
  * @param state The module state

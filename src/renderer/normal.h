@@ -2,36 +2,12 @@
  * @file renderer/normal.h
  * @brief Screen space tangent frame for normal mapping, shared by the tests and the shaders.
  *
- * A tangent space normal map stores the surface normal in the basis (t, b, n),
- * where t follows +u of the uv layout and b follows +v. The mesh carries no
- * tangents, so the fragment stage rebuilds the frame from the screen space
- * derivatives of the world position and of the uv; `perturb` in shader.c is the
- * WGSL twin of the functions below, so a change here is a change in both places.
+ * The frame (t along +u, b along +v, n) is rebuilt from screen space derivatives
+ * of world position and uv; `perturb` in shader.c is the WGSL twin of these functions.
  *
- * With p the world position and (u, v) the uv, the chain rule over the screen
- * axes x and y gives two equations in the unknown tangents:
- *
- *   dp1 = dp/dx = t * du/dx + b * dv/dx = t * duv1.x + b * duv1.y
- *   dp2 = dp/dy = t * du/dy + b * dv/dy = t * duv2.x + b * duv2.y
- *
- * Crossing the pair with the normal gives the reciprocal basis of (dp1, dp2) in
- * the tangent plane: with perp1 = dp2 x n and perp2 = n x dp1, both perp1 . dp1
- * and perp2 . dp2 equal area = n . (dp1 x dp2), the determinant of the system.
- * The uv gradients on the surface are then
- *
- *   grad u = (perp1 * duv1.x + perp2 * duv2.x) / area
- *   grad v = (perp1 * duv1.y + perp2 * duv2.y) / area
- *
- * and those are the tangents the normal map expects. Dividing by area is what
- * carries the sign: the frame is a property of the surface and its uvs, not of
- * the screen, so the same expression holds whichever way the framebuffer y axis
- * points and whichever side of the surface the normal faces. Only the length is
- * dropped, by normalizing t and b together so a stretched uv keeps its shape.
- *
- * In this engine area is positive for a surface facing the camera: the world is
- * left handed (X right, Y up, Z forward) while the WebGPU framebuffer y axis
- * points down, and the two flips cancel. The sign is computed rather than
- * assumed so neither convention can silently change the frame.
+ * With perp1 = dp2 x n, perp2 = n x dp1 and area = n . (dp1 x dp2), the tangents
+ * are t = (perp1 * duv1.x + perp2 * duv2.x) / area and the same with .y for b,
+ * normalized together. Dividing by the signed area keeps the frame screen independent.
  */
 
 #ifndef BOX_RENDERER_NORMAL_H

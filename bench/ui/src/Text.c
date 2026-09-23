@@ -50,7 +50,8 @@ static ecs_entity_t* bench_ui_text_tree(
     return tree;
 }
 
-void Text_layout_1000_glyphs(bench_t *b)
+void Text_layout_1000_glyphs(
+    bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();
@@ -85,7 +86,8 @@ void Text_layout_1000_glyphs(bench_t *b)
     ecs_fini(world);
 }
 
-void Text_layout_1000_glyphs_unchanged(bench_t *b)
+void Text_layout_1000_glyphs_unchanged(
+    bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();
@@ -107,7 +109,8 @@ void Text_layout_1000_glyphs_unchanged(bench_t *b)
     ecs_fini(world);
 }
 
-void Text_measure_1000_glyphs(bench_t *b)
+void Text_measure_1000_glyphs(
+    bench_t *b)
 {
     // ui/text
     ecs_world_t *world = ecs_init();

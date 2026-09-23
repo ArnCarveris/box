@@ -147,6 +147,7 @@ void box_scene_mirror(
     while (m->cutout_slots.count <= slot) {
         *(uint8_t*)box_vec_push(&m->cutout_slots) = 0;
     }
+
     uint8_t *cutout = box_vec_at(&m->cutout_slots, slot);
     m->cutout_count -= *cutout;
     *cutout = (data->textures[0] & 0xFFFFu) != 0 ||

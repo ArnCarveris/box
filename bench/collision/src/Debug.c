@@ -56,7 +56,8 @@ static ecs_world_t* bench_debug_world(
     return world;
 }
 
-void Debug_extract_off_10k(bench_t *b)
+void Debug_extract_off_10k(
+    bench_t *b)
 {
     // collision/debug_draw
     ecs_world_t *world = bench_debug_world(DebugNone);
@@ -75,7 +76,8 @@ void Debug_extract_off_10k(bench_t *b)
     ecs_fini(world);
 }
 
-void Debug_extract_colliders_10k(bench_t *b)
+void Debug_extract_colliders_10k(
+    bench_t *b)
 {
     // collision/debug_draw
     ecs_world_t *world = bench_debug_world(DebugColliders);

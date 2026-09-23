@@ -2,11 +2,9 @@
  * @file box/transform.h
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
- * The box.transform module keeps WorldTransform equal to parent * T * R * S.
- * Static entities are updated by observers when their pose or parent changes,
- * entities with DynamicTransform are updated every frame in PostUpdate. The tag
- * spreads to every descendant of the entity it is added to and leaves them
- * again when it is removed, so a query matches it on the entity itself.
+ * WorldTransform is kept equal to parent * T * R * S: by observers for static
+ * entities, every PostUpdate for DynamicTransform entities. DynamicTransform
+ * spreads to every descendant and is removed from them with the root.
  */
 
 #ifndef BOX_TRANSFORM_H

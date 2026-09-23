@@ -12,7 +12,8 @@
 /** Primitives along one axis of the subtree */
 #define BENCH_PRIM_SIDE (10)
 
-void Proxy_subtree_1000(bench_t *b)
+void Proxy_subtree_1000(
+    bench_t *b)
 {
     // lod/hlod_proxies/reduced_primitives
     box_lod_builder_t builder;
@@ -51,7 +52,8 @@ void Proxy_subtree_1000(bench_t *b)
     box_lod_builder_fini(&builder);
 }
 
-void Proxy_subtree_1000_materials(bench_t *b)
+void Proxy_subtree_1000_materials(
+    bench_t *b)
 {
     // lod/hlod_proxies/reduced_primitives
     box_lod_builder_t builder;
@@ -90,7 +92,8 @@ void Proxy_subtree_1000_materials(bench_t *b)
     box_lod_builder_fini(&builder);
 }
 
-void Proxy_subtree_1000_error_bound(bench_t *b)
+void Proxy_subtree_1000_error_bound(
+    bench_t *b)
 {
     // lod/hlod_proxies/reduced_primitives
     box_lod_builder_t builder;

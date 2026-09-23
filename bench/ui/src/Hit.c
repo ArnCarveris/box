@@ -49,7 +49,8 @@ static ecs_entity_t* bench_ui_hit_tree(
     return tree;
 }
 
-void Hit_hit_10k_tree(bench_t *b)
+void Hit_hit_10k_tree(
+    bench_t *b)
 {
     // ui/ui_events
     ecs_world_t *world = ecs_init();
@@ -68,7 +69,8 @@ void Hit_hit_10k_tree(bench_t *b)
     ecs_fini(world);
 }
 
-void Hit_hit_10k_tree_beside_it(bench_t *b)
+void Hit_hit_10k_tree_beside_it(
+    bench_t *b)
 {
     // ui/ui_events
     ecs_world_t *world = ecs_init();

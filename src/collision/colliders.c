@@ -2,10 +2,9 @@
  * @file collision/colliders.c
  * @brief Derives the collider of an entity from its shape, override or bounds.
  *
- * A shape with a cheap test gets that test: a sphere a ball, a box and a
- * rounded box an oriented box, a capsule a capsule. Anything else falls back on
- * the world bounds the renderer wrote. The result is one Collider in world
- * space with the scale of the entity applied, which every query reads.
+ * A sphere becomes a ball, a box or rounded box an oriented box and a capsule a
+ * capsule; anything else falls back on its world bounds. The result is one
+ * Collider in world space with the scale of the entity applied.
  */
 
 #include "collision_internal.h"

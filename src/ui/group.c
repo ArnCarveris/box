@@ -2,15 +2,9 @@
  * @file ui/group.c
  * @brief Composites a transparent subtree as one image instead of per element.
  *
- * An element with an Opacity below one that holds children would otherwise hand
- * that opacity to every node below it, and two children that overlap would show
- * through each other. Such a subtree gets a view of its own that renders it at
- * full strength into a target the size of its Bounds, and a quad in the layer
- * above shows that target once with the opacity of the element; the element
- * itself is tagged RenderGrouped so its own draw into the target keeps its full
- * strength too, or its opacity would reach the frame twice. Everything else
- * is untouched: a subtree that is fully opaque, and an element with an opacity
- * but no children, keeps the one draw it always had.
+ * A subtree whose root has an Opacity below one gets its own view that renders it at
+ * full strength into a target the size of its Bounds, shown by one quad with that
+ * opacity. The root is tagged RenderGrouped so its own draw keeps full strength.
  */
 
 #include "ui_internal.h"
@@ -129,11 +123,8 @@ static void box_ui_group_create(
 
 /** Give the target, the camera and the quad of a group the box of its element.
  *
- * The target holds whole pixels, so the camera shows exactly the logical span
- * those pixels cover and the quad is that span wide, with its top left corner
- * on a device pixel of the view above: every texel of the target then lands
- * on one pixel of the frame, which is what keeps the text of the subtree as
- * sharp as the text outside it.
+ * The target holds whole pixels and the quad covers exactly that span, its corner on
+ * a device pixel, so each texel lands on one frame pixel and text stays sharp.
  *
  * @param world The world
  * @param p The place of the element

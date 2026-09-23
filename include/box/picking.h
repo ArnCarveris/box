@@ -2,37 +2,13 @@
  * @file box/picking.h
  * @brief Picking components and the script events a pick under the cursor raises.
  *
- * A pick is a ray from the camera of a view through a normalized screen
- * position, resolved against the spatial index of box.collision. The collider
- * the ray hits is resolved to the entity an author cares about: the prefab or
- * template root it belongs to, unless it or an entity between it and that root
- * carries Pickable, which targets that entity instead.
+ * Once per frame while the cursor moves, each enabled view casts a ray into the
+ * box.collision index. The hit resolves to the nearest Pickable entity or else
+ * the prefab root, which carries Hovered while the cursor is on it.
  *
- * The engine picks once per frame for every enabled view that renders into the
- * surface, and only while the cursor moves: a frame in which the cursor stands
- * still reuses the hit of the last one and costs no ray query at all. The
- * entity the cursor points at carries Hovered while it does.
- *
- * Hover, press, release, click and drag are derived from that hit and raised as
- * the on.hover, on.press, on.release, on.click and on.drag script functions, so
- * a task awaits a pick the way it awaits an action:
- *
- *     template Button {
- *       async {
- *         const hit = await on.click(this)
- *       }
- *     }
- *
- * An event starts at the entity the pick resolved to and bubbles up the parent
- * chain; the first entity with a handler consumes it, so a parent only hears
- * what its children leave alone. An entity that carries an Action fires it
- * through the input action layer when a click resolves on it, so a widget and a
- * key binding share one action.
- *
- * Not everything a view draws has a collider: a source may answer the pick of a
- * view before its ray query runs, which is how box.ui resolves the cursor
- * against the rectangles of its trees and consumes the pick of the frame before
- * the scene under the UI ever sees it.
+ * Hover, press, release, click and drag are raised as the on.* script functions
+ * and bubble up the parent chain until a handler takes them. A click on an
+ * entity with an Action fires that action.
  */
 
 #ifndef BOX_PICKING_H
@@ -105,11 +81,9 @@ ECS_ENUM(PickEvent, {
 
 /** Answer the pick of a view from something the ray query cannot see.
  *
- * A UI view draws elements that have no collider at all, so box.ui installs a
- * source that resolves the cursor against the rectangles of its trees. The
- * source is asked before the ray query of a view runs and one that answers
- * consumes the pick, which is what puts a UI tree over the scene behind it. The
- * hit it receives already carries the cursor and the view.
+ * box.ui installs one to resolve the cursor against its trees. The source runs
+ * before the ray query, and an answer consumes the pick. The hit it receives
+ * already carries the cursor and the view.
  *
  * @param world The world
  * @param view The view being picked, 0 for the camera of a world without views
@@ -160,12 +134,11 @@ void box_picking_set_through(
 
 /** Build the world ray of a normalized position in a view.
  *
- * The position is the one the Mouse of the Input singleton reports: the origin
- * is the center of the image, x points right and y points up, and both reach 1
- * at the edge. A view of 0 takes the first camera of the world, which is what a
- * world without a View renders.
+ * The position is that of the Input Mouse: origin at the image center, x right,
+ * y up, reaching 1 at the edge. A view of 0 takes the first camera.
  *
  * @param world The world
+ * @param view The View entity, 0 for the first camera of the world
  * @param cursor Normalized position in the image of the view
  * @param origin Receives the origin of the ray in world space
  * @param dir Receives the normalized direction of the ray in world space
@@ -198,6 +171,7 @@ ecs_entity_t box_picking_target(
  * result does not depend on the order the index visits them.
  *
  * @param world The world
+ * @param view The View entity, 0 for the first camera of the world
  * @param cursor Normalized position in the image of the view
  * @param out Receives the hit, which is zeroed when the ray hit nothing
  * @return true when the ray hit a collider
@@ -210,12 +184,9 @@ bool box_picking_pick(
 
 /** Raise a pick event at the handlers of an entity and of its ancestors.
  *
- * The event starts at the entity of the hit and walks up the parent chain. The
- * bubble is delivered against the Raise record of the world, one node at a
- * time from the hit up: a handler the node resolves takes the event, because a
- * task resumes after the delivery and cannot stop it itself, a click on a node
- * with an Action fires the action and takes it, and box_event_stop called
- * inside the delivery takes it too. A taken event reaches no ancestor.
+ * The event walks up the parent chain from the hit entity. A node takes it when
+ * it resolves a handler, when a click fires its Action, or when box_event_stop
+ * is called during delivery; a taken event reaches no ancestor.
  *
  * @param world The world
  * @param event The interaction to raise
@@ -229,10 +200,8 @@ ecs_entity_t box_picking_raise(
 
 /** Drop the hit the last pick left behind so the next update picks again.
  *
- * A pick runs while the cursor moves and answers from its last hit while it
- * stands still, so a world that changed under a still cursor has to say so: a
- * UI tree that was laid out again invalidates the pick of its frame, which is
- * what hovers an element that appeared or grew under the cursor.
+ * A still cursor reuses the last hit, so a world that changed under it, such as
+ * a UI tree laid out again, calls this to pick again.
  *
  * @param world The world
  */

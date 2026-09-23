@@ -184,7 +184,8 @@ void Modulators_a_point_light_carries_its_modulator_bit(void)
     ecs_entity_t lamp = ecs_new(w);
     ecs_set(w, lamp, Position, {0, 2, 5});
     ecs_set(w, lamp, PointLight, {.intensity = 4, .range = 20});
-    ecs_set(w, lamp, LightModulator, {.shader = caustics, .params = caustics_params, .enabled = true});
+    ecs_set(w, lamp, LightModulator, {
+        .shader = caustics, .params = caustics_params, .enabled = true});
     set_modulator_params(lamp, caustics_params, 2, 0, 1.5f, 0);
     box_render_extract(w, &packet);
 
@@ -206,7 +207,8 @@ void Modulators_several_modulators_on_one_light_multiply(void)
     ecs_set(w, sun, LightModulator, {.shader = clouds, .params = cloud_params, .enabled = true});
     set_modulator_params(sun, cloud_params, 0, 0, 0.5f, 0);
     ecs_entity_t second = ecs_new_w_pair(w, EcsChildOf, sun);
-    ecs_set(w, second, LightModulator, {.shader = caustics, .params = caustics_params, .enabled = true});
+    ecs_set(w, second, LightModulator, {
+        .shader = caustics, .params = caustics_params, .enabled = true});
     set_modulator_params(second, caustics_params, 0, 0, 2, 0);
 
     box_render_extract(w, &packet);

@@ -2,12 +2,9 @@
  * @file renderer/transition.c
  * @brief Evaluates the transitions of the static instances on the renderer thread.
  *
- * An instance whose values a transition moves keeps an entry in the pool and
- * one record per channel in the lane of that channel. Every frame each lane is
- * interpolated in one pass over its own arrays and the channels the entry
- * moves are composed into the instance again, which is the only work a running
- * transition costs; the game side uploads the record once and hears about the
- * end of it through the packet it gets back.
+ * A transitioning instance has a pool entry and one record per channel lane. Each
+ * frame every lane is interpolated and composed into the instance; finished
+ * transitions are reported back through the packet.
  */
 
 #include "renderer_internal.h"
@@ -631,10 +628,8 @@ static void box_transition_stage(
 
 /** Evaluate and upload the transitions of one mesh, retiring the finished ones.
  *
- * Every instance the records moved is appended to the static updates of the
- * packet, so the passes that watch the static instances of a frame, the shadow
- * cascade cache and the probe descriptors of the bake, see the instances the
- * renderer changed exactly as they see the ones the game side changed.
+ * Every moved instance is appended to the static updates of the packet, so the
+ * shadow cascade cache and probe bake see it like a game side change.
  *
  * @param r The renderer
  * @param handle The mesh handle

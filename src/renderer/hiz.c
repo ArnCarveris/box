@@ -2,21 +2,12 @@
  * @file renderer/hiz.c
  * @brief Depth pyramids of a view and the occlusion pass that tests against them.
  *
- * A view that occlusion culls draws its static batches in two passes. The first
- * draws what the pyramid of the previous frame accepted, the depth of that pass
- * is reduced into the pyramid of this frame with the reverse Z rule of hiz.h,
- * and the second draws what the new pyramid accepts and the first pass did not
- * already draw. Nothing is ever dropped on the depth of an older frame, so a
- * camera may move as fast as it likes; the cost is one extra draw group.
+ * Static batches are drawn in two passes: the first draws what the previous
+ * pyramid accepted, its depth builds this frame's pyramid, and the second draws
+ * what the new pyramid accepts that the first did not.
  *
- * The split between the passes is recomputed instead of remembered: both passes
- * run the same test against the previous pyramid with the matrix of that frame,
- * which is what tells them whether the first pass drew an instance, so a view
- * keeps its two pyramids and nothing else between frames.
- *
- * A pyramid is a color mip chain filled by render passes rather than a storage
- * texture, because r32float storage textures are an optional feature that
- * wgpu-native and emdawnwebgpu do not both offer.
+ * A pyramid is a color mip chain filled by render passes, since r32float storage
+ * textures are not available on every backend.
  */
 
 #include "renderer_internal.h"

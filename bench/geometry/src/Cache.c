@@ -10,7 +10,8 @@
 /** Shapes kept in the cache while one of them is looked up */
 #define BENCH_CACHE_SHAPES (16)
 
-void Cache_hit(bench_t *b)
+void Cache_hit(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();

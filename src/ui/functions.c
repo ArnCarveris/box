@@ -2,11 +2,9 @@
  * @file ui/functions.c
  * @brief The text.measure, text.wrap and text.label helpers scripts build widgets with.
  *
- * The functions live under the module, so a script that does `using box.ui`
- * calls them as text.measure(element, value). They take an element rather than
- * a font so that the font of a widget is resolved exactly as the layout pass
- * resolves it: the Font of the element, else the nearest one above it, else the
- * font the engine ships.
+ * Scripts that do `using box.ui` call them as text.measure(element, value). They take
+ * an element so the font resolves as in layout: the Font of the element, else the
+ * nearest one above it, else the engine font.
  */
 
 #include "ui_internal.h"

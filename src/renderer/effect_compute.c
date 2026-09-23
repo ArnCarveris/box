@@ -1,5 +1,22 @@
+/**
+ * @file renderer/effect_compute.c
+ * @brief Compute setup pass that a post process pass can run before it draws.
+ *
+ * The setup shader runs a per pixel entry point over the source image and a single
+ * workgroup entry point after it, sharing a work buffer and a state buffer the view
+ * keeps between frames, which the post process pass then reads.
+ */
+
 #include "renderer_internal.h"
 
+/** Create a compute pipeline from an entry point of a setup shader.
+ *
+ * @param r The renderer
+ * @param module The shader module
+ * @param layout The pipeline layout
+ * @param entry Name of the entry point
+ * @return The pipeline
+ */
 static WGPUComputePipeline box_effect_compute_pipeline(
     box_renderer_t *r,
     WGPUShaderModule module,
@@ -58,13 +75,21 @@ void box_effect_compute_init(
     wgpuPipelineLayoutRelease(layout);
 }
 
+/** Build the two pipelines of the setup shader of a pass, unless they already exist.
+ *
+ * @param r The renderer
+ * @param fx The pass whose setup shader the pipelines are built from
+ * @return Whether both pipelines exist
+ */
 static bool box_effect_compute_ready(
     box_renderer_t *r,
     const box_effect_t *fx)
 {
+    bool result = true;
     if (r->setup_compute_shader == fx->setup_shader && r->setup_compute_first) {
-        return true;
+        goto done;
     }
+
     if (r->setup_compute_first) wgpuComputePipelineRelease(r->setup_compute_first);
     if (r->setup_compute_second) wgpuComputePipelineRelease(r->setup_compute_second);
     r->setup_compute_first = NULL;
@@ -72,8 +97,10 @@ static bool box_effect_compute_ready(
     r->setup_compute_shader = fx->setup_shader;
     WGPUShaderModule module = box_shader_module(r, fx->setup_shader);
     if (!module) {
-        return false;
+        result = false;
+        goto done;
     }
+
     WGPUPipelineLayoutDescriptor desc = {
         .bindGroupLayoutCount = 1,
         .bindGroupLayouts = &r->setup_compute_layout
@@ -83,7 +110,9 @@ static bool box_effect_compute_ready(
     r->setup_compute_second = box_effect_compute_pipeline(r, module, layout, "cs_second");
     wgpuPipelineLayoutRelease(layout);
     wgpuShaderModuleRelease(module);
-    return r->setup_compute_first && r->setup_compute_second;
+    result = r->setup_compute_first && r->setup_compute_second;
+done:
+    return result;
 }
 
 void box_effect_compute_fini(
@@ -134,14 +163,22 @@ done:
     return r->v->setup_compute_state;
 }
 
+/** Work buffer of the current view, recreated when the pass asks for another size.
+ *
+ * @param r The renderer
+ * @param fx The pass whose first buffer size the work buffer takes
+ * @return The work buffer, NULL when the pass declared no work buffer
+ */
 static WGPUBuffer box_effect_compute_work(
     box_renderer_t *r,
     const box_effect_t *fx)
 {
+    WGPUBuffer result = NULL;
     uint32_t size = fx->setup_buffer_size[0];
     if (!size) {
-        return NULL;
+        goto error;
     }
+
     if (r->v->setup_compute_work && r->v->setup_compute_size[0] == size) {
         goto done;
     }
@@ -154,7 +191,9 @@ static WGPUBuffer box_effect_compute_work(
     r->v->setup_compute_work = wgpuDeviceCreateBuffer(r->device, &desc);
     r->v->setup_compute_size[0] = size;
 done:
-    return r->v->setup_compute_work;
+    result = r->v->setup_compute_work;
+error:
+    return result;
 }
 
 void box_effect_compute_run(
@@ -173,6 +212,7 @@ void box_effect_compute_run(
     if (!state || !work) {
         goto done;
     }
+
     WGPUBindGroupEntry entries[4] = {
         { .binding = 0, .buffer = r->effect_uniform, .size = sizeof(box_effect_uniform_t) },
         { .binding = 1, .textureView = src->view },

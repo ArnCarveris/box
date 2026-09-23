@@ -2,13 +2,9 @@
  * @file shader/modulator.c
  * @brief Generated include that splices the light modulator plugins into the mesh shader.
  *
- * `#include "generated/light_modulators.wgsl"` is answered from the modulator
- * registry: the file of every registered plugin is preprocessed on its own and
- * its `box_light_modulate` is renamed to the slot of the registration, so the
- * mesh shader ends up with one function per modulated light and a dispatch that
- * multiplies the ones a light names. A plugin whose file does not preprocess
- * becomes the identity, which leaves the mesh shader compiling and the error on
- * the ShaderStatus of the plugin.
+ * Answers `#include "generated/light_modulators.wgsl"`: each plugin file is
+ * preprocessed and its `box_light_modulate` renamed to its slot, plus a dispatch.
+ * A plugin that fails to preprocess becomes the identity and reports on ShaderStatus.
  */
 
 #include "shader_internal.h"

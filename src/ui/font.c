@@ -2,13 +2,9 @@
  * @file ui/font.c
  * @brief Parses font files and rasterizes their glyphs into an atlas that grows.
  *
- * One atlas holds one font file at one em size and is shared by every element
- * that asks for that pair. A glyph is rasterized the first time a string needs
- * it and packed on a shelf; when the last shelf is full the atlas doubles,
- * which keeps every glyph where it is and changes every uv, so the epoch of the
- * atlas is raised and the elements that drew with it build their quads again.
- * The pixels go to the renderer through the box.texture module, so an atlas is
- * an ordinary texture that a glyph quad binds in its albedo slot.
+ * One atlas holds one font file at one em size, shared by every element using that
+ * pair. Glyphs are rasterized on first use and packed on shelves; a full atlas doubles
+ * and raises its epoch. The pixels are an ordinary box.texture texture.
  */
 
 #include "ui_internal.h"
@@ -350,15 +346,9 @@ box_ui_atlas_t* box_ui_atlas_of(
 
 /** Give an atlas the prefab its glyph quads take their material from.
  *
- * The material is what makes a glyph composite cleanly over what is behind it.
- * An alpha blended surface is a glass surface in this engine: the fragment
- * stage adds the environment specular of the surface where the fragment is
- * transparent, which would leave a lit box around every glyph, and it lets the
- * scene behind through the tint of the albedo. A nearly black metal has no
- * specular of its own and a tint of one, so the only thing the quad adds is the
- * emissive color, which the build takes from the Rgb of the element. The values
- * live on one prefab per atlas, so a glyph carries an IsA pair instead of three
- * components of its own.
+ * A near black metal adds no specular and no tint, so the quad only adds the emissive
+ * color the build takes from the Rgb of the element. The values live on one prefab per
+ * atlas that each glyph inherits through an IsA pair.
  *
  * @param world The world
  * @param atlas The atlas

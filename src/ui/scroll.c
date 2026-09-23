@@ -2,26 +2,11 @@
  * @file ui/scroll.c
  * @brief Clips the content of an element to its box and moves it by an offset.
  *
- * A Scroll names what an element does with content that does not fit it on
- * each axis. The layout measures that content without the box limiting it,
- * clamps the offset of the element to the difference between the two and hands
- * the offset to the pass that places the children and to the one that lays out
- * the glyphs of a text, which is what moves what the element holds.
+ * The layout clamps the Scroll offset to the overflow of the content and hands it to
+ * the placing and glyph passes. A clip pass leaves the intersected clip rectangle on
+ * each clipped node as a RenderClip that the fragment stage tests against.
  *
- * A node the text pass dropped while the layout ran is skipped: the places of
- * the walk are older than the glyphs an element ends the pass with.
- *
- * The clip is a rectangle per node: the pass walks the collected places from
- * the root down, intersects the rectangle of every element that clips with the
- * one it inherited and leaves the result on the node as a RenderClip, which
- * extract packs into the instance and the fragment stage tests every fragment
- * against. A node that nothing clips loses the component again, so a tree
- * without a Scroll draws exactly what it drew before.
- *
- * The wheel of a frame moves the innermost scrollable ancestor of the element
- * under the cursor: an axis that is Scroll always takes it and an axis that is
- * Auto takes it while its content is larger than its box, so a nested list
- * scrolls itself and a panel that cannot scroll hands the wheel up.
+ * The wheel moves the innermost ancestor under the cursor that can scroll on an axis.
  */
 
 #include "ui_internal.h"
@@ -53,11 +38,9 @@ static float box_ui_scroll_max(
 
 /** Offset an axis keeps after its content and its box were measured.
  *
- * An offset that sat at the end of the content travels with that end, which is
- * what keeps a log that is appended to on its last line, and every other offset
- * is clamped to what the content leaves. An element that was never laid out
- * keeps the offset it was authored with, so a list that starts larger than its
- * box shows its first item and not its last.
+ * An offset at the end of the content stays at the end, so an appended log stays on its
+ * last line; other offsets are clamped. An element never laid out keeps its authored
+ * offset.
  *
  * @param offset Offset the element carries
  * @param was Largest offset of the previous layout
@@ -173,10 +156,8 @@ static void box_ui_scroll_inherit(
 
 /** Give the children of a node the clip the node leaves them.
  *
- * The rectangle of the element and its Scroll are read from the world and not
- * from the place, because the pass also runs over a walk that was collected
- * after the layout, which is what gives the glyphs an element just emitted the
- * clip of that element.
+ * The rectangle and Scroll are read from the world, not the place, because the pass
+ * also runs over a walk collected after layout to clip newly emitted glyphs.
  *
  * @param world The world
  * @param parent The place of the node that holds the children

@@ -21,7 +21,8 @@
 /** Height in pixels the field is measured against */
 #define BENCH_FIELD_VIEWPORT (1080.0f)
 
-void Reduce_select_10k_still(bench_t *b)
+void Reduce_select_10k_still(
+    bench_t *b)
 {
     // lod/primitive_reduction
     ecs_world_t *world = ecs_init();
@@ -98,7 +99,8 @@ void Reduce_select_10k_still(bench_t *b)
     ecs_fini(world);
 }
 
-void Reduce_select_10k_walk(bench_t *b)
+void Reduce_select_10k_walk(
+    bench_t *b)
 {
     // lod/primitive_reduction
     ecs_world_t *world = ecs_init();

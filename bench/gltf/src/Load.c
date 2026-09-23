@@ -162,7 +162,8 @@ static void bench_glb(
     free(bin);
 }
 
-void Load_mesh_100k(bench_t *b)
+void Load_mesh_100k(
+    bench_t *b)
 {
     // meshes/gltf
     const char *path = "/tmp/box_bench_gltf_mesh.glb";
@@ -186,7 +187,8 @@ void Load_mesh_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Load_nodes_500(bench_t *b)
+void Load_nodes_500(
+    bench_t *b)
 {
     // meshes/gltf
     const char *path = "/tmp/box_bench_gltf_nodes.glb";

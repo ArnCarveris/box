@@ -15,7 +15,8 @@
 /** Levels of every node of the selection benchmark */
 #define BENCH_LEVEL_COUNT (4)
 
-void Metric_error_100k_perspective(bench_t *b)
+void Metric_error_100k_perspective(
+    bench_t *b)
 {
     // lod/screen_space_error
     box_lod_bounds_t *bounds;
@@ -49,7 +50,8 @@ void Metric_error_100k_perspective(bench_t *b)
     ecs_os_free(bounds);
 }
 
-void Metric_error_100k_orthographic(bench_t *b)
+void Metric_error_100k_orthographic(
+    bench_t *b)
 {
     // lod/screen_space_error
     box_lod_bounds_t *bounds;
@@ -84,7 +86,8 @@ void Metric_error_100k_orthographic(bench_t *b)
     ecs_os_free(bounds);
 }
 
-void Metric_select_100k(bench_t *b)
+void Metric_select_100k(
+    bench_t *b)
 {
     // lod/screen_space_error
     box_lod_bounds_t *bounds;

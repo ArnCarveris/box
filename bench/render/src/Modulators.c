@@ -11,7 +11,8 @@
 /** Dynamic entities the modulated sun lights in the extracted scene */
 #define BENCH_MODULATOR_COUNT (10000)
 
-void Modulators_extract_10k_plain_sun(bench_t *b)
+void Modulators_extract_10k_plain_sun(
+    bench_t *b)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -59,7 +60,8 @@ void Modulators_extract_10k_plain_sun(bench_t *b)
     ecs_fini(world);
 }
 
-void Modulators_extract_10k_modulated_sun(bench_t *b)
+void Modulators_extract_10k_modulated_sun(
+    bench_t *b)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);

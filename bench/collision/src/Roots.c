@@ -51,7 +51,8 @@ static void bench_roots_build(
     ecs_progress(world, 0.016f);
 }
 
-void Roots_idle_100k(bench_t *b)
+void Roots_idle_100k(
+    bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
@@ -72,7 +73,8 @@ void Roots_idle_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Roots_update_1k_of_100k(bench_t *b)
+void Roots_update_1k_of_100k(
+    bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
@@ -101,7 +103,8 @@ void Roots_update_1k_of_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Roots_move_1k_rigid_of_100k(bench_t *b)
+void Roots_move_1k_rigid_of_100k(
+    bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();
@@ -129,7 +132,8 @@ void Roots_move_1k_rigid_of_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Roots_instantiate_1k(bench_t *b)
+void Roots_instantiate_1k(
+    bench_t *b)
 {
     // collision/aabb_roots
     ecs_world_t *world = ecs_init();

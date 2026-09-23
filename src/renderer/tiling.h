@@ -2,36 +2,11 @@
  * @file renderer/tiling.h
  * @brief World space texture tiling math, shared by extract, the tests and the shaders.
  *
- * An instance carries a uv transform (scale x, scale y, offset x, offset y) and
- * a mode word holding a projection and a wrap mode. The fragment shader builds
- * a base uv from the projection, multiplies it with the scale, adds the offset
- * and folds the result with the wrap mode; every function here is the C twin of
- * that math, so a change here is a change in both places.
+ * C twin of the fragment shader uv math: a base uv from the projection of the local
+ * position in world meters, times scale plus offset, folded by the wrap mode.
  *
- * The local position the projections use is the mesh position in world meters:
- * the vertex position times the length of the matching column of the instance
- * matrix, which the vertex stage computes and the world size below mirrors.
- *
- * Base uv per projection, with w the local position in meters and n the local
- * normal, all in meters except the mesh projection which stays in 0..1:
- *
- *   BOX      dominant axis of |n|, x: (sign(n.x) * w.z, w.y),
- *            y: (w.x, sign(n.y) * w.z), z: (-sign(n.z) * w.x, w.y)
- *   CYLINDER r = length(w.xz), (atan2(w.z, w.x) * r, w.y)
- *   RADIAL   r = length(w.xz), (r, atan2(w.z, w.x) * r)
- *   MESH     the mesh uv
- *
- * The span is the world length one unit of base uv covers, so the tile count of
- * an axis is span / meters:
- *
- *   BOX      (size_x, size_y)
- *   CYLINDER (pi * size_x, size_y), the circumference and the height
- *   RADIAL   (size_x / 2, pi * size_x), the radius and the circumference
- *   MESH     (size_x, size_y), the base uv already spans the whole size
- *
- * The scale that reaches the instance is the tile count divided by the span,
- * except for the mesh projection where the base uv is already normalized and
- * the scale is the tile count itself.
+ * The instance scale is tile count / span, where span is the world length of one
+ * base uv unit; for MESH the base uv is normalized and the scale is the tile count.
  */
 
 #ifndef BOX_RENDERER_TILING_H
@@ -125,11 +100,8 @@ static inline void box_tiling_span(
 
 /** Tiles one axis holds at the requested tile size.
  *
- * The exact count is the span over the tile size, which leaves a partial tile
- * when the two do not divide. Setting fit rounds that count to the nearest
- * whole tile, which stretches or squeezes the tile so the pattern ends on a
- * tile boundary; allow_partial keeps the fraction that fit would round away.
- * A min_tiles above zero is the lower bound of the result.
+ * The count is span / meters. Fit rounds it to the nearest whole tile unless
+ * allow_partial is set; min_tiles above zero bounds the result from below.
  *
  * @param span World length of the axis in meters
  * @param meters World meters one tile spans

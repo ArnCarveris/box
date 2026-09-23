@@ -39,12 +39,9 @@ ECS_STRUCT(App, {
 
 /** One command line option an application adds to the parser.
  *
- * The option is an entity and its name is the flag without the dashes, so an
- * entity options.stresstest is --stresstest. What follows the flag lands in a
- * member of a singleton component, which is how the scene reads it: the text
- * after --flag=value, the fallback when the flag stands alone, true when the
- * member is a bool and the flag stands alone, and the next argument otherwise.
- * An option of the world is listed by --help next to the options of the engine.
+ * The option entity is named after the flag without dashes, so options.stresstest is --stresstest.
+ * Its value lands in a singleton member: the text after --flag=value, the fallback (or true for a
+ * bool) when the flag stands alone, else the next argument. --help lists it with engine options.
  */
 ECS_STRUCT(AppOption, {
     ecs_entity_t member; /**< Member of a singleton component the value lands in */

@@ -2,12 +2,9 @@
  * @file render/extract_lights.c
  * @brief Extracts the point and spot lights inside the view frustum into the packet.
  *
- * Static lights are marked so baked instances skip them, and are carried
- * unculled in a second array that the bake accumulates into its probes. Layer
- * membership is read once per table, because the relationship fragments, and a
- * light the view does not show is still handed to the shared bake. A light a
- * Hidden switch takes out of the frame leaves both arrays, so a pooled effect
- * that is waiting lights nothing.
+ * Static lights are marked so baked instances skip them and are also carried
+ * unculled in a second array for the bake. Layer membership is read once per table,
+ * and a light hidden by a Hidden switch leaves both arrays.
  */
 
 #include "render_internal.h"
@@ -27,6 +24,7 @@
 /** Copy the cluster settings of a view into it, filling in defaults.
  *
  * @param world The world
+ * @param e The view entity
  * @param v The view to fill
  */
 static void box_light_settings(

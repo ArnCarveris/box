@@ -9,7 +9,8 @@
 /** Entities the scene of the benchmark holds */
 #define BENCH_RESTORE_ENTITIES (500)
 
-void Restore_scene_500(bench_t *b)
+void Restore_scene_500(
+    bench_t *b)
 {
     // checkpoints/restore
     ecs_world_t *world = ecs_init();

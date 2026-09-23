@@ -25,6 +25,12 @@ static void box_cull_ctor(
     int32_t count,
     const ecs_type_info_t *ti);
 
+/** View constructor: no camera or target, default shadow, bake and cull settings.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
 static void box_view_ctor(
     void *ptr,
     int32_t count,
@@ -126,6 +132,12 @@ static void box_shadow_ctor(
     }
 }
 
+/** BakeSettings constructor: baking enabled with the default budget and grid.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
 static void box_bake_ctor(
     void *ptr,
     int32_t count,

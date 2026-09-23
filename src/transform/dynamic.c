@@ -2,14 +2,9 @@
  * @file transform/dynamic.c
  * @brief The per frame world transform system and the observers that spread its tag.
  *
- * DynamicTransform is kept on every descendant of the entity it was added to,
- * the way flecs-engine keeps it: an entity that gets the tag hands it to its
- * children, an entity that is placed under a parent that has it takes it, and
- * an entity that loses it takes it from its children, unless its own parent
- * still has it, in which case the tag comes back. Every query of the engine
- * can then match the tag on the entity itself instead of walking up the
- * hierarchy per entity, which also keeps the queries away from an Or over up
- * traversed terms that a cached query resolves wrongly over a Parent tree.
+ * DynamicTransform is kept on every descendant of the entity it was added to:
+ * it spreads to children and to entities placed under a tagged parent, and is
+ * removed from children unless their parent still has it.
  */
 
 #include <box.h>

@@ -149,11 +149,9 @@ static vec2 box_camera_turn_target(
 
 /** Turn a camera towards what the turn actions or the cursor ask for.
  *
- * The angular velocity chases the turn actions at the angular acceleration
- * while one is held and coasts to a stop at the angular deceleration once
- * none is, which is what keeps a released turn from snapping still. While the
- * Look action is held the turn is set straight from the cursor delta of the
- * frame instead.
+ * The angular velocity chases held turn actions at the angular acceleration and
+ * coasts to a stop at the angular deceleration once released. While Look is
+ * held the turn comes straight from the cursor delta of the frame.
  *
  * @param world The world
  * @param actions The actions of the module
@@ -213,6 +211,7 @@ static void box_camera_turn(
  * @param actions The actions of the module
  * @param cc The controller, its velocity is written
  * @param sprint Whether the Fast action is held
+ * @param slow Whether the Slow action is held, which halves the speed
  * @param dt Seconds the frame took
  */
 static void box_camera_move(
@@ -229,6 +228,7 @@ static void box_camera_move(
     if (sprint) {
         speed *= box_controller_value(cc->fast, BOX_CAMERA_FAST);
     }
+
     if (slow) {
         speed *= 0.5f;
     }

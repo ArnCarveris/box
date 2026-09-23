@@ -46,9 +46,7 @@ extern "C" {
 /** Process and machine CPU usage, sampled every frame while the singleton exists.
  *
  * The percentages are a moving average over window_s, where process_percent is a
- * share of one core and system_percent a share of every core. The same sampling
- * primitives drive the CPU budget of a headless instance, so budget_sleep_ms
- * shows what that budget cost the last frame.
+ * share of one core and system_percent a share of every core.
  */
 ECS_STRUCT(CpuMonitor, {
     double window_s;         /**< Seconds the moving average covers, default 1 */
@@ -113,13 +111,9 @@ ECS_STRUCT(GpuPassTime, {
 
 /** Per pass GPU timings of the rendered frames, collected while the singleton exists.
  *
- * Setting the component makes the renderer write a timestamp around every pass
- * it records; removing it stops the queries and releases what they need, so a
- * world without the component pays for nothing. The timestamps of a frame are
- * read back one or two frames later, which is the frame the numbers name. The
- * passes are those of the renderer and of the effect chain of a view, and a
- * name that several views or shadow cascades record holds what they spent
- * together. A device without the timestamp query feature reports no passes.
+ * Timestamps are read back one or two frames later, the frame the numbers name.
+ * A pass name recorded by several views or cascades sums their time. A device
+ * without timestamp queries reports no passes.
  */
 ECS_STRUCT(GpuTimings, {
     bool supported;         /**< The device can time its passes, written by the engine */
@@ -129,33 +123,25 @@ ECS_STRUCT(GpuTimings, {
     GpuPassTime passes[16]; /**< The passes, in the order the frame recorded them */
 });
 
-/** Corner of a view an overlay panel is pinned to */
-ECS_ENUM(FpsCorner, {
-    FpsTopLeft = 0,     /**< Top left corner of the view */
-    FpsTopRight = 1,    /**< Top right corner of the view */
-    FpsBottomLeft = 2,  /**< Bottom left corner of the view */
-    FpsBottomRight = 3  /**< Bottom right corner of the view */
-});
+/** Frame times the history of the Fps singleton keeps, which the ECS_STRUCT spells out */
+#define BOX_MONITOR_FPS_HISTORY (120)
 
-/** Frame rate panel drawn on a view, or on every view as a singleton.
+/** Script the frame rate panel is loaded from at import, into box.monitor.fps_panel */
+#define BOX_MONITOR_FPS_PANEL "etc/ui/fps.flecs"
+
+/** Frame rate of the last second and the most recent frame times.
  *
- * The panel background, its two reference lines and the most recent hundred
- * and twenty frame times as one bar each, green while the frame stayed above
- * sixty frames per second, yellow above thirty and red below, are drawn after the effect chain
- * of the view and before its capture, so a headless run sees them, and a view
- * without the component pays for nothing. The frame rate itself is drawn as
- * regular UI text, in the corner the panel is pinned to, through a UI element
- * box.monitor owns. The last three fields are written by the engine from the
- * last second of frames, the window the text covers.
+ * Filled and marked modified every frame. The panel shows while the variable
+ * box.monitor.fps_panel.visible is true. The history is oldest first, and slots
+ * before the first recorded frame are zero.
  */
-ECS_STRUCT(FpsOverlay, {
-    bool enabled;      /**< Draw the panel, default true */
-    FpsCorner corner;  /**< Corner of the view the panel is pinned to */
-    float scale;       /**< Size multiplier of the panel, in points, default 1 */
-    float opacity;     /**< Opacity of the panel background, default 0.7 */
-    double fps;        /**< Frames per second of the window, written by the engine */
-    double mean_ms;    /**< Mean frame time of the window, written by the engine */
-    double worst_ms;   /**< Worst frame time of the window, written by the engine */
+ECS_STRUCT(Fps, {
+    double fps;          /**< Frames per second over the last second */
+    double mean_ms;      /**< Mean frame time of the last second */
+    double worst_ms;     /**< Worst frame time of the last second */
+    double frame_ms;     /**< Milliseconds of the most recent frame */
+    int32_t count;       /**< Frame times the history holds, at most its size */
+    float history[120];  /**< Most recent frame times in milliseconds, newest last */
 });
 
 /** Register the box.monitor module.

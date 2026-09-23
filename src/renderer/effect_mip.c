@@ -1,11 +1,31 @@
+/**
+ * @file renderer/effect_mip.c
+ * @brief Mip chain setup pass that a post process pass can run before it draws.
+ *
+ * The setup shader fills the finest level of a per view pyramid from the source
+ * image, downsamples it level by level and adds every coarser level back into the
+ * finer one, optionally blending the result with the pyramid of the previous frame.
+ */
+
 #include "renderer_internal.h"
 
+/** Blend state of the upsample pass, which adds the coarser level at a constant weight */
 static const WGPUBlendState box_effect_mip_mix = {
     .color = { WGPUBlendOperation_Add, WGPUBlendFactor_Constant,
         WGPUBlendFactor_One },
     .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_One }
 };
 
+/** Create a fullscreen pipeline from a fragment entry point of a setup shader.
+ *
+ * @param r The renderer
+ * @param module The shader module
+ * @param layout The pipeline layout
+ * @param entry Name of the fragment entry point
+ * @param blend Blend state of the color target, NULL for no blending
+ * @param format Format of the pyramid the pipeline writes
+ * @return The pipeline
+ */
 static WGPURenderPipeline box_effect_mip_pipeline(
     box_renderer_t *r,
     WGPUShaderModule module,
@@ -99,22 +119,33 @@ void box_effect_mip_fini(
     r->setup_mip_shader = BOX_SHADER_NONE;
 }
 
+/** Build the four pipelines of the setup shader of a pass, unless they already exist.
+ *
+ * @param r The renderer
+ * @param fx The pass whose setup shader and format the pipelines are built from
+ * @return Whether every pipeline exists
+ */
 static bool box_effect_mip_ready(
     box_renderer_t *r,
     const box_effect_t *fx)
 {
+    bool result = true;
     if (r->setup_mip_shader == fx->setup_shader && r->setup_mip_pipeline[0]) {
-        return true;
+        goto done;
     }
+
     for (uint32_t i = 0; i < 4; i ++) {
         if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
         r->setup_mip_pipeline[i] = NULL;
     }
+
     r->setup_mip_shader = fx->setup_shader;
     WGPUShaderModule module = box_shader_module(r, fx->setup_shader);
     if (!module) {
-        return false;
+        result = false;
+        goto done;
     }
+
     WGPUPipelineLayoutDescriptor desc = {
         .bindGroupLayoutCount = 1,
         .bindGroupLayouts = &r->setup_mip_layout
@@ -132,11 +163,19 @@ static bool box_effect_mip_ready(
         "fs_history", NULL, format);
     wgpuPipelineLayoutRelease(layout);
     wgpuShaderModuleRelease(module);
-    return r->setup_mip_pipeline[0] && r->setup_mip_pipeline[1] &&
+
+    result = r->setup_mip_pipeline[0] && r->setup_mip_pipeline[1] &&
         r->setup_mip_pipeline[2] && r->setup_mip_pipeline[3];
+done:
+    return result;
 }
 
-static void box_effect_mip_history_fini(box_gpu_view_t *v)
+/** Release the history textures of the pyramid of a view and forget the history.
+ *
+ * @param v The view
+ */
+static void box_effect_mip_history_fini(
+    box_gpu_view_t *v)
 {
     for (uint32_t i = 0; i < 2; i ++) {
         if (v->setup_mip_history_view[i]) wgpuTextureViewRelease(v->setup_mip_history_view[i]);
@@ -144,6 +183,7 @@ static void box_effect_mip_history_fini(box_gpu_view_t *v)
         v->setup_mip_history_view[i] = NULL;
         v->setup_mip_history[i] = NULL;
     }
+
     v->setup_mip_history_valid = false;
     v->setup_mip_history_index = 0;
 }
@@ -172,6 +212,13 @@ void box_effect_mip_view_fini(
     v->setup_mip_height = 0;
 }
 
+/** Create a bind group of a pyramid pass.
+ *
+ * @param r The renderer
+ * @param source The image the pass samples
+ * @param history The history the pass blends with, NULL binds the source again
+ * @return The bind group
+ */
 static WGPUBindGroup box_effect_mip_group(
     box_renderer_t *r,
     WGPUTextureView source,
@@ -192,6 +239,14 @@ static WGPUBindGroup box_effect_mip_group(
     return wgpuDeviceCreateBindGroup(r->device, &desc);
 }
 
+/** Recreate the pyramid of the current view, its level views and its bind groups.
+ *
+ * @param r The renderer
+ * @param width Width of the finest level in pixels
+ * @param height Height of the finest level in pixels
+ * @param levels Levels of the pyramid
+ * @param format Format of the pyramid
+ */
 static void box_effect_mip_resize(
     box_renderer_t *r,
     uint32_t width,
@@ -239,11 +294,24 @@ static void box_effect_mip_resize(
     });
 
     for (level = 1; level < levels; level ++) {
-        r->v->setup_mip_down[level] = box_effect_mip_group(r, r->v->setup_mip_mips[level - 1], NULL);
-        r->v->setup_mip_up[level - 1] = box_effect_mip_group(r, r->v->setup_mip_mips[level], NULL);
+        r->v->setup_mip_down[level] =
+            box_effect_mip_group(r, r->v->setup_mip_mips[level - 1], NULL);
+        r->v->setup_mip_up[level - 1] =
+            box_effect_mip_group(r, r->v->setup_mip_mips[level], NULL);
     }
 }
 
+/** Record one fullscreen pass of the pyramid.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param pipeline The pipeline of the pass
+ * @param group The bind group of the pass
+ * @param target The level view the pass writes
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param mix The pass blends into the target instead of clearing it
+ * @param blend Weight of the blend constant when the pass mixes
+ */
 static void box_effect_mip_pass(
     box_renderer_t *r,
     WGPUCommandEncoder encoder,
@@ -275,6 +343,14 @@ static void box_effect_mip_pass(
     wgpuRenderPassEncoderRelease(pass);
 }
 
+/** Blend the finest level with the history and write it to the other history texture.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param frame Frame number, the history only counts when it holds the previous frame
+ * @return The view of the history texture this frame wrote
+ */
 static WGPUTextureView box_effect_mip_history(
     box_renderer_t *r,
     WGPUCommandEncoder encoder,
@@ -296,6 +372,7 @@ static WGPUTextureView box_effect_mip_history(
             v->setup_mip_history_view[i] = wgpuTextureCreateView(v->setup_mip_history[i], NULL);
         }
     }
+
     bool valid = v->setup_mip_history_valid && v->setup_mip_history_slot == slot &&
         v->setup_mip_history_frame + 1 == frame;
     uint32_t next = 1 - v->setup_mip_history_index;
@@ -308,6 +385,7 @@ static WGPUTextureView box_effect_mip_history(
     v->setup_mip_history_frame = frame;
     v->setup_mip_history_slot = slot;
     v->setup_mip_history_valid = true;
+
     return v->setup_mip_history_view[next];
 }
 
@@ -319,10 +397,11 @@ WGPUTextureView box_effect_mip_run(
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder)
 {
-    if (!src || !box_effect_mip_ready(r, fx))
-    {
-        return NULL;
+    WGPUTextureView result = NULL;
+    if (!src || !box_effect_mip_ready(r, fx)) {
+        goto done;
     }
+
     int32_t weight_param = fx->setup_parameter[0];
     int32_t size_param = fx->setup_parameter[1];
     int32_t history_param = fx->setup_parameter[2];
@@ -331,8 +410,9 @@ WGPUTextureView box_effect_mip_run(
         fx->params[weight_param] : 1.0f;
     if (weight <= 0) {
         box_effect_mip_history_fini(r->v);
-        return NULL;
+        goto done;
     }
+
     uint32_t width, height;
     float max_dimension = size_param >= 0 && size_param < BOX_EFFECT_PARAM_MAX ?
         fx->params[size_param] : 65536.0f;
@@ -349,6 +429,7 @@ WGPUTextureView box_effect_mip_run(
     {
         box_effect_mip_resize(r, width, height, levels, format);
     }
+
     float first_step[2] = { 0.5f / (float)width, 0.5f / (float)height };
     wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
         (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE + 12 * sizeof(float),
@@ -360,17 +441,23 @@ WGPUTextureView box_effect_mip_run(
         box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[1], r->v->setup_mip_down[level],
             r->v->setup_mip_mips[level], slot, false, 0);
     }
+
     for (uint32_t level = levels - 1; level > 0; level --) {
         box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[2], r->v->setup_mip_up[level - 1],
             r->v->setup_mip_mips[level - 1], slot, true,
             weight);
     }
+
     wgpuBindGroupRelease(first);
     if (history_param >= 0 && history_param < BOX_EFFECT_PARAM_MAX &&
         fx->params[history_param] > 0)
     {
-        return box_effect_mip_history(r, encoder, slot, frame);
+        result = box_effect_mip_history(r, encoder, slot, frame);
+    } else {
+        box_effect_mip_history_fini(r->v);
+        result = r->v->setup_mip_view;
     }
-    box_effect_mip_history_fini(r->v);
-    return r->v->setup_mip_view;
+
+done:
+    return result;
 }

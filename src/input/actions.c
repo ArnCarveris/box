@@ -2,13 +2,9 @@
  * @file input/actions.c
  * @brief The OnLoad system that resolves the bindings of the maps into actions.
  *
- * The maps of a world are layers: the system walks their priorities from the
- * highest down and a binding that declares consume takes its key and its action
- * away from every layer below it, which is what a UI map over the map of a game
- * needs. A binding that does not say so leaves the layers below alone, so
- * nothing is swallowed by accident and a handler decides the rest. A binding on
- * one of the any families resolves on whatever key of that family is down and
- * reports that key, so a title screen awaits one action.
+ * Maps are layers walked from the highest priority down. A binding that declares
+ * consume takes its key and action away from every layer below it. A binding on
+ * an any family resolves on whichever key of the family is down and reports it.
  */
 
 #include "input_internal.h"

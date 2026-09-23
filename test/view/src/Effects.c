@@ -1,3 +1,8 @@
+/**
+ * @file Effects.c
+ * @brief Tests for the per view post processing effect chain.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <stdlib.h>
@@ -61,10 +66,12 @@ void Effects_teardown(void)
     for (i = 0; i < packet.shader_create.count; i ++) {
         free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
+
     for (i = 0; i < packet.effect_texture_create.count; i ++) {
         free(((box_effect_texture_cmd_t*)box_vec_at(
             &packet.effect_texture_create, i))->texels);
     }
+
     box_packet_fini(&packet);
     ecs_fini(w);
 }

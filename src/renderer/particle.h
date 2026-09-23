@@ -2,10 +2,8 @@
  * @file renderer/particle.h
  * @brief Pools, passes and pipelines of the GPU particle simulation.
  *
- * A pool holds the channels of one emitter, one buffer each, and lives as long
- * as the packet keeps naming its emitter. The spawn and integrate passes write
- * those channels and the point sprite pass reads them, so no particle state
- * ever crosses back to the main thread.
+ * A pool holds one buffer per channel of an emitter while packets name it. Spawn
+ * and integrate write the channels and the sprite pass reads them, all on the GPU.
  */
 
 #ifndef BOX_RENDERER_PARTICLE_H
@@ -40,14 +38,9 @@
 
 /** Particle pool of one emitter, owned by the renderer.
  *
- * The place a particle is at and the velocity that integrates it keep their full
- * precision: the position carries the age in its w and the velocity the
- * lifetime. What only reaches the image is packed into half floats, the color
- * with its opacity into two words and the rotation with the size into one, so a
- * particle costs 44 bytes of channels instead of 68. A slot whose lifetime is
- * zero holds no particle and sits in the dead list, which the integrate pass
- * pushes to and the spawn pass pops from; the dead list and the compacted list
- * of the slots that are alive this frame share one buffer.
+ * Position (age in w) and velocity (lifetime in w) are full floats; color, opacity,
+ * rotation and size are half floats. A slot with zero lifetime is on the dead
+ * list, which shares one buffer with the compacted alive list.
  */
 typedef struct box_gpu_emitter_t {
     uint32_t id;              /**< Emitter of the packet the pool belongs to */
@@ -113,10 +106,8 @@ void box_particle_invalidate(
 
 /** Spawn into and integrate the pool of every emitter of a packet.
  *
- * The pools are renderer state: a packet only names its emitters, so a pool is
- * created the first time its emitter appears, kept while it keeps appearing and
- * released when it stops. The integrate pass runs before the spawn pass, so a
- * slot that expires this frame is spawned into again in the same frame.
+ * A pool is created when its emitter first appears and released when it stops
+ * appearing. Integrate runs before spawn, so expired slots are reused this frame.
  *
  * @param r The renderer
  * @param p The packet
@@ -129,11 +120,8 @@ void box_particle_simulate(
 
 /** Draw the particles of every pool over the image of a view.
  *
- * The pass runs after the sorted draws, expands every slot of a pool into a
- * camera facing quad or into the mesh of its emitter and drops the slots that
- * hold no live particle, reading the depth the scene left behind without
- * writing it. The blended pools are drawn back to front and the additive ones,
- * which do not care about the order, follow them.
+ * Runs after the sorted draws, depth tested without depth writes. Blended pools
+ * are drawn back to front, then the additive pools.
  *
  * @param r The renderer
  * @param view The view being recorded

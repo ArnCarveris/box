@@ -2,11 +2,9 @@
  * @file command/complete.c
  * @brief Completes the word a caret sits in against the commands and the entities.
  *
- * The first word of a line is a command, so it completes against the names
- * under box.command.commands, and every later word is an argument, so it
- * completes against the children of the scope its path names. Both answer the
- * same way: the longest prefix the candidates share replaces the word, a single
- * candidate is followed by a space and a word nothing matches is left alone.
+ * The first word completes against the names under box.command.commands, later
+ * words against the children of the scope their path names. The word becomes the
+ * longest shared prefix; a single candidate adds a space, no match changes nothing.
  */
 
 #include "command_internal.h"

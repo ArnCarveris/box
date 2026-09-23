@@ -2,10 +2,9 @@
  * @file gltf/load.c
  * @brief Parses a glTF file and builds the entity tree of one of its scenes.
  *
- * A node of the scene becomes a child entity with Position, Rotation and Scale,
- * and every primitive of its mesh becomes a child of that entity with a Mesh3
- * and a material. Everything the loader creates carries GltfNode, which is what
- * a reload or a removed component deletes again.
+ * A node becomes a child entity with Position, Rotation and Scale, and each
+ * primitive of its mesh a child with a Mesh3 and a material. Everything created
+ * carries GltfNode, which a reload or a removed component deletes.
  */
 
 #include "gltf_internal.h"

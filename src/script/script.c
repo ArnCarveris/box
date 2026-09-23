@@ -13,13 +13,16 @@ ecs_entity_t box_script_load(
     ecs_world_t *world,
     const char *path)
 {
+    ecs_entity_t result = 0;
     char resolved[BOX_SHADER_PATH_MAX];
     if (!box_locate(path, resolved, sizeof(resolved))) {
         ecs_err("box.script: %s: file not found", path);
-        return 0;
+        goto done;
     }
 
-    return ecs_script(world, { .filename = resolved });
+    result = ecs_script(world, { .filename = resolved });
+done:
+    return result;
 }
 
 /** Free the instantiation state of a world.
@@ -110,6 +113,11 @@ done:
     return;
 }
 
+/** Pending observer: queue instances that gain a pending template and drop
+ * the ones that lose it.
+ *
+ * @param it The iterator of the observer
+ */
 static void box_script_on_pending(
     ecs_iter_t *it)
 {

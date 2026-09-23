@@ -2,15 +2,9 @@
  * @file renderer/shadow.h
  * @brief Cache rule of the static cascade layers, shared by the renderer and the tests.
  *
- * Static casters are rendered into a cached depth layer per cascade, which only
- * has to be rendered again when the matrix of the cascade changed or when a
- * static caster inside the volume the cascade collects casters from moved. The
- * volume is the sphere of the cascade extruded towards the light, which the
- * light frustum of the cascade covers. A frame renders the nearest dirty layer
- * and at most one more held layer, taking turns between the cascades so none
- * of them starves while the camera keeps moving, and a cascade that keeps its
- * layer is drawn and sampled with the matrix that layer was rendered with, so
- * its shadows stay in place until its turn comes.
+ * A cached static layer is dirty when its cascade matrix changes or a static caster
+ * in its light extruded sphere moves. A kept layer is sampled with the matrix it
+ * was rendered with.
  */
 
 #ifndef BOX_RENDERER_SHADOW_H
@@ -26,8 +20,8 @@ typedef struct box_shadow_cache_t {
     bool valid[BOX_SHADOW_CASCADE_MAX];       /**< The static layer holds a rendering */
     bool stale[BOX_SHADOW_CASCADE_MAX];       /**< The working layer differs from the static one */
     uint32_t next;                            /**< Cascade the next held rebuild looks at first */
-    uint32_t caster_mask;
-    uint32_t strict_layers;
+    uint32_t caster_mask;   /**< Caster mask of the view the static layers were rendered for */
+    uint32_t strict_layers; /**< Strict layer flag of the view the layers were rendered for */
 } box_shadow_cache_t;
 
 /** Check whether two cascade matrices hold the same values.
@@ -132,13 +126,9 @@ static inline void box_shadow_cache_all(
 
 /** The cascades whose static layer is rendered this frame.
  *
- * A cascade that never held a rendering is rendered as soon as it is dirty, so
- * the first frame of a scene fills every layer. After that the nearest dirty
- * cascade is rendered every frame, since it is the cheapest and the one the
- * eye is on, and one more held cascade is rendered in turn, the first dirty one
- * from the one after the last turn, so a camera that keeps every cascade dirty
- * refreshes the far ones as well instead of starving them. The others keep
- * drawing with the layer they hold.
+ * Dirty cascades that never held a rendering are all rendered. Otherwise the
+ * nearest dirty cascade is rendered plus one more dirty cascade in round robin
+ * order; the others keep the layer they hold.
  *
  * @param c The cache
  * @param v The view of this frame

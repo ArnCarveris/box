@@ -2,25 +2,11 @@
  * @file ui/hit.c
  * @brief Resolves the cursor against the rectangles of the UI trees of a view.
  *
- * A UI element has no collider, so the module answers the pick of its view
- * itself: box.picking asks the source that is installed here before it runs the
- * ray query of a view, and an element under the cursor consumes the pick, which
- * is what puts a tree over the scene it is drawn on top of.
+ * Installs the pick source box.picking asks before the ray query of a view; an
+ * element under the cursor consumes the pick. The deepest node of the topmost subtree
+ * that holds the point wins and is written to the UiCapture singleton.
  *
- * The cursor is a point in the plane of the tree, and a node covers the
- * rectangle its Bounds sizes around the origin of its own frame, so the test
- * takes the point into that frame through the world transform of the node and
- * rotation and scale come for free. The node with the highest place in the walk
- * of its tree wins, which is the node drawn over every other one that holds the
- * point: the deepest node of the topmost subtree.
- *
- * A system writes the answer of the frame into the UiCapture singleton, which is
- * how a script and box_ui_mouse_captured learn that the pointer is on a panel.
- *
- * A node a Hidden switch takes out of the frame is not under the cursor either,
- * so a panel that is hidden hands the pointer back to the scene behind it, and
- * a node with HitThrough is passed over, so the caption of a widget leaves the
- * widget under the cursor.
+ * Hidden nodes and nodes with HitThrough are skipped.
  */
 
 #include "ui_internal.h"
@@ -41,10 +27,8 @@ static UiState* box_ui_hit_state(
 
 /** Whether the rectangle of a node holds a point of the plane of its tree.
  *
- * The point is taken into the frame of the node through the world transform of
- * that node, so rotation and scale come for free, and the comparison is scaled
- * by the determinant of that frame instead of dividing by it, which keeps a
- * node of a large tree at a handful of multiplications.
+ * The point is taken into the frame of the node through its world transform, and the
+ * comparison is scaled by the determinant of that frame instead of dividing by it.
  *
  * @param t World transform of the node
  * @param b Bounds of the node
@@ -155,10 +139,8 @@ static bool box_ui_hit_in_view(
 
 /** Whether any tree of the world is drawn by a view.
  *
- * A world with a UI holds a view per tree next to the views of its scene, and
- * the pick of every one of those views asks the hit test. The roots are a
- * handful of entities, so answering from them keeps a view without a tree from
- * walking the nodes of the trees of the other views.
+ * Answered from the tree roots, so a view without a tree does not walk the nodes of
+ * trees that other views draw.
  *
  * @param world The world
  * @param view The view
@@ -282,10 +264,8 @@ done:
 
 /** Answer the pick of a UI view from the rectangles of the trees it draws.
  *
- * The ray of the cursor is taken to the plane the trees are laid out in, which
- * is the plane z of the world is zero in, and the point it lands on is the
- * cursor of the hit test. The hit reports that point, the camera as its normal
- * and no collider, because a UI element has none.
+ * The cursor ray is intersected with the z = 0 plane of the trees. The hit reports that
+ * point, the camera as normal and no collider.
  *
  * @param world The world
  * @param view The view being picked

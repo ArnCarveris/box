@@ -2,23 +2,12 @@
  * @file ui/console.c
  * @brief The in game console: its binding, its session and the parts it fills.
  *
- * The module holds no widget, so the console is a script the framework installs
- * and the glue here is everything that script cannot do for itself. Adding the
- * Console singleton registers an action under the actions scope and an input
- * map that fires it with the grave key, so the overlay opens through the same
- * action layer a key binding and a UI button share.
+ * Adding the Console singleton registers an action and a grave key input map that
+ * opens the console script. Its submitted lines go to TerminalInput on the console
+ * session, whose log the scrollback shows.
  *
- * The first open imports box.command, loads the script and takes its two marked
- * elements: the one with a ConsoleLog shows the scrollback and the one with a
- * TextInput holds the line. A line the input submits is set as TerminalInput on
- * the session of the console, which is an ordinary session with a folder and a
- * log of its own, and the log of that session is what the scrollback shows, so
- * the overlay and an agent over HTTP see the same terminal.
- *
- * An open console holds the keyboard: every input map but its own is disabled
- * while it is open, which is the focus rule of the device layer applied to the
- * action layer, and a console that closes turns the view of its tree off and
- * gives the maps back.
+ * While open, the console disables every other input map; closing it turns off the
+ * view of its tree and gives the maps back.
  */
 
 #include "ui_internal.h"
@@ -40,17 +29,25 @@ static ConsoleImpl* box_ui_console_state(
         ecs_get_mut(world, ecs_id(ConsoleImpl), ConsoleImpl) : NULL;
 }
 
+/** Syntax class of a byte of the scrollback, which picks its TerminalColors color */
 typedef enum box_terminal_style_t {
-    BoxTerminalText,
-    BoxTerminalMuted,
-    BoxTerminalAccent,
-    BoxTerminalError,
-    BoxTerminalPath,
-    BoxTerminalType,
-    BoxTerminalNumber,
-    BoxTerminalString
+    BoxTerminalText,   /**< Plain text */
+    BoxTerminalMuted,  /**< Punctuation, operators and help descriptions */
+    BoxTerminalAccent, /**< Command names and info levels */
+    BoxTerminalError,  /**< Failed command output and error levels */
+    BoxTerminalPath,   /**< Entity paths */
+    BoxTerminalType,   /**< Type and component names */
+    BoxTerminalNumber, /**< Numbers and the true, false and null keywords */
+    BoxTerminalString  /**< Quoted strings and warning levels */
 } box_terminal_style_t;
 
+/** Give a range of bytes one style.
+ *
+ * @param styles The style of every byte of the text
+ * @param begin The first byte of the range
+ * @param end The byte after the range, an empty range writes nothing
+ * @param style The style to write
+ */
 static void box_ui_terminal_span(
     uint8_t *styles,
     int32_t begin,
@@ -62,6 +59,14 @@ static void box_ui_terminal_span(
     }
 }
 
+/** Test whether a range of the text is exactly a string.
+ *
+ * @param text The text
+ * @param begin The first byte of the range
+ * @param end The byte after the range
+ * @param value The string to compare with
+ * @return True when the range holds value and nothing else
+ */
 static bool box_ui_terminal_equal(
     const char *text,
     int32_t begin,
@@ -69,15 +74,31 @@ static bool box_ui_terminal_equal(
     const char *value)
 {
     int32_t length = (int32_t)strlen(value);
+
     return end - begin == length && !strncmp(&text[begin], value, (size_t)length);
 }
 
+/** Test whether a character is punctuation the terminal draws muted.
+ *
+ * @param ch The character
+ * @return True for brackets, separators and operators
+ */
 static bool box_ui_terminal_operator(
     char ch)
 {
     return strchr("(){}[]<>:,.?!=+*/|~-$\\", ch) != NULL;
 }
 
+/** Style an entity name or path.
+ *
+ * A name in parentheses or whose last path element starts with an upper case
+ * letter is a type, anything else is a path, and operators in it are muted.
+ *
+ * @param text The text
+ * @param styles The style of every byte of the text
+ * @param begin The first byte of the name
+ * @param end The byte after the name
+ */
 static void box_ui_terminal_name(
     const char *text,
     uint8_t *styles,
@@ -85,7 +106,7 @@ static void box_ui_terminal_name(
     int32_t end)
 {
     if (begin >= end) {
-        return;
+        goto done;
     }
 
     if (text[begin] == '(') {
@@ -109,30 +130,46 @@ static void box_ui_terminal_name(
             box_ui_terminal_span(styles, i, i + 1, BoxTerminalMuted);
         }
     }
+
+done:
+    return;
 }
 
+/** Test whether a number starts at a byte.
+ *
+ * @param text The text
+ * @param i The byte to test
+ * @param end The byte after the range the number has to fit in
+ * @return True for a digit, or a minus or dot followed by a digit
+ */
 static bool box_ui_terminal_number_start(
     const char *text,
     int32_t i,
     int32_t end)
 {
-    if (isdigit((unsigned char)text[i])) {
-        return true;
-    }
-
-    return i + 1 < end && (text[i] == '-' || text[i] == '.') &&
-        isdigit((unsigned char)text[i + 1]);
+    return isdigit((unsigned char)text[i]) ||
+        (i + 1 < end && (text[i] == '-' || text[i] == '.') &&
+            isdigit((unsigned char)text[i + 1]));
 }
 
+/** Test whether a range of the text is a single entity path.
+ *
+ * @param text The text
+ * @param begin The first byte of the range
+ * @param end The byte after the range
+ * @return True when the range starts with a letter, underscore, hash or slash
+ *         and holds only identifier and path characters
+ */
 static bool box_ui_terminal_path(
     const char *text,
     int32_t begin,
     int32_t end)
 {
+    bool result = false;
     if (begin >= end || !(isalpha((unsigned char)text[begin]) ||
         text[begin] == '_' || text[begin] == '#' || text[begin] == '/'))
     {
-        return false;
+        goto done;
     }
 
     int32_t i;
@@ -141,13 +178,24 @@ static bool box_ui_terminal_path(
             text[i] == '#' || text[i] == '.' || text[i] == '/' ||
             text[i] == '\\' || text[i] == '-'))
         {
-            return false;
+            goto done;
         }
     }
 
-    return true;
+    result = true;
+done:
+    return result;
 }
 
+/** Style a value: strings, numbers, keywords, types, paths and operators.
+ *
+ * A word followed by a colon is a member name and stays plain text.
+ *
+ * @param text The text
+ * @param styles The style of every byte of the text
+ * @param begin The first byte of the value
+ * @param end The byte after the value
+ */
 static void box_ui_terminal_value(
     const char *text,
     uint8_t *styles,
@@ -231,39 +279,51 @@ static void box_ui_terminal_value(
     }
 }
 
+/** Find the style of a log level word.
+ *
+ * @param text The text
+ * @param begin The first byte of the word
+ * @param end The byte after the word
+ * @param style Out: the style of the level, written only when it is one
+ * @return True when the word is fatal, error, warning, info, debug or trace
+ */
 static bool box_ui_terminal_level(
     const char *text,
     int32_t begin,
     int32_t end,
     box_terminal_style_t *style)
 {
+    bool result = true;
     if (box_ui_terminal_equal(text, begin, end, "fatal") ||
         box_ui_terminal_equal(text, begin, end, "error"))
     {
         style[0] = BoxTerminalError;
-        return true;
-    }
-
-    if (box_ui_terminal_equal(text, begin, end, "warning")) {
+    } else if (box_ui_terminal_equal(text, begin, end, "warning")) {
         style[0] = BoxTerminalString;
-        return true;
-    }
-
-    if (box_ui_terminal_equal(text, begin, end, "info")) {
+    } else if (box_ui_terminal_equal(text, begin, end, "info")) {
         style[0] = BoxTerminalAccent;
-        return true;
-    }
-
-    if (box_ui_terminal_equal(text, begin, end, "debug") ||
+    } else if (box_ui_terminal_equal(text, begin, end, "debug") ||
         box_ui_terminal_equal(text, begin, end, "trace"))
     {
         style[0] = BoxTerminalMuted;
-        return true;
+    } else {
+        result = false;
     }
 
-    return false;
+    return result;
 }
 
+/** Style one line of command output.
+ *
+ * A tab line is a log line or table row led by a level or path. A line with " - "
+ * after its first word is help text with accented command and highlighted argument
+ * types. A colon in the first word starts a name and value; else name or value.
+ *
+ * @param text The text
+ * @param styles The style of every byte of the text
+ * @param begin The first byte of the line
+ * @param end The byte after the line, without the newline
+ */
 static void box_ui_terminal_line(
     const char *text,
     uint8_t *styles,
@@ -287,7 +347,7 @@ static void box_ui_terminal_line(
         }
 
         box_ui_terminal_value(text, styles, tab + 1, end);
-        return;
+        goto done;
     }
 
     int32_t split = -1;
@@ -340,7 +400,7 @@ static void box_ui_terminal_line(
             }
         }
 
-        return;
+        goto done;
     }
 
     int32_t colon = -1;
@@ -355,7 +415,7 @@ static void box_ui_terminal_line(
         box_ui_terminal_name(text, styles, begin, colon);
         box_ui_terminal_span(styles, colon, colon + 1, BoxTerminalMuted);
         box_ui_terminal_value(text, styles, colon + 1, end);
-        return;
+        goto done;
     }
 
     if ((word == end && box_ui_terminal_path(text, begin, end)) ||
@@ -363,12 +423,22 @@ static void box_ui_terminal_line(
         (word == end && memchr(&text[begin], '.', (size_t)(end - begin))))
     {
         box_ui_terminal_name(text, styles, begin, end);
-        return;
+        goto done;
     }
 
     box_ui_terminal_value(text, styles, begin, end);
+done:
+    return;
 }
 
+/** Style the output of one command, line by line.
+ *
+ * @param text The text
+ * @param styles The style of every byte of the text
+ * @param begin The first byte of the output
+ * @param end The byte after the output
+ * @param error True when the command failed, which makes the output one error span
+ */
 static void box_ui_terminal_output(
     const char *text,
     uint8_t *styles,
@@ -378,45 +448,59 @@ static void box_ui_terminal_output(
 {
     if (error) {
         box_ui_terminal_span(styles, begin, end, BoxTerminalError);
-        return;
-    }
+    } else {
+        int32_t line = begin;
+        while (line < end) {
+            int32_t next = line;
+            while (next < end && text[next] != '\n') {
+                next ++;
+            }
 
-    int32_t line = begin;
-    while (line < end) {
-        int32_t next = line;
-        while (next < end && text[next] != '\n') {
-            next ++;
+            box_ui_terminal_line(text, styles, line, next);
+            line = next + 1;
         }
-
-        box_ui_terminal_line(text, styles, line, next);
-        line = next + 1;
     }
 }
 
+/** Color of a style.
+ *
+ * @param colors The terminal palette of the element
+ * @param style The style
+ * @return The color of the palette for the style
+ */
 static Rgb box_ui_terminal_color(
     const TerminalColors *colors,
     box_terminal_style_t style)
 {
+    Rgb result = colors->text;
     switch (style) {
     case BoxTerminalMuted:
-        return colors->muted;
+        result = colors->muted;
+        break;
     case BoxTerminalAccent:
-        return colors->accent;
+        result = colors->accent;
+        break;
     case BoxTerminalError:
-        return colors->error;
+        result = colors->error;
+        break;
     case BoxTerminalPath:
-        return colors->path;
+        result = colors->path;
+        break;
     case BoxTerminalType:
-        return colors->type;
+        result = colors->type;
+        break;
     case BoxTerminalNumber:
-        return colors->number;
+        result = colors->number;
+        break;
     case BoxTerminalString:
-        return colors->string;
+        result = colors->string;
+        break;
     case BoxTerminalText:
-        return colors->text;
+        result = colors->text;
+        break;
     }
 
-    return colors->text;
+    return result;
 }
 
 Rgb box_ui_console_color(
@@ -425,25 +509,26 @@ Rgb box_ui_console_color(
     int32_t byte,
     Rgb fallback)
 {
+    Rgb result = fallback;
     const TerminalColors *colors = ecs_get(world, element, TerminalColors);
     const ConsoleImpl *impl = ecs_id(ConsoleImpl) ?
         ecs_get(world, ecs_id(ConsoleImpl), ConsoleImpl) : NULL;
     if (!colors || !impl || element != impl->log || byte < 0 ||
         byte >= impl->style_count)
     {
-        return fallback;
+        goto done;
     }
 
-    return box_ui_terminal_color(colors,
+    result = box_ui_terminal_color(colors,
         (box_terminal_style_t)impl->styles[byte]);
+done:
+    return result;
 }
 
 /** Register the actions and the map that open the console with the grave key.
  *
- * The entities are named, so a script that wants to await the console finds
- * actions.Console and actions.ConsoleLine, and the binding lives in a map of
- * its own, which is the one map the console leaves enabled while it holds the
- * keyboard.
+ * The entities are actions.Console and actions.ConsoleLine, and the binding lives in
+ * its own map, the one map the console leaves enabled while it holds the keyboard.
  *
  * @param world The world
  */
@@ -773,6 +858,14 @@ done:
     return;
 }
 
+/** Byte ranges of one command and its output in the scrollback text */
+typedef struct box_ui_terminal_entry_t {
+    int32_t begin;  /**< First byte of the "$ " prompt of the command line */
+    int32_t result; /**< First byte of the output of the command */
+    int32_t end;    /**< Byte after the output of the command */
+    bool error;     /**< The command failed */
+} box_ui_terminal_entry_t;
+
 /** Write the last lines of the session log into the scrollback of the console.
  *
  * @param world The world
@@ -798,13 +891,6 @@ static void box_ui_console_scrollback(
         lines = BOX_COMMAND_LOG_MAX;
     }
 
-    typedef struct box_ui_terminal_entry_t {
-        int32_t begin;
-        int32_t result;
-        int32_t end;
-        bool error;
-    } box_ui_terminal_entry_t;
-
     box_ui_terminal_entry_t entries[BOX_COMMAND_LOG_MAX];
     int32_t entry_count = 0;
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
@@ -823,6 +909,7 @@ static void box_ui_console_scrollback(
         if (result_length && result[result_length - 1] != '\n') {
             ecs_strbuf_appendch(&buf, '\n');
         }
+
         meta->end = ecs_strbuf_written(&buf);
         meta->error = entry->error;
         ecs_strbuf_appendch(&buf, '\n');
@@ -835,6 +922,7 @@ static void box_ui_console_scrollback(
     if (!value) {
         value = ecs_os_strdup("");
     }
+
     uint8_t *styles = length ? ecs_os_calloc((ecs_size_t)length) : NULL;
     for (i = 0; i < entry_count; i ++) {
         box_ui_terminal_entry_t *meta = &entries[i];

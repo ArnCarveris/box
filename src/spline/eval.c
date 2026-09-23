@@ -2,10 +2,9 @@
  * @file spline/eval.c
  * @brief Evaluates the position, tangent and normal of a curve at a parameter.
  *
- * The parameter runs from 0 to 1 over the whole curve and splits into a segment
- * index and a local parameter the three curve types share. The normal is the up
- * of the curve: perpendicular to the tangent in the plane it spans with world
- * up, so a cross section swept along the curve does not roll.
+ * The parameter runs from 0 to 1 over the curve and splits into a segment index
+ * and a local parameter. The normal is perpendicular to the tangent in the plane
+ * it spans with world up, so a swept cross section does not roll.
  */
 
 #include "spline_internal.h"

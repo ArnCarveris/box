@@ -2,10 +2,9 @@
  * @file command/render.c
  * @brief The render command: renders an entity, prefab or template on its own.
  *
- * The command builds a temporary view with its own camera, light, layer and
- * render target, frames the camera on the bounds of the subject and captures
- * the target to a PNG in the session resources folder. The temporary scene is
- * deleted again when the image is on disk.
+ * Builds a temporary view with its own camera, light, layer and target, frames
+ * the subject bounds and captures a PNG to the session resources folder. The
+ * temporary scene is deleted once the image is on disk.
  */
 
 #include "command_internal.h"

@@ -55,7 +55,8 @@ static ecs_entity_t bench_mesh_road(
     return road;
 }
 
-void Mesh_road_1000_points(bench_t *b)
+void Mesh_road_1000_points(
+    bench_t *b)
 {
     // splines/spline_roads
     ecs_world_t *world = ecs_init();
@@ -74,7 +75,8 @@ void Mesh_road_1000_points(bench_t *b)
     ecs_fini(world);
 }
 
-void Mesh_road_1000_points_curve_edit(bench_t *b)
+void Mesh_road_1000_points_curve_edit(
+    bench_t *b)
 {
     // splines/spline_roads
     ecs_world_t *world = ecs_init();

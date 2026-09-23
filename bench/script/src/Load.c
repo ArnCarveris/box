@@ -12,7 +12,8 @@
 /** Entities the large scene of the benchmarks holds */
 #define BENCH_LOAD_ENTITIES_LARGE (50000)
 
-void Load_scene_10k(bench_t *b)
+void Load_scene_10k(
+    bench_t *b)
 {
     // responsiveness/script_eval_perf
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
@@ -48,7 +49,8 @@ void Load_scene_10k(bench_t *b)
     ecs_os_free(code);
 }
 
-void Load_scene_50k(bench_t *b)
+void Load_scene_50k(
+    bench_t *b)
 {
     // responsiveness/script_eval_perf
     ecs_strbuf_t buf = ECS_STRBUF_INIT;

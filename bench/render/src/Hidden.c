@@ -14,7 +14,8 @@
 /** Entities the switch is flipped on every frame */
 #define BENCH_HIDE_COUNT (1000)
 
-void Hidden_toggle_1000_of_10k(bench_t *b)
+void Hidden_toggle_1000_of_10k(
+    bench_t *b)
 {
     // ore_engine/visibility
     ecs_world_t *world = ecs_init();
@@ -61,7 +62,8 @@ void Hidden_toggle_1000_of_10k(bench_t *b)
     ecs_fini(world);
 }
 
-void Hidden_extract_10k_with_a_hidden_tenth(bench_t *b)
+void Hidden_extract_10k_with_a_hidden_tenth(
+    bench_t *b)
 {
     // ore_engine/visibility
     ecs_world_t *world = ecs_init();

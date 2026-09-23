@@ -171,12 +171,16 @@ static void box_layer_on_change(
     }
 }
 
+/** A shader changed status, so the layers that use it are resolved again.
+ *
+ * @param it Iterator over the shaders whose ShaderStatus was set
+ */
 static void box_layer_on_shader(
     ecs_iter_t *it)
 {
     RenderState *state = ecs_get_mut(it->world, ecs_id(RenderState), RenderState);
     if (!state) {
-        return;
+        goto done;
     }
 
     const box_layer_t *entries = ecs_vec_first_t(&state->layers, box_layer_t);
@@ -190,6 +194,9 @@ static void box_layer_on_shader(
             }
         }
     }
+
+done:
+    return;
 }
 
 /** A material enabled or disabled a layer, so its instances resolve a new mask.

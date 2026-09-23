@@ -18,7 +18,6 @@
 #include "effect_temporal.h"
 #include "effect_texture.h"
 #include "hiz.h"
-#include "overlay.h"
 #include "upscale.h"
 #include "sky.h"
 #include "particle.h"
@@ -143,9 +142,10 @@ typedef struct box_env_uniform_t {
     float params[4];  /**< Cube face, roughness, unused, unused */
 } box_env_uniform_t;
 
+/** Uniform of the bake dispatch */
 typedef struct box_bake_uniform_t {
-    uint32_t job_count;
-    uint32_t pad[3];
+    uint32_t job_count; /**< Probe jobs the dispatch runs */
+    uint32_t pad[3];    /**< Padding to the 16 byte GPU stride */
 } box_bake_uniform_t;
 
 /** Frustum and range of one dispatch of the culling pass */
@@ -157,8 +157,8 @@ typedef struct box_cull_uniform_t {
     uint32_t arg;    /**< Index of the draw arguments the dispatch counts into */
     uint32_t caster; /**< The dispatch keeps the shadow casters of the range only */
     uint32_t pad[3]; /**< Padding to the 16 byte GPU stride */
-    float clip[16];
-    float pixels[4];
+    float clip[16];  /**< World to clip matrix of the view, for the pixel size test */
+    float pixels[4]; /**< View width, height, minimum pixel size of an instance, unused */
 } box_cull_uniform_t;
 
 /** Frustum, matrices and pyramid extent of one dispatch of the occlusion pass */
@@ -168,7 +168,7 @@ typedef struct box_hiz_uniform_t {
     float planes[BOX_FRUSTUM_PLANES][4]; /**< Planes of the frustum of the view */
     uint32_t range[4];  /**< First slot, instances, first visible slot and argument index */
     uint32_t screen[4]; /**< Pyramid width, height, levels and the mode of the dispatch */
-    float pixels[4];
+    float pixels[4];    /**< View width, height, minimum pixel size of an instance, unused */
 } box_hiz_uniform_t;
 
 /** Bind group of the occlusion dispatches of one mesh in one view */
@@ -292,10 +292,10 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup cluster_group;     /**< View, lights and grid of its compute pass */
     WGPUBindGroup light_group;       /**< Lights and grid the mesh shader reads for it */
     box_cluster_t grid;              /**< Grid its cluster buffers were built for */
-    box_vec_t light_snapshot;
-    float cluster_view[16];
-    float cluster_proj[16];
-    bool cluster_dirty;
+    box_vec_t light_snapshot;        /**< box_light_t the light buffer was last written with */
+    float cluster_view[16];          /**< View matrix the clusters were last assigned with */
+    float cluster_proj[16];          /**< Projection the clusters were last assigned with */
+    bool cluster_dirty;              /**< The cluster assignment must run this frame */
     bool scene_needed;               /**< A sorted draw of the view samples the copy */
     WGPUTexture scene;               /**< Copy of the opaque image of the view */
     WGPUTextureView scene_view;      /**< View of its whole blur chain */
@@ -304,34 +304,34 @@ typedef struct box_gpu_view_t {
     WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
     uint32_t scene_mips_count;       /**< Levels its blur chain holds */
     WGPUTextureFormat scene_format;  /**< Format of that copy, which follows the scene target */
-    WGPUBuffer setup_compute_state;
-    WGPUBuffer setup_compute_work;
-    uint32_t setup_compute_size[2];
-    WGPUTexture setup_mip;
-    WGPUTextureView setup_mip_view;
-    WGPUTextureView setup_mip_mips[BOX_EFFECT_MIP_LEVELS_MAX];
-    WGPUBindGroup setup_mip_down[BOX_EFFECT_MIP_LEVELS_MAX];
-    WGPUBindGroup setup_mip_up[BOX_EFFECT_MIP_LEVELS_MAX];
-    uint32_t setup_mip_levels;
-    uint32_t setup_mip_width;
-    uint32_t setup_mip_height;
-    WGPUTextureFormat setup_mip_format;
-    WGPUBuffer setup_mip_uniform;
-    WGPUTexture setup_mip_history[2];
-    WGPUTextureView setup_mip_history_view[2];
-    uint32_t setup_mip_history_index;
-    uint32_t setup_mip_history_frame;
-    uint32_t setup_mip_history_slot;
-    bool setup_mip_history_valid;
-    WGPUTexture setup_temporal_work;
-    WGPUTextureView setup_temporal_work_view;
-    WGPUTexture setup_temporal_hist[2];
-    WGPUTextureView setup_temporal_hist_view[2];
-    uint32_t setup_temporal_width;
-    uint32_t setup_temporal_height;
-    WGPUTextureFormat setup_temporal_format;
-    uint32_t setup_temporal_slot;
-    bool setup_temporal_valid;
+    WGPUBuffer setup_compute_state;  /**< State buffer a compute setup pass keeps across frames */
+    WGPUBuffer setup_compute_work;   /**< Work buffer of the compute setup pass */
+    uint32_t setup_compute_size[2];  /**< Bytes of the work buffer and of the state buffer */
+    WGPUTexture setup_mip;           /**< Pyramid of the mip chain setup pass */
+    WGPUTextureView setup_mip_view;  /**< View of the finest level of the pyramid */
+    WGPUTextureView setup_mip_mips[BOX_EFFECT_MIP_LEVELS_MAX]; /**< Attachment view of a level */
+    WGPUBindGroup setup_mip_down[BOX_EFFECT_MIP_LEVELS_MAX]; /**< Downsample source, finer level */
+    WGPUBindGroup setup_mip_up[BOX_EFFECT_MIP_LEVELS_MAX];   /**< Upsample source, coarser level */
+    uint32_t setup_mip_levels;       /**< Levels the pyramid holds */
+    uint32_t setup_mip_width;        /**< Width of the finest level in pixels */
+    uint32_t setup_mip_height;       /**< Height of the finest level in pixels */
+    WGPUTextureFormat setup_mip_format; /**< Format of the pyramid */
+    WGPUBuffer setup_mip_uniform;    /**< Effect uniform buffer the bind groups were built with */
+    WGPUTexture setup_mip_history[2]; /**< Finest levels blended with the previous frame */
+    WGPUTextureView setup_mip_history_view[2]; /**< Views of the two history textures */
+    uint32_t setup_mip_history_index; /**< History texture the last frame wrote */
+    uint32_t setup_mip_history_frame; /**< Frame the history was last written */
+    uint32_t setup_mip_history_slot;  /**< Uniform slot of the pass that wrote the history */
+    bool setup_mip_history_valid;     /**< The history holds an image */
+    WGPUTexture setup_temporal_work;  /**< Raw image of the temporal setup pass */
+    WGPUTextureView setup_temporal_work_view; /**< View of the raw image */
+    WGPUTexture setup_temporal_hist[2]; /**< Resolved images of this and the previous frame */
+    WGPUTextureView setup_temporal_hist_view[2]; /**< Views of the two resolved images */
+    uint32_t setup_temporal_width;    /**< Width of the temporal targets in pixels */
+    uint32_t setup_temporal_height;   /**< Height of the temporal targets in pixels */
+    WGPUTextureFormat setup_temporal_format; /**< Format of the temporal targets */
+    uint32_t setup_temporal_slot;     /**< Resolved image the next frame writes */
+    bool setup_temporal_valid;        /**< A resolve was recorded since the targets were made */
     WGPUBindGroup env_group;         /**< Environment, textures and scene copy of the view */
     uint32_t env_slot;               /**< Environment entry its group binds */
     bool env_dirty;                  /**< The environment bind group must be rebuilt */
@@ -350,7 +350,7 @@ typedef struct box_gpu_view_t {
     uint32_t shadow_count;           /**< Cascades the shadow textures hold */
     box_shadow_cache_t shadow_cache; /**< State of the cached static layers */
     uint32_t shadow_rebuild;         /**< Cascades whose static layer this frame renders */
-    uint32_t shadow_patch;
+    uint32_t shadow_patch;           /**< Cascades whose static layer gets added casters drawn */
     WGPUBuffer shadow_uniform;       /**< Cascade matrix of every shadow pass of the view */
     WGPUBindGroup shadow_group;      /**< Uniform bind group of the shadow pass */
     WGPUBuffer shadow_instances;     /**< Caster instances the shadow culling compacted */
@@ -371,8 +371,8 @@ typedef struct box_gpu_mesh_t {
     box_vec_t groups;                /**< box_static_group_t, empty when no slot has a layer */
     box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
     bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
-    box_vec_t cutout_slots;
-    uint32_t cutout_count;
+    box_vec_t cutout_slots;          /**< uint8_t per slot, 1 when the instance can discard */
+    uint32_t cutout_count;           /**< Slots whose instance can discard fragments */
     box_vec_t transition_index;      /**< uint32_t entry per slot, BOX_TRANSITION_NONE for none */
     box_vec_t transition_slots;      /**< uint32_t slots of the mesh that carry a transition */
     bool transition_sorted;          /**< The slots are in ascending order, so uploads coalesce */
@@ -433,21 +433,8 @@ typedef struct box_effect_uniform_t {
 
 /** Adapted exposure of a view, which its compute passes keep between frames */
 typedef struct box_effect_storage_t {
-    float value[4];
+    float value[4]; /**< Values a compute setup pass carries to the next frame */
 } box_effect_storage_t;
-
-/** Uniform block the overlay pass reads */
-typedef struct box_overlay_uniform_t {
-    float size[4];  /**< Width and height of the view and their reciprocals */
-    float flags[4]; /**< x is 1 when the hardware encodes what the pass writes */
-} box_overlay_uniform_t;
-
-/** Buffers one view draws its frame rate panel from */
-typedef struct box_gpu_overlay_t {
-    WGPUBuffer uniform;  /**< Size of the view and the encoding of its image */
-    WGPUBuffer rects;    /**< Rectangles of the panel, at most BOX_OVERLAY_RECT_MAX */
-    WGPUBindGroup group; /**< Bind group holding both buffers */
-} box_gpu_overlay_t;
 
 /** Uniform block of the motion vector pass */
 typedef struct box_motion_uniform_t {
@@ -538,12 +525,6 @@ struct box_renderer_t {
     WGPUBuffer lines_buffer;         /**< Vertex buffer of the line list of the frame */
     uint32_t lines_capacity;         /**< Vertices the line buffer can hold */
     uint32_t lines_count;            /**< Vertices the line buffer holds this frame */
-    WGPUBindGroupLayout overlay_layout; /**< Uniform and rectangles of the overlay pass */
-    WGPURenderPipeline overlay_pipeline; /**< Pass that draws the rectangles of a panel */
-    box_vec_t overlays;              /**< box_gpu_overlay_t indexed by view index */
-    box_fps_ring_t overlay_ring;     /**< Frame times between the packets the renderer drew */
-    double overlay_time;             /**< Packet time of the previous frame, for the interval */
-    bool overlay_timed;              /**< A previous packet time was recorded */
     volatile bool device_error;      /**< The device reported an error since it was cleared */
     volatile uint32_t device_errors; /**< Device errors reported since the device was created */
     WGPULimits limits;               /**< Limits the device was created with */
@@ -807,6 +788,16 @@ WGPUBindGroup box_environment_scene_group(
     box_renderer_t *r,
     WGPUTextureView scene);
 
+/** Mesh pipeline of an opaque draw, for the scene target and normals of the current view.
+ *
+ * @param r The renderer
+ * @param solid No instance of the draw discards, so the solid variant can be used
+ * @return The pipeline
+ */
+WGPURenderPipeline box_frame_opaque_pipeline(
+    box_renderer_t *r,
+    bool solid);
+
 /** Create a variant of the mesh pipeline.
  *
  * @param r The renderer
@@ -819,8 +810,6 @@ WGPUBindGroup box_environment_scene_group(
  * @param normals One of the BOX_NORMALS constants, what it writes there
  * @return The pipeline
  */
-WGPURenderPipeline box_frame_opaque_pipeline(box_renderer_t *r, bool solid);
-
 WGPURenderPipeline box_frame_pipeline(
     box_renderer_t *r,
     uint64_t stride,
@@ -1336,10 +1325,8 @@ void box_lines_upload(
 
 /** Draw the line list of the frame over the image of a view.
  *
- * The pass runs after the opaque and the sorted draws and before the effect
- * chain, reads the depth the scene left behind without writing it, and takes
- * the matrices and the encoding of the target from the view uniform, so a line
- * is hidden by what stands in front of it.
+ * Runs after the opaque and sorted draws and before the effect chain, depth
+ * tested without depth writes, using the view uniform.
  *
  * @param r The renderer
  * @param encoder The command encoder
@@ -1357,48 +1344,6 @@ void box_lines_record(
  * @param r The renderer
  */
 void box_lines_fini(
-    box_renderer_t *r);
-
-/** Build the pipeline and the bind group layout of the frame rate overlay.
- *
- * @param r The renderer
- */
-void box_overlay_init(
-    box_renderer_t *r);
-
-/** Record the interval between this packet and the previous one in the ring.
- *
- * @param r The renderer
- * @param p The packet
- */
-void box_overlay_frame(
-    box_renderer_t *r,
-    const box_packet_t *p);
-
-/** Draw the frame rate panel of a view over the image it produced.
- *
- * The pass runs after the effect chain and before the capture, so the panel is
- * part of the image a headless run writes. A view without the overlay records
- * nothing.
- *
- * @param r The renderer
- * @param view The view of the packet
- * @param index Index of the view in the packet
- * @param encoder The command encoder
- * @param image The texture the view drew its image into
- */
-void box_overlay_record(
-    box_renderer_t *r,
-    const box_view_t *view,
-    uint32_t index,
-    WGPUCommandEncoder encoder,
-    WGPUTexture image);
-
-/** Release the pipeline and the per view buffers of the overlay.
- *
- * @param r The renderer
- */
-void box_overlay_fini(
     box_renderer_t *r);
 
 /** Drop the cached pipeline of a shader handle so the next pass rebuilds it.
@@ -1459,19 +1404,45 @@ void box_effect_run(
     WGPUCommandEncoder encoder,
     WGPUTextureView dst);
 
+/** Create the bind group layout of the compute setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_compute_init(
     box_renderer_t *r);
 
+/** Release the pipelines and the layout of the compute setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_compute_fini(
     box_renderer_t *r);
 
+/** Release the compute setup buffers of one view.
+ *
+ * @param v The view
+ */
 void box_effect_compute_view_fini(
     box_gpu_view_t *v);
 
+/** State buffer of the current view, recreated when the pass asks for another size.
+ *
+ * @param r The renderer
+ * @param fx The pass whose second buffer size and initial value it takes, or NULL
+ * @return The state buffer, 16 bytes when the pass declared no size
+ */
 WGPUBuffer box_effect_storage(
     box_renderer_t *r,
     const box_effect_t *fx);
 
+/** Record the two dispatches of the compute setup pass of a pass.
+ *
+ * @param r The renderer
+ * @param fx The pass
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param src The image the setup pass reads
+ * @param encoder The command encoder
+ */
 void box_effect_compute_run(
     box_renderer_t *r,
     const box_effect_t *fx,
@@ -1479,15 +1450,35 @@ void box_effect_compute_run(
     box_gpu_pool_t *src,
     WGPUCommandEncoder encoder);
 
+/** Create the bind group layout of the temporal setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_temporal_init(
     box_renderer_t *r);
 
+/** Release the pipelines and the layout of the temporal setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_temporal_fini(
     box_renderer_t *r);
 
+/** Release the temporal targets of one view.
+ *
+ * @param v The view
+ */
 void box_effect_temporal_view_fini(
     box_gpu_view_t *v);
 
+/** Record the raw and the resolve pass of the temporal setup pass of a pass.
+ *
+ * @param r The renderer
+ * @param fx The pass
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param encoder The command encoder
+ * @return The resolved image of this frame, NULL when the pipelines could not be built
+ */
 WGPUTextureView box_effect_temporal_run(
     box_renderer_t *r,
     const box_effect_t *fx,
@@ -1502,9 +1493,17 @@ WGPUTextureView box_effect_temporal_run(
 WGPUTextureView box_environment_specular(
     box_renderer_t *r);
 
+/** Create the bind group layout of the mip chain setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_mip_init(
     box_renderer_t *r);
 
+/** Release the pipelines and the layout of the mip chain setup passes.
+ *
+ * @param r The renderer
+ */
 void box_effect_mip_fini(
     box_renderer_t *r);
 
@@ -1520,9 +1519,10 @@ void box_effect_mip_view_fini(
  * @param r The renderer
  * @param fx The pass, whose parameters the filter reads
  * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param frame Frame number of the packet, which decides whether the history is recent
  * @param src The image the pyramid is built from
  * @param encoder The command encoder
- * @return The view of the finest level, NULL when the pyramid could not be built
+ * @return The view of the finest level or of its history blend, NULL when not built
  */
 WGPUTextureView box_effect_mip_run(
     box_renderer_t *r,
@@ -1862,12 +1862,17 @@ void box_sky_view_release(
 void box_sky_fini(
     box_renderer_t *r);
 
+/** Rebuild the bake pipeline from the current bake shader.
+ *
+ * @param r The renderer
+ */
+void box_bake_reload(
+    box_renderer_t *r);
+
 /** Create the bake pipelines, their layouts and the probe bookkeeping.
  *
  * @param r The renderer
  */
-void box_bake_reload(box_renderer_t *r);
-
 void box_bake_init(
     box_renderer_t *r);
 

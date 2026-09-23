@@ -10,7 +10,8 @@
 /** Subdivisions of the generated round shapes */
 #define BENCH_SEGMENTS (32)
 
-void Generate_sphere(bench_t *b)
+void Generate_sphere(
+    bench_t *b)
 {
     // project_tool/bench
     box_mesh_data_t probe = {0};
@@ -28,7 +29,8 @@ void Generate_sphere(bench_t *b)
     }
 }
 
-void Generate_box(bench_t *b)
+void Generate_box(
+    bench_t *b)
 {
     // project_tool/bench
     box_mesh_data_t probe = {0};
@@ -46,7 +48,8 @@ void Generate_box(bench_t *b)
     }
 }
 
-void Generate_torus(bench_t *b)
+void Generate_torus(
+    bench_t *b)
 {
     // project_tool/bench
     box_mesh_data_t probe = {0};
@@ -64,7 +67,8 @@ void Generate_torus(bench_t *b)
     }
 }
 
-void Generate_capsule(bench_t *b)
+void Generate_capsule(
+    bench_t *b)
 {
     // project_tool/bench
     box_mesh_data_t probe = {0};

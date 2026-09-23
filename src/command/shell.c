@@ -702,6 +702,8 @@ done:
 
 /** The clear command: remove every component of an entity.
  *
+ * Without a path the command clears the log of the session instead.
+ *
  * @param ctx The call context
  * @param argc Number of arguments
  * @param argv The arguments
@@ -718,6 +720,7 @@ static void box_shell_clear(
     ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
     const char *path = *(char**)argv[1].ptr;
     ecs_entity_t e = 0;
+    char *out = NULL;
     if (!path) {
         TerminalSession *state = ecs_get_mut(world, session, TerminalSession);
         int32_t i;
@@ -729,11 +732,11 @@ static void box_shell_clear(
         }
 
         state->count = 0;
-        *(char**)result->ptr = ecs_os_strdup("");
-        return;
+        out = ecs_os_strdup("");
+        goto done;
     }
 
-    char *out = box_shell_target(world, session, path, &e);
+    out = box_shell_target(world, session, path, &e);
     if (out) {
         goto done;
     }

@@ -24,7 +24,7 @@ ECS_STRUCT(RenderMesh, {
     vec3 scale;       /**< Scale applied before the world transform */
     vec3 bounds_min;  /**< Local bounds minimum of the unscaled mesh */
     vec3 bounds_max;  /**< Local bounds maximum of the unscaled mesh */
-    bool edge_bounds;
+    bool edge_bounds; /**< Primitive whose bounds extent the shader reads as its shape */
 });
 
 /** Texture handle an image entity resolved to, written by texture modules */
@@ -36,10 +36,9 @@ ECS_STRUCT(RenderTexture, {
 
 /** Takes an entity and everything below it out of every view, pick and query.
  *
- * The tag is a switch, not a change of the scene: the entity keeps its
- * components, its place in the hierarchy and its children, and only stops
- * being drawn, picked and collided with. The subtree of a hidden entity is
- * hidden with it, and a hidden prefab hands the tag to its instances.
+ * The entity keeps its components and children but is no longer drawn, picked
+ * or collided with. Its subtree is hidden with it, and a hidden prefab hands
+ * the tag to its instances.
  */
 extern ECS_TAG_DECLARE(Hidden);
 

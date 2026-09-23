@@ -15,7 +15,8 @@
 /** Points the coverage sweep evaluates */
 #define BENCH_SHAPES2D_POINTS (1024)
 
-void Shapes2D_generate_circle(bench_t *b)
+void Shapes2D_generate_circle(
+    bench_t *b)
 {
     // shapes_2d/primitives
     box_mesh_data_t probe = {0};
@@ -33,7 +34,8 @@ void Shapes2D_generate_circle(bench_t *b)
     }
 }
 
-void Shapes2D_generate_line(bench_t *b)
+void Shapes2D_generate_line(
+    bench_t *b)
 {
     // shapes_2d/primitives
     box_mesh_data_t probe = {0};
@@ -51,7 +53,8 @@ void Shapes2D_generate_line(bench_t *b)
     }
 }
 
-void Shapes2D_coverage_sweep(bench_t *b)
+void Shapes2D_coverage_sweep(
+    bench_t *b)
 {
     // shapes_2d/primitives
     float radii[4] = { 0.4f, 0.1f, 0.6f, 0.25f };
@@ -69,7 +72,8 @@ void Shapes2D_coverage_sweep(bench_t *b)
     }
 }
 
-void Shapes2D_extract_1000_borders(bench_t *b)
+void Shapes2D_extract_1000_borders(
+    bench_t *b)
 {
     // shapes_2d/primitives
     ecs_world_t *world = ecs_init();

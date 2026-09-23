@@ -44,6 +44,7 @@ const void* box_render_view_setting(
  *
  * @param world The world
  * @param state The registry
+ * @param e The view entity
  * @return True when the view lists the layer of a UI tree
  */
 static bool box_view_is_ui(
@@ -219,6 +220,7 @@ static void box_view_targets(
 /** Fill the target, clear color and size of a view from its component.
  *
  * @param world The world
+ * @param e The view entity
  * @param p The packet
  * @param v The view to fill
  */
@@ -468,6 +470,7 @@ done:
  *
  * @param world The world
  * @param state The registry
+ * @param e The view entity
  * @param index Index of the view in the packet
  * @param ui The view draws a UI tree
  * @param v The view to fill
@@ -517,6 +520,7 @@ static void box_view_environment(
  *
  * @param world The world
  * @param state The registry
+ * @param e The view entity
  * @param ui The view draws a UI tree
  * @param v The view to fill
  */
@@ -547,6 +551,15 @@ done:
     return;
 }
 
+/** Copy the cull settings of a view into it.
+ *
+ * A view that configures nothing culls with occlusion and the default GPU
+ * threshold; a view that configures any field culls and occludes only when it
+ * enables them.
+ *
+ * @param view The View component
+ * @param v The view to fill
+ */
 static void box_view_cull(
     const View *view,
     box_view_t *v)
@@ -570,6 +583,7 @@ static void box_view_cull(
  * of the two because a coarser caster hardly shows in a shadow.
  *
  * @param world The world
+ * @param e The view entity
  * @param v The view to fill
  */
 static void box_view_lod(
@@ -588,54 +602,10 @@ static void box_view_lod(
     v->lod_hysteresis = s && s->hysteresis > 0.0f ? s->hysteresis : BOX_VIEW_LOD_HYSTERESIS;
 }
 
-/** Copy the frame rate overlay of a view into it, the view first and the singleton after.
- *
- * The component belongs to box.monitor, which a world that never imports the
- * module leaves unregistered; the view then carries no panel at all. The scale
- * of the panel is multiplied by the pixels per point of the view, so the panel
- * matches the text box.monitor lays out in points on any display.
- *
- * @param world The world
- * @param v The view to fill
- */
-static void box_view_overlay(
-    ecs_world_t *world,
-    ecs_entity_t e,
-    box_view_t *v)
-{
-    if (!ecs_id(FpsOverlay) ||
-        ecs_lookup(world, "box.monitor.FpsOverlay") != ecs_id(FpsOverlay))
-    {
-        goto done;
-    }
-
-    const FpsOverlay *o = e ?
-        box_render_view_setting(world, e, ecs_id(FpsOverlay)) :
-        ecs_singleton_get(world, FpsOverlay);
-    if (!o || !o->enabled) {
-        goto done;
-    }
-
-    const Surface *surface = ecs_singleton_get(world, Surface);
-    float device = 1.0f;
-    if (surface && surface->point_height > 0 && v->height > 0) {
-        device = (float)v->height / (float)surface->point_height;
-    }
-
-    v->overlay = 1u;
-    v->overlay_corner = (uint32_t)o->corner;
-    v->overlay_scale = (o->scale > 0.0f ? o->scale : 1.0f) * device;
-    v->overlay_opacity = o->opacity;
-done:
-    return;
-}
-
 /** Fill the clip to world and the reprojection matrices a chain of a view reads.
  *
- * A pass reconstructs a world position from the depth with the inverse and the
- * motion pass reprojects it with the world to clip of the previous frame, which
- * is kept per view index so a view that appears for the first time reports no
- * motion instead of a jump. A view without a chain pays for neither.
+ * Fills the inverse view projection and the previous frame world to clip, kept per
+ * view index so a new view reports no motion. A view without a chain skips both.
  *
  * @param state The registry
  * @param index Index of the view in the packet
@@ -688,10 +658,6 @@ static void box_view_fill(
     box_view_camera(world, src->camera, v);
     box_view_cull(ecs_get(world, src->entity, View), v);
     box_view_lod(world, src->entity, v);
-    if (!ui) {
-        box_view_overlay(world, src->entity, v);
-    }
-
     bool sun = box_render_view_sun(world, state, v) && !ui;
     if (ui) {
         v->sun_intensity = 0;

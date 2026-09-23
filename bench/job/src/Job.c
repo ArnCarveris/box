@@ -43,7 +43,8 @@ static void bench_job_complete(
     bench_job_runs ++;
 }
 
-void Job_submit_100k(bench_t *b)
+void Job_submit_100k(
+    bench_t *b)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();
@@ -65,7 +66,8 @@ void Job_submit_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Job_frame_drain(bench_t *b)
+void Job_frame_drain(
+    bench_t *b)
 {
     // responsiveness/job_system
     ecs_world_t *world = ecs_init();

@@ -2,11 +2,9 @@
  * @file render/lod_cache.h
  * @brief Generated proxies of the LOD traversal, cached per node and built on jobs.
  *
- * A node that the traversal replaces asks the cache for a proxy. The cache
- * collects the primitives of the subtree in the local space of the node, hands
- * them to the job system and keeps the result until something below the node
- * changes, so a rigid move of the node costs nothing and a changed descendant
- * invalidates only the proxies that contain it.
+ * A replaced node asks the cache for a proxy, built on the job system from the
+ * subtree primitives in node local space. The result is kept until a descendant
+ * changes, which invalidates only the proxies that contain it.
  */
 
 #ifndef BOX_RENDER_LOD_CACHE_H
@@ -71,10 +69,8 @@ typedef struct box_lod_part_t {
 
 /** The representations one node was given, keyed by the identity of the node.
  *
- * Everything is in the local space of the node, so the entity the node stands
- * for moves, turns and scales without the proxy being built again. The errors
- * are lengths in world units the screen space metric projects, and a
- * representation the generator did not produce leaves its error at zero.
+ * Everything is in node local space. Errors are in world units, and a representation
+ * the generator did not produce has an error of zero.
  */
 typedef struct box_lod_entry_t {
     uint64_t id;       /**< Node the proxy stands for, an entity or a cluster */
@@ -103,10 +99,8 @@ typedef struct box_lod_entry_t {
 
 /** The contexts of the jobs of a world, which outlive the cache.
  *
- * The render registry is destroyed with the rest of the world, before the
- * teardown actions run, so a context that is still on a worker at that point
- * is handed to this struct instead, which a teardown action frees once the
- * pool joined its workers.
+ * Holds contexts still on a worker when the render registry is destroyed; a teardown
+ * action frees them once the pool joined its workers.
  */
 typedef struct box_lod_jobs_t {
     ecs_vec_t live;    /**< box_lod_gen_t* of the jobs that may still complete */

@@ -39,7 +39,8 @@ static void bench_svg_drain(
     box_packet_reset(p);
 }
 
-void SvgJobs_rasterize_1000_while_rendering(bench_t *b)
+void SvgJobs_rasterize_1000_while_rendering(
+    bench_t *b)
 {
     // responsiveness/svg_jobs
     ecs_world_t *world = ecs_init();

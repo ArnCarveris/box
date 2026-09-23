@@ -2,34 +2,13 @@
  * @file box/particle.h
  * @brief Particle module: emitters whose particles are spawned and moved on the GPU.
  *
- * A ParticleEmitter describes how many particles live at once, how fast they
- * are spawned, the volume they are spawned in and the state they start with.
- * The particles themselves never reach the ECS: the frame packet carries the
- * parameters of every emitter and the renderer keeps the buffers, spawns into
- * them and integrates them in compute passes.
+ * Emitters are placed by their entity transform; particles never reach the ECS
+ * and are spawned and integrated by the renderer in compute passes. Random draws
+ * hash the seed and spawn count, so a fixed timestep is deterministic.
  *
- * The spawn volume is placed and oriented by the transform of the emitter
- * entity, so moving, rotating or parenting an emitter moves its stream like it
- * moves a mesh. The mesh and spline shapes spawn over the surface of the Mesh3
- * or along the Spline of the source entity.
- *
- * Every random draw comes from a hash of the seed and the number of particles
- * the emitter has spawned, so a fixed timestep produces the same particles on
- * every run and on every device.
- *
- * ParticleForces moves the particles of an emitter with gravity, wind, drag and
- * turbulence, and ParticleCollision gives them a ground plane and the colliders
- * of the scene to bounce off, slide along or die on.
- *
- * ParticlePlayback starts, pauses, stops and resets an emitter and carries the
- * clock its ParticleBurst schedules go off on, so every control of the effect
- * is a component write that a script, the REST API or a terminal command makes
- * without an endpoint of its own.
- *
- * An effect that plays once at a point of the world is a template of those
- * components: box_particle_burst_at and particle.burst_at play it from a pool
- * of instances per template and hand the instance back when its last particle
- * has died, so nothing is created or deleted per hit.
+ * Forces, collision, playback and bursts are components on the emitter.
+ * box_particle_burst_at plays a one shot effect template from a pool of
+ * instances, so nothing is created or deleted per hit.
  */
 
 #ifndef BOX_PARTICLE_H
@@ -96,17 +75,9 @@ ECS_STRUCT(ParticleEmitter, {
 
 /** Forces the particles of an emitter are moved by.
  *
- * An emitter adds three sets of forces: the component of the world, which is
- * the one set on the scene itself and reaches every emitter, the component of
- * the entity its `forces` member names, which is how one wind is shared by a
- * group, and the component it carries itself.
- *
- * Wind reaches a particle through the drag only: the drag pulls the velocity of
- * a particle towards the wind, so a particle without drag keeps its own course
- * whatever the wind is. Gravity is added to the `acceleration` of the emitter.
- *
- * The constructor gives the component the gravity of earth, so an emitter that
- * names `ParticleForces: {}` falls at 9.81 world units per second squared.
+ * An emitter adds the forces of the world singleton, of the entity its `forces`
+ * member names and of its own component. Wind acts through drag only; gravity
+ * adds to the emitter `acceleration`. The constructor sets earth gravity.
  */
 ECS_STRUCT(ParticleForces, {
     vec3 gravity;     /**< Acceleration in world units per second squared */
@@ -117,15 +88,11 @@ ECS_STRUCT(ParticleForces, {
 
 /** What the particles of an emitter collide with and how they answer.
  *
- * The ground is a horizontal plane at `height`. The colliders are the entities
- * with a `Collider` that the extract finds within `reach` of the emitter in the
- * collision index, at most sixteen of them: a sphere collider is tested as a
- * sphere and every other shape as the box of its world bounds, which is what
- * keeps the test of a particle a handful of instructions.
+ * The ground is a plane at `height`; colliders are those within `reach` in the
+ * collision index, at most sixteen, tested as spheres or world bounds boxes.
  *
- * A particle that hits keeps `bounce` of the speed it had into the surface and
- * loses `friction` of the speed it had along it, or dies on the spot when `die`
- * is set, which is what a splash or a scorch mark is spawned from.
+ * A hit keeps `bounce` of the normal speed and loses `friction` of the tangent
+ * speed, or kills the particle when `die` is set.
  */
 ECS_STRUCT(ParticleCollision, {
     bool ground;    /**< Collide with the horizontal plane at height */
@@ -163,11 +130,8 @@ ECS_STRUCT(ParticleGradient, {
 
 /** What a particle of an emitter turns into over its life.
  *
- * Every curve multiplies what the particle was spawned with, except the
- * rotation, which adds turns, so the constructor hands out ones and zeros and
- * `ParticleCurves: {}` changes nothing. A smoke puff that grows and fades is
- * `size: {start: 1, early: 1.6, late: 2.2, end: 2.6}` with
- * `opacity: {start: 0, early: 1, late: 0.7, end: 0}`.
+ * Every curve multiplies the spawned value except rotation, which adds turns,
+ * so `ParticleCurves: {}` changes nothing.
  */
 ECS_STRUCT(ParticleCurves, {
     ParticleCurve size;     /**< Multiplies the size the particle was spawned with */
@@ -191,21 +155,13 @@ ECS_ENUM(ParticleBlend, {
 
 /** How the particles of an emitter are drawn.
  *
- * A sprite reads `texture`, which is a texture entity, an entity with an Image
- * or an entity with PbrTextures whose albedo is taken; `columns` and `rows`
- * split it into a sheet of frames, which `fps` plays at, or once over the life
- * of the particle when it is zero. A billboard draws the Mesh3 of `mesh` at the
- * place, size and rotation of the particle instead of a quad.
+ * A sprite reads `texture` (a texture, Image or PbrTextures entity), split into
+ * `columns` by `rows` frames played at `fps`, or once per life when zero. A
+ * billboard draws the Mesh3 of `mesh` instead of a quad.
  *
- * `softness` fades a particle out as it approaches the geometry behind it, over
- * that many world units, which is what stops a smoke puff from cutting a hard
- * line into a wall.
- *
- * `stretch` turns the sprite into a streak: it is laid over the direction the
- * particle moves in on the screen and grown along it by that many world units
- * per unit of speed, so a rain drop, a spark or a piece of debris is drawn as
- * the line it travels instead of as a dot. A sprite without a stretch keeps
- * facing the camera squarely and is turned by its own rotation.
+ * `softness` fades particles near geometry behind them over that many world
+ * units. `stretch` lengthens a sprite along its screen velocity per unit of
+ * speed; without it the sprite faces the camera and turns by its rotation.
  */
 ECS_STRUCT(ParticleAppearance, {
     ParticleShape shape;  /**< Circle, sprite or billboard */
@@ -228,18 +184,12 @@ ECS_ENUM(PlaybackState, {
 
 /** Playback of the emitter of an entity.
  *
- * An emitter without the component plays, so a stream that is never controlled
- * costs nothing. Stopping ends the emission and leaves the particles that are
- * in the air to finish their life, pausing freezes the whole pool where it is
- * and starting a stopped emitter begins its clock again, which is what replays
- * a burst schedule from the top.
+ * An emitter without the component plays. Stopping ends emission and lets live
+ * particles finish, pausing freezes the pool, and starting a stopped emitter
+ * restarts its clock and burst schedule.
  *
- * `reset` is a trigger: the frame that sees it empties the pool of the emitter,
- * sets the clock back to zero and writes the member back to false.
- *
- * The clock is written by the engine, not read from it: it advances while the
- * emitter plays and stands still while it is paused or stopped, so the times
- * the bursts of the emitter go off at are the seconds it has been playing.
+ * `reset` empties the pool, zeroes the clock and is cleared by the frame. The
+ * engine writes `time`, which advances only while playing.
  */
 ECS_STRUCT(ParticlePlayback, {
     PlaybackState state; /**< Playing, paused or stopped */
@@ -249,15 +199,9 @@ ECS_STRUCT(ParticlePlayback, {
 
 /** Burst of particles an emitter spawns at a time of its playback.
  *
- * A burst runs alongside the continuous rate of the emitter and is capped by
- * the same pool, so a burst of more particles than the emitter keeps alive
- * fills what is free. The component sits on the emitter itself or on any of its
- * descendants, which is how one emitter is given several schedules.
- *
- * The burst goes off `at` seconds into the playback and `repeat` more times
- * every `at` seconds after that, so `{count: 200, at: 0.5, repeat: 3}` is four
- * puffs half a second apart. A burst at a time of zero goes off once, on the
- * first frame the emitter plays.
+ * A burst shares the pool of the emitter and sits on the emitter or any of its
+ * descendants. It goes off `at` seconds into playback and `repeat` more times
+ * every `at` seconds; a burst at zero goes off once on the first frame.
  */
 ECS_STRUCT(ParticleBurst, {
     int32_t count;  /**< Particles the burst spawns in one frame */
@@ -267,17 +211,9 @@ ECS_STRUCT(ParticleBurst, {
 
 /** Budgets and culling that every emitter of a world shares.
  *
- * The singleton caps what the pools of a world hold together and what a frame
- * spawns into them together. An emitter that asks for more than its share of
- * either gets the share: the ceiling is divided in proportion to what the
- * emitters asked for, so a scene that runs past its budget thins every stream
- * instead of stalling or dropping one of them.
- *
- * The particles of an emitter stay inside a sphere its speed, its lifetime and
- * its acceleration bound. An emitter whose sphere no view can see is not
- * simulated at all, one further than `cull_distance` from every camera is not
- * either, and one further than `step_distance` is simulated every other frame
- * with both frames in one step, which is the same motion at half the cost.
+ * Pool and spawn ceilings are divided among emitters in proportion to what they
+ * ask for. Emitters no view sees or beyond `cull_distance` are not simulated;
+ * those beyond `step_distance` step every other frame with a double step.
  */
 ECS_STRUCT(ParticleSettings, {
     int32_t max_total;       /**< Particles every pool together holds, 0 for no ceiling */
@@ -301,11 +237,8 @@ ECS_STRUCT(ParticleStats, {
 
 /** Fading flash of an effect, next to the emitter of its template.
  *
- * An effect that lights the scene it goes off in carries a PointLight and this
- * component: the play fades the intensity of the light from `intensity` to
- * nothing over `seconds` and leaves it dark after, so the muzzle flash of a
- * template is two components of that template instead of code that creates a
- * light per shot and deletes it again.
+ * Next to a PointLight, fades its intensity from `intensity` to zero over
+ * `seconds` each time the effect plays, then leaves it dark.
  */
 ECS_STRUCT(EffectFlash, {
     float intensity; /**< Intensity the flash starts at, 0 takes the one of the light */
@@ -314,12 +247,9 @@ ECS_STRUCT(EffectFlash, {
 
 /** One shot play of an effect template, on the instance that is playing it.
  *
- * box_particle_burst_at takes an instance of a template from the pool of that
- * template, places it, scales it and plays it from the top. The engine ends the
- * emission once the bursts of the template have all gone off and hands the
- * instance back to the pool the moment its last particle has died, so the same
- * hit effect fired a hundred times a second costs the entities of one pool
- * instead of one entity per hit.
+ * box_particle_burst_at takes an instance from the template pool and plays it.
+ * The engine ends emission after the last burst and returns the instance to the
+ * pool when its last particle dies.
  */
 ECS_STRUCT(ParticleEffect, {
     ecs_entity_t effect; /**< Template the instance was made from */
@@ -331,13 +261,9 @@ ECS_STRUCT(ParticleEffect, {
 
 /** Play an effect template once at a point of the world.
  *
- * The template is one entity, an ordinary prefab or script template holding the
- * emitter of the effect, its curves, its bursts, its appearance and an optional
- * PointLight with an EffectFlash. The play takes a free instance of that
- * template from its pool or makes one, so a stream of hits reuses the same
- * entities, and the scale multiplies the sizes, the speeds and the spawn volume
- * of the emitter, which is what lets one template cover a small and a large
- * explosion.
+ * The template is a prefab or script template with an emitter, its curves,
+ * bursts, appearance and optional PointLight with EffectFlash. A pooled
+ * instance is reused; scale multiplies sizes, speeds and the spawn volume.
  *
  * @param world The world
  * @param effect The effect template

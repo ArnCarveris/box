@@ -2,11 +2,9 @@
  * @file render/lod_cache.c
  * @brief Builds the proxies of the LOD traversal on the job system and caches them.
  *
- * The traversal collects the primitives of a subtree in the local space of its
- * node and hands them over; a worker clusters them into a handful of shapes and,
- * when those shapes miss more than the node asked for, merges and simplifies
- * their meshes into one. The main thread only resolves mesh handles, so nothing
- * of the generation runs where the frame is built.
+ * The traversal collects subtree primitives in node local space; a worker clusters
+ * them into shapes and merges and simplifies their meshes when needed. The main
+ * thread only resolves mesh handles.
  */
 
 #include "lod_cache.h"

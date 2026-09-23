@@ -2,10 +2,8 @@
  * @file renderer/sky.h
  * @brief Tables, pipelines and uniform of the atmosphere the views draw.
  *
- * The transmittance and multiple scattering tables only depend on the medium,
- * the sky view table also on the sun and the camera altitude, and the packet
- * says which of them the frame has to render again. All three live once per
- * renderer because every view of a frame looks at the same sky.
+ * The transmittance, multiple scattering and sky view tables live once per
+ * renderer; the packet says which of them to render again.
  */
 
 #ifndef BOX_RENDERER_SKY_H

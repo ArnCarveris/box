@@ -636,10 +636,9 @@ static inline mat4 mat4_orthographic(
 
 /** Intersect a ray with an infinite plane.
  *
- * The plane is the set of points whose dot product with the normal equals the
- * distance, so a normal of (0, 1, 0) and a distance of 2 is the horizontal
- * plane two units up. A ray parallel to the plane and a plane behind the
- * origin of the ray both miss.
+ * The plane is the points whose dot product with the normal equals the distance, so normal
+ * (0, 1, 0) and distance 2 is the horizontal plane two units up. A ray parallel to the plane or
+ * with the plane behind its origin misses.
  *
  * @param origin Origin of the ray in world space
  * @param dir Direction of the ray, which need not be normalized

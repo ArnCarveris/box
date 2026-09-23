@@ -2,12 +2,9 @@
  * @file lod/merge.c
  * @brief Merges the meshes of a subtree into one world space mesh with a range per material.
  *
- * The sources are ordered by material key, so the triangles of one material end
- * up in one range of the index buffer, and every vertex is transformed into
- * world space and looked up in a weld table before it is appended. Normals are
- * summed per vertex and normalized once at the end, which is what makes a
- * welded seam smooth and gives a source without normals the normals of its own
- * triangles.
+ * Sources are ordered by material key so each material gets one index range.
+ * Vertices are transformed to world space and welded; normals are summed per
+ * vertex and normalized at the end, which smooths welded seams.
  */
 
 #include "mesh_internal.h"

@@ -2,10 +2,8 @@
  * @file render/mesh.c
  * @brief Mesh handles: the upload commands, the destroy commands and their packet hand off.
  *
- * A handle is an index into the batch list, so it is handed out once and never
- * reused. Destroying a mesh frees what the renderer holds for the handle and
- * leaves the batch behind, which keeps every instance that still names the
- * handle pointing at an empty mesh instead of at another one.
+ * A handle is a batch list index that is never reused. Destroying a mesh frees the
+ * renderer data and leaves an empty batch, so stale instances draw nothing.
  */
 
 #include "render_internal.h"

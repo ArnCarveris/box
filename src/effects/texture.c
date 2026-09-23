@@ -1,3 +1,8 @@
+/**
+ * @file effects/texture.c
+ * @brief Loads the 3D lookup textures of effects and sends them to the renderer.
+ */
+
 #include "effects_internal.h"
 #include <string.h>
 
@@ -5,6 +10,11 @@
 #define BOX_EFFECT_TEXTURE_MAGIC "BOXLUT3D"
 #define BOX_EFFECT_TEXTURE_MAGIC_LEN (8)
 
+/** Read a little endian 32 bit word.
+ *
+ * @param bytes The first byte of the word
+ * @return The word
+ */
 static uint32_t box_effect_texture_word(
     const unsigned char *bytes)
 {
@@ -12,6 +22,16 @@ static uint32_t box_effect_texture_word(
         ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
 }
 
+/** Read a BOXLUT3D file and queue the command that creates its texture.
+ *
+ * The file is a 16 byte header, the magic and the edge length of the cube,
+ * followed by one 32 bit texel per cell. Failures are reported.
+ *
+ * @param path The path of the file
+ * @param handle The texture handle the renderer creates
+ * @param p The packet
+ * @return True when the create command was queued
+ */
 static bool box_effect_texture_load(
     const char *path,
     uint32_t handle,
@@ -67,6 +87,7 @@ int32_t box_effect_texture(
     ecs_entity_t texture,
     box_packet_t *p)
 {
+    int32_t result = -1;
     int32_t handle;
     for (handle = 0; handle < state->texture_count; handle ++) {
         if (state->texture_entity[handle] == texture) {
@@ -76,7 +97,7 @@ int32_t box_effect_texture(
 
     if (handle == state->texture_count) {
         if (handle >= BOX_EFFECTS_MAX) {
-            return -1;
+            goto done;
         }
 
         state->texture_entity[handle] = texture;
@@ -84,7 +105,7 @@ int32_t box_effect_texture(
     }
 
     if (state->texture_failed[handle]) {
-        return -1;
+        goto done;
     }
 
     if (!state->texture_sent[handle]) {
@@ -94,5 +115,7 @@ int32_t box_effect_texture(
         state->texture_failed[handle] = !state->texture_sent[handle];
     }
 
-    return state->texture_sent[handle] ? handle : -1;
+    result = state->texture_sent[handle] ? handle : -1;
+done:
+    return result;
 }

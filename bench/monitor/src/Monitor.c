@@ -53,7 +53,8 @@ static ecs_world_t* box_bench_world(void)
     return world;
 }
 
-void Monitor_no_monitor(bench_t *b)
+void Monitor_no_monitor(
+    bench_t *b)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = box_bench_world();
@@ -67,7 +68,8 @@ void Monitor_no_monitor(bench_t *b)
     ecs_fini(world);
 }
 
-void Monitor_cpu_monitor(bench_t *b)
+void Monitor_cpu_monitor(
+    bench_t *b)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = box_bench_world();
@@ -82,7 +84,8 @@ void Monitor_cpu_monitor(bench_t *b)
     ecs_fini(world);
 }
 
-void Monitor_ecs_stats(bench_t *b)
+void Monitor_ecs_stats(
+    bench_t *b)
 {
     // monitoring/ecs_stats
     ecs_world_t *world = box_bench_world();
@@ -97,7 +100,8 @@ void Monitor_ecs_stats(bench_t *b)
     ecs_fini(world);
 }
 
-void Monitor_system_monitor(bench_t *b)
+void Monitor_system_monitor(
+    bench_t *b)
 {
     // monitoring/system_monitor
     ecs_world_t *world = box_bench_world();
@@ -112,7 +116,8 @@ void Monitor_system_monitor(bench_t *b)
     ecs_fini(world);
 }
 
-void Monitor_gpu_timings(bench_t *b)
+void Monitor_gpu_timings(
+    bench_t *b)
 {
     // monitoring/gpu_timings
     ecs_world_t *world = box_bench_world();
@@ -127,7 +132,8 @@ void Monitor_gpu_timings(bench_t *b)
     ecs_fini(world);
 }
 
-void Monitor_sample_cost(bench_t *b)
+void Monitor_sample_cost(
+    bench_t *b)
 {
     // monitoring/cpu_monitor
     ecs_world_t *world = box_bench_world();

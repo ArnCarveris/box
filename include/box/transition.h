@@ -2,14 +2,9 @@
  * @file box/transition.h
  * @brief Transition components: the duration, delay and timing of a displayed value.
  *
- * The box.transition module never changes the value an author assigned. A
- * Transition maps a component, or one of its member entities, to the
- * TransitionParams the engine interpolates that value with, and instances
- * inherit the map from their prefab. Assigning a component that the map covers
- * starts a transition from the value currently displayed toward the new one,
- * so the world keeps the authored value while a view shows the value in
- * between. Adding (TransitionValue, Component) to an entity asks the engine to
- * keep the interpolated value of that component there for scripts to read.
+ * A Transition maps a component or member to TransitionParams; assigning it then
+ * animates the displayed value while the world keeps the authored one. Adding
+ * (TransitionValue, Component) stores the interpolated value for scripts.
  */
 
 #ifndef BOX_TRANSITION_H

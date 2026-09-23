@@ -1,5 +1,11 @@
+/**
+ * @file renderer/effect_texture.c
+ * @brief Lookup cubes a post process pass can sample, uploaded from packet commands.
+ */
+
 #include "renderer_internal.h"
 
+/** Texel format of a lookup cube */
 #define BOX_EFFECT_TEXTURE_FORMAT WGPUTextureFormat_RGB9E5Ufloat
 
 void box_effect_texture_init(
@@ -24,13 +30,18 @@ void box_effect_texture_init(
         r->effect_texture_dummy, &view);
 }
 
+/** Create or replace the lookup cube of a command and upload its texels.
+ *
+ * @param r The renderer
+ * @param cmd The command, ignored when its handle is out of range
+ */
 static void box_effect_texture_upload(
     box_renderer_t *r,
     box_effect_texture_cmd_t *cmd)
 {
     uint32_t handle = cmd->handle;
     if (handle >= BOX_EFFECT_TEXTURE_MAX) {
-        return;
+        goto done;
     }
 
     if (r->effect_texture_view[handle]) {
@@ -70,6 +81,8 @@ static void box_effect_texture_upload(
     };
     r->effect_texture_view[handle] = wgpuTextureCreateView(
         r->effect_texture[handle], &view);
+done:
+    return;
 }
 
 void box_effect_texture_apply(
@@ -93,11 +106,12 @@ WGPUTextureView box_effect_texture_view(
     box_renderer_t *r,
     uint32_t handle)
 {
+    WGPUTextureView result = r->effect_texture_dummy_view;
     if (handle < BOX_EFFECT_TEXTURE_MAX && r->effect_texture_view[handle]) {
-        return r->effect_texture_view[handle];
+        result = r->effect_texture_view[handle];
     }
 
-    return r->effect_texture_dummy_view;
+    return result;
 }
 
 void box_effect_texture_fini(
@@ -108,9 +122,11 @@ void box_effect_texture_fini(
         if (r->effect_texture_view[i]) {
             wgpuTextureViewRelease(r->effect_texture_view[i]);
         }
+
         if (r->effect_texture[i]) {
             wgpuTextureRelease(r->effect_texture[i]);
         }
+
         r->effect_texture_view[i] = NULL;
         r->effect_texture[i] = NULL;
     }
@@ -118,9 +134,11 @@ void box_effect_texture_fini(
     if (r->effect_texture_dummy_view) {
         wgpuTextureViewRelease(r->effect_texture_dummy_view);
     }
+
     if (r->effect_texture_dummy) {
         wgpuTextureRelease(r->effect_texture_dummy);
     }
+
     r->effect_texture_dummy_view = NULL;
     r->effect_texture_dummy = NULL;
 }

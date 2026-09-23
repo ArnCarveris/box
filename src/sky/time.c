@@ -2,11 +2,8 @@
  * @file sky/time.c
  * @brief The simulated clock that drives the sun, the moon and the star field.
  *
- * The clock turns the hour, the date and the latitude of a world into the
- * direction of the two bodies and the orientation of the celestial sphere, and
- * writes them as rotations. Everything is derived from the component every
- * frame, so writing the hour from a script or a terminal jumps the sky in the
- * same frame instead of on the next one.
+ * The hour, date and latitude of a world are turned into the rotations of the sun,
+ * the moon and the celestial sphere every frame, so a written hour applies at once.
  */
 
 #include "sky_internal.h"

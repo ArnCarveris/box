@@ -25,7 +25,8 @@
 /** Drops the rain column case spawns per second */
 #define BENCH_RAIN_RATE (14000.0f)
 
-void Extract_one_emitter(bench_t *b)
+void Extract_one_emitter(
+    bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
@@ -51,7 +52,8 @@ void Extract_one_emitter(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_emitters_1k(bench_t *b)
+void Extract_emitters_1k(
+    bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
@@ -85,7 +87,8 @@ void Extract_emitters_1k(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_mesh_shape_table(bench_t *b)
+void Extract_mesh_shape_table(
+    bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
@@ -128,7 +131,8 @@ void Extract_mesh_shape_table(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_three_forces(bench_t *b)
+void Extract_three_forces(
+    bench_t *b)
 {
     // particles/dynamics
     ecs_world_t *world = ecs_init();
@@ -162,7 +166,8 @@ void Extract_three_forces(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_collider_table(bench_t *b)
+void Extract_collider_table(
+    bench_t *b)
 {
     // particles/dynamics
     ecs_world_t *world = ecs_init();
@@ -198,7 +203,8 @@ void Extract_collider_table(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_curves_and_appearance(bench_t *b)
+void Extract_curves_and_appearance(
+    bench_t *b)
 {
     // particles/appearance
     ecs_world_t *world = ecs_init();
@@ -242,7 +248,8 @@ void Extract_curves_and_appearance(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_playback_and_bursts(bench_t *b)
+void Extract_playback_and_bursts(
+    bench_t *b)
 {
     // particles/control
     ecs_world_t *world = ecs_init();
@@ -278,7 +285,8 @@ void Extract_playback_and_bursts(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_playback_1k(bench_t *b)
+void Extract_playback_1k(
+    bench_t *b)
 {
     // particles/control
     ecs_world_t *world = ecs_init();
@@ -314,7 +322,8 @@ void Extract_playback_1k(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_budget_1k(bench_t *b)
+void Extract_budget_1k(
+    bench_t *b)
 {
     // particles/scale
     ecs_world_t *world = ecs_init();
@@ -351,7 +360,8 @@ void Extract_budget_1k(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_cull_1k(bench_t *b)
+void Extract_cull_1k(
+    bench_t *b)
 {
     // particles/scale
     ecs_world_t *world = ecs_init();
@@ -396,7 +406,8 @@ void Extract_cull_1k(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_rain_column(bench_t *b)
+void Extract_rain_column(
+    bench_t *b)
 {
     // particles/rain
     ecs_world_t *world = ecs_init();

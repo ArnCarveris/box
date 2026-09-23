@@ -2,13 +2,9 @@
  * @file shader/preprocess.c
  * @brief Text preprocessor of the shader module: includes, macros and conditionals.
  *
- * The preprocessor is line based. A line that starts with a hash is a
- * directive, every other line has its identifiers substituted and is appended
- * to the output. Errors carry the file and the line they happened on, which is
- * the file of the include the error sits in, not the file that included it.
- * A file keeps the path it was asked for, not the path it was found at, so an
- * include of it goes through the search path again and an app can override a
- * file the engine ships.
+ * Line based: a line starting with a hash is a directive, other lines get identifiers
+ * substituted. Errors carry the file and line of the include they occur in. Files
+ * keep their requested path, so nested includes go through the search path again.
  */
 
 #include "shader_internal.h"

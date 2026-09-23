@@ -2,10 +2,8 @@
  * @file renderer/shadow.c
  * @brief Cascaded shadow maps: the depth array of a view, its caster lists and its passes.
  *
- * Every view owns a depth array with one layer per cascade and a second array
- * that caches the static casters of every cascade. A frame copies the cached
- * layer into the working layer and draws the dynamic casters on top, and it
- * renders at most one dirty static layer, the nearest one first.
+ * Every view owns a depth array per cascade and a cache of static casters. A frame
+ * copies the cached layer and draws dynamic casters on top.
  */
 
 #include "renderer_internal.h"
@@ -133,9 +131,12 @@ static void box_shadow_pipeline(
 
     WGPUVertexAttribute vertex_attrs[4] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET,
+            .shaderLocation = 17 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12,
+            .shaderLocation = 18 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24,
+            .shaderLocation = 19 }
     };
     WGPUVertexAttribute instance_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
@@ -290,6 +291,7 @@ done:
  * @param r The renderer
  * @param view The view being drawn
  * @param p The packet
+ * @return Whether the packet only added static instances, which a patch pass can draw
  */
 static bool box_shadow_invalidate(
     box_renderer_t *r,
@@ -528,6 +530,14 @@ static void box_shadow_statics(
     }
 }
 
+/** Record draws of the static instances a packet added into the cached layer of a cascade.
+ *
+ * @param r The renderer
+ * @param view The view being drawn
+ * @param p The packet
+ * @param cascade The cascade
+ * @return Whether an added instance casts into the cascade
+ */
 static bool box_shadow_additions(
     box_renderer_t *r,
     const box_view_t *view,

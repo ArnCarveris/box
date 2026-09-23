@@ -10,7 +10,8 @@
 /** Key presses one iteration queues */
 #define BENCH_INPUT_CMD_PRESSES (10)
 
-void InputCommands_key_press_10(bench_t *b)
+void InputCommands_key_press_10(
+    bench_t *b)
 {
     // input/input_commands
     ecs_world_t *world = ecs_init();
@@ -37,7 +38,8 @@ void InputCommands_key_press_10(bench_t *b)
     ecs_fini(world);
 }
 
-void InputCommands_action_list_100(bench_t *b)
+void InputCommands_action_list_100(
+    bench_t *b)
 {
     // input/input_commands
     ecs_world_t *world = ecs_init();

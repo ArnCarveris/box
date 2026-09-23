@@ -2,12 +2,9 @@
  * @file box/script.h
  * @brief Incremental instantiation of script templates.
  *
- * The box.script module marks every script template as manual, which makes the
- * script addon leave new instances pending instead of expanding them. A system
- * in PreUpdate expands the pending instances that are nearest to the active
- * camera, bounded by a count and a time budget, so a large scene fills in over
- * frames while its non template content appears at once. The camera is the
- * active camera of box.render; a world without one keeps the script order.
+ * Script templates are marked manual so new instances stay pending. A PreUpdate
+ * system expands the pending instances nearest to the active camera within a
+ * count and time budget; without a camera it keeps the script order.
  */
 
 #ifndef BOX_SCRIPT_H
@@ -49,6 +46,12 @@ ECS_STRUCT(ScriptStats, {
 void BoxScriptImport(
     ecs_world_t *world);
 
+/** Load a flecs script file, located the way box locates its other files.
+ *
+ * @param world The world
+ * @param path Path of the script
+ * @return The script entity, 0 when the file is not found or fails to run
+ */
 ecs_entity_t box_script_load(
     ecs_world_t *world,
     const char *path);

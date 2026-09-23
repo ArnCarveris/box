@@ -2,88 +2,13 @@
  * @file box/ui.h
  * @brief Ui component: the root of a retained UI tree and the view it draws in.
  *
- * An entity with a Ui component roots a UI tree: the entity and everything
- * below it is drawn by a view with an orthographic camera in logical pixels,
- * composited over the views of the 3D scene. The tree reuses Position, Rotation,
- * Scale and the 2D shapes, so nothing in the geometry path is UI specific.
+ * A Ui entity roots a tree drawn by an orthographic view in logical pixels over
+ * the scene, origin centered, y up. Nodes draw in walk order over their parent,
+ * and a layout pass writes Position and Bounds of changed trees only.
  *
- * The view shows Ui.height logical pixels from top to bottom and as many across
- * as its aspect ratio asks for, with the origin in the middle of the view, x to
- * the right and y up, which is the orientation the rest of the engine draws in.
- * A height of zero follows the surface: the view then shows the points of the
- * window divided by Ui.scale, so the tree keeps its size in points when the
- * window is resized and when it moves to a display with another resolution
- * scale.
- *
- * Depth inside a tree comes from the order of the nodes in the walk of the tree
- * and not from their positions: every node is drawn over its parent and over
- * the subtrees of its earlier siblings, so a tree needs no authored z and
- * cannot z fight. The bias is a fixed step per node toward the camera, which
- * leaves room for BOX_UI_NODE_MAX nodes in one tree.
- *
- * A root needs no Position: a tree that has none sits at the origin of its
- * view, because the layout pass gives every node of a tree the Position its
- * place asks for and a node that was never moved the origin of its parent. A
- * node only has a world transform once its Position is set, so a node without
- * one would keep the zero matrix it was created with and take its subtree with
- * it.
- *
- * A tree is walked again when it is marked: setting Ui marks it, and so does
- * every change of the tree itself. Reordering the children of a node with
- * ecs_set_child_order() raises no event, so a tree that was reordered is marked
- * by setting Ui on its root again.
- *
- * Every node of a tree joins the layer of its tree, which is what keeps the two
- * apart: the UI view draws the members of that layer only, and every other view
- * hides them. A world whose only views are UI views still draws its active
- * camera, so a scene does not lose its image when it gains a UI.
- *
- * A layout pass runs after the walk and gives every node of a tree a Bounds,
- * the rectangle the node covers in the logical pixels of its view, with its
- * centre in x, y like a Position and a Rect. A node takes its size from the
- * Layout that sizes it, from its Rect, or from its content when it arranges
- * children and no size is given. A Layout places the children of a node in a
- * row or a column in child order, with padding around them, spacing between
- * them and an alignment on both axes, and writes the Position of every child it
- * places; a child with an Anchor is pinned to an edge or the centre of its
- * parent instead and takes no room in the row or the column, and a child with
- * a WorldAnchor is pinned to the screen projection of a world entity, for a
- * health bar or a label over a thing in the scene. The pass runs for a tree
- * that changed and for no other, so a UI that stands still costs nothing.
- *
- * A node with a Text is measured by that pass too: its glyphs are rasterized
- * into the atlas of its Font, the string is wrapped to the width its Layout
- * gives it and the element ends up as large as the lines it holds. The glyphs
- * are emitted as ordinary children of the element, one textured quad each, so
- * text takes the same 2D shape path as every other element and the renderer
- * knows nothing about it. The helpers text.measure, text.wrap and text.label
- * offer the same measuring, wrapping and building to a script.
- *
- * A node with a Scroll clips what it holds to its own rectangle and moves it
- * by an offset the wheel, a script or a drag writes, so a list that is longer
- * than its box shows a window on itself instead of running into the scene. The
- * clip is a rectangle on the node that travels with its instance and is applied
- * on every draw, which is what keeps a glyph of a scrolled element out of the
- * frame without the element compositing a subtree of its own.
- *
- * A tree answers the pick of its view itself, because a UI element has no
- * collider: the cursor is resolved against the Bounds of the nodes of the view
- * and the node that is drawn over every other one that holds the point wins,
- * which is the deepest node of the topmost subtree. The view of a tree is drawn
- * over the scene, so an element under the cursor consumes the pick and the ray
- * of the scene never runs. A hit raises what box.picking raises for a collider:
- * on.hover, on.press, on.release, on.click and on.drag, bubbling up the tree
- * until a handler consumes them, with Hovered on the element under the cursor
- * and the Action of an element firing through the input action layer on a
- * click. Every widget is written in script from those pieces; the module holds
- * no widget of its own.
- *
- * The in game console is the proof of that: a Console singleton installs the
- * backtick binding and the first open loads the script the framework ships at
- * BOX_UI_CONSOLE, which builds the overlay out of the elements above. The
- * engine only fills the two parts the script marks, the scrollback of a
- * ConsoleLog element and the line of a TextInput, and holds the keyboard for
- * the overlay while it is open.
+ * The tree answers the pick of its view against node Bounds and raises the same
+ * events as box.picking. Widgets, including the console, are written in script;
+ * the engine only fills ConsoleLog and TextInput elements.
  */
 
 #ifndef BOX_UI_H
@@ -133,52 +58,71 @@ ECS_ENUM(Direction, {
 
 /** Arranges the children of an element in a row or a column, in child order.
  *
- * The box of the element is width by height, and a side that is zero takes the
- * matching side of the Rect of the element, or the size of its content when
- * that side is zero too: a row is then as wide as its children plus the spacing
- * between them and the padding around them, and a column as tall. The padding
- * insets the box on every side, the children are placed in the box that is
- * left, and h and v align them: along the axis of the layout the alignment
- * moves the whole group, across it every child on its own. An element that has
- * a Rect has it resized to the box, so the rectangle of a panel is what its
- * layout worked out.
+ * A zero side takes the Rect side, else the content size. Padding insets the
+ * box and h and v align the children, as a group along the axis and one by one
+ * across it. A Rect on the element is resized to the box.
+ *
+ * A zero padding side takes padding. The minimum and maximum bound the box
+ * however it was sized, a zero maximum bounds nothing, and a text element wraps
+ * at its maximum width.
  */
 ECS_STRUCT(Layout, {
-    Direction direction; /**< Axis the children are placed along */
-    float padding;       /**< Logical pixels between the box and its children */
-    float spacing;       /**< Logical pixels between two children */
-    float width;         /**< Width of the box, 0 takes the Rect or the content */
-    float height;        /**< Height of the box, 0 takes the Rect or the content */
-    Align h;             /**< Alignment on the x axis */
-    VAlign v;            /**< Alignment on the y axis */
+    Direction direction;  /**< Axis the children are placed along */
+    float padding;        /**< Logical pixels between the box and its children */
+    float spacing;        /**< Logical pixels between two children */
+    float width;          /**< Width of the box, 0 takes the Rect or the content */
+    float height;         /**< Height of the box, 0 takes the Rect or the content */
+    Align h;              /**< Alignment on the x axis */
+    VAlign v;             /**< Alignment on the y axis */
+    float padding_left;   /**< Padding of the left side, 0 takes padding */
+    float padding_right;  /**< Padding of the right side, 0 takes padding */
+    float padding_top;    /**< Padding of the top side, 0 takes padding */
+    float padding_bottom; /**< Padding of the bottom side, 0 takes padding */
+    float min_width;      /**< Smallest width of the box, 0 for none */
+    float max_width;      /**< Largest width of the box, 0 for none */
+    float min_height;     /**< Smallest height of the box, 0 for none */
+    float max_height;     /**< Largest height of the box, 0 for none */
+});
+
+/** Point of the parent an anchored element attaches to on the x axis */
+ECS_ENUM(AttachH, {
+    AttachHSame = 0,   /**< The edge the element is pinned by, inside the padding */
+    AttachHLeft = 1,   /**< The left edge of the box of the parent */
+    AttachHCenter = 2, /**< The middle of the box of the parent */
+    AttachHRight = 3   /**< The right edge of the box of the parent */
+});
+
+/** Point of the parent an anchored element attaches to on the y axis */
+ECS_ENUM(AttachV, {
+    AttachVSame = 0,   /**< The edge the element is pinned by, inside the padding */
+    AttachVTop = 1,    /**< The top edge of the box of the parent */
+    AttachVMiddle = 2, /**< The middle of the box of the parent */
+    AttachVBottom = 3  /**< The bottom edge of the box of the parent */
 });
 
 /** Pins an element to an edge or the centre of its parent, with an offset.
  *
- * The element is placed against the edges h and v name, inside the padding of
- * the layout of its parent when it has one, and x and y move it from there
- * toward the inside of the parent. An element in the middle of an axis is moved
- * along that axis instead, x to the right and y up. An anchored element is not
- * part of the row or the column of its parent and does not add to its content.
+ * The element is pinned to the edges h and v name, inside the parent padding,
+ * and x and y move it inward; a centered axis moves x right and y up. It takes
+ * no room in the row or column of its parent.
+ *
+ * With a parent_h or parent_v other than Same, that edge attaches to the named
+ * point of the parent box, ignoring padding, and the offset moves x right, y up.
  */
 ECS_STRUCT(Anchor, {
-    Align h;  /**< Edge of the parent the element is pinned to on the x axis */
-    VAlign v; /**< Edge of the parent the element is pinned to on the y axis */
-    float x;  /**< Offset from that edge on the x axis */
-    float y;  /**< Offset from that edge on the y axis */
+    Align h;          /**< Edge of the element pinned on the x axis */
+    VAlign v;         /**< Edge of the element pinned on the y axis */
+    float x;          /**< Offset from that edge on the x axis */
+    float y;          /**< Offset from that edge on the y axis */
+    AttachH parent_h; /**< Point of the parent the edge attaches to on the x axis */
+    AttachV parent_v; /**< Point of the parent the edge attaches to on the y axis */
 });
 
 /** Follows the screen projection of a world entity or point through a view.
  *
- * The element is placed where the camera of the view projects the world
- * position of the entity plus the offset, in the logical pixels of its tree,
- * and its tree is laid out again on every frame that projection moves, after
- * the transforms of the frame have propagated. While the point is behind the
- * camera or outside the view the element carries Hidden, which the anchor
- * removes again by itself; a Hidden an author put there is left alone. Like an
- * element with an Anchor it takes no room in the row or the column of its
- * parent, and the Layout of its own children keeps working, so a label and a
- * bar stack under one anchor.
+ * The element sits at the projected world position plus offset and its tree is
+ * laid out again when that moves. Behind the camera or off view it gets Hidden,
+ * removed again by the anchor. It takes no room in the row or column of its parent.
  */
 ECS_STRUCT(WorldAnchor, {
     ecs_entity_t entity; /**< Entity followed, 0 projects the offset as a world point */
@@ -196,16 +140,24 @@ extern ECS_TAG_DECLARE(HitThrough);
 
 /** Sizes a side of an element as a fraction of the matching side of its parent.
  *
- * A side of zero leaves the matching side of the Layout or the Rect of the
- * element alone, so an element can fill half its parent on one axis and keep
- * an authored size on the other. The parent must already know its own box: an
- * explicit Layout.width or Layout.height, inside its padding, or, for the root
- * of a tree that has neither, the logical size of the view that draws it. A
- * parent with none of those leaves the side at zero too.
+ * A zero side leaves the Layout or Rect side alone. The parent needs a known
+ * box: an explicit Layout size inside its padding, or the view size for a root;
+ * otherwise the side stays zero.
  */
 ECS_STRUCT(Fill, {
     float width;  /**< Fraction of the width of the parent, 0 leaves it alone */
     float height; /**< Fraction of the height of the parent, 0 leaves it alone */
+});
+
+/** Grows a side of an element into the room its parent leaves, by weight.
+ *
+ * Along the parent row or column the element takes a share of the free room by
+ * weight, up to its Layout maximum. Across that axis, or without one, a weight
+ * above zero stretches to the parent box. A content sized parent leaves no room.
+ */
+ECS_STRUCT(Grow, {
+    float width;  /**< Weight of the width, 0 does not grow it */
+    float height; /**< Weight of the height, 0 does not grow it */
 });
 
 /** What an element does with the content that does not fit its box */
@@ -218,25 +170,12 @@ ECS_ENUM(Overflow, {
 
 /** Clips the content of an element to its box and moves it by an offset.
  *
- * An axis that is not Visible clips the subtree of the element to its Bounds on
- * that axis, on every draw and not only when the element composites, and the
- * offset moves the content the element holds: the children a Layout places and
- * the glyphs of a Text, never a child with an Anchor, which stays pinned to the
- * box it is clipped by. The offset is in logical pixels, x counting to the
- * right and y downward like the scroll position of a document, so an offset of
- * zero shows the start of the content and the largest offset its end.
+ * A non Visible axis clips the subtree to the Bounds. The offset, in logical
+ * pixels with x right and y down, moves the content but not anchored children.
  *
- * The framework clamps the offset to the content: an axis whose content is not
- * larger than the box holds it at zero and every other axis at the difference
- * between the two, which is what the wheel, a drag and a script all write
- * through. An element whose offset sat at the end of its content when the
- * content grew keeps it at the new end, so a log that is appended to stays on
- * its last line until the user scrolls up.
- *
- * The wheel moves the innermost scrollable ancestor of the element under the
- * cursor, which is an axis that is Scroll, or Auto with content larger than the
- * box; an axis that is Hidden clips without ever taking the wheel, though a
- * script may still move its offset.
+ * The framework clamps the offset to the content, and an offset at the end stays
+ * at the end as the content grows. The wheel moves the innermost Scroll or
+ * larger Auto axis under the cursor; Hidden clips but ignores the wheel.
  */
 ECS_STRUCT(Scroll, {
     Overflow x;   /**< What the element does with content wider than its box */
@@ -246,12 +185,9 @@ ECS_STRUCT(Scroll, {
 
 /** Font a text element rasterizes its glyphs with, inherited by its subtree.
  *
- * The path is resolved against the search path of the engine, so
- * `etc/fonts/B612-Regular.ttf` finds the font the framework installs as well as
- * one an application ships. A text element takes the Font of its own entity,
- * else the nearest one above it in the tree, else the font the engine ships at
- * BOX_UI_FONT_SIZE logical pixels. One atlas is rasterized per file and size
- * and is shared by every element that asks for it.
+ * The path is resolved against the engine search path. A text element takes its
+ * own Font, else the nearest ancestor one, else BOX_UI_FONT at BOX_UI_FONT_SIZE.
+ * One atlas is shared per file and size.
  */
 ECS_STRUCT(Font, {
     char *path; /**< Font file, empty for the font the engine ships */
@@ -260,52 +196,26 @@ ECS_STRUCT(Font, {
 
 /** String drawn as one textured quad per glyph, sized by the layout pass.
  *
- * The element is as wide and as tall as the text it holds, unless its Layout
- * gives it a width or a height, and a Layout width also wraps the string: the
- * words that do not fit move to the next line and a newline in the value always
- * breaks. The lines are aligned inside the box by align, the first baseline
- * sits one ascent below its top and the next ones follow at line_height. The
- * glyphs themselves are children of the element, drawn over it like every other
- * node of the tree, in the Rgb of the element, which the build hands them as
- * the emissive color of an alpha blended quad so a glyph shows the color it was
- * given whatever the view lights it with.
+ * The element sizes to its text unless its Layout gives a size; a Layout width,
+ * or with wrap the width the parent leaves, wraps the words. Glyphs are child
+ * quads in the Rgb of the element, drawn unlit.
  *
- * A blended quad of a UI view composites plainly: the view hands the renderer
- * the plain source over contribution of every alpha blended fragment instead of
- * the glass model the rest of the engine draws a transparent surface with, so a
- * glyph or an image lies over what is below it without refracting it and the
- * view needs no copy of the scene behind it.
- *
- * An element with a BoxShadow casts one: a second quad behind it that fills the
- * rounded rectangle of its Border, grown by the spread and faded out over the
- * blur, with the same analytic shape a Border draws and no geometry of its own.
- *
- * An Opacity below one on an element that holds children makes its subtree
- * composite as one image: the subtree is rendered at full strength by a view of
- * its own into a target the size of its Bounds and one quad shows that target
- * with the opacity of the element, so two children that overlap no longer show
- * through each other. The path is taken only when the opacity of the element
- * reaches something below it, which is a child without an opacity of its own or
- * a child that composites a subtree of its own, so an element that is the only
- * thing its opacity applies to keeps the single draw it always had. The subtree
- * is clipped to the Bounds of its element, so a child that sticks out of its
- * parent is cut off, and a nested transparent subtree renders before the one
- * that holds it.
+ * An Opacity below one on an element with children composites its subtree into
+ * one image clipped to its Bounds, so overlapping children do not show through
+ * each other.
  */
 ECS_STRUCT(Text, {
     char *value;       /**< The string, UTF-8 */
     float line_height; /**< Logical pixels between two baselines, 0 for the font default */
     Align align;       /**< Alignment of the lines inside the box of the element */
+    bool wrap;         /**< The lines wrap at the width the parent leaves the element */
 });
 
 /** Blurred shadow drawn behind the rounded rectangle of an element.
  *
- * The shadow is a second quad below the element, offset by x to the right and
- * by y downward, grown by spread on every side and faded out over blur, and it
- * takes the corner radii of the Border of the element so a rounded panel casts
- * a rounded shadow. It is not part of the layout: it takes no room in the row
- * or the column of its parent and leaves the Bounds of its element alone. A
- * shadow with a transparent color draws nothing.
+ * The shadow is a quad below the element, offset x right and y down, grown by
+ * spread and faded over blur, with the corner radii of the Border. It takes no
+ * layout room and a transparent color draws nothing.
  */
 ECS_STRUCT(BoxShadow, {
     float x;      /**< Logical pixels the shadow is offset to the right */
@@ -317,10 +227,8 @@ ECS_STRUCT(BoxShadow, {
 
 /** Rectangle an element covers, written by the layout pass and read only.
  *
- * The rectangle is in the logical pixels of the view of its tree, with x and y
- * at the centre of the element like a Position and width and height the size
- * the layout gave it, so an element covers x - width / 2 to x + width / 2 and
- * y - height / 2 to y + height / 2.
+ * In logical pixels of the tree view, centered at x, y like a Position, so it
+ * spans x - width / 2 to x + width / 2 and y - height / 2 to y + height / 2.
  */
 ECS_STRUCT(Bounds, {
     float x;      /**< X of the centre of the element */
@@ -331,20 +239,12 @@ ECS_STRUCT(Bounds, {
 
 /** Line of text an element lets the keyboard edit, with a caret of its own.
  *
- * The element shows value as its Text and carries one more child, a thin quad
- * pinned to the left edge of its box at the width of the text before the
- * caret. A focused input takes the characters the frame collected and the edit
- * keys that go with them: backspace and delete around the caret, the arrows and
- * home and end over the line, and enter, which moves the line to submitted and
- * empties the input. It follows the focus rules of the device layer, so an
- * input takes nothing while the window is not focused.
+ * The element shows value as its Text with a caret child. A focused input takes
+ * the typed characters and edit keys; enter moves the line to submitted and
+ * clears it. Nothing is taken while the window is unfocused.
  *
- * An input with history walks the lines it submitted with the up and down
- * arrows, keeping the line that was being typed until the walk comes back to
- * it, and an input with complete asks box.command for the command name or the
- * entity path the tab key completes: the longest prefix every candidate shares
- * replaces the word the caret is in and a single candidate is followed by a
- * space.
+ * With history, up and down walk submitted lines. With complete, tab completes
+ * the command name or entity path under the caret via box.command.
  */
 ECS_STRUCT(TextInput, {
     char *value;     /**< The line being edited, UTF-8 */
@@ -357,27 +257,13 @@ ECS_STRUCT(TextInput, {
 
 /** The in game console, an overlay terminal the backtick key opens.
  *
- * Adding the singleton installs the binding: an InputAction under the actions
- * scope that the grave key fires through the action layer, which flips open on
- * every press. The first open loads the console script the framework installs
- * at BOX_UI_CONSOLE, which builds the overlay out of ordinary UI elements and
- * marks the two parts the engine fills, the element with a ConsoleLog that
- * holds the scrollback and the element with a TextInput that holds the line.
- * The module keeps no widget of its own: everything the console looks like is
- * in that script and an application is free to install its own.
+ * Adding the singleton binds the grave key to toggle open. The first open loads
+ * BOX_UI_CONSOLE, which builds the overlay and marks the ConsoleLog and
+ * TextInput elements the engine fills.
  *
- * An open console holds the keyboard: every other input map is disabled while
- * it is open and enabled again when it closes, so the keys that drive a game
- * do not drive it while a line is being typed, and its own map keeps working
- * so the same key closes it again. A closed console keeps its tree and its
- * session and only turns the view of the overlay off.
- *
- * The line a console submits is set as TerminalInput on its session, which is
- * the session an agent reaches over HTTP with every command it holds, and the
- * scrollback is the log of that session: every line it ran and the
- * TerminalOutput that came back, the engine log included through the logs
- * command. Submitting a line also fires the submit action, so a script can
- * await on.pressed for it.
+ * An open console disables every other input map. A submitted line is set as
+ * TerminalInput on its session, whose log is the scrollback, and fires the
+ * submit action.
  */
 ECS_STRUCT(Console, {
     bool open;            /**< The overlay is shown and holds the keyboard */
@@ -390,15 +276,16 @@ ECS_STRUCT(ConsoleLog, {
     int32_t lines; /**< Lines of the session log the element shows, 0 for the default */
 });
 
+/** Colors a console log element draws each style of its session output with */
 ECS_STRUCT(TerminalColors, {
-    Rgb text;
-    Rgb muted;
-    Rgb accent;
-    Rgb error;
-    Rgb path;
-    Rgb type;
-    Rgb number;
-    Rgb string;
+    Rgb text;   /**< Plain text */
+    Rgb muted;  /**< De-emphasized text */
+    Rgb accent; /**< Highlighted text */
+    Rgb error;  /**< Error messages */
+    Rgb path;   /**< Entity paths */
+    Rgb type;   /**< Type names */
+    Rgb number; /**< Numeric literals */
+    Rgb string; /**< String literals */
 });
 
 /** Order in the frame a created UI view renders at, after the views of a scene */
@@ -469,9 +356,8 @@ ECS_STRUCT(TerminalColors, {
 
 /** What the UI holds of the pointer this frame, written by the hit test.
  *
- * A singleton every frame carries the answer of the hit test of that frame, so a
- * script reads it as data and a game that steers its world with the cursor knows
- * to stand back while the pointer is on a panel.
+ * A game that steers with the cursor reads it to stand back while the pointer is
+ * on a panel.
  */
 ECS_STRUCT(UiCapture, {
     bool mouse;           /**< The cursor is over an element of a tree */
@@ -488,11 +374,9 @@ bool box_ui_mouse_captured(
 
 /** Element of a UI tree at a point in the plane the trees are laid out in.
  *
- * The point is in the logical pixels of the view of the tree, the units its
- * Bounds are given in, and the node that is drawn over every other node holding
- * it is the answer: the deepest node of the topmost subtree. A node without a
- * rectangle holds nothing, and a node of a transparent subtree that is clipped
- * away by the element that composites it is not hit.
+ * The point is in the logical pixels of the tree view. The answer is the deepest
+ * node of the topmost subtree; nodes without a rectangle or clipped away by a
+ * compositing ancestor are not hit.
  *
  * @param world The world
  * @param view The view whose trees are tested, 0 for the trees of every view

@@ -45,7 +45,7 @@ static const char *box_checkpoint_derived[] = {
     "box.monitor.PhaseTime",
     "box.monitor.EcsStats",
     "box.monitor.SystemMonitor",
-    "box.monitor.FpsOverlay",
+    "box.monitor.Fps",
     "box.ui.Bounds",
     NULL
 };

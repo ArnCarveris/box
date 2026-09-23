@@ -2,10 +2,8 @@
  * @file box/box.c
  * @brief The box module: imports every module of the framework in one order.
  *
- * Component ids live in process globals that every world forces, so two worlds
- * that register the modules in different orders collide. An application or a
- * test imports this module and nothing else, which gives every world the same
- * registration order and the same ids.
+ * Applications and tests import this module and nothing else, so every world
+ * registers the modules in the same order and gets the same component ids.
  */
 
 #define BOX_IMPL
@@ -13,7 +11,17 @@
 #include "../ui/ui_internal.h"
 #include "../command/command_internal.h"
 
-static void box_generate_hooks(ecs_world_t *world, ecs_entity_t parent) {
+/** Generate the compare and equals hooks of every component under a scope.
+ *
+ * Recurses into the children of every entity under the scope.
+ *
+ * @param world The world
+ * @param parent The scope to walk
+ */
+static void box_generate_hooks(
+    ecs_world_t *world,
+    ecs_entity_t parent)
+{
     ecs_iter_t it = ecs_children(world, parent);
     while (ecs_children_next(&it)) {
         if (ecs_table_has_id(world, it.table, ecs_id(EcsComponent))) {
@@ -22,7 +30,7 @@ static void box_generate_hooks(ecs_world_t *world, ecs_entity_t parent) {
                 ecs_set_rtt_equals(world, it.entities[i]);
             }
         }
-        
+
         for (int i = 0; i < it.count; i ++) {
             box_generate_hooks(world, it.entities[i]);
         }

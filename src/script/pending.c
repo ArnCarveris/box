@@ -2,10 +2,9 @@
  * @file script/pending.c
  * @brief Queue of pending template instances and the budgeted drain.
  *
- * A rebuild scans the cached query of pending instances, keys every entry with
- * its squared distance to the active camera and turns the vector into a min
- * heap in linear time. A frame pops the nearest entries until it runs out of
- * count or milliseconds.
+ * A rebuild keys every pending instance by squared distance to the active
+ * camera and heapifies it in linear time. A frame pops the nearest entries until
+ * it runs out of count or milliseconds.
  */
 
 #include "script_internal.h"
@@ -58,6 +57,11 @@ static void box_script_sift_down(
     }
 }
 
+/** Insert an entry in the heap, sifting it up to its place.
+ *
+ * @param state The state
+ * @param entry The entry
+ */
 static void box_script_push(
     box_script_state_t *state,
     box_script_entry_t entry)
@@ -258,6 +262,16 @@ static void box_script_rebuild(
     state->age = 0;
 }
 
+/** Move the additions that are still pending into the heap.
+ *
+ * An addition whose token no longer matches or whose instance lost its pending
+ * pair is skipped. The key is the distance to the camera, or the next position
+ * in the queue when the queue is not ordered by distance.
+ *
+ * @param world The world
+ * @param state The state
+ * @param settings The settings
+ */
 static void box_script_insert_additions(
     ecs_world_t *world,
     box_script_state_t *state,

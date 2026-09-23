@@ -109,31 +109,36 @@ static void bench_hierarchy_propagate_case(
     ecs_fini(world);
 }
 
-void Hierarchy_build_100k_childof(bench_t *b)
+void Hierarchy_build_100k_childof(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     bench_hierarchy_build_case(b, false);
 }
 
-void Hierarchy_build_100k_parent(bench_t *b)
+void Hierarchy_build_100k_parent(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     bench_hierarchy_build_case(b, true);
 }
 
-void Hierarchy_propagate_root_childof(bench_t *b)
+void Hierarchy_propagate_root_childof(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     bench_hierarchy_propagate_case(b, false);
 }
 
-void Hierarchy_propagate_root_parent(bench_t *b)
+void Hierarchy_propagate_root_parent(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     bench_hierarchy_propagate_case(b, true);
 }
 
-void Hierarchy_dynamic_subtree_parent(bench_t *b)
+void Hierarchy_dynamic_subtree_parent(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();

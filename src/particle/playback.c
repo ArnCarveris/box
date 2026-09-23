@@ -2,22 +2,12 @@
  * @file particle/playback.c
  * @brief The clock of an emitter and the burst schedules that ride on it.
  *
- * Every control of an effect is a component write: ParticlePlayback holds the
- * state and the clock of an emitter and ParticleBurst holds a schedule that
- * goes off on that clock. The clock only runs while the emitter plays, so a
- * paused effect keeps its place in every schedule and a stopped one starts its
- * schedules again when it is played.
+ * ParticlePlayback holds the state and clock of an emitter, and ParticleBurst holds a
+ * schedule that fires on that clock. The clock only runs while the emitter plays.
  *
- * A schedule is evaluated from the clock rather than from a countdown: the
- * number of times a burst went off by a time is the time over its period, so
- * the bursts of a frame are the difference between that count at the end of the
- * frame and at the end of the one before it. Nothing is carried between frames,
- * which is what keeps a burst on a fixed timestep landing on the same frame on
- * every run however long the effect has been playing.
- *
- * A burst sits on the emitter or on any of its descendants, which the query
- * resolves by walking up the hierarchy, so one emitter takes as many schedules
- * as the scene hangs under it.
+ * The bursts of a frame are the difference between the burst count at the end of this
+ * frame and the previous one, so nothing is carried between frames. A burst may sit on
+ * the emitter or any of its descendants.
  */
 
 #include "particle_internal.h"

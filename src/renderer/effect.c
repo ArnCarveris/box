@@ -2,16 +2,12 @@
  * @file renderer/effect.c
  * @brief Post process chain of a view: target pool, pass pipelines and the inputs.
  *
- * A view with a chain renders into a pooled target instead of its own, the passes
- * ping pong between pooled targets and the last one writes the image of the view.
- * Targets are kept by size and handed back after the chain, so the passes of one
- * view and the views of a frame reuse the same textures.
+ * A view with a chain renders into a pooled target, the passes ping pong between
+ * pooled targets and the last one writes the image of the view. Targets are
+ * pooled by size and reused across passes and views.
  *
- * The inputs a chain declares decide what the frame produces: the color is always
- * there, the depth target of the view is bound as it is, the world normals come
- * from a second attachment of the mesh pass and the motion vectors from a pass
- * that reprojects the depth with the view projection of the previous frame. An
- * input no pass asked for binds a one texel dummy instead of a target.
+ * Declared inputs decide what the frame produces: color, view depth, world normals
+ * and motion vectors. An input no pass asked for binds a one texel dummy.
  *
  */
 
@@ -346,13 +342,16 @@ void box_effect_invalidate(
         r->setup_compute_second = NULL;
         r->setup_compute_shader = BOX_SHADER_NONE;
     }
+
     if (r->setup_mip_shader == handle) {
         for (uint32_t i = 0; i < 4; i ++) {
             if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
             r->setup_mip_pipeline[i] = NULL;
         }
+
         r->setup_mip_shader = BOX_SHADER_NONE;
     }
+
     if (r->setup_temporal_shader == handle) {
         if (r->setup_temporal_first) wgpuRenderPipelineRelease(r->setup_temporal_first);
         if (r->setup_temporal_second) wgpuRenderPipelineRelease(r->setup_temporal_second);
@@ -360,6 +359,7 @@ void box_effect_invalidate(
         r->setup_temporal_second = NULL;
         r->setup_temporal_shader = BOX_SHADER_NONE;
     }
+
     if (handle >= r->effect_pipelines.count) {
         goto done;
     }
@@ -562,6 +562,8 @@ done:
  * @param dst The render target view the pass writes
  * @param encoder The command encoder
  * @param hdr The pass writes an intermediate target instead of the view target
+ * @param setup0 First image its setup pass produced, NULL binds the dummy texture
+ * @param setup1 Second image its setup pass produced, NULL binds the dummy texture
  */
 static void box_effect_pass(
     box_renderer_t *r,

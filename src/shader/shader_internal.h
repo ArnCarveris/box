@@ -70,9 +70,8 @@ void box_shader_path_init(void);
 
 /** Resolve a shader path against the search path of the engine.
  *
- * The entries are the path as written, `<BAKE_HOME>/etc/box` for a path under
- * `etc/`, the nearest ancestor of the working directory with an `etc/shaders`,
- * `apps/box_app` at or above it and the directory of the executable, in that
+ * Searches the path as written, `<BAKE_HOME>/etc/box` for `etc/` paths, the nearest
+ * ancestor with `etc/shaders`, `apps/box_app` and the executable directory, in that
  * order. An absolute path is used as it is.
  *
  * @param path The path as the component spells it

@@ -9,7 +9,8 @@
 /** Entities the scene of the benchmarks holds */
 #define BENCH_CHECKPOINT_ENTITIES (5000)
 
-void Write_scene_5000(bench_t *b)
+void Write_scene_5000(
+    bench_t *b)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
@@ -43,7 +44,8 @@ void Write_scene_5000(bench_t *b)
     ecs_fini(world);
 }
 
-void Write_report_5000(bench_t *b)
+void Write_report_5000(
+    bench_t *b)
 {
     // checkpoints/checkpoint_write
     ecs_world_t *world = ecs_init();
@@ -68,7 +70,8 @@ void Write_report_5000(bench_t *b)
     ecs_fini(world);
 }
 
-void Write_scene_500(bench_t *b)
+void Write_scene_500(
+    bench_t *b)
 {
     // checkpoints/edit_perf
     ecs_world_t *world = ecs_init();
@@ -102,7 +105,8 @@ void Write_scene_500(bench_t *b)
     ecs_fini(world);
 }
 
-void Write_scene_50000(bench_t *b)
+void Write_scene_50000(
+    bench_t *b)
 {
     // checkpoints/edit_perf
     ecs_world_t *world = ecs_init();

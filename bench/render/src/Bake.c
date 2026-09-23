@@ -23,7 +23,8 @@
 /** Static entities moved per frame by the churn case */
 #define BENCH_CHURN_COUNT (1000)
 
-void Bake_invalidate_one_of_100k(bench_t *b)
+void Bake_invalidate_one_of_100k(
+    bench_t *b)
 {
     // lighting/light_baking
     ecs_world_t *world = ecs_init();
@@ -87,7 +88,8 @@ void Bake_invalidate_one_of_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Bake_probe_count_100k(bench_t *b)
+void Bake_probe_count_100k(
+    bench_t *b)
 {
     // lighting/bake_resolution
     ecs_world_t *world = ecs_init();
@@ -137,7 +139,8 @@ void Bake_probe_count_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Bake_churn_1000_of_100k(bench_t *b)
+void Bake_churn_1000_of_100k(
+    bench_t *b)
 {
     // lighting/bake_churn
     ecs_world_t *world = ecs_init();

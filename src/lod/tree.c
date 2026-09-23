@@ -2,11 +2,9 @@
  * @file lod/tree.c
  * @brief The node hierarchy the LOD traversal walks and the walk itself.
  *
- * A node is a place in the tree, not an entity: children are a linked list, so
- * a subtree is materialised and released without moving another node, and a
- * released index is handed out again. The walk starts at the roots and stops at
- * every node the culling of the view rejects or whose projected error is under
- * the threshold, so the leaves below such a node are never visited.
+ * A node is not an entity: children form a linked list and released indices are
+ * reused. The walk starts at the roots and stops at every node that is culled or
+ * whose projected error is under the threshold.
  */
 
 #include "lod_internal.h"
@@ -363,11 +361,9 @@ float box_lod_tree_shell(
 
 /** Size a node adds to what its parent shows, in world units.
  *
- * The size is the edge of the square with the area of the widest face of the
- * bounds, so a bolt and a long thin railing both count for what they cover and
- * not for how far they reach, and the material contrast against the parent
- * scales it: a part that carries the color of what it sits on adds a quarter of
- * its size, a part that stands out adds all of it.
+ * The size is the edge of a square with the area of the widest bounds face, so
+ * parts count for what they cover. A part with the color of its parent adds a
+ * quarter of its size, a part that contrasts adds all of it.
  *
  * @param n The node
  * @param parent The parent of the node, NULL for a root

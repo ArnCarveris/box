@@ -2,13 +2,9 @@
  * @file render/texture.c
  * @brief Texture handles, the pager that spreads a size class over pages, and its commands.
  *
- * An array texture holds at most the array layer limit of the device, which is
- * the whole capacity of a size class when the class is one array texture. A
- * class is a list of pages instead: the pager hands a texture the first page of
- * its class with a free layer and opens a new page when none has room, so a
- * class spans as many array textures as it needs. The layer of a handle counts
- * across the pages of the pager, which is what puts the page in the high bits
- * of the packed instance slot.
+ * A size class is a list of array texture pages, each limited by the device layer
+ * count. The pager hands out the first free layer and opens a page when none has
+ * room. The handle layer counts across pages, putting the page in the high bits.
  */
 
 #include "render_internal.h"

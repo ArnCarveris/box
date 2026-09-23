@@ -2,12 +2,9 @@
  * @file gltf/mesh.c
  * @brief Reads a glTF primitive into the Mesh3 that the mesh cache shares and uploads.
  *
- * glTF is right handed with Z toward the viewer and box is left handed with Z
- * away from it, so positions and normals are mirrored in Z. The front face of
- * box is the mirror of the glTF one, so that mirror also turns a glTF front
- * face into a box front face and the triangles keep the order they are given
- * in. The V axis of a glTF uv runs down the image and the one of a box texture
- * runs up it, so V is inverted.
+ * glTF is right handed and box is left handed, so positions and normals are
+ * mirrored in Z and triangles keep their order. glTF V runs down the image and
+ * box V runs up it, so V is inverted.
  */
 
 #include "gltf_internal.h"
@@ -78,10 +75,8 @@ static uint8_t box_gltf_alpha(
 
 /** Read the per vertex colors of a primitive into the color stream of a Mesh3.
  *
- * A glTF color is linear and a box rgb is display encoded, so every color
- * channel is encoded on the way in. The alpha of a vec4 color is linear
- * already and scales the roughness through the vertex color, so it is kept
- * as is; a vec3 color leaves every vertex opaque.
+ * Color channels are converted from linear to display encoding. The alpha of a
+ * vec4 color is kept as is; a vec3 color leaves every vertex opaque.
  *
  * @param accessor The color accessor
  * @param vec The color vector to fill

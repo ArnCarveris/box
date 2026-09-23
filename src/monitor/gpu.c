@@ -2,11 +2,9 @@
  * @file monitor/gpu.c
  * @brief Publishes the per pass GPU times of the renderer on the GpuTimings component.
  *
- * The renderer times the passes of a frame with timestamp queries and resolves
- * them one or two frames later. This file asks it for those queries while the
- * component exists, copies the last resolved frame into reflected fields the
- * terminal and the REST API read, and turns the queries off again when the
- * component is removed.
+ * Requests timestamp queries from the renderer while the component exists and
+ * copies the last resolved frame into reflected fields. Queries are turned off
+ * again when the component is removed.
  */
 
 #include "monitor_internal.h"

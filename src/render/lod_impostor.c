@@ -2,11 +2,9 @@
  * @file render/lod_impostor.c
  * @brief Impostors: a few views of a subtree in an atlas and the billboard that shows them.
  *
- * A subtree that is still too expensive where even its merged mesh is more
- * than the frame wants gets an atlas of views around its Y axis, rendered by
- * one extra view of the packet through the same offscreen path a UI group
- * composites with. The billboard is one sorted draw that shows the tile
- * standing closest to where the eye is.
+ * A subtree whose merged mesh is still too expensive gets an atlas of views around
+ * its Y axis, rendered through the offscreen path. The billboard is one sorted draw
+ * that shows the tile closest to the eye.
  */
 
 #include "lod_cache.h"

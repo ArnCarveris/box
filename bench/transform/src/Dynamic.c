@@ -12,7 +12,8 @@
 /** Children per node of the dynamic subtree */
 #define BENCH_SUBTREE_FANOUT (8)
 
-void Dynamic_propagate_subtree(bench_t *b)
+void Dynamic_propagate_subtree(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();

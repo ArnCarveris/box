@@ -1,3 +1,8 @@
+/**
+ * @file LayerData.c
+ * @brief Benchmarks extraction of entities with material layer data.
+ */
+
 #include <box.h>
 #include <bake_bench.h>
 #include <stdlib.h>
@@ -5,7 +10,8 @@
 
 #define BENCH_LAYER_DATA_COUNT (10000)
 
-void LayerData_extract_10k_with_layer_data(bench_t *b)
+void LayerData_extract_10k_with_layer_data(
+    bench_t *b)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);

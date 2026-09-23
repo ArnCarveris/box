@@ -1,3 +1,8 @@
+/**
+ * @file Bake.c
+ * @brief Tests for the static light classification and the light bake.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
@@ -254,11 +259,18 @@ void Bake_sh_reconstructs_the_light_direction(void)
     test_assert(lit[1] == lit[0] && lit[2] == lit[0]);
 }
 
-static ecs_entity_t Bake_box(float x, float y, float z, float sx, float sy, float sz)
+static ecs_entity_t Bake_box(
+    float x,
+    float y,
+    float z,
+    float sx,
+    float sy,
+    float sz)
 {
     ecs_entity_t e = ecs_new(w);
     ecs_set(w, e, Position, {x, y, z});
     ecs_set(w, e, Box, {sx, sy, sz});
+
     return e;
 }
 
@@ -474,6 +486,7 @@ void Bake_local_lists_exclude_distant_sources(void)
         ecs_set(w, l, Position, {2 + 100 * i, 3, 2});
         ecs_set(w, l, PointLight, {.intensity = 1, .range = 4});
     }
+
     Bake_extract();
     box_bake_state_t s;
     box_bake_state_init(&s);
@@ -695,6 +708,7 @@ void Bake_local_lists_have_no_fixed_source_limit(void)
         ecs_set(w, light, Position, {2, 3, 2});
         ecs_set(w, light, PointLight, {.intensity = 1, .range = 4});
     }
+
     Bake_extract();
     box_bake_state_t s;
     box_bake_state_init(&s);
@@ -741,7 +755,6 @@ void Bake_occluder_threshold_reextracts_geometry(void)
     test_assert(!box_bake_visible_sparse(&s, a, b));
     box_bake_state_fini(&s);
 }
-
 
 void Bake_directory_preserves_negative_coords_and_holes(void)
 {
@@ -843,7 +856,6 @@ void Bake_sampling_cells_include_neighboring_occluders(void)
     box_bake_state_fini(&s);
 }
 
-
 void Bake_ui_emitter_changes_do_not_rebake_scene(void)
 {
     Bake_light();
@@ -866,6 +878,7 @@ void Bake_ui_emitter_changes_do_not_rebake_scene(void)
     if (slot < m->instances.count) {
         test_bool(((box_bake_instance_t*)box_vec_at(&m->instances, slot))->alive, false);
     }
+
     ecs_set(w, glyph, Position, {2.5f, 2, 2});
     ecs_set(w, glyph, Emissive, {.strength = 1, .color = {100, 200, 255}});
     Bake_extract();
@@ -904,7 +917,6 @@ void Bake_ui_view_does_not_override_bake_settings(void)
     test_bool(packet.bake.enabled, true);
     test_int(packet.static_updates.count, 0);
 }
-
 
 void Bake_probes_inside_occluders_are_invalid(void)
 {

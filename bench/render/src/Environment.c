@@ -7,7 +7,8 @@
 #include <bake_bench.h>
 #include "../../../src/render/render_internal.h"
 
-void Environment_extract(bench_t *b)
+void Environment_extract(
+    bench_t *b)
 {
     // lighting/ibl
     ecs_world_t *world = ecs_init();

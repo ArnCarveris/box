@@ -2,12 +2,9 @@
  * @file ui/ui.c
  * @brief Registers the box.ui module, the defaults of a tree and its update.
  *
- * The update runs in immediate mode because it creates the view of a tree and
- * joins its nodes to a layer, which a deferred system cannot do in time for the
- * extract of the same frame. It shares the phase of the immediate script update
- * and runs next to it, so the pipeline gains no sync point of its own: one in
- * another phase would move the merge of the frame and change what every other
- * system sees, which the visual scenes catch.
+ * The update runs in immediate mode so a tree view and its layer exist before the
+ * extract of the same frame. It shares the phase of the immediate script update, so
+ * the pipeline gains no sync point.
  */
 
 #define BOX_UI_IMPL
@@ -92,6 +89,7 @@ static void box_ui_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].places, UiPlace);
         ecs_vec_fini_t(NULL, &state[i].marks, UiMark);
         ecs_vec_fini_t(NULL, &state[i].subtrees, UiMark);
+        ecs_vec_fini_t(NULL, &state[i].scrolled, int32_t);
         if (state[i].hits) {
             ecs_query_fini(state[i].hits);
         }
@@ -174,10 +172,8 @@ static void box_ui_on_remove(
 
 /** Mark every tree of the world as a whole, which an atlas that grew asks for.
  *
- * Growing an atlas moves every uv of the font it holds, so the elements that
- * drew with it have to build their quads again. Their fingerprint carries the
- * epoch of the atlas, so the next layout of a tree rebuilds the elements that
- * used the atlas and leaves every other element of the tree alone.
+ * Element fingerprints carry the atlas epoch, so the next layout rebuilds only the
+ * elements that used the grown atlas.
  *
  * @param world The world
  */
@@ -270,9 +266,12 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Direction);
     ECS_META_COMPONENT(world, Ui);
     ECS_META_COMPONENT(world, Layout);
+    ECS_META_COMPONENT(world, AttachH);
+    ECS_META_COMPONENT(world, AttachV);
     ECS_META_COMPONENT(world, Anchor);
     ECS_META_COMPONENT(world, WorldAnchor);
     ECS_META_COMPONENT(world, Fill);
+    ECS_META_COMPONENT(world, Grow);
     ECS_META_COMPONENT(world, Overflow);
     ECS_META_COMPONENT(world, Scroll);
     ECS_META_COMPONENT(world, Bounds);
@@ -350,6 +349,7 @@ void BoxUiImport(
     ecs_vec_init_t(NULL, &state->places, UiPlace, 0);
     ecs_vec_init_t(NULL, &state->marks, UiMark, 0);
     ecs_vec_init_t(NULL, &state->subtrees, UiMark, 0);
+    ecs_vec_init_t(NULL, &state->scrolled, int32_t, 0);
 
     UiFonts *fonts = ecs_singleton_ensure(world, UiFonts);
     ecs_vec_init_t(NULL, &fonts->atlases, box_ui_atlas_t*, 0);

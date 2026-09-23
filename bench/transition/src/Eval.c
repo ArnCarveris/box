@@ -11,7 +11,8 @@
 /** Records a scene of ten thousand entities with ten transitions each holds */
 #define BENCH_RECORD_COUNT (100000)
 
-void Eval_eval_100k_records(bench_t *b)
+void Eval_eval_100k_records(
+    bench_t *b)
 {
     // transitions/transition_params
     ecs_os_init();
@@ -63,7 +64,8 @@ void Eval_eval_100k_records(bench_t *b)
 /** Instances the churn of the benchmark scene restarts every frame */
 #define BENCH_RESTART_COUNT (167)
 
-void Eval_fill_10k_instances(bench_t *b)
+void Eval_fill_10k_instances(
+    bench_t *b)
 {
     // transitions/renderer_eval
     ecs_os_init();
@@ -164,7 +166,8 @@ static void Eval_pool_instance(
     }
 }
 
-void Eval_pool_10k_instances(bench_t *b)
+void Eval_pool_10k_instances(
+    bench_t *b)
 {
     // transitions/scale
     ecs_os_init();
@@ -204,7 +207,8 @@ void Eval_pool_10k_instances(bench_t *b)
     box_transition_pool_fini(&pool);
 }
 
-void Eval_pool_restart_167_of_10k(bench_t *b)
+void Eval_pool_restart_167_of_10k(
+    bench_t *b)
 {
     // transitions/scale
     ecs_os_init();
@@ -241,7 +245,8 @@ void Eval_pool_restart_167_of_10k(bench_t *b)
     box_transition_pool_fini(&pool);
 }
 
-void Eval_pool_eval_60k_records(bench_t *b)
+void Eval_pool_eval_60k_records(
+    bench_t *b)
 {
     // transitions/scale
     ecs_os_init();

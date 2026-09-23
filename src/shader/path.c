@@ -2,14 +2,9 @@
  * @file shader/path.c
  * @brief Resolves shader paths against the search path of the engine.
  *
- * The entries are the path as written, the `etc` folder bake3 installs the
- * framework in at `<BAKE_HOME>/etc/box`, the nearest ancestor of the working
- * directory that holds `etc/shaders`, the `apps/box_app` folder at or above it
- * and the directory of the executable. The first entry makes an app run from
- * its own folder and override an engine file, the second one an installed game,
- * the next two a source checkout and a test project, and the last one a binary
- * that was copied elsewhere. On wasm the files are embedded under `etc`, which
- * the first entry finds.
+ * Entries: the path as written, `<BAKE_HOME>/etc/box`, the nearest ancestor with
+ * `etc/shaders`, `apps/box_app` at or above it, and the executable directory. On
+ * wasm the files are embedded under `etc`, which the first entry finds.
  */
 
 #include "shader_internal.h"

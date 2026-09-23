@@ -2,16 +2,9 @@
  * @file renderer/texture.c
  * @brief The pages of the texture pager, their array textures and their sampler.
  *
- * A texture handle names a size class and a layer inside it, so an instanced
- * batch can bind textures of different materials without changing bind groups.
- * An array texture holds at most the array layer limit of the device, so a size
- * class is a list of pages instead of one texture: the layer of a handle counts
- * across the pages, its high bits naming the page and its low bits the layer in
- * it. Every page is bound at once and the mesh shader picks one with the page
- * bits of its packed slot, which is why the pages of every class share one list
- * of bindings. The mip chain is built on the CPU by the texture module and
- * uploaded level by level; destroy commands only return layers to the game side
- * free list, the page keeps the layer for the next texture of its class.
+ * A handle names a size class and a layer whose high bits select a page (array
+ * texture) and low bits the layer in it. All pages are bound at once. Mips are
+ * uploaded level by level; destroyed layers stay in their page for reuse.
  */
 
 #include "renderer_internal.h"

@@ -96,10 +96,8 @@ static bool box_renderer_inline(
 
 /** Render every queued packet, oldest first, but only once the device exists.
  *
- * The web device is created asynchronously while the game already produces
- * packets. Their mesh uploads and static instance deltas are emitted once, so
- * the packets stay queued until the device can apply them; the game side then
- * finds no free packet and skips extraction, which keeps those deltas pending.
+ * The web device is created asynchronously; packets stay queued until it exists
+ * because their mesh uploads and static instance deltas are only emitted once.
  *
  * @param r The renderer
  */

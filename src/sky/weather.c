@@ -1,3 +1,8 @@
+/**
+ * @file sky/weather.c
+ * @brief Blends the sky, fog and rain of a world towards its weather.
+ */
+
 #include "sky_internal.h"
 #include <math.h>
 

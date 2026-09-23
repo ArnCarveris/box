@@ -14,7 +14,8 @@
 /** Tiling shapes the instances cycle through */
 #define BENCH_TILING_SHAPES (4)
 
-void Tiling_extract_10k(bench_t *b)
+void Tiling_extract_10k(
+    bench_t *b)
 {
     // textures/tiling
     ecs_world_t *world = ecs_init();

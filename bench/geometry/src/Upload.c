@@ -9,7 +9,8 @@
 /** Vertices per side of the benchmark grid, which is about 100k triangles */
 #define BENCH_MESH_SIDE (225)
 
-void Upload_mesh_100k(bench_t *b)
+void Upload_mesh_100k(
+    bench_t *b)
 {
     // meshes/mesh3
     ecs_world_t *world = ecs_init();
@@ -64,7 +65,8 @@ void Upload_mesh_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Upload_share_100k(bench_t *b)
+void Upload_share_100k(
+    bench_t *b)
 {
     // meshes/mesh3
     ecs_world_t *world = ecs_init();

@@ -8,7 +8,8 @@
 #include <bake_bench.h>
 #include "../../../src/render/render_internal.h"
 
-void Sky_extract_steady(bench_t *b)
+void Sky_extract_steady(
+    bench_t *b)
 {
     // sky/atmosphere
     ecs_world_t *world = ecs_init();
@@ -46,7 +47,8 @@ void Sky_extract_steady(bench_t *b)
     ecs_fini(world);
 }
 
-void Sky_extract_moving_sun(bench_t *b)
+void Sky_extract_moving_sun(
+    bench_t *b)
 {
     // sky/atmosphere
     ecs_world_t *world = ecs_init();
@@ -87,7 +89,8 @@ void Sky_extract_moving_sun(bench_t *b)
     ecs_fini(world);
 }
 
-void Sky_extract_moon_and_stars(bench_t *b)
+void Sky_extract_moon_and_stars(
+    bench_t *b)
 {
     // sky/celestial
     ecs_world_t *world = ecs_init();
@@ -141,7 +144,8 @@ void Sky_extract_moon_and_stars(bench_t *b)
     ecs_fini(world);
 }
 
-void Sky_advance_the_clock(bench_t *b)
+void Sky_advance_the_clock(
+    bench_t *b)
 {
     // sky/time_of_day
     ecs_world_t *world = ecs_init();

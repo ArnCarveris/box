@@ -2,13 +2,9 @@
  * @file renderer/lines.c
  * @brief Line list pass: one dynamic vertex buffer of colored segments per frame.
  *
- * The packet carries two vertices per segment in world space with a display
- * encoded color each, which one draw turns into a line list over the image of
- * every view. The pass reads the depth the scene left behind and writes none of
- * it, so a segment behind geometry is hidden and a segment in front of it is
- * not, and it takes its matrices from the view uniform the mesh pass already
- * filled. Nothing is allocated, compiled or recorded for a packet without
- * lines, which is what keeps a debug drawing that is switched off free.
+ * One draw per view renders the world space segments of the packet, depth tested
+ * but not depth written, using the view uniform of the mesh pass. Nothing is
+ * allocated or recorded for a packet without lines.
  */
 
 #include "renderer_internal.h"

@@ -2,10 +2,9 @@
  * @file controller/follow.c
  * @brief The OnUpdate system that follows a target with a third person camera.
  *
- * The camera glides toward the place its preset asks for instead of jumping
- * there, so it lags behind a target that runs and settles when it stops, and it
- * travels through the scene the way the fly camera does so the geometry between
- * it and its target pushes it in rather than swallowing it.
+ * The camera glides toward the place its preset asks for, lagging a running
+ * target and settling when it stops. It moves like the fly camera, so geometry
+ * between it and the target pushes it in.
  */
 
 #include "controller_internal.h"

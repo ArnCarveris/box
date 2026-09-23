@@ -2,10 +2,9 @@
  * @file lod/proxy.c
  * @brief The proxy generator: prepares the inputs, spends the shape budget and refines.
  *
- * The inputs are prepared in world space and sorted into one group per material
- * key, every group gets a share of the shape budget by the volume it fills, and
- * a group whose shapes miss the most gets another shape while the error of the
- * proxy is above the bound the description asks for.
+ * Inputs are prepared in world space and grouped by material key. Each group
+ * gets a share of the shape budget by volume, and the group that misses most
+ * gets another shape while the proxy error is above the requested bound.
  */
 
 #include "lod_internal.h"

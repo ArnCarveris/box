@@ -11,7 +11,8 @@
 /** Transparent entities in the extracted scene */
 #define BENCH_TRANSPARENT_COUNT (10000)
 
-void Blending_transparent_10k(bench_t *b)
+void Blending_transparent_10k(
+    bench_t *b)
 {
     // materials/blending
     ecs_world_t *world = ecs_init();

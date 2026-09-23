@@ -143,14 +143,13 @@ static void box_effect_remember(
 
 /** Copy the parameters of an effect out of its parameter component.
  *
- * The parameters are the first reflected struct on the entity that is not the
- * Effect itself, flattened into the floats the shader reads. A component whose
- * members are floats end to end is the block already, which the registry
- * remembers after it has flattened it once.
+ * The parameters are the first reflected struct on the entity other than Effect,
+ * flattened into shader floats. A component that is all floats is copied as is.
  *
  * @param world The world
  * @param state The registry
  * @param e The effect entity
+ * @param component The parameter component to read, 0 for the first struct
  * @param out The parameter block to fill
  */
 static void box_effect_params(
@@ -273,6 +272,7 @@ static void box_effect_append(
         pass->setup_initial[2] = setup->initial.z;
         pass->setup_initial[3] = setup->initial.w;
     }
+
     pass->scale = fx->scale > 0.0f ? fx->scale : 1.0f;
     pass->inputs = fx->color ? BOX_EFFECT_COLOR : 0u;
     pass->inputs |= fx->depth ? BOX_EFFECT_DEPTH : 0u;

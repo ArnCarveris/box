@@ -2,10 +2,8 @@
  * @file renderer/upscale.h
  * @brief The pass that magnifies a scaled frame onto the image that is presented.
  *
- * A surface whose resolution_scale is above one asks its views to render into a
- * smaller image. Everything a view sizes follows the size the view carries, so
- * the only extra step of the frame is one full screen pass that magnifies that
- * image with a linear sampler before the frame is presented.
+ * With resolution_scale above one the views render into a smaller image that one
+ * full screen pass magnifies with a linear sampler before presenting.
  */
 
 #ifndef BOX_RENDERER_UPSCALE_H

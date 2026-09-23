@@ -2,17 +2,12 @@
  * @file box/lod.h
  * @brief Hierarchical LOD: the proxy generator that replaces a subtree with fewer primitives.
  *
- * The generator is a pure function over the primitives of a subtree: it clusters
- * them by material key and proximity and emits a handful of boxes, spheres and
- * capsules that stand in for the whole, together with the approximation error in
- * world units that the screen space metric later turns into pixels. A builder
- * holds the working memory, so a subtree that is rebuilt does not allocate.
+ * Generates proxies from the primitives of a subtree: clusters by material key and proximity
+ * become a few boxes, spheres and capsules with an error in world units. A builder holds the
+ * working memory, so rebuilding does not allocate.
  *
- * The module also owns the screen space metric that turns such an error into
- * pixels: box_lod_error_px projects it at the nearest point of the bounds of a
- * node for a perspective or an orthographic camera, and box_lod_select turns the
- * projected errors of the levels of a node into the level of this frame, keeping
- * the current one until the error leaves the band around the threshold.
+ * box_lod_error_px projects such an error to pixels for perspective or orthographic cameras and
+ * box_lod_select picks the level of a node, keeping the current one inside a hysteresis band.
  */
 
 #ifndef BOX_LOD_H
@@ -183,11 +178,9 @@ typedef struct box_lod_camera_t {
 
 /** The levels of a node and the band the switch between them needs.
  *
- * The levels run from the most detailed to the cheapest, so their projected
- * error rises with the level. The band is a fraction of the threshold: a
- * hysteresis of 0.25 lets a node keep its level until its error leaves
- * [threshold * 0.75, threshold * 1.25], which is what keeps a camera hovering
- * at a boundary from switching every frame.
+ * Levels run from most detailed to cheapest, so error rises with the level. The band is a
+ * fraction of the threshold: 0.25 keeps a level while its error is within [threshold * 0.75,
+ * threshold * 1.25], so a camera hovering at a boundary does not switch every frame.
  */
 typedef struct box_lod_select_desc_t {
     const float *error_px; /**< Projected error in pixels of every level */
@@ -231,10 +224,9 @@ float box_lod_error_px(
 
 /** Pick the level of a node, keeping the current one inside the band.
  *
- * The node moves to a coarser level only when that level stays under the
- * narrowed threshold, and to a finer one only when its current level passes the
- * widened threshold. Level zero is the floor: a node whose finest level already
- * exceeds the threshold keeps it.
+ * A node moves coarser only when that level stays under the narrowed threshold, and finer only
+ * when its current level passes the widened one. Level zero is the floor even when it exceeds
+ * the threshold.
  *
  * @param desc The levels, the current level and the band
  * @return The level of this frame
@@ -259,10 +251,9 @@ typedef struct box_lod_mesh_group_t {
 
 /** One mesh of the subtree a merge collapses.
  *
- * A source names its entity the way box_lod_primitive_t does, with a world
- * transform and a material key, and hands over the arrays of a Mesh3 in place
- * of the bounds the proxy generator takes, so an authored mesh and the cached
- * mesh of a primitive are both merged without a copy.
+ * A source names its entity like box_lod_primitive_t, with a world transform and material key,
+ * and hands over Mesh3 arrays instead of bounds, so authored and cached meshes merge without a
+ * copy.
  */
 typedef struct box_lod_mesh_source_t {
     mat4 transform;          /**< World transform of the mesh */
@@ -278,10 +269,9 @@ typedef struct box_lod_mesh_source_t {
 
 /** What a merge is allowed to do.
  *
- * Welding is what lets a simplification cross the seam between two sources: it
- * joins the vertices that share a world position whatever their normals are and
- * averages those normals. Without it a vertex only joins another when its
- * position and all of its attributes match, which keeps every hard edge.
+ * Welding joins vertices at the same world position whatever their normals and averages the
+ * normals, letting simplification cross source seams. Without it vertices only join when all
+ * attributes match, keeping every hard edge.
  */
 typedef struct box_lod_merge_desc_t {
     const box_lod_mesh_source_t *sources; /**< Meshes of the subtree */
@@ -291,10 +281,9 @@ typedef struct box_lod_merge_desc_t {
 
 /** The mesh a subtree merges into.
  *
- * The arrays point into the builder that produced them and stay valid until the
- * same builder runs again. Positions and normals are in world space, the groups
- * split the indices by material key, and the error is the length in world units
- * the surface moved by, which is zero for a mesh that was only merged.
+ * The arrays point into the builder and stay valid until it runs again. Positions and normals
+ * are in world space, groups split indices by material key, and the error is how far the surface
+ * moved in world units, zero for a mesh that was only merged.
  */
 typedef struct box_lod_mesh_t {
     const vec3 *vertices;               /**< World position of every vertex */
@@ -313,10 +302,8 @@ typedef struct box_lod_mesh_t {
 
 /** What a simplification aims for.
  *
- * The simplifier stops at the first goal it reaches: it never keeps fewer
- * triangles than the ratio asks for and never moves the surface further than
- * the bound, so a group that cannot reach the ratio within the bound keeps more
- * triangles than it was asked to.
+ * The simplifier stops at the first goal it reaches: never fewer triangles than the ratio and
+ * never more surface movement than the bound, so a group may keep more triangles than asked.
  */
 typedef struct box_lod_simplify_desc_t {
     float ratio;      /**< Part of the triangles to keep, 0 for BOX_LOD_SIMPLIFY_RATIO */
@@ -376,11 +363,9 @@ bool box_lod_merge(
 
 /** Simplify the mesh a builder holds, in place.
  *
- * Every group is simplified on its own, so a triangle never takes the material
- * of its neighbour, the vertices no triangle uses any more are dropped and the
- * error of the mesh is the largest error of its groups, measured in world units
- * so the screen space metric can project it. The result is the same for the
- * same mesh.
+ * Each group is simplified on its own so triangles keep their material, unused vertices are
+ * dropped and the mesh error is the largest group error in world units. The result is
+ * deterministic for the same mesh.
  *
  * @param builder The builder holding the mesh a merge produced
  * @param desc What the simplification aims for
@@ -400,11 +385,9 @@ bool box_lod_simplify(
 
 /** The segment counts one parametric shape reduces through.
  *
- * Level zero is the authored count, which caps the ladder, and every level
- * after it halves the one before until the floor of the shape stops the
- * halving, so a shape authored at or below its floor holds a single level and
- * never reduces. Every level is an ordinary mesh of the shape, which is what
- * lets instances at one level share it.
+ * Level zero is the authored count and each level after halves the one before until the floor
+ * of the shape, so a shape authored at or below its floor has one level. Every level is an
+ * ordinary mesh of the shape that instances at that level share.
  */
 typedef struct box_lod_ladder_t {
     int32_t segments[BOX_LOD_LEVELS]; /**< Segment count of every level, the finest first */
@@ -413,12 +396,9 @@ typedef struct box_lod_ladder_t {
 
 /** What the reduction of one instance measures.
  *
- * The error of a level is the chord error of its segment count at the radius
- * of the instance, in world units, which the screen space metric projects at
- * the bounds like the error of any other representation. The span is the part
- * of a full circle the segments cover, so the quarter arc of a rounded box
- * corner and the sweep of an open tube are measured as the full circle they
- * are a part of.
+ * The error of a level is the chord error of its segment count at the instance radius, in world
+ * units. The span is the part of a full circle the segments cover, so arcs such as a rounded box
+ * corner or an open tube sweep are measured as the full circle.
  */
 typedef struct box_lod_reduce_desc_t {
     const box_lod_ladder_t *ladder; /**< Segment counts the shape reduces through */
@@ -480,10 +460,9 @@ extern ECS_TAG_DECLARE(LodPin);
 
 /** What the traversal of one view did this frame, written on the view entity.
  *
- * The counts are the cost of the frame: visited is the nodes the walk looked
- * at, which is what must not grow with the leaves of the scene, drawn is the
- * leaves it resolved to an instance and proxies is the nodes it replaced by a
- * cheaper representation instead of descending into them.
+ * The counts are the cost of the frame: visited is the nodes the walk looked at (which must not
+ * grow with the leaves), drawn is the leaves resolved to an instance and proxies is the nodes
+ * replaced by a cheaper representation.
  */
 ECS_STRUCT(LodStats, {
     int32_t visited;  /**< Nodes the walk of this frame looked at */
@@ -535,12 +514,9 @@ ECS_STRUCT(LodStats, {
 
 /** One node of the hierarchy the traversal walks.
  *
- * A node is a place in the tree, not an entity: its id names the entity it was
- * built from, or zero for a cluster the traversal added itself. Children are a
- * linked list, so a subtree is materialised and released without moving any
- * other node. The bounds of an interior node cover its whole subtree and the
- * error is the detail its proxy loses, in world units, which the screen space
- * metric of the epic projects.
+ * A node is a place in the tree: its id names the entity it was built from, or zero for a
+ * cluster. Children are a linked list, so subtrees are materialised and released in place.
+ * Interior bounds cover the subtree and the error is what its proxy loses, in world units.
  */
 typedef struct box_lod_node_t {
     vec3 min;            /**< Minimum corner of the world bounds of the subtree */
@@ -563,10 +539,9 @@ typedef struct box_lod_node_t {
 
 /** The node hierarchy the traversal walks, owned by the renderer.
  *
- * Nodes live in one vector and are named by their index, so a released node
- * returns to the free list and its index is handed out again. The roots are a
- * linked list of their own, which is what lets a scene add and drop template
- * instances without touching the rest of the tree.
+ * Nodes live in one vector named by index; released indices go to a free list and are reused.
+ * The roots are a separate linked list, so template instances are added and dropped without
+ * touching the rest of the tree.
  */
 typedef struct box_lod_tree_t {
     ecs_vec_t nodes; /**< box_lod_node_t of the tree, live and free */
@@ -615,10 +590,9 @@ typedef void (*box_lod_emit_t)(
 
 /** Fills the error ladder of a node the walk is about to replace.
  *
- * The levels run from the finest representation to the cheapest, so their
- * errors rise with the level and the walk takes the cheapest one that stays
- * under the threshold. A caller without a generator leaves this out, which
- * gives every node the single level its own error describes.
+ * Levels run from finest to cheapest, so errors rise with the level and the walk takes the
+ * cheapest under the threshold. Without a generator every node has the single level its own
+ * error describes.
  *
  * @param ctx The context of the walk
  * @param node Index of the node
@@ -632,10 +606,8 @@ typedef int32_t (*box_lod_levels_t)(
 
 /** What one walk of the tree measures and what it reports its result to.
  *
- * The visible callback is the culling of the view: it answers false for a node
- * the frustum or the depth pyramid rejects, which stops the walk there and
- * leaves the whole subtree unvisited. The emit callback receives every node the
- * walk resolved, as a drawn leaf or as a proxy.
+ * The visible callback culls: false for a node the frustum or depth pyramid rejects stops the
+ * walk there. The emit callback receives every node the walk resolved, as a leaf or a proxy.
  */
 typedef struct box_lod_walk_desc_t {
     box_lod_camera_t camera;    /**< Camera of the view the walk measures in */
@@ -774,10 +746,9 @@ void box_lod_tree_set_look(
 
 /** Thickness of the shell a box gets wrong against the volume it stands for.
  *
- * Replacing a subtree by its bounding box misses the volume between the box and
- * what the subtree fills; spread over the surface of the box that volume is a
- * length, which is how far the surface of the proxy sits from the surface of
- * the subtree on average and what the screen space metric projects.
+ * A bounding box proxy misses the volume between the box and what the subtree fills; spread over
+ * the box surface that volume is the average distance between the two surfaces, which the screen
+ * space metric projects.
  *
  * @param min Minimum corner of the box
  * @param max Maximum corner of the box
@@ -791,11 +762,9 @@ float box_lod_tree_shell(
 
 /** Aggregate the bounds, the leaf count and the error of every interior node.
  *
- * A node that is not open keeps the bounds, the averages and the leaf count a
- * caller gave it, so a root whose subtree was released still covers and still
- * looks like what it stands for. A materialised subtree is aggregated on its
- * own by naming its node, which is what keeps the cost of opening one node off
- * the rest of the tree.
+ * A node that is not open keeps the bounds, averages and leaf count the caller gave it, so a
+ * released root still stands for its subtree. Naming a node aggregates only its materialised
+ * subtree, which keeps opening one node cheap.
  *
  * @param tree The tree
  * @param node Index of the node to aggregate, negative for the whole tree
@@ -814,10 +783,9 @@ int32_t box_lod_tree_uncluster(
 
 /** Group loose roots into cluster nodes the walk can reject as one.
  *
- * The roots are sorted along the axis their centers spread over most and cut
- * into groups of the given size, each of which becomes a cluster node with the
- * roots as its children. Nothing about the entities changes: a cluster is a
- * node of this tree and no entity gains a parent.
+ * The roots are sorted along the axis of widest center spread and cut into groups of the given
+ * size, each becoming a cluster node with the roots as children. Entities are not changed: no
+ * entity gains a parent.
  *
  * @param tree The tree
  * @param group Roots one cluster holds, 0 for BOX_LOD_CLUSTER_SIZE
@@ -829,12 +797,9 @@ int32_t box_lod_tree_cluster(
 
 /** Walk the tree of one view and resolve every node it reaches.
  *
- * The walk starts at the roots and, at every node, rejects it by the frustum of
- * the view, replaces it by its proxy when the depth pyramid hides it or when its
- * projected error is under the threshold, or descends into its children. A
- * rejected or replaced node leaves its subtree unvisited, which is what the cost
- * of the walk is about. Nothing is dropped on the depth pyramid: a hidden node
- * still leaves its proxy behind, which the culling of the renderer tests again.
+ * Starting at the roots, the walk rejects a node by the view frustum, replaces it by its proxy
+ * when the depth pyramid hides it or its projected error is under the threshold, or descends. A
+ * hidden node still leaves its proxy, which the renderer culling tests again.
  *
  * @param tree The tree
  * @param desc The view, its threshold and its callbacks

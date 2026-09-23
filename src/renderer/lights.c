@@ -263,6 +263,7 @@ void box_lights_update(
         box_vec_reserve(snapshot, view->light_count);
         memcpy(snapshot->data, lights, bytes);
     }
+
     snapshot->count = view->light_count;
     r->v->grid = *grid;
     memcpy(r->v->cluster_view, view->view, sizeof(r->v->cluster_view));

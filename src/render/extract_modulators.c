@@ -2,12 +2,9 @@
  * @file render/extract_modulators.c
  * @brief Light modulator registry: the plugin list and the parameter block of each entry.
  *
- * A modulator is a LightModulator on a light or on a child of one. The index of
- * an entry in this list is the bit a light carries for it and the index of the
- * function the generated include of the mesh shader holds, so the list only
- * changes when a plugin is added, removed or points somewhere else. The
- * parameters travel every frame, read from whatever reflected component next to
- * the modulator was registered with box_light_modulator_params.
+ * A modulator is a LightModulator on a light or a child of one. Its list index is the
+ * light bit and generated shader function index, so the list only changes when a
+ * plugin changes. Parameters are read every frame from box_light_modulator_params.
  */
 
 #include "render_internal.h"

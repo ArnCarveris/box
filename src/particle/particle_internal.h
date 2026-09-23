@@ -32,10 +32,9 @@ typedef struct box_particle_view_t {
 
 /** Bookkeeping the module keeps next to every ParticleEmitter.
  *
- * The accumulator carries the fraction of a particle the rate did not fill this
- * frame into the next one, so a fixed timestep spawns exactly rate particles
- * per second. The table holds the sampled points of a mesh or a spline shape
- * and is filled again when the shape, the source or the seed changes.
+ * The accumulator carries the unfilled fraction of a particle into the next frame.
+ * The table holds the sampled points of a mesh or spline shape and is refilled when
+ * the shape, the source or the seed changes.
  */
 typedef struct ParticleEmitterImpl {
     double accumulator;   /**< Fraction of a particle carried into the next frame */
@@ -109,10 +108,8 @@ void box_particle_sample(
 
 /** Advance the clock of an emitter and answer its playback state.
  *
- * The clock only runs while the emitter plays, a start after a stop puts it
- * back to zero and a reset trigger empties the pool and is written back to
- * false, so the times the bursts of the emitter go off at are the seconds it
- * has been playing.
+ * The clock only runs while the emitter plays and a start after a stop puts it back
+ * to zero. A reset trigger empties the pool and is written back to false.
  *
  * @param playback The playback of the emitter, NULL when it has none
  * @param impl Its bookkeeping, which holds the clock

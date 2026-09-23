@@ -33,11 +33,8 @@ typedef struct box_renderer_stats_t {
 
 /** Per pass GPU times of the last frame the renderer resolved.
  *
- * The passes are named after the pass structure of the renderer and after the
- * position of an effect in the chain of its view, and a name that several
- * views or cascades record holds what they spent together. The numbers come
- * from a read back of the timestamps, so they trail the frame they belong to
- * by one or two frames.
+ * A name recorded by several views or cascades holds their sum. The numbers
+ * trail the frame they belong to by one or two frames.
  */
 typedef struct box_renderer_gpu_t {
     box_timing_pass_t passes[BOX_TIMING_PASS_MAX]; /**< Passes of the frame, in record order */

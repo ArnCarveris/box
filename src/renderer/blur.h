@@ -41,10 +41,8 @@ static inline uint32_t box_blur_levels(
 
 /** Level of the chain a roughness reads.
  *
- * The blur radius of a level doubles with every step, so a linear mapping
- * leaves every visible change in the last tenths of the roughness. The square
- * root spreads it: a quarter of roughness already lands halfway up the chain
- * and each step of a sweep moves about as far as the one before it.
+ * The level follows the square root of the roughness, so a quarter of roughness
+ * lands halfway up the chain, since the blur radius doubles with every level.
  *
  * @param roughness Material roughness, clamped to 0 .. 1
  * @param levels Levels the chain holds

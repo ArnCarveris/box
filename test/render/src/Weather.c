@@ -1,3 +1,8 @@
+/**
+ * @file Weather.c
+ * @brief Tests for how weather settings reach the sky and the medium.
+ */
+
 #include <box.h>
 #include <box/sky.h>
 #include <bake_test.h>

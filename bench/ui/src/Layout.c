@@ -52,7 +52,8 @@ static ecs_entity_t* bench_ui_layout_tree(
     return tree;
 }
 
-void Layout_layout_10k_tree(bench_t *b)
+void Layout_layout_10k_tree(
+    bench_t *b)
 {
     // ui/layout
     ecs_world_t *world = ecs_init();
@@ -74,7 +75,8 @@ void Layout_layout_10k_tree(bench_t *b)
     ecs_fini(world);
 }
 
-void Layout_layout_10k_unchanged(bench_t *b)
+void Layout_layout_10k_unchanged(
+    bench_t *b)
 {
     // ui/layout
     ecs_world_t *world = ecs_init();
@@ -87,6 +89,33 @@ void Layout_layout_10k_unchanged(bench_t *b)
     while (bench_iter(b)) {
         box_ui_update(world);
         bench_keep(ecs_get(world, tree[0], Bounds)->width);
+    }
+
+    ecs_os_free(tree);
+    ecs_fini(world);
+}
+
+void Layout_layout_10k_grown_tree(bench_t *b)
+{
+    // ore_engine/layout_sizing
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t *tree = bench_ui_layout_tree(world);
+
+    int32_t i;
+    for (i = 1; i < BENCH_LAYOUT_COUNT; i ++) {
+        ecs_set(world, tree[i], Grow, {.width = 1, .height = 1});
+    }
+
+    box_ui_update(world);
+    bench_set_items(b, BENCH_LAYOUT_COUNT);
+
+    while (bench_iter(b)) {
+        bench_pause(b);
+        ecs_get_mut(world, tree[0], UiImpl)->relayout = true;
+        bench_resume(b);
+        box_ui_update(world);
+        bench_keep(ecs_get(world, tree[1], Bounds)->width);
     }
 
     ecs_os_free(tree);
@@ -135,7 +164,8 @@ static ecs_entity_t* bench_ui_fixed_tree(
     return tree;
 }
 
-void Layout_layout_one_moved_of_10k(bench_t *b)
+void Layout_layout_one_moved_of_10k(
+    bench_t *b)
 {
     // ui/layout_subtree
     ecs_world_t *world = ecs_init();
@@ -205,7 +235,8 @@ static ecs_entity_t* bench_ui_scrolled_tree(
     return tree;
 }
 
-void Layout_layout_10k_scrolled_tree(bench_t *b)
+void Layout_layout_10k_scrolled_tree(
+    bench_t *b)
 {
     // ore_engine/ui_scroll
     ecs_world_t *world = ecs_init();
@@ -227,7 +258,8 @@ void Layout_layout_10k_scrolled_tree(bench_t *b)
     ecs_fini(world);
 }
 
-void Layout_layout_10k_scrolled_offset(bench_t *b)
+void Layout_layout_10k_scrolled_offset(
+    bench_t *b)
 {
     // ore_engine/ui_scroll
     ecs_world_t *world = ecs_init();

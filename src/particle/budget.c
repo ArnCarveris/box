@@ -2,20 +2,12 @@
  * @file particle/budget.c
  * @brief The share of the budget an emitter gets and the views that keep it alive.
  *
- * Ten million particles are not ten million particles per emitter: a world has
- * a ceiling on what every pool together may hold and on what a frame may spawn,
- * and an emitter that asks for more than its share of either gets the share
- * instead of the ask. The share is proportional, so an emitter that asked for
- * half of what was asked for keeps half of what there is, and it is computed
- * from the asks alone, which do not change while a scene stands still: a pool
- * only changes size when the scene changes, never because a frame was busy.
+ * An emitter that asks for more than its share of the pool or spawn ceiling gets a
+ * proportional share instead. Shares are computed from the asks alone, so a pool only
+ * changes size when the scene changes.
  *
- * What an emitter is worth is decided per view. The particles of an emitter
- * stay inside a sphere around it that its speed, its lifetime and its
- * acceleration bound, and an emitter whose sphere no view can see is not
- * stepped at all while one that is far from every camera is stepped every other
- * frame with the two frames in one step, which is the same motion at half the
- * cost.
+ * Each view decides what an emitter is worth: an emitter whose bounding sphere no view
+ * sees is not stepped, and one far from every camera is stepped every other frame.
  */
 
 #include "particle_internal.h"

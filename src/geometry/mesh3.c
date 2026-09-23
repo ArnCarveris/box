@@ -2,11 +2,9 @@
  * @file geometry/mesh3.c
  * @brief Turns the vertex data of a Mesh3 into a shared, reference counted render mesh.
  *
- * The component owns five vectors, so it carries its own lifecycle hooks: a
- * component registered from C keeps the hooks of its C type and never gets the
- * ones flecs generates for a reflected type. Setting the component hashes the
- * data, hands the hash to the mesh cache and writes the RenderMesh the shared
- * mesh is drawn with, so entities that hold the same data upload once.
+ * The component owns five vectors and carries its own lifecycle hooks. Setting
+ * it hashes the data, looks the hash up in the mesh cache and writes the
+ * RenderMesh, so entities with the same data upload once.
  */
 
 #include "geometry_internal.h"
@@ -300,6 +298,7 @@ static void box_mesh3_build(
         out->sweeps = ecs_os_malloc((ecs_size_t)bytes);
         memcpy(out->sweeps, ecs_vec_first(&m->sweeps), bytes);
     }
+
     if (uvs) {
         memcpy(out->uvs, uvs, (size_t)vertices * 2 * sizeof(float));
     } else {

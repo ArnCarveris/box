@@ -37,7 +37,7 @@ typedef struct box_batch_t {
     ecs_vec_t groups;    /**< box_slot_group_t, empty while no slot joined a layer */
     bool count_dirty;    /**< Instance count changed since the last packet */
     bool groups_dirty;   /**< Group ranges changed since the last packet */
-    bool removed;
+    bool removed;        /**< A slot was freed since the last packet */
 } box_batch_t;
 
 /** Where an entity's instance lives */
@@ -68,10 +68,8 @@ typedef struct RenderShape2D {
 
 /** World space rectangle the fragments of an entity are clipped to.
  *
- * The rectangle is axis aligned in the plane a UI tree is laid out in and
- * travels with the instance of the entity, so the fragment stage drops what
- * falls outside it on every draw the entity takes part in. An entity without
- * the component is not clipped at all.
+ * The rectangle is axis aligned in the UI layout plane; the fragment stage drops what
+ * falls outside it. An entity without the component is not clipped.
  */
 typedef struct RenderClip {
     float min[2]; /**< Left and bottom edge of the rectangle */
@@ -120,7 +118,7 @@ typedef struct box_modulator_t {
 
 /** One view of the frame, in the order the views are rendered */
 typedef struct box_view_src_t {
-    ecs_entity_t entity;
+    ecs_entity_t entity;  /**< The View entity */
     ecs_entity_t camera;  /**< Camera the view renders */
     int32_t priority;     /**< Order in the frame, lower renders first */
 } box_view_src_t;
@@ -163,7 +161,7 @@ typedef struct RenderState {
     bool layered;             /**< A material enables a layer, so instances resolve their mask */
     bool shadowless;          /**< A NoShadow tag exists, so instances resolve their caster flag */
     bool hide_used;           /**< A Hidden tag exists, so instances resolve their visibility */
-    bool layer_data;
+    bool layer_data;          /**< A MaterialLayerData exists, so instances resolve its amounts */
     bool shaped;              /**< A 2D shape exists, so instances resolve their shape words */
     bool clipped;             /**< A clip rectangle exists, so instances resolve their clip */
     bool transitioned;        /**< A transition exists, so instances resolve displayed values */
@@ -216,7 +214,7 @@ typedef struct RenderState {
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
-    float bake_occluder_min_size;
+    float bake_occluder_min_size; /**< Occluder size of the previous packet's bake */
     bool bake_enabled;        /**< Baking was enabled by the previous packet */
 } RenderState;
 
@@ -407,11 +405,9 @@ void box_render_extract_meshes(
 
 /** Upload a texture with the next packet and return its handle.
  *
- * The pixel array holds the whole RGBA8 mip chain of a square texture and is
- * handed to the renderer, which frees it after the upload. Passing a handle of
- * a matching size class replaces the contents of that handle instead of
- * allocating a new one. A world that ran out of pages logs one error, frees the
- * pixels and hands back handle 0, which renders the material without a texture.
+ * The pixels are the RGBA8 mip chain of a square texture, freed by the renderer after
+ * upload. A handle of a matching size class is replaced in place. When out of pages,
+ * logs an error, frees the pixels and returns 0.
  *
  * @param world The world
  * @param handle Handle to replace, 0 to allocate a new one
@@ -539,11 +535,8 @@ void box_render_release_slot(
 
 /** Give an entity the static slot of its layer mask, appending one when it has none.
  *
- * While no entity has joined a layer the batch has no groups and a new slot is
- * appended at the end, which is what a scene without layers has always done.
- * Once groups exist the slot lands in the run of its mask, which costs one slot
- * move per run between that run and the end of the batch; every moved entity is
- * requeued so the packet carries its instance data at its new slot.
+ * Without layer groups the slot is appended. Otherwise it lands in the run of its
+ * mask, moving one slot per run after it; moved entities are requeued.
  *
  * @param world The world
  * @param batch The batch of its mesh
@@ -657,17 +650,18 @@ void box_render_instance_bounds(
 
 /** Fill the instance data of an entity from its components.
  *
+ * The instance comes out as a shadow caster; a world that holds a NoShadow tag
+ * or a blend mode clears the flag again through box_instance_set_caster.
+ *
  * @param world The world
  * @param e The entity
  * @param mesh Its render mesh
  * @param transform Its world transform
- * The instance comes out as a shadow caster; a world that holds a NoShadow tag
- * or a blend mode clears the flag again through box_instance_set_caster.
- *
  * @param baked The instance reads a baked probe instead of the static lights
  * @param textured The world holds textures, so the PBR slots are resolved
  * @param tiled The world holds tiling components, so the uv transform is derived
  * @param shaped The world holds 2D shapes, so the shape words are derived
+ * @param layer_data The world holds layer data, so the layer amounts are derived
  * @param clipped The world holds clip rectangles, so the clip words are derived
  * @param layers The registry when a material enables a layer, NULL when none does
  * @param transition The transitions of the entity, NULL when it has none
@@ -885,11 +879,8 @@ uint32_t box_render_back_mode(
 
 /** Check whether an entity leaves the opaque batches for the sorted pass.
  *
- * An instance is sorted when its blend mode is not opaque, when its opacity is
- * below one, or when it shows its back faces, which the batched draws cannot
- * do. The registry flags say which of
- * those components the world holds at all, so a scene without them pays
- * nothing per changed entity.
+ * An instance is sorted when it is not opaque, has opacity below one, or shows back
+ * faces. Registry flags skip the checks for components the world does not hold.
  *
  * @param world The world
  * @param state The registry
@@ -994,6 +985,7 @@ void box_render_extract_dynamic(
  * @param world The world
  * @param state The registry
  * @param p The packet
+ * @param e The view entity
  * @param v The view to fill
  * @param bake The view also collects the unculled static lights of the bake
  */
@@ -1008,6 +1000,7 @@ void box_render_extract_lights(
 /** Component of a view entity, or its singleton when the view does not carry it.
  *
  * @param world The world
+ * @param e The view entity
  * @param id The component
  * @return The component, NULL when neither the view nor the world has it
  */
@@ -1030,6 +1023,7 @@ ecs_entity_t box_render_collect_views(
 
 /** The view entity the settings shared by every view are read from.
  *
+ * @param world The world
  * @param state The registry
  * @return The first view of the frame, 0 when the world has no views
  */
@@ -1056,6 +1050,7 @@ void box_render_extract_views(
  * result without testing it again.
  *
  * @param world The world
+ * @param e The view entity
  * @param out The settings to fill
  * @return The filled settings
  */
@@ -1100,6 +1095,7 @@ void box_render_shadow_corners(
  * cascade count at zero, which is what a frame without a shadow pass reads.
  *
  * @param world The world
+ * @param e The view entity
  * @param sun The world holds a directional light
  * @param v The view to fill
  */

@@ -2,20 +2,12 @@
  * @file renderer/particle.c
  * @brief Particle pools of the renderer and the passes that fill and draw them.
  *
- * Every emitter of a packet owns a pool: one buffer per particle channel, a
- * dead list of the free slots and a counter block. The integrate pass ages and
- * moves the live particles and pushes the slots that expire onto the dead list,
- * the spawn pass pops as many slots as the packet asked for and fills them from
- * a hash of the emitter seed and the spawn index, and the sprite pass expands
- * every slot into a camera facing quad or into the mesh of its emitter. A pool
- * lives as long as its emitter keeps appearing in the packets.
+ * Each emitter owns a pool of channel buffers, a dead list and counters. Integrate
+ * ages particles and frees expired slots, spawn fills free slots, and the sprite
+ * pass draws each slot as a camera facing quad or the emitter mesh.
  *
- * The sprite pass reads the block of the emitter next to its channels, so the
- * curves over the life of a particle are evaluated there, and it samples the
- * depth of the view a second time for the soft fade, which is why it takes the
- * depth as a read only attachment. A pool is drawn with the blended or the
- * additive pipeline of the target format, and the blended ones are drawn back
- * to front because their order is what their result depends on.
+ * The sprite pass evaluates life curves and a soft depth fade; blended pools are
+ * drawn back to front, additive pools in any order.
  */
 
 #include "renderer_internal.h"
@@ -41,10 +33,8 @@ static WGPUBuffer box_particle_storage(
 
 /** Write the counters and the indirect arguments a fresh pool starts from.
  *
- * Every slot is free, nothing is alive and both draws take no instance, which
- * is what an emitter that has not spawned yet draws. The vertex count of the
- * quad draw never changes; the index count of a billboard is written again when
- * the mesh of the emitter does.
+ * Every slot is free and both draws take no instance. The index count of a mesh
+ * draw is written again when the mesh of the emitter changes.
  *
  * @param r The renderer
  * @param pool The pool
@@ -152,10 +142,8 @@ static void box_particle_pool_init(
 
 /** Bind group layouts of the compute and the sprite passes.
  *
- * The compute passes bind the five channels, the dead list, the counters and
- * the shape table next to the uniform of the emitter; the sprite pass reads the
- * channels only, which keeps both stages inside the storage buffer limit every
- * device guarantees.
+ * The compute passes bind the channels, dead list, counters, shape table and
+ * emitter uniform; the sprite pass binds the channels only.
  *
  * @param r The renderer
  */
@@ -304,10 +292,8 @@ done:
 
 /** Build one sprite pipeline: a target format, a blend and a vertex source.
  *
- * The blended pipeline composites a particle over the image by its opacity and
- * the additive one adds it, which is what fire, sparks and magic are drawn
- * with. The mesh variant reads the vertices of the mesh of an emitter instead
- * of generating a quad, so it takes the vertex layout of the scene.
+ * Blending composites by opacity, additive adds to the image. The mesh variant
+ * reads emitter mesh vertices with the scene vertex layout instead of a quad.
  *
  * @param r The renderer
  * @param module Module of the sprite shader
@@ -595,10 +581,8 @@ static void box_particle_groups(
 
 /** Write the counters and the arguments the frame of a pool starts from.
  *
- * An added pool compacts its live particles into a list the frame appends to,
- * so its cursor is cleared here and the finish pass writes what the draw takes
- * from it. A blended pool is drawn over its slots instead, as many as the pool
- * has ever used, which only changes while the pool is filling.
+ * An additive pool clears the cursor of its compacted alive list; a blended pool
+ * draws every slot it has ever used.
  *
  * @param r The renderer
  * @param pool The pool

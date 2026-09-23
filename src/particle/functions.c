@@ -2,14 +2,9 @@
  * @file particle/functions.c
  * @brief Script functions that drive the playback of an emitter.
  *
- * The functions live under the module, so a script that uses box calls them as
- * particle.start(fountain). Each one is the component write a scene would make
- * by hand: they add a ParticlePlayback to an entity that has an emitter and set
- * the state or the reset trigger on it, and they answer whether the entity is
- * an emitter at all, so a script can branch on a name it was handed.
- *
- * particle.burst_at is the one shot: it plays an effect template once at a
- * point of the world from the pool of that template.
+ * The functions live under the module (particle.start(fountain)) and add or write the
+ * ParticlePlayback of an emitter, or answer whether an entity is an emitter.
+ * particle.burst_at plays an effect template once at a point from its pool.
  */
 
 #include "particle_internal.h"

@@ -2,8 +2,6 @@ $ key.press Grave
 Grave down for 1 frame
 $ get terminals.console box.command.TerminalOutput
 {result: "60 fps, mean 16.67 ms, worst 16.67 ms\n", error: false}
-$ get camera box.monitor.FpsOverlay
-'camera' has no value of 'box.monitor.FpsOverlay'
 $ capture
 capture_4_0.png
 

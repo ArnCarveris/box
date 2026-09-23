@@ -10,7 +10,8 @@
 /** Children of the scope that ls lists */
 #define BENCH_SCOPE_COUNT (1000)
 
-void Dispatch_help(bench_t *b)
+void Dispatch_help(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -29,7 +30,8 @@ void Dispatch_help(bench_t *b)
     ecs_fini(world);
 }
 
-void Dispatch_ls_scope(bench_t *b)
+void Dispatch_ls_scope(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -58,7 +60,8 @@ void Dispatch_ls_scope(bench_t *b)
     ecs_fini(world);
 }
 
-void Dispatch_path_lookup(bench_t *b)
+void Dispatch_path_lookup(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -79,7 +82,8 @@ void Dispatch_path_lookup(bench_t *b)
     ecs_fini(world);
 }
 
-void Dispatch_set_expression(bench_t *b)
+void Dispatch_set_expression(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();

@@ -55,7 +55,8 @@ void View_script_sets_culling(void)
     test_int(ecs_script_run(w, "culling",
         "using box.*\n"
         "camera { Camera: {fov: 60} }\n"
-        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, occlusion: true, hiz_levels: 3, min_dimension_px: 2}} }\n"
+        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, "
+        "occlusion: true, hiz_levels: 3, min_dimension_px: 2}} }\n"
         "disabled_view { View: {camera: camera, culling: {enabled: false}} }\n", NULL), 0);
     ecs_entity_t e = ecs_lookup(w, "view");
     test_assert(e != 0);
@@ -73,7 +74,8 @@ void View_script_sets_culling(void)
     test_bool(disabled_settings->culling.enabled, false);
     test_int(ecs_script_run(w, "overlay",
         "using box.view\n"
-        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, occlusion: false, hiz_levels: 3, min_dimension_px: 2}} }\n", NULL), 0);
+        "view { View: {camera: camera, culling: {enabled: true, gpu_threshold: 16, "
+        "occlusion: false, hiz_levels: 3, min_dimension_px: 2}} }\n", NULL), 0);
     settings = ecs_get(w, e, View);
     test_bool(settings->culling.occlusion, false);
     box_render_extract(w, &packet);

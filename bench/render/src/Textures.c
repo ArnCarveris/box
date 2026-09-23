@@ -24,7 +24,8 @@ int box_image_write_png(
     uint32_t stride,
     const void *pixels);
 
-void Textures_extract_1000_materials(bench_t *b)
+void Textures_extract_1000_materials(
+    bench_t *b)
 {
     // textures/textures
     const char *path = "/tmp/box_bench_texture.png";

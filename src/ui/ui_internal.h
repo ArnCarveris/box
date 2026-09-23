@@ -52,10 +52,8 @@ typedef struct UiVisit {
 
 /** Place of one node in the walk of its tree and the box the layout gave it.
  *
- * The walk collects a place per node in pre-order, so a node comes after its
- * parent and before the nodes below it. The layout measures the boxes over that
- * array backward, which visits a node after the children that size it, and
- * places them forward, which visits a node after the parent that places it.
+ * Places are collected in pre-order. The layout measures over them backward and
+ * places them forward.
  */
 typedef struct UiPlace {
     ecs_entity_t e;   /**< The node */
@@ -83,8 +81,8 @@ typedef struct UiPlace {
     float local_y;    /**< Y the node was given relative to its parent */
     float sum_width;  /**< Width of the children the layout places */
     float sum_height; /**< Height of the children the layout places */
-    float max_width;  /**< Width of the widest of those children */
-    float max_height; /**< Height of the tallest of those children */
+    float widest_child;  /**< Width of the widest of those children */
+    float tallest_child; /**< Height of the tallest of those children */
     float cursor;     /**< Place along the axis the next child takes */
     int32_t flow;     /**< Children the layout places */
     float fill_width;  /**< Width a Fill resolved for the node, 0 when none did */
@@ -96,6 +94,19 @@ typedef struct UiPlace {
     float clip_min[2]; /**< Left and bottom edge the node itself is clipped to */
     float clip_max[2]; /**< Right and top edge the node itself is clipped to */
     bool clipped;      /**< An element above the node clips it */
+    float pad_left;    /**< Padding of the left side of the box */
+    float pad_right;   /**< Padding of the right side of the box */
+    float pad_top;     /**< Padding of the top side of the box */
+    float pad_bottom;  /**< Padding of the bottom side of the box */
+    float grow_width;  /**< Weight the width grows with, 0 when it does not */
+    float grow_height; /**< Weight the height grows with, 0 when it does not */
+    float wrap;        /**< Width the lines of a text wrap at, 0 when they do not */
+    bool fit_width;    /**< The width of the box came from its content */
+    bool fit_height;   /**< The height of the box came from its content */
+    bool wraps;        /**< The node is a text that wraps at the width its parent leaves */
+    bool shrinks;      /**< The width of the node gives way to the width its parent leaves */
+    int32_t child;     /**< Place of the first child, -1 when there is none */
+    int32_t sibling;   /**< Place of the next sibling, -1 when there is none */
 } UiPlace;
 
 /** Last projection of a world anchored element, written by the layout.
@@ -117,12 +128,14 @@ typedef struct UiState {
     ecs_vec_t places;   /**< UiPlace of every node of the tree being walked */
     ecs_vec_t marks;    /**< UiMark of every node changed since the last update */
     ecs_vec_t subtrees; /**< UiMark the layout of one tree visits, in tree order */
+    ecs_vec_t scrolled; /**< int32_t places of the walk with a Scroll, found by the measure */
     ecs_query_t *hits;  /**< Nodes with a rectangle the cursor is resolved against */
     int32_t trees;      /**< Trees the world holds, zero skips the observers */
     int32_t texts;      /**< Text elements the world holds, zero skips the text pass */
     int32_t shadows;    /**< Box shadows the world holds, zero skips the shadow pass */
     int32_t groups;     /**< Subtrees that composite, zero skips their bookkeeping */
     int32_t scrolls;    /**< Elements that clip and scroll, zero skips the scroll pass */
+    int32_t grows;      /**< Elements with a Grow, zero skips reading it */
     int32_t opacities;  /**< Opacity components the world holds, zero skips the group pass */
     ecs_entity_t shadow_prefab; /**< Prefab the shadow quads take their material from */
     bool busy;          /**< An update runs, the observers mark no tree */
@@ -145,11 +158,8 @@ typedef struct box_ui_glyph_t {
 
 /** Glyph atlas of one font file at one em size, grown as glyphs arrive.
  *
- * The glyphs are packed on shelves: a glyph goes right of the last one on the
- * shelf being filled, and a glyph that does not fit opens a shelf below it.
- * When the last shelf runs out of room the atlas doubles, which keeps every
- * glyph where it is but changes every uv, so the epoch is raised and every
- * element that drew with the atlas builds its quads again.
+ * Glyphs are packed on shelves. When the last shelf is full the atlas doubles, which
+ * changes every uv and raises the epoch so elements rebuild their quads.
  */
 typedef struct box_ui_atlas_t {
     char *path;           /**< Font file as the component spells it */
@@ -180,7 +190,7 @@ typedef struct box_ui_quad_t {
     const box_ui_glyph_t *glyph; /**< Glyph of the atlas the quad shows */
     float x;                     /**< Logical pixels from the left of the box to the bitmap */
     float y;                     /**< Logical pixels from the top of the box to the bitmap */
-    int32_t byte;
+    int32_t byte;                /**< Offset of the glyph in the string of the element */
 } box_ui_quad_t;
 
 /** Size a string takes when it is laid out in a box */
@@ -208,10 +218,8 @@ typedef struct UiFonts {
 
 /** View, target and quad of a subtree that composites as one image.
  *
- * The subtree is rendered by a view of its own into a target the size of its
- * Bounds, and the quad shows that target in the layer of the parent, at the
- * place and the depth of the node, so the children of the subtree composite
- * with each other once and with the frame once.
+ * The view renders the subtree into a target the size of its Bounds, and the quad shows
+ * it in the parent layer at the place and depth of the node.
  */
 typedef struct GroupImpl {
     ecs_entity_t target; /**< RenderTarget the subtree is rendered into */
@@ -225,10 +233,8 @@ typedef struct GroupImpl {
 
 /** Content size and offset range of a scrolled element, added with Scroll.
  *
- * The layout writes what the element holds and how far its offset may travel,
- * which is what the wheel reads to find the innermost scrollable ancestor of
- * the cursor and what keeps an element whose offset sat at the end of its
- * content there while the content grows.
+ * Written by the layout. The wheel reads it to find the innermost scrollable ancestor,
+ * and it keeps an offset at the end of the content there while the content grows.
  */
 typedef struct ScrollImpl {
     float content_width;  /**< Width the content of the element takes */
@@ -259,8 +265,8 @@ typedef struct ConsoleImpl {
     int32_t shown;        /**< Lines of the session log the scrollback shows */
     bool loaded;          /**< The console script was loaded */
     bool open;            /**< The console was open after the last update */
-    uint8_t *styles;
-    int32_t style_count;
+    uint8_t *styles;      /**< box_terminal_style_t of every byte of the scrollback text */
+    int32_t style_count;  /**< Bytes in styles */
 } ConsoleImpl;
 
 /** Quad the shadow pass drew for an element, added with BoxShadow */
@@ -398,18 +404,12 @@ void box_ui_drop(
 
 /** Walk the tree of a root, number its nodes, join them and lay them out.
  *
- * Numbering a node changes its table, the root included, so the walk reads the
- * private state of the root into a copy and writes the result back at the end.
- * The nodes are collected into the places of the registry first, which the
- * numbering and the layout both read; a tree that only moved is not numbered
- * again and a tree that only changed shape is not laid out again. The layout
- * runs before the numbering because a node the layout gives a rectangle gains
- * its instance there, and a bias set before that instance exists is lost.
+ * The private state of the root is copied and written back at the end. The layout runs
+ * before the numbering so node instances exist when the bias is set. A tree that only
+ * moved is not numbered again and one that only changed shape is not laid out again.
  *
- * A tree that only has to be laid out again collects and lays out the subtrees
- * its marks resolved to instead of everything the root holds, and numbers
- * nothing, because their places did not move. A pass that made or dropped a
- * node falls back to the walk of the whole tree, which numbers it again.
+ * A layout-only pass lays out the marked subtrees and numbers nothing. A pass that
+ * made or dropped a node falls back to the walk of the whole tree.
  *
  * @param world The world
  * @param e The root of the tree
@@ -420,12 +420,9 @@ void box_ui_walk(
 
 /** Give every place of the collected tree its box and its Bounds.
  *
- * The pass sizes every node, then places the children of a layout along its
- * axis and the anchored nodes against the edges of their parent, which writes
- * the Position of those nodes and the Rect of a node a layout sized. The first
- * place is the node the collect started at: the root of the tree, which sits
- * where its own Position puts it, or the root of a subtree, which keeps the
- * Bounds the pass that placed it left behind.
+ * Sizes every node, then places layout children and anchored nodes, writing their
+ * Position and the Rect of layout-sized nodes. The first place is the tree root or a
+ * subtree root, which keeps the Bounds its parent pass gave it.
  *
  * @param world The world
  * @param root The root of the tree being walked
@@ -444,10 +441,8 @@ UiFonts* box_ui_fonts(
 
 /** Atlas of a font file at an em size, parsed and opened the first time.
  *
- * The atlas is rasterized at its em size times the device scale of the views,
- * so a glyph holds one texel per device pixel and its quad samples the atlas
- * without resampling. An atlas that was rasterized for another device scale is
- * rasterized again, which raises its epoch and lays every tree out again.
+ * Rasterized at the em size times the device scale of the views. An atlas made for
+ * another scale is rasterized again, which raises its epoch and relays every tree.
  *
  * @param world The world
  * @param path The font file, empty or NULL for the font the engine ships
@@ -530,6 +525,20 @@ void box_ui_text_run(
 void box_ui_text_measure(
     ecs_world_t *world,
     UiPlace *p);
+
+/** Wrap a text element again at the width the layout gave it.
+ *
+ * The element takes the width, the lines wrap at that width inside its
+ * padding and a height that came from the lines follows them.
+ *
+ * @param world The world
+ * @param p The place of the node
+ * @param width Width the layout gave the element
+ */
+void box_ui_text_rewrap(
+    ecs_world_t *world,
+    UiPlace *p,
+    float width);
 
 /** Give every text node of the collected tree the glyph quads of its string.
  *
@@ -706,6 +715,14 @@ void box_ui_console_update(
 void box_ui_console_sync(
     ecs_world_t *world);
 
+/** Color a byte of the scrollback is drawn in.
+ *
+ * @param world The world
+ * @param element The element whose text holds the byte
+ * @param byte Offset of the byte in the text of the element
+ * @param fallback Color returned for an element that is not the console log
+ * @return The TerminalColors color of the style of the byte, or fallback
+ */
 Rgb box_ui_console_color(
     const ecs_world_t *world,
     ecs_entity_t element,

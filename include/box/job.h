@@ -2,9 +2,8 @@
  * @file box/job.h
  * @brief Worker pool that runs large tasks without spiking a frame.
  *
- * The box.job module keeps a pool of workers, orders queued work by priority and
- * distance to the eye, and reports completion on the main thread in PreUpdate
- * inside a per frame budget. Modules submit work with the internal API in
+ * Keeps a worker pool, orders queued work by priority and distance to the eye, and reports
+ * completion on the main thread in PreUpdate within a per frame budget. Modules submit work via
  * src/job/job_internal.h; scripts only see the two components below.
  */
 

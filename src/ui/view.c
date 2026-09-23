@@ -183,14 +183,8 @@ void box_ui_unbind(
 
 /** Device pixels one logical pixel of a tree covers, for the glyph atlases.
  *
- * The framebuffer the scene is rendered into is what a glyph lands on, so a
- * tree on a high density surface, or one that gives a logical pixel more than
- * one point, draws its text at more pixels than the layout counts. The font
- * atlases rasterize at that factor, which is why the sync of a tree hands it to
- * the font registry before the text pass of the frame reads it, and a tree that
- * changes it is laid out again so its glyphs follow. The registry holds one
- * factor, the one of the tree that was synced last, so two trees that disagree
- * share the atlases of the one that was updated last.
+ * The font atlases rasterize at this factor; a tree that changes it is laid out again.
+ * The registry holds one factor, that of the tree synced last.
  *
  * @param surface The surface of the world
  * @param height Logical pixels the view of the tree shows vertically

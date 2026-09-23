@@ -26,7 +26,8 @@ static const char *bench_script_code =
     "  }\n"
     "}\n";
 
-void Incremental_instantiate_10k(bench_t *b)
+void Incremental_instantiate_10k(
+    bench_t *b)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();
@@ -62,7 +63,8 @@ void Incremental_instantiate_10k(bench_t *b)
     ecs_fini(world);
 }
 
-void Incremental_order_100k(bench_t *b)
+void Incremental_order_100k(
+    bench_t *b)
 {
     // responsiveness/incremental_templates
     ecs_world_t *world = ecs_init();

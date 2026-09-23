@@ -30,12 +30,9 @@ ECS_STRUCT(Texture, {
 
 /** Texture rasterized from an SVG file or inline SVG data.
  *
- * A zero width or height is derived from the other one at the aspect ratio of
- * the SVG; both zero rasterize the SVG at its own size. The rasterized pixels
- * have straight alpha and go through the same upload path as a Texture, so an
- * Svg entity binds to a PbrTextures slot like any other texture. An entity with
- * both a Texture and an Svg is an error: the component that was set first owns
- * the texture.
+ * A zero width or height follows the SVG aspect ratio; both zero use its own
+ * size. Pixels have straight alpha and bind like any Texture. An entity with
+ * both a Texture and an Svg is an error; the one set first owns the texture.
  */
 ECS_STRUCT(Svg, {
     char *file;     /**< SVG file, relative to the working directory */

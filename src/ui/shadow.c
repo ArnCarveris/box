@@ -2,13 +2,9 @@
  * @file ui/shadow.c
  * @brief Draws the box shadow of an element as a soft quad behind it.
  *
- * A shadow is one more 2D shape: the quad covers the box of its element grown
- * by the spread and the blur on every side, and the fragment stage fills the
- * rounded rectangle the blur insets and fades it out over that blur, which is
- * the analytic rounded rectangle a Border already draws with. The quad is a
- * child of its element with the same material trick the glyphs use, a near
- * black metal that carries the color of the shadow in its emission, so the
- * shadow shows the color it was given whatever its view lights it with.
+ * The shadow is a child quad covering the box grown by spread and blur; the fragment
+ * stage fades the rounded rectangle out over the blur. Its near black metal material
+ * carries the shadow color in emission, so lighting does not change it.
  */
 
 #include "ui_internal.h"

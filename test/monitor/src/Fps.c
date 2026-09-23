@@ -1,12 +1,11 @@
 /**
  * @file Fps.c
- * @brief Tests for the frame time ring, the panel it builds and the FpsOverlay component.
+ * @brief Tests for the frame time ring, the Fps singleton and the panel script.
  */
 
-#include <stdlib.h>
 #include <box.h>
 #include <bake_test.h>
-#include "../../../src/renderer/overlay.h"
+#include "../../../src/monitor/monitor_internal.h"
 
 void Fps_empty_ring_reports_nothing(void)
 {
@@ -42,13 +41,13 @@ void Fps_ring_wraps_past_its_size(void)
     box_fps_ring_t ring;
     ecs_os_memset_t(&ring, 0, box_fps_ring_t);
     int32_t i;
-    for (i = 0; i < BOX_FPS_HISTORY + 17; i ++) {
+    for (i = 0; i < BOX_FPS_RING + 17; i ++) {
         box_fps_ring_push(&ring, (float)i);
     }
 
-    test_int(ring.count, BOX_FPS_HISTORY);
-    test_flt(box_fps_ring_get(&ring, 0), (float)(BOX_FPS_HISTORY + 16));
-    test_flt(box_fps_ring_get(&ring, BOX_FPS_HISTORY - 1), 17.0f);
+    test_int(ring.count, BOX_FPS_RING);
+    test_flt(box_fps_ring_get(&ring, 0), (float)(BOX_FPS_RING + 16));
+    test_flt(box_fps_ring_get(&ring, BOX_FPS_RING - 1), 17.0f);
 }
 
 void Fps_ring_ignores_a_negative_frame(void)
@@ -68,7 +67,7 @@ void Fps_window_covers_one_second_of_frames(void)
     box_fps_ring_t ring;
     ecs_os_memset_t(&ring, 0, box_fps_ring_t);
     int32_t i;
-    for (i = 0; i < BOX_FPS_HISTORY; i ++) {
+    for (i = 0; i < BOX_FPS_RING; i ++) {
         box_fps_ring_push(&ring, 10.0f);
     }
 
@@ -96,199 +95,231 @@ void Fps_stats_summarize_the_window(void)
     test_assert(stats.fps > 47.0f && stats.fps < 50.0f);
 }
 
-void Fps_sixty_frames_a_second_is_green(void)
+static int box_test_fps_sets = 0;
+
+static void BoxTestFpsOnSet(
+    ecs_iter_t *it)
 {
-    // monitoring/fps_overlay
-    test_int(box_fps_class(0.0f), BOX_FPS_GREEN);
-    test_int(box_fps_class(8.0f), BOX_FPS_GREEN);
-    test_int(box_fps_class(1000.0f / 60.0f), BOX_FPS_GREEN);
+    box_test_fps_sets += it->count;
 }
 
-void Fps_above_thirty_frames_a_second_is_yellow(void)
-{
-    // monitoring/fps_overlay
-    test_int(box_fps_class(20.0f), BOX_FPS_YELLOW);
-    test_int(box_fps_class(1000.0f / 30.0f), BOX_FPS_YELLOW);
-}
-
-void Fps_below_thirty_frames_a_second_is_red(void)
-{
-    // monitoring/fps_overlay
-    test_int(box_fps_class(40.0f), BOX_FPS_RED);
-    test_int(box_fps_class(250.0f), BOX_FPS_RED);
-}
-
-void Fps_every_class_has_its_own_color(void)
-{
-    // monitoring/fps_overlay
-    float green[3];
-    float yellow[3];
-    float red[3];
-    box_fps_class_color(BOX_FPS_GREEN, green);
-    box_fps_class_color(BOX_FPS_YELLOW, yellow);
-    box_fps_class_color(BOX_FPS_RED, red);
-    test_assert(green[1] > green[0] && green[1] > green[2]);
-    test_assert(yellow[0] > yellow[2] && yellow[1] > yellow[2]);
-    test_assert(red[0] > red[1] && red[0] > red[2]);
-}
-
-void Fps_panel_is_pinned_to_its_corner(void)
-{
-    // monitoring/fps_overlay
-    box_fps_ring_t ring;
-    ecs_os_memset_t(&ring, 0, box_fps_ring_t);
-    box_fps_ring_push(&ring, 16.0f);
-    box_overlay_rect_t rects[BOX_OVERLAY_RECT_MAX];
-    box_overlay_layout_t layout = {
-        .width = 960.0f, .height = 540.0f, .scale = 1.0f, .opacity = 0.7f,
-        .corner = BOX_OVERLAY_TOP_LEFT
-    };
-    test_assert(box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX) > 0);
-    test_flt(rects[0].rect[0], BOX_OVERLAY_MARGIN);
-    test_flt(rects[0].rect[1], BOX_OVERLAY_MARGIN);
-    test_flt(rects[0].color[3], 0.7f);
-
-    layout.corner = BOX_OVERLAY_BOTTOM_RIGHT;
-    box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX);
-    test_flt(rects[0].rect[0], 960.0f - BOX_OVERLAY_WIDTH - BOX_OVERLAY_MARGIN);
-    test_flt(rects[0].rect[1], 540.0f - BOX_OVERLAY_HEIGHT - BOX_OVERLAY_MARGIN);
-}
-
-void Fps_panel_grows_with_its_scale(void)
-{
-    // monitoring/fps_overlay
-    box_fps_ring_t ring;
-    ecs_os_memset_t(&ring, 0, box_fps_ring_t);
-    box_fps_ring_push(&ring, 16.0f);
-    box_overlay_rect_t rects[BOX_OVERLAY_RECT_MAX];
-    box_overlay_layout_t layout = {
-        .width = 960.0f, .height = 540.0f, .scale = 2.0f, .opacity = 1.0f,
-        .corner = BOX_OVERLAY_TOP_LEFT
-    };
-    box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX);
-    test_flt(rects[0].rect[2], BOX_OVERLAY_WIDTH * 2.0f);
-    test_flt(rects[0].rect[3], BOX_OVERLAY_HEIGHT * 2.0f);
-}
-
-void Fps_panel_draws_one_bar_per_frame(void)
-{
-    // monitoring/fps_overlay
-    box_fps_ring_t ring;
-    ecs_os_memset_t(&ring, 0, box_fps_ring_t);
-    int32_t i;
-    for (i = 0; i < 20; i ++) {
-        box_fps_ring_push(&ring, 16.0f);
-    }
-
-    box_overlay_rect_t rects[BOX_OVERLAY_RECT_MAX];
-    box_overlay_layout_t layout = {
-        .width = 960.0f, .height = 540.0f, .scale = 1.0f, .opacity = 1.0f,
-        .corner = BOX_OVERLAY_TOP_RIGHT
-    };
-    int32_t count = box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX);
-    test_int(count, 3 + 20);
-    float green[3];
-    box_fps_class_color(BOX_FPS_GREEN, green);
-    test_flt(rects[3].color[0], green[0]);
-    test_flt(rects[3].color[1], green[1]);
-}
-
-void Fps_a_slow_frame_turns_its_bar_red(void)
-{
-    // monitoring/fps_overlay
-    box_fps_ring_t ring;
-    ecs_os_memset_t(&ring, 0, box_fps_ring_t);
-    box_fps_ring_push(&ring, 16.0f);
-    box_fps_ring_push(&ring, 80.0f);
-    box_overlay_rect_t rects[BOX_OVERLAY_RECT_MAX];
-    box_overlay_layout_t layout = {
-        .width = 960.0f, .height = 540.0f, .scale = 1.0f, .opacity = 1.0f,
-        .corner = BOX_OVERLAY_TOP_LEFT
-    };
-    box_overlay_build(&ring, &layout, rects, BOX_OVERLAY_RECT_MAX);
-    float red[3];
-    box_fps_class_color(BOX_FPS_RED, red);
-    test_flt(rects[3].color[0], red[0]);
-    test_flt(rects[3].rect[3], BOX_OVERLAY_CHART_H);
-}
-
-void Fps_overlay_defaults_are_enabled_in_a_corner(void)
+void Fps_singleton_exists_at_import(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_entity_t e = ecs_new(world);
-    const FpsOverlay *o = ecs_ensure(world, e, FpsOverlay);
-    test_bool(o->enabled, true);
-    test_int(o->corner, FpsTopRight);
-    test_flt(o->scale, 1.0f);
-    test_flt(o->opacity, 0.7f);
-    test_flt(o->fps, 0.0);
+    const Fps *fps = ecs_singleton_get(world, Fps);
+    test_assert(fps != NULL);
+    test_flt(fps->fps, 0.0);
+    test_int(fps->count, 0);
+    test_flt(fps->history[BOX_MONITOR_FPS_HISTORY - 1], 0.0f);
     ecs_fini(world);
 }
 
-void Fps_window_is_published_on_the_component(void)
+void Fps_window_is_published_on_the_singleton(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f});
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(world, 0.02f);
     }
 
-    const FpsOverlay *o = ecs_singleton_get(world, FpsOverlay);
-    test_assert(o->fps > 45.0 && o->fps < 55.0);
-    test_assert(o->mean_ms > 19.0 && o->mean_ms < 21.0);
-    test_assert(o->worst_ms > 19.0 && o->worst_ms < 21.0);
+    const Fps *fps = ecs_singleton_get(world, Fps);
+    test_assert(fps->fps > 49.0 && fps->fps < 51.0);
+    test_assert(fps->mean_ms > 19.0 && fps->mean_ms < 21.0);
+    test_assert(fps->worst_ms > 19.0 && fps->worst_ms < 21.0);
+    test_assert(fps->frame_ms > 19.0 && fps->frame_ms < 21.0);
     ecs_fini(world);
 }
 
-void Fps_overlay_publishes_its_text(void)
+void Fps_history_keeps_the_newest_frame_last(void)
 {
-    // ore_engine/fps_text
+    // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f,
-        .corner = FpsBottomLeft});
+    ecs_progress(world, 0.01f);
+    ecs_progress(world, 0.02f);
+    ecs_progress(world, 0.04f);
+
+    const Fps *fps = ecs_singleton_get(world, Fps);
+    test_int(fps->count, 3);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 1] > 39.0f);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 1] < 41.0f);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 2] > 19.0f);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 2] < 21.0f);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 3] > 9.0f);
+    test_assert(fps->history[BOX_MONITOR_FPS_HISTORY - 3] < 11.0f);
+    test_flt(fps->history[BOX_MONITOR_FPS_HISTORY - 4], 0.0f);
+    ecs_fini(world);
+}
+
+void Fps_history_count_stops_at_its_size(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    int32_t i;
+    for (i = 0; i < BOX_MONITOR_FPS_HISTORY + 10; i ++) {
+        ecs_progress(world, 0.01f);
+    }
+
+    const Fps *fps = ecs_singleton_get(world, Fps);
+    test_int(fps->count, BOX_MONITOR_FPS_HISTORY);
+    test_assert(fps->history[0] > 9.0f && fps->history[0] < 11.0f);
+    ecs_fini(world);
+}
+
+void Fps_publishing_emits_on_set(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_test_fps_sets = 0;
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Fps) }},
+        .events = { EcsOnSet },
+        .callback = BoxTestFpsOnSet
+    });
+    box_test_fps_sets = 0;
+    ecs_progress(world, 0.02f);
+    ecs_progress(world, 0.02f);
+    test_int(box_test_fps_sets, 2);
+    ecs_fini(world);
+}
+
+void Fps_panel_is_hidden_by_default(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t visible = ecs_lookup(world, "box.monitor.fps_panel.visible");
+    test_assert(visible != 0);
+    test_bool(ecs_mut_var_get_t(world, "box.monitor.fps_panel.visible", ecs_bool_t), false);
+    ecs_progress(world, 0.02f);
+    test_assert(ecs_lookup(world, "box.monitor.fps_panel.panel") == 0);
+    ecs_fini(world);
+}
+
+void Fps_panel_shows_while_visible(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_int(ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true}), 0);
+    ecs_entity_t panel = ecs_lookup(world, "box.monitor.fps_panel.panel");
+    test_assert(panel != 0);
+    test_assert(ecs_has(world, panel, Ui));
+
+    test_int(ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {false}), 0);
+    test_assert(!ecs_is_alive(world, panel));
+    test_assert(ecs_lookup(world, "box.monitor.fps_panel.panel") == 0);
+    ecs_fini(world);
+}
+
+void Fps_panel_label_shows_the_frame_rate(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(world, 0.02f);
     }
 
-    ecs_iter_t it = ecs_each(world, Text);
-    test_bool(ecs_each_next(&it), true);
-    test_int(it.count, 1);
-    const Text *text = ecs_get(world, it.entities[0], Text);
-    test_assert(text->value != NULL);
-    test_assert(atoi(text->value) > 45 && atoi(text->value) < 55);
+    ecs_entity_t label = ecs_lookup(world,
+        "box.monitor.fps_panel.panel.screen.frame.label");
+    test_assert(label != 0);
+    const Text *text = ecs_get(world, label, Text);
+    test_assert(text != NULL);
+    test_str(text->value, "50");
+    const Rgb *rgb = ecs_get(world, label, Rgb);
+    test_assert(rgb->r > rgb->g);
 
-    const Rgb *rgb = ecs_get(world, it.entities[0], Rgb);
-    test_assert(rgb->r > 0 || rgb->g > 0 || rgb->b > 0);
+    for (i = 0; i < 110; i ++) {
+        ecs_progress(world, 0.01f);
+    }
 
-    const Bounds *bounds = ecs_get(world, it.entities[0], Bounds);
-    float view_left = -960.0f / 2.0f;
-    float view_bottom = -540.0f / 2.0f;
-    test_assert(bounds->x > view_left && bounds->x < view_left + BOX_OVERLAY_WIDTH);
-    test_assert(bounds->y > view_bottom && bounds->y < view_bottom + BOX_OVERLAY_HEIGHT);
-    ecs_iter_fini(&it);
+    text = ecs_get(world, label, Text);
+    test_str(text->value, "100");
+    rgb = ecs_get(world, label, Rgb);
+    test_assert(rgb->g > rgb->r && rgb->g > rgb->b);
     ecs_fini(world);
 }
 
-void Fps_absent_overlay_publishes_nothing(void)
+void Fps_panel_draws_one_bar_per_recorded_frame(void)
 {
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
     int32_t i;
     for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0.01f);
+    }
+
+    ecs_entity_t frame = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame");
+    test_assert(frame != 0);
+    test_assert(ecs_lookup_child(world, frame, "bar_114") == 0);
+    for (i = 115; i < 120; i ++) {
+        char name[16];
+        ecs_os_snprintf(name, sizeof(name), "bar_%d", i);
+        test_assert(ecs_lookup_child(world, frame, name) != 0);
+    }
+
+    ecs_entity_t bar = ecs_lookup_child(world, frame, "bar_119");
+    const Rect *rect = ecs_get(world, bar, Rect);
+    test_flt(rect->width, 3.0f);
+    test_flt(rect->height, 12.0f);
+    const Rgb *rgb = ecs_get(world, bar, Rgb);
+    test_assert(rgb->g > rgb->r && rgb->g > rgb->b);
+    ecs_fini(world);
+}
+
+void Fps_slow_frame_turns_its_bar_red(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    ecs_progress(world, 0.01f);
+    ecs_progress(world, 0.025f);
+    ecs_progress(world, 0.08f);
+
+    ecs_entity_t frame = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame");
+    const Rgb *green = ecs_get(world, ecs_lookup_child(world, frame, "bar_117"), Rgb);
+    const Rgb *yellow = ecs_get(world, ecs_lookup_child(world, frame, "bar_118"), Rgb);
+    const Rgb *red = ecs_get(world, ecs_lookup_child(world, frame, "bar_119"), Rgb);
+    test_assert(green->g > green->r);
+    test_assert(yellow->r > yellow->b && yellow->g > yellow->b);
+    test_assert(red->r > red->g && red->r > red->b);
+    const Rect *rect = ecs_get(world, ecs_lookup_child(world, frame, "bar_119"), Rect);
+    test_flt(rect->height, 60.0f);
+    ecs_fini(world);
+}
+
+void Fps_panel_follows_the_surface(void)
+{
+    // monitoring/fps_overlay
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    Surface *surface = ecs_singleton_ensure(world, Surface);
+    surface->width = 960;
+    surface->height = 540;
+    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0.02f);
     }
 
-    test_assert(ecs_singleton_get(world, FpsOverlay) == NULL);
-    ecs_singleton_set(world, FpsOverlay, {.enabled = true, .scale = 1.0f});
-    const FpsOverlay *o = ecs_singleton_get(world, FpsOverlay);
-    test_flt(o->fps, 0.0);
+    ecs_entity_t back = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame.back");
+    const Bounds *bounds = ecs_get(world, back, Bounds);
+    test_assert(bounds != NULL);
+    test_flt(bounds->width, 492.0f);
+    test_flt(bounds->height, 98.0f);
+    test_flt(bounds->x, 960.0f / 2.0f - 10.0f - 492.0f / 2.0f);
+    test_flt(bounds->y, 540.0f / 2.0f - 10.0f - 98.0f / 2.0f);
     ecs_fini(world);
 }

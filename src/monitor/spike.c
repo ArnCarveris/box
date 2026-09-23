@@ -2,10 +2,9 @@
  * @file monitor/spike.c
  * @brief Frame time collector that finds the frames above a spike budget.
  *
- * A harness records one frame per measured step with the slowest system of
- * that frame; the evaluation turns the run into a mean, its percentiles and
- * the frames that exceeded the budget, worst first, so a report names both the
- * frame and what it spent its time in.
+ * A harness records one frame per step with its slowest system. The evaluation
+ * reports the mean, percentiles and the frames over budget, worst first, with
+ * what each spent its time in.
  */
 
 #include <stdlib.h>

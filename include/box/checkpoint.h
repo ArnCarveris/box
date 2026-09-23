@@ -2,11 +2,9 @@
  * @file box/checkpoint.h
  * @brief Script based checkpoints of a running instance.
  *
- * A checkpoint walks the managed scripts of the world, writes the current
- * values of the entities every script owns back into a copy of its source and
- * stores those copies in a numbered folder. The folder lives under the process
- * folder of the instance, which the engine removes when the instance stops.
- * Entities that no script statement declares are reported instead of dropped.
+ * A checkpoint writes the current values of the entities every managed script owns back into
+ * a copy of its source and stores the copies in a numbered folder under the process folder of
+ * the instance. Entities no script statement declares are reported instead of dropped.
  */
 
 #ifndef BOX_CHECKPOINT_H
@@ -68,10 +66,9 @@ char* box_checkpoint_dir(
 
 /** Write a checkpoint of every managed script of the world.
  *
- * Every script is written to `<name>.flecs` in a folder of the checkpoint
- * folder, with the current values of the components of the entities it owns
- * substituted into its source. Comments, layout and expressions of statements
- * that did not change are preserved.
+ * Every script is written to `<name>.flecs` in a subfolder of the checkpoint folder, with the
+ * current component values of its entities substituted in. Comments, layout and expressions of
+ * unchanged statements are preserved.
  *
  * @param world The world
  * @param name Name of the checkpoint folder, NULL for the next number
@@ -86,15 +83,12 @@ char* box_checkpoint_write(
 
 /** Reload every script of a checkpoint folder.
  *
- * Every managed script whose file the folder holds is reloaded from that file,
- * which deletes the entities the script owns and creates them again from the
- * text of the checkpoint, so entity handles do not survive a restore. Entities
- * that no script owns are left alone and reported.
+ * Every managed script whose file the folder holds is reloaded from it, recreating its entities,
+ * so entity handles do not survive a restore. Entities no script owns are left and reported.
  *
- * The files are all read and parsed before the first script is reloaded, so a
- * checkpoint that does not parse leaves the world untouched; a file that fails
- * to evaluate leaves the scripts before it reloaded and names the file that
- * failed in the report.
+ * All files are parsed before the first reload, so a checkpoint that does not parse leaves the
+ * world untouched; a file that fails to evaluate leaves the scripts before it reloaded and is
+ * named in the report.
  *
  * @param world The world
  * @param name Name of the checkpoint folder, NULL for the last checkpoint

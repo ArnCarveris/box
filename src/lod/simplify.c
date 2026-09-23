@@ -2,11 +2,9 @@
  * @file lod/simplify.c
  * @brief Simplifies a merged mesh with meshoptimizer, one material group at a time.
  *
- * Every group is collapsed on its own, so a triangle never takes the material
- * of its neighbour, and both the bound the simplifier is given and the error it
- * reports are absolute lengths in world units, which is what lets the screen
- * space metric project the result. The vertices the surviving triangles no
- * longer use are dropped afterwards, in the order they were merged in.
+ * Each material group is collapsed on its own, so triangles keep their material.
+ * The bound and the reported error are absolute world space lengths. Unused
+ * vertices are dropped afterwards, keeping the merge order.
  */
 
 #include "mesh_internal.h"

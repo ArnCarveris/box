@@ -18,20 +18,18 @@
 extern "C" {
 #endif
 
+/** Curve frame of a swept vertex, from which the vertex shader rebuilds it */
 ECS_STRUCT(SweepVertex, {
-    vec3 center;
-    vec3 tangent;
-    vec4 profile;
+    vec3 center;  /**< Point of the curve the cross section of the vertex sits on */
+    vec3 tangent; /**< Tangent of the curve there, zero keeps the vertex as authored */
+    vec4 profile; /**< Cross section point in xy and its normal in zw */
 });
 
 /** Application authored mesh, uploaded to the renderer when it is set.
  *
- * Vertices are required. Normals may be empty, in which case the engine derives
- * them from the triangles, and uvs may be empty, which leaves them at zero.
- * Indices may be empty, which draws the vertices in the order they are given;
- * otherwise every index must name a vertex and their count must be a multiple
- * of three. Two entities whose data is identical share one uploaded mesh, which
- * is released when the last of them lets go of it.
+ * Vertices are required. Empty normals are derived from the triangles, empty uvs are zero and
+ * empty indices draw vertices in order; otherwise indices must name vertices, in multiples of
+ * three. Entities with identical data share one uploaded mesh, released with the last of them.
  *
  * Colors multiply the albedo per vertex and their alpha scales the roughness;
  * a mesh without colors renders as opaque white would.
@@ -42,7 +40,7 @@ ECS_STRUCT(Mesh3, {
     ecs_vec(vec2) uvs;         /**< Texture coordinates, empty for zeros */
     ecs_vec(uint32_t) indices; /**< Three indices per triangle, empty to draw in order */
     ecs_vec(rgba) colors;      /**< Per vertex color and alpha, one per vertex or empty */
-    ecs_vec(SweepVertex) sweeps;
+    ecs_vec(SweepVertex) sweeps; /**< Curve frame per vertex for a GPU sweep, or empty */
 });
 
 /** Box with size x, y, z */
@@ -198,13 +196,9 @@ ECS_STRUCT(Circle, {
 
 /** Rounded corners and an inset border on the rectangle of the entity.
  *
- * A border adds the pair (With, Rect), so setting it on a bare entity gives it
- * a rectangle to draw on. Both the corner radii and the edge widths are
- * evaluated in the fragment stage from the local position of the pixel, which
- * is why changing one of them never rebuilds a mesh. A zero corner takes the
- * radius shorthand, a zero edge takes the width shorthand and a color without
- * alpha takes the Rgb of the entity. Radii and widths are lengths in the local
- * space of the rectangle and are clamped to half of its smallest side.
+ * A border adds (With, Rect). Radii and edge widths are evaluated per fragment, so changing them
+ * never rebuilds a mesh. Zero corners and edges take the radius and width shorthands, a color
+ * without alpha takes the entity Rgb; lengths are local and clamped to half the smallest side.
  */
 ECS_STRUCT(Border, {
     float radius;              /**< Corner radius every zero corner takes */
@@ -242,13 +236,9 @@ ECS_ENUM(ImageFit, {
 
 /** Region of a texture drawn on the rectangle of the entity.
  *
- * The texture itself is bound through PbrTextures like any other material, and
- * the image only says which part of it is shown: u0, v0 to u1, v1, turned by
- * rotation degrees around the center of the region. An image adds the pair
- * (With, Rect), so the rectangle is what it is drawn on, and a zero region is
- * read as the whole texture. Cover and Contain need the pixel size of the
- * texture, which the image takes from its texture entity, or from the albedo
- * slot of the entity when it names none.
+ * The texture is bound through PbrTextures; the image shows region u0, v0 to u1, v1 rotated by
+ * rotation degrees around its center (a zero region is the whole texture) and adds (With, Rect).
+ * Cover and Contain take the pixel size from its texture entity, or the albedo slot if none.
  */
 ECS_STRUCT(Image, {
     ecs_entity_t texture; /**< Texture the fit measures, 0 for the albedo slot */
@@ -340,12 +330,9 @@ typedef void (*box_shape_build_fn)(
 
 /** Registration of a shape component, which installs its observer when it is set.
  *
- * Setting this on an entity makes the module watch the component and write a
- * RenderMesh for every entity that sets it, so a project adds a shape without
- * patching the engine. Removing it again takes the observer away and leaves the
- * meshes it already handed out alone. A component whose prefab instances should
- * share one value instead of copying it gets (OnInstantiate, Inherit) before the
- * registration, because a trait cannot be set once a query reads the component.
+ * Setting this makes the module observe the component and write a RenderMesh for every entity
+ * that sets it; removing it drops the observer and keeps meshes already written. A component
+ * whose prefab instances share one value needs (OnInstantiate, Inherit) before registration.
  */
 typedef struct Shape {
     ecs_entity_t component;   /**< The component that carries the shape parameters */

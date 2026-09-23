@@ -2,11 +2,9 @@
  * @file ui/world.c
  * @brief Pins a UI element to the screen projection of a world entity or point.
  *
- * A WorldAnchor is placed by the layout on the point the camera of its view
- * projects, and a pass after the transforms of the frame compares that
- * projection with the last one, so a tree with a bar over a moving thing is
- * laid out again in the frame the thing moved and a tree over a still scene
- * is not.
+ * A WorldAnchor is placed by layout at the point its view camera projects. A pass
+ * after the frame transforms compares that projection with the last one and lays the
+ * tree out again only when it moved.
  */
 
 #include "ui_internal.h"

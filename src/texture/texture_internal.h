@@ -38,10 +38,8 @@ extern ECS_COMPONENT_DECLARE(TextureRefs);
 
 /** Scale an RGBA8 image into the mip chain of the size class it belongs to.
  *
- * Every image the module publishes goes through here, both files and rasterized
- * SVGs, and the rows are flipped before the chain is built: the first row of the
- * published texture is the bottom row of the source image, so uv v = 0 is the
- * bottom of the artwork, which is the convention the mesh generators follow.
+ * Used for every published image. Rows are flipped, so uv v = 0 is the bottom of
+ * the artwork, matching the mesh generators.
  *
  * @param src RGBA8 source pixels
  * @param width Width of the source image
@@ -106,10 +104,8 @@ void box_texture_set_memory(
 
 /** Give a texture entity an RGBA8 image a module rasterized itself.
  *
- * The entity gets a Texture with an empty path, so it goes through the same
- * release and unbind path as a texture that was loaded from a file. A square
- * image whose edge is the size of a texture class is uploaded texel for texel,
- * which is what the glyph atlas of box.ui counts on.
+ * The entity gets a Texture with an empty path, so it is released like a loaded one.
+ * A square image with a texture class edge is uploaded texel for texel.
  *
  * @param world The world
  * @param e The texture entity

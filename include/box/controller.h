@@ -23,26 +23,17 @@ extern "C" {
 
 /** Fly controller of a camera, driven by the Forward to Down and Fast actions.
  *
- * The system writes Position and Orientation every frame, and LookAt when the
- * entity has one. Movement chases a target speed, smoothed at the
- * acceleration rate while an action asks for it and at the deceleration rate
- * once it stops, so it feels weighted instead of snapping to speed. The turn
- * actions chase the angular speed the same way, at the angular acceleration
- * and deceleration rates. While the Look action is held the turn follows the
- * cursor delta directly, and it coasts to a stop at the angular deceleration
- * once it is released instead of snapping still, with the yaw a third as fast
- * while Fast is held in both cases. The wheel
- * gives the camera a push along the view. A sphere of the radius slides along
- * the colliders of the scene, which keeps the camera out of geometry, and the
- * terrain entity is the floor it falls back on. Pitch and yaw follow the
- * Orientation convention, so a positive pitch looks down and a growing yaw
- * turns to the right, the way the cursor and the Right action turn; the
- * scene has x to the right of a camera that looks along z. A member that is
- * zero or less takes its default.
+ * Writes Position, Orientation and LookAt when present every frame. Movement and turning chase
+ * their target speeds at the acceleration and deceleration rates. While Look is held the turn
+ * follows the cursor delta and coasts to a stop once released; Fast makes yaw a third as fast.
+ *
+ * The wheel pushes the camera along the view. A sphere of the radius slides along the colliders
+ * with the terrain entity as floor. A positive pitch looks down and a growing yaw turns right, as
+ * Orientation defines. A member that is zero or less takes its default.
  */
 ECS_STRUCT(CameraController, {
     float speed;          /**< Units per second at full throttle, 40 by default */
-    float fast;
+    float fast;           /**< Speed multiplier while the fast action is held, 2 by default */
     float acceleration;   /**< How fast the velocity follows a held action, 6 by default */
     float deceleration;   /**< How fast the velocity follows the stop, 18 by default */
     float sensitivity;    /**< Radians turned per point of cursor movement */
@@ -61,13 +52,9 @@ ECS_STRUCT(CameraController, {
 
 /** First person controller of a character, driven by the same movement actions.
  *
- * The controller walks in the XZ plane at the walk or the run speed, falls with
- * gravity, jumps from the ground and lowers its eye while Crouch is held. The Fly
- * action toggles free flight, which moves like the camera controller. A capsule
- * of the eye height slides along the colliders of the scene, steps onto ledges
- * of at most the step height and finds the ground with a probe below its foot;
- * the terrain entity, or the ground height when there is none, is the floor it
- * falls back on. A member that is zero or less takes its default.
+ * Walks in XZ at the walk or run speed, falls, jumps and crouches; Fly toggles free flight. A
+ * capsule of the eye height slides along colliders, steps onto ledges up to the step height and
+ * falls back on the terrain entity or ground height. A member zero or less takes its default.
  */
 ECS_STRUCT(FirstPersonController, {
     float walk;           /**< Units per second while walking, 4 by default */
@@ -106,15 +93,12 @@ ECS_STRUCT(FollowLevel, {
 
 /** Third person controller of a camera that follows a target at an offset.
  *
- * The system writes Position and LookAt every frame: the camera glides toward
- * the position of the target plus the offset and looks at the target plus the
- * look offset, so it lags behind a target that moves and settles when it stops.
- * It is placed without a glide the first frame it runs. The ZoomIn and ZoomOut
- * actions and the wheel step level through the presets the scene authored,
- * unless the cursor is on a UI element; a camera without presets keeps the
- * offset of the controller. A sphere of the radius slides along the colliders
- * of the scene, which keeps the camera out of geometry, and the terrain entity
- * is the floor it stays above. A member that is zero or less takes its default.
+ * Writes Position and LookAt every frame: the camera glides toward the target plus the offset and
+ * looks at the target plus the look offset, placed without a glide the first frame. ZoomIn, ZoomOut
+ * and the wheel step through the authored presets unless the cursor is on a UI element.
+ *
+ * Without presets the controller offset is kept. A sphere of the radius slides along colliders and
+ * stays above the terrain entity. A member that is zero or less takes its default.
  */
 ECS_STRUCT(FollowCamera, {
     ecs_entity_t target;  /**< Entity the camera follows, 0 keeps it where it is */

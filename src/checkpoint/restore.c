@@ -2,11 +2,9 @@
  * @file checkpoint/restore.c
  * @brief Reloads the script files of a checkpoint folder into a running world.
  *
- * A restore looks up the file of every managed script in the folder, reads and
- * parses them all and only then hands them to the reload entry point of the
- * script addon, which deletes the entities a script owns and creates them
- * again from the text of the checkpoint. Entities that no script owns are not
- * touched by a reload and are reported instead.
+ * Reads and parses the file of every managed script in the folder, then hands
+ * them to the script addon reload, which recreates the entities a script owns.
+ * Entities that no script owns are left alone and reported.
  */
 
 #include "checkpoint_internal.h"
@@ -198,9 +196,8 @@ static char* box_restore_apply(
 
 /** Put the counters of the instance back after the scripts were reloaded.
  *
- * A script that sets the Checkpoint singleton assigns the whole component when
- * it is reloaded, which would lose the folder of the last checkpoint and the
- * number of the next one. The restored folder becomes the last one, so a
+ * A reloaded script that sets the Checkpoint singleton would lose the last
+ * folder and the next number. The restored folder becomes the last one, so a
  * restore without a name repeats the same restore.
  *
  * @param world The world

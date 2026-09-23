@@ -59,7 +59,8 @@ static void bench_index_build(
     }
 }
 
-void Index_build_1m(bench_t *b)
+void Index_build_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     bench_set_items(b, BENCH_INDEX_ROOTS * BENCH_INDEX_FANOUT);
@@ -80,7 +81,8 @@ void Index_build_1m(bench_t *b)
     }
 }
 
-void Index_ray_1m(bench_t *b)
+void Index_ray_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
@@ -101,7 +103,8 @@ void Index_ray_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Index_ray_miss_1m(bench_t *b)
+void Index_ray_miss_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
@@ -122,7 +125,8 @@ void Index_ray_miss_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Index_sphere_1m(bench_t *b)
+void Index_sphere_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
@@ -145,7 +149,8 @@ void Index_sphere_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Index_frustum_1m(bench_t *b)
+void Index_frustum_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();
@@ -173,7 +178,8 @@ void Index_frustum_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Index_update_1k_movers_of_1m(bench_t *b)
+void Index_update_1k_movers_of_1m(
+    bench_t *b)
 {
     // collision/spatial_index
     ecs_world_t *world = ecs_init();

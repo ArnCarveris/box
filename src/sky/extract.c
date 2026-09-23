@@ -2,11 +2,9 @@
  * @file sky/extract.c
  * @brief Copies the atmosphere of a world into the packet and decides what to render.
  *
- * The parameter block leaves this file in the units the shaders integrate in,
- * so the renderer never converts. The two expensive tables depend on the medium
- * alone and are marked dirty when a coefficient changes; the sky view table
- * also follows the sun and the camera altitude and is marked dirty when either
- * moves further than its threshold.
+ * Parameters are written in shader units. The two medium tables are marked dirty when
+ * a coefficient changes; the sky view table also when the sun or camera altitude moves
+ * past its threshold.
  */
 
 #include "sky_internal.h"
@@ -159,10 +157,8 @@ static void box_sky_look(
 
 /** Write the overcast of the weather into the spare slot of the night color.
  *
- * The sky pass and the environment face of a view blend their radiance toward
- * a flat grey with it, which is how a world gets a cloud deck without the
- * atmosphere it is drawn from holding one: the medium, the sun and both
- * expensive tables stay the clear sky they were.
+ * The sky pass and the environment face of a view blend their radiance toward a flat
+ * grey with it; the medium, the sun and both expensive tables stay clear sky.
  *
  * @param world The world
  * @param sky The parameter block to fill
@@ -241,10 +237,8 @@ static bool box_sky_view_equal(
 
 /** Mix the environment generation of the sky into the views that use it.
  *
- * That generation is its own: the sky view table follows the sun within a
- * fraction of a degree because the sky is looked at directly, while filtering
- * the environment again costs a cubemap and a prefilter, which a tenth of a
- * degree of a sun does not change.
+ * The environment has its own generation because refiltering the cubemap is expensive
+ * and a fraction of a degree of sun movement does not change it.
  *
  * @param p The packet
  * @param generation The generation of the environment of the atmosphere

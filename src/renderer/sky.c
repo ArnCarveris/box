@@ -2,12 +2,9 @@
  * @file renderer/sky.c
  * @brief Renders the tables of the atmosphere and draws it over the image of a view.
  *
- * The three table passes run once per frame, as often as the packet says they
- * are out of date, and the sky pass then runs once per view: it writes the sky
- * view table where the depth target of the view is empty and the light the air
- * in front of a surface scattered where it is not, blended with what is left of
- * that surface. The same tables fill the environment cubemap of a view whose
- * image based lighting names the atmosphere.
+ * Out of date tables are rendered once per frame, then the sky pass per view draws
+ * the sky where depth is empty and aerial perspective over surfaces. The tables
+ * also fill the environment cubemap of views lit by the atmosphere.
  */
 
 #include "renderer_internal.h"
@@ -18,10 +15,8 @@
 
 /** Blend that puts premultiplied in scattered light over what a view drew.
  *
- * The pass writes the radiance the air added and, in the alpha channel, how
- * much of the image behind it the air swallowed, so one equation covers the
- * sky, which swallows all of it, and the haze over a surface, which swallows
- * part of it.
+ * The pass writes added radiance and, in alpha, how much of the image behind it
+ * the air absorbs: all of it for the sky, part of it for haze over a surface.
  */
 static const WGPUBlendState box_sky_blend = {
     .color = { WGPUBlendOperation_Add, WGPUBlendFactor_One,

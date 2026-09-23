@@ -2,10 +2,9 @@
  * @file collision/shapes.c
  * @brief Ray, sphere and capsule tests against a resolved collider.
  *
- * Every test moves the query into the frame of the collider, where a box is an
- * axis aligned box around the origin, a sphere is a ball and a capsule is a
- * segment along Y. The distance between a segment and a box is found by moving
- * a point back and forth between the two convex shapes.
+ * Every test moves the query into the frame of the collider, where a box is
+ * axis aligned around the origin and a capsule is a segment along Y. Segment to
+ * box distance alternates a point between the two convex shapes.
  */
 
 #include "collision_internal.h"

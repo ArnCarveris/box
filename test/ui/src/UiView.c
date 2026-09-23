@@ -32,6 +32,7 @@ static ecs_entity_t ui_view_scene(
 {
     ecs_entity_t result = ecs_new(w);
     ecs_set(w, result, View, {.camera = camera, .enabled = true});
+
     return result;
 }
 

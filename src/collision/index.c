@@ -2,11 +2,9 @@
  * @file collision/index.c
  * @brief Two level spatial index over root bounds, colliders and movers.
  *
- * The first level is a hierarchy over the bounds of every root and over the
- * colliders that are not below one, kept up to date by the same flush that
- * maintains bounds. The second level is the list of colliders a root covers,
- * rebuilt only when its subtree changes. Entities that move every frame live in
- * a second hierarchy that the flush rebuilds from a cached query.
+ * The first level is a hierarchy over root bounds and colliders outside a root;
+ * the second is the list of colliders per root, rebuilt when its subtree
+ * changes. Entities that move every frame live in a hierarchy rebuilt per flush.
  */
 
 #include "collision_internal.h"

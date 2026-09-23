@@ -6,10 +6,9 @@
  * one Spline. Setting the component rebuilds an arc length table and writes
  * SplineInfo with the length and the segment count of the curve.
  *
- * Scripts sample a curve with the functions the module registers under
- * box.spline: position(s, t), tangent(s, t) and normal(s, t) take a parameter
- * from 0 to 1, point_at(s, d), tangent_at(s, d) and normal_at(s, d) take a
- * distance in world units and length(s) returns the arc length.
+ * Script functions under box.spline: position, tangent and normal take a
+ * parameter from 0 to 1, point_at, tangent_at and normal_at take a distance in
+ * world units, and length returns the arc length.
  */
 
 #ifndef BOX_SPLINE_H
@@ -36,10 +35,9 @@ ECS_ENUM(SplineType, {
 
 /** Curve through control points, sampled by parameter and by arc length.
  *
- * A catmull rom or linear curve has one segment between every two points, a
- * bezier takes the first point of a segment, two handles and its last point,
- * which is the first point of the next one. A curve that loops closes from the
- * last point back to the first and takes its parameter modulo one.
+ * Catmull rom and linear curves have a segment per pair of points; a bezier
+ * segment is a start point, two handles and an end point shared with the next.
+ * A looping curve closes back to the first point and wraps its parameter.
  */
 ECS_STRUCT(Spline, {
     ecs_vec(vec3) points; /**< Control points of the curve */
@@ -56,18 +54,12 @@ ECS_STRUCT(SplineInfo, {
 
 /** Cross section swept along a Spline, rebuilt as a Mesh3 when either changes.
  *
- * The profile is a polyline in the plane of the cross section, x across the
- * curve and y up, that the engine copies along the curve at even arc length and
- * stitches into a quad strip per profile edge. A strip faces a quarter turn
- * counter clockwise from the direction the profile runs, so a profile listed
- * from left to right is a road that faces up and a closed profile listed
- * clockwise is a pipe that faces outward; a road, a fence, a cable and a pipe
- * are the same sweep with another profile.
+ * The profile polyline (x across, y up) is copied at even arc length and
+ * stitched into a quad strip per edge, facing a quarter turn counter clockwise
+ * from the profile direction: left to right faces up, closed clockwise outward.
  *
- * The result is an ordinary Mesh3, so the sweep is drawn, lit, shadowed,
- * textured and collided with as any other mesh and is shared by the mesh cache
- * with every sweep that comes out the same. The entity stays a static instance:
- * the mesh is rebuilt when the component or its curve changes, never per frame.
+ * The result is an ordinary cached Mesh3, rebuilt when the component or its
+ * curve changes, never per frame.
  */
 ECS_STRUCT(SplineMesh, {
     ecs_entity_t spline;   /**< Curve to sweep along, 0 for the curve of the entity */
@@ -77,7 +69,7 @@ ECS_STRUCT(SplineMesh, {
     float height;          /**< Scale of the cross section up */
     bool closed;           /**< Sweep the cross section as a ring, last point to first */
     bool smooth;           /**< Share the normals of neighbouring cross section points */
-    bool gpu;
+    bool gpu;              /**< Rebuild the swept vertices in the vertex shader */
 });
 
 /** What a follower does when it reaches the end of its path */
@@ -90,9 +82,8 @@ ECS_ENUM(PathMode, {
 /** Moves an entity along a spline by arc length, one step per frame.
  *
  * The follower is sampled at offset plus travelled, folded by the mode, so it
- * moves at speed world units per second whatever the shape of the curve. A
- * FollowPath adds Position, Rotation and DynamicTransform to its entity, which
- * makes a camera or a light follow a curve as readily as a mesh.
+ * moves at a constant speed. FollowPath adds Position, Rotation and
+ * DynamicTransform to its entity.
  */
 ECS_STRUCT(FollowPath, {
     ecs_entity_t spline; /**< Curve entity to follow */

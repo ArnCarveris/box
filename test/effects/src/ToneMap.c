@@ -21,7 +21,8 @@ static void tonemap_set(
     bool dither,
     int32_t curve)
 {
-    void *ptr = ecs_ensure_id(w, tonemap, tonemap_params, (size_t)ecs_get_type_info(w, tonemap_params)->size);
+    void *ptr = ecs_ensure_id(w, tonemap, tonemap_params,
+        (size_t)ecs_get_type_info(w, tonemap_params)->size);
     ecs_value_t value = { .type = tonemap_params, .ptr = ptr };
     char expr[128];
     snprintf(expr, sizeof(expr), "{white: %g, dither: %s, curve: %d}",

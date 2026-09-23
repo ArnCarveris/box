@@ -375,7 +375,6 @@ void box_device_fini(
     box_layers_fini(r);
     box_modulators_fini(r);
     box_effect_fini(r);
-    box_overlay_fini(r);
     box_upscale_fini(r);
     box_lines_fini(r);
     box_shader_fini(r);
@@ -384,7 +383,9 @@ void box_device_fini(
         if (r->pipeline[slot]) wgpuRenderPipelineRelease(r->pipeline[slot]);
         if (r->normal_pipeline[slot]) wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
         for (uint32_t normal = 0; normal < 2; normal ++) {
-            if (r->solid_pipeline[slot][normal]) wgpuRenderPipelineRelease(r->solid_pipeline[slot][normal]);
+            if (r->solid_pipeline[slot][normal]) {
+                wgpuRenderPipelineRelease(r->solid_pipeline[slot][normal]);
+            }
         }
     }
 

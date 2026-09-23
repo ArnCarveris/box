@@ -2,10 +2,8 @@
  * @file surface/surface.c
  * @brief Creates windows and renderers from Surface components and submits frames.
  *
- * The framebuffer of a surface keeps the size of its window, and
- * resolution_scale divides the size the scene is rendered at: the packet of the
- * frame carries both, every view that draws into the surface takes the scaled
- * one and the renderer blits its image up to the window before it presents.
+ * The framebuffer keeps the window size; views render at that size divided by
+ * resolution_scale and the renderer blits the image up to the window before presenting.
  */
 
 #define BOX_SURFACE_IMPL

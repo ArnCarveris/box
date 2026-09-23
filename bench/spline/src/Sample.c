@@ -13,7 +13,8 @@
 /** Samples taken per iteration */
 #define BENCH_SAMPLES (1000)
 
-void Sample_catmull_by_parameter(bench_t *b)
+void Sample_catmull_by_parameter(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
@@ -47,7 +48,8 @@ void Sample_catmull_by_parameter(bench_t *b)
     ecs_fini(world);
 }
 
-void Sample_linear_by_parameter(bench_t *b)
+void Sample_linear_by_parameter(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
@@ -82,7 +84,8 @@ void Sample_linear_by_parameter(bench_t *b)
     ecs_fini(world);
 }
 
-void Sample_bezier_by_parameter(bench_t *b)
+void Sample_bezier_by_parameter(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
@@ -117,7 +120,8 @@ void Sample_bezier_by_parameter(bench_t *b)
     ecs_fini(world);
 }
 
-void Sample_catmull_by_distance(bench_t *b)
+void Sample_catmull_by_distance(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();

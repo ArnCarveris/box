@@ -25,7 +25,8 @@ ECS_STRUCT(BenchQuad, {
     float w; /**< Fourth value */
 });
 
-void Extract_transitions_10k_x_10(bench_t *b)
+void Extract_transitions_10k_x_10(
+    bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
@@ -112,7 +113,8 @@ void Extract_transitions_10k_x_10(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_no_transitions_10k(bench_t *b)
+void Extract_no_transitions_10k(
+    bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();
@@ -163,7 +165,8 @@ void Extract_no_transitions_10k(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_start_10k_transitions(bench_t *b)
+void Extract_start_10k_transitions(
+    bench_t *b)
 {
     // transitions/transition_params
     ecs_world_t *world = ecs_init();

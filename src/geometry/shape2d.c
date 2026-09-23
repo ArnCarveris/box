@@ -2,13 +2,9 @@
  * @file geometry/shape2d.c
  * @brief The 2D shapes: rectangles, circles, lines, texture regions and borders.
  *
- * A rectangle, a circle and a line pick a cached mesh like every other shape.
- * An image picks a quad whose uvs carry the region of the texture it shows, so
- * the region and its rotation are baked once and cost nothing per frame. A
- * border carries no geometry at all: it writes the corner radii, the edge
- * widths and its color into a RenderShape2D, which extract packs into the
- * instance and the fragment stage evaluates, which is why changing a radius
- * never rebuilds a mesh.
+ * Rectangles, circles and lines pick a cached mesh; an image picks a quad whose
+ * uvs carry its texture region. A border has no geometry: it writes radii, edge
+ * widths and color into a RenderShape2D evaluated in the fragment stage.
  */
 
 #include "geometry_internal.h"
@@ -73,12 +69,9 @@ done:
 
 /** Resolve the uv region an image shows, applying its fit mode.
  *
- * Stretch takes the region as it is. Cover shrinks the longer side of the
- * region until what is left has the aspect of the rectangle, which crops the
- * texture, and Contain grows the shorter side instead, which shows more of the
- * texture around the region. Both need the pixel size of the texture, because
- * a region is a fraction of an image whose own aspect decides what undistorted
- * means.
+ * Stretch keeps the region. Cover shrinks its longer side to the aspect of the
+ * rectangle and Contain grows its shorter side; both use the pixel size of the
+ * texture.
  *
  * @param world The world
  * @param e The image entity

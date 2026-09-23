@@ -2,11 +2,9 @@
  * @file renderer/timing.c
  * @brief Records the timestamps of every pass of a frame and resolves them later.
  *
- * The collector keeps the names of the passes of the frame in flight. The
- * encoder of the next frame resolves their timestamps into a mappable buffer,
- * because the counters of a pass are only complete once its command buffer is,
- * and the map of that buffer publishes the milliseconds per pass name. Without
- * the device feature nothing is created and every pass is recorded plainly.
+ * Pass names of the frame in flight are kept; the next frame resolves their
+ * timestamps into a mappable buffer that publishes milliseconds per pass name.
+ * Without the device feature passes are recorded plainly.
  */
 
 #include "renderer_internal.h"

@@ -11,7 +11,8 @@
 /** Dynamic entities with material layers in the extracted scene */
 #define BENCH_LAYER_COUNT (10000)
 
-void Layers_extract_10k_with_layers(bench_t *b)
+void Layers_extract_10k_with_layers(
+    bench_t *b)
 {
     // materials/material_layers
     ecs_world_t *world = ecs_init();
@@ -79,7 +80,8 @@ void Layers_extract_10k_with_layers(bench_t *b)
     ecs_fini(world);
 }
 
-void Layers_extract_10k_two_views(bench_t *b)
+void Layers_extract_10k_two_views(
+    bench_t *b)
 {
     // views/layers
     ecs_world_t *world = ecs_init();

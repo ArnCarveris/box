@@ -2,10 +2,8 @@
  * @file particle/shape.c
  * @brief Samples the spawn points of the mesh and spline shapes of an emitter.
  *
- * The other shapes are closed forms the spawn pass evaluates itself; a mesh and
- * a curve are not, so the module samples a table of points once and the packet
- * carries it. The points are taken in the space of the source, which the
- * transform of the emitter then places like any other spawn volume.
+ * A mesh or curve shape is sampled once into a table of points in the space of the
+ * source, which the packet carries and the emitter transform places.
  */
 
 #include "particle_internal.h"

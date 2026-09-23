@@ -33,8 +33,9 @@ ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
 });
 
+/** Blur of the scene seen through a surface, which makes the surface transparent */
 ECS_STRUCT(BackdropBlur, {
-    float radius;
+    float radius; /**< Blur radius, 0 or less disables the blur */
 });
 
 /** Color the surface mixes toward, composed with the tints down the hierarchy */
@@ -47,11 +48,9 @@ ECS_STRUCT(Tint, {
 
 /** Tint of an entity composed with those of its ancestors, written by the engine.
  *
- * Mixing toward one color and then toward another is one mix, so a chain of
- * tints resolves into a single color and strength: the strength is one minus
- * the product of what every level leaves, and the color is the contribution the
- * levels add together divided by that strength. Views mix the surface color
- * toward this color by this strength; transparency stays with Opacity.
+ * A chain of tints resolves to one color and strength: the strength is one minus the product of
+ * what every level leaves and the color is the summed contributions divided by it. Views mix the
+ * surface color toward it by the strength; transparency stays with Opacity.
  */
 ECS_STRUCT(ActualTint, {
     uint8_t r;  /**< Red of the composed color */
@@ -136,9 +135,10 @@ ECS_STRUCT(PbrTextures, {
 /** Material layers a scene can register, one bit each in the instance layer mask */
 #define BOX_MATERIAL_LAYER_MAX (16)
 
+/** Material layer a scene registers, a shader body applied on top of the surface */
 ECS_STRUCT(MaterialLayer, {
-    ecs_entity_t shader;
-    int32_t order;
+    ecs_entity_t shader; /**< Shader entity whose WGSL file holds the body of the layer */
+    int32_t order;       /**< Position among the layers, lower applies first */
 });
 
 #define BOX_MATERIAL_LAYERS_BUILTINS "etc/box/material_layers.flecs"
@@ -149,15 +149,16 @@ ECS_STRUCT(LayerParams, {
     vec4 b; /**< Second parameter vector */
 });
 
+/** Per instance strength and variation of the material layers, quantized to a byte each */
 ECS_STRUCT(MaterialLayerData, {
-    float amount0;
-    float amount1;
-    float amount2;
-    float amount3;
-    float amount4;
-    float amount5;
-    float seed;
-    float scale;
+    float amount0; /**< Strength of the first registered layer from 0 to 1, default 1 */
+    float amount1; /**< Strength of the second registered layer, default 1 */
+    float amount2; /**< Strength of the third registered layer, default 1 */
+    float amount3; /**< Strength of the fourth registered layer, default 1 */
+    float amount4; /**< Strength of the fifth registered layer, default 1 */
+    float amount5; /**< Strength of the sixth registered layer, default 1 */
+    float seed;    /**< Noise seed from 0 to 1 that moves the pattern of the layers */
+    float scale;   /**< Frequency multiplier of the layer patterns up to 4, default 1 */
 });
 
 /** Enables a registered layer on a material as (MaterialLayerOn, layer), inherited */

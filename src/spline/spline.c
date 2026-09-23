@@ -2,10 +2,9 @@
  * @file spline/spline.c
  * @brief Registers the box.spline module, its component hooks and its observers.
  *
- * Spline and SplineTable own a vector each, so both carry their own lifecycle
- * hooks: a component registered from C keeps the hooks of its C type and never
- * gets the ones flecs generates for a reflected type. Setting a Spline rebuilds
- * the table of the entity and writes its SplineInfo.
+ * Spline and SplineTable own a vector each and carry their own lifecycle hooks,
+ * since C registered components do not get reflection generated hooks. Setting
+ * a Spline rebuilds the entity's table and writes its SplineInfo.
  */
 
 #define BOX_SPLINE_IMPL

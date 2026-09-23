@@ -9,7 +9,8 @@
 /** Controllers the benchmark moves every frame */
 #define BENCH_CONTROLLER_COUNT (100)
 
-void Camera_update_100_controllers(bench_t *b)
+void Camera_update_100_controllers(
+    bench_t *b)
 {
     // controllers/camera_controller
     ecs_world_t *world = ecs_init();

@@ -60,15 +60,12 @@ extern "C" {
 
 /** Engine key codes, exported as script constants under the keys scope.
  *
- * Printable keys use their uppercase ASCII code, so keys.W is 87 and keys.Space is
- * 32, and Backspace, Tab, Enter, Escape and Delete keep their ASCII control code.
- * Every other key takes a spare code in a range ASCII leaves unused: the lowercase
- * range 97 to 126 holds the arrows, the modifiers and the navigation block, 14 to 25
- * hold F1 to F12 and the remaining control and punctuation gaps hold the keypad. The
- * mouse buttons are codes 128 and 129 so they bind like keys, and the codes above
- * them are mask only: the four family modifiers the action layer resolves to
- * modifier bits and the three any families a binding takes to resolve on whatever
- * key or button is down. None of them are slots of Input.keys.
+ * Printable keys use their uppercase ASCII code (keys.W is 87, keys.Space 32); Backspace, Tab,
+ * Enter, Escape and Delete keep their control code. Other keys use unused ranges: 97 to 126 for
+ * arrows, modifiers and navigation, 14 to 25 for F1 to F12, the remaining gaps for the keypad.
+ *
+ * Mouse buttons are 128 and 129 so they bind like keys. Codes above them are mask only (family
+ * modifiers and any families) and are not slots of Input.keys.
  */
 typedef enum box_key_t {
     BoxKeyNone = 0,           /**< No key */

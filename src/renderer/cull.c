@@ -2,16 +2,12 @@
  * @file renderer/cull.c
  * @brief Per view frustum culling of the static and dynamic instances of a frame.
  *
- * A view compacts the instances it can see into one visible buffer and draws
- * slices of it. Small static batches and the dynamic batches are culled on the
- * CPU, out of the instance mirror and the packet; a static batch above the
- * threshold of the view is culled by a compute pass that appends the instances
- * it keeps and counts them into indexed indirect draw arguments.
+ * Visible instances are compacted into one buffer. Small static and dynamic batches
+ * are culled on the CPU; larger static batches by a compute pass that writes
+ * indexed indirect draw arguments.
  *
- * A view that also occlusion culls sends its compute culled batches through the
- * two pass scheme of hiz.c instead: the frustum test then runs in the occlusion
- * pass, which adds the depth pyramid test and splits the batch into the draw of
- * what the previous frame saw and the draw of what the pyramid uncovered.
+ * A view that occlusion culls sends its compute culled batches through the two
+ * pass scheme of hiz.c instead.
  */
 
 #include "renderer_internal.h"
@@ -501,6 +497,7 @@ static void box_cull_write(
 /** Write the uniform of every dispatch and the arguments of every draw of the view.
  *
  * @param r The renderer
+ * @param view The view
  * @param f The frustum of the view
  */
 static void box_cull_upload(

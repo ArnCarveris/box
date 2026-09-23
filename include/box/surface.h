@@ -58,13 +58,9 @@ ECS_ENUM(TextureCacheMode, {
 
 /** Window or offscreen render target, actual_*, point_* and scaled_* are written by the engine.
  *
- * resolution_scale is the only one of the sizes an author sets: it divides the
- * framebuffer the scene is drawn into, which is blitted up to the window at the
- * end of the frame. Everything authored stays in points, so a UI tree keeps its
- * logical size, a picking ray keeps taking a normalized cursor and a capture
- * writes the window size; only the pixels of the scene get cheaper.
- * device_scale is what a high density window reports, and what a headless
- * run takes to give its offscreen target the pixels of such a window.
+ * resolution_scale divides the scene framebuffer, which is blitted up to the
+ * window; everything authored stays in points. device_scale is what a high
+ * density window reports, and what a headless run uses for its offscreen target.
  */
 ECS_STRUCT(Surface, {
     int32_t width;          /**< Requested width in points */

@@ -2,10 +2,9 @@
  * @file collision/roots.c
  * @brief Recognises prefab and template roots and aggregates their bounds.
  *
- * An instance is remembered when it is created and turned into a root by the
- * next flush, which is late enough for its subtree to exist. From then on the
- * observers on AABB and on the two parent storages mark the root a change
- * belongs to, and a flush walks only the marked roots.
+ * An instance becomes a root on the next flush after it is created, once its
+ * subtree exists. Observers on AABB and on both parent storages then mark the
+ * root a change belongs to, and a flush walks only the marked roots.
  *
  * A Hidden switch is a change like any other: the walk of a root skips the
  * subtree it sits on and a hidden root itself comes out empty, which takes both
@@ -203,7 +202,6 @@ static void box_root_aggregate(
         ecs_vec_append_t(NULL, agg.list, ecs_entity_t)[0] = root;
     }
 
-
     box_hierarchy_children(world, root, box_root_visit, &agg);
 
     out->count = agg.count;
@@ -323,7 +321,7 @@ ecs_entity_t box_collision_root_of(
 {
     ecs_entity_t result = 0;
     if (!ecs_count_id(world, ecs_id(RootBounds))) {
-        return result;
+        goto done;
     }
 
     ecs_entity_t cur = e;
@@ -336,6 +334,7 @@ ecs_entity_t box_collision_root_of(
         cur = box_hierarchy_parent(world, cur);
     }
 
+done:
     return result;
 }
 
@@ -358,10 +357,9 @@ static void box_collision_mark_of(
 
 /** Mark every root below an entity and queue every other entity for a collider.
  *
- * A collider that is not below a root has a leaf of its own, so the switch
- * reaches it through the collider pass instead of through the aggregate of a
- * root; a nested root keeps its own leaf and is marked so its own pass empties
- * it.
+ * A collider outside a root has its own leaf and is reached through the
+ * collider pass; a nested root keeps its own leaf and is marked so its own
+ * pass empties it.
  *
  * @param world The world
  * @param e The entity

@@ -1,3 +1,8 @@
+/**
+ * @file render/extract_transition.c
+ * @brief Turns the running transitions of an entity into commands for the renderer.
+ */
+
 #include "render_internal.h"
 
 /** Channel of the instance a transitioned component feeds.
@@ -235,7 +240,6 @@ uint32_t box_render_extract_transition(
         result = slow ? BOX_UPDATE_SLOW : result;
         goto done;
     }
-
 
     uint32_t pose = (1u << BOX_DISPLAY_POSITION) | (1u << BOX_DISPLAY_ROTATION) |
         (1u << BOX_DISPLAY_SCALE);

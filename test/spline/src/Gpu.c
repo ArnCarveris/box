@@ -1,15 +1,23 @@
+/**
+ * @file Gpu.c
+ * @brief Tests for GPU swept spline meshes and their sample buffers.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
 #include "../../../src/render/render_internal.h"
 
-static ecs_entity_t gpu_curve(ecs_world_t *w)
+static ecs_entity_t gpu_curve(
+    ecs_world_t *w)
 {
     test_int(ecs_script_run(w, "gpu",
         "using box.*\n"
         "curve { Spline: {points: [{0, 0, 0}, {0, 3, 0}, {2, 5, 1}, {6, 4, 2}]} }\n"
         "cable { SplineMesh: {spline: curve, gpu: true, segments: 24, closed: true, smooth: true,"
-        "profile: [{0.2, 0}, {0.1, -0.17}, {-0.1, -0.17}, {-0.2, 0}, {-0.1, 0.17}, {0.1, 0.17}]} }\n", NULL), 0);
+        "profile: [{0.2, 0}, {0.1, -0.17}, {-0.1, -0.17}, {-0.2, 0}, {-0.1, 0.17}, "
+        "{0.1, 0.17}]} }\n", NULL), 0);
+
     return ecs_lookup(w, "cable");
 }
 
@@ -27,6 +35,7 @@ void Gpu_sweep_matches_cpu_geometry(void)
         if (vec3_length(right) < 1e-6f) {
             right = vec3_cross(vec3_new(0, 0, 1), tangent);
         }
+
         right = vec3_normalize(right);
         vec3 up = vec3_normalize(vec3_cross(tangent, right));
         vec3 p = vec3_add(s->center, vec3_add(vec3_scale(right, s->profile.x),
@@ -36,6 +45,7 @@ void Gpu_sweep_matches_cpu_geometry(void)
         test_assert(vec3_length(vec3_sub(p, ecs_vec_get_t(&m->vertices, vec3, i)[0])) < 1e-5f);
         test_assert(vec3_length(vec3_sub(n, ecs_vec_get_t(&m->normals, vec3, i)[0])) < 1e-5f);
     }
+
     RenderState *state = ecs_singleton_get_mut(w, RenderState);
     const RenderMesh *render = ecs_get(w, cable, RenderMesh);
     bool found = false;
@@ -43,13 +53,15 @@ void Gpu_sweep_matches_cpu_geometry(void)
         const box_mesh_cmd_t *cmd = ecs_vec_get_t(&state->pending_meshes, box_mesh_cmd_t, i);
         if (cmd->handle == render->handle) {
             const SweepVertex *s = ecs_vec_get_t(&m->sweeps, SweepVertex, 12);
-            const float *v = cmd->vertices + 12 * BOX_VERTEX_FLOATS + BOX_VERTEX_SWEEP_OFFSET / sizeof(float);
+            const float *v = cmd->vertices + 12 * BOX_VERTEX_FLOATS +
+                BOX_VERTEX_SWEEP_OFFSET / sizeof(float);
             test_flt(v[0], s->center.x);
             test_flt(v[4], s->tangent.y);
             test_flt(v[6], s->profile.x);
             found = true;
         }
     }
+
     test_assert(found);
     ecs_fini(w);
 }

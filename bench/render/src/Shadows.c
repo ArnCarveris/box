@@ -14,7 +14,8 @@
 /** Entities on one axis of the grid the caster benchmark spreads them over */
 #define BENCH_CASTER_SPAN (400)
 
-void Shadows_fit_cascades(bench_t *b)
+void Shadows_fit_cascades(
+    bench_t *b)
 {
     // views/shadows
     ecs_world_t *world = ecs_init();
@@ -48,7 +49,8 @@ void Shadows_fit_cascades(bench_t *b)
     ecs_fini(world);
 }
 
-void Shadows_casters_100k(bench_t *b)
+void Shadows_casters_100k(
+    bench_t *b)
 {
     // views/shadows
     ecs_world_t *world = ecs_init();

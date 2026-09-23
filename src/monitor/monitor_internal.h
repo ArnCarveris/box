@@ -29,6 +29,70 @@ typedef struct box_system_monitor_t {
     ecs_map_t last;       /**< Nanoseconds each system spent up to the last frame */
 } box_system_monitor_t;
 
+/** Frame times a ring keeps, a second of frames at 240 per second */
+#define BOX_FPS_RING (240)
+
+/** Milliseconds the window of the published numbers covers */
+#define BOX_FPS_WINDOW_MS (1000.0f)
+
+/** Frame times of the most recent frames, oldest overwritten first */
+typedef struct box_fps_ring_t {
+    float times_ms[BOX_FPS_RING]; /**< Frame times in the order they arrived */
+    int32_t count;                /**< Frame times the ring holds, at most its size */
+    int32_t next;                 /**< Slot the next frame time takes */
+} box_fps_ring_t;
+
+/** Frame rate and frame time distribution of the frames a window covers */
+typedef struct box_fps_stats_t {
+    int32_t frames; /**< Frames the window covered */
+    float fps;      /**< Frames per second over those frames */
+    float mean_ms;  /**< Mean frame time of the window */
+    float worst_ms; /**< Worst frame time of the window */
+} box_fps_stats_t;
+
+/** Record one frame time, overwriting the oldest one when the ring is full.
+ *
+ * @param ring The ring
+ * @param time_ms Milliseconds the frame took, negative values are ignored
+ */
+void box_fps_ring_push(
+    box_fps_ring_t *ring,
+    float time_ms);
+
+/** Frame time of one of the frames the ring holds, counted back from the newest.
+ *
+ * @param ring The ring
+ * @param back Frames back from the newest one, zero for the newest
+ * @return The frame time, zero when the ring holds no such frame
+ */
+float box_fps_ring_get(
+    const box_fps_ring_t *ring,
+    int32_t back);
+
+/** Frames of the ring whose times fit in a window, counted back from the newest.
+ *
+ * The frame that crosses the end of the window is part of it, so a ring with
+ * frames always reports at least one.
+ *
+ * @param ring The ring
+ * @param window_ms Milliseconds the window covers
+ * @return The number of frames
+ */
+int32_t box_fps_ring_window(
+    const box_fps_ring_t *ring,
+    float window_ms);
+
+/** Summarize the frames of the ring that a window covers.
+ *
+ * @param ring The ring
+ * @param window_ms Milliseconds the window covers
+ * @param out Receives the frame rate and the frame time distribution
+ */
+void box_fps_ring_stats(
+    const box_fps_ring_t *ring,
+    float window_ms,
+    box_fps_stats_t *out);
+
 /** Register the CpuMonitor sampling system.
  *
  * @param world The world
@@ -57,11 +121,11 @@ void box_system_monitor_init(
 void box_gpu_monitor_init(
     ecs_world_t *world);
 
-/** Register the FpsOverlay defaults and the system that publishes its window.
+/** Register the system that fills the Fps singleton and load the frame rate panel.
  *
  * @param world The world
  */
-void box_fps_overlay_init(
+void box_fps_monitor_init(
     ecs_world_t *world);
 
 /** Insert a system and its time into a list that keeps the slowest entries.

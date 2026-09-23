@@ -2,17 +2,9 @@
  * @file renderer/hiz.h
  * @brief Depth pyramid rule, screen bounds of a sphere and the occlusion test.
  *
- * The engine renders with reverse Z and an infinite far plane, so a depth of
- * one sits on the near plane and a depth of zero is infinitely far away. A
- * level of the pyramid therefore keeps the minimum of the texels it covers,
- * which is the farthest surface of that region, and an instance is occluded
- * when its nearest depth is still farther than that value everywhere its screen
- * rectangle reaches. Both directions of the rule are conservative: a rectangle
- * that covers more than the instance and a depth that is nearer than the
- * instance can only accept an instance that is in fact hidden.
- *
- * The same rule runs in the pyramid and culling shaders of the renderer, so a
- * change here changes both sides.
+ * With reverse Z a pyramid texel keeps the minimum (farthest) depth it covers,
+ * and an instance is occluded when its nearest depth is farther than that across
+ * its screen rectangle. The pyramid and culling shaders mirror this rule.
  */
 
 #ifndef BOX_RENDERER_HIZ_H
@@ -97,10 +89,8 @@ static inline uint32_t box_hiz_levels(
 
 /** Value one texel of the next level of a pyramid takes from the level below it.
  *
- * A texel covers the two by two block under it, plus the row or the column
- * behind it when that axis of the source is odd, because the halved level would
- * otherwise drop the last line of texels and report a nearer surface than the
- * region holds.
+ * A texel covers the two by two block under it, plus the trailing row or column
+ * when that axis of the source is odd.
  *
  * @param src Depth values of the source level, row by row
  * @param width Width of the source level in texels
@@ -147,11 +137,8 @@ static inline float box_hiz_reduce(
 
 /** Project the bounding sphere of an instance to a screen rectangle.
  *
- * The eight corners of the box around the sphere are projected and their
- * rectangle is taken, which contains the projected sphere because a projection
- * maps the convex box to a convex shape around it. A corner behind the camera
- * has no projection, so a sphere that crosses the near plane takes the whole
- * view and the nearest depth of the near plane.
+ * The rectangle bounds the projected corners of the box around the sphere. A
+ * sphere that crosses the near plane takes the whole view and near plane depth.
  *
  * @param clip World to clip matrix, sixteen floats in column major order
  * @param center Center of the sphere, three floats

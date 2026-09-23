@@ -20,12 +20,9 @@ extern "C" {
 
 /** glTF file instantiated as children of the entity that carries the component.
  *
- * Setting the component parses the file and builds one child entity per node of
- * its scene, with Position, Rotation and Scale from the node transform, and one
- * grandchild per mesh primitive with a Mesh3 that the mesh cache shares between
- * primitives with the same data. A primitive carries the material of its glTF
- * material as Rgb, Opacity, PbrMaterial, Emissive and PbrTextures, whose slots
- * point at texture entities the loader creates under a `textures` child.
+ * Setting the component parses the file into one child per scene node with Position, Rotation
+ * and Scale, and one grandchild per primitive with a cached Mesh3 plus Rgb, Opacity, PbrMaterial,
+ * Emissive and PbrTextures pointing at texture entities created under a `textures` child.
  *
  * Everything the loader creates is a child of the entity, so deleting it takes
  * the model with it. Setting the component again replaces the tree and removing

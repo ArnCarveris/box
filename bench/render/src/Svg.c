@@ -25,7 +25,8 @@ static const char *bench_svg_icon =
     "<circle cx=\"32\" cy=\"32\" r=\"15\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\"/>"
     "</svg>";
 
-void Svg_rasterize_256(bench_t *b)
+void Svg_rasterize_256(
+    bench_t *b)
 {
     // textures/svg
     ecs_world_t *world = ecs_init();

@@ -6,6 +6,10 @@
         "description": "Data-driven 2D/3D game framework built on flecs and WebGPU",
         "public": true
     },
+    "lint": {
+        "command": "python3 tools/lint.py",
+        "action": "log"
+    },
     "lang.c": {
         "c-standard": "c11",
         "defines": ["FLECS_SCRIPT_MATH", "FLECS_SCRIPT_PLATFORM", "FLECS_CREATE_MEMBER_ENTITIES"],

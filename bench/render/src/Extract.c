@@ -11,7 +11,8 @@
 /** Entities in the extracted scene */
 #define BENCH_SCENE_COUNT (10000)
 
-void Extract_static_1_changed(bench_t *b)
+void Extract_static_1_changed(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -51,7 +52,8 @@ void Extract_static_1_changed(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_static_100_changed(bench_t *b)
+void Extract_static_100_changed(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -94,7 +96,8 @@ void Extract_static_100_changed(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_static_1000_changed(bench_t *b)
+void Extract_static_1000_changed(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();
@@ -137,7 +140,8 @@ void Extract_static_1000_changed(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_static_1000_changed_parent(bench_t *b)
+void Extract_static_1000_changed_parent(
+    bench_t *b)
 {
     // scene_core/parent_hierarchy
     ecs_world_t *world = ecs_init();
@@ -183,7 +187,8 @@ void Extract_static_1000_changed_parent(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_dynamic_10k(bench_t *b)
+void Extract_dynamic_10k(
+    bench_t *b)
 {
     // project_tool/bench
     ecs_world_t *world = ecs_init();

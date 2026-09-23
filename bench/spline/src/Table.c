@@ -10,7 +10,8 @@
 /** Control points of the benchmarked curve, one per segment plus one */
 #define BENCH_TABLE_POINTS (65)
 
-void Table_build_64_segments(bench_t *b)
+void Table_build_64_segments(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();
@@ -43,7 +44,8 @@ void Table_build_64_segments(bench_t *b)
     ecs_fini(world);
 }
 
-void Table_rebuild_on_set(bench_t *b)
+void Table_rebuild_on_set(
+    bench_t *b)
 {
     // splines/spline_core
     ecs_world_t *world = ecs_init();

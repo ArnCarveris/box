@@ -1,3 +1,12 @@
+/**
+ * @file box/sky.h
+ * @brief Sky components: atmosphere, stars, time of day, weather and rain.
+ *
+ * The atmosphere and the star field are what the sky of a world is rendered
+ * from, the clock places the sun and the moon in it, and the weather eases the
+ * overcast and the rain the sky and the rain column are drawn with.
+ */
+
 #ifndef BOX_SKY_H
 #define BOX_SKY_H
 
@@ -29,11 +38,9 @@ ECS_STRUCT(AtmosphereMie, {
 
 /** Star field drawn behind the sky, on an entity with a rotation
  *
- * The field is procedural: the direction of a pixel is turned into star space
- * by the rotation of the entity, which is what makes the sky turn over the
- * night, and the cell it lands in decides whether a star sits there. The
- * `CelestialLight` of the same entity gives the field its radiance and color,
- * and daylight fades it out between the two sun elevations.
+ * The procedural field turns with the rotation of the entity. The
+ * `CelestialLight` of the same entity gives its radiance and color, and
+ * daylight fades it out between the two sun elevations.
  */
 ECS_STRUCT(Stars, {
     float density;    /**< Cells the field is cut into per radian, 0 takes 140 */
@@ -45,10 +52,9 @@ ECS_STRUCT(Stars, {
 
 /** Planet and medium the sky of a world is rendered from
  *
- * The sun, the moon and the stars are entities: the two lights carry a
- * `DirectionalLight` for their direction and a `CelestialLight` for the
- * radiance they have over the medium, and the stars carry a `Stars` with a
- * rotation. The sky attenuates all three with the transmittance of the air.
+ * The sun and moon are entities with a `DirectionalLight` and a `CelestialLight`,
+ * the stars an entity with `Stars` and a rotation. The sky attenuates all three
+ * with the transmittance of the air.
  */
 ECS_STRUCT(Atmosphere, {
     ecs_entity_t sun;   /**< Directional light the sky is lit by, 0 takes the first one */
@@ -89,15 +95,11 @@ ECS_STRUCT(Atmosphere, {
 
 /** Simulated clock that drives the sun, the moon and the stars of a world
  *
- * The clock turns an hour, a date and a latitude into the direction of the two
- * bodies and writes the `Rotation` of their entities, so a scene moves its sky
- * by writing one number. A write from a script or the terminal lands in the
- * same frame, which is what makes a capture at a given hour reproducible.
+ * The clock turns an hour, a date and a latitude into the `Rotation` of the sun
+ * and moon entities; a write takes effect in the same frame.
  *
- * The moon trails the sun by `moon_position_offset` hours along the ecliptic
- * as well as around the planet, so twelve hours is a full moon opposite the
- * sun and zero is a new moon in front of it, and the phase the sky draws
- * follows from the two directions.
+ * The moon trails the sun by `moon_position_offset` hours: twelve is a full
+ * moon opposite the sun, zero a new moon. The drawn phase follows from both.
  */
 ECS_STRUCT(TimeOfDay, {
     ecs_entity_t light;      /**< Sun light, 0 takes the sun of the atmosphere */
@@ -116,11 +118,13 @@ ECS_STRUCT(TimeOfDay, {
     float daylight; /**< Written every frame: 0 in the dark, 1 with the sun up */
 });
 
+/** Overcast and rain of a weather, each from 0 to 1 */
 ECS_STRUCT(WeatherAmounts, {
     float overcast; /**< Part of the sky the cloud deck covers */
     float rain;     /**< Part of the rain that falls on the world */
 });
 
+/** Weather of a world, which eases toward the amounts it names over time */
 ECS_STRUCT(Weather, {
     float overcast;   /**< Cloud deck the sky is blended toward, 0 to 1 */
     float rain;       /**< Rain that falls on the world, 0 to 1 */
@@ -131,15 +135,10 @@ ECS_STRUCT(Weather, {
 
 /** Rain column the weather of a world drives, as a singleton
  *
- * The rain itself is `Weather.rain`; this is the shape of the column it falls
- * in. The emitter is created the first time a world rains and follows the
- * camera of the first view from then on: a box that reaches `height` around it
- * and `area` to every side, filled with drops that fall at `speed`, are bent by
- * `wind` and die on the ground at `ground`.
+ * The amount is `Weather.rain`; this is the column it falls in. The emitter is
+ * created when a world first rains and follows the camera of the first view.
  *
- * The rain of the weather drives the rate, the size of a drop and the wind, so
- * a light rain is thinner, finer and straighter than a downpour and a change of
- * weather arrives over the transition of that weather. A world without the
+ * `Weather.rain` scales the rate, drop size and wind. A world without the
  * component rains with the defaults below, which fall straight down.
  */
 ECS_STRUCT(Rain, {

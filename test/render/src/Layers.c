@@ -423,7 +423,8 @@ void Layers_limit_is_an_error_logged_once(void)
     int32_t i;
     for (i = 0; i < 13; i ++) {
         ecs_entity_t extra = ecs_new(w);
-        ecs_set(w, extra, MaterialLayer, { .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
+        ecs_set(w, extra, MaterialLayer, {
+            .shader = ecs_lookup(w, "box.material.layer_shaders.dust"),
             .order = 100 + i });
     }
 

@@ -2,10 +2,9 @@
  * @file input/events.c
  * @brief Raises the action events of the frame as script events a task can await.
  *
- * A raise is delivered against the Raise record of the world, so a handler takes
- * it with event.stop the way a DOM handler calls stopPropagation: the rest of
- * the handlers of that raise do not run and the key it came from is taken from
- * every map below it. input.consume takes a whole action for the frame.
+ * A handler that calls event.stop skips the remaining handlers of that raise
+ * and takes its key from every map below it. input.consume takes a whole action
+ * for the frame.
  */
 
 #include "input_internal.h"
@@ -59,12 +58,9 @@ static int32_t box_input_missed_find(
 
 /** Suspend a task until the action of the argument reaches the phase.
  *
- * Delivers the missed raise of the phase right away when the frame that raised it
- * reached no waiter, the way `box_pick_hover` retries a missed hover, so a waiter
- * that registers in the frame a scene loads still catches the events of that frame.
- * Every waiter that catches up gets the raise, because the instances of a scene
- * start their tasks together; the raise a waiter resumed on is dropped at the next
- * raise pass, so the await the resumed task registers again does not take it twice.
+ * A raise of the phase that reached no waiter is delivered right away, so a
+ * waiter registered in the frame a scene loads still catches it. The raise a
+ * waiter resumed on is dropped at the next raise pass so it is not taken twice.
  *
  * @param ctx Call context, whose ctx holds the phase
  * @param argc Number of arguments

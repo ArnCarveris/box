@@ -2,17 +2,13 @@
  * @file collision/debug.c
  * @brief Turns the colliders and the root bounds a view sees into debug lines.
  *
- * The extract of a frame calls this once the views of the packet are known. A
- * setting of DebugNone returns before anything is read, so a scene
- * that does not debug draw runs no query, walks no hierarchy and uploads no
- * buffer. With the setting on, the colliders come out of the spatial index with
- * the frustum of the first view, which is the query the index exists for, and
- * the root bounds are walked directly because a world holds few roots.
+ * A setting of DebugNone returns before anything is read. Otherwise colliders
+ * come from the spatial index with the frustum of the first view and root
+ * bounds are walked directly.
  *
- * A collider is drawn in the color of its kind: a sphere as three circles, a
- * box as its twelve edges, a capsule as the circles of its two caps with four
- * lines between them, and the fallback as the twelve edges of its box. The
- * bounds of a root are the same twelve edges in a color of their own.
+ * A sphere is drawn as three circles, a capsule as its two cap circles joined by
+ * four lines, and a box, fallback or root bounds as twelve edges, each kind in
+ * a color of its own.
  */
 
 #include "collision_internal.h"

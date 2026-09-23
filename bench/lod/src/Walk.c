@@ -59,7 +59,8 @@ static void bench_walk_city(
     }
 }
 
-void Walk_city_32k_leaves(bench_t *b)
+void Walk_city_32k_leaves(
+    bench_t *b)
 {
     // lod/hierarchy_traversal
     box_lod_tree_t tree;
@@ -87,7 +88,8 @@ void Walk_city_32k_leaves(bench_t *b)
     box_lod_tree_fini(&tree);
 }
 
-void Walk_city_256k_leaves(bench_t *b)
+void Walk_city_256k_leaves(
+    bench_t *b)
 {
     // lod/hierarchy_traversal
     box_lod_tree_t tree;
@@ -115,7 +117,8 @@ void Walk_city_256k_leaves(bench_t *b)
     box_lod_tree_fini(&tree);
 }
 
-void Walk_city_256k_leaves_close(bench_t *b)
+void Walk_city_256k_leaves_close(
+    bench_t *b)
 {
     // lod/hierarchy_traversal
     box_lod_tree_t tree;
@@ -143,7 +146,8 @@ void Walk_city_256k_leaves_close(bench_t *b)
     box_lod_tree_fini(&tree);
 }
 
-void Walk_cluster_4k_roots(bench_t *b)
+void Walk_cluster_4k_roots(
+    bench_t *b)
 {
     // lod/hierarchy_traversal
     box_lod_tree_t tree;

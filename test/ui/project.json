@@ -92,7 +92,22 @@
                     "changed_leaf_keeps_the_places_of_the_tree",
                     "structural_change_numbers_the_tree_again",
                     "fill_sizes_an_element_as_a_fraction_of_its_parent",
-                    "fill_of_the_root_follows_the_view"
+                    "fill_of_the_root_follows_the_view",
+                    "padding_sides_inset_the_children",
+                    "padding_side_of_zero_takes_the_padding",
+                    "content_sized_box_adds_the_padding_of_each_side",
+                    "min_width_widens_a_content_sized_box",
+                    "max_width_narrows_an_explicit_box",
+                    "max_height_bounds_a_content_sized_column",
+                    "grow_takes_the_room_a_row_leaves",
+                    "grow_weights_share_the_room",
+                    "grow_stops_at_the_max_width",
+                    "grow_height_takes_the_room_a_column_leaves",
+                    "grow_stretches_across_a_column",
+                    "grow_in_a_content_sized_row_takes_no_room",
+                    "grow_follows_a_sibling_that_changes",
+                    "grow_of_a_nested_row_follows_its_parent",
+                    "anchored_grow_fills_the_view_of_a_root_without_a_box"
                 ],
                 "setup": true,
                 "teardown": true
@@ -150,7 +165,11 @@
                     "anchored_child_does_not_size_its_parent",
                     "anchor_of_a_nested_element_follows_its_parent",
                     "changed_anchor_lays_out_the_tree_again",
-                    "removed_anchor_returns_the_child_to_the_row"
+                    "removed_anchor_returns_the_child_to_the_row",
+                    "parent_v_bottom_opens_below_the_parent",
+                    "parent_h_right_places_beside_the_parent",
+                    "attach_offset_follows_the_axes",
+                    "attach_centre_to_centre"
                 ],
                 "setup": true,
                 "teardown": true
@@ -183,7 +202,14 @@
                     "content_sized_row_wraps_around_its_label",
                     "glyphs_composite_with_plain_alpha_in_the_ui_view",
                     "glyph_origin_lands_on_a_device_pixel",
-                    "glyph_quad_is_the_bitmap_in_logical_pixels"
+                    "glyph_quad_is_the_bitmap_in_logical_pixels",
+                    "wrap_follows_the_width_of_the_parent",
+                    "wrapped_glyphs_stay_inside_the_parent",
+                    "wrap_shrinks_content_sized_ancestors",
+                    "wrap_in_a_row_takes_the_room_its_siblings_leave",
+                    "short_wrapped_text_keeps_its_width",
+                    "changed_value_wraps_again",
+                    "max_width_wraps_the_string"
                 ],
                 "setup": true,
                 "teardown": true

@@ -63,7 +63,8 @@ static void bench_ui_free_meshes(
     }
 }
 
-void Extract_extract_10k_tree(bench_t *b)
+void Extract_extract_10k_tree(
+    bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();
@@ -94,7 +95,8 @@ void Extract_extract_10k_tree(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_walk_10k_tree(bench_t *b)
+void Extract_walk_10k_tree(
+    bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();
@@ -124,7 +126,8 @@ void Extract_walk_10k_tree(bench_t *b)
     ecs_fini(world);
 }
 
-void Extract_extract_10k_static_tree(bench_t *b)
+void Extract_extract_10k_static_tree(
+    bench_t *b)
 {
     // ui/ui_view
     ecs_world_t *world = ecs_init();

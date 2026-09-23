@@ -6,12 +6,9 @@
  * LOD selection of the view measures against, with a more aggressive threshold
  * for its shadow passes.
  *
- * A layer is any entity an entity or a light joins with the pair (Layer, layer).
- * A view lists the layers it shows and the layers that cast its shadows; both
- * lists hold at most BOX_VIEW_LAYER_MAX entries, end at the first zero and show
- * every layer when they are empty. An entity in no layer is drawn by every view,
- * unless the view sets strict_layers and lists layers, which draws its members
- * only.
+ * Entities join a layer with (Layer, layer). A view lists up to
+ * BOX_VIEW_LAYER_MAX shown and shadow layers, zero terminated, empty for all.
+ * Entities in no layer are drawn by every view without strict_layers.
  */
 
 #ifndef BOX_VIEW_H
@@ -35,8 +32,9 @@ ECS_STRUCT(RenderTarget, {
     int32_t height;  /**< Height in pixels */
 });
 
+/** Cascaded shadow map settings of a view, a member that is zero takes its default */
 ECS_STRUCT(ShadowSettings, {
-    bool enabled;
+    bool enabled;        /**< The view renders shadows */
     int32_t cascades;    /**< Cascades of the shadow map, default 4, at most 4 */
     int32_t resolution;  /**< Edge of one cascade in texels, default 2048 */
     float max_distance;  /**< View distance the shadows reach, default 200 */
@@ -47,46 +45,51 @@ ECS_STRUCT(ShadowSettings, {
     float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
 });
 
+/** Baked lighting settings, read from the primary view, zero takes the default */
 ECS_STRUCT(BakeSettings, {
-    bool enabled;
-    int32_t budget;
-    float probe_spacing;
-    float occluder_min_size;
-    int32_t probe_max;
-    int32_t x;
-    int32_t y;
-    int32_t z;
-    int32_t steps;
+    bool enabled;            /**< Static instances read baked probes, not the static lights */
+    int32_t budget;          /**< Probes rebaked per frame, default BOX_BAKE_BUDGET */
+    float probe_spacing;     /**< World units between two probes of an instance, default 1 */
+    float occluder_min_size; /**< Side two axes of a shape need to occlude, default 0.5 */
+    int32_t probe_max;       /**< Probes an instance gets on one axis, default 32 */
+    int32_t x;               /**< Occupancy voxels across the scene, default 128 */
+    int32_t y;               /**< Occupancy voxels up the scene, default 32 */
+    int32_t z;               /**< Occupancy voxels through the scene, default 128 */
+    int32_t steps;           /**< Ray march samples per visibility test, default 32 */
 });
 
+/** Post process effect in the chain of a view */
 ECS_STRUCT(ViewEffect, {
-    ecs_entity_t effect;
-    bool enabled;
+    ecs_entity_t effect; /**< Effect entity, 0 is skipped */
+    bool enabled;        /**< The effect runs in this view */
 });
 
+/** Material layer a view draws */
 ECS_STRUCT(ViewMaterialLayer, {
-    ecs_entity_t layer;
-    bool enabled;
+    ecs_entity_t layer; /**< MaterialLayer entity, 0 is skipped */
+    bool enabled;       /**< The layer is drawn in this view */
 });
 
+/** Culling settings of a view, all zero culls with occlusion and the defaults */
 ECS_STRUCT(CullSettings, {
-    bool enabled;
-    int32_t gpu_threshold;
-    bool occlusion;
-    int32_t hiz_levels;
-    float min_dimension_px;
+    bool enabled;           /**< Cull the instances of the view */
+    int32_t gpu_threshold;  /**< Static instances past which a batch culls on the GPU */
+    bool occlusion;         /**< Cull instances hidden behind the depth pyramid */
+    int32_t hiz_levels;     /**< Levels of the depth pyramid, 0 for the whole chain */
+    float min_dimension_px; /**< Projected size in pixels below which an instance is culled */
 });
 
+/** What a frame draws: a camera, the target it draws into and its settings */
 ECS_STRUCT(View, {
     ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
     ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
     ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
     ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
-    ShadowSettings shadows;
-    BakeSettings bake;
-    CullSettings culling;
-    ecs_vec(ViewEffect) effects;
-    ecs_vec(ViewMaterialLayer) material_layers;
+    ShadowSettings shadows; /**< Shadow settings of the view */
+    BakeSettings bake;      /**< Baked lighting, used when this is the primary view */
+    CullSettings culling;   /**< Culling settings of the view */
+    ecs_vec(ViewEffect) effects;                /**< Post process chain, in order */
+    ecs_vec(ViewMaterialLayer) material_layers; /**< Material layers the view draws */
     rgb clear;            /**< Color the target is cleared to */
     float clear_alpha;    /**< Alpha the target is cleared to */
     int32_t priority;     /**< Order in the frame, lower renders first */
@@ -132,14 +135,9 @@ extern ECS_TAG_DECLARE(Layer);
 
 /** Screen space error settings of a view, with the singleton as its default.
  *
- * A level of a node may not project an error larger than error_px, which
- * quality scales: a view of quality 2 allows half of it and a view of quality
- * 0.5 twice as much. Shadow passes measure against shadow_error_px, which is
- * larger because a coarser caster hardly shows in a shadow. hysteresis is the
- * fraction of the threshold the band around it is wide, so a node keeps its
- * level until its error leaves that band. A value of zero takes the default of
- * every field, and the flag is true through the constructor, so a view that
- * needs one field adds the component and writes that field.
+ * A level may not project an error above error_px divided by quality; shadow
+ * passes use shadow_error_px. A node keeps its level until its error leaves the
+ * hysteresis band. Zero fields take their default; enabled defaults to true.
  */
 ECS_STRUCT(LodSettings, {
     bool enabled;          /**< The view selects levels by projected error, default true */

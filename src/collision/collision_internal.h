@@ -402,10 +402,8 @@ void box_index_movers(
 
 /** Turn the colliders and the root bounds a view sees into packet lines.
  *
- * The extract of a frame calls this once its views are known. A world without
- * the module, a packet without a view and a CollisionDebugNone setting all
- * return before anything is walked, so the drawing costs a frame nothing while
- * it is off.
+ * Called by the extract once its views are known. Returns before walking
+ * anything without the module, without a view or with CollisionDebugNone.
  *
  * @param world The world of the extract, which may be a stage
  * @param p The packet of the frame

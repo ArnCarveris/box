@@ -44,10 +44,9 @@ static void box_checkpoint_command(
 
 /** The restore command: reload the scripts of a checkpoint folder.
  *
- * The first line of the output is the folder, the lines after it name the
- * entities that no script owns, which a restore leaves alone. The script that
- * declares the session is kept, so a restore does not delete the terminal that
- * runs it.
+ * The first output line is the folder, the lines after it name the entities
+ * no script owns. The script that declares the session is kept, so a restore
+ * does not delete the terminal that runs it.
  *
  * @param ctx The call context
  * @param argc Number of arguments

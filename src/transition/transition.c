@@ -2,11 +2,9 @@
  * @file transition/transition.c
  * @brief Registers the box.transition module, its components and its hooks.
  *
- * Transition is a map component, which flecs has no macro for, so the type is
- * created from a map descriptor and the component handle is assigned by hand.
- * The private state owns a vector of records and carries its own lifecycle
- * hooks, and a Tint is displayed through the ActualTint the material module
- * composes, so that component is registered under the key the author writes.
+ * Transition is a map component, so its type is created from a map descriptor
+ * and the handle is assigned by hand. The private state owns a vector of records
+ * with its own hooks; Tint is displayed through the material module's ActualTint.
  */
 
 #define BOX_TRANSITION_IMPL

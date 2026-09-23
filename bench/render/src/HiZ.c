@@ -21,7 +21,8 @@
 /** Height of the pyramid the benchmark tests against */
 #define BENCH_HIZ_HEIGHT (720)
 
-void HiZ_project_100k(bench_t *b)
+void HiZ_project_100k(
+    bench_t *b)
 {
     // culling/hi_z
     mat4 view = mat4_look_at(vec3_new(0, 60, -160), vec3_new(0, 0, 0), vec3_new(0, 1, 0));

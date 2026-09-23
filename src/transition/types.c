@@ -2,10 +2,9 @@
  * @file transition/types.c
  * @brief Turns the reflection of a component into the float layout a transition uses.
  *
- * A transitionable component is a struct of floats and bytes, up to four of
- * them. The layout records where each one lives so the interpolation reads and
- * writes the component without consulting reflection again, and which member
- * entity covers which floats so a Transition can key a single member.
+ * A transitionable component is a struct of up to four floats or bytes. The
+ * layout records where each lives, so interpolation skips reflection, and which
+ * member covers which floats, so a Transition can key a single member.
  */
 
 #include "transition_internal.h"

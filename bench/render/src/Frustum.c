@@ -14,7 +14,8 @@
 /** Spheres on one axis of the grid the benchmark spreads them over */
 #define BENCH_SPHERE_SPAN (100)
 
-void Frustum_cull_100k_cpu(bench_t *b)
+void Frustum_cull_100k_cpu(
+    bench_t *b)
 {
     // culling/frustum_culling
     mat4 view = mat4_look_at(vec3_new(0, 60, -160), vec3_new(0, 0, 0), vec3_new(0, 1, 0));

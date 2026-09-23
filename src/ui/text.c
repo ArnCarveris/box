@@ -2,15 +2,9 @@
  * @file ui/text.c
  * @brief Measures a string, wraps it to a width and emits its glyphs as quads.
  *
- * The layout pass measures a text node while it sizes every other node, so the
- * element is as large as the lines it holds and the row or the column above it
- * places it like any other box. Once the pass placed everything, the build
- * gives every text node one child per visible glyph: a rectangle the size of
- * the bitmap, an Image that names the region of the atlas it shows and the
- * material of that atlas, which is the same 2D shape path a picture takes. A
- * build is skipped when the fingerprint of the string, the font, the box and
- * the color matches the one the last build drew, so text that stands still
- * costs one comparison and no entity ever changes.
+ * Layout measures text nodes like any other box. The build then gives each text node
+ * one child quad per visible glyph with an Image region of the atlas, skipped when the
+ * fingerprint of string, font, box and color is unchanged.
  */
 
 #include "ui_internal.h"
@@ -280,6 +274,9 @@ void box_ui_text_run(
 
 /** Width a text element wraps its lines at, from its Layout or its Rect.
  *
+ * A maximum width of the Layout wraps a string that has no width of its own,
+ * and bounds the width of one that has.
+ *
  * @param p The place of the node
  * @return The width, 0 when the element does not wrap
  */
@@ -287,12 +284,17 @@ static float box_ui_text_wrap_width(
     const UiPlace *p)
 {
     float result = 0;
+    float pad = p->pad_left + p->pad_right;
     if (p->has_layout && p->layout.width > 0) {
-        result = p->layout.width - p->layout.padding * 2;
+        result = p->layout.width - pad;
     } else if (p->fill_width > 0) {
         result = p->fill_width;
     } else if (p->has_rect && p->width > 0) {
         result = p->width;
+    }
+
+    if (p->layout.max_width > 0 && (result <= 0 || result > p->layout.max_width - pad)) {
+        result = p->layout.max_width - pad;
     }
 
     return result;
@@ -309,10 +311,11 @@ void box_ui_text_measure(
 
     p->has_text = true;
     p->layout.direction = DirectionNone;
+    p->wrap = box_ui_text_wrap_width(p);
 
     box_ui_atlas_t *atlas = box_ui_atlas_of(world, p->e);
     box_ui_extent_t extent;
-    box_ui_text_run(world, atlas, text, box_ui_text_wrap_width(p), 0, &extent);
+    box_ui_text_run(world, atlas, text, p->wrap, 0, &extent);
 
     TextImpl *impl = ecs_get_mut(world, p->e, TextImpl);
     if (impl) {
@@ -324,9 +327,48 @@ void box_ui_text_measure(
     p->content_height = extent.height;
     if (p->fill_width <= 0 && (!p->has_layout || p->layout.width <= 0)) {
         p->width = extent.width;
+        p->fit_width = true;
+        p->wraps = text->wrap;
     }
 
     if (p->fill_height <= 0 && (!p->has_layout || p->layout.height <= 0)) {
+        p->height = extent.height;
+        p->fit_height = true;
+    }
+
+done:
+    return;
+}
+
+void box_ui_text_rewrap(
+    ecs_world_t *world,
+    UiPlace *p,
+    float width)
+{
+    const Text *text = ecs_get(world, p->e, Text);
+    if (!text) {
+        goto done;
+    }
+
+    box_ui_atlas_t *atlas = box_ui_atlas_of(world, p->e);
+    box_ui_extent_t extent;
+    p->wrap = width - p->pad_left - p->pad_right;
+    if (p->wrap < 1) {
+        p->wrap = 1;
+    }
+
+    box_ui_text_run(world, atlas, text, p->wrap, 0, &extent);
+
+    TextImpl *impl = ecs_get_mut(world, p->e, TextImpl);
+    if (impl) {
+        impl->width = extent.width;
+        impl->height = extent.height;
+    }
+
+    p->width = width;
+    p->content_width = extent.width;
+    p->content_height = extent.height;
+    if (p->fit_height) {
         p->height = extent.height;
     }
 
@@ -340,6 +382,7 @@ done:
  * @param text The Text of the element
  * @param atlas The atlas of the element
  * @param color The color the glyphs are drawn in
+ * @param terminal The terminal palette of the element, NULL when it has none
  * @return The fingerprint
  */
 static uint64_t box_ui_text_print(
@@ -350,7 +393,7 @@ static uint64_t box_ui_text_print(
     const TerminalColors *terminal)
 {
     const char *value = text->value ? text->value : "";
-    float box[3] = { p->width, p->height, box_ui_text_wrap_width(p) };
+    float box[3] = { p->width, p->height, p->wrap };
     uint64_t hash = box_ui_hash(BOX_UI_HASH_SEED, value, (int32_t)strlen(value));
 
     hash = box_ui_hash(hash, &text->line_height, (int32_t)sizeof(float));
@@ -382,10 +425,8 @@ static float box_ui_text_snap(
 
 /** Give one glyph element the rectangle, the region and the place of its quad.
  *
- * The bitmap of a glyph holds one texel per device pixel, so the quad is as
- * wide as its bitmap divided by the device scale and its top left corner is
- * snapped to a device pixel: the quad then covers whole pixels and samples one
- * texel per pixel, which is what keeps the glyph as sharp as it was rasterized.
+ * The quad is the bitmap size divided by the device scale, with its top left corner
+ * snapped to a device pixel, so it samples one texel per pixel.
  *
  * @param world The world
  * @param e The glyph element
@@ -572,8 +613,7 @@ void box_ui_text_build(
         }
 
         box_ui_extent_t extent;
-        box_ui_text_run(world, atlas, text, box_ui_text_wrap_width(&place),
-            place.width, &extent);
+        box_ui_text_run(world, atlas, text, place.wrap, place.width, &extent);
         box_ui_text_element(world, &place, atlas, color);
 
         TextImpl *written = ecs_get_mut(world, place.e, TextImpl);

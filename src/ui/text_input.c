@@ -2,16 +2,9 @@
  * @file ui/text_input.c
  * @brief The editable line of a TextInput element, its caret, history and completion.
  *
- * The pass runs inside the immediate update of the module, after the device
- * layer filled the frame and before the tree is walked, so a character that was
- * typed this frame is laid out in the same frame it arrived in. A focused input
- * takes the characters the frame collected and the edit keys that go with them,
- * writes the line it holds as the Text of its element and pins one thin quad to
- * the left edge of its box at the width of the text before the caret.
- *
- * Everything the pass edits lives in the component, so a script can read the
- * line, set it or submit it without the module knowing what the input is for:
- * the console is one user of it and a scripted form is another.
+ * Runs in the immediate update after the device layer and before the tree walk, so
+ * typed characters lay out in the same frame. A focused input edits its line, writes
+ * it as the Text of its element and places a caret quad.
  */
 
 #include "ui_internal.h"

@@ -55,7 +55,8 @@ static void bench_pick_build(
     ecs_progress(world, 0);
 }
 
-void Pick_ray_from_a_camera(bench_t *b)
+void Pick_ray_from_a_camera(
+    bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
@@ -78,7 +79,8 @@ void Pick_ray_from_a_camera(bench_t *b)
     ecs_fini(world);
 }
 
-void Pick_pick_1m(bench_t *b)
+void Pick_pick_1m(
+    bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
@@ -98,7 +100,8 @@ void Pick_pick_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Pick_pick_miss_1m(bench_t *b)
+void Pick_pick_miss_1m(
+    bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
@@ -118,7 +121,8 @@ void Pick_pick_miss_1m(bench_t *b)
     ecs_fini(world);
 }
 
-void Pick_target_of_a_nested_hit(bench_t *b)
+void Pick_target_of_a_nested_hit(
+    bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();
@@ -145,7 +149,8 @@ void Pick_target_of_a_nested_hit(bench_t *b)
     ecs_fini(world);
 }
 
-void Pick_raise_to_an_empty_chain(bench_t *b)
+void Pick_raise_to_an_empty_chain(
+    bench_t *b)
 {
     // picking/picking
     ecs_world_t *world = ecs_init();

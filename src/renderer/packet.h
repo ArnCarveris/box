@@ -22,10 +22,8 @@
 
 /** Version of the vertex layout, bumped whenever its channels change.
  *
- * The renderer, the mesh upload and the mesh shader read one stride, so a build
- * that mixes a vertex buffer of one version with a pipeline of another misreads
- * every vertex. The version keys the layout so a mismatch is caught where the
- * layout is asserted instead of showing up as scrambled geometry.
+ * The renderer, the mesh upload and the mesh shader share one stride; the version
+ * lets a layout mismatch be caught where the layout is asserted.
  */
 #define BOX_VERTEX_VERSION (3)
 
@@ -134,14 +132,11 @@
 /** Shader slot of the pass that writes the motion vectors of a view */
 #define BOX_SHADER_MOTION (11)
 
-/** Shader slot of the pass that draws the rectangles of the frame rate panel */
-#define BOX_SHADER_OVERLAY (12)
-
 /** Shader slot of the pass that draws the debug line list */
-#define BOX_SHADER_LINES (13)
+#define BOX_SHADER_LINES (12)
 
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (14)
+#define BOX_SHADER_BUILTIN_MAX (13)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -274,10 +269,8 @@
 
 /** Words the packed 2D shape parameters of an instance take.
  *
- * The first holds the four corner radii, the second the four edge widths, the
- * third the border color and the fourth the two half extents of the rectangle
- * the radii and widths are measured against. They sit behind the bounding
- * sphere the culling passes read, so every word before them keeps its offset.
+ * Corner radii, edge widths, border color and the two half extents of the
+ * rectangle, in that order, placed after the bounding sphere.
  */
 #define BOX_SHAPE_WORDS (4)
 
@@ -300,9 +293,9 @@ typedef struct box_instance_t {
     uint32_t uv_mode;      /**< Tiling, wrap, blend, back face mode and layer mask */
     float bounds[4];       /**< World space bounding sphere: center xyz and radius */
     uint32_t shape[BOX_SHAPE_WORDS]; /**< Packed 2D shape parameters, zero without one */
-    uint32_t layer_data[BOX_LAYER_DATA_WORDS];
-    float clip[4];                   /**< World space clip rectangle: min x, min y, max x, max y */
-    float half_extent[3];
+    uint32_t layer_data[BOX_LAYER_DATA_WORDS]; /**< Layer amounts, seed and scale, a byte each */
+    float clip[4]; /**< World space clip rectangle: min x, min y, max x, max y */
+    float half_extent[3]; /**< Half size of the local mesh bounds, zero skips the pixel test */
 } box_instance_t;
 
 /** 32 bit words one instance takes in a GPU instance buffer */
@@ -311,6 +304,7 @@ typedef struct box_instance_t {
 /** Word the bounding sphere of an instance starts at */
 #define BOX_INSTANCE_BOUNDS (31)
 
+/** Word the half extent of an instance starts at */
 #define BOX_INSTANCE_HALF_EXTENT (45)
 
 /** Word the tiling, blend, back face, caster and layer modes of an instance sit in */
@@ -345,16 +339,17 @@ typedef struct box_emitter_t {
     float radius;       /**< Radius of the sphere the instance is treated as */
     float color[3];     /**< Linear emissive color times its strength */
     float range;        /**< Distance at which the emitted light reaches zero */
-    uint32_t mesh;
-    uint32_t slot;
-    uint32_t pad[2];
+    uint32_t mesh;      /**< Mesh handle of the instance */
+    uint32_t slot;      /**< Static slot of the instance, UINT32_MAX when it has none */
+    uint32_t pad[2];    /**< Padding to the 16 byte GPU stride */
 } box_emitter_t;
 
+/** Settings of the probe bake of the frame */
 typedef struct box_bake_t {
     uint32_t enabled;   /**< Static instances read baked probes instead of the static lights */
     uint32_t budget;    /**< Probes rebaked per frame */
     float spacing;      /**< World units between two probes of an instance */
-    float occluder_min_size;
+    float occluder_min_size; /**< Edge two axes of an automatic occluder reach at least */
     uint32_t probe_max; /**< Probes an instance gets on one axis */
     uint32_t x;         /**< Occupancy voxels across the scene */
     uint32_t y;         /**< Occupancy voxels up the scene */
@@ -364,10 +359,8 @@ typedef struct box_bake_t {
 
 /** Atmosphere of the frame, the parameter block the sky shaders read
  *
- * The vectors hold the medium in the units the shaders integrate in: radii and
- * scale heights in kilometers and the scattering and absorption coefficients
- * per kilometer, so the renderer copies the block into its uniform and adds
- * only what belongs to the view it is drawing.
+ * Radii and scale heights are in kilometers, scattering and absorption
+ * coefficients per kilometer. The renderer copies the block into its uniform.
  */
 typedef struct box_sky_t {
     float sun_dir[4];       /**< Direction toward the sun, w is the display encode flag */
@@ -407,10 +400,8 @@ typedef struct box_cluster_t {
 
 /** Camera, target and lighting of one view.
  *
- * The fields up to and including the padding are the view uniform the shaders
- * read and must keep their layout; the fields after it stay on the CPU and tell
- * the renderer where the view draws and which slice of the packet arrays is
- * its own.
+ * Fields up to and including the padding are the view uniform and must keep their
+ * layout; the fields after it are CPU only: draw target and packet array slices.
  */
 typedef struct box_view_t {
     float view[16];         /**< World to view matrix */
@@ -426,11 +417,11 @@ typedef struct box_view_t {
     box_cluster_t cluster;  /**< Froxel grid the lights are assigned to */
     uint32_t light_count;   /**< Lights of the view in the packet light array */
     uint32_t env_generation; /**< Changes when the extracted environment changes */
-    uint32_t material_layer_count;
+    uint32_t material_layer_count; /**< Material layers the view enables */
     uint32_t plain_blend;   /**< Blended fragments composite source over, without the glass model */
     uint32_t sun_modulator; /**< Modulator slots of the sun, one bit each, 0 for none */
     float frame_time;       /**< Seconds since the world started, for an animated modulator */
-    uint32_t material_layers[BOX_LAYER_MAX];
+    uint32_t material_layers[BOX_LAYER_MAX]; /**< Index of every layer it enables, in order */
     float shadow_matrix[BOX_SHADOW_CASCADE_MAX * 16]; /**< World to clip of every cascade */
     float shadow_split[4];  /**< View depth a cascade ends at, the last is the distance */
     float shadow_offset[4]; /**< World offset along the normal of a cascade, its texel size */
@@ -465,16 +456,12 @@ typedef struct box_view_t {
     uint32_t dynamic_count; /**< Dynamic batches of the view */
     uint32_t cull_enabled;  /**< Instances outside the frustum of the view are not drawn */
     uint32_t cull_threshold; /**< Static instances a batch needs before a compute pass culls it */
-    float min_dimension_px;
+    float min_dimension_px; /**< Pixels an instance must cover to be drawn, 0 for no limit */
     uint32_t occlusion;     /**< Compute culled static batches are tested against a depth pyramid */
     uint32_t hiz_levels;    /**< Levels of that pyramid, 0 for the whole chain */
     uint32_t strict_layers; /**< A view that lists layers draws its members only */
     uint32_t shadow_resolution; /**< Edge of one cascade of its shadow map in texels */
     float shadow_bounds[BOX_SHADOW_CASCADE_MAX * 4]; /**< Sphere of a cascade, center and radius */
-    uint32_t overlay;       /**< The view draws the frame rate panel over its image */
-    uint32_t overlay_corner; /**< Corner of the view the panel is pinned to */
-    float overlay_scale;    /**< Size multiplier of the panel, one for its natural size */
-    float overlay_opacity;  /**< Opacity of the panel background, one for opaque */
     uint32_t sky;           /**< The view draws the atmosphere behind its geometry */
     uint32_t sky_env;       /**< Its environment is prefiltered from the atmosphere */
     uint32_t lod_enabled;   /**< The view selects LOD levels by their projected error */
@@ -536,12 +523,9 @@ static inline bool box_view_casts(
 
 /** Coarse depth of a view the renderer read back, for the LOD traversal.
  *
- * The grid is one level of the depth pyramid of a view, small enough to read
- * back every frame, together with the matrix that level was drawn with. The
- * traversal reduces it further on the CPU and tests the bounds of a node
- * against it, so a hidden node stops at its proxy instead of being descended
- * into. Nothing is dropped on it: the proxy is still drawn and culled on the
- * GPU, so a stale grid costs detail for a frame and never an object.
+ * The grid is one small level of the depth pyramid of a view with the matrix it
+ * was drawn with. A node hidden by it stops at its proxy instead of descending;
+ * the proxy is still drawn, so a stale grid only costs detail.
  */
 typedef struct box_lod_depth_t {
     float values[BOX_LOD_DEPTH_MAX * BOX_LOD_DEPTH_MAX]; /**< Depth of every texel, row by row */
@@ -572,14 +556,14 @@ typedef struct box_mesh_cmd_t {
 /** One post process pass of a view, in the order the chain runs them */
 typedef struct box_effect_t {
     uint32_t shader;  /**< Shader handle of the pass */
-    uint32_t texture;
-    uint32_t setup_shader;
-    uint32_t setup_kind;
-    uint32_t setup_format;
-    int32_t setup_parameter[4];
-    uint32_t setup_workgroup_size;
-    uint32_t setup_buffer_size[2];
-    float setup_initial[4];
+    uint32_t texture; /**< Lookup cube handle, BOX_EFFECT_TEXTURE_NONE for none */
+    uint32_t setup_shader; /**< Shader handle of its setup pass, BOX_SHADER_NONE for none */
+    uint32_t setup_kind;   /**< One of the BOX_EFFECT_SETUP constants */
+    uint32_t setup_format; /**< BOX_EFFECT_TEXTURE format of the setup targets */
+    int32_t setup_parameter[4]; /**< Indices of the params the setup pass reads, -1 for none */
+    uint32_t setup_workgroup_size; /**< Edge of a workgroup of the compute setup pass */
+    uint32_t setup_buffer_size[2]; /**< Bytes of the work buffer and of the state buffer */
+    float setup_initial[4]; /**< Value the state buffer starts out with */
     uint32_t inputs;  /**< BOX_EFFECT bits of the inputs the pass declared */
     float scale;      /**< Resolution scale of its output, 1 for the view size */
     float params[BOX_EFFECT_PARAM_MAX]; /**< Uniform block of its parameter component */
@@ -607,6 +591,11 @@ static inline void box_effect_size(
     *out_height = h ? h : 1;
 }
 
+/** Whether a view renders into the float scene target, which its chain reads.
+ *
+ * @param v The view
+ * @return Whether the view has a post process chain
+ */
 static inline bool box_view_hdr(
     const box_view_t *v)
 {
@@ -668,7 +657,7 @@ static inline float box_effect_encode_flag(
 
 /** Display transform lookup cube to upload, the renderer owns the texel array */
 typedef struct box_effect_texture_cmd_t {
-    uint32_t handle;
+    uint32_t handle;  /**< Lookup cube handle */
     uint32_t dim;     /**< Texels along one edge of the cube */
     uint32_t *texels; /**< dim cubed RGB9E5 texels, freed by the renderer */
 } box_effect_texture_cmd_t;
@@ -813,9 +802,8 @@ static inline size_t box_texture_bytes(
 /** Write a texture handle into one of the packed texture slots of an instance.
  *
  * A slot holds the size class in its top two bits and the layer plus one below
- * them, so a slot of zero binds no texture and two slots fit in one word. The
- * layer spans the pages of the size class: its high bits name the page and its
- * low bits the layer inside it, which is what the shader splits it into.
+ * them, so zero binds no texture. The layer's high bits name the page of the
+ * size class and its low bits the layer inside it.
  *
  * @param inst The instance
  * @param slot Slot index, 0 albedo, 1 emissive, 2 roughness and 3 normal
@@ -920,6 +908,13 @@ static inline uint32_t box_instance_layers(
     return inst->uv_mode >> BOX_MODE_LAYER_SHIFT;
 }
 
+/** Pack the per entity layer values into an instance and flag it as carrying them.
+ *
+ * @param inst The instance
+ * @param amounts Six layer amounts, clamped to 0 to 1
+ * @param seed Random seed, clamped to 0 to 1
+ * @param scale Feature scale, stored in steps of 1 / BOX_LAYER_DATA_SCALE_STEP
+ */
 static inline void box_instance_set_layer_data(
     box_instance_t *inst,
     const float *amounts,
@@ -948,6 +943,11 @@ static inline void box_instance_set_layer_data(
     inst->uv_mode |= 1u << BOX_MODE_LAYER_DATA_SHIFT;
 }
 
+/** Whether an instance carries per entity layer values.
+ *
+ * @param inst The instance
+ * @return Whether the layer data mode bit is set
+ */
 static inline bool box_instance_has_layer_data(
     const box_instance_t *inst)
 {
@@ -958,6 +958,7 @@ static inline bool box_instance_has_layer_data(
  *
  * @param inst The instance
  * @param index 0 to 5 the amounts, 6 the seed and 7 the feature scale
+ * @return The value, 1 for an amount and scale and 0 for the seed without layer data
  */
 static inline float box_instance_layer_data(
     const box_instance_t *inst,
@@ -1127,11 +1128,12 @@ typedef struct box_static_update_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t slot;          /**< Instance slot */
     uint32_t transition;    /**< Transition the slot starts, BOX_UPDATE_STILL for none */
-    uint32_t flags;
-    int32_t bake_occluder;
+    uint32_t flags;         /**< BOX_STATIC_UPDATE flags */
+    int32_t bake_occluder;  /**< 1 occludes, -1 never, 0 by size, 2 keeps the mode of the slot */
     box_instance_t data;    /**< New instance data */
 } box_static_update_t;
 
+/** The instance of the update got its slot this frame */
 #define BOX_STATIC_UPDATE_ADDED (1u)
 
 /** Transition of an instance update that starts none.
@@ -1161,9 +1163,10 @@ typedef struct box_static_group_t {
 typedef struct box_static_count_t {
     uint32_t mesh;          /**< Mesh handle */
     uint32_t count;         /**< Instances in use */
-    uint32_t flags;
+    uint32_t flags;         /**< BOX_STATIC_COUNT flags */
 } box_static_count_t;
 
+/** An instance of the mesh was removed since the previous count */
 #define BOX_STATIC_COUNT_REMOVED (1u)
 
 /** One instance the sorted pass draws after the opaque batches.
@@ -1220,11 +1223,8 @@ typedef struct box_dynamic_batch_t {
 
 /** Bytes one particle of a pool costs: its channels, its slot and its alive entry.
  *
- * The position and the velocity keep their full precision, sixteen bytes each
- * with the age and the lifetime in their w, and what only reaches the image is
- * packed into half floats: the color with its opacity into two words and the
- * rotation with the size into one. The dead list and the compacted alive list
- * add a word each.
+ * Position and velocity take sixteen bytes each, color with opacity two words of
+ * half floats and rotation with size one; the dead and alive lists add a word each.
  */
 #define BOX_PARTICLE_BYTES (52)
 
@@ -1301,12 +1301,9 @@ typedef struct box_dynamic_batch_t {
 
 /** One entry of the table of an emitter, a spawn point or a collider.
  *
- * The spawn points of the shape come first, in the space of the transform of
- * the emitter, and the colliders the particles bounce off follow them in world
- * space: their center sits in the position with the shape constant in its w and
- * their half extents in the normal, which is the radius in every component of a
- * sphere. Both live in one table because the simulation pass already binds the
- * eight storage buffers a device guarantees.
+ * Spawn points come first, in emitter space, then colliders in world space: center
+ * in the position with the shape constant in w, half extents in the normal (the
+ * radius in every component for a sphere).
  */
 typedef struct box_particle_point_t {
     float position[4]; /**< Point of the surface or the curve, or the center of a collider */
@@ -1315,10 +1312,8 @@ typedef struct box_particle_point_t {
 
 /** Parameters of one emitter, the only particle data the packet carries.
  *
- * The fields up to the padding are the uniform block the spawn and integrate
- * passes read and must keep their layout; the fields after it stay on the CPU
- * and tell the renderer which pool the block belongs to and where its shape
- * table sits in the packet.
+ * Fields up to the padding are the spawn and integrate uniform and must keep
+ * their layout; the fields after it are CPU only: pool and shape table location.
  */
 typedef struct box_particle_emitter_t {
     float transform[12];    /**< Rows of the 3x4 world matrix of the emitter */
@@ -1397,7 +1392,7 @@ typedef struct box_packet_t {
     box_vec_t texture_create;                /**< box_texture_cmd_t, also replaces a handle */
     box_vec_t texture_destroy;               /**< uint32_t handles */
     box_vec_t shader_create;                 /**< box_shader_cmd_t of the shaders that changed */
-    box_vec_t effect_texture_create;
+    box_vec_t effect_texture_create;         /**< box_effect_texture_cmd_t */
     uint32_t layer_count;                    /**< Layers the scene has registered */
     box_layer_params_t layer_params[BOX_LAYER_MAX]; /**< Parameters of every layer */
     uint32_t modulator_count;                /**< Light modulators the scene has registered */

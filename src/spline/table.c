@@ -2,10 +2,9 @@
  * @file spline/table.c
  * @brief The cached arc length table of a curve and the sampling of an entity.
  *
- * The table holds the distance of evenly spaced parameters, so a distance maps
- * back to a parameter with a binary search and one interpolation. Sampling an
- * entity reads the table the module cached on it, which is why nothing else
- * measures a curve of its own.
+ * The table holds the distance at evenly spaced parameters, so a distance maps
+ * to a parameter with a binary search and one interpolation. Sampling an entity
+ * reads the table cached on it.
  */
 
 #include "spline_internal.h"

@@ -148,6 +148,7 @@ void box_render_extract_emitters(
                 (box_render_entity_layers(world, state, it.entities[i]) & state->ui_mask)) {
                 continue;
             }
+
             if (state->hide_used &&
                 box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
             {

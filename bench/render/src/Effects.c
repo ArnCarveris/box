@@ -11,7 +11,8 @@
 /** Passes the benchmarked chain orders and copies parameters for */
 #define BENCH_EFFECT_COUNT (8)
 
-void Effects_extract_chain(bench_t *b)
+void Effects_extract_chain(
+    bench_t *b)
 {
     // effects/shader_graph
     ecs_world_t *world = ecs_init();
@@ -22,7 +23,7 @@ void Effects_extract_chain(bench_t *b)
     packet.height = 1080;
 
     ecs_entity_t shader = ecs_new(world);
-    ecs_set(world, shader, Shader, {.path = "etc/shaders/overlay.wgsl"});
+    ecs_set(world, shader, Shader, {.path = "etc/shaders/tonemap.wgsl"});
     ecs_entity_t params = ecs_id(LayerParams);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60});
@@ -40,6 +41,7 @@ void Effects_extract_chain(bench_t *b)
         ecs_vec_append_t(NULL, &settings->effects, ViewEffect)[0] =
             (ViewEffect){.effect = e, .enabled = true};
     }
+
     ecs_modified(world, view, View);
 
     box_render_extract(world, &packet);

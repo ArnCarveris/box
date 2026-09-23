@@ -2,16 +2,11 @@
  * @file particle/extract.c
  * @brief Writes the emitters of a world into the frame packet.
  *
- * One block per emitter carries its transform, its shape, the ranges a particle
- * starts between and how many particles the frame spawns. The count comes from
- * an accumulator on the fixed clock, so a frame of a fixed timestep always
- * spawns the same number of particles, and the pool of the renderer caps it.
+ * One block per emitter carries its transform, shape, spawn ranges and the spawn count
+ * of the frame, accumulated on the fixed clock and capped by the renderer pool.
  *
- * The block also carries the forces of the emitter, which are the sum of the
- * ParticleForces of the world, of the entity the emitter names and of the one
- * it carries itself, and what its particles collide with: the ground plane and
- * the colliders the collision index holds within the reach of the emitter,
- * written into the table of the block after its spawn points.
+ * The block also carries the summed ParticleForces of the world, the named entity and
+ * the emitter, and the ground plane and colliders within reach of the emitter.
  */
 
 #include "particle_internal.h"
@@ -63,15 +58,10 @@ static uint32_t box_particle_max(
 
 /** Particles the frame spawns, from the rate, the clock and the pool size.
  *
- * The accumulator keeps the fraction the rate did not fill, so a rate that is
- * not a multiple of the frame rate still spawns its particles per second. More
- * particles than the pool holds are dropped here; the dead list of the pool is
- * what enforces the maximum exactly.
+ * The accumulator keeps the fraction the rate did not fill. Rate and burst particles
+ * are capped together at the pool size; the dead list of the pool enforces it exactly.
  *
- * The bursts that went off this frame are added to what the rate asked for and
- * the two are capped together, so a burst never spawns past the pool either. An
- * emitter that is paused or stopped asks for nothing and keeps the fraction it
- * had, so playing it again carries on where it left off.
+ * A paused or stopped emitter asks for nothing and keeps its fraction.
  *
  * @param emitter The emitter
  * @param impl Its bookkeeping
@@ -199,10 +189,8 @@ static void box_particle_add(
 
 /** Write the forces of an emitter into its block.
  *
- * The forces of the world reach every emitter, the forces of the entity the
- * emitter names reach the emitters that share it and the ones it carries itself
- * reach only its own particles; the three are added, so a group under one wind
- * can still be given a drag of its own.
+ * The forces of the world, of the entity the emitter names and of the emitter itself
+ * are added together.
  *
  * @param world The world
  * @param emitter The emitter
@@ -606,10 +594,8 @@ done:
 
 /** Give every emitter of a world its share of the particles the world allows.
  *
- * The share is proportional to what the emitters asked for, so a scene over its
- * ceiling thins every stream by the same fraction instead of stalling, and it
- * only depends on the asks, which is what keeps a pool from being rebuilt
- * because a frame was busy.
+ * The share is proportional to what the emitters asked for and depends only on the
+ * asks, so a scene over its ceiling thins every stream by the same fraction.
  *
  * @param world The world
  * @param state The registry holding the emitter query

@@ -268,12 +268,8 @@ done:
 
 /** Extract every entity the dirty list holds and empty it.
  *
- * The list grows while it is walked, because extracting one entity can move
- * the slot of another, and it grows again in the passes that follow the walk:
- * a layer that lands on a prefab while the views are extracted requeues every
- * instance. The sweep therefore runs once more after those passes, so an
- * instance marked late is extracted in the frame it was marked in and none
- * is left dirty for the check at the end.
+ * The list can grow during the walk and in the passes after it, so the sweep runs
+ * once more after those passes. Instances marked late are extracted in the same frame.
  *
  * @param world The world
  * @param state The registry

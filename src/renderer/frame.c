@@ -55,10 +55,8 @@ static void box_frame_init_view(
 
 /** Blend the coverage of a sorted draw is folded into the normal attachment with.
  *
- * The color equation keeps what is left of the surface behind the fragment and
- * the alpha equation clears the channel, so the write mask of the target turns
- * it into `indirect *= 1 - coverage` for the diffuse fraction and `0` for the
- * specular one.
+ * With the write mask of the target this gives `indirect *= 1 - coverage` for
+ * the diffuse fraction and `0` for the specular one.
  */
 static const WGPUBlendState box_frame_cover_blend = {
     .color = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero,
@@ -66,6 +64,19 @@ static const WGPUBlendState box_frame_cover_blend = {
     .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_Zero }
 };
 
+/** Create a variant of the mesh pipeline, optionally with the solid constant set.
+ *
+ * @param r The renderer
+ * @param stride Bytes between two instances in the instance buffer
+ * @param offset Bytes from an instance buffer element to its instance data
+ * @param cull Faces the rasterizer drops
+ * @param depth_write The draw writes the depth buffer
+ * @param blend Blend state of the color target, NULL for no blending
+ * @param hdr The draw writes the float scene target of a view with a chain
+ * @param normals One of the BOX_NORMALS constants, what it writes there
+ * @param solid Set box_solid, which drops the clip, cutout and shape discards
+ * @return The pipeline
+ */
 static WGPURenderPipeline box_frame_pipeline_create(
     box_renderer_t *r,
     uint64_t stride,
@@ -85,9 +96,12 @@ static WGPURenderPipeline box_frame_pipeline_create(
             .shaderLocation = 12 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
             .shaderLocation = 13 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
-        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
-        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET,
+            .shaderLocation = 17 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12,
+            .shaderLocation = 18 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24,
+            .shaderLocation = 19 }
     };
     WGPUVertexAttribute instance_attrs[12] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 0, .shaderLocation = 3 },
@@ -218,7 +232,8 @@ void box_frame_init(
     box_hiz_init(r);
 
     r->mesh_shader = box_shader_module(r, BOX_SHADER_MESH);
-    r->solid_supported = strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
+    r->solid_supported =
+        strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
 
     WGPUBindGroupLayout group_layouts[4] = {
         r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
@@ -230,7 +245,6 @@ void box_frame_init(
     r->pipeline[0] = box_frame_pipeline(r, sizeof(box_instance_t), 0, WGPUCullMode_Back,
         true, NULL, false, BOX_NORMALS_NONE);
     box_effect_init(r);
-    box_overlay_init(r);
     box_upscale_init(r);
 }
 
@@ -281,18 +295,24 @@ WGPURenderPipeline box_frame_opaque_pipeline(
     box_renderer_t *r,
     bool solid)
 {
+    WGPURenderPipeline result = NULL;
     bool hdr = r->effect_scene != NULL;
     bool normals = r->effect_normal != NULL;
     if (!solid || !r->solid_supported) {
-        return normals ? box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr);
+        result = normals ? box_frame_normal_pipeline(r, hdr) : box_frame_mesh_pipeline(r, hdr);
+        goto done;
     }
+
     WGPURenderPipeline *pipeline = &r->solid_pipeline[hdr][normals];
     if (!*pipeline) {
         *pipeline = box_frame_pipeline_create(r, sizeof(box_instance_t), 0,
             WGPUCullMode_Back, true, NULL, hdr,
             normals ? BOX_NORMALS_WRITE : BOX_NORMALS_NONE, true);
     }
-    return *pipeline;
+
+    result = *pipeline;
+done:
+    return result;
 }
 
 bool box_frame_rebuild(
@@ -311,7 +331,8 @@ bool box_frame_rebuild(
         WGPUCullMode_Back, true, NULL, false, BOX_NORMALS_NONE);
     result = pipeline != NULL && !r->device_error;
     if (result) {
-        r->solid_supported = strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
+        r->solid_supported =
+            strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
         box_transparent_reset(r);
         wgpuShaderModuleRelease(previous);
         uint32_t slot;
@@ -330,6 +351,7 @@ bool box_frame_rebuild(
                     r->solid_pipeline[slot][normal] = NULL;
                 }
             }
+
             r->pipeline[slot] = NULL;
             r->normal_pipeline[slot] = NULL;
         }
@@ -390,10 +412,8 @@ static void box_frame_write_view(
  * The opaque target is copied and its blur chain filled first, so the blended
  * draws can read what is behind them at the blur their roughness asks for.
  *
- * The pass keeps the normal attachment of the opaque pass when the chain asked
- * for one, so a draw folds its coverage into the indirect fractions of the
- * pixels it blends over and the occlusion and reflection passes stop treating
- * them as the surface behind.
+ * When the chain has a normal attachment, a draw folds its coverage into the
+ * indirect fractions of the pixels it blends over.
  *
  * @param r The renderer
  * @param view The view
@@ -453,10 +473,8 @@ static void box_frame_sorted(
 
 /** Record and submit the occlusion pass that keeps what the previous frame saw.
  *
- * The dispatch goes into a command buffer of its own because it samples the
- * depth pyramid that the passes of this frame render into later on, and a
- * texture read that a command buffer records before the render pass that fills
- * it reads nothing.
+ * The dispatch uses its own command buffer because it samples the depth pyramid
+ * that later passes of this frame render into.
  *
  * @param r The renderer
  */
@@ -479,10 +497,8 @@ done:
 
 /** Build the depth pyramid of the current view and draw what it uncovers.
  *
- * The first pass of the view drew the instances the previous frame drew, so its
- * depth target is what the pyramid is built from; the occlusion pass then tests
- * the instances that pass left out and this pass draws the ones it accepted
- * over the same color and depth targets.
+ * The pyramid is built from the depth of the first pass; this pass draws the
+ * instances the occlusion pass accepted over the same color and depth targets.
  *
  * @param r The renderer
  * @param encoder The command encoder
@@ -558,10 +574,8 @@ static bool box_frame_first_use(
 
 /** Clear color the scene passes of a view start from.
  *
- * The clear color of a view is given in the space its target is shown in, which
- * is what the 8 bit path writes it into. The float scene target holds linear
- * light and the chain encodes once at the end, so the clear is decoded here and
- * the background of a view with a chain stays what it was without one.
+ * The view clear color is display encoded; for the linear float scene target it
+ * is decoded, so a view looks the same with or without a chain.
  *
  * @param r The renderer
  * @param view The view
@@ -707,7 +721,6 @@ static void box_frame_view(
         wgpuTextureViewRelease(final);
     }
 
-    box_overlay_record(r, view, index, encoder, image);
     wgpuTextureViewRelease(attachment);
 done:
     return;
@@ -741,7 +754,6 @@ void box_frame_render(
     box_renderer_t *r,
     box_packet_t *p)
 {
-    box_overlay_frame(r, p);
     box_device_resize(r, p->width, p->height);
     box_shader_apply(r, p);
     if (!r->initialized && box_shader_ready(r)) {

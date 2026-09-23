@@ -2,11 +2,9 @@
  * @file render/extract_lod.c
  * @brief Builds the LOD node hierarchy and walks it once per view of the frame.
  *
- * The hierarchy is renderer state, not the entity tree: every collision root is
- * a node, spatial clusters are stacked over those roots until few are left, and
- * the subtree of a root is materialised only while the walk descends into it.
- * A walk shows the leaves it reaches, hides the subtree of every node it
- * replaces and leaves one proxy instance in its place.
+ * The hierarchy is renderer state: every collision root is a node, spatial clusters
+ * are stacked over the roots, and a root subtree is materialised only while walked.
+ * A replaced node hides its subtree and leaves one proxy instance in its place.
  */
 
 #include "render_internal.h"
@@ -441,10 +439,8 @@ static bool box_render_lod_visible(
 
 /** Reduce the depth grid the renderer read back into a pyramid the walk tests.
  *
- * The grid the packet carries is one level of the pyramid of the first view,
- * which the same halving rule as the renderer turns into a chain down to a
- * single texel, so the rectangle of a node is tested at the level that matches
- * its size.
+ * The packet grid is one pyramid level of the first view, halved down to a single
+ * texel, so a node rectangle is tested at the level that matches its size.
  *
  * @param lod The state
  * @param p The packet the renderer returned
@@ -696,10 +692,8 @@ static const box_render_lod_view_t* box_render_lod_current(
 
 /** Whether a node is small enough on screen for a proxy to stand in for it.
  *
- * A subtree that fills the view is never replaced by a generated proxy: the
- * error of such a proxy may well be under the threshold, but the detail it
- * drops is what the viewer is looking at, and the draws it saves are the ones
- * the frame is there for.
+ * A subtree that fills the view is never replaced by a generated proxy, even when
+ * the proxy error is under the threshold.
  *
  * @param lod The state
  * @param n The node
@@ -735,12 +729,9 @@ static float box_render_lod_need(
 
 /** The projected error ladder of a node, the finest representation first.
  *
- * The ladder is always the same four levels, so a representation the cache
- * does not hold takes the error of the level under it and the walk falls back
- * to the box of the node without ever picking something it cannot draw. The
- * cheapest level that stays under the threshold wins, which is why a node the
- * box already stands in for never spends a generated proxy on itself and why
- * the impostor, one billboard, is the last thing tried before that box.
+ * The ladder always has four levels; a representation the cache does not hold takes
+ * the error of the level under it. The cheapest level under the threshold wins, and
+ * the impostor is the last level tried before the box.
  *
  * @param ctx The state
  * @param node Index of the node
@@ -1567,10 +1558,8 @@ static void box_render_lod_recluster(
 
 /** Follow a root that moved, which is not a reason to build anything again.
  *
- * A rigid move only changes the place of the root, and the proxies of its
- * subtree are held in the space of the node they belong to, so the node takes
- * its new bounds and keeps everything the generator built for it. A root whose
- * leaf count changed is a different subtree and gives its proxies up.
+ * A rigid move keeps the proxies of the subtree, which live in node space, and only
+ * updates the node bounds. A root whose leaf count changed drops its proxies.
  *
  * @param lod The state
  * @param node Index of the root node
@@ -1705,10 +1694,8 @@ done:
 
 /** Give a view the shadow pass it casts, measured against its own threshold.
  *
- * The pass is the widest cascade of the view: an orthographic camera over the
- * sphere the cascade covers, drawn at the resolution of the shadow map, which
- * is why a caster the camera cannot see is allowed the coarser error of
- * shadow_error_px instead of the error of the view.
+ * The pass is the widest cascade of the view, an orthographic camera over its sphere
+ * at shadow map resolution. Casters outside the camera use shadow_error_px.
  *
  * @param world The world
  * @param state The registry
@@ -1833,6 +1820,7 @@ static int32_t box_render_lod_views(
  *
  * @param world The world
  * @param lod The state
+ * @param e The view entity the walk belongs to
  * @param stats What the walk cost
  */
 static void box_render_lod_publish(

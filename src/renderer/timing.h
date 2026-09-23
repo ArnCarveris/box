@@ -2,14 +2,8 @@
  * @file renderer/timing.h
  * @brief Per pass GPU timestamps of a frame, their names and their delayed resolve.
  *
- * The renderer writes two timestamps around every pass it records, resolves
- * them in the encoder of the next frame and maps that buffer a frame or two
- * later, so the numbers of a frame arrive while a later frame is recorded. The
- * bookkeeping lives here because the monitor publishes the same passes and
- * because
- * neither side of the frame packet may include the WebGPU headers. The
- * recording functions at the end are declared for the renderer sources only,
- * which is what including gpu.h before this file selects.
+ * Two timestamps wrap each pass and are resolved a frame or two later. The
+ * recording functions at the end are only declared when gpu.h is included first.
  */
 
 #ifndef BOX_RENDERER_TIMING_H

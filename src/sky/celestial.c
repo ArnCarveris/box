@@ -2,11 +2,9 @@
  * @file sky/celestial.c
  * @brief Resolves the sun, the moon and the stars and lights the views with them.
  *
- * The sun and the moon are entities with a direction and a radiance over the
- * atmosphere. This file marches the medium once per view to find what is left
- * of that radiance at the camera, hands the brighter of the two to the view as
- * its directional light and copies the moon and the star field into the packet
- * the sky pass draws them from.
+ * Marches the medium once per view to find the radiance of the sun and moon at the
+ * camera, gives the brighter one to the view as its directional light and copies the
+ * moon and star field into the packet.
  */
 
 #include "sky_internal.h"
@@ -297,10 +295,8 @@ static float box_sky_fade(
 
 /** Hand the view the body that reaches the camera brightest.
  *
- * An overcast world keeps the body it is lit by and the direction that body
- * stands in, and only blends the color toward the grey of its own luminance,
- * dimmed by what a full cloud deck lets through. That is what lets the sun
- * keep moving behind the clouds while the scene under them flattens.
+ * An overcast world keeps the body and its direction and only blends the color toward
+ * its own luminance grey, dimmed by what a full cloud deck lets through.
  *
  * @param state The registry holding the two bodies
  * @param overcast Part of the sky the cloud deck of the weather covers

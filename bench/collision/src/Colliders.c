@@ -15,7 +15,8 @@
 /** Shape tests one iteration runs */
 #define BENCH_COLLIDER_TESTS (1000)
 
-void Colliders_resolve_1k_of_100k(bench_t *b)
+void Colliders_resolve_1k_of_100k(
+    bench_t *b)
 {
     // collision/colliders
     ecs_world_t *world = ecs_init();
@@ -47,7 +48,8 @@ void Colliders_resolve_1k_of_100k(bench_t *b)
     ecs_fini(world);
 }
 
-void Colliders_ray_sphere(bench_t *b)
+void Colliders_ray_sphere(
+    bench_t *b)
 {
     // collision/colliders
     Collider c = { ColliderSphere, {0, 0, 0}, {1, 1, 1},
@@ -67,7 +69,8 @@ void Colliders_ray_sphere(bench_t *b)
     }
 }
 
-void Colliders_ray_box(bench_t *b)
+void Colliders_ray_box(
+    bench_t *b)
 {
     // collision/colliders
     Collider c = { ColliderBox, {0, 0, 0}, {1, 1, 1},
@@ -87,7 +90,8 @@ void Colliders_ray_box(bench_t *b)
     }
 }
 
-void Colliders_capsule_box(bench_t *b)
+void Colliders_capsule_box(
+    bench_t *b)
 {
     // collision/colliders
     Collider c = { ColliderBox, {0, 0, 0}, {1, 1, 1},

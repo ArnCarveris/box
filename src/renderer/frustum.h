@@ -2,10 +2,8 @@
  * @file renderer/frustum.h
  * @brief View frustum planes with a sphere and a box test, shared by extract and the renderer.
  *
- * The planes come out of the view projection matrix in the clip convention the
- * engine uses: x and y span minus one to one and z spans zero to one, with a
- * reverse Z projection whose far plane sits at infinity. That far plane then has
- * a zero normal and a positive distance, so every point passes it.
+ * Planes are extracted from the view projection matrix: x and y in -1 .. 1, z in
+ * 0 .. 1, reverse Z with an infinite far plane that every point passes.
  */
 
 #ifndef BOX_RENDERER_FRUSTUM_H

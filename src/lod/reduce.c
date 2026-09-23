@@ -2,12 +2,9 @@
  * @file lod/reduce.c
  * @brief The level ladder of a parametric shape and the level its error picks.
  *
- * A shape that is drawn with a segment count reduces by halving that count,
- * which makes a ladder of levels that all describe the same surface. The error
- * of a level is the chord error of its segment count at the radius of the
- * instance, a length in world units, so the screen space metric projects it
- * like the error of any other representation and the switch between levels is
- * the one every node uses.
+ * A segmented shape reduces by halving its segment count. The error of a level
+ * is the chord error of its segment count at the instance radius, in world
+ * units, so it projects and switches like any other node.
  */
 
 #include <box.h>

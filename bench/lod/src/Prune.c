@@ -68,7 +68,8 @@ static void bench_prune_city(
     box_lod_tree_refresh(tree, -1);
 }
 
-void Prune_city_without_pruning(bench_t *b)
+void Prune_city_without_pruning(
+    bench_t *b)
 {
     // lod/detail_pruning
     box_lod_tree_t tree;
@@ -95,7 +96,8 @@ void Prune_city_without_pruning(bench_t *b)
     box_lod_tree_fini(&tree);
 }
 
-void Prune_city_with_pruning(bench_t *b)
+void Prune_city_with_pruning(
+    bench_t *b)
 {
     // lod/detail_pruning
     box_lod_tree_t tree;

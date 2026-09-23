@@ -1,12 +1,11 @@
 /**
  * @file Fps.c
- * @brief Tests for the fps command: the window it prints and the overlay it switches.
+ * @brief Tests for the fps command: the window it prints and the panel it switches.
  */
 
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/command/command_internal.h"
-#include "../../../src/render/render_internal.h"
 
 static ecs_world_t *w;
 static ecs_entity_t session;
@@ -27,7 +26,6 @@ void Fps_teardown(void)
 void Fps_prints_the_window_of_the_last_second(void)
 {
     // monitoring/fps_command
-    ecs_singleton_set(w, FpsOverlay, {.enabled = true, .scale = 1.0f});
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(w, 0.02f);
@@ -43,7 +41,6 @@ void Fps_prints_the_window_of_the_last_second(void)
 void Fps_worst_frame_is_the_slowest_of_the_window(void)
 {
     // monitoring/fps_command
-    ecs_singleton_set(w, FpsOverlay, {.enabled = true, .scale = 1.0f});
     ecs_progress(w, 0.01f);
     ecs_progress(w, 0.03f);
     bool error = true;
@@ -53,93 +50,43 @@ void Fps_worst_frame_is_the_slowest_of_the_window(void)
     ecs_os_free(out);
 }
 
-void Fps_on_enables_the_overlay(void)
+void Fps_on_shows_the_panel(void)
 {
     // monitoring/fps_command
     bool error = true;
     char *out = box_command_run(w, session, "fps on", &error);
     test_bool(error, false);
-    test_str(out, "fps overlay on\n");
+    test_str(out, "fps panel on\n");
     ecs_os_free(out);
 
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_assert(o != NULL);
-    test_bool(o->enabled, true);
-    test_int(o->corner, FpsTopRight);
-    test_flt(o->scale, 1.0f);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), true);
+    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") != 0);
 }
 
-void Fps_off_disables_the_overlay(void)
+void Fps_off_hides_the_panel(void)
 {
     // monitoring/fps_command
     bool error = true;
     ecs_os_free(box_command_run(w, session, "fps on", &error));
     char *out = box_command_run(w, session, "fps off", &error);
     test_bool(error, false);
-    test_str(out, "fps overlay off\n");
+    test_str(out, "fps panel off\n");
     ecs_os_free(out);
 
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_assert(o != NULL);
-    test_bool(o->enabled, false);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), false);
+    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") == 0);
 }
 
-void Fps_on_form_enables_the_overlay_on_the_target(void)
-{
-    // ore_engine/fps_command_overlay
-    bool error = true;
-    char *out = box_command_run(w, session, "fps on", &error);
-    test_bool(error, false);
-    test_str(out, "fps overlay on\n");
-    ecs_os_free(out);
-
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_assert(o != NULL);
-    test_bool(o->enabled, true);
-}
-
-void Fps_off_form_disables_the_overlay_on_the_target(void)
-{
-    // ore_engine/fps_command_overlay
-    bool error = true;
-    char *out = box_command_run(w, session, "fps off", &error);
-    test_bool(error, false);
-    test_str(out, "fps overlay off\n");
-    ecs_os_free(out);
-
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_assert(o != NULL);
-    test_bool(o->enabled, false);
-}
-
-void Fps_switching_keeps_the_panel_settings(void)
+void Fps_first_call_shows_the_panel(void)
 {
     // monitoring/fps_command
-    ecs_singleton_set(w, FpsOverlay, {
-        .enabled = true, .corner = FpsBottomLeft, .scale = 3.0f, .opacity = 0.25f
-    });
-    bool error = true;
-    ecs_os_free(box_command_run(w, session, "fps off", &error));
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_bool(o->enabled, false);
-    test_int(o->corner, FpsBottomLeft);
-    test_flt(o->scale, 3.0f);
-    test_flt(o->opacity, 0.25f);
-}
-
-void Fps_first_call_starts_the_window_with_the_panel(void)
-{
-    // ore_engine/fps_command_overlay
-    test_assert(ecs_singleton_get(w, FpsOverlay) == NULL);
     bool error = true;
     char *out = box_command_run(w, session, "fps", &error);
     test_bool(error, false);
     test_str(out, "0 fps, mean 0.00 ms, worst 0.00 ms\n");
     ecs_os_free(out);
-
-    const FpsOverlay *o = ecs_singleton_get(w, FpsOverlay);
-    test_assert(o != NULL);
-    test_bool(o->enabled, true);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), true);
+    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") != 0);
 }
 
 void Fps_window_falls_back_to_the_current_frame(void)
@@ -177,57 +124,7 @@ void Fps_unknown_state_is_an_error(void)
     test_bool(error, true);
     test_str(out, "expected 'on' or 'off', got 'maybe'");
     ecs_os_free(out);
-    test_assert(ecs_singleton_get(w, FpsOverlay) == NULL);
-}
-
-void Fps_on_targets_the_scene_view_over_a_ui_view(void)
-{
-    // ore_engine/fps_text
-    ECS_IMPORT(w, Box);
-    ecs_entity_t layer = ecs_entity(w, { .name = "ui_layer" });
-    box_render_add_ui_layer(w, layer);
-    ecs_entity_t ui_view = ecs_entity(w, { .name = "ui_view" });
-    ecs_set(w, ui_view, View, { .layers = { layer } });
-    ecs_entity_t scene_view = ecs_entity(w, { .name = "scene_view" });
-    ecs_add(w, scene_view, View);
-
-    RenderState *state = box_render_state(w);
-    box_view_src_t *ui_src = ecs_vec_append_t(NULL, &state->view_list, box_view_src_t);
-    ui_src->entity = ui_view;
-    box_view_src_t *scene_src = ecs_vec_append_t(NULL, &state->view_list, box_view_src_t);
-    scene_src->entity = scene_view;
-
-    bool error = true;
-    char *out = box_command_run(w, session, "fps on", &error);
-    test_bool(error, false);
-    test_str(out, "fps overlay on\n");
-    ecs_os_free(out);
-
-    test_assert(ecs_get(w, scene_view, FpsOverlay) != NULL);
-    test_assert(ecs_get(w, ui_view, FpsOverlay) == NULL);
-}
-
-void Fps_on_targets_the_singleton_when_every_view_is_ui(void)
-{
-    // ore_engine/fps_text
-    ECS_IMPORT(w, Box);
-    ecs_entity_t layer = ecs_entity(w, { .name = "ui_layer" });
-    box_render_add_ui_layer(w, layer);
-    ecs_entity_t ui_view = ecs_entity(w, { .name = "ui_view" });
-    ecs_set(w, ui_view, View, { .layers = { layer } });
-
-    RenderState *state = box_render_state(w);
-    box_view_src_t *ui_src = ecs_vec_append_t(NULL, &state->view_list, box_view_src_t);
-    ui_src->entity = ui_view;
-
-    bool error = true;
-    char *out = box_command_run(w, session, "fps on", &error);
-    test_bool(error, false);
-    test_str(out, "fps overlay on\n");
-    ecs_os_free(out);
-
-    test_assert(ecs_singleton_get(w, FpsOverlay) != NULL);
-    test_assert(ecs_get(w, ui_view, FpsOverlay) == NULL);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), false);
 }
 
 void Fps_help_lists_the_command(void)

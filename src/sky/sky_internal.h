@@ -28,12 +28,9 @@ typedef struct box_body_t {
 
 /** Blend state of a Weather, added next to it
  *
- * The amounts a frame is drawn with live here rather than in the component,
- * because writing a new target over the component is exactly what a command
- * does and that write must not lose the weather the world is standing in. The
- * system copies them into `Weather.current` every frame. A weather starts at
- * the amounts it was authored with instead of easing in from a clear sky,
- * which is why the state knows whether it ran before.
+ * Holds the amounts a frame is drawn with so that a command writing a new target to
+ * the component does not lose the current weather. The system copies them into
+ * `Weather.current` every frame; a new weather starts at its authored amounts.
  */
 typedef struct WeatherBlend {
     WeatherAmounts amounts; /**< Amounts the frame is drawn with */
@@ -157,11 +154,9 @@ void box_sky_transmittance(
 
 /** Resolve the sun and the moon of the atmosphere and light a view with one.
  *
- * The view already holds the first directional light of the world, which the
- * atmosphere takes when it names no sun of its own. The body that reaches the
- * camera brightest becomes the light of the view, with the transmittance of
- * the air between the two applied to its color, so a low sun turns the scene
- * red and a night without a moon leaves it dark.
+ * The view already holds the first directional light of the world, used when the
+ * atmosphere names no sun. The brightest body at the camera becomes the view light,
+ * with the transmittance of the air applied to its color.
  *
  * @param world The world
  * @param v The view to light

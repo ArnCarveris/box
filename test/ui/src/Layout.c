@@ -594,3 +594,279 @@ void Layout_content_sized_ancestors_follow_a_grandchild_that_appears_later(void)
     test_flt(ecs_get(w, panel, Rect)->width, 282);
     test_flt(ecs_get(w, panel, Bounds)->height, 60);
 }
+
+void Layout_padding_sides_inset_the_children(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 200, .height = 100,
+        .padding_left = 10, .padding_top = 5});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, a, Bounds)->x, -70);
+    test_flt(ecs_get(w, a, Bounds)->y, 35);
+}
+
+void Layout_padding_side_of_zero_takes_the_padding(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 200, .height = 100,
+        .padding = 8, .padding_left = 20});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, a, Bounds)->x, -60);
+    test_flt(ecs_get(w, a, Bounds)->y, 32);
+}
+
+void Layout_content_sized_box_adds_the_padding_of_each_side(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, row, Layout, {.direction = DirectionRow, .padding_left = 3,
+        .padding_right = 7, .padding_top = 2, .padding_bottom = 4});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, a, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, row, Bounds)->width, 50);
+    test_flt(ecs_get(w, row, Bounds)->height, 26);
+    test_flt(ecs_get(w, a, Bounds)->x - ecs_get(w, row, Bounds)->x, -2);
+    test_flt(ecs_get(w, a, Bounds)->y - ecs_get(w, row, Bounds)->y, 1);
+}
+
+void Layout_min_width_widens_a_content_sized_box(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, row, Layout, {.direction = DirectionRow, .min_width = 100,
+        .min_height = 50});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, a, Rect, {40, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, row, Bounds)->width, 100);
+    test_flt(ecs_get(w, row, Bounds)->height, 50);
+}
+
+void Layout_max_width_narrows_an_explicit_box(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t box = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, box, Layout, {.width = 300, .height = 200, .max_width = 120,
+        .max_height = 80});
+    ecs_set(w, box, Rect, {0, 0});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, box, Bounds)->width, 120);
+    test_flt(ecs_get(w, box, Bounds)->height, 80);
+    test_flt(ecs_get(w, box, Rect)->width, 120);
+}
+
+void Layout_max_height_bounds_a_content_sized_column(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t column = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, column, Layout, {.direction = DirectionColumn, .max_height = 60});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, column);
+    ecs_set(w, a, Rect, {40, 50});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, column);
+    ecs_set(w, b, Rect, {40, 50});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, column, Bounds)->height, 60);
+}
+
+void Layout_grow_takes_the_room_a_row_leaves(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 200, .height = 100});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {40, 20});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, b, Rect, {0, 20});
+    ecs_set(w, b, Grow, {.width = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, b, Bounds)->width, 160);
+    test_flt(ecs_get(w, b, Bounds)->height, 20);
+    test_flt(ecs_get(w, b, Bounds)->x, 20);
+}
+
+void Layout_grow_weights_share_the_room(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 300, .height = 100});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {0, 10});
+    ecs_set(w, a, Grow, {.width = 1});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, b, Rect, {0, 10});
+    ecs_set(w, b, Grow, {.width = 2});
+    ecs_entity_t c = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, c, Rect, {60, 10});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, a, Bounds)->width, 80);
+    test_flt(ecs_get(w, b, Bounds)->width, 160);
+    test_flt(ecs_get(w, c, Bounds)->x, 120);
+}
+
+void Layout_grow_stops_at_the_max_width(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 300, .height = 100});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Layout, {.max_width = 50, .height = 10});
+    ecs_set(w, a, Grow, {.width = 1});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, b, Layout, {.height = 10});
+    ecs_set(w, b, Grow, {.width = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, a, Bounds)->width, 50);
+    test_flt(ecs_get(w, b, Bounds)->width, 250);
+}
+
+void Layout_grow_height_takes_the_room_a_column_leaves(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 100,
+        .height = 200, .spacing = 10});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {10, 50});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, b, Rect, {10, 0});
+    ecs_set(w, b, Grow, {.height = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, b, Bounds)->height, 140);
+    test_flt(ecs_get(w, b, Bounds)->y, -30);
+    test_flt(ecs_get(w, b, Rect)->height, 140);
+}
+
+void Layout_grow_stretches_across_a_column(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 200,
+        .height = 100, .padding = 10});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {0, 30});
+    ecs_set(w, a, Grow, {.width = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, a, Bounds)->width, 180);
+    test_flt(ecs_get(w, a, Bounds)->height, 30);
+    test_flt(ecs_get(w, a, Bounds)->x, 0);
+}
+
+void Layout_grow_in_a_content_sized_row_takes_no_room(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, row, Layout, {.direction = DirectionRow});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, a, Rect, {40, 20});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, b, Layout, {.width = 30, .height = 20});
+    ecs_set(w, b, Grow, {.width = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, row, Bounds)->width, 70);
+    test_flt(ecs_get(w, b, Bounds)->width, 30);
+}
+
+void Layout_grow_follows_a_sibling_that_changes(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 200, .height = 100});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, a, Rect, {40, 20});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, b, Rect, {0, 20});
+    ecs_set(w, b, Grow, {.width = 1});
+    box_ui_update(w);
+    test_flt(ecs_get(w, b, Rect)->width, 160);
+
+    ecs_set(w, a, Rect, {60, 20});
+    box_ui_update(w);
+    test_flt(ecs_get(w, b, Bounds)->width, 140);
+    test_flt(ecs_get(w, b, Rect)->width, 140);
+    test_flt(ecs_get(w, b, Rect)->height, 20);
+
+    box_ui_update(w);
+    test_flt(ecs_get(w, b, Bounds)->width, 140);
+}
+
+void Layout_grow_of_a_nested_row_follows_its_parent(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 300, .height = 100});
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, row, Layout, {.direction = DirectionRow});
+    ecs_set(w, row, Grow, {.width = 1});
+    ecs_entity_t a = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, a, Rect, {40, 20});
+    ecs_entity_t b = ecs_new_w_pair(w, EcsChildOf, row);
+    ecs_set(w, b, Rect, {0, 20});
+    ecs_set(w, b, Grow, {.width = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, row, Bounds)->width, 300);
+    test_flt(ecs_get(w, b, Bounds)->width, 260);
+
+    ecs_set(w, a, Rect, {100, 20});
+    box_ui_update(w);
+    test_flt(ecs_get(w, b, Bounds)->width, 200);
+}
+
+void Layout_anchored_grow_fills_the_view_of_a_root_without_a_box(void)
+{
+    // ore_engine/layout_sizing
+    Surface *surface = ecs_singleton_ensure(w, Surface);
+    surface->width = 960;
+    surface->height = 540;
+    surface->point_width = 960;
+    surface->point_height = 540;
+
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t overlay = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, overlay, Anchor, {.h = AlignCenter, .v = VAlignMiddle});
+    ecs_set(w, overlay, Rect, {0, 0});
+    ecs_set(w, overlay, Grow, {.width = 1, .height = 1});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, overlay, Bounds)->width, 960);
+    test_flt(ecs_get(w, overlay, Bounds)->height, 540);
+}

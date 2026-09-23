@@ -2,10 +2,9 @@
  * @file transition/eval.c
  * @brief Interpolation of a transition record, the per frame work of the module.
  *
- * Nothing here reads the world. A record carries the value it started from,
- * the value that was assigned, the time it started and the parameters, which
- * is everything the interpolation needs, so the game side and the renderer
- * thread run the same interpolation over their own copies of a record.
+ * Nothing here reads the world: a record carries its start and target values,
+ * start time and parameters, so the game side and the renderer thread run the
+ * same interpolation on their own copies.
  */
 
 #include "transition_internal.h"

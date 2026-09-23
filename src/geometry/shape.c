@@ -2,12 +2,9 @@
  * @file geometry/shape.c
  * @brief The shape registration point: Shape installs an observer for a project component.
  *
- * Setting a Shape allocates the registration the observer reads, creates an
- * OnSet observer for the component it names and remembers that observer on the
- * shape entity. The observer builds the key of every changed value, asks the
- * mesh cache for the mesh of that key and writes the RenderMesh, which is the
- * path the builtin shapes take, so a project shape shares its meshes with every
- * other shape of the same key and joins the instanced draw of the primitives.
+ * Setting a Shape creates an OnSet observer for the component it names. The
+ * observer builds the key of every changed value, gets its mesh from the mesh
+ * cache and writes the RenderMesh, like the builtin shapes do.
  */
 
 #include "geometry_internal.h"

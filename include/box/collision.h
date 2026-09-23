@@ -2,26 +2,11 @@
  * @file box/collision.h
  * @brief Collision components: root bounds, colliders and the shape tests.
  *
- * The box.collision module recognises a prefab or template instance as a root
- * at instantiation and keeps a RootBounds on it that covers the whole subtree.
- * A descendant that moves, appears or is destroyed marks its root, and the
- * marked roots are recomputed once per frame; a root whose subtree moves as one
- * piece transforms its cached local bounds instead of walking the subtree.
+ * Keeps a RootBounds over the subtree of every prefab or template instance and a Collider on
+ * every renderable, and recomputes marked roots once per frame. Ray, sphere, box and frustum
+ * queries read the two level spatial index the last update left behind.
  *
- * Every renderable gets a Collider in the same pass, derived from its shape
- * where a cheap one exists and from its world bounds otherwise, with the
- * instance scale applied. The shape tests take a resolved collider, so picking,
- * controller collision and LOD all test the same geometry.
- *
- * With CollisionSettings.debug the extract of a frame turns the colliders and
- * the root bounds a view can see into a list of line segments the renderer
- * draws over the image, which is how a scene shows what it collides with.
- *
- * The same pass keeps a two level spatial index: a hierarchy over the bounds of
- * every root and over the colliders that are not below one, with the colliders
- * a root covers as its second level, next to a hierarchy of the entities that
- * move every frame. The ray, sphere, box and frustum queries read the index the
- * last update left behind, so they never walk the scene.
+ * With CollisionSettings.debug the visible colliders and root bounds are drawn as lines.
  */
 
 #ifndef BOX_COLLISION_H
@@ -41,10 +26,8 @@ extern "C" {
 
 /** Bounds of a root and of every entity below it.
  *
- * The world corners are what queries test. The local corners are the same box
- * in the space of the root, which is what a rigid root transforms when it moves
- * instead of aggregating its subtree again. A root that covers no bounds at all
- * has a count of zero and corners of zero.
+ * Queries test the world corners. The local corners are the same box in root space, which a
+ * rigid root transforms when it moves. A root that covers no bounds has count and corners zero.
  */
 ECS_STRUCT(RootBounds, {
     vec3 min;       /**< Minimum corner in world space */
@@ -84,10 +67,9 @@ ECS_STRUCT(CapsuleCollider, {
 
 /** The collider of an entity in world space, written by the engine.
  *
- * A sphere keeps its radius in every component of half, a capsule keeps its
- * radius in x and z and half the length of its cylinder part in y, and a box
- * keeps its half extents. The axes are the normalized axes of the entity; an
- * axis aligned collider keeps the world axes.
+ * A sphere keeps its radius in every component of half, a capsule its radius in x and z and
+ * half its cylinder length in y, and a box its half extents. The axes are the normalized axes
+ * of the entity, or the world axes for an axis aligned collider.
  */
 ECS_STRUCT(Collider, {
     ColliderKind kind; /**< Shape of the collider */
@@ -269,11 +251,9 @@ typedef struct box_move_result_t {
 
 /** Move a capsule through the scene, sliding along what it runs into.
  *
- * The move reads the colliders of the cells the capsule can reach this frame
- * from the index once, walks its motion in small steps and pushes the capsule
- * out of what it reaches into after every one, which is what slides it along a
- * wall. A move a wall stopped is tried again over a ledge of at most the step
- * height, and the ground probe is a ray down the same colliders.
+ * The move walks its motion in small steps against the colliders of the cells it can reach,
+ * pushing the capsule out after every step so it slides along walls. A stopped move is retried
+ * over a ledge of at most the step height; the ground probe is a ray down the same colliders.
  *
  * @param world The world
  * @param desc The move

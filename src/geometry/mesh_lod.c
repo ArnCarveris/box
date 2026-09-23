@@ -2,13 +2,9 @@
  * @file geometry/mesh_lod.c
  * @brief Reduces the tessellation of a parametric shape to its projected size.
  *
- * A shape that is drawn with a segment count gets a ladder of levels, from the
- * authored count down to the floor of its family. Every level is an ordinary
- * entry of the mesh cache, so the instances that settle on one level share a
- * mesh and a level change is a handle swap instead of a rebuild. The selection
- * runs once per frame at the head of the extract, over the views of that frame
- * and with the radius of the instance in world units, and takes the finest
- * level any view asks for, because one handle serves them all.
+ * A shape with a segment count gets levels from the authored count down to the
+ * floor of its family, each an ordinary mesh cache entry. Once per frame the
+ * extract picks the finest level any view asks for.
  */
 
 #include "geometry_internal.h"
@@ -188,6 +184,7 @@ done:
  * threshold of zero, which holds every shape it draws at its authored level.
  *
  * @param world The world
+ * @param e The view entity
  * @param camera The camera the view renders
  * @param viewport_px Height of the surface in pixels
  * @param out Receives the view
@@ -268,10 +265,8 @@ static int32_t box_mesh_lod_views(
 
 /** Largest factor an instance matrix scales the radius of an arc by.
  *
- * The length of a column is what the matrix scales that local axis by, so the
- * longest column of the axes the arc sweeps is the factor its radius grows by.
- * An arc in the XZ plane skips the Y column, because the height of a cylinder
- * never changes how round its circle is.
+ * The factor is the longest column of the axes the arc sweeps. An arc in the XZ
+ * plane skips the Y column, since height does not affect how round it is.
  *
  * @param m The instance matrix, the world transform times the shape scale
  * @param axial The arc lies in the XZ plane of the mesh

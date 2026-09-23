@@ -2,10 +2,9 @@
  * @file spline/mesh.c
  * @brief Sweeps the cross section of a SplineMesh along its curve into a Mesh3.
  *
- * The cross section is laid out once as a list of columns, a point with the
- * normal of the surface at it, and copied along the curve at even arc length.
- * The mesh is rebuilt when the component or the curve changes, never per frame,
- * so the entity stays a static instance.
+ * The cross section is laid out once as columns (a point and its normal) and
+ * copied along the curve at even arc length. The mesh is rebuilt when the
+ * component or curve changes, never per frame.
  */
 
 #include "spline_internal.h"
@@ -37,7 +36,7 @@ typedef struct box_spline_sweep_t {
     int32_t slices;               /**< Quad strips along the curve */
     int32_t rings;                /**< Copies of the cross section along the curve */
     bool smooth;                  /**< Columns are shared by neighbouring edges */
-    bool gpu;
+    bool gpu;                     /**< The vertex shader rebuilds the swept vertices */
 } box_spline_sweep_t;
 
 /** Scale a cross section direction to unit length.

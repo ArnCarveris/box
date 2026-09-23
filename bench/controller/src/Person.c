@@ -9,7 +9,8 @@
 /** Characters the benchmark walks every frame */
 #define BENCH_PERSON_COUNT (100)
 
-void Person_update_100_characters(bench_t *b)
+void Person_update_100_characters(
+    bench_t *b)
 {
     // controllers/first_person
     ecs_world_t *world = ecs_init();
@@ -50,7 +51,8 @@ void Person_update_100_characters(bench_t *b)
 /** Distance between two roots of the grid */
 #define BENCH_PERSON_STEP (4.0f)
 
-void Person_walk_through_1m_colliders(bench_t *b)
+void Person_walk_through_1m_colliders(
+    bench_t *b)
 {
     // collision/controller_collision
     ecs_world_t *world = ecs_init();

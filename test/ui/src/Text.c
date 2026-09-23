@@ -553,3 +553,142 @@ void Text_glyph_quad_is_the_bitmap_in_logical_pixels(void)
         test_flt(rect->height, (float)glyph->height * 0.5f);
     }
 }
+
+void Text_wrap_follows_the_width_of_the_parent(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 100,
+        .height = 300, .padding = 5});
+    ecs_entity_t plain = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, plain, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff ggg"),
+        .line_height = 20});
+    ecs_entity_t wrapped = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, wrapped, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff ggg"),
+        .line_height = 20, .wrap = true});
+    box_ui_update(w);
+
+    test_assert(ecs_get(w, plain, Bounds)->width > 90);
+    test_flt(ecs_get(w, plain, Bounds)->height, 20);
+    test_flt(ecs_get(w, wrapped, Bounds)->width, 90);
+    test_assert(ecs_get(w, wrapped, Bounds)->height >= 40);
+}
+
+void Text_wrapped_glyphs_stay_inside_the_parent(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 100,
+        .height = 300, .h = AlignLeft});
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("one two three four five six"),
+        .line_height = 20, .wrap = true});
+    box_ui_update(w);
+
+    test_assert(ecs_count_id(w, UiGlyph) > 0);
+    ecs_iter_t it = ecs_each_id(w, UiGlyph);
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const Bounds *b = ecs_get(w, it.entities[i], Bounds);
+
+            test_assert(b->x - b->width * 0.5f >= -51);
+            test_assert(b->x + b->width * 0.5f <= 51);
+        }
+    }
+}
+
+void Text_wrap_shrinks_content_sized_ancestors(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 120,
+        .height = 300});
+    ecs_entity_t card = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, card, Layout, {.direction = DirectionColumn, .padding = 10});
+    ecs_set(w, card, Rect, {0, 0});
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, card);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff ggg"),
+        .line_height = 20, .wrap = true});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, card, Bounds)->width, 120);
+    test_flt(ecs_get(w, label, Bounds)->width, 100);
+    test_flt(ecs_get(w, card, Bounds)->height,
+        ecs_get(w, label, Bounds)->height + 20);
+    test_assert(ecs_get(w, label, Bounds)->height >= 40);
+    test_flt(ecs_get(w, card, Rect)->width, 120);
+}
+
+void Text_wrap_in_a_row_takes_the_room_its_siblings_leave(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionRow, .width = 150,
+        .height = 300, .spacing = 10});
+    ecs_entity_t icon = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, icon, Rect, {40, 40});
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff ggg"),
+        .line_height = 20, .wrap = true});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, label, Bounds)->width, 100);
+    test_assert(ecs_get(w, label, Bounds)->height >= 40);
+    test_flt(ecs_get(w, icon, Bounds)->width, 40);
+}
+
+void Text_short_wrapped_text_keeps_its_width(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 300,
+        .height = 300});
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("ab"), .line_height = 20,
+        .wrap = true});
+    box_ui_update(w);
+
+    test_assert(ecs_get(w, label, Bounds)->width < 50);
+    test_flt(ecs_get(w, label, Bounds)->height, 20);
+}
+
+void Text_changed_value_wraps_again(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.direction = DirectionColumn, .width = 100,
+        .height = 300});
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("ab"), .line_height = 20,
+        .wrap = true});
+    box_ui_update(w);
+    test_flt(ecs_get(w, label, Bounds)->height, 20);
+
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff ggg"),
+        .line_height = 20, .wrap = true});
+    box_ui_update(w);
+    test_flt(ecs_get(w, label, Bounds)->width, 100);
+    test_assert(ecs_get(w, label, Bounds)->height >= 40);
+}
+
+void Text_max_width_wraps_the_string(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("aaa bbb ccc ddd eee fff"),
+        .line_height = 20});
+    ecs_set(w, label, Layout, {.max_width = 60});
+    box_ui_update(w);
+
+    test_assert(ecs_get(w, label, Bounds)->width <= 60);
+    test_assert(ecs_get(w, label, Bounds)->height >= 40);
+}

@@ -2,12 +2,9 @@
  * @file geometry/shape_example.c
  * @brief Worked example of the shape registry: the flat Star polygon.
  *
- * Star is registered through the same public API a project uses, so this file
- * is the reference for adding a shape without patching the engine. A shape
- * needs three things: a component with its parameters, a key function that
- * splits those parameters into what changes the mesh and what only scales it,
- * and a build function that fills the mesh of a key. Everything else, the
- * observer, the mesh cache, the sharing and the instanced draw, is the module's.
+ * Star uses the public API a project uses: a parameter component, a key function
+ * that splits parameters into what changes the mesh and what only scales it, and
+ * a build function that fills the mesh of a key.
  */
 
 #include "geometry_internal.h"

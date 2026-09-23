@@ -2,10 +2,9 @@
  * @file Group.c
  * @brief Benchmarks for the subtrees that composite through a target of their own.
  *
- * Ten transparent panels are ten more views, ten more targets and ten more
- * layers, and the frame has to walk, lay out and extract all of them. The same
- * ten panels without the opacity are the price of the panels alone, so the two
- * cases together say what group transparency costs.
+ * Ten transparent panels add ten views, targets and layers the frame walks, lays out
+ * and extracts. The same panels without opacity measure the panels alone, so the two
+ * cases together give the cost of group transparency.
  */
 
 #include <box.h>
@@ -87,7 +86,8 @@ static void bench_ui_group_meshes(
     }
 }
 
-void Group_extract_ten_transparent_panels(bench_t *b)
+void Group_extract_ten_transparent_panels(
+    bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();
@@ -119,7 +119,8 @@ void Group_extract_ten_transparent_panels(bench_t *b)
     ecs_fini(world);
 }
 
-void Group_extract_ten_opaque_panels(bench_t *b)
+void Group_extract_ten_opaque_panels(
+    bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();
@@ -151,7 +152,8 @@ void Group_extract_ten_opaque_panels(bench_t *b)
     ecs_fini(world);
 }
 
-void Group_ten_transparent_panels_unchanged(bench_t *b)
+void Group_ten_transparent_panels_unchanged(
+    bench_t *b)
 {
     // ui/ui_visuals
     ecs_world_t *world = ecs_init();

@@ -54,6 +54,12 @@ static void box_pbr_ctor(
     }
 }
 
+/** MaterialLayerData constructor: every layer at full amount, unit scale.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
 static void box_material_layer_data_ctor(
     void *ptr,
     int32_t count,

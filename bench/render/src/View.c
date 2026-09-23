@@ -7,7 +7,8 @@
 #include <bake_bench.h>
 #include "../../../src/render/render_internal.h"
 
-void View_extract_two_views(bench_t *b)
+void View_extract_two_views(
+    bench_t *b)
 {
     // views/view
     ecs_world_t *world = ecs_init();

@@ -13,7 +13,8 @@
 /** Control points the curve of the sampling case holds */
 #define BENCH_SPLINE_POINTS (64)
 
-void Shape_resample_mesh_1k_triangles(bench_t *b)
+void Shape_resample_mesh_1k_triangles(
+    bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();
@@ -55,7 +56,8 @@ void Shape_resample_mesh_1k_triangles(bench_t *b)
     ecs_fini(world);
 }
 
-void Shape_resample_spline(bench_t *b)
+void Shape_resample_spline(
+    bench_t *b)
 {
     // particles/emitter
     ecs_world_t *world = ecs_init();

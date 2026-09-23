@@ -26,6 +26,7 @@ static bool Console_has_color(
     ecs_entity_t log,
     Rgb color)
 {
+    bool result = false;
     ecs_iter_t it = ecs_children(w, log);
     while (ecs_children_next(&it)) {
         int32_t i;
@@ -35,12 +36,15 @@ static bool Console_has_color(
                 emissive->color.r == color.r && emissive->color.g == color.g &&
                 emissive->color.b == color.b)
             {
-                return true;
+                ecs_iter_fini(&it);
+                result = true;
+                goto done;
             }
         }
     }
 
-    return false;
+done:
+    return result;
 }
 
 static void Console_run(

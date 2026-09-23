@@ -12,7 +12,8 @@
 /** Maps the layered benchmark spreads its bindings over */
 #define BENCH_ACTION_LAYERS (4)
 
-void Actions_resolve_100_bindings(bench_t *b)
+void Actions_resolve_100_bindings(
+    bench_t *b)
 {
     // input/action_layer
     ecs_world_t *world = ecs_init();
@@ -49,7 +50,8 @@ void Actions_resolve_100_bindings(bench_t *b)
     ecs_fini(world);
 }
 
-void Actions_resolve_100_bindings_in_4_layers(bench_t *b)
+void Actions_resolve_100_bindings_in_4_layers(
+    bench_t *b)
 {
     // ore_engine/input_layers
     ecs_world_t *world = ecs_init();

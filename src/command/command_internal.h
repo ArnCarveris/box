@@ -154,11 +154,9 @@ char* box_command_run(
 
 /** Complete the word the caret of a command line sits in.
  *
- * The first word of a line completes against the command names under
- * box.command.commands and every later word against the children of the scope
- * its path names, relative to the working entity of the session. The word is
- * replaced by the longest prefix every candidate shares and a single candidate
- * is followed by a space.
+ * The first word completes against the command names under box.command.commands,
+ * later words against the children of the scope their path names. The word
+ * becomes the longest shared prefix; a single candidate is followed by a space.
  *
  * @param world The world
  * @param session The session entity

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Checks C sources against design/coding_style.c. Usage: lint.py [paths...]"""
+"""Checks C sources against design/coding_style.c.
+
+Usage: lint.py [--fix] [paths...]
+       lint.py <file> <log|error|autofix>   (bake3 "lint" command)
+"""
 import os
 import re
 import sys
@@ -7,9 +11,12 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATHS = ["include", "src", "apps", "test", "bench"]
 EXTENSIONS = (".c", ".h", ".m")
+BAKE_ACTIONS = ("log", "error", "autofix")
 MAX_LINE = 100
 MAX_FUNCTION_LINES = 200
 MAX_FILE_LINES = 2000
+MAX_PARAGRAPH_LINES = 3
+MAX_PARAGRAPHS = 2
 TEST_REF = re.compile(r"^\s*// [a-z0-9_]+(/[a-z0-9_]+){0,2}$")
 FUNC_START = re.compile(r"^(?:static\s+|inline\s+|extern\s+)*[A-Za-z_][A-Za-z0-9_ \*]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\($")
 FUNC_ONE_LINE = re.compile(r"^(?:static\s+|inline\s+|extern\s+)*[A-Za-z_][A-Za-z0-9_ \*]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*\{?\s*$")
@@ -33,6 +40,7 @@ class Lint:
         self.check_lines()
         self.check_functions()
         self.check_types()
+        self.check_doc_paragraphs()
         return self.problems
 
     def check_file_header(self):
@@ -176,6 +184,66 @@ class Lint:
             self.check_comment(name, start, brace_line)
             self.check_body(name, brace_line, end)
 
+    def doc_blocks(self):
+        i = 0
+        n = len(self.lines)
+        while i < n:
+            start = self.lines[i].find("/**")
+            if start == -1:
+                i += 1
+                continue
+            j = i
+            while j < n and "*/" not in self.lines[j][start + 3 if j == i else 0:]:
+                j += 1
+            yield i, min(j, n - 1)
+            i = j + 1
+
+    def doc_text(self, line):
+        text = line.strip()
+        if text.startswith("/**"):
+            text = text[3:].lstrip("<")
+        elif text.startswith("*") and not text.startswith("*/"):
+            text = text[1:]
+        if "*/" in text:
+            text = text[:text.index("*/")]
+        return text.strip()
+
+    def check_doc_paragraphs(self):
+        for first, last in self.doc_blocks():
+            paragraphs = []
+            current = None
+            in_tag = False
+            summary_line = None
+            for k in range(first, last + 1):
+                text = self.doc_text(self.lines[k])
+                if not text:
+                    current = None
+                    in_tag = False
+                    continue
+                if text.startswith("@"):
+                    current = None
+                    in_tag = True
+                    if summary_line is None:
+                        summary_line = -1
+                    continue
+                if summary_line is None:
+                    summary_line = k
+                if in_tag:
+                    continue
+                if current is None:
+                    current = [k, 0]
+                    paragraphs.append(current)
+                current[1] += 1
+            for start, count in paragraphs:
+                if count > MAX_PARAGRAPH_LINES:
+                    self.report(start + 1,
+                        f"doc paragraph longer than {MAX_PARAGRAPH_LINES} lines")
+            if paragraphs and paragraphs[0][0] == summary_line:
+                paragraphs = paragraphs[1:]
+            if len(paragraphs) > MAX_PARAGRAPHS:
+                self.report(paragraphs[MAX_PARAGRAPHS][0] + 1,
+                    f"doc comment has more than {MAX_PARAGRAPHS} paragraphs")
+
     def check_types(self):
         for i, line in enumerate(self.lines):
             stripped = line.strip()
@@ -269,7 +337,21 @@ def fix_file(path):
         f.write("".join(lines))
 
 
+def lint_one(path, action):
+    if action == "autofix":
+        fix_file(path)
+    with open(path) as f:
+        lines = f.readlines()
+    problems = Lint(os.path.relpath(path, ROOT), lines).run()
+    for rel, line, message in problems:
+        print(f"{rel}:{line}: {message}")
+
+    return 1 if problems else 0
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[2] in BAKE_ACTIONS and os.path.isfile(sys.argv[1]):
+        return lint_one(os.path.abspath(sys.argv[1]), sys.argv[2])
     fix = "--fix" in sys.argv
     paths = [a for a in sys.argv[1:] if a != "--fix"] or DEFAULT_PATHS
     if fix:

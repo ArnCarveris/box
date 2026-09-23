@@ -167,6 +167,10 @@ static void box_render_on_hidden(
     }
 }
 
+/** A MaterialLayerData exists, so extract resolves the layer amounts of changed entities.
+ *
+ * @param it Iterator over the entities that gained the component
+ */
 static void box_render_on_layer_data(
     ecs_iter_t *it)
 {
@@ -359,11 +363,8 @@ done:
 
 /** Write the packed 2D shape parameters of an entity into instance data.
  *
- * The radii and widths of the shape are lengths in the local space of the
- * rectangle, which the fragment stage never sees; it reads them as ratios of
- * the smaller half extent of the instance, the same length the rounded corner
- * of the shape is bound by. The half extents themselves travel as ratios of the
- * larger one, which is all the fragment stage needs to keep a corner round.
+ * Shape radii and widths are stored as ratios of the smaller half extent, and the
+ * half extents as ratios of the larger one.
  *
  * @param world The world
  * @param e The entity
@@ -587,10 +588,8 @@ done:
 
 /** Compose the world transform an entity displays from its transitioned pose.
  *
- * The pose components keep the values the author assigned, so the matrix the
- * transform module wrote is not the one a view shows while a transition moves
- * one of them: the local pose is composed again from what is displayed and put
- * back under the world transform of the parent.
+ * While a transition moves a pose component, the local pose is recomposed from the
+ * displayed values and put back under the parent world transform.
  *
  * @param world The world
  * @param e The entity
@@ -645,6 +644,14 @@ done:
     return result;
 }
 
+/** Write the displayed layer amounts, seed and scale of an entity into its instance.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param transition The transitions of the entity, NULL when it has none
+ * @param time The time the transitions are displayed at
+ * @param out The instance to fill, left unchanged without MaterialLayerData
+ */
 static void box_render_fill_layer_data(
     ecs_world_t *world,
     ecs_entity_t e,

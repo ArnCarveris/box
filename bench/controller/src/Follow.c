@@ -9,7 +9,8 @@
 /** Follow cameras and targets the benchmark moves every frame */
 #define BENCH_FOLLOW_COUNT (100)
 
-void Follow_update_100_followers(bench_t *b)
+void Follow_update_100_followers(
+    bench_t *b)
 {
     // ore_engine/follow_camera
     ecs_world_t *world = ecs_init();

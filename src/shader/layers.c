@@ -15,6 +15,17 @@
 
 #define BOX_LAYER_MACRO_MAX (512)
 
+/** Append the WGSL function of one material layer to the generated include.
+ *
+ * The shader of the layer is preprocessed with the macros that splice it in
+ * as layer_<index>. A layer without a shader, or whose shader cannot be
+ * preprocessed, gets an empty function so the dispatch still compiles.
+ *
+ * @param world The world
+ * @param layer The layer, NULL when the registry entry has no MaterialLayer
+ * @param index Index of the layer in the registry
+ * @param buf The buffer the generated source is appended to
+ */
 static void box_shader_layer_body(
     ecs_world_t *world,
     const MaterialLayer *layer,
@@ -37,7 +48,7 @@ static void box_shader_layer_body(
             ecs_strbuf_appendstr(buf, result.source);
             ecs_strbuf_appendstr(buf, "\n");
             box_shader_result_fini(&result);
-            return;
+            goto done;
         }
 
         box_shader_result_fini(&result);
@@ -47,6 +58,8 @@ static void box_shader_layer_body(
     snprintf(line, sizeof(line),
         "fn layer_%d(s: ptr<function, Surface>, p: LayerParams) {}\n", index);
     ecs_strbuf_appendstr(buf, line);
+done:
+    return;
 }
 
 char* box_shader_layers_wgsl(

@@ -21,7 +21,8 @@
 /** Billboards along one row of the field */
 #define BENCH_IMPOSTOR_ROW (100)
 
-void Impostor_billboard_10k(bench_t *b)
+void Impostor_billboard_10k(
+    bench_t *b)
 {
     // lod/hlod_proxies/impostors
     box_lod_billboard_t *billboards;

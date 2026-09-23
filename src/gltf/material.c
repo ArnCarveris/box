@@ -2,10 +2,9 @@
  * @file gltf/material.c
  * @brief Creates the texture entities of a glTF file and maps its materials onto components.
  *
- * Every image of the file becomes one texture entity under a `textures` child
- * of the owner, whether its pixels come from a file next to the glTF, from a
- * data uri or from a buffer view of a glb. A material turns into the Rgb,
- * Opacity, PbrMaterial, Emissive and PbrTextures of the entity of a primitive.
+ * Every image becomes a texture entity under a `textures` child of the owner,
+ * read from a file, a data uri or a glb buffer view. A material becomes Rgb,
+ * Opacity, PbrMaterial, Emissive and PbrTextures on the primitive entity.
  */
 
 #include "gltf_internal.h"

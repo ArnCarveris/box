@@ -25,18 +25,22 @@ ECS_STRUCT(DirectionalLight, {
 
 /** Sun or moon light, the radiance it has before the atmosphere absorbs it
  *
- * A directional light with this component is a body over the medium: the sky
- * attenuates its color and intensity with the transmittance of the air between
- * the camera and the body, so a low sun lights the scene red of its own accord.
- * The moon and the star field carry it for the same reason.
+ * A directional light with this component is a body over the medium: the sky attenuates its
+ * color and intensity by the air transmittance to the camera, so a low sun lights the scene red.
+ * The moon and the star field carry it too.
  */
 ECS_STRUCT(CelestialLight, {
     float toa_intensity; /**< Radiance over the atmosphere, 0 takes the DirectionalLight */
     rgb toa_color;       /**< Color over the atmosphere, black takes white */
 });
 
+/** Overrides whether an instance blocks the light of the bake, inherited by instances
+ *
+ * Without it a Box shape with two sides of at least the occluder_min_size of the
+ * bake occludes and any other mesh does not.
+ */
 ECS_STRUCT(BakeOccluder, {
-    bool enabled;
+    bool enabled; /**< The instance occludes the bake, false keeps it out of it */
 });
 
 /** Omnidirectional light */
@@ -55,22 +59,17 @@ ECS_STRUCT(SpotLight, {
 
 /** Plugin that scales the direct light of a light at every shaded point
  *
- * The shader is a `Shader` entity whose WGSL file defines `fn
- * box_light_modulate(p: vec3<f32>, n: vec3<f32>, l: vec3<f32>, time: f32,
- * params: LightModulatorParams) -> vec3<f32>`, a color multiplier of the direct
- * light at the shaded world position. The renderer splices that file into the
- * mesh shader with one function per modulated light and multiplies the term of
- * the light after its shadow, so a modulator never reaches the indirect light.
- * A light without one costs nothing and compiles the plain shader.
+ * The shader is a `Shader` entity whose WGSL file defines `fn box_light_modulate(p: vec3<f32>,
+ * n: vec3<f32>, l: vec3<f32>, time: f32, params: LightModulatorParams) -> vec3<f32>`, a color
+ * multiplier applied to the direct light after its shadow, never to indirect light.
  *
- * The modulator sits on the light or on a child of it, which is how one light
- * carries more than one: their multipliers multiply. The parameters of a
- * modulator are an ordinary component next to it that was registered with
- * box_light_modulator_params.
+ * The modulator sits on the light or a child of it; several modulators multiply. Its parameters
+ * are a component next to it registered with box_light_modulator_params. A light without one
+ * compiles the plain shader.
  */
 ECS_STRUCT(LightModulator, {
     ecs_entity_t shader; /**< Shader entity of the plugin, without one it is skipped */
-    ecs_entity_t params;
+    ecs_entity_t params; /**< Parameter component, 0 finds the registered one it carries */
     bool enabled;        /**< The modulator runs, default true */
 });
 
@@ -141,10 +140,8 @@ ECS_STRUCT(ClusterSettings, {
 
 /** Added to a component entity to let it fill the parameter block of a modulator.
  *
- * The engine reads the reflection of the component that sits next to a
- * LightModulator and writes its floats into the sixteen float block the
- * modulate function receives, in member order, so a plugin ships an ordinary
- * component and a script line instead of engine code.
+ * The engine reads the reflection of the component next to a LightModulator and writes its
+ * floats, in member order, into the sixteen float block the modulate function receives.
  */
 extern ECS_TAG_DECLARE(LightModulatorParams);
 

@@ -2,10 +2,9 @@
  * @file Cache.c
  * @brief Benchmarks what the generation of one cached proxy costs a worker.
  *
- * The frame never waits for any of this: a job clusters the primitives of a
- * subtree into a handful of shapes and, when those shapes carry more error
- * than the node allows, merges and simplifies their meshes into one. The
- * content hash is the only part the extract pays, once per checked subtree.
+ * A job clusters the primitives of a subtree into a handful of shapes and, when
+ * they carry more error than the node allows, merges and simplifies their
+ * meshes into one. The extract only pays the content hash, once per subtree.
  */
 
 #include <box.h>
@@ -57,7 +56,8 @@ static void bench_cache_subtree(
     }
 }
 
-void Cache_proxy_set_512(bench_t *b)
+void Cache_proxy_set_512(
+    bench_t *b)
 {
     // lod/cache_and_jobs
     box_lod_builder_t builder;
@@ -86,7 +86,8 @@ void Cache_proxy_set_512(bench_t *b)
     ecs_os_free(primitives);
 }
 
-void Cache_proxy_mesh_512(bench_t *b)
+void Cache_proxy_mesh_512(
+    bench_t *b)
 {
     // lod/cache_and_jobs
     box_lod_builder_t builder;
@@ -153,7 +154,8 @@ void Cache_proxy_mesh_512(bench_t *b)
     ecs_os_free(indices);
 }
 
-void Cache_content_hash_512(bench_t *b)
+void Cache_content_hash_512(
+    bench_t *b)
 {
     // lod/cache_and_jobs
     box_lod_primitive_t *primitives;

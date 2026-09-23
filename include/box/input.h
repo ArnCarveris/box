@@ -2,13 +2,9 @@
  * @file box/input.h
  * @brief Device and action input layer: the Input singleton, actions and their bindings.
  *
- * One OnLoad system fills Input from the events the platform layer queues and from
- * injected events, so injected input is indistinguishable from real input. A second
- * one resolves the Binding entities of the input maps into the InputAction state,
- * map by map from the highest InputMap.priority down. A binding that declares
- * consume keeps its key and its action from every map below it, and a handler
- * stops a raise the rest of the frame with box_event_stop, the way a DOM handler
- * calls stopPropagation.
+ * Fills Input from platform and injected events alike, then resolves the Binding entities of the
+ * input maps into InputAction state from the highest InputMap.priority down. A consuming binding
+ * hides its key and action from lower maps; box_event_stop stops a raise for the frame.
  */
 
 #ifndef BOX_INPUT_H
@@ -104,10 +100,9 @@ ECS_STRUCT(InputAction, {
 
 /** Marks an entity as an input map: the bindings under it resolve while enabled.
  *
- * The maps of a world are layers: they resolve from the highest priority down and
- * the first map that fires an action takes both that action and the keys of the
- * binding that fired it, so a map below it never sees them. A UI map above the map
- * of a game is how a key that both bind reaches the UI alone.
+ * Maps resolve from the highest priority down; the first map that fires an action takes that
+ * action and the keys of its binding from every map below. A UI map above the game map is how a
+ * key both bind reaches the UI alone.
  */
 ECS_STRUCT(InputMap, {
     bool enabled;     /**< Bindings of this map resolve, true unless the script clears it */
@@ -158,22 +153,13 @@ ECS_STRUCT(ActionEvent, {
 
 /** The raise a handler of the frame is running for, and whether it was stopped.
  *
- * One record per world names what is being delivered while a handler runs, so a
- * handler takes an interaction with box_event_stop instead of the framework
- * guessing that it did. A stopped raise reaches no further handler of its own
- * event and takes the key of its binding away from every lower map, which is the
- * handler side of the consume flag of a binding. The order a frame delivers in
- * is the order the layers resolve in: the highest map first, then the deepest
- * node of the UI over the scene, then the scene itself. A pick event bubbles
- * from the node the cursor is on up its parents against this record with the
- * priority BOX_PICK_PRIORITY: a script handler the node resolves takes it,
- * because its task resumes after the delivery, a click on a node with an
- * Action takes it by firing the action, box_event_stop inside the delivery
- * takes it, and a taken event reaches no ancestor. A UI element keeps an event
- * from the scene behind it unless its tree opted in with Ui.passthrough, in
- * which case an event no node took goes on to the ray of the views behind. A
- * task that resumed from a click takes the action it fired for the rest of
- * the frame with box_input_consume, the same call a key handler makes.
+ * Names what is being delivered while a handler runs, so box_event_stop can take it. A stopped
+ * raise reaches no further handler and takes its binding key from lower maps. Delivery order is
+ * the highest map first, then the deepest UI node, then the scene.
+ *
+ * Pick events bubble from the node under the cursor up its parents at BOX_PICK_PRIORITY, taken by
+ * a resolved script handler, a click firing an Action or box_event_stop. UI blocks the scene unless
+ * Ui.passthrough; box_input_consume takes an action a resumed task fired for the frame.
  */
 ECS_STRUCT(Raise, {
     ecs_entity_t target; /**< Action or entity the raise is about, 0 between raises */
@@ -184,10 +170,9 @@ ECS_STRUCT(Raise, {
 
 /** Stop the raise a handler is running for.
  *
- * The rest of the handlers of that raise do not run and the key of its binding
- * is taken from every map below the one it came from, so the actions those maps
- * bind to the same key are cleared for the frame. Outside a raise the call does
- * nothing, which is what makes it safe to call from a task that resumed late.
+ * The remaining handlers of the raise do not run and its binding key is taken from every lower
+ * map, clearing their actions on that key for the frame. Outside a raise it does nothing, so a
+ * task that resumed late may call it safely.
  *
  * @param world The world
  * @return Whether a raise was stopped
@@ -205,11 +190,9 @@ const Raise* box_event_current(
 
 /** Take an action for the rest of the frame from a handler.
  *
- * The state of the action is cleared, its drag stops and the events it has not
- * raised yet are dropped, so nothing below the handler sees it; the frame after,
- * an action whose key is still down carries on as held rather than pressing
- * again. This is the explicit form of what a binding with consume does before a
- * handler runs at all.
+ * Clears the action state, stops its drag and drops its unraised events; next frame a key still
+ * down carries on as held rather than pressing again. This is the explicit form of a binding's
+ * consume flag.
  *
  * @param world The world
  * @param action The action entity

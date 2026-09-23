@@ -1,3 +1,8 @@
+/**
+ * @file sky/rain.c
+ * @brief Drives the particle emitter of the rain of a world from its settings.
+ */
+
 #include "sky_internal.h"
 #include <box/particle.h>
 #include <math.h>
@@ -127,10 +132,8 @@ static float box_rain_life(
 
 /** Drive the emitter of the rain of a world from the amount that falls on it.
  *
- * The pool keeps the size it was created with, because a pool that changes size
- * is emptied, so a rain that thins spawns fewer drops rather than holding fewer
- * of them. A world that dries up stops the emitter, which ends the emission and
- * leaves the drops that are in the air to reach the ground.
+ * The pool keeps its size, since resizing a pool empties it, so thinner rain spawns
+ * fewer drops. A world that dries up stops the emitter and lets drops in the air land.
  *
  * @param world The world
  * @param e The emitter

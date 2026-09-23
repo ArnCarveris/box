@@ -2,10 +2,8 @@
  * @file render/extract_shadow.c
  * @brief Cascade splits and light matrices of the shadow map of one view.
  *
- * A cascade covers a slice of the camera frustum, fitted with the bounding
- * sphere of the slice so its size never changes when the camera turns, and its
- * light matrix is snapped to texel increments so static content does not
- * shimmer when the camera moves.
+ * A cascade covers a camera frustum slice fitted with its bounding sphere, and its
+ * light matrix is snapped to texel increments to avoid shimmer.
  */
 
 #include "render_internal.h"

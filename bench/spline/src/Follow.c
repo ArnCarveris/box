@@ -56,7 +56,8 @@ static ecs_entity_t box_bench_follow_scene(
     return curve;
 }
 
-void Follow_followers_10k(bench_t *b)
+void Follow_followers_10k(
+    bench_t *b)
 {
     // splines/spline_paths
     ecs_world_t *world = ecs_init();
@@ -73,7 +74,8 @@ void Follow_followers_10k(bench_t *b)
     ecs_fini(world);
 }
 
-void Follow_followers_10k_oriented(bench_t *b)
+void Follow_followers_10k_oriented(
+    bench_t *b)
 {
     // splines/spline_paths
     ecs_world_t *world = ecs_init();

@@ -2,10 +2,9 @@
  * @file lod/error.c
  * @brief The screen space error metric and the level switch its band guards.
  *
- * The metric projects an error in world units at the nearest point of the
- * bounds of a node, for a perspective and for an orthographic camera alike, and
- * the switch keeps a node at its level until the projected error leaves the
- * band around the threshold of the view.
+ * Projects a world space error at the nearest point of a node's bounds, for
+ * perspective and orthographic cameras. The switch keeps a node at its level
+ * until the projected error leaves the band around the view threshold.
  */
 
 #include <box.h>

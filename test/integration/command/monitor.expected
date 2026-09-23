@@ -10,13 +10,14 @@ BoxSystemMonitorOnRemove
 BoxSystemMonitorOnSet
 CpuMonitor
 EcsStats
-FpsCorner
-FpsOverlay
+Fps
 GpuPassTime
 GpuTimings
 PhaseTime
 SystemMonitor
 SystemTime
+fps_panel
+fps_script
 
 $ has box.monitor.CpuMonitor box.monitor.CpuMonitor
 true

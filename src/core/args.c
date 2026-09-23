@@ -2,11 +2,9 @@
  * @file core/args.c
  * @brief Parses command line arguments into the App singleton.
  *
- * The engine owns a handful of options and an application adds its own as
- * AppOption entities before the parse: the flag is the name of the entity and
- * its value lands in the member of a singleton component the option names, so
- * a scene reads the flag as a component instead of the application passing it
- * around. Both sets are listed by --help and a flag nobody claims is an error.
+ * The engine owns a few options; an application adds AppOption entities before
+ * the parse, named after the flag, whose value lands in a member of a singleton.
+ * --help lists both sets and an unclaimed flag is an error.
  */
 
 #include <box.h>
@@ -254,10 +252,9 @@ char* box_args_usage(
 
 /** The entity a scene of the command line is loaded on: scenes.<stem of the file>.
  *
- * A script loaded on no entity takes its entity from its path, and an absolute
- * path leaves a root entity with an empty name in the world, which is what a
- * command that walks the root then trips over. A reload of the same file lands
- * on the same entity and replaces the scene.
+ * A script loaded on no entity takes its entity from its path, which leaves an
+ * unnamed root for an absolute path. A reload of the same file lands on the same
+ * entity and replaces the scene.
  *
  * @param world The world
  * @param path The path of the scene file

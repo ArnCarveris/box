@@ -194,3 +194,67 @@ void Anchor_removed_anchor_returns_the_child_to_the_row(void)
     test_flt(ecs_get(w, a, Bounds)->x, -80);
     test_flt(ecs_get(w, a, Bounds)->y, 40);
 }
+
+void Anchor_parent_v_bottom_opens_below_the_parent(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.width = 200, .height = 100, .padding = 10});
+    ecs_entity_t menu = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, menu, Rect, {80, 40});
+    ecs_set(w, menu, Anchor, {.h = AlignLeft, .v = VAlignTop,
+        .parent_h = AttachHLeft, .parent_v = AttachVBottom});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, menu, Bounds)->x, -60);
+    test_flt(ecs_get(w, menu, Bounds)->y, -70);
+}
+
+void Anchor_parent_h_right_places_beside_the_parent(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.width = 200, .height = 100});
+    ecs_entity_t tip = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, tip, Rect, {60, 20});
+    ecs_set(w, tip, Anchor, {.h = AlignLeft, .v = VAlignMiddle,
+        .parent_h = AttachHRight});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, tip, Bounds)->x, 130);
+    test_flt(ecs_get(w, tip, Bounds)->y, 0);
+}
+
+void Anchor_attach_offset_follows_the_axes(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.width = 200, .height = 100});
+    ecs_entity_t menu = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, menu, Rect, {80, 40});
+    ecs_set(w, menu, Anchor, {.h = AlignRight, .v = VAlignTop, .x = 5, .y = -4,
+        .parent_h = AttachHRight, .parent_v = AttachVBottom});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, menu, Bounds)->x, 65);
+    test_flt(ecs_get(w, menu, Bounds)->y, -74);
+}
+
+void Anchor_attach_centre_to_centre(void)
+{
+    // ore_engine/layout_sizing
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_set(w, root, Layout, {.width = 200, .height = 100, .padding_left = 40});
+    ecs_entity_t dot = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, dot, Rect, {10, 10});
+    ecs_set(w, dot, Anchor, {.h = AlignCenter, .v = VAlignMiddle,
+        .parent_h = AttachHCenter, .parent_v = AttachVMiddle});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, dot, Bounds)->x, 0);
+    test_flt(ecs_get(w, dot, Bounds)->y, 0);
+}

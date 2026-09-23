@@ -2,14 +2,9 @@
  * @file renderer/shader.c
  * @brief WGSL sources the renderer compiles its pipelines from.
  *
- * Every shader arrives as a resource command with a handle and the source the
- * game side preprocessed, so the renderer never reads a file and never composes
- * a shader itself. The builtin slots are known up front, which is why the first
- * packet is also what brings the renderer up: it carries them all.
- *
- * A source that arrives again after the pipelines exist is compiled into a new
- * module and the pipelines of that slot are rebuilt; a module that does not
- * compile leaves the previous pipelines drawing and is reported once.
+ * Shaders arrive as resource commands with preprocessed source; the first packet
+ * carries every builtin slot. A source that arrives again rebuilds the pipelines
+ * of its slot; a failed compile keeps the previous pipelines and is reported once.
  */
 
 #include "renderer_internal.h"
@@ -112,7 +107,6 @@ static void box_shader_rebuild(
     case BOX_SHADER_BAKE: box_bake_reload(r); break;
     case BOX_SHADER_BLUR: box_transparent_fini(r); box_transparent_init(r); break;
     case BOX_SHADER_MOTION: box_effect_fini(r); box_effect_init(r); break;
-    case BOX_SHADER_OVERLAY: box_overlay_fini(r); box_overlay_init(r); break;
     case BOX_SHADER_LINES: box_lines_fini(r); break;
     default: break;
     }

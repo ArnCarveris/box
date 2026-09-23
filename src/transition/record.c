@@ -2,10 +2,9 @@
  * @file transition/record.c
  * @brief Starts and replaces the transitions of an entity when a value is assigned.
  *
- * A record survives the transition it describes and keeps holding the value
- * that is displayed, so the next assignment of the same component knows where
- * to start from. Assigning the value an entity already shows produces a record
- * that is finished right away, which is what the first assignment does.
+ * A record outlives its transition and keeps the displayed value, so the next
+ * assignment knows where to start. Assigning the displayed value produces a
+ * record that is finished right away.
  */
 
 #include "transition_internal.h"

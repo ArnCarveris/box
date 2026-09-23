@@ -2,12 +2,9 @@
  * @file renderer/transition.h
  * @brief Transition records the renderer evaluates next to the instances.
  *
- * A transition that moves a value of a static instance travels to the renderer
- * once, when it starts, and the renderer thread computes the value the frame
- * shows from the record alone. The record names a channel of the instance, the
- * value it started from, the value that was assigned, the time it started and
- * the parameters, which is everything the interpolation needs, so the main
- * thread does nothing per frame while the transition runs.
+ * A record is sent once when a static instance transition starts: channel, start
+ * and target values, start time and parameters. The renderer thread evaluates
+ * it every frame from the record alone.
  */
 
 #ifndef BOX_RENDERER_TRANSITION_H
@@ -139,10 +136,8 @@ static inline double box_transition_rate(
 
 /** Interpolate one transition at a time.
  *
- * This is the whole of the per frame work of a transition and touches nothing
- * but its arguments, so the game side and the renderer thread share it. The
- * rate is one over the duration, which a caller that evaluates the same record
- * every frame keeps next to it instead of dividing again.
+ * Pure function of its arguments, shared by the game side and the renderer
+ * thread.
  *
  * @param start Time the transition started
  * @param delay Seconds the value holds still before it moves

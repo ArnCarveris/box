@@ -18,7 +18,8 @@
 /** Sources of the subtree, which together hold a hundred thousand triangles */
 #define BENCH_MESH_COUNT (125)
 
-void Mesh_merge_100k(bench_t *b)
+void Mesh_merge_100k(
+    bench_t *b)
 {
     // lod/hlod_proxies/merged_meshes
     box_lod_mesh_builder_t builder;
@@ -78,7 +79,8 @@ void Mesh_merge_100k(bench_t *b)
     box_lod_mesh_builder_fini(&builder);
 }
 
-void Mesh_merge_100k_welded(bench_t *b)
+void Mesh_merge_100k_welded(
+    bench_t *b)
 {
     // lod/hlod_proxies/merged_meshes
     box_lod_mesh_builder_t builder;
@@ -139,7 +141,8 @@ void Mesh_merge_100k_welded(bench_t *b)
     box_lod_mesh_builder_fini(&builder);
 }
 
-void Mesh_simplify_100k(bench_t *b)
+void Mesh_simplify_100k(
+    bench_t *b)
 {
     // lod/hlod_proxies/merged_meshes
     box_lod_mesh_builder_t builder;

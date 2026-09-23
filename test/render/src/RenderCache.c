@@ -1,3 +1,8 @@
+/**
+ * @file RenderCache.c
+ * @brief Tests for the render caches that reuse unchanged cluster and slot inputs.
+ */
+
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/render/render_internal.h"
@@ -7,7 +12,8 @@ static ecs_world_t *world;
 static box_renderer_t *renderer;
 static ecs_entity_t camera;
 
-static void render_frame(int change)
+static void render_frame(
+    int change)
 {
     box_packet_t *p = box_renderer_acquire(renderer);
     test_assert(p != NULL);
@@ -26,6 +32,7 @@ static void render_frame(int change)
     case 8: ((box_light_t*)box_vec_at(&p->lights, v->light_first))->is_static = 0; break;
     case 9: ((box_light_t*)box_vec_at(&p->lights, v->light_first))->range *= 0.5f; break;
     }
+
     box_renderer_submit(renderer, p);
     test_int(box_renderer_errors(renderer), 0);
 }

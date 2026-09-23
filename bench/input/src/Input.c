@@ -9,7 +9,8 @@
 /** Events the queue holds when the update system runs */
 #define BENCH_INPUT_EVENTS (1000)
 
-void Input_update_1000_events(bench_t *b)
+void Input_update_1000_events(
+    bench_t *b)
 {
     // input/device_layer
     ecs_world_t *world = ecs_init();

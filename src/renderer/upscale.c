@@ -2,12 +2,9 @@
  * @file renderer/upscale.c
  * @brief Renders the surface views into a smaller image and blits it to the window.
  *
- * A packet whose scaled size is not its target size asks for the whole frame to
- * be drawn into a texture of that scaled size. The views, their depth targets,
- * their effect chains and their overlays all follow the size the view carries,
- * so nothing but the last step changes: one full screen pass magnifies the
- * image onto the swap chain texture with a linear sampler before it is
- * presented, and the capture of the frame still reads the window sized image.
+ * When the scaled size differs from the target size the frame is drawn into a
+ * scaled texture, then one full screen pass magnifies it onto the swap chain with
+ * a linear sampler. Captures read the window sized image.
  */
 
 #include "renderer_internal.h"

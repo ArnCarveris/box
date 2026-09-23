@@ -2,19 +2,12 @@
  * @file particle/simulate.h
  * @brief The simulation of one particle in C, the twin of etc/shaders/particle_sim.wgsl.
  *
- * The particles live in renderer buffers and are moved by a compute pass, so
- * nothing here runs in a frame. The functions below are the C twin of the ones
- * the shaders are built from: the hash the random draws come from, the range a
- * property is drawn between, the cone a particle leaves in, the step the
- * integrate pass takes, the answer of a particle that hits a surface, and the
- * curve, sheet frame and soft fade the sprite pass reads. A change to one of
- * them is a change to both places, and the tests check these against the motion
- * and the appearance they are supposed to produce.
+ * The C twin of the functions the particle shaders are built from: hash, ranges, cone,
+ * integrate step, collision response, curves, sheet frames and soft fade. A change to
+ * one is a change to both; the tests check these against the expected motion.
  *
- * The step is a semi implicit Euler step with the drag solved exactly: forces
- * are added to the velocity, the drag pulls that velocity towards the wind over
- * exp(-drag * delta), which is the closed form of the differential equation and
- * is stable at any timestep, and the position follows the new velocity.
+ * The step is semi implicit Euler with exact drag: velocity is pulled towards the wind
+ * over exp(-drag * delta), then the position follows the new velocity.
  */
 
 #ifndef BOX_PARTICLE_SIMULATE_H
@@ -160,11 +153,9 @@ static inline vec3 box_particle_cone(
 
 /** Turbulence the field of an emitter gives a particle at a point.
  *
- * The field is three sines of the point, which is smooth, costs three
- * instructions and does not need a table: a particle that passes through the
- * same place is pushed the same way, so the wander of a stream is as
- * reproducible as the rest of the simulation. The seed offsets the field, so
- * two emitters in the same place do not wander alike.
+ * The field is three sines of the point, so it is smooth, needs no table and pushes a
+ * particle the same way at the same place. The seed offsets the field so that two
+ * emitters in the same place do not wander alike.
  *
  * @param position Position of the particle in world space
  * @param seed Seed of the emitter
@@ -235,11 +226,9 @@ static inline void box_particle_step(
 
 /** Answer of a particle that ended its step behind a surface.
  *
- * The particle is lifted back onto the surface, the speed it had into the
- * surface is turned around and scaled by the bounce and the speed it had along
- * the surface is scaled down by the friction. A particle that is already moving
- * away keeps its direction, which is what stops a particle resting on a surface
- * from being thrown off it.
+ * The particle is lifted onto the surface, its normal speed is reversed and scaled by
+ * the bounce and its tangential speed is reduced by the friction. A particle already
+ * moving away keeps its direction, so resting particles are not thrown off.
  *
  * @param hit The surface
  * @param bounce Fraction of the speed into the surface that is kept
@@ -423,11 +412,9 @@ static inline uint32_t box_particle_frame(
 
 /** Offsets of one corner of a streak along the right and the up axis of a view.
  *
- * A streak is the sprite of a particle laid over the direction it moves in on
- * the screen instead of over the axes of the camera: it keeps the size of the
- * particle across that direction and grows along it with the speed of the
- * particle, so the quad is the line the particle travels over. A particle that
- * stands still on the screen keeps the axes it had.
+ * A streak lays the sprite along the screen direction of motion: it keeps the particle
+ * size across that direction and grows along it with speed. A particle that stands
+ * still on the screen keeps the camera axes.
  *
  * @param corner The corner of the quad, both components between -1 and 1
  * @param screen Velocity of the particle along the right and the up axis

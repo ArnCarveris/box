@@ -9,7 +9,8 @@
 /** Script tasks that await the same action while the benchmark runs */
 #define BENCH_EVENT_WAITERS (100)
 
-void Events_resume_100_waiters(bench_t *b)
+void Events_resume_100_waiters(
+    bench_t *b)
 {
     // input/script_events
     ecs_world_t *world = ecs_init();

@@ -14,7 +14,8 @@
 /** Lights per row of the grid */
 #define BENCH_LIGHT_ROW (40)
 
-void Lights_extract_1000_moving(bench_t *b)
+void Lights_extract_1000_moving(
+    bench_t *b)
 {
     // lighting/clustered_forward
     ecs_world_t *world = ecs_init();
@@ -65,7 +66,8 @@ void Lights_extract_1000_moving(bench_t *b)
     ecs_fini(world);
 }
 
-void Lights_extract_1000_culled(bench_t *b)
+void Lights_extract_1000_culled(
+    bench_t *b)
 {
     // lighting/clustered_forward
     ecs_world_t *world = ecs_init();

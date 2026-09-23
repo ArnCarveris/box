@@ -2,10 +2,9 @@
  * @file spline/follow.c
  * @brief Moves the entities that hold a FollowPath along their curve in OnUpdate.
  *
- * A follower keeps the distance it travelled, so a speed that changes takes
- * effect from that point on. The distance is folded by the mode before it is
- * sampled: a loop wraps it, a ping pong reflects it and turns the follower
- * around, and a once clamps it to the ends of the curve.
+ * A follower keeps its travelled distance, so a speed change applies from there.
+ * The distance is folded by mode before sampling: loop wraps, ping pong reflects
+ * and turns around, once clamps to the curve ends.
  */
 
 #include "spline_internal.h"

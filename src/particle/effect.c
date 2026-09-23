@@ -2,13 +2,9 @@
  * @file particle/effect.c
  * @brief One shot effects: a pool of instances per template and the play that reuses it.
  *
- * An effect is an ordinary template, so what it does is authored as components
- * and not as code. Playing it takes a free instance of that template from its
- * pool, or makes one when the pool is empty, places it, scales it and plays it
- * from the top. The engine ends the emission once the bursts of the template
- * have all gone off and disables the instance a lifetime later, which is the
- * moment its last particle has died; the instance stays for the next play, so a
- * stream of hits costs the entities of one pool instead of one entity per hit.
+ * Playing an effect takes a free instance of its template from a pool, or makes one,
+ * then places, scales and plays it. The instance is disabled a lifetime after its last
+ * burst and stays in the pool for the next play.
  */
 
 #include "particle_internal.h"

@@ -2,13 +2,9 @@
  * @file collision/sweep.c
  * @brief Moves a capsule through the scene: sliding, a step up and a ground probe.
  *
- * A move reads the colliders of the cells its capsule can reach this frame from
- * the index once, so the cost of a move follows what is around the capsule and
- * not what is in the scene. The motion is walked in steps no longer than half
- * the radius and the capsule is pushed out of what it reaches into after every
- * step, which is what makes it slide along a wall instead of stopping dead. A
- * move a wall stopped is tried again over a ledge of at most the step height,
- * and the ground under the capsule is a ray down the same colliders.
+ * A move reads the reachable colliders from the index once, then walks the
+ * motion in steps of at most half the radius, pushing the capsule out after
+ * each. A blocked move retries over a ledge up to the step height.
  */
 
 #include "collision_internal.h"
