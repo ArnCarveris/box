@@ -15,7 +15,7 @@
 
 - `test/editor` (88 cases over Command, Select, Tree, Inspector, Source, Gizmo, Spline and Toolbar), `test/draw` (13 cases), and the new cases of `test/picking` and `test/ui`; every test project passes.
 - Headless captures of the app driven over its HTTP terminal: `editor on`, a click on the ball, the Move, Rotate and Scale tools and a drag of the x arrow that moved the ball; see `gizmos/deliverable` and `editor.png`.
-- The visual and command integration scenes still match their baselines.
+- The integration scenes: 106 visual and 17 command scenes pass; 17 visual and 5 command scenes fail on this branch and, run the same way, on the unmodified main tree (stale baselines and expected files after the recent renderer and Text changes), see `integration/`.
 
 ## Lessons
 
