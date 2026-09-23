@@ -1,0 +1,19 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:40Z",
+  "pass": 8,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.130019,
+  "tests": [
+    {"suite": "Command", "case": "on_turns_the_editor_on", "status": "pass", "elapsed": 0.109864},
+    {"suite": "Command", "case": "no_argument_turns_it_on", "status": "pass", "elapsed": 0.109903},
+    {"suite": "Command", "case": "off_turns_it_off", "status": "pass", "elapsed": 0.110022},
+    {"suite": "Command", "case": "off_clears_the_selection_and_the_opened_instance", "status": "pass", "elapsed": 0.129898},
+    {"suite": "Command", "case": "bad_argument_is_an_error", "status": "pass", "elapsed": 0.107120},
+    {"suite": "Command", "case": "overlay_exists_while_on", "status": "pass", "elapsed": 0.124449},
+    {"suite": "Command", "case": "overlay_is_gone_while_off", "status": "pass", "elapsed": 0.123832},
+    {"suite": "Command", "case": "system_does_nothing_while_off", "status": "pass", "elapsed": 0.109581}
+  ]
+}

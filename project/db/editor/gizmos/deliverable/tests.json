@@ -1,0 +1,24 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:46Z",
+  "pass": 13,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.750509,
+  "tests": [
+    {"suite": "Gizmo", "case": "select_tool_draws_nothing", "status": "pass", "elapsed": 0.287911},
+    {"suite": "Gizmo", "case": "move_tool_draws_the_move_gizmo_at_the_selection", "status": "pass", "elapsed": 0.294702},
+    {"suite": "Gizmo", "case": "gizmo_is_drawn_in_the_overlay_layer", "status": "pass", "elapsed": 0.190985},
+    {"suite": "Gizmo", "case": "gizmo_scales_with_the_distance_to_the_camera", "status": "pass", "elapsed": 0.297346},
+    {"suite": "Gizmo", "case": "handles_are_pickable_through_the_overlay_view", "status": "pass", "elapsed": 0.302552},
+    {"suite": "Gizmo", "case": "dragging_the_x_arrow_moves_along_x", "status": "pass", "elapsed": 0.314744},
+    {"suite": "Gizmo", "case": "dragging_the_xy_plane_keeps_z", "status": "pass", "elapsed": 0.366354},
+    {"suite": "Gizmo", "case": "dragging_the_center_moves_in_the_view_plane", "status": "pass", "elapsed": 0.324630},
+    {"suite": "Gizmo", "case": "rotating_about_y_changes_y_only", "status": "pass", "elapsed": 0.385891},
+    {"suite": "Gizmo", "case": "scaling_along_x_changes_x_only", "status": "pass", "elapsed": 0.384767},
+    {"suite": "Gizmo", "case": "release_drops_the_grab", "status": "pass", "elapsed": 0.455674},
+    {"suite": "Gizmo", "case": "tool_change_drops_the_grab", "status": "pass", "elapsed": 0.279850},
+    {"suite": "Gizmo", "case": "gizmo_of_a_child_moves_it_in_its_parent", "status": "pass", "elapsed": 0.301587}
+  ]
+}

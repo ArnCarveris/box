@@ -1,0 +1,20 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:49Z",
+  "pass": 9,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.206974,
+  "tests": [
+    {"suite": "Source", "case": "literal_value_is_literal", "status": "pass", "elapsed": 0.112429},
+    {"suite": "Source", "case": "computed_value_is_computed", "status": "pass", "elapsed": 0.113140},
+    {"suite": "Source", "case": "missing_statement_is_none", "status": "pass", "elapsed": 0.113151},
+    {"suite": "Source", "case": "scene_entity_is_editable", "status": "pass", "elapsed": 0.113071},
+    {"suite": "Source", "case": "template_child_with_a_literal_is_editable", "status": "pass", "elapsed": 0.113591},
+    {"suite": "Source", "case": "template_child_with_a_prop_is_not", "status": "pass", "elapsed": 0.113524},
+    {"suite": "Source", "case": "transform_flag_follows_the_source", "status": "pass", "elapsed": 0.114639},
+    {"suite": "Source", "case": "write_through_updates_every_instance", "status": "pass", "elapsed": 0.138475},
+    {"suite": "Source", "case": "assign_on_a_computed_member_is_refused", "status": "pass", "elapsed": 0.094379}
+  ]
+}

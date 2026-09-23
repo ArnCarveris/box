@@ -1,0 +1,29 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:42Z",
+  "pass": 18,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.605621,
+  "tests": [
+    {"suite": "Inspector", "case": "nothing_selected_gives_no_fields", "status": "pass", "elapsed": 0.108967},
+    {"suite": "Inspector", "case": "fields_list_the_components_of_the_selection", "status": "pass", "elapsed": 0.187240},
+    {"suite": "Inspector", "case": "members_get_a_widget_by_type", "status": "pass", "elapsed": 0.186578},
+    {"suite": "Inspector", "case": "nested_struct_members_are_flattened", "status": "pass", "elapsed": 0.187171},
+    {"suite": "Inspector", "case": "enum_field_lists_its_constants", "status": "pass", "elapsed": 0.143550},
+    {"suite": "Inspector", "case": "engine_written_components_are_read_only", "status": "pass", "elapsed": 0.185795},
+    {"suite": "Inspector", "case": "tags_and_pairs_are_listed_by_name", "status": "pass", "elapsed": 0.186797},
+    {"suite": "Inspector", "case": "fields_are_published_once_per_change", "status": "pass", "elapsed": 0.316355},
+    {"suite": "Inspector", "case": "assign_sets_a_number", "status": "pass", "elapsed": 0.096843},
+    {"suite": "Inspector", "case": "assign_sets_an_enum_by_name", "status": "pass", "elapsed": 0.094153},
+    {"suite": "Inspector", "case": "assign_sets_a_bool", "status": "pass", "elapsed": 0.121032},
+    {"suite": "Inspector", "case": "assign_sets_a_string", "status": "pass", "elapsed": 0.124006},
+    {"suite": "Inspector", "case": "assign_sets_an_entity_by_path", "status": "pass", "elapsed": 0.118692},
+    {"suite": "Inspector", "case": "assign_rejects_a_bad_value", "status": "pass", "elapsed": 0.118794},
+    {"suite": "Inspector", "case": "submitted_line_of_a_bound_input_is_assigned", "status": "pass", "elapsed": 0.193086},
+    {"suite": "Inspector", "case": "focused_field_captures_the_input_maps", "status": "pass", "elapsed": 0.128434},
+    {"suite": "Inspector", "case": "grid_rows_are_widgets", "status": "pass", "elapsed": 0.299326},
+    {"suite": "Inspector", "case": "clicking_a_checkbox_flips_the_member", "status": "pass", "elapsed": 0.299821}
+  ]
+}

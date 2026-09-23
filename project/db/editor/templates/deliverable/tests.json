@@ -1,0 +1,376 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T22:46:50Z",
+  "pass": 49,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.78658,
+  "tests": [
+    {
+      "suite": "Source",
+      "case": "literal_value_is_literal",
+      "status": "pass",
+      "elapsed": 0.112429,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "computed_value_is_computed",
+      "status": "pass",
+      "elapsed": 0.11314,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "missing_statement_is_none",
+      "status": "pass",
+      "elapsed": 0.113151,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "scene_entity_is_editable",
+      "status": "pass",
+      "elapsed": 0.113071,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "template_child_with_a_literal_is_editable",
+      "status": "pass",
+      "elapsed": 0.113591,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "template_child_with_a_prop_is_not",
+      "status": "pass",
+      "elapsed": 0.113524,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "transform_flag_follows_the_source",
+      "status": "pass",
+      "elapsed": 0.114639,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "write_through_updates_every_instance",
+      "status": "pass",
+      "elapsed": 0.138475,
+      "project": "editor"
+    },
+    {
+      "suite": "Source",
+      "case": "assign_on_a_computed_member_is_refused",
+      "status": "pass",
+      "elapsed": 0.094379,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "select_marks_an_entity",
+      "status": "pass",
+      "elapsed": 0.115431,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "select_zero_clears",
+      "status": "pass",
+      "elapsed": 0.113362,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "child_of_a_template_instance_selects_the_root",
+      "status": "pass",
+      "elapsed": 0.11511,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "child_of_a_prefab_instance_selects_the_root",
+      "status": "pass",
+      "elapsed": 0.120281,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "root_is_reported_as_an_instance",
+      "status": "pass",
+      "elapsed": 0.115764,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "spline_is_reported",
+      "status": "pass",
+      "elapsed": 0.115383,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_hides_the_siblings_and_shows_the_instance",
+      "status": "pass",
+      "elapsed": 0.116609,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_lets_the_children_be_selected",
+      "status": "pass",
+      "elapsed": 0.116598,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "close_shows_the_scene_again",
+      "status": "pass",
+      "elapsed": 0.106115,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_is_recursive",
+      "status": "pass",
+      "elapsed": 0.107043,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_refuses_an_entity_that_is_not_a_root",
+      "status": "pass",
+      "elapsed": 0.102884,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "click_in_the_scene_selects_the_hit",
+      "status": "pass",
+      "elapsed": 0.288299,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "click_on_empty_space_clears_the_selection",
+      "status": "pass",
+      "elapsed": 0.271955,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "deleted_selection_is_cleared",
+      "status": "pass",
+      "elapsed": 0.128797,
+      "project": "editor"
+    },
+    {
+      "suite": "Incremental",
+      "case": "templates_are_marked_manual",
+      "status": "pass",
+      "elapsed": 0.012686,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instances_are_pending",
+      "status": "pass",
+      "elapsed": 0.013,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "non_template_entities_appear_immediately",
+      "status": "pass",
+      "elapsed": 0.012994,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "count_budget_per_frame",
+      "status": "pass",
+      "elapsed": 0.013384,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "time_budget_stops_a_frame",
+      "status": "pass",
+      "elapsed": 0.014167,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "instance_is_complete_when_it_appears",
+      "status": "pass",
+      "elapsed": 0.012968,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "every_instance_is_expanded_eventually",
+      "status": "pass",
+      "elapsed": 0.013298,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_everything_at_once",
+      "status": "pass",
+      "elapsed": 0.017404,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "disabled_expands_nested_templates",
+      "status": "pass",
+      "elapsed": 0.012684,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_queue",
+      "status": "pass",
+      "elapsed": 0.012283,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "stats_report_the_worst_frame",
+      "status": "pass",
+      "elapsed": 0.012559,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "template_declared_before_import_is_marked",
+      "status": "pass",
+      "elapsed": 0.011797,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "removed_and_readded_pending_runs_once",
+      "status": "pass",
+      "elapsed": 0.011766,
+      "project": "script"
+    },
+    {
+      "suite": "Incremental",
+      "case": "multiple_templates_on_one_instance_expand",
+      "status": "pass",
+      "elapsed": 0.01164,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_to_the_camera_first",
+      "status": "pass",
+      "elapsed": 0.078916,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "reorder_when_the_camera_moves",
+      "status": "pass",
+      "elapsed": 0.075038,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "nearest_first_off_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.079227,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "no_camera_keeps_script_order",
+      "status": "pass",
+      "elapsed": 0.078847,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "instance_without_position_goes_first",
+      "status": "pass",
+      "elapsed": 0.078789,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "world_position_orders_a_child_instance",
+      "status": "pass",
+      "elapsed": 0.078687,
+      "project": "script"
+    },
+    {
+      "suite": "Order",
+      "case": "new_near_instance_precedes_queued_far_instance",
+      "status": "pass",
+      "elapsed": 0.078406,
+      "project": "script"
+    },
+    {
+      "suite": "Async",
+      "case": "a_waiter_in_a_manual_template_resumes",
+      "status": "pass",
+      "elapsed": 0.078436,
+      "project": "script"
+    },
+    {
+      "suite": "Async",
+      "case": "several_waiters_resume_on_one_action",
+      "status": "pass",
+      "elapsed": 0.078323,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "rewritten_file_is_reloaded",
+      "status": "pass",
+      "elapsed": 0.076493,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "parse_error_keeps_the_scene",
+      "status": "pass",
+      "elapsed": 0.071592,
+      "project": "script"
+    },
+    {
+      "suite": "Reload",
+      "case": "reloaded_instances_are_pending",
+      "status": "pass",
+      "elapsed": 0.071131,
+      "project": "script"
+    }
+  ],
+  "projects": [
+    {
+      "project": "editor",
+      "pass": 9,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.206974
+    },
+    {
+      "project": "editor",
+      "pass": 14,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.403895
+    },
+    {
+      "project": "script",
+      "pass": 26,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.175711
+    }
+  ]
+}

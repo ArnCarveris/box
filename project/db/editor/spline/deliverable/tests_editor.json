@@ -1,0 +1,20 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:47Z",
+  "pass": 9,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.342194,
+  "tests": [
+    {"suite": "Spline", "case": "selecting_a_spline_draws_a_handle_per_point", "status": "pass", "elapsed": 0.212443},
+    {"suite": "Spline", "case": "handles_sit_on_the_world_points", "status": "pass", "elapsed": 0.154968},
+    {"suite": "Spline", "case": "guide_follows_the_selected_spline", "status": "pass", "elapsed": 0.156800},
+    {"suite": "Spline", "case": "guide_is_hidden_without_a_spline", "status": "pass", "elapsed": 0.245107},
+    {"suite": "Spline", "case": "point_selects_a_control_point", "status": "pass", "elapsed": 0.113211},
+    {"suite": "Spline", "case": "point_add_inserts_after_the_selected_point", "status": "pass", "elapsed": 0.115107},
+    {"suite": "Spline", "case": "point_add_extends_the_end", "status": "pass", "elapsed": 0.114514},
+    {"suite": "Spline", "case": "point_remove_deletes_the_selected_point", "status": "pass", "elapsed": 0.115002},
+    {"suite": "Spline", "case": "dragging_a_handle_moves_its_point", "status": "pass", "elapsed": 0.228758}
+  ]
+}
