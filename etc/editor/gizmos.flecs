@@ -1,7 +1,8 @@
 // The gizmos of the scene editor. box.editor loads this script at import into
 // box.editor.gizmos and draws MoveGizmo, RotateGizmo or ScaleGizmo through
-// box.draw over the selection, and a PointHandle on every control point of a
-// selected spline. A handle carries a GizmoHandle that says what dragging it
+// box.draw over the selection, twelve SelectionEdge instances around the bounds
+// of the selection while the select tool is active, and a PointHandle on every
+// control point of a selected spline. A handle carries a GizmoHandle that says what dragging it
 // changes; the press and the drags reach the editor through editor.grab and
 // editor.pull, so the math lives in the engine and the interaction here.
 module box.editor.gizmos
@@ -222,6 +223,13 @@ template ScaleGizmo {
   Handle xyz(mode: HandleScale, axes: 7, color: white) {
     Box: {0.18, 0.18, 0.18}
   }
+}
+
+// One edge of the box drawn around the bounds of the selection, a unit box along x.
+template SelectionEdge {
+  NoCollider
+  Box: {1, 1, 1}
+  Rgb: {255, 160, 40}
 }
 
 // A control point of a spline, orange while it is the selected point.

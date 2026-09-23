@@ -81,6 +81,7 @@ static EditorField* box_editor_field(
     ecs_vec_init_t(NULL, &field->options, char*, 0);
     field->option = -1;
     field->editable = editable;
+    field->expanded = true;
 
     return field;
 }
@@ -416,15 +417,24 @@ static void box_editor_id_fields(
     } else if (meta && meta->kind == EcsStructType) {
         bool editable = !box_editor_engine_written(world, id) &&
             box_editor_editable(world, e, id);
-        box_editor_field(inspector, id, NULL, name, FieldHeader, "", editable);
-        void *ptr = ECS_CONST_CAST(void*, ecs_get_id(world, e, id));
-        ecs_meta_cursor_t cur = ecs_meta_cursor(world, id, ptr);
-        box_editor_members(world, inspector, &cur, id, "", 0, editable);
+        bool expanded = ecs_map_get(&box_editor_state(world)->collapsed, id) == NULL;
+        EditorField *header = box_editor_field(
+            inspector, id, NULL, name, FieldHeader, "", editable);
+        header->expanded = expanded;
+        if (expanded) {
+            void *ptr = ECS_CONST_CAST(void*, ecs_get_id(world, e, id));
+            ecs_meta_cursor_t cur = ecs_meta_cursor(world, id, ptr);
+            box_editor_members(world, inspector, &cur, id, "", 0, editable);
+        }
     } else if (meta) {
-        char *value = ecs_ptr_to_expr(world, id, ecs_get_id(world, e, id));
-        box_editor_field(inspector, id, NULL, name, FieldHeader, "", false);
-        box_editor_field(inspector, id, "", "value", FieldValue, value, false);
-        ecs_os_free(value);
+        bool expanded = ecs_map_get(&box_editor_state(world)->collapsed, id) == NULL;
+        EditorField *header = box_editor_field(inspector, id, NULL, name, FieldHeader, "", false);
+        header->expanded = expanded;
+        if (expanded) {
+            char *value = ecs_ptr_to_expr(world, id, ecs_get_id(world, e, id));
+            box_editor_field(inspector, id, "", "value", FieldValue, value, false);
+            ecs_os_free(value);
+        }
     }
 
     ecs_os_free(name);
@@ -446,8 +456,9 @@ static char* box_editor_fields_text(
         (uint32_t)inspector->entity);
     for (i = 0; i < count; i ++) {
         const EditorField *f = ecs_vec_get_t(&inspector->fields, EditorField, i);
-        ecs_strbuf_append(&buf, "%u:%s:%s:%d:%s:%d:%d;", (uint32_t)f->component,
-            f->member, f->label, (int)f->kind, f->value, f->option, (int)f->editable);
+        ecs_strbuf_append(&buf, "%u:%s:%s:%d:%s:%d:%d:%d;", (uint32_t)f->component,
+            f->member, f->label, (int)f->kind, f->value, f->option, (int)f->editable,
+            (int)f->expanded);
     }
 
     return ecs_strbuf_get(&buf);
@@ -532,6 +543,19 @@ bool box_editor_assign(
     result = true;
 done:
     return result;
+}
+
+void box_editor_collapse(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    bool collapsed)
+{
+    EditorState *state = box_editor_state(world);
+    if (collapsed) {
+        ecs_map_ensure(&state->collapsed, component)[0] = 1;
+    } else {
+        ecs_map_remove(&state->collapsed, component);
+    }
 }
 
 /** Disable every enabled input map, remembering which ones.

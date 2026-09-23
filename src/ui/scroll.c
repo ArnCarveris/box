@@ -38,24 +38,26 @@ static float box_ui_scroll_max(
 
 /** Offset an axis keeps after its content and its box were measured.
  *
- * An offset at the end of the content stays at the end, so an appended log stays on its
- * last line; other offsets are clamped. An element never laid out keeps its authored
- * offset.
+ * With FollowEnd an offset at the end of the content stays at the end, so an
+ * appended log stays on its last line; other offsets, and every offset of a
+ * FollowStart element, are clamped. An element never laid out keeps its offset.
  *
  * @param offset Offset the element carries
  * @param was Largest offset of the previous layout
  * @param max Largest offset of this layout
  * @param measured The element was laid out before
+ * @param follow What the offset does when the content grows
  * @return The offset the element ends the pass with
  */
 static float box_ui_scroll_offset(
     float offset,
     float was,
     float max,
-    bool measured)
+    bool measured,
+    ScrollFollow follow)
 {
     float result = offset;
-    if (measured && offset >= was && max > was) {
+    if (measured && follow == FollowEnd && offset >= was && max > was) {
         result = max;
     }
 
@@ -84,9 +86,9 @@ void box_ui_scroll_resolve(
     float max_y = box_ui_scroll_max(scroll->y, p->content_height, p->height);
     bool measured = impl != NULL && impl->measured;
     float x = box_ui_scroll_offset(scroll->offset.x,
-        impl ? impl->max_x : 0, max_x, measured);
+        impl ? impl->max_x : 0, max_x, measured, scroll->follow);
     float y = box_ui_scroll_offset(scroll->offset.y,
-        impl ? impl->max_y : 0, max_y, measured);
+        impl ? impl->max_y : 0, max_y, measured, scroll->follow);
 
     if (impl) {
         impl->content_width = p->content_width;

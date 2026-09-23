@@ -118,11 +118,14 @@ void Spline_guide_is_hidden_without_a_spline(void)
     ecs_entity_t guide = ecs_lookup(w, "box.editor.guide");
     test_assert(guide != 0);
     test_assert(ecs_has_id(w, guide, Hidden));
+    ecs_entity_t asset = ecs_lookup(w, "box.editor.gizmos.PointHandle");
     ecs_iter_t it = ecs_each(w, DrawInstance);
     while (ecs_each_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
-            test_assert(ecs_has_id(w, it.entities[i], Hidden));
+            if (ecs_get(w, it.entities[i], DrawInstance)->asset == asset) {
+                test_assert(ecs_has_id(w, it.entities[i], Hidden));
+            }
         }
     }
 }

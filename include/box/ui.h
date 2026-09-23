@@ -180,19 +180,26 @@ ECS_ENUM(Overflow, {
     OverflowAuto = 3     /**< The content is clipped and the wheel moves it when it is larger */
 });
 
+/** What the offset of a scrolling element does when its content grows */
+ECS_ENUM(ScrollFollow, {
+    FollowEnd = 0,   /**< An offset at the end stays at the end, so a log shows its last line */
+    FollowStart = 1  /**< The offset stays where it is, so a list keeps showing its top */
+});
+
 /** Clips the content of an element to its box and moves it by an offset.
  *
  * A non Visible axis clips the subtree to the Bounds. The offset, in logical
  * pixels with x right and y down, moves the content but not anchored children.
  *
- * The framework clamps the offset to the content, and an offset at the end stays
- * at the end as the content grows. The wheel moves the innermost Scroll or
- * larger Auto axis under the cursor; Hidden clips but ignores the wheel.
+ * The framework clamps the offset to the content; follow says whether an offset
+ * at the end stays at the end as the content grows. The wheel moves the innermost
+ * Scroll or larger Auto axis under the cursor; Hidden clips but ignores the wheel.
  */
 ECS_STRUCT(Scroll, {
-    Overflow x;   /**< What the element does with content wider than its box */
-    Overflow y;   /**< What the element does with content taller than its box */
-    vec2 offset;  /**< Logical pixels the content is moved by, right and down */
+    Overflow x;          /**< What the element does with content wider than its box */
+    Overflow y;          /**< What the element does with content taller than its box */
+    vec2 offset;         /**< Logical pixels the content is moved by, right and down */
+    ScrollFollow follow; /**< What the offset does when the content grows */
 });
 
 /** Font a text element rasterizes its glyphs with, inherited by its subtree.

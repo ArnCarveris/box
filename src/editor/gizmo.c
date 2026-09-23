@@ -3,7 +3,8 @@
  * @brief The transform gizmos: drawing them over the selection and the math of a drag.
  *
  * The gizmo of the tool is drawn through box.draw every frame at the world
- * position of the selection, sized by its distance to the camera.
+ * position of the selection, sized by its distance to the camera, and the
+ * select tool draws a box around the bounds of the selection instead.
  *
  * A handle that is pressed records where the drag started; every drag maps the
  * cursor ray back onto the axis or the plane of the handle and moves the selection.
@@ -541,6 +542,93 @@ done:
     return result;
 }
 
+/** World bounds of the selection: of its instance, its AABB or its collider.
+ *
+ * @param world The world
+ * @param e The selected entity
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ * @return true when the selection has bounds with some extent
+ */
+static bool box_editor_bounds(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    vec3 *min,
+    vec3 *max)
+{
+    const RootBounds *rb = ecs_get(world, e, RootBounds);
+    const AABB *aabb = ecs_get(world, e, AABB);
+    const Collider *collider = ecs_get(world, e, Collider);
+    bool result = false;
+    if (rb && rb->count) {
+        *min = rb->min;
+        *max = rb->max;
+        result = true;
+    } else if (aabb && (aabb->max.x > aabb->min.x || aabb->max.y > aabb->min.y)) {
+        *min = aabb->min;
+        *max = aabb->max;
+        result = true;
+    } else if (collider) {
+        box_collider_bounds(collider, min, max);
+        result = true;
+    }
+
+    return result && (max->x - min->x > 0 || max->y - min->y > 0 || max->z - min->z > 0);
+}
+
+/** Draw the twelve edges of the box around the bounds of the selection.
+ *
+ * @param world The world
+ * @param editor The editor singleton
+ * @param eye Position of the camera
+ */
+static void box_editor_draw_selection(
+    ecs_world_t *world,
+    const Editor *editor,
+    vec3 eye)
+{
+    ecs_entity_t asset = ecs_lookup(world, "box.editor.gizmos.SelectionEdge");
+    vec3 min, max;
+    if (!asset || !box_editor_bounds(world, editor->selected, &min, &max)) {
+        goto done;
+    }
+
+    vec3 center = vec3_scale(vec3_add(min, max), 0.5f);
+    vec3 size = vec3_sub(max, min);
+    float t = vec3_length(vec3_sub(center, eye)) * BOX_EDITOR_GIZMO_SIZE * BOX_EDITOR_EDGE_SIZE;
+    float half = 1.5707963f;
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        int32_t axis = i / 4;
+        float a = (i & 1) ? 0.5f : -0.5f;
+        float b = (i & 2) ? 0.5f : -0.5f;
+        vec3 at = center;
+        vec3 scale = vec3_new(t, t, t);
+        vec3 rotation = vec3_new(0, 0, 0);
+        if (axis == 0) {
+            at.y += a * size.y;
+            at.z += b * size.z;
+            scale.x = size.x + t;
+        } else if (axis == 1) {
+            at.x += a * size.x;
+            at.z += b * size.z;
+            scale.x = size.y + t;
+            rotation.z = half;
+        } else {
+            at.x += a * size.x;
+            at.y += b * size.y;
+            scale.x = size.z + t;
+            rotation.y = half;
+        }
+
+        box_draw(world, &(box_draw_desc_t){ .asset = asset, .key = 100 + (uint64_t)i,
+            .position = at, .rotation = rotation, .scale = scale, .overlay = true });
+    }
+
+done:
+    return;
+}
+
 /** Draw the gizmo of the tool at the selection.
  *
  * @param world The world
@@ -554,7 +642,12 @@ static void box_editor_draw_tool(
 {
     const char *names[] = { NULL, "MoveGizmo", "RotateGizmo", "ScaleGizmo" };
     ecs_entity_t e = editor->selected;
-    if (editor->tool == ToolSelect || !editor->transform || !ecs_has(world, e, Position)) {
+    if (editor->tool == ToolSelect) {
+        box_editor_draw_selection(world, editor, eye);
+        goto done;
+    }
+
+    if (!editor->transform || !ecs_has(world, e, Position)) {
         goto done;
     }
 

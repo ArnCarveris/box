@@ -43,6 +43,24 @@ static void box_editor_fn_expand(
     *(bool*)result->ptr = true;
 }
 
+/** editor.collapse: hide or show the members of a component in the inspector.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments: the component and whether its members are hidden
+ * @param result Receives true
+ */
+static void box_editor_fn_collapse(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    (void)argc;
+    box_editor_collapse(ctx->world, *(ecs_entity_t*)argv[0].ptr, *(bool*)argv[1].ptr);
+    *(bool*)result->ptr = true;
+}
+
 /** editor.open: open an instance, hiding the rest of the scene.
  *
  * @param ctx The call context
@@ -242,6 +260,13 @@ void box_editor_functions_init(
     ecs_function(world, { .name = "expand", .parent = scope, .return_type = boolean,
         .params = {{ .name = "entity", .type = entity }, { .name = "expanded", .type = boolean }},
         .callback = box_editor_fn_expand });
+
+    ecs_function(world, { .name = "collapse", .parent = scope, .return_type = boolean,
+        .params = {
+            { .name = "component", .type = entity },
+            { .name = "collapsed", .type = boolean }
+        },
+        .callback = box_editor_fn_collapse });
 
     ecs_function(world, { .name = "open", .parent = scope, .return_type = boolean,
         .params = {{ .name = "entity", .type = entity }},

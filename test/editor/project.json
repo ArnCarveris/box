@@ -58,7 +58,9 @@
                     "rows_are_widgets_in_model_order",
                     "clicking_a_row_selects_its_entity",
                     "clicking_the_arrow_expands_the_row",
-                    "tree_follows_a_scene_that_changed"
+                    "tree_follows_a_scene_that_changed",
+                    "variables_of_flecs_core_have_no_children",
+                    "rows_scroll_with_the_wheel"
                 ],
                 "setup": true,
                 "teardown": true
@@ -83,7 +85,12 @@
                     "submitted_line_of_a_bound_input_is_assigned",
                     "focused_field_captures_the_input_maps",
                     "grid_rows_are_widgets",
-                    "clicking_a_checkbox_flips_the_member"
+                    "clicking_a_checkbox_flips_the_member",
+                    "collapsing_a_component_hides_its_members",
+                    "clicking_a_header_collapses_its_component",
+                    "fields_scroll_with_the_wheel",
+                    "hovering_rows_after_a_collapse",
+                    "rows_keep_the_children_of_their_template"
                 ],
                 "setup": true,
                 "teardown": true
@@ -107,7 +114,7 @@
             {
                 "id": "Gizmo",
                 "testcases": [
-                    "select_tool_draws_nothing",
+                    "select_tool_draws_the_selection_box",
                     "move_tool_draws_the_move_gizmo_at_the_selection",
                     "gizmo_is_drawn_in_the_overlay_layer",
                     "gizmo_scales_with_the_distance_to_the_camera",

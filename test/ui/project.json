@@ -403,7 +403,8 @@
                     "offset_moves_the_glyphs_of_a_text",
                     "log_that_grows_stays_at_the_end",
                     "log_that_grows_stays_put_after_a_scroll_up",
-                    "hit_test_skips_a_clipped_node"
+                    "hit_test_skips_a_clipped_node",
+                    "start_follow_keeps_the_offset_as_the_content_grows"
                 ],
                 "setup": true,
                 "teardown": true

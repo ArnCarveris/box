@@ -294,3 +294,62 @@ void Tree_tree_follows_a_scene_that_changed(void)
 
     test_bool(seen, true);
 }
+
+void Tree_variables_of_flecs_core_have_no_children(void)
+{
+    // editor/module
+    box_editor_expand(w, ecs_lookup(w, "flecs"), true);
+    box_editor_expand(w, ecs_lookup(w, "flecs.core"), true);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    const EditorTree *tree = ecs_singleton_get(w, EditorTree);
+    int32_t i, count = ecs_vec_count(&tree->rows);
+    bool seen = false;
+    for (i = 0; i < count; i ++) {
+        const EditorNode *n = ecs_vec_get_t(&tree->rows, EditorNode, i);
+        if (n->entity == EcsWildcard || n->entity == EcsAny || n->entity == EcsThis) {
+            test_bool(n->children, false);
+            seen = true;
+        }
+    }
+
+    test_bool(seen, true);
+    box_editor_expand(w, EcsWildcard, true);
+    ecs_progress(w, 0);
+}
+
+void Tree_rows_scroll_with_the_wheel(void)
+{
+    // editor/ui
+    int32_t i;
+    for (i = 0; i < 60; i ++) {
+        char name[16];
+        snprintf(name, sizeof(name), "row_%02d", i);
+        ecs_entity(w, { .name = name });
+    }
+
+    box_editor_expand(w, 0, true);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t rows = ecs_lookup(w, "box.editor.ui.overlay.tree_panel.rows");
+    const Bounds *b = ecs_get(w, rows, Bounds);
+    test_assert(b != NULL);
+    test_assert(b->height <= 720);
+    const Scroll *scroll = ecs_get(w, rows, Scroll);
+    test_assert(scroll != NULL);
+    test_flt(scroll->offset.y, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {130, 400} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputScroll, .value = {0, -3} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    float moved = ecs_get(w, rows, Scroll)->offset.y;
+    if (moved == 0) {
+        box_input_inject(w, &(InputEvent){ .kind = InputScroll, .value = {0, 3} });
+        ecs_progress(w, 0);
+        ecs_progress(w, 0);
+        moved = ecs_get(w, rows, Scroll)->offset.y;
+    }
+
+    test_assert(moved != 0);
+}

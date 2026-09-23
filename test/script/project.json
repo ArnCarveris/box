@@ -55,6 +55,15 @@
                     "parse_error_keeps_the_scene",
                     "reloaded_instances_are_pending"
                 ]
+            },
+            {
+                "id": "Template",
+                "testcases": [
+                    "switching_templates_keeps_a_child_of_the_same_name",
+                    "switching_templates_without_a_loop_keeps_the_child",
+                    "switching_templates_keeps_a_tag_both_templates_add",
+                    "adding_a_tag_the_template_tests_for_reinstantiates"
+                ]
             }
         ]
     }

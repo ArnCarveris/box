@@ -101,6 +101,7 @@ ECS_STRUCT(EditorField, {
     ecs_vec(char*) options;       /**< Constants of an enum field */
     int32_t option;               /**< Index of the value among the options */
     bool editable;                /**< The value may be changed */
+    bool expanded;                /**< The members of a header are shown below it */
 });
 
 /** The property grid of the selection, written by the engine while the editor is on */
@@ -154,6 +155,9 @@ ECS_STRUCT(EditorBinding, {
 
 /** Fraction of the distance to the camera a gizmo spans */
 #define BOX_EDITOR_GIZMO_SIZE (0.15f)
+
+/** Fraction of the gizmo size the edges of the selection box are thick */
+#define BOX_EDITOR_EDGE_SIZE (0.02f)
 
 /** Register the box.editor module.
  *

@@ -32,6 +32,7 @@ const selection: Rgb = {31, 66, 52}
 const tree_w = 260
 const insp_w = 340
 const row_h = 22
+const header_h = 28
 const label_w = 120
 const field_w = insp_w - label_w - 30
 
@@ -167,14 +168,18 @@ template TreeRow {
   arrow {
     HitThrough
     Layout: {width: 12, height: row_h, v: Middle, h: Center}
-    Font: {size: 11}
-    Rgb: text_3
-    if children && expanded {
-      Text: {value: "v"}
-    } else if children {
-      Text: {value: ">"}
-    } else {
-      Text: {value: ""}
+
+    glyph {
+      HitThrough
+      Font: {size: 12}
+      Rgb: text_3
+      if children && expanded {
+        Text: {value: "v"}
+      } else if children {
+        Text: {value: ">"}
+      } else {
+        Text: {value: ""}
+      }
     }
   }
 
@@ -249,19 +254,49 @@ template FieldRow {
   }
 }
 
-// The name of a component above the rows of its members.
+// The name of a component above the rows of its members, which a click folds away.
 template HeaderRow {
   prop label = ""
+  prop component: entity = 0
+  prop expanded = true
 
-  Layout: {direction: Row, height: row_h + 2, padding_left: 8, v: Middle, h: Left, width: insp_w}
+  Layout: {direction: Row, spacing: 4, height: row_h + 2, padding_left: 8, v: Middle, h: Left, width: insp_w}
   Rect: {}
-  Rgb: bg_mute
+
+  if this?[Hovered] {
+    Rgb: border
+  } else {
+    Rgb: bg_mute
+  }
+
+  arrow {
+    HitThrough
+    Layout: {width: 12, height: row_h, v: Middle, h: Center}
+
+    glyph {
+      HitThrough
+      Font: {size: 12}
+      Rgb: text_3
+      if expanded {
+        Text: {value: "v"}
+      } else {
+        Text: {value: ">"}
+      }
+    }
+  }
 
   name {
     HitThrough
     Text: {value: label}
     Font: {size: 12}
     Rgb: {88, 166, 255}
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.collapse(component, expanded)
+    }
   }
 }
 
@@ -571,8 +606,20 @@ if ed.enabled {
       Rect: {}
       Rgb: bg_soft
 
+      rows {
+        Layout: {direction: Column, width: tree_w, h: Left, v: Top, padding_top: header_h}
+        Fill: {height: 1}
+        Scroll: {y: Auto, follow: FollowStart}
+
+        for (i, r) in tree.rows {
+          TreeRow "n_{r.id}"(index: i, entity: r.entity, label: r.name, depth: r.depth,
+            kind: r.kind, expanded: r.expanded, children: r.children, selected: r.selected)
+        }
+      }
+
       header {
-        Layout: {height: 28, padding_left: 10, v: Middle, h: Left, width: tree_w}
+        Anchor: {h: Left, v: Top}
+        Layout: {height: header_h, padding_left: 10, v: Middle, h: Left, width: tree_w}
         Rect: {}
         Rgb: bg
 
@@ -581,17 +628,6 @@ if ed.enabled {
           Text: {value: "Scene"}
           Font: {size: 13}
           Rgb: text_2
-        }
-      }
-
-      rows {
-        Layout: {direction: Column, width: tree_w, h: Left, v: Top}
-        Grow: {height: 1}
-        Scroll: {y: Auto}
-
-        for (i, r) in tree.rows {
-          TreeRow "n_{r.id}"(index: i, entity: r.entity, label: r.name, depth: r.depth,
-            kind: r.kind, expanded: r.expanded, children: r.children, selected: r.selected)
         }
       }
     }
@@ -603,31 +639,14 @@ if ed.enabled {
       Rect: {}
       Rgb: bg_soft
 
-      header {
-        Layout: {height: 28, padding_left: 10, v: Middle, h: Left, width: insp_w}
-        Rect: {}
-        Rgb: bg
-
-        title {
-          HitThrough
-          if insp.entity != 0 {
-            Text: {value: insp.name}
-          } else {
-            Text: {value: "Nothing selected"}
-          }
-          Font: {size: 13}
-          Rgb: text_2
-        }
-      }
-
       fields {
-        Layout: {direction: Column, width: insp_w, h: Left, v: Top}
-        Grow: {height: 1}
-        Scroll: {y: Auto}
+        Layout: {direction: Column, width: insp_w, h: Left, v: Top, padding_top: header_h}
+        Fill: {height: 1}
+        Scroll: {y: Auto, follow: FollowStart}
 
         for (i, f) in insp.fields {
           if f.kind == FieldHeader {
-            HeaderRow "f_{i}"(label: f.label)
+            HeaderRow "f_{i}"(label: f.label, component: f.component, expanded: f.expanded)
           } else if f.kind == FieldTag {
             TagRow "f_{i}"(label: f.label)
           } else if f.kind == FieldBool {
@@ -642,6 +661,24 @@ if ed.enabled {
             TextField "f_{i}"(label: f.label, component: f.component, member: f.member,
               value: f.value, editable: f.editable)
           }
+        }
+      }
+
+      header {
+        Anchor: {h: Left, v: Top}
+        Layout: {height: header_h, padding_left: 10, v: Middle, h: Left, width: insp_w}
+        Rect: {}
+        Rgb: bg
+
+        title {
+          HitThrough
+          if insp.entity != 0 {
+            Text: {value: insp.name}
+          } else {
+            Text: {value: "Nothing selected"}
+          }
+          Font: {size: 13}
+          Rgb: text_2
         }
       }
     }

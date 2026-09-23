@@ -46,6 +46,7 @@ typedef struct box_editor_grab_t {
 /** Private state of the module, a singleton */
 typedef struct EditorState {
     ecs_map_t expanded;      /**< Entities whose children the tree shows */
+    ecs_map_t collapsed;     /**< Components whose members the inspector hides */
     ecs_vec_t levels;        /**< box_editor_level_t, the opened instances */
     ecs_vec_t captured;      /**< Input maps disabled while a field has the focus */
     ecs_query_t *roots;      /**< Entities without a parent */
@@ -228,6 +229,17 @@ bool box_editor_assign(
     ecs_entity_t component,
     const char *member,
     const char *value);
+
+/** Hide or show the members of a component in the inspector.
+ *
+ * @param world The world
+ * @param component The component
+ * @param collapsed Whether its members are hidden
+ */
+void box_editor_collapse(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    bool collapsed);
 
 /** Apply the lines the bound text inputs submitted and capture the input maps.
  *

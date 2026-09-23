@@ -44,12 +44,27 @@ static int box_editor_child_compare(
     return result;
 }
 
+/** Tell whether an entity is a query variable rather than something with children.
+ *
+ * @param e The entity
+ * @return true for the wildcards and the this and variable entities of flecs
+ */
+static bool box_editor_is_variable(
+    ecs_entity_t e)
+{
+    return e == EcsWildcard || e == EcsAny || e == EcsThis || e == EcsVariable;
+}
+
 void box_editor_children(
     ecs_world_t *world,
     ecs_entity_t parent,
     ecs_vec_t *out)
 {
     EditorState *state = box_editor_state(world);
+    if (box_editor_is_variable(parent)) {
+        goto done;
+    }
+
     ecs_iter_t it = parent ? ecs_children(world, parent) : ecs_query_iter(world, state->roots);
     ecs_iter_next_action_t next = parent ? ecs_children_next : ecs_query_next;
     while (next(&it)) {
@@ -58,6 +73,9 @@ void box_editor_children(
             ecs_vec_append_t(NULL, out, ecs_entity_t)[0] = it.entities[i];
         }
     }
+
+done:
+    return;
 }
 
 /** Tell whether an entity has at least one child.
@@ -70,12 +88,18 @@ static bool box_editor_has_children(
     ecs_world_t *world,
     ecs_entity_t e)
 {
+    bool result = false;
+    if (box_editor_is_variable(e)) {
+        goto done;
+    }
+
     ecs_iter_t it = ecs_children(world, e);
-    bool result = ecs_children_next(&it);
+    result = ecs_children_next(&it);
     if (result) {
         ecs_iter_fini(&it);
     }
 
+done:
     return result;
 }
 

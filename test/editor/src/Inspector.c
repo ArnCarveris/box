@@ -364,7 +364,24 @@ void Inspector_clicking_a_checkbox_flips_the_member(void)
     ecs_entity_t row = ecs_lookup_child(w, rows, name);
     ecs_entity_t box = ecs_lookup_child(w, row, "box");
     test_assert(box != 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {1100, 300} });
+    ecs_progress(w, 0);
+    float direction = -3;
+    int32_t turns = 0;
+    while (ecs_get(w, box, Bounds)->y < -330 && turns < 40) {
+        float before = ecs_get(w, box, Bounds)->y;
+        box_input_inject(w, &(InputEvent){ .kind = InputScroll, .value = {0, direction} });
+        ecs_progress(w, 0);
+        ecs_progress(w, 0);
+        if (ecs_get(w, box, Bounds)->y < before) {
+            direction = -direction;
+        }
+
+        turns ++;
+    }
+
     const Bounds *b = ecs_get(w, box, Bounds);
+    test_assert(b->y >= -330);
     box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {640 + b->x, 360 - b->y} });
     ecs_progress(w, 0);
     box_input_inject(w, &(InputEvent){
@@ -373,4 +390,196 @@ void Inspector_clicking_a_checkbox_flips_the_member(void)
     ecs_progress(w, 0);
     ecs_progress(w, 0);
     test_bool(ecs_get(w, rock, Sphere)->smooth, true);
+}
+
+void Inspector_collapsing_a_component_hides_its_members(void)
+{
+    // editor/ui
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    box_editor_collapse(w, ecs_id(Sphere), true);
+    ecs_progress(w, 0);
+    const EditorInspector *insp = ecs_singleton_get(w, EditorInspector);
+    int32_t i, count = ecs_vec_count(&insp->fields), members = 0, headers = 0;
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        if (f->component != ecs_id(Sphere)) {
+            continue;
+        }
+
+        if (f->kind == FieldHeader) {
+            test_bool(f->expanded, false);
+            headers ++;
+        } else {
+            members ++;
+        }
+    }
+
+    test_int(headers, 1);
+    test_int(members, 0);
+    box_editor_collapse(w, ecs_id(Sphere), false);
+    ecs_progress(w, 0);
+    insp = ecs_singleton_get(w, EditorInspector);
+    count = ecs_vec_count(&insp->fields);
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        if (f->component == ecs_id(Sphere) && f->kind != FieldHeader) {
+            members ++;
+        }
+    }
+
+    test_int(members, 3);
+}
+
+void Inspector_clicking_a_header_collapses_its_component(void)
+{
+    // editor/ui
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    const EditorInspector *insp = ecs_singleton_get(w, EditorInspector);
+    int32_t i, count = ecs_vec_count(&insp->fields), at = -1;
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        if (f->component == ecs_id(Sphere) && f->kind == FieldHeader) {
+            at = i;
+        }
+    }
+
+    test_assert(at >= 0);
+    char name[16];
+    snprintf(name, sizeof(name), "f_%d", at);
+    ecs_entity_t fields = ecs_lookup(w, "box.editor.ui.overlay.inspector.fields");
+    ecs_entity_t row = ecs_lookup_child(w, fields, name);
+    const Bounds *b = ecs_get(w, row, Bounds);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputMouseMove, .value = {640 + b->x, 360 - b->y} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    insp = ecs_singleton_get(w, EditorInspector);
+    count = ecs_vec_count(&insp->fields);
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        if (f->component == ecs_id(Sphere)) {
+            test_int((int)f->kind, (int)FieldHeader);
+            test_bool(f->expanded, false);
+        }
+    }
+}
+
+void Inspector_fields_scroll_with_the_wheel(void)
+{
+    // editor/ui
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t fields = ecs_lookup(w, "box.editor.ui.overlay.inspector.fields");
+    const Bounds *b = ecs_get(w, fields, Bounds);
+    test_assert(b != NULL);
+    test_assert(b->height <= 720);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {1100, 400} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputScroll, .value = {0, -3} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    float moved = ecs_get(w, fields, Scroll)->offset.y;
+    if (moved == 0) {
+        box_input_inject(w, &(InputEvent){ .kind = InputScroll, .value = {0, 3} });
+        ecs_progress(w, 0);
+        ecs_progress(w, 0);
+        moved = ecs_get(w, fields, Scroll)->offset.y;
+    }
+
+    test_assert(moved != 0);
+}
+
+void Inspector_hovering_rows_after_a_collapse(void)
+{
+    // editor/ui
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t fields = ecs_lookup(w, "box.editor.ui.overlay.inspector.fields");
+    const EditorInspector *insp = ecs_singleton_get(w, EditorInspector);
+    int32_t i, count = ecs_vec_count(&insp->fields), at = -1;
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        if (f->component == ecs_id(Position) && f->kind == FieldHeader) {
+            at = i;
+        }
+    }
+
+    test_assert(at >= 0);
+    int32_t round;
+    for (round = 0; round < 3; round ++) {
+        char name[16];
+        snprintf(name, sizeof(name), "f_%d", at);
+        ecs_entity_t row = ecs_lookup_child(w, fields, name);
+        const Bounds *b = ecs_get(w, row, Bounds);
+        box_input_inject(w, &(InputEvent){
+            .kind = InputMouseMove, .value = {640 + b->x, 360 - b->y} });
+        ecs_progress(w, 0);
+        box_input_inject(w, &(InputEvent){
+            .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+        ecs_progress(w, 0);
+        ecs_progress(w, 0);
+        ecs_progress(w, 0);
+        insp = ecs_singleton_get(w, EditorInspector);
+        count = ecs_vec_count(&insp->fields);
+        for (i = 0; i < count; i ++) {
+            snprintf(name, sizeof(name), "f_%d", i);
+            row = ecs_lookup_child(w, fields, name);
+            test_assert(row != 0);
+            b = ecs_get(w, row, Bounds);
+            test_assert(b != NULL);
+            if (b->y < -360 || b->y > 360) {
+                continue;
+            }
+
+            box_input_inject(w, &(InputEvent){
+                .kind = InputMouseMove, .value = {640 + b->x, 360 - b->y} });
+            ecs_progress(w, 0);
+            ecs_progress(w, 0);
+        }
+    }
+}
+
+void Inspector_rows_keep_the_children_of_their_template(void)
+{
+    // editor/ui
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    box_editor_collapse(w, ecs_id(Position), true);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t fields = ecs_lookup(w, "box.editor.ui.overlay.inspector.fields");
+    const EditorInspector *insp = ecs_singleton_get(w, EditorInspector);
+    int32_t i, count = ecs_vec_count(&insp->fields);
+    test_assert(count > 0);
+    for (i = 0; i < count; i ++) {
+        const EditorField *f = ecs_vec_get_t(&insp->fields, EditorField, i);
+        char name[16];
+        snprintf(name, sizeof(name), "f_%d", i);
+        ecs_entity_t row = ecs_lookup_child(w, fields, name);
+        test_assert(row != 0);
+        ecs_entity_t label = ecs_lookup_child(w, row, "name");
+        test_assert(label != 0);
+        test_str(ecs_get(w, label, Text)->value, f->label);
+        if (f->kind == FieldHeader) {
+            test_assert(ecs_lookup_child(w, row, "arrow") != 0);
+        } else if (f->kind == FieldBool) {
+            test_assert(ecs_lookup_child(w, row, "box") != 0);
+        } else if (f->kind == FieldEnum) {
+            test_assert(ecs_lookup_child(w, row, "box") != 0);
+        } else if (f->kind == FieldValue) {
+            test_assert(ecs_lookup_child(w, row, "value_text") != 0);
+        } else if (f->kind != FieldTag) {
+            test_assert(ecs_lookup_child(w, row, "input") != 0);
+        }
+    }
 }

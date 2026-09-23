@@ -274,6 +274,7 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Fill);
     ECS_META_COMPONENT(world, Grow);
     ECS_META_COMPONENT(world, Overflow);
+    ECS_META_COMPONENT(world, ScrollFollow);
     ECS_META_COMPONENT(world, Scroll);
     ECS_META_COMPONENT(world, Bounds);
     ECS_META_COMPONENT(world, BoxShadow);

@@ -588,3 +588,33 @@ void Scroll_hit_test_skips_a_clipped_node(void)
     test_uint(box_ui_hit(w, 0, 0, 0), item);
     test_uint(box_ui_hit(w, 0, 0, -120), 0);
 }
+
+void Scroll_start_follow_keeps_the_offset_as_the_content_grows(void)
+{
+    // editor/ui
+    ecs_entity_t root = ecs_entity(w, { .name = "root" });
+    ecs_add(w, root, Ui);
+    ecs_entity_t list = ecs_entity(w, { .name = "list", .parent = root });
+    ecs_set(w, list, Layout, { .direction = DirectionColumn, .width = 100, .height = 50 });
+    ecs_set(w, list, Scroll, { .y = OverflowAuto, .follow = FollowStart });
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_entity_t row = ecs_entity(w, { .parent = list });
+        ecs_set(w, row, Rect, { 100, 20 });
+    }
+
+    ecs_progress(w, 0);
+    test_flt(ecs_get(w, list, Scroll)->offset.y, 0);
+    for (i = 0; i < 6; i ++) {
+        ecs_entity_t row = ecs_entity(w, { .parent = list });
+        ecs_set(w, row, Rect, { 100, 20 });
+    }
+
+    ecs_progress(w, 0);
+    test_flt(ecs_get(w, list, Scroll)->offset.y, 0);
+    ecs_get_mut(w, list, Scroll)->follow = FollowEnd;
+    ecs_entity_t row = ecs_entity(w, { .parent = list });
+    ecs_set(w, row, Rect, { 100, 20 });
+    ecs_progress(w, 0);
+    test_flt(ecs_get(w, list, Scroll)->offset.y, 0);
+}

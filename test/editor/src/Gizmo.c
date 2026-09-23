@@ -35,13 +35,44 @@ void Gizmo_teardown(void)
     ecs_fini(w);
 }
 
-void Gizmo_select_tool_draws_nothing(void)
+void Gizmo_select_tool_draws_the_selection_box(void)
 {
     // editor/gizmos
     box_editor_select(w, rock);
     ecs_progress(w, 0);
     ecs_progress(w, 0);
-    test_int(ecs_count(w, DrawInstance), 0);
+    ecs_entity_t asset = ecs_lookup(w, "box.editor.gizmos.SelectionEdge");
+    test_assert(asset != 0);
+    int32_t edges = 0;
+    ecs_iter_t it = ecs_each(w, DrawInstance);
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const DrawInstance *d = ecs_get(w, it.entities[i], DrawInstance);
+            test_uint(d->asset, asset);
+            test_bool(d->overlay, true);
+            test_assert(!ecs_has_id(w, it.entities[i], Hidden));
+            test_assert(ecs_has_id(w, it.entities[i], NoCollider));
+            const Position *p = ecs_get(w, it.entities[i], Position);
+            test_assert(fabsf(p->x) <= 1.01f && fabsf(p->y) <= 1.01f && fabsf(p->z) <= 1.01f);
+            edges ++;
+        }
+    }
+
+    test_int(edges, 12);
+    box_editor_get(w)->tool = ToolMove;
+    box_editor_modified(w);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    it = ecs_each(w, DrawInstance);
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_get(w, it.entities[i], DrawInstance)->asset == asset) {
+                test_assert(ecs_has_id(w, it.entities[i], Hidden));
+            }
+        }
+    }
 }
 
 void Gizmo_move_tool_draws_the_move_gizmo_at_the_selection(void)

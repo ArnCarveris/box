@@ -57,6 +57,7 @@ static void box_editor_state_dtor(
         ecs_vec_fini_t(NULL, &state[i].levels, box_editor_level_t);
         ecs_vec_fini_t(NULL, &state[i].captured, ecs_entity_t);
         ecs_map_fini(&state[i].expanded);
+        ecs_map_fini(&state[i].collapsed);
         if (state[i].roots) {
             ecs_query_fini(state[i].roots);
         }
@@ -228,6 +229,7 @@ void BoxEditorImport(
 
     EditorState *state = ecs_singleton_ensure(world, EditorState);
     ecs_map_init(&state->expanded, NULL);
+    ecs_map_init(&state->collapsed, NULL);
     ecs_vec_init_t(NULL, &state->levels, box_editor_level_t, 0);
     ecs_vec_init_t(NULL, &state->captured, ecs_entity_t, 0);
     state->tree_dirty = true;
