@@ -58,3 +58,8 @@ Profiling report: /tmp/town-profile/report.md.
 Benchmark harness, pinned binaries, raw results and samples: /tmp/town-opt/.
 Newest sample: /tmp/town-opt/latest.sample; remaining hotspots include shared event routing, observer invocation/query iterator setup, script VM/entity creation, and table moves.
 Next: isolate geometry versus queue gains, profile current rendered app, and pursue generic Flecs event/observer overhead. Have a Sol agent implement identified fixes. Commit each Flecs fix separately and append SHA plus measured gain here.
+
+September 22 rollback to the requested Flecs baseline
+694b367142a4d9081ef4146c3203189d0bcccb9c  Retain only baseline-compatible OnSet dispatch. The six intervening Flecs fixes are undone; relative to 71f6962462d030da3bcec8acc477bbc83d150250, only the OnSet fast dispatch, its two regression tests, and generated files differ.
+Paired five-run isolated benchmark with current box, full scene counts in every run: baseline 932.360 ms, retained OnSet 878.252 ms, gain 54.108 ms (5.8%). Runs: baseline [932.950, 938.004, 929.014, 922.836, 932.360]; OnSet [878.110, 883.502, 876.758, 878.252, 885.463]. Build uses -O3 -DNDEBUG -flto.
+Box's local Flecs bundle updated to 694b367142a4. Flecs core 3675/3675; box script 26/26, render 399/399, geometry 116/116, transform 90/90. The previous six-fix and seven-fix benchmark rows above are historical, not current state.
