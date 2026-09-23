@@ -288,6 +288,37 @@ done:
     return;
 }
 
+/** Layers the static slot of a mesh belongs to, from the layer runs of the mesh.
+ *
+ * @param r The renderer
+ * @param mesh The mesh handle
+ * @param slot The instance slot
+ * @return The layer mask of the run that holds the slot, 0 when it joined no layer
+ */
+static uint32_t box_shadow_slot_mask(
+    box_renderer_t *r,
+    uint32_t mesh,
+    uint32_t slot)
+{
+    uint32_t result = 0;
+    if (mesh >= r->meshes.count) {
+        goto done;
+    }
+
+    box_gpu_mesh_t *m = box_vec_at(&r->meshes, mesh);
+    uint32_t g;
+    for (g = 0; g < m->groups.count; g ++) {
+        box_static_group_t *run = box_vec_at(&m->groups, g);
+        if (slot >= run->first && slot < run->first + run->count) {
+            result = run->mask;
+            break;
+        }
+    }
+
+done:
+    return result;
+}
+
 /** Mark the cascades whose cached static layer no longer holds the scene.
  *
  * @param r The renderer
@@ -314,7 +345,9 @@ static bool box_shadow_invalidate(
 
     for (i = 0; i < p->static_updates.count; i ++) {
         box_static_update_t *u = box_vec_at(&p->static_updates, i);
-        if (!(u->flags & BOX_STATIC_UPDATE_ADDED)) {
+        if (!(u->flags & BOX_STATIC_UPDATE_ADDED) &&
+            box_view_casts(view, box_shadow_slot_mask(r, u->mesh, u->slot)))
+        {
             rebuild = true;
         }
     }
