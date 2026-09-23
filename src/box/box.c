@@ -65,6 +65,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxCollision);
     ECS_IMPORT(world, BoxPicking);
     ECS_IMPORT(world, BoxSpline);
+    ECS_IMPORT(world, BoxDraw);
     ECS_IMPORT(world, BoxParticle);
     ECS_IMPORT(world, BoxController);
     ECS_IMPORT(world, BoxUi);

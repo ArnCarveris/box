@@ -1,0 +1,35 @@
+{
+    "id": "draw",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.draw module",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Draw",
+                "testcases": [
+                    "prefab_draws_an_instance_under_the_pool",
+                    "template_draws_an_instance_with_its_body",
+                    "same_key_draws_the_same_instance",
+                    "calls_without_a_key_are_numbered_by_order",
+                    "instance_not_drawn_again_is_hidden",
+                    "instance_drawn_again_is_shown",
+                    "instance_hidden_for_long_is_deleted",
+                    "instance_follows_the_transform_of_the_call",
+                    "zero_scale_draws_at_one",
+                    "live_entity_is_not_drawn",
+                    "overlay_instance_joins_the_overlay_layer",
+                    "overlay_view_draws_the_layer_with_the_scene_camera",
+                    "overlay_layer_is_hidden_from_the_scene_view"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}
