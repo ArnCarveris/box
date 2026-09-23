@@ -24,7 +24,9 @@
                     "disabled_expands_nested_templates",
                     "stats_report_the_queue",
                     "stats_report_the_worst_frame",
-                    "template_declared_before_import_is_marked"
+                    "template_declared_before_import_is_marked",
+                    "removed_and_readded_pending_runs_once",
+                    "multiple_templates_on_one_instance_expand"
                 ]
             },
             {
@@ -35,7 +37,8 @@
                     "nearest_first_off_keeps_script_order",
                     "no_camera_keeps_script_order",
                     "instance_without_position_goes_first",
-                    "world_position_orders_a_child_instance"
+                    "world_position_orders_a_child_instance",
+                    "new_near_instance_precedes_queued_far_instance"
                 ]
             },
             {

@@ -58,6 +58,24 @@ static void box_script_sift_down(
     }
 }
 
+static void box_script_push(
+    box_script_state_t *state,
+    box_script_entry_t entry)
+{
+    int32_t index = ecs_vec_count(&state->queue);
+    ecs_vec_append_t(NULL, &state->queue, box_script_entry_t)[0] = entry;
+    box_script_entry_t *entries = ecs_vec_first_t(&state->queue, box_script_entry_t);
+    while (index) {
+        int32_t parent = (index - 1) / 2;
+        if (entries[parent].key <= entries[index].key) {
+            break;
+        }
+
+        box_script_swap(&entries[parent], &entries[index]);
+        index = parent;
+    }
+}
+
 /** Turn the queue into a min heap in linear time.
  *
  * @param state The state
@@ -176,6 +194,27 @@ done:
     return result;
 }
 
+void box_script_pending_add(
+    box_script_state_t *state,
+    ecs_entity_t instance,
+    ecs_entity_t template_)
+{
+    box_script_entry_t *entry = ecs_vec_append_t(
+        NULL, &state->additions, box_script_entry_t);
+    entry->instance = instance;
+    entry->template_ = template_;
+    entry->token = ++state->next_token;
+    ecs_map_ensure(&state->queued, ecs_pair(instance, template_))[0] = entry->token;
+}
+
+void box_script_pending_remove(
+    box_script_state_t *state,
+    ecs_entity_t instance,
+    ecs_entity_t template_)
+{
+    ecs_map_remove(&state->queued, ecs_pair(instance, template_));
+}
+
 /** Collect every pending instance and order the queue.
  *
  * @param world The world
@@ -188,6 +227,8 @@ static void box_script_rebuild(
     const ScriptSettings *settings)
 {
     ecs_vec_clear(&state->queue);
+    ecs_vec_clear(&state->additions);
+    ecs_map_clear(&state->queued);
     bool by_distance = settings->nearest_first && state->has_eye;
     double seq = 0;
     ecs_iter_t it = ecs_query_iter(world, state->query);
@@ -201,6 +242,9 @@ static void box_script_rebuild(
                 NULL, &state->queue, box_script_entry_t);
             e->instance = it.entities[i];
             e->template_ = template_;
+            e->token = ++state->next_token;
+            ecs_map_ensure(&state->queued,
+                ecs_pair(e->instance, e->template_))[0] = e->token;
             e->key = by_distance
                 ? box_script_key(state, p ? &p[i] : NULL, wt ? &wt[i] : NULL)
                 : seq;
@@ -209,8 +253,47 @@ static void box_script_rebuild(
     }
 
     box_script_heapify(state);
+    state->next_order = seq;
     state->dirty = false;
     state->age = 0;
+}
+
+static void box_script_insert_additions(
+    ecs_world_t *world,
+    box_script_state_t *state,
+    const ScriptSettings *settings)
+{
+    bool by_distance = settings->nearest_first && state->has_eye;
+    box_script_entry_t *entries = ecs_vec_first_t(
+        &state->additions, box_script_entry_t);
+    int32_t i, count = ecs_vec_count(&state->additions);
+    for (i = 0; i < count; i ++) {
+        box_script_entry_t entry = entries[i];
+        ecs_id_t key = ecs_pair(entry.instance, entry.template_);
+        ecs_map_val_t *token = ecs_map_get(&state->queued, key);
+        if (!token || token[0] != entry.token) {
+            continue;
+        }
+
+        if (!ecs_has_pair(world, entry.instance,
+            EcsScriptTemplatePending, entry.template_))
+        {
+            ecs_map_remove(&state->queued, key);
+            continue;
+        }
+
+        if (by_distance) {
+            const Position *p = ecs_get(world, entry.instance, Position);
+            const WorldTransform *wt = ecs_get(world, entry.instance, WorldTransform);
+            entry.key = box_script_key(state, p, wt);
+        } else {
+            entry.key = state->next_order ++;
+        }
+
+        box_script_push(state, entry);
+    }
+
+    ecs_vec_clear(&state->additions);
 }
 
 /** Rebuild the queue when it went stale, the camera moved or it aged out.
@@ -231,11 +314,14 @@ static void box_script_refresh(
         : 0;
     double threshold = settings->reorder_distance * settings->reorder_distance;
     bool stale = state->dirty || has_eye != state->has_eye || moved > threshold ||
-        (settings->reorder_interval > 0 && state->age >= settings->reorder_interval);
+        (settings->reorder_interval > 0 &&
+            ecs_vec_count(&state->queue) && state->age >= settings->reorder_interval);
     state->eye = eye;
     state->has_eye = has_eye;
-    if (stale && (state->dirty || ecs_vec_count(&state->queue))) {
+    if (stale) {
         box_script_rebuild(world, state, settings);
+    } else if (ecs_vec_count(&state->additions)) {
+        box_script_insert_additions(world, state, settings);
     }
 }
 
@@ -287,6 +373,16 @@ static int32_t box_script_expand(
             break;
         }
 
+        ecs_id_t key = ecs_pair(entry.instance, entry.template_);
+        ecs_map_val_t *token = ecs_map_get(&state->queued, key);
+        if (!token || token[0] != entry.token ||
+            !ecs_has_pair(world, entry.instance,
+                EcsScriptTemplatePending, entry.template_))
+        {
+            continue;
+        }
+
+        ecs_map_remove(&state->queued, key);
         if (!ecs_script_template_update(world, entry.instance, entry.template_)) {
             done ++;
         }
@@ -300,6 +396,8 @@ box_script_state_t* box_script_state_new(
 {
     box_script_state_t *result = ecs_os_calloc_t(box_script_state_t);
     ecs_vec_init_t(NULL, &result->queue, box_script_entry_t, 0);
+    ecs_vec_init_t(NULL, &result->additions, box_script_entry_t, 0);
+    ecs_map_init(&result->queued, NULL);
     result->dirty = true;
     result->query = ecs_query(world, {
         .terms = {
@@ -320,6 +418,8 @@ void box_script_state_free(
     }
 
     ecs_vec_fini_t(NULL, &state->queue, box_script_entry_t);
+    ecs_vec_fini_t(NULL, &state->additions, box_script_entry_t);
+    ecs_map_fini(&state->queued);
     ecs_os_free(state);
 }
 
@@ -340,7 +440,7 @@ void box_script_drain(
         box_script_refresh(world, state, settings);
         round = box_script_expand(world, state, limit, budget, &start);
         done += round;
-        if (!all || !state->dirty) {
+        if (!all || !ecs_vec_count(&state->additions)) {
             round = 0;
         }
     }
@@ -350,8 +450,8 @@ void box_script_drain(
         state->worst_ms = elapsed;
     }
 
-    state->age ++;
-    stats->pending = ecs_vec_count(&state->queue);
+    state->age = ecs_map_count(&state->queued) ? state->age + 1 : 0;
+    stats->pending = ecs_map_count(&state->queued);
     stats->instantiated = done;
     stats->worst_frame_ms = state->worst_ms;
 }

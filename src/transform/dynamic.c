@@ -172,12 +172,6 @@ void box_transform_dynamic_init(
         .callback = BoxTransformOnDynamicParent
     });
 
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(EcsParent) }},
-        .events = { EcsOnSet },
-        .callback = BoxTransformOnDynamicParent
-    });
-
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxTransformDynamicUpdate" }),
         .phase = EcsPostUpdate,

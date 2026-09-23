@@ -279,7 +279,7 @@ static void box_render_watch(
     ecs_observer(world, {
         .query.terms = {
             { .id = component },
-            { .id = ecs_id(RenderMesh), .inout = EcsInOutNone }
+            { .id = ecs_id(RenderMesh), .inout = EcsInOutFilter }
         },
         .events = { EcsOnSet },
         .callback = box_render_on_change

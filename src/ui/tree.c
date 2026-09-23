@@ -639,12 +639,6 @@ void box_ui_tree_init(
     });
 
     ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(EcsParent) }},
-        .events = { EcsOnSet, EcsOnRemove },
-        .callback = box_ui_on_parent
-    });
-
-    ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(RenderInstance), .inout = EcsInOutNone }},
         .events = { EcsOnAdd },
         .callback = box_ui_on_instance

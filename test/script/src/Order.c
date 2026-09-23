@@ -260,3 +260,48 @@ void Order_world_position_orders_a_child_instance(void)
 
     ecs_fini(world);
 }
+
+void Order_new_near_instance_precedes_queued_far_instance(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
+    settings->enabled = true;
+    settings->templates_per_frame = 1;
+    settings->budget_ms = 0;
+    settings->reorder_interval = 100;
+    ecs_singleton_modified(world, ScriptSettings);
+
+    test_int(ecs_script_run(world, "first",
+        "using box.transform\n"
+        "using box.camera\n"
+        "template Tree { trunk { Rotation: {0, 1, 0} } }\n"
+        "eye {\n"
+        "  Position: {0, 0, 0}\n"
+        "  Camera: {fov: 60}\n"
+        "}\n"
+        "far_a {\n"
+        "  Position: {100, 0, 0}\n"
+        "  Tree\n"
+        "}\n"
+        "far_b {\n"
+        "  Position: {200, 0, 0}\n"
+        "  Tree\n"
+        "}\n", NULL), 0);
+
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, "far_a.trunk") != 0);
+    test_assert(ecs_lookup(world, "far_b.trunk") == 0);
+
+    test_int(ecs_script_run(world, "second",
+        "using box.transform\n"
+        "near {\n"
+        "  Position: {1, 0, 0}\n"
+        "  Tree\n"
+        "}\n", NULL), 0);
+
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, "near.trunk") != 0);
+    test_assert(ecs_lookup(world, "far_b.trunk") == 0);
+    ecs_fini(world);
+}

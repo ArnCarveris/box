@@ -406,3 +406,68 @@ void Incremental_template_declared_before_import_is_marked(void)
 
     ecs_fini(world);
 }
+
+void Incremental_removed_and_readded_pending_runs_once(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxScript);
+    ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
+    settings->enabled = true;
+    settings->templates_per_frame = 1;
+    settings->budget_ms = 0;
+    ecs_singleton_modified(world, ScriptSettings);
+
+    test_int(ecs_script_run(world, "test",
+        "using box.transform\n"
+        "template Tree { trunk { Rotation: {0, 1, 0} } }\n"
+        "first { Tree }\n"
+        "second { Tree }\n", NULL), 0);
+
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, "first.trunk") != 0);
+    test_assert(ecs_lookup(world, "second.trunk") == 0);
+
+    ecs_entity_t node = ecs_lookup(world, "second");
+    ecs_entity_t tree = ecs_lookup(world, "Tree");
+    test_assert(ecs_has_pair(world, node, EcsScriptTemplatePending, tree));
+    ecs_remove_pair(world, node, EcsScriptTemplatePending, tree);
+    ecs_add_pair(world, node, EcsScriptTemplatePending, tree);
+
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, "second.trunk") != 0);
+    test_int(ecs_singleton_get(world, ScriptStats)->instantiated, 1);
+    test_int(ecs_singleton_get(world, ScriptStats)->pending, 0);
+
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, ScriptStats)->instantiated, 0);
+    test_int(ecs_singleton_get(world, ScriptStats)->pending, 0);
+    ecs_fini(world);
+}
+
+void Incremental_multiple_templates_on_one_instance_expand(void)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxScript);
+    ScriptSettings *settings = ecs_singleton_ensure(world, ScriptSettings);
+    settings->enabled = true;
+    settings->templates_per_frame = 1;
+    settings->budget_ms = 0;
+    ecs_singleton_modified(world, ScriptSettings);
+
+    test_int(ecs_script_run(world, "test",
+        "using box.transform\n"
+        "template First { a { Rotation: {0, 1, 0} } }\n"
+        "template Second { b { Rotation: {0, 1, 0} } }\n"
+        "node {\n"
+        "  First\n"
+        "  Second\n"
+        "}\n", NULL), 0);
+
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, ScriptStats)->pending, 1);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, "node.a") != 0);
+    test_assert(ecs_lookup(world, "node.b") != 0);
+    test_int(ecs_singleton_get(world, ScriptStats)->pending, 0);
+    ecs_fini(world);
+}

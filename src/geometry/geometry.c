@@ -346,6 +346,7 @@ static void box_shape_watch(
     ecs_iter_action_t callback)
 {
     ecs_add_pair(world, component, EcsOnInstantiate, EcsInherit);
+    ecs_add_pair(world, component, EcsWith, ecs_id(RenderMesh));
     ecs_observer(world, {
         .query.terms = {{ .id = component, .inout = EcsIn }},
         .events = { EcsOnSet },

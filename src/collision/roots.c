@@ -322,6 +322,10 @@ ecs_entity_t box_collision_root_of(
     ecs_entity_t e)
 {
     ecs_entity_t result = 0;
+    if (!ecs_count_id(world, ecs_id(RootBounds))) {
+        return result;
+    }
+
     ecs_entity_t cur = e;
     while (cur && ecs_is_alive(world, cur)) {
         if (ecs_has(world, cur, RootBounds)) {
@@ -462,13 +466,7 @@ static void BoxCollisionOnParent(
 {
     box_collision_state_t *state = it->ctx;
     ecs_world_t *world = it->world;
-    ecs_entity_t parent = 0;
-    if (ECS_IS_PAIR(it->event_id)) {
-        parent = ecs_pair_second(world, it->event_id);
-    } else {
-        const EcsParent *p = ecs_field(it, EcsParent, 0);
-        parent = p ? p->value : 0;
-    }
+    ecs_entity_t parent = ecs_pair_second(world, it->event_id);
 
     box_collision_mark_of(world, state, parent);
     int32_t i;
@@ -594,13 +592,6 @@ void box_collision_roots_init(
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
         .events = { EcsOnAdd, EcsOnRemove },
-        .callback = BoxCollisionOnParent,
-        .ctx = state
-    });
-
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(EcsParent) }},
-        .events = { EcsOnSet, EcsOnRemove },
         .callback = BoxCollisionOnParent,
         .ctx = state
     });

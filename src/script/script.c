@@ -86,6 +86,8 @@ done:
 static void box_script_on_settings(
     ecs_iter_t *it)
 {
+    box_script_state_t *state = it->ctx;
+    state->dirty = true;
     const ScriptSettings *settings = ecs_field(it, ScriptSettings, 0);
     ecs_world_t *world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(it->world));
     if (!settings->enabled) {
@@ -108,15 +110,22 @@ done:
     return;
 }
 
-/** Mark the queue for a rebuild when an instance starts waiting.
- *
- * @param it The iterator of the observer
- */
 static void box_script_on_pending(
     ecs_iter_t *it)
 {
     box_script_state_t *state = it->ctx;
-    state->dirty = true;
+    ecs_world_t *world = it->world;
+    ecs_entity_t template_ = ecs_pair_second(world, it->event_id);
+    int32_t i;
+    if (it->event == EcsOnAdd) {
+        for (i = 0; i < it->count; i ++) {
+            box_script_pending_add(state, it->entities[i], template_);
+        }
+    } else {
+        for (i = 0; i < it->count; i ++) {
+            box_script_pending_remove(state, it->entities[i], template_);
+        }
+    }
 }
 
 /** Expand the pending instances a frame can afford and report the counters.
@@ -179,12 +188,13 @@ void BoxScriptImport(
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(ScriptSettings), .inout = EcsIn }},
         .events = { EcsOnSet },
-        .callback = box_script_on_settings
+        .callback = box_script_on_settings,
+        .ctx = state
     });
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_pair(EcsScriptTemplatePending, EcsWildcard) }},
-        .events = { EcsOnAdd },
+        .events = { EcsOnAdd, EcsOnRemove },
         .callback = box_script_on_pending,
         .ctx = state
     });
