@@ -280,7 +280,9 @@
                     "mirror_wrap_folds_the_uv",
                     "clamp_wrap_holds_the_range",
                     "inherited_from_a_prefab",
-                    "scale_change_updates_the_tiling"
+                    "scale_change_updates_the_tiling",
+                    "image_region_reaches_the_instance",
+                    "image_region_composes_with_the_transform"
                 ],
                 "setup": true,
                 "teardown": true

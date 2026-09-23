@@ -53,6 +53,33 @@ static void box_render_world_size(
     }
 }
 
+/** Map the uv transform of an instance into the texture region of its mesh.
+ *
+ * The transform is applied first and the region last, so tiling repeats
+ * inside the region. A region without extent leaves the transform alone.
+ *
+ * @param mesh The render mesh
+ * @param uv The uv scale x, scale y, offset x and offset y, updated
+ */
+static void box_render_fill_region(
+    const RenderMesh *mesh,
+    float *uv)
+{
+    const vec4 *r = &mesh->uv_region;
+    float span_u = r->z - r->x;
+    float span_v = r->w - r->y;
+    if (span_u <= 0.0f || span_v <= 0.0f) {
+        goto done;
+    }
+
+    uv[2] = r->x + span_u * uv[2];
+    uv[3] = r->y + span_v * uv[3];
+    uv[0] *= span_u;
+    uv[1] *= span_v;
+done:
+    return;
+}
+
 void box_render_fill_uv(
     ecs_world_t *world,
     ecs_entity_t e,
@@ -103,5 +130,5 @@ void box_render_fill_uv(
 
     out->uv_mode = box_tiling_mode(projection, mode);
 done:
-    return;
+    box_render_fill_region(mesh, out->uv_transform);
 }

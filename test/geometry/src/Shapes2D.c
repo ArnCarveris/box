@@ -199,13 +199,18 @@ void Shapes2D_image_uvs_show_the_region(void)
     ecs_set(w, e, Image, {.u0 = 0.25f, .v0 = 0.25f, .u1 = 0.75f, .v1 = 0.75f});
     box_render_extract(w, &packet);
 
+    const RenderMesh *mesh = ecs_get(w, e, RenderMesh);
+    test_flt(mesh->uv_region.x, 0.25f);
+    test_flt(mesh->uv_region.y, 0.25f);
+    test_flt(mesh->uv_region.z, 0.75f);
+    test_flt(mesh->uv_region.w, 0.75f);
+
     box_mesh_cmd_t *cmd = NULL;
-    uint32_t handle = ecs_get(w, e, RenderMesh)->handle;
     uint32_t i;
     for (i = 0; i < packet.mesh_create.count; i ++) {
         box_mesh_cmd_t *candidate = box_vec_at(&packet.mesh_create, i);
 
-        if (candidate->handle == handle) {
+        if (candidate->handle == mesh->handle) {
             cmd = candidate;
         }
     }
@@ -213,10 +218,16 @@ void Shapes2D_image_uvs_show_the_region(void)
     test_assert(cmd != NULL);
 
     float *v = cmd->vertices;
-    test_flt(v[6], 0.25f);
-    test_flt(v[7], 0.25f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 6], 0.75f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 7], 0.75f);
+    test_flt(v[6], 0.0f);
+    test_flt(v[7], 0.0f);
+    test_flt(v[BOX_VERTEX_FLOATS * 2 + 6], 1.0f);
+    test_flt(v[BOX_VERTEX_FLOATS * 2 + 7], 1.0f);
+
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.uv_transform[0], 0.5f);
+    test_flt(u->data.uv_transform[1], 0.5f);
+    test_flt(u->data.uv_transform[2], 0.25f);
+    test_flt(u->data.uv_transform[3], 0.25f);
 }
 
 void Shapes2D_image_cover_crops_the_region(void)
@@ -228,26 +239,12 @@ void Shapes2D_image_cover_crops_the_region(void)
     ecs_set(w, tex, RenderTexture, {.handle = 1, .width = 64, .height = 64});
     ecs_set(w, e, Rect, {2, 1});
     ecs_set(w, e, Image, {.texture = tex, .fit = ImageCover, .u1 = 1, .v1 = 1});
-    box_render_extract(w, &packet);
 
-    box_mesh_cmd_t *cmd = NULL;
-    uint32_t handle = ecs_get(w, e, RenderMesh)->handle;
-    uint32_t i;
-    for (i = 0; i < packet.mesh_create.count; i ++) {
-        box_mesh_cmd_t *candidate = box_vec_at(&packet.mesh_create, i);
-
-        if (candidate->handle == handle) {
-            cmd = candidate;
-        }
-    }
-
-    test_assert(cmd != NULL);
-
-    float *v = cmd->vertices;
-    test_flt(v[6], 0.0f);
-    test_flt(v[7], 0.25f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 6], 1.0f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 7], 0.75f);
+    const RenderMesh *mesh = ecs_get(w, e, RenderMesh);
+    test_flt(mesh->uv_region.x, 0.0f);
+    test_flt(mesh->uv_region.y, 0.25f);
+    test_flt(mesh->uv_region.z, 1.0f);
+    test_flt(mesh->uv_region.w, 0.75f);
 }
 
 void Shapes2D_image_contain_widens_the_region(void)
@@ -259,26 +256,12 @@ void Shapes2D_image_contain_widens_the_region(void)
     ecs_set(w, tex, RenderTexture, {.handle = 1, .width = 64, .height = 64});
     ecs_set(w, e, Rect, {2, 1});
     ecs_set(w, e, Image, {.texture = tex, .fit = ImageContain, .u1 = 1, .v1 = 1});
-    box_render_extract(w, &packet);
 
-    box_mesh_cmd_t *cmd = NULL;
-    uint32_t handle = ecs_get(w, e, RenderMesh)->handle;
-    uint32_t i;
-    for (i = 0; i < packet.mesh_create.count; i ++) {
-        box_mesh_cmd_t *candidate = box_vec_at(&packet.mesh_create, i);
-
-        if (candidate->handle == handle) {
-            cmd = candidate;
-        }
-    }
-
-    test_assert(cmd != NULL);
-
-    float *v = cmd->vertices;
-    test_flt(v[6], -0.5f);
-    test_flt(v[7], 0.0f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 6], 1.5f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 7], 1.0f);
+    const RenderMesh *mesh = ecs_get(w, e, RenderMesh);
+    test_flt(mesh->uv_region.x, -0.5f);
+    test_flt(mesh->uv_region.y, 0.0f);
+    test_flt(mesh->uv_region.z, 1.5f);
+    test_flt(mesh->uv_region.w, 1.0f);
 }
 
 void Shapes2D_image_fit_follows_the_texture_aspect(void)
@@ -290,26 +273,12 @@ void Shapes2D_image_fit_follows_the_texture_aspect(void)
     ecs_set(w, tex, RenderTexture, {.handle = 1, .width = 128, .height = 64});
     ecs_set(w, e, Rect, {2, 1});
     ecs_set(w, e, Image, {.texture = tex, .fit = ImageCover, .u1 = 1, .v1 = 1});
-    box_render_extract(w, &packet);
 
-    box_mesh_cmd_t *cmd = NULL;
-    uint32_t handle = ecs_get(w, e, RenderMesh)->handle;
-    uint32_t i;
-    for (i = 0; i < packet.mesh_create.count; i ++) {
-        box_mesh_cmd_t *candidate = box_vec_at(&packet.mesh_create, i);
-
-        if (candidate->handle == handle) {
-            cmd = candidate;
-        }
-    }
-
-    test_assert(cmd != NULL);
-
-    float *v = cmd->vertices;
-    test_flt(v[6], 0.0f);
-    test_flt(v[7], 0.0f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 6], 1.0f);
-    test_flt(v[BOX_VERTEX_FLOATS * 2 + 7], 1.0f);
+    const RenderMesh *mesh = ecs_get(w, e, RenderMesh);
+    test_flt(mesh->uv_region.x, 0.0f);
+    test_flt(mesh->uv_region.y, 0.0f);
+    test_flt(mesh->uv_region.z, 1.0f);
+    test_flt(mesh->uv_region.w, 1.0f);
 }
 
 void Shapes2D_image_rotation_turns_the_uvs(void)
@@ -339,6 +308,52 @@ void Shapes2D_image_rotation_turns_the_uvs(void)
     test_assert(fabsf(v[7] - 0.0f) < 1e-5f);
     test_assert(fabsf(v[BOX_VERTEX_FLOATS * 2 + 6] - 0.0f) < 1e-5f);
     test_assert(fabsf(v[BOX_VERTEX_FLOATS * 2 + 7] - 1.0f) < 1e-5f);
+}
+
+void Shapes2D_image_shares_the_quad_mesh(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t plain = ecs_new(w);
+    ecs_entity_t image = ecs_new(w);
+
+    ecs_set(w, plain, Rect, {2, 2});
+    ecs_set(w, image, Rect, {3, 1});
+    ecs_set(w, image, Image, {.u0 = 0.25f, .v0 = 0.25f, .u1 = 0.75f, .v1 = 0.75f});
+    test_int(ecs_get(w, image, RenderMesh)->handle, ecs_get(w, plain, RenderMesh)->handle);
+    test_flt(ecs_get(w, plain, RenderMesh)->uv_region.z, 0.0f);
+}
+
+void Shapes2D_images_of_one_texture_share_a_mesh(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t a = ecs_new(w);
+    ecs_entity_t b = ecs_new(w);
+
+    ecs_set(w, a, Rect, {1, 1});
+    ecs_set(w, a, Image, {.u0 = 0.0f, .v0 = 0.0f, .u1 = 0.5f, .v1 = 0.5f});
+    ecs_set(w, b, Rect, {1, 1});
+    ecs_set(w, b, Image, {.u0 = 0.5f, .v0 = 0.5f, .u1 = 1.0f, .v1 = 1.0f});
+    test_int(ecs_get(w, a, RenderMesh)->handle, ecs_get(w, b, RenderMesh)->handle);
+    test_flt(ecs_get(w, a, RenderMesh)->uv_region.z, 0.5f);
+    test_flt(ecs_get(w, b, RenderMesh)->uv_region.x, 0.5f);
+}
+
+void Shapes2D_rotated_image_has_its_own_mesh(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t plain = ecs_new(w);
+    ecs_entity_t turned = ecs_new(w);
+    ecs_entity_t same = ecs_new(w);
+
+    ecs_set(w, plain, Rect, {1, 1});
+    ecs_set(w, plain, Image, {.u1 = 1, .v1 = 1});
+    ecs_set(w, turned, Rect, {1, 1});
+    ecs_set(w, turned, Image, {.u0 = 0.25f, .u1 = 0.5f, .v1 = 1, .rotation = 90});
+    ecs_set(w, same, Rect, {1, 1});
+    ecs_set(w, same, Image, {.u0 = 0.5f, .u1 = 0.75f, .v1 = 1, .rotation = 90});
+    test_assert(ecs_get(w, turned, RenderMesh)->handle != ecs_get(w, plain, RenderMesh)->handle);
+    test_int(ecs_get(w, turned, RenderMesh)->handle, ecs_get(w, same, RenderMesh)->handle);
+    test_flt(ecs_get(w, turned, RenderMesh)->uv_region.x, 0.25f);
 }
 
 void Shapes2D_border_adds_a_rect(void)

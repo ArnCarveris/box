@@ -3,7 +3,7 @@
  * @brief The 2D shapes: rectangles, circles, lines, texture regions and borders.
  *
  * Rectangles, circles and lines pick a cached mesh; an image picks a quad whose
- * uvs carry its texture region. A border has no geometry: it writes radii, edge
+ * region rides on the instance. A border has no geometry: it writes radii, edge
  * widths and color into a RenderShape2D evaluated in the fragment stage.
  */
 
@@ -12,23 +12,25 @@
 
 /** Assign the cached mesh of a key to an entity with the given instance scale.
  *
- * The mesh is set through the stage of the observer, because a shape that
- * arrives with an instantiated prefab is set while the entity is being moved to
- * its table, where a direct set would move it a second time.
- *
  * @param it The observer iterator
  * @param e The entity
  * @param key The mesh key
  * @param scale The instance scale
+ * @param region Texture region u0, v0, u1, v1 the uvs map into, NULL for all of it
  */
 static void box_shape2d_apply(
     ecs_iter_t *it,
     ecs_entity_t e,
     const box_mesh_key_t *key,
-    vec3 scale)
+    vec3 scale,
+    const float *region)
 {
     RenderMesh mesh = { .scale = scale };
     mesh.handle = box_mesh_cache_get(it->world, key, &mesh.bounds_min, &mesh.bounds_max);
+    if (region) {
+        mesh.uv_region = (vec4){ region[0], region[1], region[2], region[3] };
+    }
+
     ecs_set_ptr(it->stage, e, RenderMesh, &mesh);
 }
 
@@ -130,6 +132,9 @@ done:
 
 /** Give one entity the mesh of its rectangle, showing an image when it has one.
  *
+ * An image keeps the quad mesh and puts its region on the instance, so every
+ * image of one texture shares a mesh; only a rotation needs a mesh of its own.
+ *
  * @param it The observer iterator
  * @param e The entity
  * @param rect Its rectangle
@@ -141,20 +146,20 @@ static void box_shape2d_rect(
 {
     const Image *img = ecs_get(it->world, e, Image);
     box_mesh_key_t key = { .kind = BoxShapeQuad };
+    float region[4];
 
     if (img) {
-        float region[4];
-
         box_shape2d_region(it->world, e, img, rect, region);
-        key.kind = BoxShapeImage;
-        key.f0 = region[0];
-        key.f1 = region[1];
-        key.f2 = region[2];
-        key.f3 = region[3];
-        key.f4 = img->rotation;
+        if (img->rotation != 0.0f) {
+            key.kind = BoxShapeImage;
+            key.f2 = 1.0f;
+            key.f3 = 1.0f;
+            key.f4 = img->rotation;
+        }
     }
 
-    box_shape2d_apply(it, e, &key, vec3_new(rect->width, rect->height, 1.0f));
+    box_shape2d_apply(it, e, &key, vec3_new(rect->width, rect->height, 1.0f),
+        img ? region : NULL);
 }
 
 int32_t box_circle_segments(
@@ -251,7 +256,7 @@ static void box_shape2d_on_circle(
         int32_t segments = c[i].segments > 0 ? c[i].segments : box_circle_segments(radius);
         box_mesh_key_t key = { .kind = BoxShapeNGon, .i0 = segments };
 
-        box_shape2d_apply(it, it->entities[i], &key, vec3_new(radius, radius, 1.0f));
+        box_shape2d_apply(it, it->entities[i], &key, vec3_new(radius, radius, 1.0f), NULL);
     }
 }
 
@@ -284,7 +289,7 @@ static void box_shape2d_on_line(
             .f3 = span[3] / scale, .f4 = span[4] / scale
         };
 
-        box_shape2d_apply(it, it->entities[i], &key, vec3_new(scale, scale, 1.0f));
+        box_shape2d_apply(it, it->entities[i], &key, vec3_new(scale, scale, 1.0f), NULL);
     }
 }
 

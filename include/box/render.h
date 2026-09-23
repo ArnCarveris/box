@@ -18,13 +18,18 @@
 extern "C" {
 #endif
 
-/** Mesh and local scale that render an entity, written by shape modules */
+/** Mesh and local scale that render an entity, written by shape modules.
+ *
+ * The uv region maps the mesh uvs into a part of the texture through the
+ * instance, so entities showing different parts of one texture share a mesh.
+ */
 ECS_STRUCT(RenderMesh, {
     uint32_t handle;  /**< Renderer mesh handle */
     vec3 scale;       /**< Scale applied before the world transform */
     vec3 bounds_min;  /**< Local bounds minimum of the unscaled mesh */
     vec3 bounds_max;  /**< Local bounds maximum of the unscaled mesh */
     bool edge_bounds; /**< Primitive whose bounds extent the shader reads as its shape */
+    vec4 uv_region;   /**< Texture region u0, v0, u1, v1 the uvs map into, zero for all */
 });
 
 /** Texture handle an image entity resolved to, written by texture modules */

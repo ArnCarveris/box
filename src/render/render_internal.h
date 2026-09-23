@@ -820,6 +820,8 @@ bool box_render_is_hidden(
  * scale with the tile count its projection derives from the world size of the
  * instance and TextureWrap selects the fold the fragment stage applies.
  *
+ * The result is mapped into the uv region of the mesh when it has one.
+ *
  * @param world The world
  * @param e The entity
  * @param mesh Its render mesh

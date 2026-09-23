@@ -1,0 +1,10 @@
+{
+  "kind": "refactor",
+  "status": "complete",
+  "created": "2026-09-23T23:04:31.768+00:00",
+  "start_time": "2026-09-23T23:04:31.828+00:00",
+  "end_time": "2026-09-23T23:07:10.043+00:00",
+  "dependencies": [
+    "ui/ui_draw_cost"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "project": "ui",
+  "timestamp": "2026-09-23T23:06:29Z",
+  "pass": 2,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.147292,
+  "tests": [
+    {"suite": "DrawCost", "case": "sorted_pass_sets_its_pipeline_once", "status": "pass", "elapsed": 0.130766},
+    {"suite": "DrawCost", "case": "changing_element_keeps_the_scene_shadows_cached", "status": "pass", "elapsed": 0.147197}
+  ]
+}

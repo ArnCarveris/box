@@ -103,6 +103,33 @@ void Text_glyph_shows_a_region_of_the_atlas(void)
     test_assert(ecs_get(w, glyph, RenderMesh) != NULL);
 }
 
+void Text_glyphs_share_one_mesh(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, label, Text, {.value = ecs_os_strdup("Wide")});
+    ecs_entity_t back = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, back, Rect, {40, 20});
+    box_ui_update(w);
+
+    uint32_t handle = ecs_get(w, back, RenderMesh)->handle;
+    int32_t glyphs = 0;
+    ecs_iter_t it = ecs_each_id(w, UiGlyph);
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const RenderMesh *mesh = ecs_get(w, it.entities[i], RenderMesh);
+            test_int(mesh->handle, handle);
+            test_assert(mesh->uv_region.z > mesh->uv_region.x);
+            glyphs ++;
+        }
+    }
+
+    test_int(glyphs, 4);
+}
+
 void Text_glyph_binds_the_atlas_texture(void)
 {
     // ui/text

@@ -383,3 +383,45 @@ void Tiling_scale_change_updates_the_tiling(void)
     test_flt(u->data.uv_transform[0], 6.0f);
     test_flt(u->data.uv_transform[1], 1.0f);
 }
+
+void Tiling_image_region_reaches_the_instance(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Rect, {2, 2});
+    ecs_set(w, e, Image, {.u0 = 0.25f, .v0 = 0.5f, .u1 = 0.75f, .v1 = 1.0f});
+    box_render_extract(w, &packet);
+
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.uv_transform[0], 0.5f);
+    test_flt(u->data.uv_transform[1], 0.5f);
+    test_flt(u->data.uv_transform[2], 0.25f);
+    test_flt(u->data.uv_transform[3], 0.5f);
+    test_int(u->data.uv_mode, 0);
+
+    float local[3] = { 0.5f, 0.5f, 0.0f };
+    float normal[3] = { 0.0f, 0.0f, -1.0f };
+    float mesh_uv[2] = { 1.0f, 0.0f };
+    float uv[2];
+    box_tiling_uv(u->data.uv_mode, u->data.uv_transform, local, normal, mesh_uv, uv);
+    test_flt(uv[0], 0.75f);
+    test_flt(uv[1], 0.5f);
+}
+
+void Tiling_image_region_composes_with_the_transform(void)
+{
+    // ui/glyph_batching
+    ecs_entity_t e = ecs_new(w);
+    ecs_set(w, e, Position, {0, 0, 0});
+    ecs_set(w, e, Rect, {2, 2});
+    ecs_set(w, e, Image, {.u0 = 0.5f, .v0 = 0.0f, .u1 = 1.0f, .v1 = 0.5f});
+    ecs_set(w, e, TextureTransform, {2.0f, 4.0f, 0.5f, 0.25f});
+    box_render_extract(w, &packet);
+
+    box_static_update_t *u = box_vec_at(&packet.static_updates, 0);
+    test_flt(u->data.uv_transform[0], 1.0f);
+    test_flt(u->data.uv_transform[1], 2.0f);
+    test_flt(u->data.uv_transform[2], 0.75f);
+    test_flt(u->data.uv_transform[3], 0.125f);
+}

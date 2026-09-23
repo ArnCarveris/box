@@ -26,6 +26,11 @@ void DrawCost_sorted_pass_sets_its_pipeline_once(void)
     ecs_add(w, root, Ui);
     ecs_entity_t label = ecs_new_w_pair(w, EcsChildOf, root);
     ecs_set(w, label, Text, {.value = ecs_os_strdup("abcdefghij")});
+    ecs_entity_t dot = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, dot, Circle, {.radius = 8});
+    ecs_set(w, dot, Opacity, {0.5f});
+    ecs_entity_t other = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, other, Text, {.value = ecs_os_strdup("klmnopqrst")});
 
     box_renderer_desc_t desc = { .width = DRAW_COST_SIZE, .height = DRAW_COST_SIZE };
     box_renderer_t *r = box_renderer_create(&desc);

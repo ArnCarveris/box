@@ -1,0 +1,572 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T23:06:29Z",
+  "pass": 76,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 1.10402,
+  "tests": [
+    {
+      "suite": "Shapes2D",
+      "case": "rect_builds_a_quad",
+      "status": "pass",
+      "elapsed": 0.097007,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_writes_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.096955,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_segments_follow_the_radius",
+      "status": "pass",
+      "elapsed": 0.096577,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_shares_the_mesh_of_an_ngon",
+      "status": "pass",
+      "elapsed": 0.096948,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circle_uses_a_given_segment_count",
+      "status": "pass",
+      "elapsed": 0.096943,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "circles_of_one_size_share_a_mesh",
+      "status": "pass",
+      "elapsed": 0.096937,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_writes_a_render_mesh",
+      "status": "pass",
+      "elapsed": 0.09708,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_shares_one_mesh_per_outline",
+      "status": "pass",
+      "elapsed": 0.096632,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "line_uvs_run_along_the_segment",
+      "status": "pass",
+      "elapsed": 0.085969,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_adds_a_rect",
+      "status": "pass",
+      "elapsed": 0.086016,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_uvs_show_the_region",
+      "status": "pass",
+      "elapsed": 0.085361,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_cover_crops_the_region",
+      "status": "pass",
+      "elapsed": 0.085572,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_contain_widens_the_region",
+      "status": "pass",
+      "elapsed": 0.085821,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_fit_follows_the_texture_aspect",
+      "status": "pass",
+      "elapsed": 0.084465,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_rotation_turns_the_uvs",
+      "status": "pass",
+      "elapsed": 0.085091,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "image_shares_the_quad_mesh",
+      "status": "pass",
+      "elapsed": 0.084482,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "images_of_one_texture_share_a_mesh",
+      "status": "pass",
+      "elapsed": 0.081183,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "rotated_image_has_its_own_mesh",
+      "status": "pass",
+      "elapsed": 0.080496,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_adds_a_rect",
+      "status": "pass",
+      "elapsed": 0.080346,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_shorthand_fills_every_corner",
+      "status": "pass",
+      "elapsed": 0.078647,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "border_keeps_the_quad_mesh",
+      "status": "pass",
+      "elapsed": 0.079789,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "changing_a_radius_keeps_the_mesh",
+      "status": "pass",
+      "elapsed": 0.079793,
+      "project": "geometry"
+    },
+    {
+      "suite": "Shapes2D",
+      "case": "removing_a_border_drops_the_shape",
+      "status": "pass",
+      "elapsed": 0.079418,
+      "project": "geometry"
+    },
+    {
+      "suite": "Tiling",
+      "case": "component_defaults",
+      "status": "pass",
+      "elapsed": 0.09373,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "untiled_instance_is_the_identity",
+      "status": "pass",
+      "elapsed": 0.094349,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "transform_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.09435,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "box_projection_tiles_every_face",
+      "status": "pass",
+      "elapsed": 0.09441,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "cylinder_projection_tiles_the_circumference",
+      "status": "pass",
+      "elapsed": 0.094611,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "radial_projection_tiles_radius_and_arc",
+      "status": "pass",
+      "elapsed": 0.094511,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "meters_projection_stretches_the_mesh_uv",
+      "status": "pass",
+      "elapsed": 0.094565,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "fit_rounds_the_tile_count",
+      "status": "pass",
+      "elapsed": 0.094572,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "partial_tiles_keep_the_fraction",
+      "status": "pass",
+      "elapsed": 0.087739,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "min_tiles_raises_the_count",
+      "status": "pass",
+      "elapsed": 0.087276,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "wrap_mode_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.087281,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "mirror_wrap_folds_the_uv",
+      "status": "pass",
+      "elapsed": 0.087562,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "clamp_wrap_holds_the_range",
+      "status": "pass",
+      "elapsed": 0.086618,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "inherited_from_a_prefab",
+      "status": "pass",
+      "elapsed": 0.087184,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "scale_change_updates_the_tiling",
+      "status": "pass",
+      "elapsed": 0.086556,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "image_region_reaches_the_instance",
+      "status": "pass",
+      "elapsed": 0.086959,
+      "project": "render"
+    },
+    {
+      "suite": "Tiling",
+      "case": "image_region_composes_with_the_transform",
+      "status": "pass",
+      "elapsed": 0.065695,
+      "project": "render"
+    },
+    {
+      "suite": "Text",
+      "case": "element_is_as_wide_as_its_string",
+      "status": "pass",
+      "elapsed": 0.108717,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "longer_string_is_wider",
+      "status": "pass",
+      "elapsed": 0.109446,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "empty_string_has_no_glyphs",
+      "status": "pass",
+      "elapsed": 0.107657,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "one_glyph_per_visible_character",
+      "status": "pass",
+      "elapsed": 0.109507,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_shows_a_region_of_the_atlas",
+      "status": "pass",
+      "elapsed": 0.110941,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_share_one_mesh",
+      "status": "pass",
+      "elapsed": 0.109404,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_binds_the_atlas_texture",
+      "status": "pass",
+      "elapsed": 0.109359,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_is_drawn_over_its_element",
+      "status": "pass",
+      "elapsed": 0.108629,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "newline_starts_a_second_line",
+      "status": "pass",
+      "elapsed": 0.08936,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "line_height_sets_the_distance_between_lines",
+      "status": "pass",
+      "elapsed": 0.088176,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "layout_width_wraps_the_string",
+      "status": "pass",
+      "elapsed": 0.087302,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrapped_lines_stay_inside_the_width",
+      "status": "pass",
+      "elapsed": 0.087758,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "align_center_centres_the_lines",
+      "status": "pass",
+      "elapsed": 0.086566,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "align_right_puts_the_lines_against_the_edge",
+      "status": "pass",
+      "elapsed": 0.087668,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "changed_value_rebuilds_the_glyphs",
+      "status": "pass",
+      "elapsed": 0.088788,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "shorter_string_drops_the_glyphs_it_lost",
+      "status": "pass",
+      "elapsed": 0.085843,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "unchanged_text_keeps_its_glyphs",
+      "status": "pass",
+      "elapsed": 0.08888,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "removed_text_drops_its_glyphs",
+      "status": "pass",
+      "elapsed": 0.088585,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "text_sizes_the_row_that_holds_it",
+      "status": "pass",
+      "elapsed": 0.087765,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "layout_height_overrides_the_measured_height",
+      "status": "pass",
+      "elapsed": 0.087757,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_take_the_color_of_the_element",
+      "status": "pass",
+      "elapsed": 0.086862,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_composite_over_what_is_behind_them",
+      "status": "pass",
+      "elapsed": 0.08646,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "rect_of_the_element_wraps_the_string",
+      "status": "pass",
+      "elapsed": 0.08779,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "content_sized_row_wraps_around_its_label",
+      "status": "pass",
+      "elapsed": 0.086832,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyphs_composite_with_plain_alpha_in_the_ui_view",
+      "status": "pass",
+      "elapsed": 0.088948,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_origin_lands_on_a_device_pixel",
+      "status": "pass",
+      "elapsed": 0.089014,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "glyph_quad_is_the_bitmap_in_logical_pixels",
+      "status": "pass",
+      "elapsed": 0.087352,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrap_follows_the_width_of_the_parent",
+      "status": "pass",
+      "elapsed": 0.087968,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrapped_glyphs_stay_inside_the_parent",
+      "status": "pass",
+      "elapsed": 0.087602,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrap_shrinks_content_sized_ancestors",
+      "status": "pass",
+      "elapsed": 0.086993,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "wrap_in_a_row_takes_the_room_its_siblings_leave",
+      "status": "pass",
+      "elapsed": 0.087362,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "short_wrapped_text_keeps_its_width",
+      "status": "pass",
+      "elapsed": 0.086899,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "changed_value_wraps_again",
+      "status": "pass",
+      "elapsed": 0.074544,
+      "project": "ui"
+    },
+    {
+      "suite": "Text",
+      "case": "max_width_wraps_the_string",
+      "status": "pass",
+      "elapsed": 0.073547,
+      "project": "ui"
+    },
+    {
+      "suite": "DrawCost",
+      "case": "sorted_pass_sets_its_pipeline_once",
+      "status": "pass",
+      "elapsed": 0.130766,
+      "project": "ui"
+    },
+    {
+      "suite": "DrawCost",
+      "case": "changing_element_keeps_the_scene_shadows_cached",
+      "status": "pass",
+      "elapsed": 0.147197,
+      "project": "ui"
+    }
+  ],
+  "projects": [
+    {
+      "project": "geometry",
+      "pass": 23,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.262968
+    },
+    {
+      "project": "render",
+      "pass": 17,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.247105
+    },
+    {
+      "project": "ui",
+      "pass": 34,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.446655
+    },
+    {
+      "project": "ui",
+      "pass": 2,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.147292
+    }
+  ]
+}
