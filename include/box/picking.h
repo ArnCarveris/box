@@ -49,6 +49,16 @@ extern ECS_TAG_DECLARE(Pickable);
 /** The entity a pick of this frame resolved to, written by the engine */
 extern ECS_TAG_DECLARE(Hovered);
 
+/** Sink of the events no handler took.
+ *
+ * An event that reaches no waiter on its way up the parent chain, nor on the
+ * hit behind a passthrough tree, resolves the waiters on this entity.
+ *
+ * A script that does `await on.click(Unhandled)` hears every click the scene
+ * left alone, including one on empty space, whose hit names no entity.
+ */
+extern ECS_TAG_DECLARE(Unhandled);
+
 /** Input action an entity fires when a click resolves on it.
  *
  * A click walks up from the entity it resolved to and the first Action it finds
@@ -194,6 +204,18 @@ bool box_picking_pick(
  * @return The entity that took the event, 0 when nothing did
  */
 ecs_entity_t box_picking_raise(
+    ecs_world_t *world,
+    PickEvent event,
+    const PickHit *hit);
+
+/** Raise a pick event at the waiters on Unhandled.
+ *
+ * @param world The world
+ * @param event The interaction to raise
+ * @param hit The hit the handlers receive
+ * @return Unhandled when a waiter took the event, 0 when none was waiting
+ */
+ecs_entity_t box_picking_raise_unhandled(
     ecs_world_t *world,
     PickEvent event,
     const PickHit *hit);

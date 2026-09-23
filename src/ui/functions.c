@@ -177,6 +177,33 @@ static void box_ui_fn_label(
     *(ecs_entity_t*)result->ptr = e;
 }
 
+/** text.focus: give the input of an element the keyboard, taking it from the others.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments: the element
+ * @param result Receives whether the element has a TextInput that took the focus
+ */
+static void box_ui_fn_focus(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t e = *(ecs_entity_t*)argv[0].ptr;
+    TextInput *input = e && ecs_is_alive(world, e) ?
+        ecs_get_mut(world, e, TextInput) : NULL;
+    (void)argc;
+
+    if (input) {
+        input->focused = true;
+        ecs_modified(world, e, TextInput);
+    }
+
+    *(bool*)result->ptr = input != NULL;
+}
+
 void box_ui_functions_init(
     ecs_world_t *world,
     ecs_entity_t module)
@@ -206,6 +233,16 @@ void box_ui_functions_init(
             { .name = "width", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_ui_fn_wrap
+    });
+
+    ecs_function(world, {
+        .name = "focus",
+        .parent = scope,
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "element", .type = ecs_id(ecs_entity_t) }
+        },
+        .callback = box_ui_fn_focus
     });
 
     ecs_function(world, {

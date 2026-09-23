@@ -302,8 +302,7 @@
                     "glyphs_of_a_label_are_not_hit",
                     "element_that_left_the_tree_is_not_hit",
                     "moved_element_is_hit_where_it_went",
-                    "world_without_a_tree_hits_nothing"
-                ,
+                    "world_without_a_tree_hits_nothing",
                     "a_hit_through_element_hands_the_point_to_its_parent"
                 ],
                 "setup": true,
@@ -324,8 +323,7 @@
                     "the_action_of_an_ancestor_fires",
                     "a_handler_receives_the_point_in_logical_pixels",
                     "an_element_that_appears_under_a_still_cursor_is_hovered",
-                    "an_element_that_moves_under_a_still_cursor_is_hovered"
-                ,
+                    "an_element_that_moves_under_a_still_cursor_is_hovered",
                     "a_passthrough_tree_lets_an_untaken_event_reach_the_scene",
                     "a_handler_keeps_a_passthrough_event_from_the_scene",
                     "a_task_that_resumed_from_a_click_consumes_its_action"
@@ -349,7 +347,9 @@
                     "tab_completes_a_command_name",
                     "caret_sits_at_the_width_of_the_text_before_it",
                     "caret_advances_by_the_width_of_a_typed_space",
-                    "caret_goes_with_the_focus"
+                    "caret_goes_with_the_focus",
+                    "focusing_an_input_takes_the_focus_from_the_others",
+                    "text_focus_gives_an_element_the_keyboard"
                 ],
                 "setup": true,
                 "teardown": true

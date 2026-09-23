@@ -243,8 +243,9 @@ ECS_STRUCT(Bounds, {
  * the typed characters and edit keys; enter moves the line to submitted and
  * clears it. Nothing is taken while the window is unfocused.
  *
- * With history, up and down walk submitted lines. With complete, tab completes
- * the command name or entity path under the caret via box.command.
+ * With history, up and down walk submitted lines and with complete, tab completes
+ * a command name or entity path via box.command. One input holds the focus at a
+ * time: focusing one, or calling text.focus(element), blurs every other input.
  */
 ECS_STRUCT(TextInput, {
     char *value;     /**< The line being edited, UTF-8 */

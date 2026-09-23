@@ -8,6 +8,7 @@
  */
 
 #include "picking_internal.h"
+#include "../render/render_internal.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -242,6 +243,67 @@ ecs_entity_t box_picking_target(
     return result;
 }
 
+/** What the layer filter of a pick needs to know about its view */
+typedef struct box_pick_layers_t {
+    const RenderState *render; /**< The layer registry */
+    uint32_t mask;             /**< Layers the view draws */
+    bool strict;               /**< The view draws its members only */
+} box_pick_layers_t;
+
+/** Accept the colliders of the entities the view of a pick draws.
+ *
+ * A strict view hits its members only; any other view hits everything but the
+ * members of the UI layers, which the views of the scene never draw.
+ *
+ * @param world The world
+ * @param e The entity of the collider
+ * @param ctx The layers of the view
+ * @return true when the view draws the entity
+ */
+static bool box_pick_layer_filter(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    void *ctx)
+{
+    const box_pick_layers_t *layers = ctx;
+    uint32_t mask = box_render_entity_layers(
+        ECS_CONST_CAST(ecs_world_t*, world), layers->render, e);
+
+    return layers->strict ? (mask & layers->mask) != 0 :
+        (mask & layers->render->ui_mask) == 0;
+}
+
+/** Fill the layer filter of a pick through a view.
+ *
+ * @param world The world
+ * @param view The view, 0 for the camera of a world without views
+ * @param out Receives the filter context
+ * @return true when the world has a layer registry to filter with
+ */
+static bool box_pick_layers(
+    const ecs_world_t *world,
+    ecs_entity_t view,
+    box_pick_layers_t *out)
+{
+    bool result = false;
+    if (!ecs_id(RenderState)) {
+        goto done;
+    }
+
+    const RenderState *render = ecs_singleton_get(world, RenderState);
+    const View *v = view ? ecs_get(world, view, View) : NULL;
+    if (!render) {
+        goto done;
+    }
+
+    out->render = render;
+    out->strict = v && v->strict_layers && v->layers[0] != 0;
+    out->mask = out->strict ? box_render_view_layers(render, v->layers) : 0;
+    result = true;
+done:
+    return result;
+}
+
 bool box_picking_pick(
     const ecs_world_t *world,
     ecs_entity_t view,
@@ -267,7 +329,11 @@ bool box_picking_pick(
     float max_dist = settings && settings->max_distance > 0 ?
         settings->max_distance : BOX_PICK_DISTANCE;
     box_ray_hit_t hit;
-    if (!box_collision_ray(world, origin, dir, max_dist, &hit)) {
+    box_pick_layers_t layers;
+    bool filtered = box_pick_layers(world, view, &layers);
+    if (!box_collision_ray_filter(world, origin, dir, max_dist,
+        filtered ? box_pick_layer_filter : NULL, &layers, &hit))
+    {
         goto done;
     }
 

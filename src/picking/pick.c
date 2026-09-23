@@ -52,7 +52,7 @@ static void box_pick_query(
     state->valid = true;
 }
 
-/** Raise an event on the hit, and on the hit behind it when nothing took it.
+/** Raise an event on the hit, on the hit behind it and last on Unhandled.
  *
  * @param world The world
  * @param state The module state
@@ -69,6 +69,10 @@ static ecs_entity_t box_pick_raise(
     ecs_entity_t result = box_picking_raise(world, event, hit);
     if (!result && state->fallback_valid && hit == &state->hit) {
         result = box_picking_raise(world, event, &state->fallback);
+    }
+
+    if (!result) {
+        result = box_picking_raise_unhandled(world, event, hit);
     }
 
     return result;
@@ -155,13 +159,12 @@ static void box_pick_buttons(
     if (pressed) {
         state->press = state->hit;
         state->press_window = in->mouse.window;
+        state->pressed = true;
         state->dragging = false;
-        if (state->hit.entity) {
-            box_pick_raise(it->stage, state, PickPress, &state->hit);
-        }
+        box_pick_raise(it->stage, state, PickPress, &state->hit);
     }
 
-    if (down && state->press.entity) {
+    if (down && state->pressed) {
         float dx = in->mouse.window.x - state->press_window.x;
         float dy = in->mouse.window.y - state->press_window.y;
         bool far_enough = (dx * dx + dy * dy) > (threshold * threshold);
@@ -170,18 +173,17 @@ static void box_pick_buttons(
         if (state->dragging && moved) {
             PickHit drag;
             box_pick_drag_hit(it->world, state, in->mouse.normalized, &drag);
-            box_picking_raise(it->stage, PickDrag, &drag);
+            box_pick_raise(it->stage, state, PickDrag, &drag);
         }
     }
 
     if (released) {
-        if (state->hit.entity) {
-            box_pick_raise(it->stage, state, PickRelease, &state->hit);
-        }
-
+        box_pick_raise(it->stage, state, PickRelease, &state->hit);
         if (!state->dragging && state->hit.entity == state->press.entity) {
             box_pick_raise(it->stage, state, PickClick, &state->hit);
         }
+
+        state->pressed = false;
 
         memset(&state->press, 0, sizeof(PickHit));
         state->dragging = false;

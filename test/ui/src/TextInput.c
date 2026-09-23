@@ -275,3 +275,39 @@ void TextInput_caret_goes_with_the_focus(void)
     ecs_progress(w, 0);
     test_assert(ecs_lookup_child(w, element, "caret") != 0);
 }
+
+void TextInput_focusing_an_input_takes_the_focus_from_the_others(void)
+{
+    // editor/events
+    ecs_entity_t root = ecs_get_parent(w, element);
+    ecs_entity_t other = ecs_entity(w, { .name = "other", .parent = root });
+    ecs_set(w, other, Layout, { .width = 400, .height = 20 });
+    ecs_set(w, other, TextInput, { .focused = true });
+    ecs_progress(w, 0);
+    test_bool(ecs_get(w, element, TextInput)->focused, false);
+    test_bool(ecs_get(w, other, TextInput)->focused, true);
+    test_assert(ecs_lookup_child(w, element, "caret") == 0);
+    test_assert(ecs_lookup_child(w, other, "caret") != 0);
+}
+
+void TextInput_text_focus_gives_an_element_the_keyboard(void)
+{
+    // editor/events
+    ecs_entity_t root = ecs_get_parent(w, element);
+    ecs_set_name(w, root, "root");
+    ecs_entity_t other = ecs_entity(w, { .name = "other", .parent = root });
+    ecs_set(w, other, Layout, { .width = 400, .height = 20 });
+    ecs_set(w, other, TextInput, { .focused = false });
+    ecs_progress(w, 0);
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using box.ui\n"
+        "export const ok = text.focus(root.other)\n" });
+    test_assert(s != 0);
+    test_bool(ecs_get(w, other, TextInput)->focused, true);
+    test_bool(ecs_get(w, element, TextInput)->focused, false);
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'h' });
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'i' });
+    ecs_progress(w, 0);
+    test_str(ecs_get(w, other, TextInput)->value, "hi");
+    test_str(ecs_get(w, element, TextInput)->value, "");
+}

@@ -156,6 +156,20 @@ ecs_entity_t box_picking_raise(
     return result;
 }
 
+ecs_entity_t box_picking_raise_unhandled(
+    ecs_world_t *world,
+    PickEvent event,
+    const PickHit *hit)
+{
+    PickState *state = box_picking_state(world);
+    ecs_entity_t result = 0;
+    if (state && box_pick_deliver(state, Unhandled, event, hit)) {
+        result = Unhandled;
+    }
+
+    return result;
+}
+
 ecs_entity_t box_picking_action(
     ecs_world_t *world,
     ecs_entity_t e)

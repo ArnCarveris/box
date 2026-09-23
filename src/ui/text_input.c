@@ -544,6 +544,34 @@ static void box_ui_input_impl_dtor(
     }
 }
 
+/** TextInput observer: an input that takes the focus takes it from every other one.
+ *
+ * @param it Iterator over the inputs that were set
+ */
+static void box_ui_input_focused(
+    ecs_iter_t *it)
+{
+    const TextInput *input = ecs_field(it, TextInput, 0);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (!input[i].focused) {
+            continue;
+        }
+
+        ecs_iter_t others = ecs_each(it->world, TextInput);
+        while (ecs_each_next(&others)) {
+            TextInput *other = ecs_field(&others, TextInput, 0);
+            int32_t o;
+            for (o = 0; o < others.count; o ++) {
+                if (others.entities[o] != it->entities[i] && other[o].focused) {
+                    other[o].focused = false;
+                    ecs_modified(it->world, others.entities[o], TextInput);
+                }
+            }
+        }
+    }
+}
+
 /** TextInput observer: an element that loses the component loses its state.
  *
  * @param it Iterator over the elements that lose the component
@@ -578,5 +606,11 @@ void box_ui_text_input_init(
         },
         .events = { EcsOnRemove },
         .callback = box_ui_input_dropped
+    });
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(TextInput), .inout = EcsIn }},
+        .events = { EcsOnSet },
+        .callback = box_ui_input_focused
     });
 }

@@ -4,9 +4,11 @@
  *
  * box_draw draws an asset at a transform for the frame it is called in. The
  * instance behind a key keeps its identity from frame to frame, so it stays
- * hoverable and its script tasks keep waiting; a key that is not drawn again
- * is hidden and, after a while, deleted. An overlay draw goes to a layer a
- * dedicated view draws unlit over the scene, with the camera of the primary view.
+ * hoverable and its script tasks keep waiting.
+ *
+ * A key that is not drawn again is hidden and, after a while, deleted. An
+ * overlay draw goes to a layer a dedicated view draws unlit over the scene,
+ * with the camera of the primary view.
  */
 
 #ifndef BOX_DRAW_H
