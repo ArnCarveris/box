@@ -471,18 +471,62 @@ done:
     return result;
 }
 
+/** What the sorted pass has bound, so a draw only sets what differs */
+typedef struct box_transparent_bound_t {
+    WGPURenderPipeline pipeline; /**< Pipeline of the pass, NULL before the first set */
+    WGPUBindGroup group;         /**< Bind group in the mesh slot of the pass */
+    uint32_t mesh;               /**< Mesh whose buffers are bound, UINT32_MAX for none */
+} box_transparent_bound_t;
+
+/** Bind the pipeline, mesh bind group and mesh buffers of a draw that are not bound yet.
+ *
+ * @param pass The render pass
+ * @param bound What the pass has bound, updated
+ * @param pipeline The pipeline of the draw
+ * @param group The bind group of the mesh slot
+ * @param handle The mesh handle
+ * @param m The mesh
+ */
+static void box_transparent_bind(
+    WGPURenderPassEncoder pass,
+    box_transparent_bound_t *bound,
+    WGPURenderPipeline pipeline,
+    WGPUBindGroup group,
+    uint32_t handle,
+    const box_gpu_mesh_t *m)
+{
+    if (bound->pipeline != pipeline) {
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+        bound->pipeline = pipeline;
+    }
+
+    if (bound->group != group) {
+        wgpuRenderPassEncoderSetBindGroup(pass, 2, group, 0, NULL);
+        bound->group = group;
+    }
+
+    if (bound->mesh != handle) {
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
+            WGPU_WHOLE_SIZE);
+        bound->mesh = handle;
+    }
+}
+
 /** Draw the composite of one group at its place in the sorted list.
  *
  * @param r The renderer
  * @param entry The sorted entry of the composite
  * @param index Index of that entry in the sorted instance buffer
  * @param pass The render pass
+ * @param bound What the pass has bound, updated
  */
 static void box_transparent_group_draw(
     box_renderer_t *r,
     const box_transparent_t *entry,
     uint32_t index,
-    WGPURenderPassEncoder pass)
+    WGPURenderPassEncoder pass,
+    box_transparent_bound_t *bound)
 {
     box_gpu_mesh_t *m = box_vec_at(&r->meshes, entry->mesh);
     WGPUBindGroup bind = box_transparent_group_bind(r, entry->group);
@@ -490,16 +534,11 @@ static void box_transparent_group_draw(
         goto done;
     }
 
-    wgpuRenderPassEncoderSetPipeline(pass, box_transparent_group_pipeline(r,
-        r->effect_scene != NULL, r->effect_normal != NULL));
-    wgpuRenderPassEncoderSetBindGroup(pass, 2, bind, 0, NULL);
-    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+    box_transparent_bind(pass, bound, box_transparent_group_pipeline(r,
+        r->effect_scene != NULL, r->effect_normal != NULL), bind, entry->mesh, m);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->sorted,
         (uint64_t)index * sizeof(box_transparent_t), sizeof(box_transparent_t));
-    wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
-        WGPU_WHOLE_SIZE);
     wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, 1, 0, 0, 0);
-    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
 done:
     return;
 }
@@ -512,12 +551,15 @@ void box_transparent_draw(
 {
     bool hdr = r->effect_scene != NULL;
     bool cover = r->effect_normal != NULL;
+    box_transparent_bound_t bound = {
+        .pipeline = NULL, .group = r->v->env_group, .mesh = UINT32_MAX
+    };
     uint32_t end = view->transparent_first + view->transparent_count;
     uint32_t first = view->transparent_first;
     while (first < end) {
         box_transparent_t *entry = box_vec_at(&p->transparent, first);
         if (entry->group) {
-            box_transparent_group_draw(r, entry, first, pass);
+            box_transparent_group_draw(r, entry, first, pass, &bound);
             first ++;
             continue;
         }
@@ -536,14 +578,12 @@ void box_transparent_draw(
 
         box_gpu_mesh_t *m = box_vec_at(&r->meshes, entry->mesh);
         if (m->alive) {
-            wgpuRenderPassEncoderSetPipeline(pass,
-                box_transparent_pipeline(r, entry->blend, entry->back, hdr, cover));
-            wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+            box_transparent_bind(pass, &bound,
+                box_transparent_pipeline(r, entry->blend, entry->back, hdr, cover),
+                r->v->env_group, entry->mesh, m);
             wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->sorted,
                 (uint64_t)first * sizeof(box_transparent_t),
                 (uint64_t)(last - first) * sizeof(box_transparent_t));
-            wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
-                WGPU_WHOLE_SIZE);
             wgpuRenderPassEncoderDrawIndexed(pass, m->index_count, last - first, 0, 0, 0);
         }
 
