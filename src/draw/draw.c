@@ -108,6 +108,40 @@ done:
     return;
 }
 
+/** Put every descendant of an instance in the overlay layer.
+ *
+ * @param world The world
+ * @param e The instance
+ * @param layer The overlay layer
+ */
+static void box_draw_layer_subtree(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t layer)
+{
+    ecs_vec_t children;
+    ecs_vec_init_t(NULL, &children, ecs_entity_t, 0);
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            ecs_vec_append_t(NULL, &children, ecs_entity_t)[0] = it.entities[i];
+        }
+    }
+
+    int32_t i, count = ecs_vec_count(&children);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t child = ecs_vec_get_t(&children, ecs_entity_t, i)[0];
+        if (!ecs_has_pair(world, child, Layer, layer)) {
+            ecs_add_pair(world, child, Layer, layer);
+        }
+
+        box_draw_layer_subtree(world, child, layer);
+    }
+
+    ecs_vec_fini_t(NULL, &children, ecs_entity_t);
+}
+
 /** Create the instance of a draw call.
  *
  * @param world The world
@@ -181,6 +215,10 @@ ecs_entity_t box_draw(
         unit ? 1 : desc->scale.x, unit ? 1 : desc->scale.y, unit ? 1 : desc->scale.z });
     if (ecs_has_id(world, result, Hidden)) {
         ecs_remove_id(world, result, Hidden);
+    }
+
+    if (desc->overlay) {
+        box_draw_layer_subtree(world, result, state->overlay);
     }
 
 done:

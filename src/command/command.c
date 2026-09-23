@@ -115,6 +115,7 @@ void BoxCommandImport(
     box_checkpoint_cmd_init(world);
     box_render_cmd_init(world);
     box_fps_cmd_init(world);
+    box_editor_cmd_init(world);
     box_input_cmd_init(world);
     box_http_init(world);
     box_wasm_init(world);

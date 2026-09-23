@@ -73,6 +73,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxScript);
     ECS_IMPORT(world, BoxCheckpoint);
     ECS_IMPORT(world, BoxCommand);
+    ECS_IMPORT(world, BoxEditor);
 
     box_generate_hooks(world, ecs_id(Box));
 

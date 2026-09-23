@@ -294,6 +294,13 @@ void box_render_cmd_fini(
 void box_fps_cmd_init(
     ecs_world_t *world);
 
+/** Register the editor command.
+ *
+ * @param world The world
+ */
+void box_editor_cmd_init(
+    ecs_world_t *world);
+
 /** Register the input command group: the key, mouse, input and action commands.
  *
  * @param world The world

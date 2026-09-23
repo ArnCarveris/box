@@ -1,0 +1,647 @@
+// The overlay of the scene editor. box.editor loads this script at import into
+// box.editor.ui and the editor command switches Editor.enabled, which brings
+// the overlay into being: a toolbar over the scene, a tree of the entities on
+// the left and the property grid of the selection on the right. The engine
+// fills EditorTree and EditorInspector; every widget here is a template over
+// the layout, text, shape and event components that calls the editor.*
+// functions from its async blocks. The colors follow the flecs playground.
+module box.editor.ui
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.picking
+using box.ui
+using box.editor
+using box.editor.EditorTool
+using box.editor.EditorKind
+using box.editor.EditorFieldKind
+
+const bg: Rgb = {15, 18, 22}
+const bg_soft: Rgb = {22, 26, 32}
+const bg_mute: Rgb = {30, 35, 43}
+const border: Rgb = {38, 44, 53}
+const border_strong: Rgb = {53, 61, 72}
+const text: Rgb = {217, 222, 229}
+const text_2: Rgb = {163, 171, 182}
+const text_3: Rgb = {125, 133, 144}
+const accent: Rgb = {66, 185, 131}
+const accent_strong: Rgb = {92, 203, 150}
+const selection: Rgb = {31, 66, 52}
+
+const tree_w = 260
+const insp_w = 340
+const row_h = 22
+const label_w = 120
+const field_w = insp_w - label_w - 30
+
+// A panel that keeps the events on it from the scene behind it.
+template Panel {
+  async {
+    while true {
+      await on.click(this)
+    }
+  }
+
+  async {
+    while true {
+      await on.press(this)
+    }
+  }
+
+  async {
+    while true {
+      await on.drag(this)
+    }
+  }
+}
+
+// A push button of the toolbar, filled while it is the active one.
+template EditorButton {
+  prop label = ""
+  prop active = false
+
+  Layout: {height: 26, padding_left: 10, padding_right: 10, v: Middle, h: Center}
+  Rect: {}
+  Border: {radius: 4}
+
+  if active {
+    Rgb: accent
+  } else if this?[Hovered] {
+    Rgb: border_strong
+  } else {
+    Rgb: bg_mute
+  }
+
+  caption {
+    HitThrough
+    Text: {value: label}
+    Font: {size: 12}
+    if active {
+      Rgb: bg
+    } else {
+      Rgb: text
+    }
+  }
+}
+
+// A button that picks a tool.
+template ToolButton : EditorButton {
+  prop tool: EditorTool = ToolSelect
+
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.tool(tool)
+    }
+  }
+}
+
+// A button that opens the selected instance.
+template OpenButton : EditorButton {
+  prop target: entity = 0
+
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.open(target)
+    }
+  }
+}
+
+// A button that closes the opened instance.
+template CloseButton : EditorButton {
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.close()
+    }
+  }
+}
+
+// A button that adds a control point to the selected spline.
+template AddPointButton : EditorButton {
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.point_add()
+    }
+  }
+}
+
+// A button that removes the selected control point.
+template RemovePointButton : EditorButton {
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.point_remove()
+    }
+  }
+}
+
+// A row of the tree: an arrow, an icon for the kind and the name of an entity.
+template TreeRow {
+  prop entity: entity = 0
+  prop label = ""
+  prop depth: i32 = 0
+  prop kind: EditorKind = KindEntity
+  prop expanded = false
+  prop children = false
+  prop selected = false
+
+  const indent = 8 + depth * 14
+
+  Layout: {direction: Row, spacing: 6, height: row_h, padding_left: indent, v: Middle, h: Left, width: tree_w}
+  Rect: {}
+
+  if selected {
+    Rgb: selection
+  } else if this?[Hovered] {
+    Rgb: bg_mute
+  } else {
+    Rgb: bg_soft
+  }
+
+  arrow {
+    HitThrough
+    Layout: {width: 12, height: row_h, v: Middle, h: Center}
+    Font: {size: 11}
+    Rgb: text_3
+    if children && expanded {
+      Text: {value: "v"}
+    } else if children {
+      Text: {value: ">"}
+    } else {
+      Text: {value: ""}
+    }
+  }
+
+  icon {
+    HitThrough
+    if kind == KindSystem || kind == KindObserver || kind == KindQuery {
+      Circle: {radius: 4}
+    } else {
+      Rect: {8, 8}
+    }
+    if kind == KindPrefab {
+      Rgb: {163, 113, 247}
+    } else if kind == KindComponent {
+      Rgb: {88, 166, 255}
+    } else if kind == KindTemplate {
+      Rgb: {210, 168, 255}
+    } else if kind == KindTag {
+      Rgb: accent
+    } else if kind == KindModule {
+      Rgb: {245, 158, 11}
+    } else if kind == KindSystem {
+      Rgb: {63, 185, 80}
+    } else if kind == KindObserver {
+      Rgb: {86, 212, 221}
+    } else if kind == KindQuery {
+      Rgb: {126, 231, 135}
+    } else if kind == KindInstance {
+      Rgb: {210, 168, 255}
+    } else {
+      Rgb: border_strong
+    }
+  }
+
+  name {
+    HitThrough
+    Text: {value: label}
+    Font: {size: 12}
+    if kind == KindEntity || kind == KindInstance {
+      Rgb: text
+    } else {
+      Rgb: text_2
+    }
+  }
+
+  async {
+    while true {
+      const hit = await on.click(this)
+      const b = this[Bounds]
+      if children && hit.point.x < b.x - b.width / 2 + indent + 14 {
+        const ok = editor.expand(entity, !expanded)
+      } else {
+        const ok = editor.select(entity)
+      }
+    }
+  }
+}
+
+// A row of the property grid with the name of its member on the left.
+template FieldRow {
+  prop label = ""
+
+  Layout: {direction: Row, spacing: 6, height: row_h, padding_left: 10, v: Middle, h: Left, width: insp_w}
+  Rect: {}
+  Rgb: bg_soft
+
+  name {
+    HitThrough
+    Layout: {width: label_w, height: row_h, v: Middle, h: Left}
+    Text: {value: label}
+    Font: {size: 12}
+    Rgb: text_2
+  }
+}
+
+// The name of a component above the rows of its members.
+template HeaderRow {
+  prop label = ""
+
+  Layout: {direction: Row, height: row_h + 2, padding_left: 8, v: Middle, h: Left, width: insp_w}
+  Rect: {}
+  Rgb: bg_mute
+
+  name {
+    HitThrough
+    Text: {value: label}
+    Font: {size: 12}
+    Rgb: {88, 166, 255}
+  }
+}
+
+// A tag or a pair of the selection, shown by name.
+template TagRow {
+  prop label = ""
+
+  Layout: {direction: Row, height: row_h, padding_left: 10, v: Middle, h: Left, width: insp_w}
+  Rect: {}
+  Rgb: bg_soft
+
+  name {
+    HitThrough
+    Text: {value: label}
+    Font: {size: 12}
+    Rgb: accent
+  }
+}
+
+// A text input bound to a member, focused by a click and applied by enter.
+template EditInput {
+  prop component: entity = 0
+  prop member = ""
+  prop value = ""
+  prop editable = true
+
+  Layout: {width: field_w, height: 20, padding_left: 6, v: Middle, h: Left}
+  Font: {size: 12}
+
+  back {
+    HitThrough
+    Anchor: {h: Left, v: Top}
+    Rect: {field_w, 20}
+    Border: {radius: 3}
+    if editable && this?[Hovered] {
+      Rgb: bg_mute
+    } else {
+      Rgb: bg
+    }
+  }
+
+  if editable {
+    TextInput: {value: value}
+    EditorBinding: {component: component, member: member}
+    Text: {value: value}
+    Rgb: text
+  } else {
+    Text: {value: value}
+    Rgb: text_3
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if editable {
+        const ok = text.focus(this)
+      }
+    }
+  }
+}
+
+// A member edited as text: a string, a number or an entity path.
+template TextField : FieldRow {
+  prop component: entity = 0
+  prop member = ""
+  prop value = ""
+  prop editable = true
+
+  EditInput input(component: component, member: member, value: value, editable: editable)
+}
+
+// A box with a mark that flips a boolean member.
+template BoolBox {
+  prop component: entity = 0
+  prop member = ""
+  prop value = false
+  prop editable = true
+
+  Rect: {16, 16}
+  Border: {radius: 3}
+
+  if this?[Hovered] && editable {
+    Rgb: bg_mute
+  } else {
+    Rgb: bg
+  }
+
+  if value {
+    mark {
+      HitThrough
+      Rect: {10, 10}
+      Border: {radius: 2}
+      if editable {
+        Rgb: accent
+      } else {
+        Rgb: text_3
+      }
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if editable && value {
+        const ok = editor.assign(component, member, "false")
+      } else if editable {
+        const ok = editor.assign(component, member, "true")
+      }
+    }
+  }
+}
+
+// A boolean member.
+template BoolField : FieldRow {
+  prop component: entity = 0
+  prop member = ""
+  prop value = false
+  prop editable = true
+
+  BoolBox box(component: component, member: member, value: value, editable: editable)
+}
+
+// One constant of an open enum field, assigned by a click.
+template EnumOption {
+  prop component: entity = 0
+  prop member = ""
+  prop label = ""
+  prop selected = false
+
+  Layout: {width: field_w, height: 20, padding_left: 6, v: Middle, h: Left}
+  Rect: {}
+
+  if selected {
+    Rgb: accent
+  } else if this?[Hovered] {
+    Rgb: border_strong
+  } else {
+    Rgb: bg_mute
+  }
+
+  caption {
+    HitThrough
+    Text: {value: label}
+    Font: {size: 12}
+    if selected {
+      Rgb: bg
+    } else {
+      Rgb: text
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      const ok = editor.assign(component, member, label)
+    }
+  }
+}
+
+// A closed box with the constant of an enum member that lists the others when clicked.
+template EnumBox {
+  prop component: entity = 0
+  prop member = ""
+  prop value = ""
+  prop options: Strings = []
+  prop option: i32 = -1
+  prop editable = true
+
+  mut open = false
+
+  Layout: {direction: Column, width: field_w, h: Left, v: Top}
+
+  head {
+    Layout: {width: field_w, height: 20, padding_left: 6, padding_right: 6, v: Middle, h: Left, direction: Row}
+    Rect: {}
+    Border: {radius: 3}
+    if editable && this?[Hovered] {
+      Rgb: bg_mute
+    } else {
+      Rgb: bg
+    }
+
+    caption {
+      HitThrough
+      Grow: {width: 1}
+      Text: {value: value}
+      Font: {size: 12}
+      if editable {
+        Rgb: text
+      } else {
+        Rgb: text_3
+      }
+    }
+
+    arrow {
+      HitThrough
+      Font: {size: 11}
+      Rgb: text_3
+      if open {
+        Text: {value: "v"}
+      } else if editable {
+        Text: {value: ">"}
+      } else {
+        Text: {value: ""}
+      }
+    }
+  }
+
+  if open {
+    for (i, o) in options {
+      EnumOption "o_{i}"(component: component, member: member, label: o, selected: i == option)
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      if editable {
+        open = !open
+      }
+    }
+  }
+}
+
+// An enum member.
+template EnumField : FieldRow {
+  prop component: entity = 0
+  prop member = ""
+  prop value = ""
+  prop options: Strings = []
+  prop option: i32 = -1
+  prop editable = true
+
+  Layout: {direction: Row, spacing: 6, padding_left: 10, v: Top, h: Left, width: insp_w}
+
+  EnumBox box(component: component, member: member, value: value, options: options, option: option, editable: editable)
+}
+
+// A member shown as text and not edited.
+template ValueField : FieldRow {
+  prop value = ""
+
+  value_text {
+    HitThrough
+    Layout: {width: field_w}
+    Text: {value: value, wrap: true}
+    Font: {size: 12}
+    Rgb: text_3
+  }
+}
+
+// Listens for the clicks nothing in the scene took and selects what they hit.
+template Picker {
+  async {
+    while true {
+      const hit = await on.click(Unhandled)
+      const ok = editor.select(hit.entity)
+    }
+  }
+}
+
+const ed = Editor[Editor]
+
+if ed.enabled {
+  const tree = EditorTree[EditorTree]
+  const insp = EditorInspector[EditorInspector]
+
+  overlay {
+    Ui: {height: 0, passthrough: true}
+    Font: {size: 12}
+
+    Picker picker()
+
+    Panel toolbar() {
+      Anchor: {h: Center, v: Top, y: 8}
+      Layout: {direction: Row, spacing: 4, padding: 4, v: Middle, h: Center}
+      Rect: {}
+      Border: {radius: 6}
+      Rgb: bg_soft
+
+      ToolButton select(label: "Select", tool: ToolSelect, active: ed.tool == ToolSelect)
+      ToolButton move(label: "Move", tool: ToolMove, active: ed.tool == ToolMove)
+      ToolButton rotate(label: "Rotate", tool: ToolRotate, active: ed.tool == ToolRotate)
+      ToolButton scale(label: "Scale", tool: ToolScale, active: ed.tool == ToolScale)
+
+      if ed.instance {
+        OpenButton open(label: "Open", target: ed.selected)
+      }
+
+      if ed.depth > 0 {
+        CloseButton close(label: "Close")
+      }
+
+      if ed.spline {
+        AddPointButton add_point(label: "Add point")
+      }
+
+      if ed.spline && ed.point >= 0 {
+        RemovePointButton remove_point(label: "Remove point")
+      }
+    }
+
+    Panel tree_panel() {
+      Anchor: {h: Left, v: Top}
+      Layout: {direction: Column, width: tree_w, h: Left, v: Top}
+      Fill: {height: 1}
+      Rect: {}
+      Rgb: bg_soft
+
+      header {
+        Layout: {height: 28, padding_left: 10, v: Middle, h: Left, width: tree_w}
+        Rect: {}
+        Rgb: bg
+
+        title {
+          HitThrough
+          Text: {value: "Scene"}
+          Font: {size: 13}
+          Rgb: text_2
+        }
+      }
+
+      rows {
+        Layout: {direction: Column, width: tree_w, h: Left, v: Top}
+        Grow: {height: 1}
+        Scroll: {y: Auto}
+
+        for r in tree.rows {
+          TreeRow "n_{r.entity}"(entity: r.entity, label: r.name, depth: r.depth,
+            kind: r.kind, expanded: r.expanded, children: r.children, selected: r.selected)
+        }
+      }
+    }
+
+    Panel inspector() {
+      Anchor: {h: Right, v: Top}
+      Layout: {direction: Column, width: insp_w, h: Left, v: Top}
+      Fill: {height: 1}
+      Rect: {}
+      Rgb: bg_soft
+
+      header {
+        Layout: {height: 28, padding_left: 10, v: Middle, h: Left, width: insp_w}
+        Rect: {}
+        Rgb: bg
+
+        title {
+          HitThrough
+          if insp.entity != 0 {
+            Text: {value: insp.name}
+          } else {
+            Text: {value: "Nothing selected"}
+          }
+          Font: {size: 13}
+          Rgb: text_2
+        }
+      }
+
+      fields {
+        Layout: {direction: Column, width: insp_w, h: Left, v: Top}
+        Grow: {height: 1}
+        Scroll: {y: Auto}
+
+        for (i, f) in insp.fields {
+          if f.kind == FieldHeader {
+            HeaderRow "f_{i}"(label: f.label)
+          } else if f.kind == FieldTag {
+            TagRow "f_{i}"(label: f.label)
+          } else if f.kind == FieldBool {
+            BoolField "f_{i}"(label: f.label, component: f.component, member: f.member,
+              value: f.value == "true", editable: f.editable)
+          } else if f.kind == FieldEnum {
+            EnumField "f_{i}"(label: f.label, component: f.component, member: f.member,
+              value: f.value, options: f.options, option: f.option, editable: f.editable)
+          } else if f.kind == FieldValue {
+            ValueField "f_{i}"(label: f.label, value: f.value)
+          } else {
+            TextField "f_{i}"(label: f.label, component: f.component, member: f.member,
+              value: f.value, editable: f.editable)
+          }
+        }
+      }
+    }
+  }
+}
