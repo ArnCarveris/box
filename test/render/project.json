@@ -257,7 +257,8 @@
                     "new_set_supersedes_the_queued_job",
                     "deleting_the_entity_cancels_the_job",
                     "bands_split_a_large_image",
-                    "nearest_texture_rasterizes_first"
+                    "nearest_texture_rasterizes_first",
+                    "publish_from_progress_with_observer"
                 ],
                 "setup": true,
                 "teardown": true

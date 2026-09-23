@@ -226,3 +226,44 @@ void SvgJobs_nearest_texture_rasterizes_first(void)
     box_texture_cmd_t *second = box_vec_at(&packet.texture_create, 1);
     test_int(second->handle, ecs_get(w, far, RenderTexture)->handle);
 }
+
+/** OnSet observer on RenderTexture that queues a structural change, like a
+ * reactive UI script does.
+ *
+ * @param it Iterator over the textures that were set
+ */
+static void SvgJobs_on_render_texture(
+    ecs_iter_t *it)
+{
+    ecs_entity_t tag = (ecs_entity_t)(uintptr_t)it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_add_id(it->world, it->entities[i], tag);
+    }
+}
+
+void SvgJobs_publish_from_progress_with_observer(void)
+{
+    // textures/svg_publish_readonly
+    JobSettings *js = ecs_singleton_ensure(w, JobSettings);
+    js->workers = -1;
+    js->budget_ms = 0;
+    ecs_singleton_modified(w, JobSettings);
+
+    ecs_entity_t tag = ecs_new(w);
+    ecs_observer(w, {
+        .query.terms = {{ .id = ecs_id(RenderTexture) }},
+        .events = { EcsOnSet },
+        .callback = SvgJobs_on_render_texture,
+        .ctx = (void*)(uintptr_t)tag
+    });
+
+    ecs_entity_t t = ecs_new(w);
+    ecs_set(w, t, Svg, { .data = ecs_os_strdup(jobs_svg), .width = 64, .height = 64 });
+    test_int(ecs_get(w, t, RenderTexture)->handle, 0);
+
+    ecs_progress(w, 0.016f);
+    test_assert(ecs_get(w, t, RenderTexture)->handle != 0);
+    test_assert(ecs_has_id(w, t, tag));
+    test_bool(ecs_get(w, t, TextureImpl)->pending, false);
+}
