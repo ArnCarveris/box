@@ -16,10 +16,10 @@ $ {
 }
 
 camera {
-  Position: {350, 290, 510}
-  LookAt: {0, 205, 0}
-  Camera: {fov: 47}
-  CameraController: {speed: 42}
+  Position: {5.854, 4.744, 47.484}
+  LookAt: {5.377, 5.105, 46.683}
+  Camera: {fov: 55}
+  CameraController: {speed: 12}
 }
 marketCamera {
   Position: {48, 23, 68}
@@ -73,10 +73,10 @@ post {
     Ssr: {steps: 24, thickness: 0.8, max_roughness: 0.35, intensity: 0.55, fade: 0.2}
   }
   mist : box.effects.fog {
-    Fog: {color: {0.035, 0.075, 0.11}, density: 0.0012, falloff: 0.045, start: 160, max_opacity: 0.8, height: 8}
+    Fog: {color: {0.035, 0.075, 0.11}, density: 0.01, falloff: 0.001, start: 1, max_opacity: 0.8, height: 8}
   }
   bloom : box.effects.bloom {
-    Bloom: {intensity: 0.24, prefilter: {threshold: 1.2, threshold_softness: 0.5}, low_frequency_boost: 0.45}
+    Bloom: {intensity: 0.4, prefilter: {threshold: 1.2, threshold_softness: 0.5}, low_frequency_boost: 0.45}
   }
   tonemap : box.effects.tonemap {
     ToneMapping: {white: 1.2, dither: true}
@@ -88,7 +88,12 @@ view {
     clear: {12, 21, 34},
     culling: {enabled: true, gpu_threshold: 2048, occlusion: true, min_dimension_px: 0.6},
     shadows: {enabled: true, resolution: 2048, max_distance: 850},
-    bake: {enabled: true, budget: 8192, probe_spacing: 2, probe_max: 8},
+    bake: {enabled: true, budget: 8192, probe_spacing: 2, probe_max: 8, occluder_min_size: 4},
+    material_layers: [
+      {layer: box.material.layers.edge_wear, enabled: true},
+      {layer: box.material.layers.dust, enabled: true},
+      {layer: box.material.layers.grime, enabled: true}
+    ],
     effects: [
       {effect: post.ao, enabled: true},
       {effect: post.reflection, enabled: true},
@@ -103,15 +108,9 @@ signs {
   tide {
     Svg: {width: 1024, height: 256, data: `<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='256'><rect width='1024' height='256' fill='#101d26'/><path d='M28 24h968v208H28z' fill='none' stroke='#39dae6' stroke-width='5'/><text x='64' y='133' font-family='sans-serif' font-size='108' font-weight='bold' fill='#a2f6ed'>TIDE / 09</text><text x='68' y='198' font-family='sans-serif' font-size='32' letter-spacing='12' fill='#39dae6'>VERTICAL COMMONS</text></svg>`}
   }
-  market {
-    Svg: {width: 768, height: 256, data: `<svg xmlns='http://www.w3.org/2000/svg' width='768' height='256'><rect width='768' height='256' fill='#251927'/><text x='35' y='136' font-family='sans-serif' font-size='99' font-weight='bold' fill='#ff5e9e'>NIGHT MARKET</text><text x='40' y='212' font-family='sans-serif' font-size='37' letter-spacing='8' fill='#ffc779'>OPEN ALL TIDES / 24H</text></svg>`}
-  }
   bath {
     Position: {}
     Svg: {width: 768, height: 256, data: `<svg xmlns='http://www.w3.org/2000/svg' width='768' height='256'><rect width='768' height='256' fill='#132e2e'/><text x='40' y='137' font-family='sans-serif' font-size='100' font-weight='bold' fill='#a6f4cf'>SKY BATHS</text><text x='44' y='210' font-family='sans-serif' font-size='32' letter-spacing='9' fill='#54d1b3'>GARDENS / LEVEL 60</text></svg>`}
-  }
-  work {
-    Svg: {width: 768, height: 256, data: `<svg xmlns='http://www.w3.org/2000/svg' width='768' height='256'><rect width='768' height='256' fill='#252322'/><text x='40' y='140' font-family='sans-serif' font-size='105' font-weight='bold' fill='#ffbf64'>REPAIR / 08</text><text x='44' y='215' font-family='sans-serif' font-size='32' letter-spacing='8' fill='#ffe3a3'>MAKERS COOPERATIVE</text></svg>`}
   }
   corp {
     Svg: {width: 768, height: 256, data: `<svg xmlns='http://www.w3.org/2000/svg' width='768' height='256'><rect width='768' height='256' fill='#122434'/><text x='52' y='160' font-family='sans-serif' font-size='136' letter-spacing='17' fill='#9cdeff'>A E O N</text><text x='58' y='216' font-family='sans-serif' font-size='26' letter-spacing='13' fill='#5d95b1'>ABOVE THE EVERYDAY</text></svg>`}
@@ -249,6 +248,39 @@ commonsTextures {
   garden { Position: {}; Svg: {width: 768, height: 128, data: `<svg xmlns='http://www.w3.org/2000/svg' width='768' height='128'><rect width='768' height='128' fill='#254440'/><text x='384' y='83' text-anchor='middle' font-family='sans-serif' font-size='53' letter-spacing='5' fill='#a8d5ad'>SKY COMMONS / 60</text></svg>`} }
 }
 
+box {
+  material {
+    layers {
+      edge_wear {
+        LayerParams: {a: {0.72, 0.76, 0.8, 1}, b: {0.085, 0.28, 5, 0.7}}
+      }
+      dust {
+        LayerParams: {a: {0.3, 0.27, 0.22, 0.8}, b: {1.4, 0.92, 2, 0}}
+      }
+      grime {
+        LayerParams: {a: {0.08, 0.1, 0.08, 1.8}, b: {1.8, 0.9, 0.85, 0.65}}
+      }
+    }
+  }
+}
+
+template Weathering {
+  prop dust: f32 = 0.18
+  prop grime: f32 = 0.3
+  prop edge: f32 = 0
+  prop seed: f32 = 0
+  if edge > 0 {
+    (MaterialLayerOn, box.material.layers.edge_wear)
+  }
+  if dust > 0 {
+    (MaterialLayerOn, box.material.layers.dust)
+  }
+  if grime > 0 {
+    (MaterialLayerOn, box.material.layers.grime)
+  }
+  MaterialLayerData: {amount0: edge, amount1: dust, amount2: grime, seed: (seed % 251) / 251, scale: 1}
+}
+
 @tree Parent
 template Surface {
   prop image: entity = surfaces.screen0
@@ -327,17 +359,17 @@ template Railing {
   prop width: f32 = 4
   prop color: Rgb = {89, 108, 113}
   for i in 0..2 {
-    { Position: {0, 0.48 + i * 0.54, 0}; Box: {width, 0.065, 0.065}; Rgb: color }
+    { Position: {0, 0.48 + i * 0.54, 0}; Box: {width, 0.065, 0.065}; Weathering: {dust: 0, grime: 0, edge: 0.55}; PbrMaterial: {metallic: 0.65, roughness: 0.55}; Rgb: color }
   }
   for i in 0..5 {
-    { Position: {-width / 2 + width * i / 4, 0.5, 0}; Box: {0.065, 1, 0.065}; Rgb: color }
+    { Position: {-width / 2 + width * i / 4, 0.5, 0}; Box: {0.065, 1, 0.065}; Weathering: {dust: 0, grime: 0, edge: 0.55}; PbrMaterial: {metallic: 0.65, roughness: 0.55}; Rgb: color }
   }
 }
 
 @tree Parent
 template Vent {
   prop seed: i32 = 0
-  { Position: {}; Box: {0.94, 0.66, 0.5}; Rgb: {149, 157, 149}; PbrMaterial: {roughness: 0.85} }
+  { Position: {}; Box: {0.94, 0.66, 0.5}; Rgb: {149, 157, 149}; Weathering: {dust: 0, grime: 0, edge: 0.65}; PbrMaterial: {metallic: 0.35, roughness: 0.85} }
   { Position: {0, 0, 0.256}; Surface: {image: grillImages[seed % 12], width: 0.9, height: 0.62} }
   { Position: {0.46, -0.52, -0.05}; Box: {0.055, 0.65, 0.07}; Rgb: rust }
   for i in 0..2 {
@@ -361,7 +393,7 @@ template Tank {
   prop radius: f32 = 0.8
   prop height: f32 = 2
   prop color: Rgb = {107, 136, 139}
-  { Position: {0, height / 2, 0}; Cylinder: {radius: radius, length: height, segments: 16}; Rgb: color; PbrMaterial: {roughness: 0.47, metallic: 0.4} }
+  { Position: {0, height / 2, 0}; Cylinder: {radius: radius, length: height, segments: 16}; Rgb: color; Weathering: {dust: 0, grime: 0, edge: 0.65}; PbrMaterial: {roughness: 0.47, metallic: 0.4} }
   for i in 0..3 {
     { Position: {0, 0.15 + (height - 0.3) * i / 2, 0}; Torus: {radius: radius + 0.01, tube: 0.045, segments: 16, rings: 5}; Rgb: iron }
   }
@@ -402,7 +434,7 @@ template Bench : StreetAsset {
 
 @tree Parent
 template Vending : StreetAsset {
-  { Position: {0, 1.05, 0}; Box: {1.12, 2.1, 0.85}; Rgb: {67 + seed % 90, 62, 73} }
+  { Position: {0, 1.05, 0}; Box: {1.12, 2.1, 0.85}; Weathering: {dust: 0, grime: 0, edge: 0.5, seed: seed}; PbrMaterial: {metallic: 0.45, roughness: 0.55}; Rgb: {67 + seed % 90, 62, 73} }
   { Position: {-0.13, 1.18, 0.44}; Box: {0.73, 1.2, 0.045}; Rgb: {17, 31, 39} }
   { Position: {0, 1.95, 0.46}; Neon: {size: {0.98, 0.13, 0.05}, color: accent} }
   { Position: {-0.13, 1.18, 0.472}; Surface: {image: screenImages[seed % 12], width: 0.69, height: 1.14, glow: 0.8} }
@@ -425,7 +457,7 @@ template Terminal : StreetAsset {
 
 @tree Parent
 template Server : StreetAsset {
-  { Position: {0, 1.15, 0}; Box: {0.85, 2.3, 0.85}; Rgb: {30, 44, 52} }
+  { Position: {0, 1.15, 0}; Box: {0.85, 2.3, 0.85}; Weathering: {dust: 0, grime: 0, edge: 0.5, seed: seed}; PbrMaterial: {metallic: 0.45, roughness: 0.55}; Rgb: {30, 44, 52} }
   { Position: {0, 1.15, 0.431}; Surface: {image: cabinetImages[seed % 8], width: 0.78, height: 2.17, glow: 0.18} }
   for i in 0..3 {
     { Position: {-0.22 + i * 0.2, 1.15, -0.5}; Box: {0.045, 2.1, 0.06}; Rgb: {112, 104 + i * 30, 70} }
@@ -526,10 +558,10 @@ template Drone {
 template Ladder {
   prop height: f32 = 4
   for i in 0..2 {
-    { Position: {-0.33 + i * 0.66, height / 2, 0}; Box: {0.055, height, 0.055}; Rgb: rust }
+    { Position: {-0.33 + i * 0.66, height / 2, 0}; Box: {0.055, height, 0.055}; Weathering: {dust: 0, grime: 0, edge: 0.55}; PbrMaterial: {metallic: 0.65, roughness: 0.55}; Rgb: rust }
   }
   for i in 0..12 {
-    { Position: {0, height * i / 12, 0}; Box: {0.7, 0.045, 0.06}; Rgb: {169, 133, 86} }
+    { Position: {0, height * i / 12, 0}; Box: {0.7, 0.045, 0.06}; Weathering: {dust: 0, grime: 0, edge: 0.55}; PbrMaterial: {metallic: 0.65, roughness: 0.55}; Rgb: {169, 133, 86} }
   }
 }
 
@@ -576,7 +608,7 @@ template CableLoom {
 @tree Parent
 template Junction {
   prop seed: i32 = 0
-  { Position: {}; Box: {0.52, 0.72, 0.19}; Rgb: {104 + seed % 50, 121, 115} }
+  { Position: {}; Box: {0.52, 0.72, 0.19}; Weathering: {dust: 0, grime: 0, edge: 0.5, seed: seed}; PbrMaterial: {metallic: 0.45, roughness: 0.55}; Rgb: {104 + seed % 50, 121, 115} }
   { Position: {0, 0, 0.102}; Surface: {image: cabinetImages[seed % 8], width: 0.46, height: 0.65, glow: 0.1} }
   { Position: {0.22, 0.09, 0.22}; Rotation: {0, 0.5, 0}; Box: {0.04, 0.58, 0.43}; Rgb: {121, 135, 126} }
   for i in 0..3 {
@@ -766,7 +798,7 @@ template DomesticLife {
 
 @tree Parent
 template CapsuleHome : Frontage {
-  { Position: {0, height / 2, -0.2}; Box: {width - 0.08, height - 0.1, 0.4}; Rgb: {77, 99, 111} }
+  { Position: {0, height / 2, -0.2}; Box: {width - 0.08, height - 0.1, 0.4}; Weathering: {dust: 0.18, grime: 0.32, seed: seed}; Rgb: {77, 99, 111} }
   for y in 0..2 {
     for x in 0..2 {
       {
@@ -786,7 +818,7 @@ template CapsuleHome : Frontage {
 
 @tree Parent
 template BayHome : Frontage {
-  { Position: {0, height / 2, -0.23}; Box: {width - 0.08, height - 0.12, 0.46}; Rgb: {142 + seed % 36, 100 + seed % 42, 80 + seed % 49} }
+  { Position: {0, height / 2, -0.23}; Box: {width - 0.08, height - 0.12, 0.46}; Weathering: {dust: 0.18, grime: 0.32, seed: seed}; Rgb: {142 + seed % 36, 100 + seed % 42, 80 + seed % 49} }
   { Position: {-0.24, height * 0.56, 0.28}; Box: {width * 0.67, height * 0.67, 0.62}; Rgb: iron }
   { Position: {-0.24, height * 0.56, 0.61}; Window: {width: width * 0.61, height: height * 0.56, seed: seed, color: {235, 186, 135}} }
   for i in 0..7 {
@@ -848,7 +880,7 @@ template MachineBay {
 @tree Parent
 template Tenement : Frontage {
   const shade = seed * 17 % 55
-  { Position: {0, height / 2, -0.22}; Box: {width - 0.06, height - 0.12, 0.44}; Rgb: {111 + shade, 116 + shade * 0.6, 114 + shade * 0.4} }
+  { Position: {0, height / 2, -0.22}; Box: {width - 0.06, height - 0.12, 0.44}; Weathering: {dust: 0.18, grime: 0.32, seed: seed}; Rgb: {111 + shade, 116 + shade * 0.6, 114 + shade * 0.4} }
   { Position: {-0.24, height * 0.58, 0.06}; Window: {width: width * 0.55, height: height * 0.42, seed: seed, color: {255, 162 + seed % 75, 94 + seed % 105}} }
   { Position: {width * 0.39, height * 0.3, 0.03}; Box: {0.55, height * 0.58, 0.07}; Rgb: {63, 83, 88} }
   { Position: {width * 0.29, 1.2, 0.09}; Neon: {size: {0.045, 0.1, 0.025}, color: cyan, power: 0.6} }
@@ -976,7 +1008,7 @@ template Umbilical {
 @tree Parent
 template Compressor {
   prop seed: i32 = 0
-  { Position: {0, 0.1, 0}; Box: {1.3, 0.2, 0.8}; Rgb: iron }
+  { Position: {0, 0.1, 0}; Box: {1.3, 0.2, 0.8}; Weathering: {dust: 0, grime: 0, edge: 0.5, seed: seed}; PbrMaterial: {metallic: 0.45, roughness: 0.55}; Rgb: iron }
   { Position: {-0.25, 0.42, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.29, length: 0.65, segments: 12}; Rgb: {111 + seed % 55, 108, 82} }
   { Position: {0.4, 0.39, 0}; Box: {0.38, 0.48, 0.65}; Rgb: concrete }
   { Position: {0.4, 0.4, 0.331}; Surface: {image: grillImages[seed % 12], width: 0.35, height: 0.43} }
@@ -986,7 +1018,7 @@ template Compressor {
     { Position: {-0.5 + i * 0.25, 0.94, 0}; Box: {0.14, 0.045, 0.14}; Rgb: iron }
   }
   { Position: {-0.25, 0.42, 0.303}; Surface: {image: labelImages[seed % 12], width: 0.23, height: 0.23} }
-  { Position: {0, 0.04, 0.408}; Surface: {image: hazardImages[seed % 8], fit: false, width: 1.2, height: 0.12} }
+  { Position: {0, 0.208, 0.33}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[seed % 8], fit: false, width: 1.2, height: 0.12} } }
   { Position: {-0.55, 0.15, -0.12}; Umbilical: {seed: seed, length: 0.6}; Scale: {0.7, 0.7, 0.7} }
 }
 
@@ -1012,7 +1044,7 @@ template BatteryBank {
 template Winch {
   prop seed: i32 = 0
   for i in 0..2 {
-    { Position: {-0.56 + i * 1.12, 0.35, 0}; Box: {0.12, 0.7, 0.75}; Rgb: iron }
+    { Position: {-0.56 + i * 1.12, 0.35, 0}; Box: {0.12, 0.7, 0.75}; Weathering: {dust: 0, grime: 0, edge: 0.5, seed: seed}; PbrMaterial: {metallic: 0.45, roughness: 0.55}; Rgb: iron }
     { Position: {-0.42 + i * 0.84, 0.48, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.38, length: 0.08, segments: 12}; Rgb: rust }
   }
   { Position: {0, 0.48, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.23, length: 0.85, segments: 12}; Rgb: iron }
@@ -1049,7 +1081,7 @@ template ExteriorRetrofit : Retrofit {
     { Position: {(side * 2 - 1) * width * 0.41, height - 0.68, reach - 0.2}; Rotation: {0.48, 0, 0}; Box: {0.11, 0.94, 0.13}; Rgb: rust }
     { Position: {(side * 2 - 1) * width * 0.42, height - 0.05, reach}; Box: {0.085, 0.5, 1.2}; Rgb: iron }
   }
-  { Position: {0, height - 0.26, reach + 0.58}; Surface: {image: hazardImages[seed % 8], fit: false, width: width - 0.21, height: 0.13} }
+  { Position: {0, height - 0.192, reach + 0.5}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[seed % 8], fit: false, width: width - 0.21, height: 0.13} } }
   for slot in 0..2 {
     {
       Position: {(slot * 2 - 1) * width * 0.235, height - 0.19, reach}
@@ -1150,26 +1182,31 @@ template FacadeFrame : Frontage {
   prop finish: Rgb = {95, 112, 116}
   prop trim: Rgb = {43, 58, 67}
   prop depth: f32 = 1.6
+  prop weathering: f32 = 0
   {
     Position: {0, height / 2, -0.21}
     Box: {width - 0.06, height - 0.12, 0.42}
     Rgb: finish
+    Weathering: {dust: weathering * 0.2, grime: weathering * 0.38, seed: seed}
   }
   {
     Position: {0, 0.08, depth / 2}
     Box: {width, 0.16, depth}
     Rgb: trim
+    Weathering: {dust: weathering * 0.25, grime: weathering * 0.32, seed: seed + 1}
   }
   {
     Position: {0, height - 0.08, depth * 0.28}
     Box: {width, 0.14, depth * 0.65}
     Rgb: trim
+    Weathering: {dust: weathering * 0.25, grime: weathering * 0.32, seed: seed + 1}
   }
   for s in 0..2 {
     {
       Position: {(s * 2 - 1) * (width / 2 - 0.08), height / 2, 0.12}
       Box: {0.12, height - 0.12, 0.23}
       Rgb: trim
+      Weathering: {dust: weathering * 0.25, grime: weathering * 0.32, seed: seed + 1}
     }
   }
 }
@@ -1200,13 +1237,18 @@ template ShopHeader {
   prop width: f32 = 3.8
   prop height: f32 = 3.48
   prop image: entity = shopSigns.shop0
+  prop lightbox: bool = false
   prop accent: Rgb = {55, 226, 237}
   {
     Position: {0, height - 0.37, 0.42}
     Box: {width - 0.25, 0.51, 0.18}
     Rgb: iron
   }
-  { Position: {0, height - 0.37, 0.52}; Surface: {image: image, width: width - 0.35, height: 0.43, glow: 0.85} }
+  if lightbox {
+    { Position: {0, height - 0.37, 0.52}; Neon: {size: {width - 0.35, 0.43, 0.08}, color: accent, power: 0.85} }
+  } else {
+    { Position: {0, height - 0.37, 0.52}; Surface: {image: image, width: width - 0.35, height: 0.43, glow: 0.85} }
+  }
   { Position: {0, height - 0.68, 0.43}; Neon: {size: {width - 0.3, 0.035, 0.08}, color: accent, power: 1.3} }
 }
 
@@ -1906,7 +1948,7 @@ template SkyGym {
 
 @tree Parent
 template WalkupHome : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {119 + seed % 35, 123, 114}} }
+  { Position: {}; FacadeFrame: {weathering: 1, width: width, height: height, seed: seed, finish: {119 + seed % 35, 123, 114}} }
   { Position: {-0.27, height * 0.58, 0.12}; Window: {width: width * 0.58, height: height * 0.48, seed: seed, color: amber} }
   { Position: {width * 0.36, 1.14, 0.05}; ServiceHatch: {seed: seed} }
   { Position: {0, 0.16, 1.53}; Railing: {width: width} }
@@ -1955,7 +1997,7 @@ template CapsuleFront : Frontage {
 
 @tree Parent
 template ShutterHome : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {83, 110, 117}, trim: rust, depth: 1.8} }
+  { Position: {}; FacadeFrame: {weathering: 1.15, width: width, height: height, seed: seed, finish: {83, 110, 117}, trim: rust, depth: 1.8} }
   { Position: {-0.2, 1.72, 0.04}; Window: {width: width * 0.74, height: 2.3, seed: seed, color: {177, 199, 158}} }
   for i in 0..2 {
     { Position: {-width * 0.3 + i * width * 0.56, 1.72, 0.23}; Rotation: {0, (i * 2 - 1) * 0.3, 0};
@@ -1975,7 +2017,7 @@ template ShutterHome : Frontage {
 
 @tree Parent
 template MakerLoft : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {103, 95, 91}, depth: 2.1} }
+  { Position: {}; FacadeFrame: {weathering: 1.1, width: width, height: height, seed: seed, finish: {103, 95, 91}, depth: 2.1} }
   { Position: {}; GlazedBay: {width: width, height: height, seed: seed, divisions: 4, tint: {203, 174, 129}} }
   { Position: {0, 0.16, 1.96}; Railing: {width: width} }
   {
@@ -2001,7 +2043,7 @@ template MakerLoft : Frontage {
 
 @tree Parent
 template GreenHome : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {107, 128, 108}, depth: 1.8} }
+  { Position: {}; FacadeFrame: {weathering: 0.65, width: width, height: height, seed: seed, finish: {107, 128, 108}, depth: 1.8} }
   { Position: {}; GlazedBay: {width: width, height: height, seed: seed, divisions: 2, tint: {164, 214, 174}} }
   { Position: {0, 0.16, 1.72}; Railing: {width: width, color: {119, 144, 115}} }
   {
@@ -2047,14 +2089,14 @@ template BayResidence : Frontage {
 
 @tree Parent
 template FoodStall : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {97, 74, 79}, depth: 2.2} }
+  { Position: {}; FacadeFrame: {weathering: 0.85, width: width, height: height, seed: seed, finish: {97, 74, 79}, depth: 2.2} }
   { Position: {0, 1.65, 0.03}; Window: {width: width - 0.6, height: 1.5, seed: seed, color: amber} }
   {
     Position: {0, 0.16, 1.02}
     Stall: {seed: seed, accent: pink}
     Scale: {0.84, 0.84, 0.84}
   }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop0, accent: pink} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop0, accent: pink} }
   { Position: {width * 0.39, 1.6, 0.24}; Surface: {image: screenImages[8], width: 0.35, height: 0.62, glow: 0.5} }
   {
     Position: {-width * 0.39, 2.62, 0.3}
@@ -2071,7 +2113,7 @@ template FoodStall : Frontage {
 
 @tree Parent
 template Bar : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {74, 61, 85}, depth: 2} }
+  { Position: {}; FacadeFrame: {weathering: 0.8, width: width, height: height, seed: seed, finish: {74, 61, 85}, depth: 2} }
   {
     Position: {0, 1.64, 0.02}
     Box: {width - 0.3, 2.45, 0.06}
@@ -2104,13 +2146,13 @@ template Bar : Frontage {
       Rgb: iron
     }
   }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop4, accent: pink} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop4, accent: pink} }
   { Position: {width * 0.4, 1.65, 0.46}; Surface: {image: posterImages[4], width: 0.38, height: 0.7, glow: 0.6} }
 }
 
 @tree Parent
 template RepairShop : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {113, 103, 76}, depth: 2.1} }
+  { Position: {}; FacadeFrame: {weathering: 1.35, width: width, height: height, seed: seed, finish: {113, 103, 76}, depth: 2.1} }
   { Position: {0, 1.55, 0.02}; Surface: {image: shutterImages[3], width: width - 0.3, height: 2.5} }
   {
     Position: {-0.65, 0.16, 0.65}
@@ -2127,20 +2169,20 @@ template RepairShop : Frontage {
     ServiceDebris: {seed: seed, accent: amber}
     Scale: {0.6, 0.6, 0.6}
   }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop1, accent: amber} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop1, accent: amber} }
   {
     Position: {width * 0.4, 2.32, 0.35}
     Junction: {seed: seed}
     Scale: {0.65, 0.65, 0.65}
   }
-  { Position: {0, 0.22, 2.06}; Surface: {image: hazardImages[1], width: width - 0.2, height: 0.15, fit: false} }
+  { Position: {0, 0.168, 2.01}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[1], width: width - 0.2, height: 0.15, fit: false} } }
 }
 
 @tree Parent
 template TeaHouse : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {110, 137, 123}, trim: bronze, depth: 2.15} }
+  { Position: {}; FacadeFrame: {weathering: 0.5, width: width, height: height, seed: seed, finish: {110, 137, 123}, trim: bronze, depth: 2.15} }
   { Position: {}; GlazedBay: {width: width, height: height, seed: seed, divisions: 3, tint: {222, 192, 142}} }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop7, accent: amber} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop7, accent: amber} }
   {
     Position: {-0.8, 0.16, 0.94}
     TeaCart: {seed: seed, accent: amber}
@@ -2163,13 +2205,13 @@ template TeaHouse : Frontage {
 
 @tree Parent
 template ArcadeShop : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {81, 72, 114}, depth: 2.1} }
+  { Position: {}; FacadeFrame: {weathering: 0.7, width: width, height: height, seed: seed, finish: {81, 72, 114}, depth: 2.1} }
   {
     Position: {0, 0.16, 0.58}
     MarketArcade: {seed: seed}
     Scale: {0.93, 0.93, 0.93}
   }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop14, accent: pink} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop14, accent: pink} }
   for i in 0..2 {
     { Position: {(i * 2 - 1) * width * 0.45, 1.5, 0.28}; Neon: {size: {0.065, 2.4, 0.07}, color: pink, power: 1.6} }
     {
@@ -2188,7 +2230,7 @@ template ArcadeShop : Frontage {
 
 @tree Parent
 template ParcelShop : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {129, 114, 83}, depth: 1.9} }
+  { Position: {}; FacadeFrame: {weathering: 0.9, width: width, height: height, seed: seed, finish: {129, 114, 83}, depth: 1.9} }
   {
     Position: {-0.82, 0.16, 0.4}
     Locker: {seed: seed, accent: cyan}
@@ -2199,7 +2241,7 @@ template ParcelShop : Frontage {
     Locker: {seed: seed + 1, accent: amber}
     Scale: {0.85, 0.85, 0.85}
   }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop11, accent: cyan} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop11, accent: cyan} }
   {
     Position: {0, 0.16, 1.28}
     RobotPorter: {seed: seed, accent: cyan}
@@ -2215,7 +2257,7 @@ template ParcelShop : Frontage {
 
 @tree Parent
 template Fabrication : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {96, 113, 122}, depth: 2} }
+  { Position: {}; FacadeFrame: {weathering: 1.4, width: width, height: height, seed: seed, finish: {96, 113, 122}, depth: 2} }
   { Position: {0, 2.35, 0.02}; Window: {width: width - 0.5, height: 0.74, seed: seed, color: cyan} }
   {
     Position: {-0.78, 0.16, 0.7}
@@ -2235,7 +2277,7 @@ template Fabrication : Frontage {
 
 @tree Parent
 template DataWorks : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {64, 85, 108}, depth: 1.6} }
+  { Position: {}; FacadeFrame: {weathering: 0.85, width: width, height: height, seed: seed, finish: {64, 85, 108}, depth: 1.6} }
   for i in 0..3 {
     {
       Position: {-1.07 + i * 1.07, 0.16, 0.43}
@@ -2250,13 +2292,13 @@ template DataWorks : Frontage {
   }
   { Position: {0, 0.16, 1.52}; Railing: {width: width} }
   { Position: {0, height - 0.18, 0.48}; CableLoom: {seed: seed, width: width - 0.3} }
-  { Position: {0, height - 0.18, 0.55}; Surface: {image: shopSigns.shop8, width: width - 0.4, height: 0.3, glow: 0.6} }
+  { Position: {0, height - 0.18, 0.55}; Neon: {size: {width - 0.4, 0.3, 0.08}, color: amber, power: 0.6} }
   { Position: {-width * 0.42, 0.12, 1.2}; Umbilical: {seed: seed, length: 1} }
 }
 
 @tree Parent
 template WaterWorks : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {73, 114, 115}, depth: 2} }
+  { Position: {}; FacadeFrame: {weathering: 1.25, width: width, height: height, seed: seed, finish: {73, 114, 115}, depth: 2} }
   for i in 0..3 {
     { Position: {-1.1 + i * 1.1, 0.16, 0.64}; Tank: {radius: 0.38, height: 2.3 - (i % 2) * 0.4, color: {109, 146, 141}} }
   }
@@ -2273,17 +2315,17 @@ template WaterWorks : Frontage {
     Rgb: rust
   }
   { Position: {0, 1.3, 1.95}; Surface: {image: labelImages[1], width: 0.47, height: 0.34} }
-  { Position: {0, 0.1, 1.98}; Surface: {image: hazardImages[0], width: width - 0.2, height: 0.14, fit: false} }
+  { Position: {0, 0.168, 1.92}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[0], width: width - 0.2, height: 0.14, fit: false} } }
 }
 
 @tree Parent
 template RoboticsLab : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {136, 148, 139}, depth: 1.9} }
+  { Position: {}; FacadeFrame: {weathering: 0.65, width: width, height: height, seed: seed, finish: {136, 148, 139}, depth: 1.9} }
   { Position: {}; GlazedBay: {width: width, height: height, seed: seed, divisions: 3, tint: {169, 224, 212}} }
   { Position: {-0.78, 0.16, 0.8}; RobotPorter: {seed: seed, accent: cyan} }
   { Position: {0.84, 0.16, 0.8}; RobotPorter: {seed: seed + 1, accent: amber} }
   { Position: {0, 0.16, 1.83}; Railing: {width: width} }
-  { Position: {0, height - 0.24, 0.39}; Surface: {image: shopSigns.shop8, width: width - 0.5, height: 0.33, glow: 0.45} }
+  { Position: {0, height - 0.24, 0.39}; Neon: {size: {width - 0.5, 0.33, 0.08}, color: cyan, power: 0.45} }
   {
     Position: {0, 0.16, 0.49}
     Terminal: {seed: seed, accent: cyan}
@@ -2294,7 +2336,7 @@ template RoboticsLab : Frontage {
 
 @tree Parent
 template PowerExchange : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {97, 104, 77}, depth: 1.8} }
+  { Position: {}; FacadeFrame: {weathering: 1.25, width: width, height: height, seed: seed, finish: {97, 104, 77}, depth: 1.8} }
   { Position: {-0.82, 0.2, 0.68}; BatteryBank: {seed: seed} }
   { Position: {0.83, 0.2, 0.68}; BatteryBank: {seed: seed + 3} }
   {
@@ -2304,13 +2346,13 @@ template PowerExchange : Frontage {
   }
   { Position: {0, 1.74, 0.398}; Surface: {image: screenImages[9], width: 0.88, height: 0.82, glow: 0.7} }
   { Position: {0, 0.16, 1.73}; Railing: {width: width, color: amber} }
-  { Position: {0, height - 0.21, 0.24}; Surface: {image: shopSigns.shop12, width: width - 0.3, height: 0.3, glow: 0.5} }
+  { Position: {0, height - 0.21, 0.24}; Neon: {size: {width - 0.3, 0.3, 0.08}, color: amber, power: 0.5} }
   { Position: {-width * 0.43, 1.9, 0.39}; Umbilical: {seed: seed, length: 1.4} }
 }
 
 @tree Parent
 template PrintWorks : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {124, 106, 110}, depth: 2.1} }
+  { Position: {}; FacadeFrame: {weathering: 1.1, width: width, height: height, seed: seed, finish: {124, 106, 110}, depth: 2.1} }
   { Position: {0, 2.6, 0.13}; Window: {width: width - 0.7, height: 0.65, seed: seed, color: pink} }
   {
     Position: {0, 0.73, 0.7}
@@ -2691,7 +2733,7 @@ template ListeningLounge : Frontage {
 
 @tree Parent
 template LanternHome : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {150, 110, 91}, trim: rust, depth: 2} }
+  { Position: {}; FacadeFrame: {weathering: 0.9, width: width, height: height, seed: seed, finish: {150, 110, 91}, trim: rust, depth: 2} }
   for i in 0..2 {
     { Position: {-width * 0.23 + i * width * 0.46, 1.85, 0.16}; Window: {width: width * 0.39, height: 1.73, seed: seed + i, color: {236, 188, 141}} }
     { Position: {-width * 0.3 + i * width * 0.6, 0.16, 1.47}; SculptedPlanter: {seed: seed + i, size: 0.55} }
@@ -2730,9 +2772,9 @@ template LanternHome : Frontage {
 
 @tree Parent
 template FishMarket : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {66, 121, 130}, depth: 2} }
+  { Position: {}; FacadeFrame: {weathering: 1.15, width: width, height: height, seed: seed, finish: {66, 121, 130}, depth: 2} }
   { Position: {0, 1.94, 0.07}; Window: {width: width - 0.65, height: 1.8, seed: seed, color: cyan} }
-  { Position: {}; ShopHeader: {width: width, height: height, image: shopSigns.shop10, accent: cyan} }
+  { Position: {}; ShopHeader: {lightbox: true, width: width, height: height, image: shopSigns.shop10, accent: cyan} }
   {
     Position: {0, 0.64, 1}
     Box: {width - 0.5, 0.94, 0.97}
@@ -2770,7 +2812,7 @@ template FishMarket : Frontage {
 
 @tree Parent
 template DroneHangar : Frontage {
-  { Position: {}; FacadeFrame: {width: width, height: height, seed: seed, finish: {99, 111, 133}, depth: 2.1} }
+  { Position: {}; FacadeFrame: {weathering: 1.25, width: width, height: height, seed: seed, finish: {99, 111, 133}, depth: 2.1} }
   {
     Position: {0, 1.73, 0.04}
     Box: {width - 0.28, 2.85, 0.055}
@@ -2788,14 +2830,14 @@ template DroneHangar : Frontage {
       Scale: {0.6, 0.6, 0.6}
     }
     { Position: {-0.9 + i * 1.8, 1.9, 0.15}; Surface: {image: screenImages[(seed + i) % 12], width: 0.81, height: 0.66, glow: 0.55} }
-    { Position: {-0.9 + i * 1.8, 0.46, 1.775}; Surface: {image: hazardImages[1], width: 1.5, height: 0.13, fit: false} }
+    { Position: {-0.9 + i * 1.8, 0.568, 1.69}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[1], width: 1.5, height: 0.13, fit: false} } }
   }
   {
     Position: {0, height - 0.32, 0.42}
     Box: {width - 0.25, 0.2, 0.8}
     Rgb: concrete
   }
-  { Position: {0, height - 0.3, 0.831}; Surface: {image: shopSigns.shop11, width: width - 0.35, height: 0.18, glow: 0.5} }
+  { Position: {0, height - 0.3, 0.831}; Neon: {size: {width - 0.35, 0.18, 0.08}, color: cyan, power: 0.5} }
   { Position: {0, 0.16, 0.3}; Umbilical: {seed: seed, length: 1.3} }
   {
     Position: {width * 0.43, 0.16, 1.85}
@@ -2986,11 +3028,11 @@ template CommonsKitchen {
 template NoodleKitchen : Frontage {
   {
     Position: {}
-    FacadeFrame: {width: width, height: height, seed: seed, finish: {157, 92, 65}, trim: bronze, depth: 2.2}
+    FacadeFrame: {weathering: 0.85, width: width, height: height, seed: seed, finish: {157, 92, 65}, trim: bronze, depth: 2.2}
   }
   {
     Position: {}
-    ShopHeader: {width: width, height: height, image: shopImages[seed % 16], accent: amber}
+    ShopHeader: {lightbox: true, width: width, height: height, image: shopImages[seed % 16], accent: amber}
   }
   {
     Position: {0, 1.1, 0.22}
@@ -3063,11 +3105,11 @@ template NoodleKitchen : Frontage {
 template CeramicWorks : Frontage {
   {
     Position: {}
-    FacadeFrame: {width: width, height: height, seed: seed, finish: {139, 113, 90}, trim: iron, depth: 2.15}
+    FacadeFrame: {weathering: 1.2, width: width, height: height, seed: seed, finish: {139, 113, 90}, trim: iron, depth: 2.15}
   }
   {
     Position: {}
-    ShopHeader: {width: width, height: height, image: shopImages[(seed + 5) % 16], accent: amber}
+    ShopHeader: {lightbox: true, width: width, height: height, image: shopImages[(seed + 5) % 16], accent: amber}
   }
   {
     Position: {-width * 0.27, 1.03, 0.69}
@@ -3089,8 +3131,7 @@ template CeramicWorks : Frontage {
     Rgb: concrete
   }
   {
-    Position: {-width * 0.27, 0.38, 1.31}
-    Surface: {image: hazardImages[seed % 8], width: 1.02, height: 0.12, fit: false}
+    Position: {-width * 0.27, 1.848, 1.1}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[seed % 8], width: 1.02, height: 0.12, fit: false} }
   }
   for row in 0..3 {
     {
@@ -3341,14 +3382,16 @@ template Stack {
   prop seed: i32 = 1
   prop accent: Rgb = {55, 226, 237}
   prop irregular: bool = true
+  prop weathering: f32 = 1
   const width = bays * 3.8
   for f in 0..floors {
     const phase = (math.floor(f / 3) + seed) % 3
     const shift = phase * 0.75
+    const exposure = weathering * (f < premiumStart)
     {
       Position: {shift, f * 3.6, -shift}
-      { Position: {0, 1.7, 0}; Box: {width - 0.5, 3.4, width - 0.5}; Rgb: {80, 97, 106} }
-      { Position: {0, 0.06, 0}; Box: {width + 0.5, 0.23, width + 0.5}; Rgb: concrete }
+      { Position: {0, 1.7, 0}; Box: {width - 0.5, 3.4, width - 0.5}; Weathering: {dust: exposure * 0.16, grime: exposure * 0.3, seed: seed + f}; Rgb: {80, 97, 106} }
+      { Position: {0, 0.06, 0}; Box: {width + 0.5, 0.23, width + 0.5}; Weathering: {dust: exposure * 0.24, grime: exposure * 0.4, seed: seed + f}; Rgb: concrete }
       for side in 0..4 {
         {
           Rotation: {0, side * math.PI / 2, 0}
@@ -3386,7 +3429,7 @@ template Stack {
   }
   roof {
     Position: {0.8, floors * 3.6, -0.8}
-    { Position: {0, 0.12, 0}; Box: {width + 1, 0.25, width + 1}; Rgb: {95, 112, 116} }
+    { Position: {0, 0.12, 0}; Box: {width + 1, 0.25, width + 1}; Weathering: {dust: weathering * (premiumStart >= floors) * 0.28, grime: weathering * (premiumStart >= floors) * 0.35, seed: seed}; Rgb: {95, 112, 116} }
     for side in 0..4 {
       {
         Rotation: {0, side * math.PI / 2, 0}
@@ -3414,7 +3457,7 @@ template Bridge {
   prop length: f32 = 24
   prop width: f32 = 4
   prop accent: Rgb = {55, 226, 237}
-  { Position: {0, -0.2, 0}; Box: {length, 0.4, width}; Rgb: {95, 116, 124} }
+  { Position: {0, -0.2, 0}; Box: {length, 0.4, width}; Weathering: {dust: 0.2, grime: 0.32}; Rgb: {95, 116, 124} }
   for side in 0..2 {
     { Position: {0, 0, (side * 2 - 1) * width / 2}; Railing: {width: length} }
     { Position: {0, -0.22, (side * 2 - 1) * (width / 2 + 0.02)}; Neon: {size: {length, 0.07, 0.07}, color: accent, power: 2} }
@@ -3651,6 +3694,105 @@ template SkyStair {
 }
 
 @tree Parent
+template CorePipe {
+  prop height: f32 = 10.8
+  prop radius: f32 = 0.3
+  prop color: Rgb = {136, 76, 56}
+  { Position: {0, height / 2, 0}; Cylinder: {radius: radius, length: height, segments: 10}; Rgb: color; Weathering: {dust: 0, grime: 0, edge: 0.65}; PbrMaterial: {roughness: 0.54, metallic: 0.45} }
+  for end in 0..2 {
+    { Position: {0, 0.3 + end * (height - 0.6), 0}; Cylinder: {radius: radius + 0.12, length: 0.16, segments: 10}; Rgb: iron }
+    { Position: {0, 0.42 + end * (height - 0.84), 0}; Torus: {radius: radius + 0.02, tube: 0.045, segments: 10, rings: 4}; Rgb: concrete }
+  }
+  { Position: {0, height * 0.52, -radius}; Box: {radius * 2 + 0.35, 0.22, radius * 2 + 0.3}; Rgb: iron }
+  { Position: {0, height * 0.52, 0}; Torus: {radius: radius + 0.035, tube: 0.055, segments: 10, rings: 4}; Rgb: concrete }
+}
+
+@tree Parent
+template CoreExtractor {
+  prop seed: i32 = 0
+  { Position: {0, 0, 0.35}; Box: {2.7, 2.7, 0.7}; Rgb: {91, 112, 118}; Weathering: {dust: 0, grime: 0, edge: 0.65}; PbrMaterial: {roughness: 0.6, metallic: 0.35} }
+  { Position: {0, 0, 0.72}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 1.13, length: 0.09, segments: 16}; Rgb: {20, 32, 39} }
+  { Position: {0, 0, 0.83}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 1.13, tube: 0.11, segments: 16, rings: 5}; Rgb: iron }
+  for blade in 0..6 {
+    {
+      Position: {0, 0, 0.84}
+      Rotation: {0, 0, blade * math.PI / 3 + seed * 0.4}
+      { Position: {0.5, 0, 0}; Rotation: {0.22, 0, -0.28}; Box: {0.83, 0.3, 0.07}; Rgb: {139, 155, 151} }
+    }
+  }
+  { Position: {0, 0, 0.92}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.25, length: 0.18, segments: 10}; Rgb: amber }
+  for bar in 0..5 {
+    { Position: {-0.72 + bar * 0.36, 0, 1.02}; Box: {0.045, 1.95, 0.045}; Rgb: iron }
+  }
+  for corner in 0..4 {
+    { Position: {-1.17 + (corner % 2) * 2.34, -1.17 + math.floor(corner / 2) * 2.34, 0.73}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.075, length: 0.07, segments: 6}; Rgb: concrete }
+  }
+}
+
+@tree Parent
+template MegatowerLift {
+  prop seed: i32 = 0
+  { Position: {}; RoundedBox: {x: 3.4, y: 3.2, z: 1.4, radius: 0.14, segments: 2}; Rgb: {146, 164, 171}; Weathering: {dust: 0, grime: 0, edge: 0.65}; PbrMaterial: {roughness: 0.4, metallic: 0.45} }
+  { Position: {0, 0.05, 0.72}; Box: {2.85, 2.65, 0.08}; Rgb: iron }
+  for door in 0..2 {
+    { Position: {-0.65 + door * 1.3, 0.03, 0.79}; Box: {1.25, 2.48, 0.09}; Rgb: {96, 123, 133}; PbrMaterial: {roughness: 0.34, metallic: 0.55} }
+    { Position: {-0.65 + door * 1.3, 0.4, 0.845}; Neon: {size: {1.02, 1.1, 0.025}, color: {143, 213, 231}, power: 0.65} }
+    { Position: {-0.65 + door * 1.3, -0.55, 0.85}; Box: {1.06, 0.035, 0.035}; Rgb: iron }
+    { Position: {-0.13 + door * 0.26, -0.26, 0.86}; Box: {0.045, 0.3, 0.04}; Rgb: concrete }
+  }
+  { Position: {0, 1.47, 0.77}; Box: {1.3, 0.22, 0.13}; Rgb: {18, 33, 40} }
+  { Position: {0, 1.47, 0.846}; Surface: {image: screenImages[seed % 12], width: 1.2, height: 0.17, fit: false, glow: 0.75} }
+  { Position: {1.5, 0.02, 0.76}; Surface: {image: labelImages[seed % 12], width: 0.2, height: 0.4} }
+  { Position: {0, -1.58, 0.22}; Box: {3.7, 0.16, 1.65}; Rgb: iron }
+  { Position: {0, -1.492, 0.965}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[seed % 8], width: 3.6, height: 0.14, fit: false} } }
+  { Position: {0, 1.68, 0}; Box: {3.65, 0.17, 1.6}; Rgb: iron }
+  { Position: {0, 1.8, 0}; Box: {1.15, 0.12, 0.85}; Rgb: concrete }
+  { Position: {-1.05, 1.77, -0.08}; Compressor: {seed: seed}; Scale: {0.7, 0.7, 0.7} }
+  { Position: {1.1, 1.97, 0}; Vent: {seed: seed}; Scale: {0.65, 0.65, 0.65} }
+  { Position: {0, -1.83, -0.1}; Box: {2.6, 0.32, 0.9}; Rgb: iron }
+  for side in 0..2 {
+    const sx = side * 2 - 1
+    { Position: {sx * 1.62, 0, 0.78}; Box: {0.12, 3.15, 0.12}; Rgb: iron }
+    { Position: {sx * 1.62, 0.2, 0.85}; Neon: {size: {0.045, 2.5, 0.025}, color: cyan, power: 1.2} }
+    { Position: {sx * 1.75, 0, -0.3}; Box: {0.15, 3.9, 0.32}; Rgb: iron }
+    { Position: {sx * 0.82, -1.99, -0.1}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.12, length: 0.7, segments: 8}; Rgb: rust }
+    { Position: {sx * 1.45, 1.91, 0.63}; Neon: {size: {0.17, 0.18, 0.15}, color: amber, power: 1.6} }
+    for end in 0..2 {
+      { Position: {sx * 1.88, -1.34 + end * 2.68, -0.3}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.23, length: 0.18, segments: 10}; Rgb: {25, 35, 41} }
+      { Position: {sx * 1.88, -1.34 + end * 2.68, -0.18}; Rotation: {math.PI / 2, 0, 0}; Cylinder: {radius: 0.11, length: 0.09, segments: 8}; Rgb: concrete }
+    }
+    { Position: {sx * 1.72, -0.4, 0}; Rotation: {0, sx * math.PI / 2, 0}
+      { Position: {}; Surface: {image: grillImages[seed % 12], width: 0.8, height: 0.7} }
+    }
+  }
+}
+
+@tree Parent
+template CoreServiceBay {
+  prop seed: i32 = 0
+  { Position: {0, 0, 0}; Box: {16.8, 0.26, 2.8}; Rgb: iron }
+  { Position: {0, 0.138, 1.29}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[seed % 8], width: 16.6, height: 0.2, fit: false} } }
+  { Position: {0, 0.16, 1.23}; Railing: {width: 16.5} }
+  for support in 0..4 {
+    { Position: {-7.5 + support * 5, -0.8, -0.25}; Rotation: {0.55, 0, 0}; Box: {0.24, 2, 0.24}; Rgb: iron }
+  }
+  { Position: {-4.3, 3.2, -0.3}; CoreExtractor: {seed: seed} }
+  { Position: {-4.3, 6.1, -0.3}; CoreExtractor: {seed: seed + 1} }
+  { Position: {0.1, 0.15, -0.05}; Tank: {radius: 0.75, height: 4.6, color: {115, 134, 130}} }
+  { Position: {2.1, 0.15, 0}; Compressor: {seed: seed}; Scale: {1.5, 1.5, 1.5} }
+  { Position: {4, 1.45, -0.18}; Junction: {seed: seed}; Scale: {2, 2, 2} }
+  { Position: {2.2, 3.7, 0.2}; CableLoom: {seed: seed, width: 4} }
+  { Position: {1.3, 4.9, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.19, length: 2.4, segments: 10}; Rgb: rust }
+  { Position: {2.5, 3.55, 0}; CorePipe: {height: 1.35, radius: 0.19} }
+  { Position: {0.1, 2.4, 0.92}; Rotation: {math.PI / 2, 0, 0}; Torus: {radius: 0.38, tube: 0.055, segments: 12, rings: 5}; Rgb: amber }
+  { Position: {0.1, 2.4, 0.94}; Box: {0.7, 0.065, 0.065}; Rgb: amber }
+  { Position: {0.1, 2.4, 0.94}; Box: {0.065, 0.7, 0.065}; Rgb: amber }
+  { Position: {4.1, 4, -0.15}; Box: {1.45, 0.65, 0.2}; Rgb: iron }
+  { Position: {4.1, 4, -0.035}; Surface: {image: screenImages[seed % 12], width: 1.3, height: 0.52, fit: false, glow: 0.6} }
+  { Position: {-0.7, 8.4, -0.3}; CableLoom: {seed: seed + 3, width: 12.5} }
+}
+
+@tree Parent
 template TidalMegatower {
   prop seed: i32 = 9
   prop homeFacade: template Frontage[] = [WalkupHome, CapsuleFront, ShutterHome, MakerLoft, GreenHome, BayResidence, LanternHome]
@@ -3673,7 +3815,7 @@ template TidalMegatower {
         { Position: {}; Box: {25, 0.4, 25}; Rgb: {28, 108, 119}; PbrMaterial: {roughness: 0.08, metallic: 0.65} }
         for side in 0..4 {
           { Rotation: {0, side * math.PI / 2, 0}
-            { Position: {0, 1.5, 12.6}; Box: {25.6, 3.3, 0.4}; Rgb: {76, 99, 108} }
+            { Position: {0, 1.5, 12.6}; Box: {25.6, 3.3, 0.4}; Weathering: {dust: 0.05, grime: 0.65, seed: seed + side}; Rgb: {76, 99, 108} }
             { Position: {0, 3.2, 12.6}; Neon: {size: {25.6, 0.05, 0.1}, color: cyan, power: 1} }
           }
         }
@@ -3683,6 +3825,7 @@ template TidalMegatower {
       {
         Position: {(i % 4) * 17 - 25.5, -12, math.floor(i / 4) * 17 - 25.5}
         Cylinder: {radius: 2, length: 31, segments: 12}
+        Weathering: {dust: 0.06, grime: 0.6, seed: seed + i}
         Rgb: {79, 100, 103}
         for y in 0..4 {
           { Position: {0, -10 + y * 7, 0}; Torus: {radius: 2.04, tube: 0.18, segments: 12, rings: 5}; Rgb: rust }
@@ -3722,11 +3865,29 @@ template TidalMegatower {
       for i in 0..3 {
         { Position: {-5.4 + i * 5.4, 138.6, -12.2 + s * 18.4}; Box: {3.8, 300, 0.28}; Rgb: {25, 50, 62}; PbrMaterial: {roughness: 0.23, metallic: 0.6} }
         { Position: {-7.5 + i * 5.4, 138.6, -12.4 + s * 18.8}; Neon: {size: {0.11, 300, 0.12}, color: cyan, power: 1.6} }
+        for rail in 0..2 {
+          { Position: {-7.28 + i * 5.4 + rail * 3.76, 138.6, -12.45 + s * 18.9}; Box: {0.12, 300, 0.25}; Rgb: {126, 144, 149}; PbrMaterial: {roughness: 0.36, metallic: 0.7} }
+          { Position: {-6 + i * 5.4 + rail * 1.2, 138.6, -12.4 + s * 18.8}; Cylinder: {radius: 0.035, length: 300, segments: 6}; Rgb: iron }
+        }
+        for bracket in 0..28 {
+          { Position: {-5.4 + i * 5.4, -8 + bracket * 10.8, -12.42 + s * 18.84}; Box: {4.1, 0.18, 0.3}; Rgb: iron }
+        }
+        {
+          Position: {-5.4 + i * 5.4, 287, -12.7 + s * 19.4}
+          Rotation: {0, (1 - s) * math.PI, 0}
+          { Position: {0, 0, 0}; Box: {4.4, 0.4, 2}; Rgb: iron }
+          { Position: {0, 0.7, 0}; Rotation: {0, 0, math.PI / 2}; Cylinder: {radius: 0.6, length: 2.5, segments: 16}; Rgb: {105, 124, 128} }
+          for drum in 0..4 {
+            { Position: {-0.9 + drum * 0.6, 0.7, 0}; Rotation: {0, 0, math.PI / 2}; Torus: {radius: 0.61, tube: 0.075, segments: 16, rings: 5}; Rgb: iron }
+          }
+          { Position: {1.55, 0.6, 0}; Box: {0.65, 0.8, 1}; Rgb: rust }
+          { Position: {0, 0.208, 0.865}; Rotation: {-math.PI / 2, 0, 0}; { Position: {}; Surface: {image: hazardImages[i], width: 4.2, height: 0.25, fit: false} } }
+        }
         for j in 0..8 {
           {
             Position: {-5.4 + i * 5.4, 14 + j * 41 + i * 6, -12.7 + s * 19.4}
-            { Position: {}; Box: {3.4, 3.2, 1.4}; Rgb: {146, 164, 171} }
-            { Position: {0, 0.2, (s * 2 - 1) * 0.73}; Neon: {size: {2.8, 1.6, 0.06}, color: {143, 213, 231}, power: 1} }
+            Rotation: {0, (1 - s) * math.PI, 0}
+            MegatowerLift: {seed: seed + i + j * 3 + s * 5}
           }
         }
       }
@@ -3734,11 +3895,56 @@ template TidalMegatower {
     for f in 0..80 {
       { Position: {0, f * 3.6 + 3, 6.4}; Box: {17.2, 0.13, 0.35}; Rgb: {129, 143, 143} }
     }
+    for face in 0..2 {
+      {
+        Position: {0, 0, -3}
+        Rotation: {0, face * math.PI, 0}
+        for gap in 0..2 {
+          {
+            Position: {-2.7 + gap * 5.4, 0, 9.45}
+            { Position: {0, 138.6, 0}; Box: {0.55, 300, 0.35}; Rgb: iron }
+            for wire in 0..3 {
+              { Position: {-0.16 + wire * 0.16, 138.6, 0.23}; Cylinder: {radius: 0.045, length: 300, segments: 6}; Rgb: {114 + wire * 23, 94 + wire * 14, 67} }
+            }
+            for clamp in 0..40 {
+              { Position: {0, -8 + clamp * 7.5, 0.25}; Box: {0.67, 0.12, 0.13}; Rgb: concrete }
+              if clamp % 4 == 0 {
+                { Position: {0, -7.3 + clamp * 7.5, 0.23}; Junction: {seed: seed + clamp} }
+              }
+            }
+          }
+        }
+      }
+    }
+    for side in 0..2 {
+      {
+        Position: {(side * 2 - 1) * 8.7, 0, -3}
+        Rotation: {0, (side * 2 - 1) * math.PI / 2, 0}
+        { Position: {-4.3, 138.6, 0.25}; Box: {3.3, 300, 0.8}; Rgb: {87, 105, 110}; PbrMaterial: {roughness: 0.67, metallic: 0.3} }
+        { Position: {6, 138.6, 0.1}; Box: {1.1, 300, 0.3}; Rgb: iron }
+        for wire in 0..5 {
+          { Position: {5.6 + wire * 0.2, 138.6, 0.32}; Cylinder: {radius: 0.055, length: 300, segments: 6}; Rgb: {55 + wire * 20, 70 + wire * 8, 74} }
+        }
+        for section in 0..28 {
+          const base = -11.4 + section * 10.7
+          { Position: {-7.2, base, 0.6}; CorePipe: {height: 10.7, radius: 0.45, color: rust} }
+          { Position: {-6, base, 0.45}; CorePipe: {height: 10.7, radius: 0.22, color: {108, 139, 138}} }
+          { Position: {7.5, base, 0.48}; CorePipe: {height: 10.7, radius: 0.33, color: {147, 127, 89}} }
+          { Position: {-4.3, base + 0.25, 0.25}; Box: {3.5, 0.18, 1}; Rgb: iron }
+          { Position: {-4.3, base + 5.35, 0.68}; Box: {3.3, 0.07, 0.08}; Rgb: concrete }
+          { Position: {6, base + 2, 0.4}; Box: {1.25, 0.18, 0.18}; Rgb: concrete }
+          { Position: {6, base + 7, 0.4}; Box: {1.25, 0.18, 0.18}; Rgb: concrete }
+          if section % 2 == 1 {
+            { Position: {0, base + 0.5, 1}; CoreServiceBay: {seed: seed + section + side * 3} }
+          }
+        }
+      }
+    }
   }
 
   market_raft {
     Position: {}
-    { Position: {0, 2.2, 0}; Box: {79, 2.4, 75}; Rgb: {75, 94, 101} }
+    { Position: {0, 2.2, 0}; Box: {79, 2.4, 75}; Weathering: {dust: 0.3, grime: 0.45, seed: seed}; Rgb: {75, 94, 101} }
     for side in 0..4 {
       {
         Rotation: {0, side * math.PI / 2, 0}
@@ -3764,8 +3970,8 @@ template TidalMegatower {
         { Position: {-32 + i * 2.7, 3.5, 28.5}; ServiceDebris: {seed: i, accent: cyan} }
       }
     }
-    { Position: {-18, 32.6, 32.5}; Billboard: {image: signs.market, width: 20, height: 6.7, color: pink} }
-    { Position: {30, 40.6, 20}; Rotation: {0, math.PI / 2, 0}; Billboard: {image: signs.tide, width: 17, height: 4.25} }
+    { Position: {-18, 32.6, 32.5}; Neon: {size: {20, 6.7, 0.5}, color: pink, power: 1.2} }
+    { Position: {30, 40.6, 20}; Rotation: {0, math.PI / 2, 0}; Neon: {size: {17, 4.25, 0.5}, color: cyan, power: 1.2} }
     for i in 0..18 {
       {
         Position: {-34 + i * 4, 10.7 - math.sin(i * math.PI / 17) * 2, 36}
@@ -3783,7 +3989,7 @@ template TidalMegatower {
     { Position: {17, 32.2, -17}; Stack: {facade: workFacade, furniture: workFurniture, floors: 26, bays: 6, seed: seed + 5, accent: cyan, irregular: false} }
     { Position: {-20, 25, 19}; Stack: {facade: workFacade, furniture: workFurniture, floors: 14, bays: 5, seed: seed + 6, accent: amber, irregular: false} }
     { Position: {17, 32.2, 20}; Stack: {facade: workFacade, furniture: workFurniture, floors: 18, bays: 5, seed: seed + 7, accent: amber, irregular: false} }
-    { Position: {27.3, 70.6, 20}; Rotation: {0, math.PI / 2, 0}; Billboard: {image: signs.work, width: 14, height: 4.67, color: amber} }
+    { Position: {27.3, 70.6, 20}; Rotation: {0, math.PI / 2, 0}; Neon: {size: {14, 4.67, 0.5}, color: amber, power: 1.2} }
     for side in 0..2 {
       for i in 0..5 {
         {
@@ -3812,9 +4018,11 @@ template TidalMegatower {
     { Position: {-10, 226.6, -13}; Stack: {facade: homeFacade, premiumFacade: wealthFacade, premiumStart: 9, furniture: homeFurniture, floors: 16, bays: 4, seed: seed + 21, accent: amber} }
     { Position: {11, 246.6, 14}; Stack: {facade: homeFacade, premiumFacade: wealthFacade, premiumStart: 6, furniture: homeFurniture, floors: 10, bays: 3, seed: seed + 22, accent: pink} }
     { Position: {-18, 233.8, 6}; Stack: {facade: homeFacade, premiumFacade: wealthFacade, premiumStart: 4, furniture: homeFurniture, floors: 8, bays: 3, seed: seed + 24, accent: amber} }
-    for i in 0..12 {
-      { Position: {-1, 104.6 + i * 10.8, 21}; Bridge: {length: 19, width: 3, accent: pink} }
-      { Position: {19, 140.6 + i * 10.8, 0}; Rotation: {0, math.PI / 2, 0}; Bridge: {length: 19, width: 2.8, accent: cyan} }
+    for i in 0..23 {
+      { Position: {-0.75, 39.4 + i * 7.2 + 0.175, 21}; Bridge: {length: 21, width: 3, accent: pink} }
+    }
+    for i in 0..16 {
+      { Position: {19, 39.4 + i * 10.8 + 0.175, 1.5}; Rotation: {0, math.PI / 2, 0}; Bridge: {length: 19, width: 2.8, accent: cyan} }
     }
     for i in 0..16 {
       {
@@ -3870,7 +4078,7 @@ template TidalMegatower {
     { Position: {-15, 208.6, 19}; Garden: {facade: leisureFacade, seed: seed,width: 37, depth: 29} }
     { Position: {20, 216.6, 17}; Garden: {facade: leisureFacade, seed: seed,width: 26, depth: 25} }
     { Position: {3, 208.6, 18}; SkyStair: {length: 13, rise: 8, width: 5} }
-    { Position: {-15, 218.6, 33.7}; Billboard: {image: signs.bath, width: 15, height: 5, color: {88, 229, 174}} }
+    { Position: {-15, 208.6 + 5 * 0.95, 33.2}; Billboard: {image: signs.bath, width: 15, height: 5, color: {88, 229, 174}} }
     for i in 0..9 {
       {
         Position: {-29 + i * 3.5, 206.2, 33}
@@ -3889,8 +4097,8 @@ template TidalMegatower {
 
   aeon_crown {
     Position: {}
-    { Position: {0, 291.4, -4}; Stack: {facade: crownFacade, furniture: crownFurniture, floors: 18, bays: 5, seed: seed + 23, accent: cyan, irregular: false, serviceEvery: 9999, underdeckEvery: 16} }
-    { Position: {3, 356.2, -6}; Stack: {facade: crownFacade, furniture: crownFurniture, floors: 10, bays: 3, seed: seed + 25, accent: cyan, irregular: false, serviceEvery: 9999, underdeckEvery: 16} }
+    { Position: {0, 291.4, -4}; Stack: {weathering: 0, facade: crownFacade, furniture: crownFurniture, floors: 18, bays: 5, seed: seed + 23, accent: cyan, irregular: false, serviceEvery: 9999, underdeckEvery: 16} }
+    { Position: {3, 356.2, -6}; Stack: {weathering: 0, facade: crownFacade, furniture: crownFurniture, floors: 10, bays: 3, seed: seed + 25, accent: cyan, irregular: false, serviceEvery: 9999, underdeckEvery: 16} }
     { Position: {-10, 286, -13}; Garden: {facade: leisureFacade, seed: seed,width: 24, depth: 20} }
     { Position: {0, 346.6, 7.1}; Billboard: {image: signs.corp, width: 18, height: 6} }
     for side in 0..4 {
@@ -3915,8 +4123,8 @@ template TidalMegatower {
 
   tideline_station {
     Position: {51, 56.6, 14}
-    { Position: {0, -0.6, 0}; Box: {17, 1.2, 57}; Rgb: {100, 118, 128} }
-    { Position: {0, 4.8, 0}; Box: {18, 0.55, 59}; Rgb: {109, 137, 145} }
+    { Position: {0, -0.6, 0}; Box: {17, 1.2, 57}; Weathering: {dust: 0.2, grime: 0.35, seed: seed}; Rgb: {100, 118, 128} }
+    { Position: {0, 4.8, 0}; Box: {18, 0.55, 59}; Weathering: {dust: 0.3, grime: 0.25, seed: seed + 1}; Rgb: {109, 137, 145} }
     for i in 0..10 {
       { Position: {-7, 2.1, -25 + i * 5.6}; Box: {0.24, 4.4, 0.24}; Rgb: iron }
       { Position: {0, 4.45, -25 + i * 5.6}; Neon: {size: {11, 0.065, 0.12}, color: cyan, power: 2} }
@@ -3968,10 +4176,6 @@ template TidalMegatower {
     { Position: {7, 17.5, 0}; Box: {4, 2.7, 3.1}; Rgb: iron }
     { Position: {-22, 9.5, 0}; Box: {0.045, 17, 0.045}; Rgb: iron }
     { Position: {-22, 1, 0}; Torus: {radius: 0.4, tube: 0.09, segments: 10, rings: 5}; Rotation: {math.PI / 2, 0, 0}; Rgb: amber }
-  }
-
-  for i in 0..12 {
-    { Position: {-28 + (i % 4) * 18, 4.2, 35}; Rotation: {0, i * 1.7, 0}; Drone: {color: cyan} }
   }
 }
 

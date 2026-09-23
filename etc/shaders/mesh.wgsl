@@ -67,7 +67,7 @@ struct VertexOut {
   @location(4) emissive: vec4<f32>,
   @location(5) params: vec4<f32>,
   @location(6) @interpolate(flat) shape: vec4<u32>,
-  @location(7) local: vec3<f32>,
+  @location(7) @interpolate(flat) scale_handedness: vec4<f32>,
   @location(8) @interpolate(flat) textures: vec2<u32>,
   @location(9) local_pos: vec3<f32>,
   @location(10) local_normal: vec3<f32>,
@@ -115,17 +115,19 @@ fn clip_fragment(in: VertexOut) {
   out.textures = in.textures;
   out.params = in.params;
   out.shape = in.shape;
-  out.local_pos = sweep.position * vec3(
+  let local_scale = vec3(
     length(vec3(in.row0.x, in.row1.x, in.row2.x)),
     length(vec3(in.row0.y, in.row1.y, in.row2.y)),
     length(vec3(in.row0.z, in.row1.z, in.row2.z)));
+  out.local_pos = sweep.position * local_scale;
   out.local_normal = sweep.normal;
   out.uv_xform = in.uv_xform;
   out.uv_mode = vec4(in.uv_mode, u32(in.params.w), in.layer_data.x, in.layer_data.y);
   out.bounds_pos = in.bounds_pos.xyz;
   out.vertex_color = in.vertex_color;
   out.clip_rect = in.clip_rect;
-  out.local = vec3<f32>(0.0);
+  out.scale_handedness = vec4(local_scale,
+    dot(cross(m[0].xyz, m[1].xyz), m[2].xyz));
 
   return out;
 }
@@ -241,7 +243,11 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   let uv = wrap_uv(in.uv_mode.x, projected);
   let dp1 = dpdx(in.world_pos);
   let dp2 = dpdy(in.world_pos);
-  let shape_fw = fwidth(in.bounds_pos.xy);
+  let bounds_fw = fwidth(in.bounds_pos);
+  let layer_fw = fwidth(in.local_pos);
+  let footprint = length(abs(dp1) + abs(dp2));
+  let curvature = length(fwidth(normalize(in.normal))) / max(footprint, 1e-6);
+  let shape_fw = bounds_fw.xy;
   var ddx = dpdx(projected);
   var ddy = dpdy(projected);
   if ((in.uv_mode.x & 0xFu) >= 2u) {
@@ -251,9 +257,10 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
     ddy = clamp(ddy, vec2(-lim), vec2(lim));
   }
   let blend = (in.uv_mode.x >> 8u) & 0xFu;
-  let plain = !front && ((in.uv_mode.x >> 12u) & 0x3u) == 1u;
+  let surface_front = front == (in.scale_handedness.w >= 0.0);
+  let plain = !surface_front && ((in.uv_mode.x >> 12u) & 0x3u) == 1u;
   var gn = normalize(in.normal);
-  if (!front) {
+  if (!surface_front) {
     gn = -gn;
   }
   var n = gn;
@@ -314,6 +321,15 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   s.geo_normal = gn;
   s.world_pos = in.world_pos;
   s.local = in.bounds_pos;
+  s.local_footprint = bounds_fw;
+  s.world_footprint = max(abs(dp1), abs(dp2));
+  s.layer_pos = in.local_pos;
+  s.layer_normal = in.local_normal;
+  s.layer_footprint = layer_fw;
+  s.footprint = footprint;
+  s.curvature = curvature;
+  s.edge_bounds = (in.uv_mode.x & SHAPE2D_BIT) == 0u && in.shape.w == 1u;
+  s.layer_extent = bitcast<vec3<f32>>(in.shape.xyz) * in.scale_handedness.xyz;
   s.layer_data = material_layer_data_unpack(
     (in.uv_mode.x & LAYER_DATA_BIT) != 0u, in.uv_mode.z, in.uv_mode.w);
   let mask = in.uv_mode.x >> u32(MODE_LAYER_SHIFT);

@@ -24,6 +24,10 @@ static void box_shape_apply(
     vec3 scale)
 {
     RenderMesh mesh = { .scale = scale };
+    mesh.edge_bounds = key->kind == BoxShapeBox ||
+        key->kind == BoxShapeTrianglePrism ||
+        key->kind == BoxShapeRightTrianglePrism ||
+        (key->kind >= BoxShapeSphere && key->kind <= BoxShapeRoundedBox);
     mesh.handle = box_mesh_cache_get(it->world, key, &mesh.bounds_min, &mesh.bounds_max);
     ecs_set_ptr(it->stage, e, RenderMesh, &mesh);
     box_mesh_lod_set(it->world, it->stage, e, key);

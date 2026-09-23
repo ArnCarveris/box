@@ -24,6 +24,7 @@ ECS_STRUCT(RenderMesh, {
     vec3 scale;       /**< Scale applied before the world transform */
     vec3 bounds_min;  /**< Local bounds minimum of the unscaled mesh */
     vec3 bounds_max;  /**< Local bounds maximum of the unscaled mesh */
+    bool edge_bounds;
 });
 
 /** Texture handle an image entity resolved to, written by texture modules */

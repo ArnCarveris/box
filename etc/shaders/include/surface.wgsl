@@ -1,5 +1,7 @@
 #pragma once
 
+#include "material_noise.wgsl"
+
 // Per entity amounts of the material layers of one instance.
 //
 // Every amount is a factor of what the scene set on its layer, so an instance
@@ -23,6 +25,15 @@ struct Surface {
   geo_normal: vec3<f32>,
   world_pos: vec3<f32>,
   local: vec3<f32>,
+  local_footprint: vec3<f32>,
+  world_footprint: vec3<f32>,
+  layer_pos: vec3<f32>,
+  layer_normal: vec3<f32>,
+  layer_footprint: vec3<f32>,
+  layer_extent: vec3<f32>,
+  footprint: f32,
+  curvature: f32,
+  edge_bounds: bool,
   layer_data: MaterialLayerData,
 };
 
@@ -32,9 +43,6 @@ const LAYER_DATA_BIT: u32 = 0x20u;
 // Turns the unit range of the scale byte back into steps of one over 64, which
 // is BOX_WEAR_SCALE_STEP, so a feature scale of one comes back as one.
 const LAYER_DATA_SCALE_DECODE: f32 = 3.984375;
-
-// World units the noise of an instance is offset by per unit of its seed.
-const LAYER_DATA_SEED_SPAN: f32 = 97.0;
 
 // Unpacks the two wear words of an instance, or the neutral wear without them.
 fn material_layer_data_unpack(on: bool, a: u32, b: u32) -> MaterialLayerData {
@@ -54,8 +62,6 @@ fn material_layer_data_unpack(on: bool, a: u32, b: u32) -> MaterialLayerData {
   return data;
 }
 
-// Value noise of a layer at the world position of a surface, seeded and scaled
-// by the wear of its instance, so a layer reads one frequency and gets both.
 fn material_layer_amount(s: ptr<function, Surface>, index: u32) -> f32 {
   if (index < 4u) {
     return (*s).layer_data.amounts0[index];
@@ -66,10 +72,27 @@ fn material_layer_amount(s: ptr<function, Surface>, index: u32) -> f32 {
   return 1.0;
 }
 
+fn material_layer_seed(s: ptr<function, Surface>) -> u32 {
+  return u32(round((*s).layer_data.seed * 255.0));
+}
+
+fn material_layer_origin(s: ptr<function, Surface>) -> vec3<f32> {
+  let seed = material_layer_seed(s);
+  let cell = vec2<i32>(i32(seed), 0);
+  let offset = vec3(material_noise_hash(cell, 3u), material_noise_hash(cell, 7u),
+    material_noise_hash(cell, 11u)) * 64.0;
+  return (*s).layer_pos + offset;
+}
+
+fn material_layer_noise_scaled(s: ptr<function, Surface>, frequency: vec3<f32>) -> f32 {
+  let origin = material_layer_origin(s);
+  let scale = frequency * (*s).layer_data.scale;
+  return material_noise_triplanar(origin * scale, (*s).layer_normal,
+    (*s).layer_footprint * abs(scale), material_layer_seed(s));
+}
+
 fn material_layer_noise(s: ptr<function, Surface>, frequency: f32) -> f32 {
-  let data = (*s).layer_data;
-  let origin = (*s).world_pos + vec3<f32>(data.seed * LAYER_DATA_SEED_SPAN);
-  return box_noise(origin * (frequency * data.scale));
+  return material_layer_noise_scaled(s, vec3(frequency));
 }
 
 struct LayerParams {

@@ -12,7 +12,7 @@ layer_shaders {
 layers {
   prefab edge_wear {
     MaterialLayer: {shader: layer_shaders.edge_wear, order: 0}
-    LayerParams: {a: {0.78, 0.76, 0.72, 1}, b: {0.08, 0.25, 6, 0}}
+    LayerParams: {a: {0.78, 0.76, 0.72, 1}, b: {0.04, 0.4, 6, 0.7}}
   }
   prefab dust {
     MaterialLayer: {shader: layer_shaders.dust, order: 10}

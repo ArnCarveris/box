@@ -750,6 +750,10 @@ void box_render_fill_instance(
     memset(out->shape, 0, sizeof(out->shape));
     if (shaped) {
         box_render_fill_shape(world, e, mesh, &m, out);
+    } else if (mesh->edge_bounds) {
+        vec3 extent = vec3_sub(mesh->bounds_max, mesh->bounds_min);
+        memcpy(out->shape, &extent, sizeof(extent));
+        out->shape[3] = 1;
     }
 
     memset(out->layer_data, 0, sizeof(out->layer_data));

@@ -579,7 +579,8 @@
                     "an_instance_of_a_prefab_inherits_it",
                     "a_dynamic_instance_carries_its_amounts",
                     "a_transition_keeps_the_instance_extracted",
-                    "the_layers_of_the_shader_read_the_channel"
+                    "the_layers_of_the_shader_read_the_channel",
+                    "dust_stays_on_upward_faces_when_mirrored"
                 ],
                 "setup": true,
                 "teardown": true

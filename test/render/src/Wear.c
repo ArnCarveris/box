@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stb_image.h>
+#include "../../../src/renderer/renderer.h"
 #include "../../../src/render/render_internal.h"
 
 static ecs_world_t *w;
@@ -267,4 +269,74 @@ void Wear_the_layers_of_the_shader_read_the_channel(void)
     for (i = 0; i < packet.shader_create.count; i ++) {
         free(((box_shader_cmd_t*)box_vec_at(&packet.shader_create, i))->source);
     }
+}
+
+void Wear_dust_stays_on_upward_faces_when_mirrored(void)
+{
+    ecs_entity_t layer = ecs_lookup(w, "box.material.layers.dust");
+    ecs_set(w, layer, LayerParams, {
+        .a = {0.8f, 0.5f, 0.2f, 1}, .b = {1, 0.9f, 2, 0}});
+    ecs_entity_t camera = ecs_new(w);
+    ecs_set(w, camera, Camera, {.fov = 48});
+    ecs_set(w, camera, LookAt, {0, 0, 0});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = camera, .enabled = true});
+    View *settings = ecs_get_mut(w, view, View);
+    ecs_vec_append_t(NULL, &settings->material_layers, ViewMaterialLayer)[0] =
+        (ViewMaterialLayer){.layer = layer, .enabled = true};
+    ecs_modified(w, view, View);
+    ecs_entity_t slab = ecs_new(w);
+    ecs_set(w, slab, Position, {0, 0, 0});
+    ecs_set(w, slab, Box, {4, 0.3f, 3});
+    ecs_set(w, slab, Rgb, {30, 45, 60});
+    ecs_set(w, slab, BackFaceMode, {BackFaceTextured});
+    ecs_set(w, slab, MaterialLayerData, {
+        .amount1 = 1, .seed = 0.3f, .scale = 1});
+    box_renderer_desc_t desc = {.width = 96, .height = 96};
+    box_renderer_t *renderer = box_renderer_create(&desc);
+    test_assert(renderer != NULL);
+    for (int mirrored = 0; mirrored < 2; mirrored ++) {
+        ecs_set(w, slab, Scale, {mirrored ? -1 : 1, 1, 1});
+        for (int above = 0; above < 2; above ++) {
+            ecs_set(w, camera, Position, {0, above ? 4 : -4, 2});
+            unsigned char *pixels[2];
+            for (int dusty = 0; dusty < 2; dusty ++) {
+                ecs_add_pair(w, slab, MaterialLayerOn, layer);
+                settings = ecs_get_mut(w, view, View);
+                ecs_vec_get_t(&settings->material_layers, ViewMaterialLayer, 0)->enabled = dusty;
+                ecs_modified(w, view, View);
+                ecs_progress(w, 0.016f);
+                box_packet_t *frame = box_renderer_acquire(renderer);
+                frame->width = 96;
+                frame->height = 96;
+                box_render_extract(w, frame);
+                frame->view.unlit = true;
+                for (uint32_t i = 0; i < frame->views.count; i ++) {
+                    ((box_view_t*)box_vec_at(&frame->views, i))->unlit = true;
+                }
+                const char *path = "/tmp/box_test_dust_faces.png";
+                snprintf(frame->capture_path, BOX_CAPTURE_PATH_MAX, "%s", path);
+                box_renderer_submit(renderer, frame);
+                int width, height, channels;
+                pixels[dusty] = stbi_load(path, &width, &height, &channels, 4);
+                test_assert(pixels[dusty] != NULL);
+                test_int(width, 96);
+                test_int(height, 96);
+                remove(path);
+            }
+            int changed = 0;
+            for (int i = 0; i < 96 * 96 * 4; i ++) {
+                changed += abs(pixels[0][i] - pixels[1][i]) > 8;
+            }
+            stbi_image_free(pixels[0]);
+            stbi_image_free(pixels[1]);
+            if (above) {
+                test_assert(changed > 500);
+            } else {
+                test_int(changed, 0);
+            }
+        }
+    }
+    test_int(box_renderer_errors(renderer), 0);
+    box_renderer_destroy(renderer);
 }
