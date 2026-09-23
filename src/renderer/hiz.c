@@ -61,6 +61,7 @@ static WGPURenderPipeline box_hiz_level_pipeline(
         .targets = &target
     };
     WGPURenderPipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("hiz pyramid"),
         .layout = pipeline_layout,
         .vertex = {
             .module = module,

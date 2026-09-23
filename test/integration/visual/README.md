@@ -76,6 +76,7 @@ Rules for adding one:
 | Collision debug | `collision_debug` | Collider wireframes per shape kind and root bounds in white, the cone in its bounds box. |
 | Picking | `picking_hover` | The middle of five boxes tinted by its `on.hover` handler after the cursor sweeps onto it. |
 | FPS panel | `fps_overlay` | The frame rate panel script, switched on with `fps on`, with its bar chart in the top right corner of the view. |
+| Statistics panels | `stats_overlay` | The renderer panel of `etc/ui/stats.flecs`, switched on with `stats renderer`, in the top left corner; the capture precedes the first counted frame, so it guards the layout and every value reads zero. |
 | Transitions | `transitions` | Color and position transitions captured halfway under the fixed timestep. |
 | UI | `ui_panels`, `ui_panels_small`, `ui_layout`, `ui_text`, `ui_shadow`, `ui_group_alpha`, `ui_group_alpha_direct`, `ui_hover`, `console` | Nested panels at two surface sizes, the layout gallery, paragraphs and a labelled button, box shadows, a transparent group through the texture path against the ghosting direct path, a hovered button, the open console over a scene. |
 | UI sizing | `ui_layout_sizing` | A toolbar whose search field grows, a row shared 1:2 with a capped third, a sidebar with asymmetric padding, a card whose paragraphs wrap at the width it leaves them, a dropdown below its button, a tooltip left of its button and a footer at its minimum width. |

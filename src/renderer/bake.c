@@ -1582,6 +1582,7 @@ void box_bake_reload(
     WGPUPipelineLayoutDescriptor ld = {.bindGroupLayoutCount = 2, .bindGroupLayouts = layouts};
     WGPUPipelineLayout layout = wgpuDeviceCreatePipelineLayout(r->device, &ld);
     WGPUComputePipelineDescriptor pd = {
+        .label = BOX_GPU_LABEL("bake"),
         .layout = layout,
         .compute = {.module = shader, .entryPoint = {.data = "cs_bake", .length = WGPU_STRLEN}}
     };

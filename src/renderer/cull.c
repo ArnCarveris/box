@@ -76,6 +76,7 @@ static void box_cull_pipeline(
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
     WGPUComputePipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("cull"),
         .layout = pipeline_layout,
         .compute = {
             .module = shader,

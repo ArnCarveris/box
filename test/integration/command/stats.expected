@@ -1,0 +1,58 @@
+$ stats
+renderer   off  draw calls, passes, state changes, uploads and memory per frame
+gpu        off  GPU time of every pass
+pass       off  draws, triangles and state changes per pass
+pipeline   off  sets, switches and draws per pipeline
+bindgroup  off  bind group sets and changes per pass and slot
+buffer     off  live buffers and uploads per usage
+compute    off  dispatches and workgroups per compute pass
+
+$ stats renderer
+renderer panel on
+
+$ stats gpu on
+gpu panel on
+
+$ stats pass
+pass panel on
+
+$ stats pipeline
+pipeline panel on
+
+$ stats bindgroup
+bindgroup panel on
+
+$ stats buffer
+buffer panel on
+
+$ stats compute
+compute panel on
+
+$ stats
+renderer   on   draw calls, passes, state changes, uploads and memory per frame
+gpu        on   GPU time of every pass
+pass       on   draws, triangles and state changes per pass
+pipeline   on   sets, switches and draws per pipeline
+bindgroup  on   bind group sets and changes per pass and slot
+buffer     on   live buffers and uploads per usage
+compute    on   dispatches and workgroups per compute pass
+
+$ stats gpu off
+gpu panel off
+
+$ stats off
+stats panels off
+
+$ stats
+renderer   off  draw calls, passes, state changes, uploads and memory per frame
+gpu        off  GPU time of every pass
+pass       off  draws, triangles and state changes per pass
+pipeline   off  sets, switches and draws per pipeline
+bindgroup  off  bind group sets and changes per pass and slot
+buffer     off  live buffers and uploads per usage
+compute    off  dispatches and workgroups per compute pass
+
+$ stats nope
+no statistics panel 'nope'
+$ stats renderer maybe
+expected 'on' or 'off', got 'maybe'

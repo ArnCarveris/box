@@ -150,6 +150,10 @@ static WGPURenderPipeline box_frame_pipeline_create(
     };
     const char *entries[] = { "fs_main", "fs_normal", "fs_cover", "fs_group",
         "fs_group_cover" };
+    const char *suffixes[] = { "", " normal", " cover", " group", " group cover" };
+    char label[48];
+    snprintf(label, sizeof(label), "%s%s%s", blend ? "blended" : "mesh",
+        solid ? " solid" : "", suffixes[normals]);
     WGPUConstantEntry constant = {
         .key = { .data = "box_solid", .length = WGPU_STRLEN }, .value = 1.0
     };
@@ -171,6 +175,7 @@ static WGPURenderPipeline box_frame_pipeline_create(
         .stencilWriteMask = 0xFFFFFFFF
     };
     WGPURenderPipelineDescriptor desc = {
+        .label = { .data = label, .length = WGPU_STRLEN },
         .layout = r->mesh_layout,
         .vertex = {
             .module = r->mesh_shader,
@@ -754,6 +759,8 @@ void box_frame_render(
     box_renderer_t *r,
     box_packet_t *p)
 {
+    bool rendered = false;
+    box_count_begin(r);
     box_device_resize(r, p->width, p->height);
     box_shader_apply(r, p);
     if (!r->initialized && box_shader_ready(r)) {
@@ -802,6 +809,7 @@ void box_frame_render(
     }
 
     box_cull_record(r, encoder);
+    box_count_record(r, encoder);
     box_timing_close(r);
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(r->gpu_queue, 1, &cmd);
@@ -823,6 +831,7 @@ void box_frame_render(
         wgpuTextureRelease(present);
     }
 
+    rendered = true;
 done:
-    return;
+    box_count_end(r, rendered);
 }

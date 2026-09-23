@@ -1,0 +1,66 @@
+// The statistics panels. box.monitor loads this script at import into
+// box.monitor.stats and ties every exported mut variable below to the singleton
+// its panel reads: turning a variable on adds the singleton, which starts its
+// collection, and turning it off removes it, so a hidden panel costs nothing.
+// The stats command switches the variables. The panels are templates from
+// etc/ui/stats_panels.flecs stacked in one column in the top left corner, so an
+// application that wants another arrangement ships its own etc/ui/stats.flecs.
+module box.monitor.stats
+using flecs.script
+using box.ui
+using box.monitor.panels
+
+export mut renderer = false
+export mut gpu = false
+export mut pass = false
+export mut pipeline = false
+export mut bindgroup = false
+export mut buffer = false
+export mut compute = false
+
+const margin = 10
+
+if renderer || gpu || pass || pipeline || bindgroup || buffer || compute {
+  panel {
+    Ui: {height: 0, passthrough: true}
+
+    screen {
+      Anchor: {h: Left, v: Top}
+      Layout: {}
+      Fill: {width: 1, height: 1}
+
+      stack {
+        Anchor: {h: Left, v: Top, x: margin, y: margin}
+        Layout: {direction: Column, spacing: 6, h: Left, v: Top}
+
+        if renderer {
+          RendererPanel renderer_stats
+        }
+
+        if gpu {
+          GpuPanel gpu_stats
+        }
+
+        if pass {
+          PassPanel pass_stats
+        }
+
+        if pipeline {
+          PipelinePanel pipeline_stats
+        }
+
+        if bindgroup {
+          BindGroupPanel bindgroup_stats
+        }
+
+        if buffer {
+          BufferPanel buffer_stats
+        }
+
+        if compute {
+          ComputePanel compute_stats
+        }
+      }
+    }
+  }
+}

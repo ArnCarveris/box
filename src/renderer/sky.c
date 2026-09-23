@@ -386,7 +386,11 @@ static void box_sky_pass(
         .loadOp = WGPULoadOp_Clear,
         .storeOp = WGPUStoreOp_Store
     };
-    WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
+    WGPURenderPassDescriptor desc = {
+        .label = BOX_GPU_LABEL("sky table"),
+        .colorAttachmentCount = 1,
+        .colorAttachments = &color
+    };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 0, NULL);

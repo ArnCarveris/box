@@ -394,6 +394,7 @@ void box_device_fini(
     if (r->view_layout) wgpuBindGroupLayoutRelease(r->view_layout);
     if (r->offscreen_view) wgpuTextureViewRelease(r->offscreen_view);
     if (r->offscreen) wgpuTextureRelease(r->offscreen);
+    box_count_fini(r);
     if (r->gpu_queue) wgpuQueueRelease(r->gpu_queue);
     if (r->device) wgpuDeviceRelease(r->device);
     if (r->adapter) wgpuAdapterRelease(r->adapter);

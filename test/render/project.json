@@ -603,6 +603,26 @@
                     "solid_slots_follow_material_changes",
                     "solid_slots_survive_mirror_limit_and_removal"
                 ]
+            },
+            {
+                "id": "Counters",
+                "testcases": [
+                    "triangles_follow_the_topology",
+                    "passes_with_one_name_share_an_entry",
+                    "a_full_pass_table_takes_no_more",
+                    "a_long_name_is_truncated",
+                    "texture_bytes_cover_every_mip_and_layer",
+                    "block_compressed_bytes_round_up_to_blocks",
+                    "nothing_is_counted_until_asked",
+                    "one_mesh_draws_its_instances_at_once",
+                    "live_resources_match_the_device_report",
+                    "indirect_draws_are_resolved_from_their_arguments",
+                    "counting_again_forgets_the_last_frame",
+                    "details_are_only_counted_when_asked",
+                    "details_add_up_to_the_totals",
+                    "redundant_bind_group_sets_are_no_changes",
+                    "compute_passes_count_their_workgroups"
+                ]
             }
         ]
     }

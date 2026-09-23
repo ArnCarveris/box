@@ -166,6 +166,7 @@ static void box_shadow_pipeline(
         .stencilWriteMask = 0xFFFFFFFF
     };
     WGPURenderPipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("shadow"),
         .layout = r->shadow_pipeline_layout,
         .vertex = {
             .module = r->shadow_shader,
@@ -235,7 +236,8 @@ void box_shadow_frame(
         WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
         (uint64_t)jobs * BOX_CULL_UNIFORM_STRIDE);
     WGPUBuffer args = box_shadow_buffer(r, WGPUBufferUsage_Indirect | WGPUBufferUsage_Storage |
-        WGPUBufferUsage_CopyDst, (uint64_t)jobs * BOX_CULL_ARG_WORDS * sizeof(uint32_t));
+        WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
+        (uint64_t)jobs * BOX_CULL_ARG_WORDS * sizeof(uint32_t));
     if (r->shadow_cull_uniform) wgpuBufferRelease(r->shadow_cull_uniform);
     if (r->shadow_args) wgpuBufferRelease(r->shadow_args);
     r->shadow_cull_uniform = uniform;

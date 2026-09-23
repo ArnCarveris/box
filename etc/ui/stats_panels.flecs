@@ -1,0 +1,315 @@
+// Templates of the statistics panels. box.monitor loads this script at import
+// into box.monitor.panels, before etc/ui/stats.flecs lays the panels out. Every
+// panel is a content sized column with a heading, so a Column layout stacks any
+// number of them. A panel reads a box.monitor singleton, which exists while the
+// panel is shown: box.monitor adds it when the variable of the panel in
+// box.monitor.stats turns true, which is what starts its collection.
+module box.monitor.panels
+using flecs.script
+using box.geometry
+using box.material
+using box.ui
+using box.monitor
+
+const text: Rgb = {214, 218, 224}
+const text_dim: Rgb = {140, 148, 160}
+const heading_color: Rgb = {238, 240, 244}
+const warn: Rgb = {242, 199, 64}
+const background: Rgb = {16, 17, 21}
+
+// A labelled value on one line, the value against the right edge.
+template StatRow {
+  prop label = ""
+  prop value = ""
+  prop width: f32 = 220
+  prop dim = false
+
+  Layout: {direction: Row, width: width, v: Middle}
+
+  name {
+    HitThrough
+    Grow: {width: 1}
+    Text: {value: label}
+    Rgb: text_dim
+  }
+
+  amount {
+    HitThrough
+    Text: {value: value, align: Right}
+    if dim {
+      Rgb: text_dim
+    } else {
+      Rgb: text
+    }
+  }
+}
+
+// The frame of a panel: a dark rounded column with a heading. A panel derives
+// from it and adds its rows as children, which follow the heading.
+template StatsPanel {
+  prop title = "Statistics"
+  prop width: f32 = 220
+  prop pad: f32 = 8
+
+  Layout: {direction: Column, padding: pad, spacing: 2, width: width + pad * 2, h: Left, v: Top}
+  Rect
+  Border: {radius: 4}
+  Rgb: background
+  Font: {size: 13}
+
+  heading {
+    HitThrough
+    Layout: {height: 18, v: Top}
+    Text: {value: title}
+    Rgb: heading_color
+  }
+}
+
+// What the renderer did in its last finished frame and the memory it holds.
+template RendererPanel : StatsPanel {
+  prop title = "Renderer"
+
+  const s = RendererStats[RendererStats]
+  const mb = 1024.0 * 1024.0
+
+  StatRow draw_calls(label: "Draw calls", value: "{s.draw_calls}", width: width)
+  StatRow render_passes(label: "Render passes", value: "{s.render_passes}", width: width)
+  StatRow pipeline_switches(label: "Pipeline switches", value: "{s.pipeline_switches}",
+    width: width)
+  StatRow bind_group_changes(label: "Bind group changes", value: "{s.bind_group_changes}",
+    width: width)
+  StatRow buffer_uploads(label: "Buffer uploads", value: "{s.buffer_uploads}", width: width)
+  StatRow bytes_uploaded(label: "Bytes uploaded", value: "{s.bytes_uploaded}", width: width)
+  StatRow texture_uploads(label: "Texture uploads", value: "{s.texture_uploads}", width: width)
+  StatRow compute_dispatches(label: "Compute dispatches", value: "{s.compute_dispatches}",
+    width: width)
+  StatRow instances(label: "Instances rendered", value: "{s.instances}", width: width)
+  StatRow triangles(label: "Triangles rendered", value: "{s.triangles}", width: width)
+  StatRow gpu_memory(label: "GPU memory", value: "{s.gpu_memory / mb:.1} MB", width: width)
+  StatRow buffer_memory(label: "Buffer memory", value: "{s.buffer_memory / mb:.1} MB",
+    width: width)
+  StatRow texture_memory(label: "Texture memory", value: "{s.texture_memory / mb:.1} MB",
+    width: width)
+  StatRow frame(label: "Frame", value: "{s.frame}", width: width, dim: true)
+}
+
+// The GPU time of every pass of the last frame whose timestamps resolved.
+template GpuPanel : StatsPanel {
+  prop title = "GPU"
+
+  const g = GpuTimings[GpuTimings]
+
+  if g.supported {
+    StatRow total(label: "Frame", value: "{g.frame_ms:.2} ms", width: width)
+    for i in 0..g.pass_count {
+      "pass_{i}" {
+        StatRow: {label: g.passes[i].name, value: "{g.passes[i].time_ms:.3} ms", width: width,
+          dim: true}
+      }
+    }
+  } else {
+    StatRow unsupported(label: "Timestamps", value: "not supported", width: width, dim: true)
+  }
+}
+
+// A row of a table: a name column and four right aligned value columns. A
+// header row draws every column dim, an accent row draws its name in color.
+template StatCells {
+  prop name = ""
+  prop a = ""
+  prop b = ""
+  prop c = ""
+  prop d = ""
+  prop name_width: f32 = 150
+  prop cell_width: f32 = 58
+  prop header = false
+  prop accent = false
+
+  Layout: {direction: Row, v: Middle}
+
+  name_cell {
+    HitThrough
+    Layout: {width: name_width}
+    Text: {value: name}
+    if header {
+      Rgb: text_dim
+    } else if accent {
+      Rgb: warn
+    } else {
+      Rgb: text
+    }
+  }
+
+  a_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: a, align: Right}
+    if header {
+      Rgb: text_dim
+    } else {
+      Rgb: text
+    }
+  }
+
+  b_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: b, align: Right}
+    if header {
+      Rgb: text_dim
+    } else {
+      Rgb: text
+    }
+  }
+
+  c_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: c, align: Right}
+    if header {
+      Rgb: text_dim
+    } else {
+      Rgb: text
+    }
+  }
+
+  d_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: d, align: Right}
+    if header {
+      Rgb: text_dim
+    } else {
+      Rgb: text
+    }
+  }
+}
+
+// Width of a table panel: the name column and four value columns.
+const table_width = 150 + 58 * 4
+
+// Per pass counts: calls are the draws of a render pass or the dispatches of
+// a compute pass, whose name is drawn in color.
+template PassPanel : StatsPanel {
+  prop title = "Passes"
+  prop width: f32 = table_width
+
+  const s = PassStats[PassStats]
+
+  StatCells header(name: "pass ({s.count}/{s.total})", a: "calls", b: "tris", c: "pipes",
+    d: "binds", header: true)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..s.count {
+      const p = s.passes[i]
+      "pass_{i}" {
+        StatCells: {name: p.name, a: "{p.draw_calls + p.dispatches}", b: "{p.triangles}",
+          c: "{p.pipeline_switches}", d: "{p.bind_group_changes}", accent: p.compute}
+      }
+    }
+  }
+}
+
+// Per pipeline counts, most switches first; compute pipelines in color.
+template PipelinePanel : StatsPanel {
+  prop title = "Pipelines"
+  prop width: f32 = table_width
+
+  const s = PipelineStats[PipelineStats]
+
+  StatCells header(name: "pipeline ({s.count}/{s.total})", a: "sets", b: "switch",
+    c: "calls", d: "tris", header: true)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..s.count {
+      const p = s.pipelines[i]
+      "pipeline_{i}" {
+        StatCells: {name: p.name, a: "{p.sets}", b: "{p.switches}",
+          c: "{p.draw_calls + p.dispatches}", d: "{p.triangles}", accent: p.compute}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.sets}", b: "{s.switches}", header: true)
+}
+
+// Bind group set calls per pass and slot, most changes first. A set that
+// binds what the slot already holds is redundant.
+template BindGroupPanel : StatsPanel {
+  prop title = "Bind groups"
+  prop width: f32 = table_width
+
+  const s = BindGroupStats[BindGroupStats]
+
+  StatCells header(name: "pass slot ({s.count}/{s.total})", a: "sets", b: "changes",
+    c: "redund", header: true)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..s.count {
+      const g = s.slots[i]
+      "slot_{i}" {
+        StatCells: {name: "{g.pass} {g.slot}", a: "{g.sets}", b: "{g.changes}",
+          c: "{g.sets - g.changes}"}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.sets}", b: "{s.changes}", c: "{s.sets - s.changes}",
+    header: true)
+}
+
+// Live buffers and the uploads of the frame per usage class.
+template BufferPanel : StatsPanel {
+  prop title = "Buffers"
+  prop width: f32 = table_width
+
+  const s = BufferStats[BufferStats]
+  const mb = 1024.0 * 1024.0
+
+  StatCells header(name: "usage", a: "count", b: "MB", c: "uploads", d: "KB up",
+    header: true)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..8 {
+      const u = s.usages[i]
+      if u.buffers > 0 || u.uploads > 0 {
+        "usage_{i}" {
+          StatCells: {name: u.usage, a: "{u.buffers}", b: "{u.bytes / mb:.2}",
+            c: "{u.uploads}", d: "{u.upload_bytes / 1024.0:.1}"}
+        }
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.buffers}", b: "{s.bytes / mb:.2}", c: "{s.uploads}",
+    d: "{s.upload_bytes / 1024.0:.1}", header: true)
+}
+
+// Per compute pass counts: dispatches, the workgroups they launched and the
+// state they changed.
+template ComputePanel : StatsPanel {
+  prop title = "Compute"
+  prop width: f32 = table_width
+
+  const s = ComputeStats[ComputeStats]
+
+  StatCells header(name: "pass ({s.count}/{s.total})", a: "disp", b: "groups", c: "pipes",
+    d: "binds", header: true)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..s.count {
+      const p = s.passes[i]
+      "pass_{i}" {
+        StatCells: {name: p.name, a: "{p.dispatches}", b: "{p.workgroups}",
+          c: "{p.pipeline_switches}", d: "{p.bind_group_changes}"}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.dispatches}", b: "{s.workgroups}", header: true)
+}

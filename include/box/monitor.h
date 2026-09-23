@@ -123,6 +123,169 @@ ECS_STRUCT(GpuTimings, {
     GpuPassTime passes[16]; /**< The passes, in the order the frame recorded them */
 });
 
+/** Counts of the last frame the renderer finished, collected while the singleton exists.
+ *
+ * Every value belongs to one frame, published once the frame is whole, which
+ * includes the read back of the arguments of its indirect draws, so the numbers
+ * trail the frame they name by one or two frames.
+ *
+ * Memory is what the buffers, textures and query sets the renderer created hold
+ * at the end of that frame, by the size they were created with.
+ */
+ECS_STRUCT(RendererStats, {
+    int32_t frame;               /**< Frame of the renderer the counts belong to */
+    bool indirect_resolved;      /**< Instances and triangles include the indirect draws */
+    int32_t draw_calls;          /**< Draw calls */
+    int32_t indirect_draw_calls; /**< Draw calls that read their arguments from a buffer */
+    int32_t render_passes;       /**< Render passes */
+    int32_t compute_passes;      /**< Compute passes */
+    int32_t pipeline_switches;   /**< Pipeline set calls that bound another pipeline */
+    int32_t bind_group_changes;  /**< Bind group set calls that changed a slot */
+    int32_t buffer_uploads;      /**< Queue writes into buffers */
+    int64_t bytes_uploaded;      /**< Bytes the buffer and texture writes uploaded */
+    int32_t texture_uploads;     /**< Queue writes into textures */
+    int32_t compute_dispatches;  /**< Compute dispatches */
+    int64_t instances;           /**< Instances the draws rendered */
+    int64_t triangles;           /**< Triangles the draws rendered */
+    int64_t gpu_memory;          /**< Bytes of every buffer, texture and query set */
+    int64_t buffer_memory;       /**< Bytes of the buffers */
+    int64_t texture_memory;      /**< Bytes of the textures */
+    int32_t buffers;             /**< Live buffers */
+    int32_t textures;            /**< Live textures */
+});
+
+/** Rows a detail statistics component holds, which the ECS_STRUCTs spell out */
+#define BOX_MONITOR_STAT_ROWS (16)
+
+/** Buffer usage classes a BufferStats component holds, which the ECS_STRUCT spells out */
+#define BOX_MONITOR_USAGES (8)
+
+/** What the passes of one name recorded in a frame */
+ECS_STRUCT(PassStat, {
+    char *name;                 /**< Name of the pass, NULL when the row is unused */
+    bool compute;               /**< The pass is a compute pass */
+    int32_t recorded;           /**< Passes of this name the frame began */
+    int32_t draw_calls;         /**< Draw calls */
+    int32_t dispatches;         /**< Compute dispatches */
+    int64_t instances;          /**< Instances the draws rendered */
+    int64_t triangles;          /**< Triangles the draws rendered */
+    int32_t pipeline_switches;  /**< Pipeline set calls that bound another pipeline */
+    int32_t bind_group_changes; /**< Bind group set calls that changed a slot */
+});
+
+/** Per pass counts of the last frame the renderer finished, while the singleton exists.
+ *
+ * Passes of one name, such as a pass per view or per cascade, share a row. The
+ * rows are in the order the frame first recorded each name.
+ */
+ECS_STRUCT(PassStats, {
+    int32_t frame;         /**< Frame of the renderer the counts belong to */
+    int32_t total;         /**< Pass names the frame recorded */
+    int32_t count;         /**< Rows in use, at most sixteen */
+    PassStat passes[16];   /**< The passes, in record order */
+});
+
+/** What one pipeline recorded in a frame */
+ECS_STRUCT(PipelineStat, {
+    char *name;         /**< Label of the pipeline, NULL when the row is unused */
+    bool compute;       /**< The pipeline is a compute pipeline */
+    int32_t sets;       /**< Set calls that named it */
+    int32_t switches;   /**< Set calls that bound it over another pipeline */
+    int32_t draw_calls; /**< Draw calls made while it was bound */
+    int32_t dispatches; /**< Dispatches made while it was bound */
+    int64_t instances;  /**< Instances those draws rendered */
+    int64_t triangles;  /**< Triangles those draws rendered */
+});
+
+/** Per pipeline counts of the last frame the renderer finished, while the singleton exists.
+ *
+ * A pipeline is named by the label it was created with. The rows hold the
+ * pipelines with the most switches, most first.
+ */
+ECS_STRUCT(PipelineStats, {
+    int32_t frame;              /**< Frame of the renderer the counts belong to */
+    int32_t total;              /**< Pipelines the frame bound */
+    int32_t count;              /**< Rows in use, at most sixteen */
+    int32_t sets;               /**< Pipeline set calls of the frame */
+    int32_t switches;           /**< Of those, the calls that bound another pipeline */
+    PipelineStat pipelines[16]; /**< The pipelines, most switches first */
+});
+
+/** Bind group set calls of one slot of the passes of one name */
+ECS_STRUCT(BindGroupStat, {
+    char *pass;      /**< Name of the pass, NULL when the row is unused */
+    int32_t slot;    /**< Bind group slot */
+    int32_t sets;    /**< Set calls */
+    int32_t changes; /**< Set calls that bound another group or other dynamic offsets */
+});
+
+/** Per pass and slot bind group counts of the last finished frame, while the singleton exists.
+ *
+ * A set call that binds the group and offsets a slot already holds is a set
+ * but no change. The rows hold the slots with the most changes, most first.
+ */
+ECS_STRUCT(BindGroupStats, {
+    int32_t frame;           /**< Frame of the renderer the counts belong to */
+    int32_t total;           /**< Pass and slot pairs the frame bound */
+    int32_t count;           /**< Rows in use, at most sixteen */
+    int32_t sets;            /**< Bind group set calls of the frame */
+    int32_t changes;         /**< Of those, the calls that changed a slot */
+    BindGroupStat slots[16]; /**< The slots, most changes first */
+});
+
+/** Buffers of one usage class and what the frame uploaded into them */
+ECS_STRUCT(BufferStat, {
+    char *usage;          /**< Name of the usage class */
+    int32_t buffers;      /**< Live buffers */
+    int64_t bytes;        /**< Bytes those buffers hold */
+    int32_t uploads;      /**< Queue writes into them */
+    int64_t upload_bytes; /**< Bytes those writes uploaded */
+});
+
+/** Buffers per usage class of the last frame the renderer finished, while the singleton exists.
+ *
+ * A buffer is counted under the first of indirect, vertex, index, uniform,
+ * storage, readback and query its usage has, else under other.
+ */
+ECS_STRUCT(BufferStats, {
+    int32_t frame;         /**< Frame of the renderer the counts belong to */
+    int32_t buffers;       /**< Live buffers */
+    int64_t bytes;         /**< Bytes they hold */
+    int32_t uploads;       /**< Queue writes into buffers */
+    int64_t upload_bytes;  /**< Bytes those writes uploaded */
+    BufferStat usages[8];  /**< The usage classes, in the order above */
+});
+
+/** What the compute passes of one name recorded in a frame */
+ECS_STRUCT(ComputeStat, {
+    char *name;                 /**< Name of the pass, NULL when the row is unused */
+    int32_t recorded;           /**< Passes of this name the frame began */
+    int32_t dispatches;         /**< Dispatches */
+    int64_t workgroups;         /**< Workgroups those dispatches launched */
+    int32_t pipeline_switches;  /**< Pipeline set calls that bound another pipeline */
+    int32_t bind_group_changes; /**< Bind group set calls that changed a slot */
+});
+
+/** Per compute pass counts of the last finished frame, while the singleton exists.
+ *
+ * Compute passes of one name share a row, in the order the frame first
+ * recorded each name.
+ */
+ECS_STRUCT(ComputeStats, {
+    int32_t frame;          /**< Frame of the renderer the counts belong to */
+    int32_t total;          /**< Compute pass names the frame recorded */
+    int32_t count;          /**< Rows in use, at most sixteen */
+    int32_t dispatches;     /**< Dispatches of the frame */
+    int64_t workgroups;     /**< Workgroups they launched */
+    ComputeStat passes[16]; /**< The compute passes, in record order */
+});
+
+/** Script the templates of the statistics panels are loaded from, into box.monitor.panels */
+#define BOX_MONITOR_STATS_TEMPLATES "etc/ui/stats_panels.flecs"
+
+/** Script that lays the statistics panels out, loaded into box.monitor.stats */
+#define BOX_MONITOR_STATS_PANEL "etc/ui/stats.flecs"
+
 /** Frame times the history of the Fps singleton keeps, which the ECS_STRUCT spells out */
 #define BOX_MONITOR_FPS_HISTORY (120)
 

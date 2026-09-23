@@ -71,6 +71,7 @@ static WGPURenderPipeline box_lines_pipeline(
     WGPUPipelineLayout pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &layout_desc);
     WGPURenderPipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("lines"),
         .layout = pipeline_layout,
         .vertex = {
             .module = module,

@@ -1,0 +1,26 @@
+{
+  "project": "render",
+  "timestamp": "2026-09-23T22:24:19Z",
+  "pass": 15,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.557721,
+  "tests": [
+    {"suite": "Counters", "case": "triangles_follow_the_topology", "status": "pass", "elapsed": 0.005479},
+    {"suite": "Counters", "case": "passes_with_one_name_share_an_entry", "status": "pass", "elapsed": 0.005474},
+    {"suite": "Counters", "case": "a_full_pass_table_takes_no_more", "status": "pass", "elapsed": 0.006178},
+    {"suite": "Counters", "case": "a_long_name_is_truncated", "status": "pass", "elapsed": 0.005644},
+    {"suite": "Counters", "case": "texture_bytes_cover_every_mip_and_layer", "status": "pass", "elapsed": 0.006319},
+    {"suite": "Counters", "case": "block_compressed_bytes_round_up_to_blocks", "status": "pass", "elapsed": 0.005703},
+    {"suite": "Counters", "case": "nothing_is_counted_until_asked", "status": "pass", "elapsed": 0.516720},
+    {"suite": "Counters", "case": "one_mesh_draws_its_instances_at_once", "status": "pass", "elapsed": 0.517658},
+    {"suite": "Counters", "case": "live_resources_match_the_device_report", "status": "pass", "elapsed": 0.507204},
+    {"suite": "Counters", "case": "indirect_draws_are_resolved_from_their_arguments", "status": "pass", "elapsed": 0.546463},
+    {"suite": "Counters", "case": "counting_again_forgets_the_last_frame", "status": "pass", "elapsed": 0.507683},
+    {"suite": "Counters", "case": "details_are_only_counted_when_asked", "status": "pass", "elapsed": 0.509320},
+    {"suite": "Counters", "case": "details_add_up_to_the_totals", "status": "pass", "elapsed": 0.505567},
+    {"suite": "Counters", "case": "redundant_bind_group_sets_are_no_changes", "status": "pass", "elapsed": 0.004051},
+    {"suite": "Counters", "case": "compute_passes_count_their_workgroups", "status": "pass", "elapsed": 0.547154}
+  ]
+}

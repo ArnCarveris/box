@@ -1,6 +1,6 @@
 /**
  * @file renderer/gpu.h
- * @brief Selects the WebGPU header for the current platform.
+ * @brief Selects the WebGPU header for the current platform and counts its calls.
  */
 
 #ifndef BOX_RENDERER_GPU_H
@@ -12,5 +12,7 @@
 #include <webgpu.h>
 #include <wgpu.h>
 #endif
+
+#include "instrument.h"
 
 #endif

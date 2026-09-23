@@ -58,6 +58,7 @@ void box_upscale_init(
             .targets = &target
         };
         WGPURenderPipelineDescriptor desc = {
+            .label = BOX_GPU_LABEL("upscale"),
             .layout = pipeline_layout,
             .vertex = {
                 .module = module,

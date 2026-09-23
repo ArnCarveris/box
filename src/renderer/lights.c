@@ -74,6 +74,7 @@ static void box_lights_pipeline(
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
     WGPUComputePipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("light clusters"),
         .layout = pipeline_layout,
         .compute = {
             .module = shader,
@@ -279,7 +280,8 @@ void box_lights_dispatch(
         goto done;
     }
 
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+    WGPUComputePassDescriptor desc = { .label = BOX_GPU_LABEL("light clusters") };
+    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, &desc);
     wgpuComputePassEncoderSetPipeline(pass, r->cluster_pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, r->v->cluster_group, 0, NULL);
     wgpuComputePassEncoderDispatchWorkgroups(pass,

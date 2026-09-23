@@ -105,6 +105,27 @@
                     "report_keeps_the_worst_of_many_spikes",
                     "collector_grows_past_its_capacity"
                 ]
+            },
+            {
+                "id": "StatsPanels",
+                "testcases": [
+                    "panels_are_hidden_by_default",
+                    "templates_are_loaded",
+                    "showing_a_panel_adds_its_singleton",
+                    "gpu_panel_adds_gpu_timings",
+                    "hiding_keeps_a_singleton_added_elsewhere",
+                    "removing_the_singleton_stops_counting",
+                    "renderer_panel_shows_the_counts",
+                    "gpu_panel_lists_the_passes",
+                    "panels_stack_in_one_column",
+                    "a_surface_world_publishes_the_counts",
+                    "detail_panels_add_their_singletons",
+                    "counting_asks_for_what_the_singletons_need",
+                    "pass_panel_lists_the_passes",
+                    "tables_end_with_their_total",
+                    "buffer_panel_shows_the_used_classes",
+                    "a_surface_world_publishes_the_details"
+                ]
             }
         ]
     }

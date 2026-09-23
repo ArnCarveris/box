@@ -112,7 +112,7 @@ double box_timing_get(
 void box_timing_frame(
     box_renderer_t *r);
 
-/** Begin a render pass, timing it when the frame is being recorded.
+/** Begin a render pass labeled with its name, timing it when the frame is recorded.
  *
  * @param r The renderer
  * @param encoder The command encoder
@@ -126,7 +126,7 @@ WGPURenderPassEncoder box_timing_render(
     const WGPURenderPassDescriptor *desc,
     const char *name);
 
-/** Begin a compute pass, timing it when the frame is being recorded.
+/** Begin a compute pass labeled with its name, timing it when the frame is recorded.
  *
  * @param r The renderer
  * @param encoder The command encoder

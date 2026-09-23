@@ -90,6 +90,17 @@ void BoxMonitorImport(
     ECS_META_COMPONENT(world, GpuPassTime);
     ECS_META_COMPONENT(world, GpuTimings);
     ECS_META_COMPONENT(world, Fps);
+    ECS_META_COMPONENT(world, RendererStats);
+    ECS_META_COMPONENT(world, PassStat);
+    ECS_META_COMPONENT(world, PassStats);
+    ECS_META_COMPONENT(world, PipelineStat);
+    ECS_META_COMPONENT(world, PipelineStats);
+    ECS_META_COMPONENT(world, BindGroupStat);
+    ECS_META_COMPONENT(world, BindGroupStats);
+    ECS_META_COMPONENT(world, BufferStat);
+    ECS_META_COMPONENT(world, BufferStats);
+    ECS_META_COMPONENT(world, ComputeStat);
+    ECS_META_COMPONENT(world, ComputeStats);
 
     ecs_set_hooks(world, SystemTime, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, PhaseTime, { .ctor = flecs_default_ctor });
@@ -98,10 +109,23 @@ void BoxMonitorImport(
     ecs_set_hooks(world, SystemMonitor, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, GpuPassTime, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, GpuTimings, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, RendererStats, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, PassStat, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, PassStats, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, PipelineStat, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, PipelineStats, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, BindGroupStat, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, BindGroupStats, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, BufferStat, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, BufferStats, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ComputeStat, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, ComputeStats, { .ctor = flecs_default_ctor });
 
     box_cpu_monitor_init(world);
     box_stats_monitor_init(world);
     box_system_monitor_init(world);
     box_gpu_monitor_init(world);
     box_fps_monitor_init(world);
+    box_counters_monitor_init(world);
+    box_stats_panels_init(world);
 }

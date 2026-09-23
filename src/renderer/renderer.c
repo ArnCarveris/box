@@ -140,6 +140,7 @@ box_renderer_t* box_renderer_create(
     const box_renderer_desc_t *desc)
 {
     box_renderer_t *r = calloc(1, sizeof(box_renderer_t));
+    box_count_init(r);
     r->desc = *desc;
     r->desc.canvas_selector = NULL;
     if (desc->canvas_selector) {
@@ -198,6 +199,7 @@ void box_renderer_destroy(
     }
 
     box_device_fini(r);
+    box_count_destroy(r);
     box_queue_fini(&r->queue);
     free((void*)r->desc.canvas_selector);
     free(r);
@@ -272,6 +274,34 @@ void box_renderer_stats(
     *out = r->stats;
 }
 
+void box_renderer_set_counters(
+    box_renderer_t *r,
+    uint32_t flags)
+{
+    if (flags && !r->count.request) {
+        box_count_lock(r);
+        r->count.has_published = false;
+        box_count_unlock(r);
+    }
+
+    r->count.request = flags;
+}
+
+bool box_renderer_counters(
+    box_renderer_t *r,
+    box_counters_t *out)
+{
+    box_count_lock(r);
+    bool result = r->count.has_published;
+    if (result) {
+        memcpy(out, &r->count.published, sizeof(box_counters_t));
+    }
+
+    box_count_unlock(r);
+
+    return result;
+}
+
 void box_renderer_set_gpu_timings(
     box_renderer_t *r,
     bool enable)
@@ -280,9 +310,10 @@ void box_renderer_set_gpu_timings(
 }
 
 void box_renderer_gpu_timings(
-    const box_renderer_t *r,
+    box_renderer_t *r,
     box_renderer_gpu_t *out)
 {
+    box_count_lock(r);
     uint32_t count = r->timing.count;
     if (count > BOX_TIMING_PASS_MAX) {
         count = BOX_TIMING_PASS_MAX;
@@ -293,6 +324,7 @@ void box_renderer_gpu_timings(
     out->frame = r->timing.resolved;
     out->frame_ms = r->timing.frame_ms;
     out->supported = r->timing_supported;
+    box_count_unlock(r);
 }
 
 uint32_t box_renderer_frames(

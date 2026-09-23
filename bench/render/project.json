@@ -137,6 +137,14 @@
                 "benchcases": [
                     "extract_10k_with_layer_data"
                 ]
+            },
+            {
+                "id": "Counters",
+                "benchcases": [
+                    "record_2000_shapes_uncounted",
+                    "record_2000_shapes_counted",
+                    "record_2000_shapes_all_details"
+                ]
             }
         ]
     }

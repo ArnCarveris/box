@@ -192,11 +192,14 @@ static void box_timing_mapped(
 
     const uint64_t *stamps = wgpuBufferGetConstMappedRange(r->timing_readback, 0,
         (size_t)count * sizeof(uint64_t));
+    box_count_lock(r);
     if (stamps) {
         box_timing_resolve(&r->timing, stamps, count);
     } else {
         box_timing_drop(&r->timing);
     }
+
+    box_count_unlock(r);
 
     wgpuBufferUnmap(r->timing_readback);
 done:
@@ -312,19 +315,13 @@ WGPURenderPassEncoder box_timing_render(
     const WGPURenderPassDescriptor *desc,
     const char *name)
 {
-    WGPURenderPassEncoder result;
     WGPUPassTimestampWrites writes;
-    const WGPUPassTimestampWrites *timed = box_timing_writes(r, name, &writes);
-    if (!timed) {
-        result = wgpuCommandEncoderBeginRenderPass(encoder, desc);
-        goto done;
-    }
+    WGPURenderPassDescriptor named = *desc;
+    named.label.data = name;
+    named.label.length = WGPU_STRLEN;
+    named.timestampWrites = box_timing_writes(r, name, &writes);
 
-    WGPURenderPassDescriptor timed_desc = *desc;
-    timed_desc.timestampWrites = timed;
-    result = wgpuCommandEncoderBeginRenderPass(encoder, &timed_desc);
-done:
-    return result;
+    return wgpuCommandEncoderBeginRenderPass(encoder, &named);
 }
 
 WGPUComputePassEncoder box_timing_compute(
@@ -332,18 +329,13 @@ WGPUComputePassEncoder box_timing_compute(
     WGPUCommandEncoder encoder,
     const char *name)
 {
-    WGPUComputePassEncoder result;
     WGPUPassTimestampWrites writes;
-    const WGPUPassTimestampWrites *timed = box_timing_writes(r, name, &writes);
-    if (!timed) {
-        result = wgpuCommandEncoderBeginComputePass(encoder, NULL);
-        goto done;
-    }
+    WGPUComputePassDescriptor desc = {
+        .label = { .data = name, .length = WGPU_STRLEN },
+        .timestampWrites = box_timing_writes(r, name, &writes)
+    };
 
-    WGPUComputePassDescriptor desc = { .timestampWrites = timed };
-    result = wgpuCommandEncoderBeginComputePass(encoder, &desc);
-done:
-    return result;
+    return wgpuCommandEncoderBeginComputePass(encoder, &desc);
 }
 
 void box_timing_record(

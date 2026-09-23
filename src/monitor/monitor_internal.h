@@ -8,6 +8,19 @@
 
 #include <box.h>
 #include "../core/core_internal.h"
+#include "../renderer/renderer.h"
+
+/** Statistics components the counts of the renderer can be published on */
+#define BOX_MONITOR_COUNTED_MAX (8)
+
+/** Copy the counts of a frame into a statistics component.
+ *
+ * @param ptr The component
+ * @param c The counts
+ */
+typedef void (*box_counted_write_t)(
+    void *ptr,
+    const box_counters_t *c);
 
 /** Moving average state of the CPU monitor, owned by its sampling system */
 typedef struct box_cpu_monitor_t {
@@ -119,6 +132,50 @@ void box_system_monitor_init(
  * @param world The world
  */
 void box_gpu_monitor_init(
+    ecs_world_t *world);
+
+/** Renderer of the first surface of a world.
+ *
+ * @param world The world
+ * @return The renderer, or NULL when the world renders nothing
+ */
+box_renderer_t* box_monitor_renderer(
+    ecs_world_t *world);
+
+/** Keep a name in a reflected string field, reusing it while it is the same.
+ *
+ * @param slot The field
+ * @param name The name it has now, NULL for an unused entry
+ */
+void box_monitor_name(
+    char **slot,
+    const char *name);
+
+/** Register the system that publishes the counts of the renderer and RendererStats.
+ *
+ * @param world The world
+ */
+void box_counters_monitor_init(
+    ecs_world_t *world);
+
+/** Publish the counts of the renderer on a statistics singleton while it exists.
+ *
+ * @param world The world
+ * @param component The singleton
+ * @param flags BOX_COUNT_ flags of what it needs counted
+ * @param write Fills it from the counts of a frame
+ */
+void box_monitor_counted(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    uint32_t flags,
+    box_counted_write_t write);
+
+/** Load the statistics panel templates and layout and tie each panel to its singleton.
+ *
+ * @param world The world
+ */
+void box_stats_panels_init(
     ecs_world_t *world);
 
 /** Register the system that fills the Fps singleton and load the frame rate panel.

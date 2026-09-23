@@ -347,6 +347,26 @@
                 ],
                 "setup": true,
                 "teardown": true
+            },
+            {
+                "id": "Stats",
+                "testcases": [
+                    "lists_the_panels",
+                    "naming_a_panel_shows_it",
+                    "naming_a_shown_panel_prints_its_counts",
+                    "gpu_prints_the_passes",
+                    "off_hides_the_panel",
+                    "off_hides_every_panel",
+                    "unknown_panel_is_an_error",
+                    "unknown_state_is_an_error",
+                    "help_lists_the_command",
+                    "pass_prints_a_row_per_pass",
+                    "bindgroup_prints_the_redundant_sets",
+                    "buffer_skips_the_unused_classes",
+                    "off_hides_the_detail_panels"
+                ],
+                "setup": true,
+                "teardown": true
             }
         ]
     }

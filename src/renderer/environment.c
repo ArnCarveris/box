@@ -396,7 +396,11 @@ static void box_env_pass(
         .loadOp = WGPULoadOp_Clear,
         .storeOp = WGPUStoreOp_Store
     };
-    WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
+    WGPURenderPassDescriptor desc = {
+        .label = BOX_GPU_LABEL("environment"),
+        .colorAttachmentCount = 1,
+        .colorAttachments = &color
+    };
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     uint32_t offset = index * BOX_ENV_STRIDE;
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);

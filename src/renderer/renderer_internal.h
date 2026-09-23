@@ -446,6 +446,7 @@ typedef struct box_motion_uniform_t {
 struct box_renderer_t {
     box_renderer_desc_t desc;        /**< Creation parameters */
     box_queue_t queue;               /**< Packet handoff */
+    box_count_t count;               /**< Per frame counts, kept when the device is released */
     WGPUInstance instance;           /**< WebGPU instance */
     WGPUSurface surface;             /**< Window surface, NULL when offscreen */
     WGPUAdapter adapter;             /**< Selected adapter */

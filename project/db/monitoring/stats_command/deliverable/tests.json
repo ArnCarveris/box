@@ -1,0 +1,341 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T22:24:21Z",
+  "pass": 44,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 0.983288,
+  "tests": [
+    {
+      "suite": "Counters",
+      "case": "triangles_follow_the_topology",
+      "status": "pass",
+      "elapsed": 0.005479,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "passes_with_one_name_share_an_entry",
+      "status": "pass",
+      "elapsed": 0.005474,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "a_full_pass_table_takes_no_more",
+      "status": "pass",
+      "elapsed": 0.006178,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "a_long_name_is_truncated",
+      "status": "pass",
+      "elapsed": 0.005644,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "texture_bytes_cover_every_mip_and_layer",
+      "status": "pass",
+      "elapsed": 0.006319,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "block_compressed_bytes_round_up_to_blocks",
+      "status": "pass",
+      "elapsed": 0.005703,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "nothing_is_counted_until_asked",
+      "status": "pass",
+      "elapsed": 0.51672,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "one_mesh_draws_its_instances_at_once",
+      "status": "pass",
+      "elapsed": 0.517658,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "live_resources_match_the_device_report",
+      "status": "pass",
+      "elapsed": 0.507204,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "indirect_draws_are_resolved_from_their_arguments",
+      "status": "pass",
+      "elapsed": 0.546463,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "counting_again_forgets_the_last_frame",
+      "status": "pass",
+      "elapsed": 0.507683,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "details_are_only_counted_when_asked",
+      "status": "pass",
+      "elapsed": 0.50932,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "details_add_up_to_the_totals",
+      "status": "pass",
+      "elapsed": 0.505567,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "redundant_bind_group_sets_are_no_changes",
+      "status": "pass",
+      "elapsed": 0.004051,
+      "project": "render"
+    },
+    {
+      "suite": "Counters",
+      "case": "compute_passes_count_their_workgroups",
+      "status": "pass",
+      "elapsed": 0.547154,
+      "project": "render"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "panels_are_hidden_by_default",
+      "status": "pass",
+      "elapsed": 0.099232,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "templates_are_loaded",
+      "status": "pass",
+      "elapsed": 0.097216,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "showing_a_panel_adds_its_singleton",
+      "status": "pass",
+      "elapsed": 0.100765,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "gpu_panel_adds_gpu_timings",
+      "status": "pass",
+      "elapsed": 0.09851,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "hiding_keeps_a_singleton_added_elsewhere",
+      "status": "pass",
+      "elapsed": 0.097495,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "removing_the_singleton_stops_counting",
+      "status": "pass",
+      "elapsed": 0.096816,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "renderer_panel_shows_the_counts",
+      "status": "pass",
+      "elapsed": 0.129534,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "gpu_panel_lists_the_passes",
+      "status": "pass",
+      "elapsed": 0.099654,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "panels_stack_in_one_column",
+      "status": "pass",
+      "elapsed": 0.158718,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "a_surface_world_publishes_the_counts",
+      "status": "pass",
+      "elapsed": 0.15541,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "detail_panels_add_their_singletons",
+      "status": "pass",
+      "elapsed": 0.093758,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "counting_asks_for_what_the_singletons_need",
+      "status": "pass",
+      "elapsed": 0.085206,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "pass_panel_lists_the_passes",
+      "status": "pass",
+      "elapsed": 0.087782,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "tables_end_with_their_total",
+      "status": "pass",
+      "elapsed": 0.097177,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "buffer_panel_shows_the_used_classes",
+      "status": "pass",
+      "elapsed": 0.087281,
+      "project": "monitor"
+    },
+    {
+      "suite": "StatsPanels",
+      "case": "a_surface_world_publishes_the_details",
+      "status": "pass",
+      "elapsed": 0.123126,
+      "project": "monitor"
+    },
+    {
+      "suite": "Stats",
+      "case": "lists_the_panels",
+      "status": "pass",
+      "elapsed": 0.090109,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "naming_a_panel_shows_it",
+      "status": "pass",
+      "elapsed": 0.095208,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "naming_a_shown_panel_prints_its_counts",
+      "status": "pass",
+      "elapsed": 0.095449,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "gpu_prints_the_passes",
+      "status": "pass",
+      "elapsed": 0.092352,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "off_hides_the_panel",
+      "status": "pass",
+      "elapsed": 0.091322,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "off_hides_every_panel",
+      "status": "pass",
+      "elapsed": 0.093501,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "unknown_panel_is_an_error",
+      "status": "pass",
+      "elapsed": 0.089581,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "unknown_state_is_an_error",
+      "status": "pass",
+      "elapsed": 0.089972,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "help_lists_the_command",
+      "status": "pass",
+      "elapsed": 0.077499,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "pass_prints_a_row_per_pass",
+      "status": "pass",
+      "elapsed": 0.079071,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "bindgroup_prints_the_redundant_sets",
+      "status": "pass",
+      "elapsed": 0.079266,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "buffer_skips_the_unused_classes",
+      "status": "pass",
+      "elapsed": 0.078037,
+      "project": "command"
+    },
+    {
+      "suite": "Stats",
+      "case": "off_hides_the_detail_panels",
+      "status": "pass",
+      "elapsed": 0.077385,
+      "project": "command"
+    }
+  ],
+  "projects": [
+    {
+      "project": "command",
+      "pass": 13,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.169875
+    },
+    {
+      "project": "monitor",
+      "pass": 16,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.255692
+    },
+    {
+      "project": "render",
+      "pass": 15,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.557721
+    }
+  ]
+}

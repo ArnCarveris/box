@@ -18,6 +18,7 @@ extern "C" {
 typedef struct box_renderer_t box_renderer_t;
 
 #include "timing.h"
+#include "counters.h"
 
 /** Instance counts of the last frame the renderer drew.
  *
@@ -148,14 +149,40 @@ void box_renderer_set_gpu_timings(
     box_renderer_t *r,
     bool enable);
 
-/** Per pass GPU times of the last frame the renderer resolved.
+/** Per pass GPU times of the last frame the renderer resolved, copied whole.
  *
  * @param r The renderer
  * @param out The times to fill
  */
 void box_renderer_gpu_timings(
-    const box_renderer_t *r,
+    box_renderer_t *r,
     box_renderer_gpu_t *out);
+
+/** Count the work of the frames that follow, or stop counting it.
+ *
+ * Nothing is counted while the flags are zero. A frame starts counting with the
+ * flags it finds when it begins, so a frame is always counted whole. Starting
+ * to count again forgets the frame published before counting stopped.
+ *
+ * @param r The renderer
+ * @param flags BOX_COUNT_ flags of what to count, zero for nothing
+ */
+void box_renderer_set_counters(
+    box_renderer_t *r,
+    uint32_t flags);
+
+/** Counts of the last frame the renderer finished counting.
+ *
+ * A frame is published whole, after the read back of its indirect draws, so
+ * the counts trail the frame they belong to by one or two frames.
+ *
+ * @param r The renderer
+ * @param out The counts to fill
+ * @return true when a frame was published
+ */
+bool box_renderer_counters(
+    box_renderer_t *r,
+    box_counters_t *out);
 
 /** Number of frames the renderer has presented.
  *

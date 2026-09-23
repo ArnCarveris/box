@@ -127,7 +127,7 @@ static void box_particle_pool_init(
 
     WGPUBufferDescriptor args = {
         .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst |
-            WGPUBufferUsage_Indirect,
+            WGPUBufferUsage_Indirect | WGPUBufferUsage_CopySrc,
         .size = BOX_PARTICLE_ARGS * sizeof(uint32_t)
     };
     pool->args = wgpuDeviceCreateBuffer(r->device, &args);
@@ -354,6 +354,7 @@ static WGPURenderPipeline box_particle_build_draw(
         .attributes = attributes
     };
     WGPURenderPipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL(mesh ? "particle mesh" : "particles"),
         .layout = layout,
         .vertex = {
             .module = module,

@@ -286,6 +286,7 @@ static void box_effect_motion_pipeline(
             .targets = &target
         };
         WGPURenderPipelineDescriptor desc = {
+            .label = BOX_GPU_LABEL("motion"),
             .layout = layout,
             .vertex = {
                 .module = module,
@@ -417,6 +418,7 @@ static WGPURenderPipeline box_effect_pipeline(
         .targets = &target
     };
     WGPURenderPipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("effect"),
         .layout = r->effect_pipeline_layout,
         .vertex = {
             .module = module,
