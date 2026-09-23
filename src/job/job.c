@@ -1,6 +1,9 @@
 /**
  * @file job/job.c
  * @brief Registers the box.job module and drains completions in PreUpdate.
+ *
+ * The drain runs as an immediate system, because completions publish results
+ * with ecs_modified and the observers of those events may change the world.
  */
 
 #define BOX_JOB_IMPL
@@ -148,7 +151,12 @@ void BoxJobImport(
     jp->pool = box_job_pool_new(raw, box_job_pool_worker_count(0));
     ecs_singleton_modified(world, JobPool);
 
-    ECS_SYSTEM(world, BoxJobUpdate, EcsPreUpdate, 0);
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxJobUpdate" }),
+        .phase = EcsPreUpdate,
+        .callback = BoxJobUpdate,
+        .immediate = true
+    });
 
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(JobSettings), .inout = EcsIn }},

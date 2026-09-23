@@ -1,0 +1,11 @@
+{
+  "kind": "bug",
+  "status": "complete",
+  "created": "2026-09-23T22:28:14.278+00:00",
+  "start_time": "2026-09-23T22:28:58.234+00:00",
+  "end_time": "2026-09-23T22:35:35.992+00:00",
+  "dependencies": [
+    "textures"
+  ],
+  "bench": false
+}
