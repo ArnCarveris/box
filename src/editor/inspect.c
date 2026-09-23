@@ -299,7 +299,8 @@ static void box_editor_members(
         const EcsType *meta = ecs_get(world, type, EcsType);
         char *path = prefix[0] ? flecs_asprintf("%s.%s", prefix, name) : ecs_os_strdup(name);
         void *ptr = ecs_meta_get_ptr(cur);
-        bool collection = ecs_meta_is_collection(cur);
+        const EcsMember *m = ecs_get(world, ecs_meta_get_member_id(cur), EcsMember);
+        bool collection = ecs_meta_is_collection(cur) || (m && m->count > 1);
         if (meta && meta->kind == EcsStructType && !collection && depth < BOX_EDITOR_NEST_MAX) {
             box_editor_field(inspector, component, path, path, FieldValue, "", false);
             box_editor_members(world, inspector, cur, component, path, depth + 1, editable);
@@ -325,7 +326,6 @@ static void box_editor_members(
                 editable && kind != FieldValue);
             ecs_os_free(value);
         } else if (collection && meta && meta->kind != EcsVectorType) {
-            const EcsMember *m = ecs_get(world, ecs_meta_get_member_id(cur), EcsMember);
             char *value = box_editor_array_text(world, cur, type, m ? m->count : 0);
             box_editor_field(inspector, component, path, path, FieldValue, value, false);
             ecs_os_free(value);

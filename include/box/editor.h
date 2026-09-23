@@ -76,6 +76,7 @@ ECS_STRUCT(Editor, {
 /** One visible row of the tree view */
 ECS_STRUCT(EditorNode, {
     ecs_entity_t entity; /**< The entity of the row */
+    int64_t id;          /**< Number of the entity, which names the row of the tree */
     char *name;          /**< Name of the entity, or its id when it has none */
     int32_t depth;       /**< Ancestors of the entity, indents the row */
     EditorKind kind;     /**< What the entity is, picks the icon */

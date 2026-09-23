@@ -84,6 +84,17 @@ ECS_STRUCT(Layout, {
     float max_height;     /**< Largest height of the box, 0 for none */
 });
 
+/** Place of an element among the children of a layout.
+ *
+ * A row or a column places its children in child order; a child with an Order
+ * goes before every child with a higher value and after every child with a
+ * lower one, children without one counting as zero. Rows a script builds from
+ * a list in one order and adds to in another are kept in the order of the list.
+ */
+ECS_STRUCT(Order, {
+    int32_t value; /**< Place among the siblings, lower first */
+});
+
 /** Point of the parent an anchored element attaches to on the x axis */
 ECS_ENUM(AttachH, {
     AttachHSame = 0,   /**< The edge the element is pinned by, inside the padding */

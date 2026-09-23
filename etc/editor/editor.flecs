@@ -141,6 +141,7 @@ template RemovePointButton : EditorButton {
 
 // A row of the tree: an arrow, an icon for the kind and the name of an entity.
 template TreeRow {
+  prop index: i32 = 0
   prop entity: entity = 0
   prop label = ""
   prop depth: i32 = 0
@@ -153,6 +154,7 @@ template TreeRow {
 
   Layout: {direction: Row, spacing: 6, height: row_h, padding_left: indent, v: Middle, h: Left, width: tree_w}
   Rect: {}
+  Order: {index}
 
   if selected {
     Rgb: selection
@@ -286,29 +288,29 @@ template EditInput {
   prop value = ""
   prop editable = true
 
-  Layout: {width: field_w, height: 20, padding_left: 6, v: Middle, h: Left}
+  Layout: {direction: Row, width: field_w, height: 20, padding_left: 6, v: Middle, h: Left}
+  Rect: {}
+  Border: {radius: 3}
   Font: {size: 12}
 
-  back {
-    HitThrough
-    Anchor: {h: Left, v: Top}
-    Rect: {field_w, 20}
-    Border: {radius: 3}
-    if editable && this?[Hovered] {
-      Rgb: bg_mute
-    } else {
-      Rgb: bg
-    }
+  if editable && this?[Hovered] {
+    Rgb: bg_mute
+  } else {
+    Rgb: bg
   }
 
-  if editable {
-    TextInput: {value: value}
-    EditorBinding: {component: component, member: member}
-    Text: {value: value}
-    Rgb: text
-  } else {
-    Text: {value: value}
-    Rgb: text_3
+  line {
+    HitThrough
+    Layout: {height: 16}
+    if editable {
+      TextInput: {value: value}
+      EditorBinding: {component: component, member: member}
+      Text: {value: value}
+      Rgb: text
+    } else {
+      Text: {value: value}
+      Rgb: text_3
+    }
   }
 
   async {
@@ -587,8 +589,8 @@ if ed.enabled {
         Grow: {height: 1}
         Scroll: {y: Auto}
 
-        for r in tree.rows {
-          TreeRow "n_{r.entity}"(entity: r.entity, label: r.name, depth: r.depth,
+        for (i, r) in tree.rows {
+          TreeRow "n_{r.id}"(index: i, entity: r.entity, label: r.name, depth: r.depth,
             kind: r.kind, expanded: r.expanded, children: r.children, selected: r.selected)
         }
       }

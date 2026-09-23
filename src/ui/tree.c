@@ -269,6 +269,65 @@ done:
     box_render_set_depth(world, e, depth);
 }
 
+/** Put the children of a node in the order their Order components ask for.
+ *
+ * The sort is stable, so children without an Order, which count as zero, and
+ * children that share a value keep their child order.
+ *
+ * @param world The world
+ * @param nodes The children, in child order
+ */
+static void box_ui_sort_children(
+    ecs_world_t *world,
+    ecs_vec_t *nodes)
+{
+    int32_t i, count = ecs_vec_count(nodes);
+    ecs_entity_t *entities = ecs_vec_first_t(nodes, ecs_entity_t);
+    bool ordered = false;
+    for (i = 0; i < count && !ordered; i ++) {
+        ordered = ecs_has(world, entities[i], Order);
+    }
+
+    for (i = 1; ordered && i < count; i ++) {
+        ecs_entity_t e = entities[i];
+        const Order *order = ecs_get(world, e, Order);
+        int32_t value = order ? order->value : 0;
+        int32_t j = i;
+        while (j > 0) {
+            const Order *prev = ecs_get(world, entities[j - 1], Order);
+            if ((prev ? prev->value : 0) <= value) {
+                break;
+            }
+
+            entities[j] = entities[j - 1];
+            j --;
+        }
+
+        entities[j] = e;
+    }
+}
+
+/** Order observer: count the elements and lay the parent out again.
+ *
+ * @param it Iterator over the elements that gained, changed or lost their Order
+ */
+static void box_ui_order_on_change(
+    ecs_iter_t *it)
+{
+    UiState *state = box_ui_state(it->world);
+    int32_t i;
+    if (it->event == EcsOnAdd) {
+        state->orders += it->count;
+    } else if (it->event == EcsOnRemove) {
+        state->orders -= it->count;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t parent = ecs_get_parent(it->world, it->entities[i]);
+        box_ui_mark(it->world, parent ? parent : it->entities[i]);
+    }
+}
+
 /** Collect the nodes below a node into the places of the registry, in pre-order.
  *
  * @param world The world
@@ -313,6 +372,9 @@ static int32_t box_ui_collect(
 
         ecs_vec_clear(&state->nodes);
         box_hierarchy_collect(world, visit.e, &state->nodes);
+        if (state->orders) {
+            box_ui_sort_children(world, &state->nodes);
+        }
 
         int32_t i;
         for (i = ecs_vec_count(&state->nodes) - 1; i >= 0; i --) {
@@ -619,6 +681,12 @@ static void box_ui_on_tree(
 void box_ui_tree_init(
     ecs_world_t *world)
 {
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(Order), .inout = EcsInOutNone }},
+        .events = { EcsOnAdd, EcsOnSet, EcsOnRemove },
+        .callback = box_ui_order_on_change
+    });
+
     ecs_observer(world, {
         .query.terms = {{ .id = ecs_id(UiImpl), .inout = EcsInOutNone }},
         .events = { EcsOnAdd, EcsOnRemove },

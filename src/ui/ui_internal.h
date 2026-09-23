@@ -136,6 +136,7 @@ typedef struct UiState {
     int32_t groups;     /**< Subtrees that composite, zero skips their bookkeeping */
     int32_t scrolls;    /**< Elements that clip and scroll, zero skips the scroll pass */
     int32_t grows;      /**< Elements with a Grow, zero skips reading it */
+    int32_t orders;     /**< Elements with an Order, zero skips sorting the children */
     int32_t opacities;  /**< Opacity components the world holds, zero skips the group pass */
     ecs_entity_t shadow_prefab; /**< Prefab the shadow quads take their material from */
     bool busy;          /**< An update runs, the observers mark no tree */

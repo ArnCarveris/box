@@ -177,7 +177,43 @@ static void box_ui_fn_label(
     *(ecs_entity_t*)result->ptr = e;
 }
 
+/** Find the input of an element: the element itself or its first descendant with one.
+ *
+ * @param world The world
+ * @param e The element
+ * @return The entity that carries a TextInput, 0 when none does
+ */
+static ecs_entity_t box_ui_fn_input_of(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    if (ecs_has(world, e, TextInput)) {
+        result = e;
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count && !result; i ++) {
+            result = box_ui_fn_input_of(world, it.entities[i]);
+        }
+
+        if (result) {
+            ecs_iter_fini(&it);
+            break;
+        }
+    }
+
+done:
+    return result;
+}
+
 /** text.focus: give the input of an element the keyboard, taking it from the others.
+ *
+ * The input is the element itself or its first descendant with a TextInput, so
+ * a widget can wrap its line in a box and focus the box.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -192,13 +228,13 @@ static void box_ui_fn_focus(
 {
     ecs_world_t *world = ctx->world;
     ecs_entity_t e = *(ecs_entity_t*)argv[0].ptr;
-    TextInput *input = e && ecs_is_alive(world, e) ?
-        ecs_get_mut(world, e, TextInput) : NULL;
+    ecs_entity_t target = e && ecs_is_alive(world, e) ? box_ui_fn_input_of(world, e) : 0;
+    TextInput *input = target ? ecs_get_mut(world, target, TextInput) : NULL;
     (void)argc;
 
     if (input) {
         input->focused = true;
-        ecs_modified(world, e, TextInput);
+        ecs_modified(world, target, TextInput);
     }
 
     *(bool*)result->ptr = input != NULL;

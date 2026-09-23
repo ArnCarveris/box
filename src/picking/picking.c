@@ -151,5 +151,10 @@ void BoxPickingImport(
     ecs_singleton_modified(world, PickSettings);
     box_picking_events_init(world);
 
-    ECS_SYSTEM(world, BoxPickingUpdate, EcsOnLoad, 0);
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxPickingUpdate" }),
+        .phase = EcsOnLoad,
+        .callback = BoxPickingUpdate,
+        .immediate = true
+    });
 }

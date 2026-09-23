@@ -47,7 +47,6 @@ typedef struct box_editor_grab_t {
 typedef struct EditorState {
     ecs_map_t expanded;      /**< Entities whose children the tree shows */
     ecs_vec_t levels;        /**< box_editor_level_t, the opened instances */
-    ecs_vec_t systems;       /**< System entities enabled with the editor */
     ecs_vec_t captured;      /**< Input maps disabled while a field has the focus */
     ecs_query_t *roots;      /**< Entities without a parent */
     ecs_entity_t script;     /**< The overlay script */

@@ -4,7 +4,8 @@
  *
  * The rows are rebuilt when the selection or the expansion changed and every
  * BOX_EDITOR_TREE_INTERVAL frames otherwise, so the tree follows a scene that
- * changes without walking it every frame. Only expanded nodes are walked.
+ * changes without walking it every frame. Only expanded nodes are walked, and
+ * nameless systems, queries and observers, the machinery of the engine, are skipped.
  */
 
 #include "editor_internal.h"
@@ -182,12 +183,20 @@ static void box_editor_tree_walk(
 
     for (i = 0; i < count && ecs_vec_count(&tree->rows) < BOX_EDITOR_TREE_MAX; i ++) {
         ecs_entity_t e = children[i].entity;
+        EditorKind kind = box_editor_kind(world, e);
+        if (!children[i].name && (kind == KindSystem || kind == KindQuery ||
+            kind == KindObserver))
+        {
+            continue;
+        }
+
         EditorNode *node = ecs_vec_append_t(NULL, &tree->rows, EditorNode);
         node->entity = e;
+        node->id = (int64_t)(uint32_t)e;
         node->name = children[i].name ? ecs_os_strdup(children[i].name) :
             flecs_asprintf("#%u", (uint32_t)e);
         node->depth = depth;
-        node->kind = box_editor_kind(world, e);
+        node->kind = kind;
         node->children = box_editor_has_children(world, e);
         node->expanded = node->children && ecs_map_get(&state->expanded, e) != NULL;
         node->selected = e == editor->selected;

@@ -2,9 +2,15 @@
  * @file picking/pick.c
  * @brief Picks under the cursor once per frame and raises the events it implies.
  *
+ * The update runs immediately on the world, so a hover that re-evaluates a
+ * template restarts its tasks before the press of the same frame is raised.
+ *
  * The pick of a frame is one ray query per view that renders into the surface,
  * and only while the cursor moves: a still cursor answers from the hit the last
  * query left behind, so a frame that changes nothing costs no query.
+ *
+ * A press that found no waiter is kept while the button is held, so a handler
+ * whose task restarted in that frame, as a hover does to a template, still gets it.
  */
 
 #include "picking_internal.h"
@@ -83,7 +89,7 @@ static ecs_entity_t box_pick_raise(
  * A raise without a waiter marks the hover missed, so a waiter registered later
  * in the same hover resolves on its next update. One delivery clears the miss.
  *
- * @param it Iterator of the system, whose stage carries the change
+ * @param it Iterator of the system, which runs immediately on the world
  * @param state The module state
  * @param entity The entity the cursor points at, 0 for none
  */
@@ -94,7 +100,7 @@ static void box_pick_hover(
 {
     if (state->hovered == entity) {
         if (state->hover_missed &&
-            box_pick_raise(it->stage, state, PickHover, &state->hit))
+            box_pick_raise(it->world, state, PickHover, &state->hit))
         {
             state->hover_missed = false;
         }
@@ -103,15 +109,15 @@ static void box_pick_hover(
     }
 
     if (state->hovered && ecs_is_alive(it->world, state->hovered)) {
-        ecs_remove_id(it->stage, state->hovered, Hovered);
+        ecs_remove_id(it->world, state->hovered, Hovered);
     }
 
     state->hovered = entity;
     state->hover_missed = false;
     if (entity) {
-        ecs_add_id(it->stage, entity, Hovered);
+        ecs_add_id(it->world, entity, Hovered);
         state->hover_missed =
-            box_pick_raise(it->stage, state, PickHover, &state->hit) == 0;
+            box_pick_raise(it->world, state, PickHover, &state->hit) == 0;
     }
 
 done:
@@ -161,7 +167,8 @@ static void box_pick_buttons(
         state->press_window = in->mouse.window;
         state->pressed = true;
         state->dragging = false;
-        box_pick_raise(it->stage, state, PickPress, &state->hit);
+        state->press_missed = state->hit.entity != 0 &&
+            box_pick_raise(it->world, state, PickPress, &state->hit) == 0;
     }
 
     if (down && state->pressed) {
@@ -173,17 +180,18 @@ static void box_pick_buttons(
         if (state->dragging && moved) {
             PickHit drag;
             box_pick_drag_hit(it->world, state, in->mouse.normalized, &drag);
-            box_pick_raise(it->stage, state, PickDrag, &drag);
+            box_pick_raise(it->world, state, PickDrag, &drag);
         }
     }
 
     if (released) {
-        box_pick_raise(it->stage, state, PickRelease, &state->hit);
+        box_pick_raise(it->world, state, PickRelease, &state->hit);
         if (!state->dragging && state->hit.entity == state->press.entity) {
-            box_pick_raise(it->stage, state, PickClick, &state->hit);
+            box_pick_raise(it->world, state, PickClick, &state->hit);
         }
 
         state->pressed = false;
+        state->press_missed = false;
 
         memset(&state->press, 0, sizeof(PickHit));
         state->dragging = false;

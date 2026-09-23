@@ -42,6 +42,7 @@ typedef struct PickState {
     bool valid;              /**< The cached hit answers for the cursor of this frame */
     bool held;               /**< The left mouse button was down last frame */
     bool pressed;            /**< A press is being held, on an entity or on empty space */
+    bool press_missed;       /**< The press of the held button raised to no waiter yet */
     bool dragging;           /**< The press passed the drag threshold */
     int32_t queries;         /**< Ray queries the last update ran */
 } PickState;

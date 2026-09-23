@@ -2,9 +2,9 @@
  * @file editor/editor.c
  * @brief Registers the box.editor module: its singleton, its models, its scripts and its system.
  *
- * The Editor singleton is switched by the editor command. An observer on it
- * enables the update system while the editor is on and disables it again when
- * it goes off, so an editor that is off costs no work per frame.
+ * The Editor singleton is switched by the editor command through
+ * box_editor_enable. The update system returns at once while the editor is
+ * off, so an editor that is off costs one flag test per frame.
  */
 
 #define BOX_EDITOR_IMPL
@@ -55,7 +55,6 @@ static void box_editor_state_dtor(
         }
 
         ecs_vec_fini_t(NULL, &state[i].levels, box_editor_level_t);
-        ecs_vec_fini_t(NULL, &state[i].systems, ecs_entity_t);
         ecs_vec_fini_t(NULL, &state[i].captured, ecs_entity_t);
         ecs_map_fini(&state[i].expanded);
         if (state[i].roots) {
@@ -121,32 +120,12 @@ done:
     return result;
 }
 
-/** Editor observer: switch the systems with the enabled flag.
- *
- * @param it Iterator over the singleton
- */
-static void box_editor_switched(
-    ecs_iter_t *it)
-{
-    ecs_world_t *world = it->world;
-    const Editor *editor = ecs_field(it, Editor, 0);
-    EditorState *state = box_editor_state(world);
-    int32_t i, count = ecs_vec_count(&state->systems);
-    for (i = 0; i < count; i ++) {
-        ecs_entity_t system = ecs_vec_get_t(&state->systems, ecs_entity_t, i)[0];
-        if (ecs_has_id(world, system, EcsDisabled) == editor->enabled) {
-            ecs_enable(world, system, editor->enabled);
-        }
-    }
-
-    state->tree_dirty = true;
-}
-
 void box_editor_enable(
     ecs_world_t *world,
     bool enabled)
 {
     EditorState *state = box_editor_state(world);
+    state->tree_dirty = true;
     Editor *editor = box_editor_get(world);
     if (!enabled) {
         state->grab.active = false;
@@ -250,7 +229,6 @@ void BoxEditorImport(
     EditorState *state = ecs_singleton_ensure(world, EditorState);
     ecs_map_init(&state->expanded, NULL);
     ecs_vec_init_t(NULL, &state->levels, box_editor_level_t, 0);
-    ecs_vec_init_t(NULL, &state->systems, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->captured, ecs_entity_t, 0);
     state->tree_dirty = true;
     state->roots = ecs_query(world, {
@@ -266,21 +244,11 @@ void BoxEditorImport(
     ecs_vec_init_t(NULL, &inspector->fields, EditorField, 0);
     ecs_singleton_modified(world, EditorInspector);
 
-    ecs_entity_t system = ecs_system(world, {
+    ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxEditorUpdate" }),
         .phase = EcsOnUpdate,
         .callback = BoxEditorUpdate,
         .immediate = true
-    });
-
-    ecs_enable(world, system, false);
-    state = box_editor_state(world);
-    ecs_vec_append_t(NULL, &state->systems, ecs_entity_t)[0] = system;
-
-    ecs_observer(world, {
-        .query.terms = {{ .id = ecs_id(Editor), .src.id = ecs_id(Editor), .inout = EcsIn }},
-        .events = { EcsOnSet },
-        .callback = box_editor_switched
     });
 
     box_editor_functions_init(world, ecs_id(BoxEditor));

@@ -10,6 +10,7 @@
  */
 
 #include "editor_internal.h"
+#include "../render/render_internal.h"
 #include <string.h>
 
 /** Radians one unit of normalized cursor movement turns a free rotation */
@@ -78,20 +79,25 @@ static mat4 box_editor_world_of(
     return wt ? wt->m : mat4_identity();
 }
 
-/** Eye and forward direction of the camera a pick came from.
+/** Eye and forward direction of the camera a pick came from, or of the scene.
  *
  * @param world The world
- * @param view The view of the pick
+ * @param view The view of the pick, 0 for the primary view of the scene
  * @param eye Receives the position of the camera
  * @param forward Receives the direction the camera looks in
  * @return true when the world has a camera
  */
 static bool box_editor_camera(
-    const ecs_world_t *world,
+    ecs_world_t *world,
     ecs_entity_t view,
     vec3 *eye,
     vec3 *forward)
 {
+    if (!view) {
+        RenderState *render = box_render_state(world);
+        view = box_render_primary_view(world, render);
+    }
+
     return box_picking_ray(world, view, (vec2){0, 0}, eye, forward);
 }
 

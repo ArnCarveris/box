@@ -14,26 +14,27 @@ using box.collision
 using box.editor
 using box.editor.HandleMode
 
-const red: Rgb = {226, 74, 74}
-const green: Rgb = {74, 200, 96}
-const blue: Rgb = {84, 132, 240}
-const white: Rgb = {220, 224, 230}
-const hover: Rgb = {255, 235, 120}
+const red: Tint = {226, 74, 74, 255}
+const green: Tint = {74, 200, 96, 255}
+const blue: Tint = {84, 132, 240, 255}
+const white: Tint = {220, 224, 230, 255}
+const hover: Tint = {255, 235, 120, 255}
 const half = 1.5707963
 
 // A part of a gizmo that can be dragged, colored by its axis and lit up under the cursor.
+// The color is a Tint, which reaches the shapes below the handle.
 template Handle {
   prop mode: HandleMode = HandleMove
   prop axes: i32 = 1
-  prop color: Rgb = {255, 255, 255}
+  prop color: Tint = {255, 255, 255, 255}
 
   Pickable
   GizmoHandle: {mode: mode, axes: axes}
 
   if this?[Hovered] {
-    Rgb: hover
+    Tint: hover
   } else {
-    Rgb: color
+    Tint: color
   }
 
   async {
@@ -215,11 +216,11 @@ template PointHandle {
   const handle = this[GizmoHandle]
 
   if this?[Hovered] {
-    Rgb: hover
+    Tint: hover
   } else if handle.index == point {
-    Rgb: {255, 160, 40}
+    Tint: {255, 160, 40, 255}
   } else {
-    Rgb: white
+    Tint: white
   }
 
   async {
