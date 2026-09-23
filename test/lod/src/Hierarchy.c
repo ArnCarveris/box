@@ -24,6 +24,8 @@ void Hierarchy_a_far_root_is_replaced_by_a_proxy(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -86,6 +88,8 @@ void Hierarchy_a_near_root_draws_its_leaves(void)
     ecs_set(w, cam, Position, {0, 2, -12});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -135,6 +139,8 @@ void Hierarchy_the_traversal_leaves_the_entities_alone(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_entity(w, { .name = "tower" });
     ecs_set(w, root, Position, {0, 0, 0});
@@ -189,6 +195,8 @@ void Hierarchy_settings_off_draws_every_leaf(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -238,6 +246,8 @@ void Hierarchy_turning_the_settings_off_shows_the_leaves_again(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -295,6 +305,8 @@ void Hierarchy_the_walk_reports_what_it_cost(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     int32_t r;
     for (r = 0; r < 3; r ++) {
@@ -346,6 +358,8 @@ void Hierarchy_a_detail_that_stops_contributing_is_pruned(void)
     ecs_set(w, cam, Position, {0, 0, -200});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -412,6 +426,8 @@ void Hierarchy_a_pinned_detail_survives_pruning(void)
     ecs_set(w, cam, Position, {0, 0, -200});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -477,6 +493,8 @@ void Hierarchy_the_walk_reports_what_it_pruned(void)
     ecs_set(w, cam, Position, {0, 0, -200});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});

@@ -16,6 +16,8 @@ void Debug_off_emits_no_lines(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, SphereCollider, {{0, 0, 0}, 1});
@@ -45,6 +47,8 @@ void Debug_sphere_draws_three_circles(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, SphereCollider, {{0, 0, 0}, 1});
@@ -74,6 +78,8 @@ void Debug_box_draws_twelve_edges(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, BoxCollider, {{0, 0, 0}, {1, 1, 1}});
@@ -103,6 +109,8 @@ void Debug_capsule_draws_two_circles_and_four_lines(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, CapsuleCollider, {{0, 0, 0}, 0.5f, 2});
@@ -132,6 +140,8 @@ void Debug_root_bounds_draw_a_box(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, inst);
@@ -162,6 +172,8 @@ void Debug_all_draws_colliders_and_bounds(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, inst);
@@ -192,6 +204,8 @@ void Debug_collider_outside_the_view_is_skipped(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, -100});
     ecs_set(world, e, SphereCollider, {{0, 0, 0}, 1});
@@ -221,6 +235,8 @@ void Debug_lines_are_cleared_between_packets(void)
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, {0, 0, -10});
     ecs_set(world, cam, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = cam, .enabled = true});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
     ecs_set(world, e, BoxCollider, {{0, 0, 0}, {1, 1, 1}});

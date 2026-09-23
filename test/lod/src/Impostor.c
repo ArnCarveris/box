@@ -71,6 +71,8 @@ void Impostor_a_sparse_subtree_is_given_an_atlas(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 800});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 800});
@@ -130,6 +132,8 @@ void Impostor_the_capture_renders_every_tile_before_the_frame(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 800});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 800});
@@ -197,6 +201,8 @@ void Impostor_the_billboard_is_one_sorted_draw_of_the_atlas(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 800});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 800});
@@ -261,6 +267,8 @@ void Impostor_a_changed_descendant_captures_the_atlas_again(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 800});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 800});
@@ -334,6 +342,8 @@ void Impostor_destroying_a_root_frees_its_atlas(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 800});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 800});
@@ -401,6 +411,8 @@ void Impostor_a_near_subtree_keeps_its_parts(void)
     ecs_set(w, cam, Position, {0, 8, 0});
     ecs_set(w, cam, LookAt, {0, 8, 100});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 100});

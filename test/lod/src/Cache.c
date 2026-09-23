@@ -27,6 +27,8 @@ void Cache_a_subtree_keeps_its_parts_until_its_proxy_arrives(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -85,6 +87,8 @@ void Cache_a_clustered_subtree_is_replaced_by_its_primitive_set(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -143,6 +147,8 @@ void Cache_many_materials_fall_back_to_a_merged_mesh(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -199,6 +205,8 @@ void Cache_a_node_that_fills_the_view_keeps_its_parts(void)
     ecs_set(w, cam, Position, {0, 2, -40});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -251,6 +259,8 @@ void Cache_moving_a_rigid_root_builds_nothing_again(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -319,6 +329,8 @@ void Cache_a_changed_descendant_builds_its_proxy_again(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -381,6 +393,8 @@ void Cache_a_change_in_another_root_leaves_the_proxy_alone(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     for (j = 0; j < 2; j ++) {
         roots[j] = ecs_new(w);
@@ -449,6 +463,8 @@ void Cache_destroying_a_root_frees_its_proxy(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -512,6 +528,8 @@ void Cache_the_job_system_builds_the_proxy_off_the_frame(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});
@@ -575,6 +593,8 @@ void Cache_the_nearest_subtree_is_built_first(void)
     ecs_set(w, cam, Position, {0, 2, -400});
     ecs_set(w, cam, LookAt, {0, 0, 1});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     for (j = 0; j < 6; j ++) {
         roots[j] = ecs_new(w);
@@ -634,6 +654,8 @@ void Cache_the_statistics_report_the_proxies_and_the_queue(void)
     ecs_set(w, cam, Position, {0, 2, -4000});
     ecs_set(w, cam, LookAt, {10, 10, 10});
     ecs_set(w, cam, Camera, {.fov = 60, .far_ = 100000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_set(w, view, View, {.camera = cam, .enabled = true});
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {0, 0, 0});

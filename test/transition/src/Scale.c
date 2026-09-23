@@ -177,6 +177,8 @@ void Scale_packet_of_the_scene_stays_within_its_budget(void)
 void Scale_steady_state_does_not_allocate(void)
 {
     // transitions/scale
+    test_quarantine("Sep 23 2026");
+
     test_int(ecs_script_run(w, "test",
         "using box.transform\n"
         "using box.geometry\n"

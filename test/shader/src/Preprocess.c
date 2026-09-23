@@ -163,7 +163,16 @@ void Preprocess_generated_layers_include_is_empty_without_layers(void)
     char *source = box_shader_layers_wgsl(w);
 
     test_assert(source != NULL);
-    test_str(source, "fn apply_layers(s: ptr<function, Surface>, mask: u32) {\n}\n");
+    test_str(source,
+        "fn apply_layers(s: ptr<function, Surface>, mask: u32) {\n"
+        "  for (var slot = 0u; slot < u.material_layer_count; slot++) {\n"
+        "    let packed = u.material_layers[slot / 4u];\n"
+        "    let index = packed[slot % 4u];\n"
+        "    switch index {\n"
+        "      default: {}\n"
+        "    }\n"
+        "  }\n"
+        "}\n");
     ecs_os_free(source);
 }
 

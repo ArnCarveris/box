@@ -29,6 +29,9 @@ void Shadow_a_caster_the_view_misses_is_replaced_by_its_proxy(void)
     ecs_set(w, cam, Position, {0, 2, -30});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 15, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_ensure(w, view, View)->camera = cam;
+    ecs_modified(w, view, View);
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {60, 0, 20});
@@ -79,6 +82,9 @@ void Shadow_a_small_shadow_threshold_keeps_the_caster_detailed(void)
     ecs_set(w, cam, Position, {0, 2, -30});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 15, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_ensure(w, view, View)->camera = cam;
+    ecs_modified(w, view, View);
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {60, 0, 20});
@@ -125,6 +131,9 @@ void Shadow_a_world_without_a_sun_walks_the_view_alone(void)
     ecs_set(w, cam, Position, {0, 2, -30});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 15, .far_ = 4000});
+    ecs_entity_t view = ecs_new(w);
+    ecs_ensure(w, view, View)->camera = cam;
+    ecs_modified(w, view, View);
 
     ecs_entity_t root = ecs_new(w);
     ecs_set(w, root, Position, {60, 0, 20});
