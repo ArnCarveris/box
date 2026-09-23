@@ -1,0 +1,29 @@
+{
+  "project": "monitor",
+  "timestamp": "2026-09-23T23:17:52Z",
+  "pass": 18,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 3.997107,
+  "tests": [
+    {"suite": "StatsPanels", "case": "panels_are_hidden_by_default", "status": "pass", "elapsed": 0.804349},
+    {"suite": "StatsPanels", "case": "templates_are_loaded", "status": "pass", "elapsed": 1.186429},
+    {"suite": "StatsPanels", "case": "showing_a_panel_adds_its_singleton", "status": "pass", "elapsed": 1.353075},
+    {"suite": "StatsPanels", "case": "gpu_panel_adds_gpu_timings", "status": "pass", "elapsed": 1.039578},
+    {"suite": "StatsPanels", "case": "hiding_keeps_a_singleton_added_elsewhere", "status": "pass", "elapsed": 1.013367},
+    {"suite": "StatsPanels", "case": "removing_the_singleton_stops_counting", "status": "pass", "elapsed": 1.318417},
+    {"suite": "StatsPanels", "case": "renderer_panel_shows_the_counts", "status": "pass", "elapsed": 1.694479},
+    {"suite": "StatsPanels", "case": "gpu_panel_lists_the_passes", "status": "pass", "elapsed": 0.677237},
+    {"suite": "StatsPanels", "case": "panels_stack_in_one_column", "status": "pass", "elapsed": 3.237523},
+    {"suite": "StatsPanels", "case": "a_surface_world_publishes_the_counts", "status": "pass", "elapsed": 1.538935},
+    {"suite": "StatsPanels", "case": "detail_panels_add_their_singletons", "status": "pass", "elapsed": 1.589106},
+    {"suite": "StatsPanels", "case": "counting_asks_for_what_the_singletons_need", "status": "pass", "elapsed": 1.467772},
+    {"suite": "StatsPanels", "case": "pass_panel_lists_the_passes", "status": "pass", "elapsed": 1.447621},
+    {"suite": "StatsPanels", "case": "tables_end_with_their_total", "status": "pass", "elapsed": 1.568905},
+    {"suite": "StatsPanels", "case": "buffer_panel_shows_the_used_classes", "status": "pass", "elapsed": 1.346440},
+    {"suite": "StatsPanels", "case": "a_surface_world_publishes_the_details", "status": "pass", "elapsed": 1.693156},
+    {"suite": "StatsPanels", "case": "systems_panel_enables_the_monitor", "status": "pass", "elapsed": 1.652629},
+    {"suite": "StatsPanels", "case": "systems_panel_lists_ten_at_most", "status": "pass", "elapsed": 1.144066}
+  ]
+}

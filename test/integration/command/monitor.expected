@@ -21,6 +21,7 @@ BoxShowStatsGpuTimings
 BoxShowStatsPassStats
 BoxShowStatsPipelineStats
 BoxShowStatsRendererStats
+BoxShowStatsSystemMonitor
 BoxStatsOnSet
 BoxSystemMonitorOnRemove
 BoxSystemMonitorOnSet

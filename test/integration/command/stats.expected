@@ -6,6 +6,7 @@ pipeline   off  sets, switches and draws per pipeline
 bindgroup  off  bind group sets and changes per pass and slot
 buffer     off  live buffers and uploads per usage
 compute    off  dispatches and workgroups per compute pass
+systems    off  the ten slowest ECS systems of the frame
 
 $ stats renderer
 renderer panel on
@@ -28,6 +29,9 @@ buffer panel on
 $ stats compute
 compute panel on
 
+$ stats systems
+systems panel on
+
 $ stats
 renderer   on   draw calls, passes, state changes, uploads and memory per frame
 gpu        on   GPU time of every pass
@@ -36,6 +40,7 @@ pipeline   on   sets, switches and draws per pipeline
 bindgroup  on   bind group sets and changes per pass and slot
 buffer     on   live buffers and uploads per usage
 compute    on   dispatches and workgroups per compute pass
+systems    on   the ten slowest ECS systems of the frame
 
 $ stats gpu off
 gpu panel off
@@ -51,6 +56,7 @@ pipeline   off  sets, switches and draws per pipeline
 bindgroup  off  bind group sets and changes per pass and slot
 buffer     off  live buffers and uploads per usage
 compute    off  dispatches and workgroups per compute pass
+systems    off  the ten slowest ECS systems of the frame
 
 $ stats nope
 no statistics panel 'nope'

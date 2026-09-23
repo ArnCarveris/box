@@ -124,7 +124,9 @@
                     "pass_panel_lists_the_passes",
                     "tables_end_with_their_total",
                     "buffer_panel_shows_the_used_classes",
-                    "a_surface_world_publishes_the_details"
+                    "a_surface_world_publishes_the_details",
+                    "systems_panel_enables_the_monitor",
+                    "systems_panel_lists_ten_at_most"
                 ]
             }
         ]

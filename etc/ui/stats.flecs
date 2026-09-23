@@ -17,10 +17,11 @@ export mut pipeline = false
 export mut bindgroup = false
 export mut buffer = false
 export mut compute = false
+export mut systems = false
 
 const margin = 10
 
-if renderer || gpu || pass || pipeline || bindgroup || buffer || compute {
+if renderer || gpu || pass || pipeline || bindgroup || buffer || compute || systems {
   panel {
     Ui: {height: 0, passthrough: true}
 
@@ -59,6 +60,10 @@ if renderer || gpu || pass || pipeline || bindgroup || buffer || compute {
 
         if compute {
           ComputePanel compute_stats
+        }
+
+        if systems {
+          SystemsPanel systems_stats
         }
       }
     }

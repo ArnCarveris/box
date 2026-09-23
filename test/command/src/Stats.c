@@ -36,7 +36,8 @@ void Stats_lists_the_panels(void)
         "pipeline   off  sets, switches and draws per pipeline\n"
         "bindgroup  off  bind group sets and changes per pass and slot\n"
         "buffer     off  live buffers and uploads per usage\n"
-        "compute    off  dispatches and workgroups per compute pass\n");
+        "compute    off  dispatches and workgroups per compute pass\n"
+        "systems    off  the ten slowest ECS systems of the frame\n");
     ecs_os_free(out);
 }
 
@@ -258,4 +259,35 @@ void Stats_off_hides_the_detail_panels(void)
     test_assert(ecs_singleton_get(w, PipelineStats) == NULL);
     test_assert(ecs_singleton_get(w, ComputeStats) == NULL);
     test_assert(ecs_lookup(w, "box.monitor.stats.panel") == 0);
+}
+
+void Stats_systems_prints_the_slowest_systems(void)
+{
+    // monitoring/stats_systems
+    bool error = true;
+    ecs_os_free(box_command_run(w, session, "stats systems", &error));
+    const SystemMonitor *live = ecs_singleton_get(w, SystemMonitor);
+    test_assert(live != NULL);
+    test_bool(live->enabled, true);
+
+    SystemMonitor *s = ecs_singleton_ensure(w, SystemMonitor);
+    s->frame_ms = 1.5;
+    s->system_count = 2;
+    s->slowest[0].system = ecs_lookup(w, "box.monitor.BoxCollectSystems");
+    s->slowest[0].time_ms = 1.0;
+    s->slowest[1].system = ecs_lookup(w, "box.monitor.BoxPublishFps");
+    s->slowest[1].time_ms = 0.5;
+    ecs_singleton_modified(w, SystemMonitor);
+
+    char *out = box_command_run(w, session, "stats systems", &error);
+    test_bool(error, false);
+    test_str(out,
+        "systems              2\n"
+        "frame                1.500 ms\n"
+        "BoxCollectSystems    1.000 ms\n"
+        "BoxPublishFps        0.500 ms\n");
+    ecs_os_free(out);
+
+    ecs_os_free(box_command_run(w, session, "stats systems off", &error));
+    test_assert(ecs_singleton_get(w, SystemMonitor) == NULL);
 }

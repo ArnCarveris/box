@@ -1,0 +1,25 @@
+{
+  "project": "command",
+  "timestamp": "2026-09-23T23:17:57Z",
+  "pass": 14,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 1.556633,
+  "tests": [
+    {"suite": "Stats", "case": "lists_the_panels", "status": "pass", "elapsed": 0.778013},
+    {"suite": "Stats", "case": "naming_a_panel_shows_it", "status": "pass", "elapsed": 0.882146},
+    {"suite": "Stats", "case": "naming_a_shown_panel_prints_its_counts", "status": "pass", "elapsed": 0.977459},
+    {"suite": "Stats", "case": "gpu_prints_the_passes", "status": "pass", "elapsed": 0.811015},
+    {"suite": "Stats", "case": "off_hides_the_panel", "status": "pass", "elapsed": 0.782633},
+    {"suite": "Stats", "case": "off_hides_every_panel", "status": "pass", "elapsed": 0.875710},
+    {"suite": "Stats", "case": "unknown_panel_is_an_error", "status": "pass", "elapsed": 0.748221},
+    {"suite": "Stats", "case": "unknown_state_is_an_error", "status": "pass", "elapsed": 1.006203},
+    {"suite": "Stats", "case": "help_lists_the_command", "status": "pass", "elapsed": 0.800696},
+    {"suite": "Stats", "case": "pass_prints_a_row_per_pass", "status": "pass", "elapsed": 0.752136},
+    {"suite": "Stats", "case": "bindgroup_prints_the_redundant_sets", "status": "pass", "elapsed": 0.713124},
+    {"suite": "Stats", "case": "buffer_skips_the_unused_classes", "status": "pass", "elapsed": 0.745313},
+    {"suite": "Stats", "case": "off_hides_the_detail_panels", "status": "pass", "elapsed": 0.594000},
+    {"suite": "Stats", "case": "systems_prints_the_slowest_systems", "status": "pass", "elapsed": 0.650675}
+  ]
+}

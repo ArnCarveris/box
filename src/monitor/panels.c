@@ -11,13 +11,14 @@
 #include "../shader/shader_internal.h"
 
 /** Panels the layout script shows */
-#define BOX_STATS_PANEL_COUNT (7)
+#define BOX_STATS_PANEL_COUNT (8)
 
 /** A statistics panel: its variable in box.monitor.stats and the singleton it reads */
 typedef struct box_stats_panel_t {
     const char *name;       /**< Name of the exported mut variable */
     ecs_entity_t component; /**< Singleton the panel reads */
     bool owned;             /**< The panel added the singleton, so hiding it removes it */
+    bool enable;            /**< The singleton collects while its enabled field is set */
 } box_stats_panel_t;
 
 /** Load a script into a named child of box.monitor.
@@ -53,7 +54,8 @@ done:
 /** Add or remove the singleton of a panel when its variable changes.
  *
  * A singleton that existed before the panel showed belongs to someone else and
- * stays when the panel hides.
+ * stays when the panel hides. A singleton that collects while enabled is
+ * enabled when the panel adds it.
  *
  * @param it Iterator over the variable
  */
@@ -68,6 +70,9 @@ static void BoxStatsPanelVisible(
     if (visible && !present) {
         ecs_add_id(it->world, panel->component, panel->component);
         panel->owned = true;
+        if (panel->enable) {
+            ecs_singleton_set(it->world, SystemMonitor, { .enabled = true });
+        }
     } else if (!visible && present && panel->owned) {
         ecs_remove_id(it->world, panel->component, panel->component);
         panel->owned = false;
@@ -96,7 +101,8 @@ void box_stats_panels_init(
         { .name = "pipeline", .component = ecs_id(PipelineStats) },
         { .name = "bindgroup", .component = ecs_id(BindGroupStats) },
         { .name = "buffer", .component = ecs_id(BufferStats) },
-        { .name = "compute", .component = ecs_id(ComputeStats) }
+        { .name = "compute", .component = ecs_id(ComputeStats) },
+        { .name = "systems", .component = ecs_id(SystemMonitor), .enable = true }
     };
 
     bool loaded = box_stats_script(world, BOX_MONITOR_STATS_TEMPLATES, "stats_templates");

@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 /** Entries of the slowest lists of a monitor, which the ECS_STRUCTs spell out */
-#define BOX_MONITOR_TOP (8)
+#define BOX_MONITOR_TOP (10)
 
 /** Entries of the phase list of a system monitor, which the ECS_STRUCT spells out */
 #define BOX_MONITOR_PHASES (8)
@@ -87,20 +87,21 @@ ECS_STRUCT(EcsStats, {
     double system_time_ms;    /**< Milliseconds the last frame spent in systems */
     double merge_time_ms;     /**< Milliseconds the last frame spent merging */
     double fps;               /**< Frames per second at the last collection */
-    SystemTime slowest[8];    /**< Slowest systems of the period, slowest first */
+    SystemTime slowest[10];   /**< Slowest systems of the period, slowest first */
 });
 
 /** Per system and per phase frame timings, collected while enabled.
  *
  * Setting enabled turns on the flecs system time measurement, which the monitor
  * reads per frame; the totals cover the frame before the one being collected.
+ * The component is marked modified after every frame it collected.
  */
 ECS_STRUCT(SystemMonitor, {
     bool enabled;          /**< Collect per system timings, default false */
     double frame_ms;       /**< Milliseconds every system spent in the frame */
     int32_t system_count;  /**< Systems that spent time in the frame */
-    SystemTime slowest[8]; /**< Slowest systems of the frame, slowest first */
-    PhaseTime phases[8];   /**< Milliseconds per phase, in pipeline order */
+    SystemTime slowest[10]; /**< Slowest systems of the frame, slowest first */
+    PhaseTime phases[8];    /**< Milliseconds per phase, in pipeline order */
 });
 
 /** Name of a render pass and the time it spent on the GPU in one frame */

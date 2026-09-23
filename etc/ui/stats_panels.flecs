@@ -313,3 +313,26 @@ template ComputePanel : StatsPanel {
 
   StatCells total(name: "total", a: "{s.dispatches}", b: "{s.workgroups}", header: true)
 }
+
+// The ten systems that spent the most time in the last frame, slowest first,
+// and what every system of the frame added up to.
+template SystemsPanel : StatsPanel {
+  prop title = "Systems"
+
+  const s = SystemMonitor[SystemMonitor]
+
+  StatRow total(label: "{s.system_count} systems", value: "{s.frame_ms:.3} ms", width: width)
+  rows {
+    Layout: {direction: Column, spacing: 2, h: Left}
+
+    for i in 0..10 {
+      const entry = s.slowest[i]
+      if entry.system != 0 {
+        "system_{i}" {
+          StatRow: {label: entry.system.name(), value: "{entry.time_ms:.3} ms", width: width,
+            dim: true}
+        }
+      }
+    }
+  }
+}

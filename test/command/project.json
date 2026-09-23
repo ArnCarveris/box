@@ -363,7 +363,8 @@
                     "pass_prints_a_row_per_pass",
                     "bindgroup_prints_the_redundant_sets",
                     "buffer_skips_the_unused_classes",
-                    "off_hides_the_detail_panels"
+                    "off_hides_the_detail_panels",
+                    "systems_prints_the_slowest_systems"
                 ],
                 "setup": true,
                 "teardown": true

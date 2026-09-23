@@ -79,6 +79,9 @@ done:
 
 /** Walk every system of the world and publish the frame breakdown.
  *
+ * A frame that collected marks the component modified, which is what the
+ * systems panel redraws on.
+ *
  * @param it Iterator over the SystemMonitor singleton
  */
 static void BoxCollectSystems(
@@ -103,6 +106,8 @@ static void BoxCollectSystems(
             box_system_attribute(world, ctx, m, sit.entities[i]);
         }
     }
+
+    ecs_modified(it->world, ecs_id(SystemMonitor), SystemMonitor);
 done:
     return;
 }
@@ -162,7 +167,8 @@ void box_system_monitor_init(
         .query.terms = {{ .id = ecs_id(SystemMonitor), .src.id = ecs_id(SystemMonitor) }},
         .callback = BoxCollectSystems,
         .ctx = ctx,
-        .ctx_free = box_system_monitor_free
+        .ctx_free = box_system_monitor_free,
+        .immediate = true
     });
 
     ecs_observer(world, {

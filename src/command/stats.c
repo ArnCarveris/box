@@ -319,6 +319,36 @@ done:
     return;
 }
 
+/** Print the SystemMonitor singleton.
+ *
+ * @param world The world
+ * @param buf The output
+ */
+static void box_stats_print_systems(
+    ecs_world_t *world,
+    ecs_strbuf_t *buf)
+{
+    const SystemMonitor *s = ecs_singleton_get(world, SystemMonitor);
+    if (!s) {
+        goto done;
+    }
+
+    box_stats_line(buf, "systems", s->system_count);
+    ecs_strbuf_append(buf, "%-20s %.3f ms\n", "frame", s->frame_ms);
+    int32_t i;
+    for (i = 0; i < BOX_MONITOR_TOP; i ++) {
+        if (!s->slowest[i].system) {
+            continue;
+        }
+
+        const char *name = ecs_get_name(world, s->slowest[i].system);
+        ecs_strbuf_append(buf, "%-20s %.3f ms\n", name ? name : "", s->slowest[i].time_ms);
+    }
+
+done:
+    return;
+}
+
 /** The panels the command switches, in the order the listing prints them */
 static const box_stats_cmd_panel_t box_stats_panels[] = {
     { "renderer", "draw calls, passes, state changes, uploads and memory per frame",
@@ -329,7 +359,8 @@ static const box_stats_cmd_panel_t box_stats_panels[] = {
     { "bindgroup", "bind group sets and changes per pass and slot",
         box_stats_print_bindgroup },
     { "buffer", "live buffers and uploads per usage", box_stats_print_buffer },
-    { "compute", "dispatches and workgroups per compute pass", box_stats_print_compute }
+    { "compute", "dispatches and workgroups per compute pass", box_stats_print_compute },
+    { "systems", "the ten slowest ECS systems of the frame", box_stats_print_systems }
 };
 
 /** Panels the command switches */

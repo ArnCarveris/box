@@ -1,0 +1,11 @@
+{
+  "kind": "feature",
+  "status": "complete",
+  "created": "2026-09-23T23:16:51.277+00:00",
+  "start_time": "2026-09-23T23:16:51.709+00:00",
+  "end_time": "2026-09-23T23:18:11.626+00:00",
+  "dependencies": [
+    "monitoring/stats_details"
+  ],
+  "bench": false
+}

@@ -6,6 +6,7 @@ stats pipeline
 stats bindgroup
 stats buffer
 stats compute
+stats systems
 stats
 stats gpu off
 stats off
