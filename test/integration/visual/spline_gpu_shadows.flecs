@@ -1,0 +1,19 @@
+using box.*
+view {
+  View: {
+    camera: camera,
+    culling: {enabled: true, gpu_threshold: 1, occlusion: true},
+    shadows: {enabled: true, cascades: 4, resolution: 1024, max_distance: 150},
+    bake: {enabled: false}
+  }
+}
+
+for style in 0..8 {
+  for copy in 0..2 {
+    {
+      Position: {0, style * 0.7, copy * 0.5 - 1}
+      SplineMesh: {spline: cables, gpu: true, closed: true, smooth: true, segments: 24, profile: [{0.07 + style * 0.009, 0}, {0, 0.07}, {-0.07, 0}, {0, -0.07}]}
+      Rgb: {110 + style * 15, 141, 124}
+    }
+  }
+}

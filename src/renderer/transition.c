@@ -675,6 +675,7 @@ static void box_transition_mesh(
             moved->slot = slot;
             moved->transition = BOX_UPDATE_STILL;
             moved->flags = 0;
+            moved->bake_occluder = 2;
             moved->data = *base;
         }
 

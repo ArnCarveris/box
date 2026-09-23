@@ -783,6 +783,13 @@ void box_render_instance_init(
     box_render_watch(world, ecs_id(ActualTint));
     box_render_watch(world, ecs_id(PbrMaterial));
     box_render_watch(world, ecs_id(Emissive));
+    box_render_watch(world, ecs_id(BakeOccluder));
+    ecs_observer(world, {
+        .query.terms = {{.id = ecs_id(BakeOccluder)},
+            {.id = ecs_id(RenderMesh), .inout = EcsInOutFilter}},
+        .events = {EcsOnRemove},
+        .callback = box_render_on_change
+    });
     box_render_watch(world, ecs_id(PbrTextures));
     box_render_watch(world, ecs_id(BlendMode));
     box_render_watch(world, ecs_id(BackFaceMode));

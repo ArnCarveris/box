@@ -18,6 +18,12 @@
 extern "C" {
 #endif
 
+ECS_STRUCT(SweepVertex, {
+    vec3 center;
+    vec3 tangent;
+    vec4 profile;
+});
+
 /** Application authored mesh, uploaded to the renderer when it is set.
  *
  * Vertices are required. Normals may be empty, in which case the engine derives
@@ -36,6 +42,7 @@ ECS_STRUCT(Mesh3, {
     ecs_vec(vec2) uvs;         /**< Texture coordinates, empty for zeros */
     ecs_vec(uint32_t) indices; /**< Three indices per triangle, empty to draw in order */
     ecs_vec(rgba) colors;      /**< Per vertex color and alpha, one per vertex or empty */
+    ecs_vec(SweepVertex) sweeps;
 });
 
 /** Box with size x, y, z */

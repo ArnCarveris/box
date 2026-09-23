@@ -216,6 +216,7 @@ typedef struct RenderState {
     uint32_t mesh_count;      /**< Handles allocated so far */
     EnvironmentLight env;     /**< Environment of the previous packet */
     uint32_t env_generation;  /**< Times the environment changed since startup */
+    float bake_occluder_min_size;
     bool bake_enabled;        /**< Baking was enabled by the previous packet */
 } RenderState;
 
@@ -1033,6 +1034,7 @@ ecs_entity_t box_render_collect_views(
  * @return The first view of the frame, 0 when the world has no views
  */
 ecs_entity_t box_render_primary_view(
+    ecs_world_t *world,
     RenderState *state);
 
 /** Fill the view array of the packet, one entry per view that renders.

@@ -1,0 +1,41 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ { EnvironmentLight: {sky_color: {100, 110, 130}, ground_color: {80, 85, 100}, intensity: 0.035} }
+
+sun { Rotation: {0.9, -0.4, 0}; DirectionalLight: {intensity: 0.015} }
+
+camera {
+  Position: {7, 8, -17}
+  LookAt: {0, 3.5, 0}
+  Camera: {fov: 48}
+}
+
+floor { Position: {0, -0.1, 0}; Box: {12, 0.2, 8}; Rgb: {185, 185, 185} }
+ceiling { Position: {0, 3.95, 0}; Box: {12, 0.1, 8}; Rgb: {185, 185, 185} }
+back { Position: {0, 4, 4}; Box: {12, 8, 0.15}; Rgb: {180, 180, 180} }
+divider { Position: {0, 4, 0}; Box: {0.15, 8, 8}; Rgb: {180, 180, 180} }
+
+for floor_index in 0..2 {
+  for side in 0..2 {
+    _ {
+      Position: {side * 6 - 3, floor_index * 4, 0}
+      plinth { Position: {0, 0.25, 0.5}; Box: {2.6, 0.5, 2.6}; Rgb: {160, 160, 160} }
+      sphere { Position: {0, 1.25, 0.5}; Sphere: {segments: 20, smooth: false, radius: 0.75}; Rgb: {200, 200, 200} }
+      for i in 0..6 {
+        _ { Position: {-2.2 + i * 0.32, 0.15 + i * 0.1, -2.8}; Box: {0.3, 0.3 + i * 0.2, 0.7}; Rgb: {180, 180, 180} }
+      }
+    }
+  }
+}
+
+warm { Position: {-3, 2.8, 0}; PointLight: {intensity: 24, range: 14}; Rgb: {255, 95, 35} }
+cool { Position: {3, 2.8, 0}; PointLight: {intensity: 24, range: 14}; Rgb: {35, 145, 255} }
+green { Position: {-3, 6.8, 0}; PointLight: {intensity: 24, range: 14}; Rgb: {75, 255, 110} }
+violet { Position: {3, 6.8, 0}; PointLight: {intensity: 24, range: 14}; Rgb: {195, 65, 255} }
+
+post_effects { tonemap : box.effects.tonemap {} }
+view { box.view.View: {camera: camera, bake: {enabled: true, probe_spacing: 0.75, budget: 65536}, effects: [{effect: post_effects.tonemap, enabled: true}]} }

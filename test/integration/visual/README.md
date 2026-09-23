@@ -43,7 +43,7 @@ Rules for adding one:
 | Every primitive shape with materials, a camera and a sun | `primitives` | Eighteen shapes on a floor, lit and shadowed. |
 | Clustered point and spot lights | `lights_city` | 324 colored point lights and 6 spots over a box city with distinct falloff. |
 | Image based lighting | `pbr_spheres` | Roughness by metallic sphere grid: smooth metals mirror the gradient, rough dielectrics go diffuse. |
-| Baked lighting and emissive | `baked_room`, `dynamic_room` | The same room with static and dynamic lights; the pillar shadows the wall, emissive boxes light their surroundings. |
+| Sparse baked lighting | `baked_rooms`, `baked_details`, `baked_emitters` | Four colored rooms separated by thin walls and a floor; hundreds of posts and wires above a continuous slab and tiled floor; emissive alcoves and a spotlight. |
 | Textures and normal maps | `textured`, `normal_bump` | Checker box and sphere, a bump mapped box lit like the sphere beside it, a roughness ramp. |
 | SVG textures | `svg_icons` | Three icons at 64, 256 and 1024 px, crisp at the large size. |
 | Texture tiling and wrap modes | `tiling` | Identical world size checkers over 1, 2 and 6 m boxes, a cylinder and a sphere, plus offset, mirror, clamp and fit. |

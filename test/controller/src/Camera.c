@@ -43,7 +43,11 @@ void Camera_the_module_binds_the_movement_actions(void)
     test_assert(ecs_lookup(w, "actions.Fast") != 0);
     test_int(box_input_bindings(
         w, ecs_lookup(w, "actions.Fast"), masks, 4), 1);
-    test_uint(masks[0], BoxKeyShift);
+    test_uint(masks[0], BoxKeyShiftLeft);
+    test_assert(ecs_lookup(w, "actions.Slow") != 0);
+    test_int(box_input_bindings(
+        w, ecs_lookup(w, "actions.Slow"), masks, 4), 1);
+    test_uint(masks[0], BoxKeyShiftRight);
     test_assert(ecs_lookup(w, "box.input.map.Forward") != 0);
 }
 
@@ -147,6 +151,33 @@ void Camera_the_fast_modifier_multiplies_the_speed(void)
 
     float fast = ecs_get(w, camera, Position)->z - plain;
     test_assert(fast > plain * 2.0f);
+}
+
+void Camera_shift_keys_change_camera_speed(void)
+{
+    ecs_set(w, camera, CameraController, {
+        .speed = 10, .acceleration = 1000, .no_collision = true });
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    ecs_progress(w, 0.1f);
+    test_flt(ecs_get(w, camera, CameraController)->velocity.z, 10.0f);
+
+    box_input_reset(w);
+    ecs_set(w, camera, CameraController, {
+        .speed = 10, .acceleration = 1000, .no_collision = true });
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    box_input_inject(w, &(InputEvent){
+        .kind = InputKeyDown, .code = BoxKeyShiftLeft });
+    ecs_progress(w, 0.1f);
+    test_flt(ecs_get(w, camera, CameraController)->velocity.z, 20.0f);
+
+    box_input_reset(w);
+    ecs_set(w, camera, CameraController, {
+        .speed = 10, .acceleration = 1000, .no_collision = true });
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyW });
+    box_input_inject(w, &(InputEvent){
+        .kind = InputKeyDown, .code = BoxKeyShiftRight });
+    ecs_progress(w, 0.1f);
+    test_flt(ecs_get(w, camera, CameraController)->velocity.z, 5.0f);
 }
 
 void Camera_the_mouse_turns_the_camera_while_captured(void)

@@ -143,23 +143,10 @@ typedef struct box_env_uniform_t {
     float params[4];  /**< Cube face, roughness, unused, unused */
 } box_env_uniform_t;
 
-/** Uniforms shared by the occupancy and probe bake passes */
 typedef struct box_bake_uniform_t {
-    float grid_min[4];      /**< World minimum corner of the occupancy grid */
-    float grid_cell[4];     /**< World size of one voxel, w is its diagonal */
-    uint32_t grid_dim[4];   /**< Voxels on each axis, w unused */
-    uint32_t light_count;   /**< Static lights in the bake light buffer */
-    uint32_t emitter_count; /**< Emitters in the emitter buffer */
-    uint32_t steps;         /**< Ray march samples per visibility test */
-    uint32_t pad;           /**< Padding to the 16 byte GPU stride */
+    uint32_t job_count;
+    uint32_t pad[3];
 } box_bake_uniform_t;
-
-/** Descriptor and job count of one mesh, the per mesh uniform of the bake passes */
-typedef struct box_bake_info_t {
-    uint32_t desc_count;  /**< Static instance slots of the mesh */
-    uint32_t job_count;   /**< Probes the bake pass writes this frame */
-    uint32_t pad[2];      /**< Padding to the 16 byte GPU stride */
-} box_bake_info_t;
 
 /** Frustum and range of one dispatch of the culling pass */
 typedef struct box_cull_uniform_t {
@@ -378,20 +365,11 @@ typedef struct box_gpu_mesh_t {
     uint32_t static_capacity;        /**< Instances the static buffer can hold */
     uint32_t static_count;           /**< Static instances to draw */
     box_vec_t groups;                /**< box_static_group_t, empty when no slot has a layer */
-    WGPUBuffer probe_descs;          /**< Probe grid descriptor per static slot */
-    WGPUBuffer probes;               /**< Probe pool of the mesh, baked spherical harmonics */
-    WGPUBuffer probe_jobs;           /**< Probes the bake pass writes this frame */
-    WGPUBuffer probe_info;           /**< box_bake_info_t of the mesh */
-    WGPUBindGroup probe_group;       /**< Probes and descriptors the mesh shader reads */
-    WGPUBindGroup bake_group;        /**< Probe buffers of the bake pass */
     box_vec_t mirror;                /**< box_instance_t copy of the static buffer, for the CPU */
     bool mirror_valid;               /**< The mirror holds every static instance of the mesh */
     box_vec_t transition_index;      /**< uint32_t entry per slot, BOX_TRANSITION_NONE for none */
     box_vec_t transition_slots;      /**< uint32_t slots of the mesh that carry a transition */
     bool transition_sorted;          /**< The slots are in ascending order, so uploads coalesce */
-    uint32_t desc_capacity;          /**< Descriptors the descriptor buffer can hold */
-    uint32_t probe_capacity;         /**< Probes the probe buffer can hold */
-    uint32_t job_capacity;           /**< Jobs the job buffer can hold */
     bool alive;                      /**< Handle is in use */
 } box_gpu_mesh_t;
 
@@ -589,22 +567,25 @@ struct box_renderer_t {
     WGPURenderPipeline env_brdf_pipeline; /**< Split sum integration of the lookup table */
     WGPUBindGroupLayout env_layout;  /**< Layout of the environment group of the mesh shader */
     uint32_t env_epoch;              /**< Rises when an environment group is built again */
-    box_bake_state_t bake;           /**< Probe descriptors, dirty set and previous inputs */
-    WGPUBuffer bake_uniform;         /**< Grid and count uniforms of the bake passes */
-    WGPUBuffer bake_lights;          /**< Static lights the bake accumulates */
-    uint32_t bake_light_capacity;    /**< Lights the bake light buffer can hold */
-    WGPUBuffer bake_emitters;        /**< Emissive static instances the bake accumulates */
-    uint32_t bake_emitter_capacity;  /**< Emitters the emitter buffer can hold */
-    WGPUBuffer occupancy;            /**< Occupancy bits of the static scene */
-    uint32_t occupancy_words;        /**< Words the occupancy buffer holds */
-    WGPUBindGroupLayout bake_layout; /**< Uniform, lights, emitters and occupancy */
-    WGPUBindGroup bake_group;        /**< Global bind group of the bake pass */
-    WGPUBindGroupLayout bake_mesh_layout; /**< Per mesh layout of the bake pass */
-    WGPUBindGroupLayout probe_layout; /**< Probe and descriptor layout the mesh shader reads */
-    WGPUBuffer probe_dummy;          /**< Zero probe bound by dynamic draws */
-    WGPUBuffer desc_dummy;           /**< Zero descriptor bound by dynamic draws */
-    WGPUBindGroup probe_dummy_group; /**< Bind group of the zero probe */
-    WGPUComputePipeline bake_pipeline; /**< Probe bake pass */
+    box_bake_state_t bake;
+    WGPUBuffer bake_uniform;
+    WGPUBuffer bake_lights;
+    WGPUBuffer bake_emitters;
+    WGPUBuffer bake_data;
+    WGPUBuffer bake_probes;
+    WGPUBuffer bake_jobs;
+    uint32_t bake_light_capacity;
+    uint32_t bake_emitter_capacity;
+    uint32_t bake_data_capacity;
+    uint32_t bake_probe_capacity;
+    uint32_t bake_job_capacity;
+    WGPUBindGroupLayout bake_layout;
+    WGPUBindGroupLayout bake_mesh_layout;
+    WGPUBindGroupLayout probe_layout;
+    WGPUBindGroup bake_group;
+    WGPUBindGroup bake_work_group;
+    WGPUBindGroup probe_group;
+    WGPUComputePipeline bake_pipeline;
     box_gpu_texpage_t texpage[BOX_TEXTURE_PAGES]; /**< Array textures of the texture pager */
     WGPUSampler texture_sampler;     /**< Sampler of every page, with the anisotropy setting */
     uint64_t texture_layout;         /**< Hash of the page layout the bind group was built for */
@@ -1875,6 +1856,8 @@ void box_sky_fini(
  *
  * @param r The renderer
  */
+void box_bake_reload(box_renderer_t *r);
+
 void box_bake_init(
     box_renderer_t *r);
 
@@ -1900,13 +1883,6 @@ WGPUBindGroup box_bake_group(
     box_renderer_t *r,
     uint32_t mesh,
     bool baked);
-
-/** Release the probe buffers and bind groups of a mesh.
- *
- * @param m The mesh entry
- */
-void box_bake_mesh_release(
-    box_gpu_mesh_t *m);
 
 /** Release the bake pipelines, buffers and bookkeeping.
  *

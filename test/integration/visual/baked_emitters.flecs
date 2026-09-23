@@ -1,0 +1,30 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ { EnvironmentLight: {sky_color: {80, 90, 110}, ground_color: {60, 65, 75}, intensity: 0.04} }
+sun { Rotation: {0.9, -0.4, 0}; DirectionalLight: {intensity: 0.015} }
+
+camera { Position: {8, 9, -19}; LookAt: {0, 1.3, 0.5}; Camera: {fov: 46} }
+
+floor { Position: {0, -0.1, 0}; Box: {18, 0.2, 10}; Rgb: {170, 170, 170} }
+back { Position: {0, 2, 5}; Box: {18, 4, 0.15}; Rgb: {170, 170, 170} }
+for i in 0..2 {
+  _ { Position: {-3 + i * 6, 1.5, 1.5}; Box: {0.12, 3, 7}; Rgb: {180, 180, 180} }
+}
+for i in 0..3 {
+  _ { Position: {-6 + i * 6, 0.25, 0}; Box: {2.4, 0.5, 2.4}; Rgb: {125, 125, 125} }
+  _ { Position: {-6 + i * 6, 1.1, 0}; Rotation: {0, 0.4, 0}; Box: {1, 1.2, 1}; Rgb: {195, 195, 195} }
+  for j in 0..5 {
+    _ { Position: {-7.2 + i * 6 + j * 0.6, 0.4, -3}; Box: {0.1, 0.8, 0.1}; Rgb: {200, 200, 200} }
+  }
+}
+for i in 0..5 {
+  _ { Position: {-7.2 + i * 0.6, 1.1, 3.4}; Box: {0.35, 0.35, 0.35}; Rgb: {255, 125, 45}; Emissive: {strength: 14, color: {255, 105, 25}} }
+  _ { Position: {-1.2 + i * 0.6, 1.1, 3.4}; Box: {0.35, 0.35, 0.35}; Rgb: {65, 160, 255}; Emissive: {strength: 14, color: {30, 130, 255}} }
+}
+spot { Position: {6, 3.5, 1}; Rotation: {1.5708, 0, 0}; SpotLight: {intensity: 40, range: 8, inner_angle: 35, outer_angle: 65}; Rgb: {125, 255, 140} }
+post_effects { tonemap : box.effects.tonemap {} }
+view { box.view.View: {camera: camera, bake: {enabled: true, probe_spacing: 0.5, budget: 65536}, effects: [{effect: post_effects.tonemap, enabled: true}]} }

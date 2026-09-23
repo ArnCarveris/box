@@ -37,6 +37,7 @@ typedef struct box_spline_sweep_t {
     int32_t slices;               /**< Quad strips along the curve */
     int32_t rings;                /**< Copies of the cross section along the curve */
     bool smooth;                  /**< Columns are shared by neighbouring edges */
+    bool gpu;
 } box_spline_sweep_t;
 
 /** Scale a cross section direction to unit length.
@@ -192,6 +193,7 @@ static bool box_spline_mesh_plan(
     }
 
     sweep->smooth = sm->smooth;
+    sweep->gpu = sm->gpu;
     sweep->slices = sm->segments > 0 ?
         sm->segments : table->segments * BOX_SPLINE_MESH_SLICES;
     if (sweep->slices < 1) {
@@ -244,6 +246,13 @@ static void box_spline_mesh_ring(
         normals[first + c] = vec3_normalize(normal);
         uvs[first + c].x = column->u;
         uvs[first + c].y = v;
+        if (sweep->gpu) {
+            SweepVertex *sv = ecs_vec_get_t(&out->sweeps, SweepVertex, first + c);
+            sv->center = sample->position;
+            sv->tangent = sample->tangent;
+            sv->profile = (vec4){column->point.x, column->point.y,
+                column->normal.x, column->normal.y};
+        }
     }
 }
 
@@ -300,6 +309,8 @@ static void box_spline_mesh_fill(
     ecs_vec_init_if_t(&out->normals, vec3);
     ecs_vec_init_if_t(&out->uvs, vec2);
     ecs_vec_init_if_t(&out->indices, uint32_t);
+    ecs_vec_init_if_t(&out->sweeps, SweepVertex);
+    ecs_vec_set_count_t(NULL, &out->sweeps, SweepVertex, sweep->gpu ? vertices : 0);
     ecs_vec_set_count_t(NULL, &out->vertices, vec3, vertices);
     ecs_vec_set_count_t(NULL, &out->normals, vec3, vertices);
     ecs_vec_set_count_t(NULL, &out->uvs, vec2, vertices);
@@ -326,6 +337,7 @@ static void box_spline_mesh_streams_fini(
     ecs_vec_fini_t(NULL, &mesh->normals, vec3);
     ecs_vec_fini_t(NULL, &mesh->uvs, vec2);
     ecs_vec_fini_t(NULL, &mesh->indices, uint32_t);
+    ecs_vec_fini_t(NULL, &mesh->sweeps, SweepVertex);
 }
 
 /** Rebuild the mesh of one sweep and hand it to its entity.

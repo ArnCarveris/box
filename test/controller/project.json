@@ -19,6 +19,7 @@
                     "strafing_moves_sideways",
                     "up_and_down_move_the_height",
                     "the_fast_modifier_multiplies_the_speed",
+                    "shift_keys_change_camera_speed",
                     "the_mouse_turns_the_camera_while_captured",
                     "the_mouse_is_ignored_without_capture",
                     "the_look_action_turns_without_capture",

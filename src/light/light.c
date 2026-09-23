@@ -45,6 +45,8 @@ void BoxLightImport(
     ECS_META_COMPONENT(world, DirectionalLight);
     ECS_META_COMPONENT(world, CelestialLight);
     ECS_META_COMPONENT(world, PointLight);
+    ECS_META_COMPONENT(world, BakeOccluder);
+    ecs_add_pair(world, ecs_id(BakeOccluder), EcsOnInstantiate, EcsInherit);
     ECS_META_COMPONENT(world, SpotLight);
     ECS_META_COMPONENT(world, EnvironmentLight);
     ECS_META_COMPONENT(world, ClusterSettings);

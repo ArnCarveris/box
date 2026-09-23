@@ -14,11 +14,13 @@ void box_mesh_data_fini(
     ecs_os_free(mesh->normals);
     ecs_os_free(mesh->uvs);
     ecs_os_free(mesh->colors);
+    ecs_os_free(mesh->sweeps);
     ecs_os_free(mesh->indices);
     mesh->positions = NULL;
     mesh->normals = NULL;
     mesh->uvs = NULL;
     mesh->colors = NULL;
+    mesh->sweeps = NULL;
     mesh->indices = NULL;
     mesh->vertex_count = 0;
     mesh->index_count = 0;
@@ -34,6 +36,7 @@ void box_mesh_builder_init(
     mesh->normals = ecs_os_malloc_n(float, vertex_count * 3);
     mesh->uvs = ecs_os_malloc_n(float, vertex_count * 2);
     mesh->colors = NULL;
+    mesh->sweeps = NULL;
     mesh->indices = ecs_os_malloc_n(uint32_t, index_count);
     mesh->vertex_count = vertex_count;
     mesh->index_count = index_count;

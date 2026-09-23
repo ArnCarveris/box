@@ -9,8 +9,7 @@
 /** Units per second the camera moves at when the controller does not say */
 #define BOX_CAMERA_SPEED (40.0f)
 
-/** Speed multiplier of the Fast action when the controller does not say */
-#define BOX_CAMERA_FAST (5.0f)
+#define BOX_CAMERA_FAST (2.0f)
 
 /** How fast the velocity follows a held action when the controller does not say */
 #define BOX_CAMERA_ACCEL (6.0f)
@@ -221,6 +220,7 @@ static void box_camera_move(
     const ControllerActions *actions,
     CameraController *cc,
     bool sprint,
+    bool slow,
     float dt)
 {
     vec3 dir = box_controller_direction(world, actions, cc->yaw);
@@ -228,6 +228,9 @@ static void box_camera_move(
     float speed = box_controller_value(cc->speed, BOX_CAMERA_SPEED);
     if (sprint) {
         speed *= box_controller_value(cc->fast, BOX_CAMERA_FAST);
+    }
+    if (slow) {
+        speed *= 0.5f;
     }
 
     vec3 target = vec3_new(0, 0, 0);
@@ -310,9 +313,10 @@ void BoxCameraControllerUpdate(
     int32_t i;
     for (i = 0; dt > 0 && i < it->count; i ++) {
         bool sprint = box_controller_held(world, actions->fast);
+        bool slow = box_controller_held(world, actions->slow);
 
         box_camera_turn(world, actions, &cc[i], sprint, dt);
-        box_camera_move(world, actions, &cc[i], sprint, dt);
+        box_camera_move(world, actions, &cc[i], sprint, slow, dt);
         box_camera_wheel(world, &cc[i]);
         box_camera_travel(world, &cc[i], it->entities[i], &p[i], dt);
         box_controller_clearance(

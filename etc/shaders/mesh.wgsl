@@ -1,6 +1,7 @@
 #include "include/view.wgsl"
 #include "include/light.wgsl"
 #include "include/probe.wgsl"
+#include "include/spline.wgsl"
 
 @group(0) @binding(0) var<uniform> u: View;
 @group(1) @binding(0) var<storage, read> lights: array<Light>;
@@ -11,7 +12,9 @@
 @group(2) @binding(2) var env_brdf: texture_2d<f32>;
 @group(2) @binding(3) var env_sampler: sampler;
 @group(3) @binding(0) var<storage, read> probes: array<Probe>;
-@group(3) @binding(1) var<storage, read> probe_descs: array<Desc>;
+@group(3) @binding(1) var<storage, read> bake_data: array<u32>;
+
+#include "include/sparse_probe.wgsl"
 
 #include "include/shadow.wgsl"
 #include "include/textures.wgsl"
@@ -32,24 +35,6 @@ struct LightModulatorBlock {
 
 #include "generated/light_modulators.wgsl"
 
-fn probe_axis(span: vec3<f32>, rel: vec3<f32>, last: f32) -> f32 {
-  var result = 0.0;
-  let len = dot(span, span);
-  if (len > 1e-8) {
-    result = dot(rel, span) / len * last;
-  }
-  return result;
-}
-
-fn probe_coord(slot: u32, world: vec3<f32>) -> vec3<f32> {
-  let d = probe_descs[slot];
-  let last = vec3<f32>(probe_dim(d)) - vec3(1.0);
-  let rel = world - probe_position(d, 0u);
-  return vec3(probe_axis(d.span[0].xyz, rel, last.x),
-              probe_axis(d.span[1].xyz, rel, last.y),
-              probe_axis(d.span[2].xyz, rel, last.z));
-}
-
 struct VertexIn {
   @location(0) pos: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -68,6 +53,9 @@ struct VertexIn {
   @location(14) shape: vec4<u32>,
   @location(15) layer_data: vec2<u32>,
   @location(16) clip_rect: vec4<f32>,
+  @location(17) sweep_center: vec3<f32>,
+  @location(18) sweep_tangent: vec3<f32>,
+  @location(19) sweep_profile: vec4<f32>,
 };
 
 struct VertexOut {
@@ -114,61 +102,71 @@ fn clip_fragment(in: VertexOut) {
     vec4(in.row0.y, in.row1.y, in.row2.y, 0.0),
     vec4(in.row0.z, in.row1.z, in.row2.z, 0.0),
     vec4(in.row0.w, in.row1.w, in.row2.w, 1.0));
-  let world = m * vec4(in.pos, 1.0);
+  let sweep = spline_sweep(in.pos, in.normal, in.sweep_center,
+    in.sweep_tangent, in.sweep_profile);
+  let world = m * vec4(sweep.position, 1.0);
   var out: VertexOut;
   out.clip = u.proj * u.view * world;
   out.world_pos = world.xyz;
-  out.normal = normalize((m * vec4(in.normal, 0.0)).xyz);
+  out.normal = normalize((m * vec4(sweep.normal, 0.0)).xyz);
   out.uv = in.uv;
   out.color = in.color;
   out.emissive = in.emissive;
   out.textures = in.textures;
   out.params = in.params;
   out.shape = in.shape;
-  out.local_pos = in.pos * vec3(
+  out.local_pos = sweep.position * vec3(
     length(vec3(in.row0.x, in.row1.x, in.row2.x)),
     length(vec3(in.row0.y, in.row1.y, in.row2.y)),
     length(vec3(in.row0.z, in.row1.z, in.row2.z)));
-  out.local_normal = in.normal;
+  out.local_normal = sweep.normal;
   out.uv_xform = in.uv_xform;
   out.uv_mode = vec4(in.uv_mode, u32(in.params.w), in.layer_data.x, in.layer_data.y);
   out.bounds_pos = in.bounds_pos.xyz;
   out.vertex_color = in.vertex_color;
   out.clip_rect = in.clip_rect;
   out.local = vec3<f32>(0.0);
-  if (in.params.z > 0.5) {
-    out.local = probe_coord(u32(in.params.w), world.xyz);
-  }
+
   return out;
 }
 
-fn baked(slot: u32, local: vec3<f32>, n: vec3<f32>, albedo: vec3<f32>,
+fn baked(world: vec3<f32>, gn: vec3<f32>, n: vec3<f32>, albedo: vec3<f32>,
     metallic: f32) -> vec3<f32> {
-  let d = probe_descs[slot];
-  let dim = probe_dim(d);
-  let t = clamp(local, vec3(0.0), vec3<f32>(dim) - vec3(1.0));
-  let f = t - floor(t);
-  let lo = vec3<u32>(floor(t));
-  let hi = min(lo + vec3<u32>(1u), dim - vec3<u32>(1u));
+  let spacing = bake_spacing();
+  let origin = world + gn * spacing * 0.02;
+  let coord = origin / spacing - vec3(0.5);
+  let lo = vec3<i32>(floor(coord));
+  let f = fract(coord);
+  let cell_chunk_coord = vec3<i32>(floor(vec3<f32>(lo) / 4.0));
+  let cell_chunk = bake_chunk(cell_chunk_coord);
+  if (cell_chunk == 0xffffffffu) { return vec3(0.0); }
+  let cell_local = vec3<u32>(lo - cell_chunk_coord * 4);
   var sr = vec4<f32>(0.0);
   var sg = vec4<f32>(0.0);
   var sb = vec4<f32>(0.0);
-  for (var i = 0u; i < 8u; i = i + 1u) {
+  var total = 0.0;
+  for (var i = 0u; i < 8u; i ++) {
     let bx = (i & 1u) != 0u;
     let by = (i & 2u) != 0u;
     let bz = (i & 4u) != 0u;
-    let c = vec3<u32>(select(lo.x, hi.x, bx), select(lo.y, hi.y, by),
-      select(lo.z, hi.z, bz));
+    let corner = vec3<u32>(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
+    let relative = cell_local + corner;
+    let neighbor = relative >> vec3(2u);
+    let chunk = bake_data[bake_data[5] + cell_chunk * 8u + neighbor.x + neighbor.y * 2u + neighbor.z * 4u];
+    if (chunk == 0xffffffffu) { continue; }
     let w = select(1.0 - f.x, f.x, bx) * select(1.0 - f.y, f.y, by) *
       select(1.0 - f.z, f.z, bz);
-    let p = probes[d.grid.x + c.x + c.y * dim.x + c.z * dim.x * dim.y];
-    sr = sr + p.r * w;
-    sg = sg + p.g * w;
-    sb = sb + p.b * w;
+    let local = relative & vec3(3u);
+    let p = probes[chunk * 64u + local.x + local.y * 4u + local.z * 16u];
+    if (p.r.x < 0.0) { continue; }
+    sr += p.r * w;
+    sg += p.g * w;
+    sb += p.b * w;
+    total += w;
   }
   let basis = vec4(SH_A0, SH_A1 * n.y, SH_A1 * n.z, SH_A1 * n.x);
   let irradiance = max(vec3(dot(sr, basis), dot(sg, basis), dot(sb, basis)), vec3(0.0));
-  return irradiance * albedo * (1.0 - metallic);
+  return irradiance * albedo * (1.0 - metallic) / max(total, 1e-4);
 }
 
 fn punctual(world_pos: vec3<f32>, n: vec3<f32>, v: vec3<f32>, albedo: vec3<f32>,
@@ -348,7 +346,7 @@ fn mesh_shade(in: VertexOut, front: bool, out_normal: ptr<function, vec3<f32>>,
   color = color + punctual(in.world_pos, sn, v, s.albedo, metallic, roughness, is_baked);
   var indirect = parts.diffuse;
   if (is_baked) {
-    let probe = baked(in.uv_mode.y, in.local, sn, s.albedo, metallic);
+    let probe = baked(in.world_pos, gn, sn, s.albedo, metallic);
     color = color + probe;
     indirect = indirect + probe;
   }

@@ -27,10 +27,10 @@
  * every vertex. The version keys the layout so a mismatch is caught where the
  * layout is asserted instead of showing up as scrambled geometry.
  */
-#define BOX_VERTEX_VERSION (2)
+#define BOX_VERTEX_VERSION (3)
 
-/** Floats per vertex: position, normal, uv, the packed bounds local position and the color */
-#define BOX_VERTEX_FLOATS (10)
+#define BOX_VERTEX_FLOATS (20)
+#define BOX_VERTEX_SWEEP_OFFSET (40)
 
 /** Bytes from a vertex to its packed local position, a Unorm10_10_10_2 value */
 #define BOX_VERTEX_LOCAL_OFFSET (32)
@@ -125,26 +125,23 @@
 /** Shader slot of the environment prefilter passes */
 #define BOX_SHADER_ENV_FILTER (8)
 
-/** Shader slot of the occupancy grid pass of the light bake */
-#define BOX_SHADER_BAKE_GRID (9)
-
 /** Shader slot of the probe pass of the light bake */
-#define BOX_SHADER_BAKE (10)
+#define BOX_SHADER_BAKE (9)
 
 /** Shader slot of the blur chain of the background copy */
-#define BOX_SHADER_BLUR (11)
+#define BOX_SHADER_BLUR (10)
 
 /** Shader slot of the pass that writes the motion vectors of a view */
-#define BOX_SHADER_MOTION (12)
+#define BOX_SHADER_MOTION (11)
 
 /** Shader slot of the pass that draws the rectangles of the frame rate panel */
-#define BOX_SHADER_OVERLAY (13)
+#define BOX_SHADER_OVERLAY (12)
 
 /** Shader slot of the pass that draws the debug line list */
-#define BOX_SHADER_LINES (14)
+#define BOX_SHADER_LINES (13)
 
 /** Shader slots the renderer builds its own pipelines from */
-#define BOX_SHADER_BUILTIN_MAX (15)
+#define BOX_SHADER_BUILTIN_MAX (14)
 
 /** Floats the parameter block of a post process effect holds */
 #define BOX_EFFECT_PARAM_MAX (16)
@@ -348,12 +345,16 @@ typedef struct box_emitter_t {
     float radius;       /**< Radius of the sphere the instance is treated as */
     float color[3];     /**< Linear emissive color times its strength */
     float range;        /**< Distance at which the emitted light reaches zero */
+    uint32_t mesh;
+    uint32_t slot;
+    uint32_t pad[2];
 } box_emitter_t;
 
 typedef struct box_bake_t {
     uint32_t enabled;   /**< Static instances read baked probes instead of the static lights */
     uint32_t budget;    /**< Probes rebaked per frame */
     float spacing;      /**< World units between two probes of an instance */
+    float occluder_min_size;
     uint32_t probe_max; /**< Probes an instance gets on one axis */
     uint32_t x;         /**< Occupancy voxels across the scene */
     uint32_t y;         /**< Occupancy voxels up the scene */
@@ -1127,6 +1128,7 @@ typedef struct box_static_update_t {
     uint32_t slot;          /**< Instance slot */
     uint32_t transition;    /**< Transition the slot starts, BOX_UPDATE_STILL for none */
     uint32_t flags;
+    int32_t bake_occluder;
     box_instance_t data;    /**< New instance data */
 } box_static_update_t;
 

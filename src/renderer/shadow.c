@@ -131,8 +131,11 @@ static void box_shadow_pipeline(
     r->shadow_pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
-    WGPUVertexAttribute vertex_attr = {
-        .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0
+    WGPUVertexAttribute vertex_attrs[4] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
     };
     WGPUVertexAttribute instance_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
@@ -143,8 +146,8 @@ static void box_shadow_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 1,
-            .attributes = &vertex_attr
+            .attributeCount = 4,
+            .attributes = vertex_attrs
         }, {
             .arrayStride = sizeof(box_instance_t),
             .stepMode = WGPUVertexStepMode_Instance,
@@ -221,7 +224,8 @@ void box_shadow_frame(
     r->shadow_arg_count = 0;
     r->shadow_rebuilds = 0;
 
-    uint32_t jobs = (p->views.count + 1) * (r->meshes.count + 1);
+    uint32_t jobs = (p->views.count + 1) * (r->meshes.count + 1) *
+        BOX_SHADOW_CASCADE_MAX;
     if (jobs <= r->shadow_uniform_capacity) {
         goto done;
     }

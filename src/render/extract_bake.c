@@ -32,12 +32,13 @@ void box_render_extract_bake(
     RenderState *state,
     box_packet_t *p)
 {
-    ecs_entity_t primary = box_render_primary_view(state);
+    ecs_entity_t primary = box_render_primary_view(world, state);
     const View *view = primary ? ecs_get(world, primary, View) : NULL;
     const BakeSettings *s = view ? &view->bake : NULL;
     p->bake.enabled = s && s->enabled ? 1u : 0u;
     p->bake.budget = s && s->budget > 0 ? (uint32_t)s->budget : BOX_BAKE_BUDGET;
     p->bake.spacing = s && s->probe_spacing > 0 ? s->probe_spacing : BOX_BAKE_SPACING;
+    p->bake.occluder_min_size = s && s->occluder_min_size > 0 ? s->occluder_min_size : 0.5f;
     p->bake.probe_max = s && s->probe_max > 0 ? (uint32_t)s->probe_max : BOX_BAKE_PROBE_MAX;
     p->bake.x = s && s->x > 0 ? (uint32_t)s->x : BOX_BAKE_GRID_X;
     p->bake.y = s && s->y > 0 ? (uint32_t)s->y : BOX_BAKE_GRID_Y;
@@ -45,7 +46,9 @@ void box_render_extract_bake(
     p->bake.steps = s && s->steps > 0 ? (uint32_t)s->steps : BOX_BAKE_STEPS;
 
     bool enabled = p->bake.enabled != 0;
-    if (enabled != state->bake_enabled) {
+    if (enabled != state->bake_enabled ||
+        p->bake.occluder_min_size != state->bake_occluder_min_size) {
+        state->bake_occluder_min_size = p->bake.occluder_min_size;
         state->bake_enabled = enabled;
         box_extract_mark_all(world, state);
     }
@@ -116,6 +119,10 @@ static void box_extract_emitter(
     out->color[1] = color[1];
     out->color[2] = color[2];
     out->range = box_bake_emitter_range(color, radius);
+    const RenderInstance *instance = ecs_get(it->world, it->entities[i], RenderInstance);
+    out->mesh = mesh->handle;
+    out->slot = instance ? instance->slot : UINT32_MAX;
+    out->pad[0] = out->pad[1] = 0;
 done:
     return;
 }
@@ -137,6 +144,10 @@ void box_render_extract_emitters(
 
         int32_t i;
         for (i = 0; i < it.count; i ++) {
+            if (state->ui_mask &&
+                (box_render_entity_layers(world, state, it.entities[i]) & state->ui_mask)) {
+                continue;
+            }
             if (state->hide_used &&
                 box_hierarchy_ancestor_has(world, it.entities[i], Hidden))
             {

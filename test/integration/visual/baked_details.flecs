@@ -1,0 +1,41 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.light
+
+$ { EnvironmentLight: {sky_color: {100, 120, 150}, ground_color: {80, 85, 100}, intensity: 0.06} }
+sun { Rotation: {0.9, -0.4, 0}; DirectionalLight: {intensity: 0.015} }
+
+camera { Position: {18, 15, -22}; LookAt: {0, 1, 0}; Camera: {fov: 48} }
+
+large_slab { Position: {-5, -0.2, 0}; Box: {10, 0.4, 14}; Rgb: {155, 155, 155} }
+for row in 0..7 {
+  for column in 0..5 {
+    _ { Position: {1 + column * 2, -0.2, -6 + row * 2}; Box: {2, 0.4, 2}; Rgb: {155, 155, 155} }
+  }
+}
+back { Position: {0, 2.5, 7}; Box: {20, 5, 0.2}; Rgb: {150, 150, 150} }
+pillar { Position: {0, 2, 2.5}; Box: {1.2, 4, 1.2}; Rgb: {140, 140, 140} }
+
+for row in 0..6 {
+  for i in 0..80 {
+    _ {
+      Position: {-9.5 + i * 0.24, 0.65, -5.5 + row * 1.1}
+      Box: {0.06, 1.3, 0.06}
+      Rgb: {180, 180, 180}
+    }
+  }
+  _ { Position: {0, 1.2, -5.5 + row * 1.1}; Box: {19, 0.04, 0.04}; Rgb: {200, 200, 200} }
+}
+for i in 0..60 {
+  _ { Position: {-9 + i * 0.3, 3.8, 4}; Box: {0.025, 0.025, 5}; Rgb: {150, 150, 150} }
+}
+for i in 0..5 {
+  _ { Position: {-7 + i * 3.5, 0.75, 4.5}; Sphere: {segments: 12, radius: 0.75}; Rgb: {180, 180, 180} }
+}
+warm { Position: {-6, 3.4, -1}; PointLight: {intensity: 65, range: 15}; Rgb: {255, 135, 50} }
+cool { Position: {6, 3.4, -1}; PointLight: {intensity: 65, range: 15}; Rgb: {60, 160, 255} }
+rear { Position: {0, 3.5, 6}; PointLight: {intensity: 25, range: 9}; Rgb: {95, 255, 155} }
+post_effects { tonemap : box.effects.tonemap {} }
+view { box.view.View: {camera: camera, bake: {enabled: true, probe_spacing: 1, budget: 65536}, effects: [{effect: post_effects.tonemap, enabled: true}]} }

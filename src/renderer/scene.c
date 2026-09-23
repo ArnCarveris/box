@@ -50,7 +50,6 @@ static void box_scene_mesh_release(
     box_renderer_t *r,
     box_gpu_mesh_t *m)
 {
-    box_bake_mesh_release(m);
     box_transition_clear(r, m);
     if (m->vertices) wgpuBufferRelease(m->vertices);
     if (m->indices) wgpuBufferRelease(m->indices);

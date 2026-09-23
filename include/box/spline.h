@@ -77,6 +77,7 @@ ECS_STRUCT(SplineMesh, {
     float height;          /**< Scale of the cross section up */
     bool closed;           /**< Sweep the cross section as a ring, last point to first */
     bool smooth;           /**< Share the normals of neighbouring cross section points */
+    bool gpu;
 });
 
 /** What a follower does when it reaches the end of its path */

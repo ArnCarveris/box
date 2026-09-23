@@ -42,7 +42,7 @@ extern "C" {
  */
 ECS_STRUCT(CameraController, {
     float speed;          /**< Units per second at full throttle, 40 by default */
-    float fast;           /**< Speed multiplier while Fast is held, 5 by default */
+    float fast;
     float acceleration;   /**< How fast the velocity follows a held action, 6 by default */
     float deceleration;   /**< How fast the velocity follows the stop, 18 by default */
     float sensitivity;    /**< Radians turned per point of cursor movement */

@@ -20,6 +20,7 @@ typedef struct box_mesh_data_t {
     float *normals;         /**< Three floats per vertex, unit length */
     float *uvs;             /**< Two floats per vertex in 0..1 */
     uint32_t *colors;       /**< Display encoded RGBA8 per vertex, NULL for white */
+    float *sweeps;
     uint32_t *indices;      /**< Three indices per triangle */
     uint32_t vertex_count;  /**< Number of vertices */
     uint32_t index_count;   /**< Number of indices */

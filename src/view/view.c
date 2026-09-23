@@ -138,6 +138,7 @@ static void box_bake_ctor(
         s[i].enabled = true;
         s[i].budget = BOX_BAKE_BUDGET;
         s[i].probe_spacing = BOX_BAKE_SPACING;
+        s[i].occluder_min_size = 0.5f;
         s[i].probe_max = BOX_BAKE_PROBE_MAX;
         s[i].x = BOX_BAKE_GRID_X;
         s[i].y = BOX_BAKE_GRID_Y;

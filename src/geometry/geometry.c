@@ -360,6 +360,7 @@ void BoxGeometryImport(
     ECS_MODULE(world, BoxGeometry);
     ECS_IMPORT(world, BoxRender);
 
+    ECS_META_COMPONENT(world, SweepVertex);
     ECS_META_COMPONENT(world, Mesh3);
     ECS_META_COMPONENT(world, Box);
     ECS_META_COMPONENT(world, Quad);

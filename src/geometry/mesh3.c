@@ -15,7 +15,7 @@
 #include <string.h>
 
 /** Vector members a Mesh3 holds */
-#define BOX_MESH3_VECTORS (5)
+#define BOX_MESH3_VECTORS (6)
 
 /** Offset basis of the 64 bit FNV-1a hash */
 #define BOX_MESH3_HASH_SEED (14695981039346656037u)
@@ -26,7 +26,7 @@
 /** Element size of every vector member of a Mesh3, in declaration order */
 static const ecs_size_t box_mesh3_elem[BOX_MESH3_VECTORS] = {
     ECS_SIZEOF(vec3), ECS_SIZEOF(vec3), ECS_SIZEOF(vec2),
-    ECS_SIZEOF(uint32_t), ECS_SIZEOF(rgba)
+    ECS_SIZEOF(uint32_t), ECS_SIZEOF(rgba), ECS_SIZEOF(SweepVertex)
 };
 
 /** Collect the vector members of a Mesh3 in declaration order.
@@ -43,6 +43,7 @@ static void box_mesh3_vectors(
     out[2] = &m->uvs;
     out[3] = &m->indices;
     out[4] = &m->colors;
+    out[5] = &m->sweeps;
 }
 
 /** Release the vectors of a Mesh3.
@@ -184,6 +185,8 @@ static bool box_mesh3_check(
         problem = "holds a uv count that is not its vertex count";
     } else if (ecs_vec_count(&m->colors) && ecs_vec_count(&m->colors) != vertices) {
         problem = "holds a color count that is not its vertex count";
+    } else if (ecs_vec_count(&m->sweeps) && ecs_vec_count(&m->sweeps) != vertices) {
+        problem = "holds a sweep count that is not its vertex count";
     } else if ((indices ? indices : vertices) % 3) {
         problem = "does not hold whole triangles";
     }
@@ -292,6 +295,11 @@ static void box_mesh3_build(
     box_mesh_builder_init(&builder, out, vertices, indices ? indices : vertices);
     memcpy(out->positions, ecs_vec_first(&m->vertices), (size_t)vertices * 3 * sizeof(float));
     box_mesh3_colors(m, out);
+    if (ecs_vec_count(&m->sweeps)) {
+        size_t bytes = (size_t)vertices * sizeof(SweepVertex);
+        out->sweeps = ecs_os_malloc((ecs_size_t)bytes);
+        memcpy(out->sweeps, ecs_vec_first(&m->sweeps), bytes);
+    }
     if (uvs) {
         memcpy(out->uvs, uvs, (size_t)vertices * 2 * sizeof(float));
     } else {

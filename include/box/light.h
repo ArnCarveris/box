@@ -35,6 +35,10 @@ ECS_STRUCT(CelestialLight, {
     rgb toa_color;       /**< Color over the atmosphere, black takes white */
 });
 
+ECS_STRUCT(BakeOccluder, {
+    bool enabled;
+});
+
 /** Omnidirectional light */
 ECS_STRUCT(PointLight, {
     float intensity; /**< Radiance scale */

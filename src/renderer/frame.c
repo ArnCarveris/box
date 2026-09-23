@@ -76,14 +76,17 @@ WGPURenderPipeline box_frame_pipeline(
     bool hdr,
     uint32_t normals)
 {
-    WGPUVertexAttribute vertex_attrs[5] = {
+    WGPUVertexAttribute vertex_attrs[8] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
             .shaderLocation = 12 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
-            .shaderLocation = 13 }
+            .shaderLocation = 13 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
     };
     WGPUVertexAttribute instance_attrs[12] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = offset + 0, .shaderLocation = 3 },
@@ -106,7 +109,7 @@ WGPURenderPipeline box_frame_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 5,
+            .attributeCount = 8,
             .attributes = vertex_attrs
         }, {
             .arrayStride = stride,
@@ -228,14 +231,17 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         goto done;
     }
 
-    WGPUVertexAttribute vertex_attrs[5] = {
+    WGPUVertexAttribute vertex_attrs[8] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_LOCAL_OFFSET,
             .shaderLocation = 12 },
         { .format = WGPUVertexFormat_Unorm8x4, .offset = BOX_VERTEX_COLOR_OFFSET,
-            .shaderLocation = 13 }
+            .shaderLocation = 13 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET, .shaderLocation = 17 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = BOX_VERTEX_SWEEP_OFFSET + 12, .shaderLocation = 18 },
+        { .format = WGPUVertexFormat_Float32x4, .offset = BOX_VERTEX_SWEEP_OFFSET + 24, .shaderLocation = 19 }
     };
     WGPUVertexAttribute instance_attrs[12] = {
         { .format = WGPUVertexFormat_Float32x4, .offset = 0, .shaderLocation = 3 },
@@ -258,7 +264,7 @@ static WGPURenderPipeline box_frame_normal_pipeline(
         {
             .arrayStride = BOX_VERTEX_FLOATS * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 5,
+            .attributeCount = 8,
             .attributes = vertex_attrs
         }, {
             .arrayStride = sizeof(box_instance_t),
@@ -471,7 +477,7 @@ static void box_frame_sorted(
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
-    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
     box_transparent_draw(r, view, p, pass);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
@@ -556,7 +562,7 @@ static void box_frame_uncovered(
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
-    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
     box_cull_draw(r, pass, BOX_HIZ_PASS_NEW);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
@@ -700,7 +706,7 @@ static void box_frame_view(
     wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
-    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_dummy_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
     if (r->v->culled) {
         box_cull_draw(r, pass, BOX_HIZ_PASS_VISIBLE);
     } else {

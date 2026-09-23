@@ -95,4 +95,4 @@ spots {
   }
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, bake: {enabled: true, budget: 262144}} }

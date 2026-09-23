@@ -131,6 +131,7 @@ static void box_spline_mesh_copy(
         dst[i].height = src[i].height;
         dst[i].closed = src[i].closed;
         dst[i].smooth = src[i].smooth;
+        dst[i].gpu = src[i].gpu;
     }
 }
 

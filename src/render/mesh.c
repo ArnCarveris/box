@@ -10,9 +10,9 @@
 
 #include "render_internal.h"
 
-_Static_assert(BOX_VERTEX_VERSION == 2 &&
-    BOX_VERTEX_COLOR_OFFSET + 4 == BOX_VERTEX_FLOATS * (int)sizeof(float),
-    "the color closes the vertex, bump BOX_VERTEX_VERSION when the layout changes");
+_Static_assert(BOX_VERTEX_VERSION == 3 &&
+    BOX_VERTEX_SWEEP_OFFSET + sizeof(SweepVertex) == BOX_VERTEX_FLOATS * sizeof(float),
+    "the sweep closes the vertex");
 
 /** Pack the position of a vertex inside the mesh bounds into four bytes.
  *
@@ -79,6 +79,11 @@ uint32_t box_render_mesh_create(
         memcpy(dst + 8, &local, sizeof(local));
         uint32_t color = data->colors ? data->colors[v] : BOX_VERTEX_COLOR_WHITE;
         memcpy(dst + 9, &color, sizeof(color));
+        if (data->sweeps) {
+            memcpy(dst + 10, data->sweeps + (size_t)v * 10, sizeof(SweepVertex));
+        } else {
+            memset(dst + 10, 0, sizeof(SweepVertex));
+        }
     }
 
     return handle;

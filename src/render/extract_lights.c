@@ -157,7 +157,8 @@ static void box_light_extract(
         *(box_light_t*)box_vec_push(&p->lights) = light;
     }
 
-    if (bake && is_static && p->bake.enabled && p->bake_lights.count < BOX_LIGHT_MAX) {
+    if (bake && is_static && p->bake.enabled && p->bake_lights.count < BOX_LIGHT_MAX &&
+        !(box_render_entity_layers(it->world, state, it->entities[i]) & state->ui_mask)) {
         *(box_light_t*)box_vec_push(&p->bake_lights) = light;
     }
 }

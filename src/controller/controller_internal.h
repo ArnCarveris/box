@@ -23,6 +23,7 @@ typedef struct ControllerActions {
     ecs_entity_t up;      /**< Move up */
     ecs_entity_t down;    /**< Move down */
     ecs_entity_t fast;    /**< Move faster while held */
+    ecs_entity_t slow;
     ecs_entity_t look;    /**< Turn with the cursor while held */
     ecs_entity_t turn_left; /**< Turn the view left while held */
     ecs_entity_t turn_right;/**< Turn the view right while held */

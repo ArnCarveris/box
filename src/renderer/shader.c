@@ -109,8 +109,7 @@ static void box_shader_rebuild(
     case BOX_SHADER_SHADOW: box_shadow_fini(r); box_shadow_init(r); break;
     case BOX_SHADER_ENV:
     case BOX_SHADER_ENV_FILTER: box_environment_fini(r); box_environment_init(r); break;
-    case BOX_SHADER_BAKE_GRID:
-    case BOX_SHADER_BAKE: box_bake_fini(r); box_bake_init(r); break;
+    case BOX_SHADER_BAKE: box_bake_reload(r); break;
     case BOX_SHADER_BLUR: box_transparent_fini(r); box_transparent_init(r); break;
     case BOX_SHADER_MOTION: box_effect_fini(r); box_effect_init(r); break;
     case BOX_SHADER_OVERLAY: box_overlay_fini(r); box_overlay_init(r); break;

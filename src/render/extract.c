@@ -121,7 +121,12 @@ static void box_extract_static(
     update->slot = inst->slot;
     update->transition = BOX_UPDATE_STILL;
     update->flags = added ? BOX_STATIC_UPDATE_ADDED : 0;
-    box_render_fill_instance(world, e, mesh, transform, state->bake_enabled,
+    const BakeOccluder *occluder = ecs_get(world, e, BakeOccluder);
+    update->bake_occluder = occluder ? (occluder->enabled ? 1 : -1) :
+        (ecs_has(world, e, Box) ? 0 : -1);
+    bool baked = state->bake_enabled &&
+        !(box_render_entity_layers(world, state, e) & state->ui_mask);
+    box_render_fill_instance(world, e, mesh, transform, baked,
         state->textured, state->tiled, state->shaped, state->layer_data, state->clipped,
         state->layered ? state : NULL, transition, time, inst->depth, &update->data);
     if (transition) {

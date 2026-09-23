@@ -701,7 +701,8 @@ static void box_view_fill(
 
     box_render_extract_shadows(world, src->entity, sun, v);
     box_view_environment(world, state, src->entity, index, ui, v);
-    box_render_extract_lights(world, state, p, src->entity, v, index == 0);
+    box_render_extract_lights(world, state, p, src->entity, v,
+        src->entity == box_render_primary_view(world, state));
     if (ui) {
         v->light_count = 0;
     }
@@ -784,11 +785,16 @@ ecs_entity_t box_render_collect_views(
 }
 
 ecs_entity_t box_render_primary_view(
+    ecs_world_t *world,
     RenderState *state)
 {
     ecs_entity_t result = 0;
-    if (ecs_vec_count(&state->view_list)) {
-        result = ecs_vec_get_t(&state->view_list, box_view_src_t, 0)->entity;
+    for (int32_t i = 0; i < ecs_vec_count(&state->view_list); i ++) {
+        ecs_entity_t e = ecs_vec_get_t(&state->view_list, box_view_src_t, i)->entity;
+        if (!box_view_is_ui(world, state, e)) {
+            result = e;
+            break;
+        }
     }
 
     return result;

@@ -51,6 +51,7 @@ ECS_STRUCT(BakeSettings, {
     bool enabled;
     int32_t budget;
     float probe_spacing;
+    float occluder_min_size;
     int32_t probe_max;
     int32_t x;
     int32_t y;
