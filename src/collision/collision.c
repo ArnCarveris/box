@@ -126,8 +126,7 @@ void BoxCollisionImport(
     state->index.query = ecs_query(world, {
         .terms = {
             { .id = ecs_id(WorldTransform), .inout = EcsIn },
-            { .id = DynamicTransform, .src.id = EcsSelf|EcsUp,
-                .trav = EcsChildOf, .inout = EcsInOutNone },
+            { .id = DynamicTransform, .inout = EcsInOutNone },
             { .id = NoCollider, .oper = EcsNot, .inout = EcsInOutNone }
         },
         .cache_kind = EcsQueryCacheAuto

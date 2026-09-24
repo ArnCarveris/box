@@ -103,6 +103,8 @@
           "nested_root_found",
           "dynamic_entity_found",
           "dynamic_entity_moves_each_frame",
+          "dynamic_childof_child_moves_with_parent",
+          "dynamic_parent_child_moves_with_parent",
           "disabled_index_finds_nothing",
           "random_sphere_matches_brute_force",
           "random_aabb_matches_brute_force",

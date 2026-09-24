@@ -347,6 +347,62 @@ void Index_dynamic_entity_moves_each_frame(void)
     ecs_fini(world);
 }
 
+void Index_dynamic_childof_child_moves_with_parent(void)
+{
+    // collision/spatial_index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, DynamicTransform);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {5, 0, 0});
+    ecs_set(world, child, SphereCollider, {{0, 0, 0}, 1});
+    ecs_progress(world, 0);
+
+    Position *p = ecs_get_mut(world, parent, Position);
+    p->x = 40;
+    ecs_progress(world, 0);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_collision_sphere(world, vec3_new(5, 0, 0), 1, &out), 0);
+    test_int(box_collision_sphere(world, vec3_new(45, 0, 0), 1, &out), 1);
+    test_uint(ecs_vec_get_t(&out, ecs_entity_t, 0)[0], child);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+
+    ecs_fini(world);
+}
+
+void Index_dynamic_parent_child_moves_with_parent(void)
+{
+    // collision/spatial_index
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, DynamicTransform);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_entity_t child = ecs_new_w_parent(world, parent, "child");
+    ecs_set(world, child, Position, {5, 0, 0});
+    ecs_set(world, child, SphereCollider, {{0, 0, 0}, 1});
+    ecs_progress(world, 0);
+
+    Position *p = ecs_get_mut(world, parent, Position);
+    p->x = 40;
+    ecs_progress(world, 0);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_collision_sphere(world, vec3_new(5, 0, 0), 1, &out), 0);
+    test_int(box_collision_sphere(world, vec3_new(45, 0, 0), 1, &out), 1);
+    test_uint(ecs_vec_get_t(&out, ecs_entity_t, 0)[0], child);
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+
+    ecs_fini(world);
+}
+
 void Index_disabled_index_finds_nothing(void)
 {
     // collision/spatial_index
