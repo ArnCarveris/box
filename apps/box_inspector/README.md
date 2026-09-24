@@ -11,6 +11,18 @@ are fetched from `/resource` and shown as thumbnails. The render pane asks `/cap
 (1 Hz, pausable, 0.5 - 5 s) and shows the PNG with the frame number; a wasm image also renders
 live in the canvas, toggled with **Show capture** / **Show live**.
 
+## Mouse input
+
+The pointer over the capture drives the instance's cursor with the `mouse` commands, so hover,
+picking and gizmo drags can be tried in a headless run. `stagePoint` maps the pointer to the
+image without the letterbox bars, in -1 to 1 with y up, and the page sends it as `mouse.move
+x,y true`, which the instance scales to its `Surface`; the left and right buttons become
+`mouse.button left|right true|false`, the wheel `mouse.scroll dx dy` in notches the way the web
+platform counts them, and leaving the image `mouse.release`. `createInputQueue` sends one command
+at a time and replaces a queued move with a newer one, so a fast pointer never piles up requests.
+A button or wheel reply asks for a fresh capture; errors land in the console. The live wasm canvas
+gets its input from the browser directly, so only the capture forwards events.
+
 ## Console output
 
 `colorize(text, command)` in `inspector-core` turns a result into HTML with one span per
@@ -61,7 +73,8 @@ run `set camera Position "{2, 6, -14}"` and watch the render pane show the new v
 second; run `capture` and open the thumbnail, which links to a `/resource/<file>?session=<id>`
 PNG; run `render sphere` and open the thumbnail it prints once that frame rendered; run
 `clear` to empty the log without a request; press **Disconnect**. Run `grep Position` and
-`logs` and check the columns line up, and toggle the theme to read the log in both.
+`logs` and check the columns line up, and toggle the theme to read the log in both. Hover and click the capture of a
+scene with picking and watch the highlight or selection show up in the next capture.
 `project/db/inspector/page/deliverable/console_colors.png` is a headless Chrome shot of the
 log after `help`, `ls`, `cat camera` and an unknown command.
 

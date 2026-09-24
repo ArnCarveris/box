@@ -147,7 +147,7 @@ main {
   flex: 1; position: relative; min-height: 260px; background: var(--stage);
   display: flex; align-items: center; justify-content: center;
 }
-#shot { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#shot { max-width: 100%; max-height: 100%; object-fit: contain; display: block; cursor: crosshair; touch-action: none; user-select: none; }
 #canvas { width: 100%; height: 100%; display: block; }
 .stage.overlay #shot { position: absolute; inset: 0; margin: auto; background: var(--stage); }
 #canvas:focus { outline: none; }
@@ -207,7 +207,7 @@ main {
     </div>
     <div class="stage" id="stage">
       <div class="placeholder" id="placeholder">Not connected</div>
-      <img id="shot" alt="capture" hidden>
+      <img id="shot" alt="capture" draggable="false" oncontextmenu="event.preventDefault()" hidden>
       <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()" hidden></canvas>
     </div>
     <div class="caption"><span id="refreshed">no capture yet</span><span id="frame"></span></div>
@@ -227,6 +227,7 @@ var IMAGE_FILE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 var RESOURCE_TRIES = 6;
 var RESOURCE_DELAY = 500;
 var COLUMN_MAX = 6;
+var MOUSE_BUTTONS = { 0: "left", 2: "right" };
 var ERROR_LINE = /^error:/;
 var LOG_LEVEL = /^(fatal|error|warning|info|debug|trace)$/;
 var PATH_LINE = /^(\/|[A-Za-z_#][A-Za-z0-9_#]*(?:\.[A-Za-z_#][A-Za-z0-9_#]*)*)$/;
@@ -383,6 +384,78 @@ function closePath(session) {
 function parseFrame(text) {
   var match = /\bframe:\s*(\d+)/.exec(String(text || ""));
   return match ? parseInt(match[1], 10) : null;
+}
+
+function stagePoint(box, image, clientX, clientY) {
+  if (!box.width || !box.height || !image.width || !image.height) {
+    return null;
+  }
+  var scale = Math.min(box.width / image.width, box.height / image.height);
+  var width = image.width * scale, height = image.height * scale;
+  var left = box.left + (box.width - width) / 2, top = box.top + (box.height - height) / 2;
+  var u = (clientX - left) / width, v = (clientY - top) / height;
+  if (u < 0 || u > 1 || v < 0 || v > 1) {
+    return null;
+  }
+  return { x: u * 2 - 1, y: 1 - v * 2 };
+}
+
+function coord(value) {
+  var text = (Math.round(value * 10000) / 10000).toString();
+  return text === "-0" ? "0" : text;
+}
+
+function mouseMoveCommand(point) {
+  return "mouse.move " + coord(point.x) + "," + coord(point.y) + " true";
+}
+
+function mouseButtonCommand(button, down) {
+  var name = MOUSE_BUTTONS[button];
+  return name ? "mouse.button " + name + " " + (down ? "true" : "false") : null;
+}
+
+function mouseScrollCommand(deltaX, deltaY, deltaMode) {
+  var scale = deltaMode === 1 ? 1 : deltaMode === 2 ? 3 : 0.01;
+  return "mouse.scroll " + coord(deltaX * scale) + " " + coord(-deltaY * scale);
+}
+
+function createInputQueue(exec, onReply) {
+  var pending = [];
+  var running = false;
+  var drain = function () {
+    if (running || !pending.length) {
+      return;
+    }
+    running = true;
+    var line = pending.shift();
+    Promise.resolve().then(function () {
+      return exec(line);
+    }).then(function (reply) {
+      if (onReply) {
+        onReply(line, reply, null);
+      }
+    }, function (err) {
+      if (onReply) {
+        onReply(line, null, err);
+      }
+    }).then(function () {
+      running = false;
+      drain();
+    });
+  };
+  return {
+    push: function (line) {
+      var last = pending[pending.length - 1];
+      if (last && last.indexOf("mouse.move ") === 0 && line.indexOf("mouse.move ") === 0) {
+        pending[pending.length - 1] = line;
+      } else {
+        pending.push(line);
+      }
+      drain();
+    },
+    clear: function () { pending = []; },
+    size: function () { return pending.length + (running ? 1 : 0); }
+  };
 }
 
 function createSession(transport) {
@@ -759,6 +832,11 @@ return {
   capturePath: capturePath,
   closePath: closePath,
   parseFrame: parseFrame,
+  stagePoint: stagePoint,
+  mouseMoveCommand: mouseMoveCommand,
+  mouseButtonCommand: mouseButtonCommand,
+  mouseScrollCommand: mouseScrollCommand,
+  createInputQueue: createInputQueue,
   createSession: createSession,
   createHistory: createHistory,
   parseQuery: parseQuery,
@@ -818,6 +896,17 @@ var state = {
   commandNames: []
 };
 var tabState = null;
+var pointer = { down: {}, pinned: false };
+var inputQueue = I.createInputQueue(function (line) {
+  return state.session ? state.session.exec(line) : Promise.reject(new Error("not connected"));
+}, function (line, reply, err) {
+  if (err || (reply && reply.status >= 400)) {
+    append("err", line + ": " + (err ? (err.message || err) : String(reply.body).split("\n")[0]));
+    endResult();
+  } else if (!/^mouse\.(move|release) /.test(line + " ")) {
+    tick();
+  }
+});
 
 endpointEl.value = query.endpoint || saved.endpoint || DEFAULT_ENDPOINT;
 imageEl.value = query.image || saved.image || DEFAULT_IMAGE;
@@ -1093,6 +1182,8 @@ function connect() {
 
 function disconnect(quiet) {
   stopTimer();
+  inputQueue.clear();
+  pointer = { down: {}, pinned: false };
   var session = state.session;
   state.session = null;
   state.transport = null;
@@ -1168,6 +1259,76 @@ liveEl.onclick = function () {
     startTimer();
   }
 };
+function shotPoint(ev) {
+  return I.stagePoint(shotEl.getBoundingClientRect(),
+    { width: shotEl.naturalWidth, height: shotEl.naturalHeight }, ev.clientX, ev.clientY);
+}
+
+function sendInput(line) {
+  if (state.session && line) {
+    inputQueue.push(line);
+  }
+}
+
+function moveTo(ev) {
+  var point = shotPoint(ev);
+  if (point) {
+    pointer.pinned = true;
+    sendInput(I.mouseMoveCommand(point));
+  }
+
+  return point;
+}
+
+function releaseButton(button) {
+  if (!pointer.down[button]) {
+    return;
+  }
+  delete pointer.down[button];
+  sendInput(I.mouseButtonCommand(button, false));
+}
+
+shotEl.addEventListener("pointerdown", function (ev) {
+  var command = I.mouseButtonCommand(ev.button, true);
+  if (!command || !state.session) {
+    return;
+  }
+  ev.preventDefault();
+  if (!moveTo(ev)) {
+    return;
+  }
+  shotEl.setPointerCapture(ev.pointerId);
+  pointer.down[ev.button] = true;
+  sendInput(command);
+});
+shotEl.addEventListener("pointermove", function (ev) {
+  if (state.session) {
+    moveTo(ev);
+  }
+});
+shotEl.addEventListener("pointerup", function (ev) {
+  releaseButton(ev.button);
+});
+shotEl.addEventListener("pointercancel", function () {
+  Object.keys(pointer.down).forEach(function (button) {
+    releaseButton(Number(button));
+  });
+});
+shotEl.addEventListener("pointerleave", function () {
+  if (pointer.pinned && !Object.keys(pointer.down).length) {
+    pointer.pinned = false;
+    sendInput("mouse.release");
+  }
+});
+shotEl.addEventListener("wheel", function (ev) {
+  if (!state.session || !shotPoint(ev)) {
+    return;
+  }
+  ev.preventDefault();
+  moveTo(ev);
+  sendInput(I.mouseScrollCommand(ev.deltaX, ev.deltaY, ev.deltaMode));
+}, { passive: false });
+
 function parseHelpNames(text) {
   var names = [];
   String(text || "").split("\n").forEach(function (line) {

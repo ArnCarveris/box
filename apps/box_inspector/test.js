@@ -565,6 +565,83 @@ describe("Completion", () => {
 
 /* ---------- run ---------- */
 
+/* ---------- mouse input over the render pane ---------- */
+
+describe("Mouse", () => {
+  test("stage_point_is_normalized_with_y_up", () => {
+    const box = { left: 10, top: 20, width: 200, height: 100 };
+    const image = { width: 400, height: 200 };
+    equal(I.stagePoint(box, image, 110, 70), { x: 0, y: 0 }, "center");
+    equal(I.stagePoint(box, image, 10, 20), { x: -1, y: 1 }, "top left");
+    equal(I.stagePoint(box, image, 210, 120), { x: 1, y: -1 }, "bottom right");
+  });
+
+  test("stage_point_skips_letterbox_bars", () => {
+    const box = { left: 0, top: 0, width: 300, height: 100 };
+    const image = { width: 200, height: 100 };
+    equal(I.stagePoint(box, image, 50, 50), { x: -1, y: 0 }, "left edge of the image");
+    equal(I.stagePoint(box, image, 20, 50), null, "left bar");
+    equal(I.stagePoint(box, image, 280, 50), null, "right bar");
+  });
+
+  test("stage_point_needs_a_loaded_image", () => {
+    equal(I.stagePoint({ left: 0, top: 0, width: 100, height: 100 },
+      { width: 0, height: 0 }, 50, 50), null, "no image");
+  });
+
+  test("commands_use_the_mouse_syntax", () => {
+    equal(I.mouseMoveCommand({ x: 0.123456, y: -0.5 }), "mouse.move 0.1235,-0.5 true", "move");
+    equal(I.mouseMoveCommand({ x: -0.00001, y: 0 }), "mouse.move 0,0 true", "no negative zero");
+    equal(I.mouseButtonCommand(0, true), "mouse.button left true", "left down");
+    equal(I.mouseButtonCommand(2, false), "mouse.button right false", "right up");
+    equal(I.mouseButtonCommand(1, true), null, "middle has no command");
+  });
+
+  test("scroll_matches_the_web_platform", () => {
+    equal(I.mouseScrollCommand(0, 100, 0), "mouse.scroll 0 -1", "pixels, down");
+    equal(I.mouseScrollCommand(0, -3, 1), "mouse.scroll 0 3", "lines, up");
+    equal(I.mouseScrollCommand(1, 0, 2), "mouse.scroll 3 0", "pages");
+  });
+
+  test("queue_runs_in_order_and_coalesces_moves", async () => {
+    const sent = [];
+    let release = null;
+    const exec = (line) => {
+      sent.push(line);
+      if (sent.length === 1) {
+        return new Promise((resolve) => { release = resolve; });
+      }
+      return Promise.resolve({ status: 200, body: "" });
+    };
+    const replies = [];
+    const queue = I.createInputQueue(exec, (line, reply) => replies.push(line));
+    queue.push("mouse.move 0,0 true");
+    queue.push("mouse.move 0.1,0 true");
+    queue.push("mouse.move 0.2,0 true");
+    queue.push("mouse.button left true");
+    queue.push("mouse.move 0.3,0 true");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release({ status: 200, body: "" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    equal(sent, ["mouse.move 0,0 true", "mouse.move 0.2,0 true",
+      "mouse.button left true", "mouse.move 0.3,0 true"], "sent");
+    equal(replies, sent, "replies");
+    equal(queue.size(), 0, "drained");
+  });
+
+  test("queue_reports_errors_and_keeps_going", async () => {
+    const errors = [];
+    const queue = I.createInputQueue((line) => (line === "bad" ?
+      Promise.reject(new Error("down")) : Promise.resolve({ status: 200, body: "" })),
+    (line, reply, err) => { if (err) { errors.push(line + ": " + err.message); } });
+    queue.push("bad");
+    queue.push("mouse.release");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    equal(errors, ["bad: down"], "errors");
+    equal(queue.size(), 0, "drained");
+  });
+});
+
 async function run() {
   const started = process.hrtime.bigint();
   for (const item of cases) {
