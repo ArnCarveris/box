@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include <string.h>
+#include <stdio.h>
 #include "../../../src/command/command_internal.h"
 
 static ecs_world_t *w;
@@ -654,4 +655,295 @@ void Shell_ls_root_entity_with_empty_name(void)
     char *out = box_command_run(w, session, "ls", NULL);
     test_assert(out[0] == '\n');
     ecs_os_free(out);
+}
+
+void Shell_ls_wildcard_has_no_children(void)
+{
+    // command/shell
+    bool error = true;
+    char *out = box_command_run(w, session, "ls _", &error);
+    test_bool(error, false);
+    test_str(out, "");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "ls *", &error);
+    test_bool(error, false);
+    test_str(out, "");
+    ecs_os_free(out);
+}
+
+void Shell_cat_value_without_serializer(void)
+{
+    // command/shell
+    char *out = box_command_run(w, session, "query q Point", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "cat agent0.q", NULL);
+    test_assert(strstr(out, "\n(Poly,Query)\n") != NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "logs error 100", NULL);
+    test_assert(strstr(out, "cannot serialize") == NULL);
+    ecs_os_free(out);
+}
+
+void Shell_get_value_without_serializer(void)
+{
+    // command/shell
+    char *out = box_command_run(w, session, "query q Point", NULL);
+    ecs_os_free(out);
+
+    bool error = false;
+    out = box_command_run(w, session,
+        "get agent0.q (flecs.core.Poly, flecs.core.Query)", &error);
+    test_bool(error, true);
+    test_str(out, "cannot serialize '(flecs.core.Poly, flecs.core.Query)'");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "logs error 100", NULL);
+    test_assert(strstr(out, "cannot serialize value") == NULL);
+    ecs_os_free(out);
+}
+
+void Shell_rm_builtin(void)
+{
+    // command/shell
+    bool error = false;
+    char *out = box_command_run(w, session, "rm *", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change builtin entity '*'");
+    ecs_os_free(out);
+
+    error = false;
+    out = box_command_run(w, session, "rm flecs.core", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change builtin entity 'flecs.core'");
+    ecs_os_free(out);
+    test_assert(ecs_is_alive(w, EcsFlecsCore));
+}
+
+void Shell_clear_builtin(void)
+{
+    // command/shell
+    bool error = false;
+    char *out = box_command_run(w, session, "clear _", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change builtin entity '_'");
+    ecs_os_free(out);
+}
+
+void Shell_mv_builtin(void)
+{
+    // command/shell
+    bool error = false;
+    char *out = box_command_run(w, session, "mv flecs renamed", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change builtin entity 'flecs'");
+    ecs_os_free(out);
+    test_str(ecs_get_name(w, EcsFlecs), "flecs");
+}
+
+void Shell_mv_into_wildcard(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    bool error = false;
+    char *out = box_command_run(w, session, "mv thing *.x", &error);
+    test_bool(error, true);
+    test_str(out, "cannot move into builtin '*.x'");
+    ecs_os_free(out);
+    test_assert(ecs_get_parent(w, e) == 0);
+}
+
+void Shell_touch_under_wildcard(void)
+{
+    // command/shell
+    char *out = box_command_run(w, session, "cd *", NULL);
+    ecs_os_free(out);
+
+    bool error = false;
+    out = box_command_run(w, session, "touch child", &error);
+    test_bool(error, true);
+    test_str(out, "'child' is not a valid path");
+    ecs_os_free(out);
+}
+
+void Shell_add_wildcard(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    bool error = false;
+    char *out = box_command_run(w, session, "add thing (Likes, *)", &error);
+    test_bool(error, true);
+    test_str(out, "cannot add '(Likes, *)'");
+    ecs_os_free(out);
+    test_assert(!ecs_has_pair(w, e, likes, EcsWildcard));
+}
+
+void Shell_add_relationship_without_target(void)
+{
+    // command/shell
+    ecs_add_id(w, likes, EcsRelationship);
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    bool error = false;
+    char *out = box_command_run(w, session, "add thing Likes", &error);
+    test_bool(error, true);
+    test_str(out, "cannot add 'Likes'");
+    ecs_os_free(out);
+    test_assert(!ecs_has_id(w, e, likes));
+}
+
+void Shell_mv_into_own_child(void)
+{
+    // command/shell
+    ecs_entity_t parent = ecs_entity(w, { .name = "parent" });
+    ecs_entity(w, { .name = "parent.child" });
+    bool error = false;
+    char *out = box_command_run(w, session, "mv parent parent.child.x", &error);
+    test_bool(error, true);
+    test_str(out, "cannot move into itself 'parent.child.x'");
+    ecs_os_free(out);
+    test_assert(ecs_get_parent(w, parent) == 0);
+}
+
+void Shell_add_childof_cycle(void)
+{
+    // command/shell
+    ecs_entity_t parent = ecs_entity(w, { .name = "parent" });
+    ecs_entity(w, { .name = "parent.child" });
+    bool error = false;
+    char *out = box_command_run(w, session, "add parent (ChildOf, parent.child)", &error);
+    test_bool(error, true);
+    test_str(out, "cannot move into itself '(ChildOf, parent.child)'");
+    ecs_os_free(out);
+    test_assert(ecs_get_parent(w, parent) == 0);
+}
+
+void Shell_add_isa_cycle(void)
+{
+    // command/shell
+    ecs_entity_t a = ecs_entity(w, { .name = "a" });
+    ecs_entity(w, { .name = "b" });
+    char *out = box_command_run(w, session, "add b (IsA, a)", NULL);
+    test_str(out, "b");
+    ecs_os_free(out);
+
+    bool error = false;
+    out = box_command_run(w, session, "add a (IsA, b)", &error);
+    test_bool(error, true);
+    test_str(out, "'(IsA, b)' creates a cycle");
+    ecs_os_free(out);
+    test_assert(ecs_get_target(w, a, EcsIsA, 0) == 0);
+}
+
+void Shell_touch_too_deep(void)
+{
+    // command/shell
+    char path[1024] = "d";
+    int32_t i;
+    for (i = 1; i < 200; i ++) {
+        strcat(path, ".d");
+    }
+
+    char line[1100];
+    snprintf(line, sizeof(line), "touch %s", path);
+    bool error = false;
+    char *out = box_command_run(w, session, line, &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+}
+
+void Shell_mv_too_deep(void)
+{
+    // command/shell
+    char path[1024] = "d";
+    int32_t i;
+    for (i = 1; i < FLECS_DAG_DEPTH_MAX - 2; i ++) {
+        strcat(path, ".d");
+    }
+
+    char line[1100];
+    snprintf(line, sizeof(line), "touch %s", path);
+    char *out = box_command_run(w, session, line, NULL);
+    ecs_os_free(out);
+    ecs_entity(w, { .name = "parent.child" });
+
+    snprintf(line, sizeof(line), "mv parent %s.parent", path);
+    bool error = false;
+    out = box_command_run(w, session, line, &error);
+    test_bool(error, true);
+    test_assert(strstr(out, "is too deep") != NULL);
+    ecs_os_free(out);
+}
+
+void Shell_set_poly(void)
+{
+    // command/shell
+    ecs_entity(w, { .name = "thing" });
+    bool error = false;
+    char *out = box_command_run(w, session,
+        "set thing (flecs.core.Poly, flecs.core.Query) {}", &error);
+    test_bool(error, true);
+    test_str(out, "'(flecs.core.Poly, flecs.core.Query)' cannot be set");
+    ecs_os_free(out);
+}
+
+void Shell_add_trait_to_component_in_use(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_set_id(w, e, point, sizeof(int32_t) * 2, (int32_t[]){ 1, 2 });
+    bool error = false;
+    char *out = box_command_run(w, session, "add Point flecs.core.Sparse", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change 'flecs.core.Sparse' while it is in use");
+    ecs_os_free(out);
+    test_assert(!ecs_has_id(w, point, EcsSparse));
+}
+
+void Shell_clear_component_in_use(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_set_id(w, e, point, sizeof(int32_t) * 2, (int32_t[]){ 1, 2 });
+    bool error = false;
+    char *out = box_command_run(w, session, "clear Point", &error);
+    test_bool(error, true);
+    test_str(out, "cannot clear 'Point' while it is in use");
+    ecs_os_free(out);
+    test_assert(ecs_has(w, point, EcsComponent));
+}
+
+void Shell_rm_module_entity(void)
+{
+    // command/shell
+    bool error = false;
+    char *out = box_command_run(w, session, "rm box.transform.Position", &error);
+    test_bool(error, true);
+    test_str(out, "cannot change module entity 'box.transform.Position'");
+    ecs_os_free(out);
+    test_assert(ecs_lookup(w, "box.transform.Position") != 0);
+}
+
+void Shell_rm_panic_policy(void)
+{
+    // command/shell
+    ecs_entity_t e = ecs_entity(w, { .name = "thing" });
+    ecs_add_pair(w, e, EcsOnDelete, EcsPanic);
+    bool error = false;
+    char *out = box_command_run(w, session, "rm thing", &error);
+    test_bool(error, true);
+    test_str(out, "deleting 'thing' panics, see its OnDelete policy");
+    ecs_os_free(out);
+    test_assert(ecs_is_alive(w, e));
+}
+
+void Shell_set_module_singleton(void)
+{
+    // command/shell
+    char *out = box_command_run(w, session,
+        "set box.core.App box.core.App {target_fps: 30}", NULL);
+    test_str(out, "box.core.App");
+    ecs_os_free(out);
+    test_int(ecs_singleton_get(w, App)->target_fps, 30);
 }

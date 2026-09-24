@@ -437,3 +437,12 @@ void InputCommands_an_unknown_input_command_is_an_error(void)
     test_str(out, "unknown command 'key'");
     ecs_os_free(out);
 }
+
+void InputCommands_mouse_sweep_caps_steps(void)
+{
+    // input/input_commands
+    char *out = box_command_run(w, session, "mouse.sweep 0,0 40,0 2147483647 2147483647", NULL);
+    test_str(out, "sweep 0,0 to 40,0 in 4096 steps over 36000 frames");
+    ecs_os_free(out);
+    test_int(box_input_pending(w), 4097);
+}

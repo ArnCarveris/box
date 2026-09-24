@@ -220,7 +220,7 @@ static char* box_search_value(
         }
     }
 
-    if (ptr) {
+    if (ptr && ecs_has(it->world, type, EcsTypeSerializer)) {
         result = ecs_ptr_to_expr(it->world, type, ptr);
     }
 
@@ -367,7 +367,8 @@ static void box_search_scan(
 
         char *id_str = ecs_id_str(world, id);
         ecs_entity_t vtype = ecs_get_typeid(world, id);
-        const void *ptr = vtype ? ecs_get_id(world, e, id) : NULL;
+        const void *ptr = vtype && ecs_has(world, vtype, EcsTypeSerializer) ?
+            ecs_get_id(world, e, id) : NULL;
         char *value = ptr ? ecs_ptr_to_expr(world, vtype, ptr) : NULL;
         bool hit = value && strstr(value, text);
         if (!hit && (!filter || !value)) {
@@ -448,7 +449,7 @@ static void box_search_collect_root(
 /** Append the children of a scope to a vector.
  *
  * @param world The world
- * @param scope The scope, 0 for the root
+ * @param scope The scope, 0 for the root; a wildcard has no children
  * @param out The vector
  */
 static void box_search_collect_children(
@@ -458,7 +459,7 @@ static void box_search_collect_children(
 {
     if (!scope) {
         box_search_collect_root(world, out);
-    } else {
+    } else if (!ecs_id_is_wildcard(scope)) {
         box_hierarchy_children(world, scope, box_search_append_entity, out);
     }
 }

@@ -299,6 +299,25 @@ void Search_grep_recur_nested_children(void)
     ecs_os_free(out);
 }
 
+void Search_grep_recur_from_root(void)
+{
+    // command/search
+    ecs_entity_t deep = ecs_entity(w, { .name = "scene.a.deep" });
+    ecs_set_id(w, deep, point, sizeof(int32_t) * 2, (int32_t[]){ 7, 8 });
+
+    char *out = box_command_run(w, session, "grep_recur Point", NULL);
+    test_assert(out != NULL);
+    const char *match = "scene.a.deep\tPoint\t{x: 7, y: 8}\n";
+    const char *first = strstr(out, match);
+    test_assert(first != NULL);
+    test_assert(strstr(first + 1, match) == NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "logs error 100", NULL);
+    test_assert(strstr(out, "cannot serialize") == NULL);
+    ecs_os_free(out);
+}
+
 void Search_output_capped_at_limit(void)
 {
     // command/search

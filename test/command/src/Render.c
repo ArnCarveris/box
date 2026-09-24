@@ -367,3 +367,16 @@ void Render_live_subject_is_rendered_alone(void)
     test_bool(box_view_shows(v, ecs_get(w, floor, RenderInstance)->layer_mask), false);
     box_packet_fini(&packet);
 }
+
+void Render_builtin_subject(void)
+{
+    // views/render_command
+    bool error = false;
+    char *out = box_command_run(w, session, "render *", &error);
+    test_bool(error, true);
+    test_str(out, "cannot render builtin entity '*'");
+    ecs_os_free(out);
+
+    TerminalSession *s = ecs_get_mut(w, session, TerminalSession);
+    test_int(ecs_vec_count(&s->renders), 0);
+}

@@ -387,6 +387,42 @@ char* box_patch_apply(
     const char *patch,
     char **error);
 
+/** Test whether an entity is a wildcard or part of the flecs module tree.
+ *
+ * Commands read these entities but never change them or create children under
+ * them, since flecs asserts on structural changes to its builtins.
+ *
+ * @param world The world
+ * @param e The entity, 0 for the root
+ * @return true when the entity is a wildcard, flecs or a descendant of flecs
+ */
+bool box_path_builtin(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Test whether an entity is a wildcard, a module or part of a module tree.
+ *
+ * Commands do not delete, clear or move these entities, since the systems and
+ * queries of the module keep using them.
+ *
+ * @param world The world
+ * @param e The entity, 0 for the root
+ * @return true when the entity or one of its parents is a module
+ */
+bool box_path_in_module(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Count the parents of an entity including itself.
+ *
+ * @param world The world
+ * @param e The entity, 0 for the root
+ * @return The depth, 0 for the root and 1 for an entity without a parent
+ */
+int32_t box_path_depth(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Get the scope that the paths of a session resolve against.
  *
  * @param world The world

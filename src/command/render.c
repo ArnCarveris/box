@@ -471,6 +471,11 @@ static void box_render_cmd_command(
         goto done;
     }
 
+    if (box_path_builtin(world, subject)) {
+        out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "cannot render builtin entity '%s'", arg);
+        goto done;
+    }
+
     char *file = box_render_cmd_start(world, session, subject);
     out = flecs_asprintf("%s\n", file);
     ecs_os_free(file);

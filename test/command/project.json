@@ -220,7 +220,28 @@
                     "mv_parent_child_keeps_storage",
                     "mv_parent_child_to_root",
                     "touch_under_parent_child",
-                    "ls_root_entity_with_empty_name"
+                    "ls_root_entity_with_empty_name",
+                    "ls_wildcard_has_no_children",
+                    "cat_value_without_serializer",
+                    "get_value_without_serializer",
+                    "rm_builtin",
+                    "clear_builtin",
+                    "mv_builtin",
+                    "mv_into_wildcard",
+                    "touch_under_wildcard",
+                    "add_wildcard",
+                    "add_relationship_without_target",
+                    "mv_into_own_child",
+                    "add_childof_cycle",
+                    "add_isa_cycle",
+                    "touch_too_deep",
+                    "mv_too_deep",
+                    "set_poly",
+                    "add_trait_to_component_in_use",
+                    "clear_component_in_use",
+                    "rm_module_entity",
+                    "rm_panic_policy",
+                    "set_module_singleton"
                 ],
                 "setup": true,
                 "teardown": true
@@ -242,6 +263,7 @@
                     "grep_with_component_filter",
                     "grep_unknown_component",
                     "grep_recur_nested_children",
+                    "grep_recur_from_root",
                     "output_capped_at_limit",
                     "delete_session_while_iterating"
                 ],
@@ -279,7 +301,8 @@
                     "cleans_up_when_the_image_appears",
                     "live_entity_joins_and_leaves_the_layer",
                     "live_subject_is_rendered_alone",
-                    "headless_run_writes_the_png"
+                    "headless_run_writes_the_png",
+                    "builtin_subject"
                 ],
                 "setup": true,
                 "teardown": true
@@ -362,7 +385,8 @@
                     "action_drag_holds_the_action_while_the_cursor_sweeps",
                     "action_list_shows_the_bindings",
                     "the_help_listing_includes_the_input_commands",
-                    "an_unknown_input_command_is_an_error"
+                    "an_unknown_input_command_is_an_error",
+                    "mouse_sweep_caps_steps"
                 ],
                 "setup": true,
                 "teardown": true

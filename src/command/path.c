@@ -123,7 +123,9 @@ static int box_path_walk(
                 scope = box_path_parent(world, scope);
             } else {
                 ecs_entity_t child = ecs_lookup_child(world, scope, p);
-                if (!child && create) {
+                if (!child && create && !box_path_builtin(world, scope) &&
+                    box_path_depth(world, scope) < FLECS_DAG_DEPTH_MAX - 1)
+                {
                     child = ecs_entity(world, {
                         .name = p,
                         .parent = scope,
@@ -147,6 +149,48 @@ static int box_path_walk(
 done:
     ecs_os_free(buffer);
     out[0] = scope;
+
+    return result;
+}
+
+bool box_path_builtin(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = ecs_id_is_wildcard(e);
+    ecs_entity_t cur = e;
+    while (cur && !result) {
+        result = cur == EcsFlecs;
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
+bool box_path_in_module(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = ecs_id_is_wildcard(e);
+    ecs_entity_t cur = e;
+    while (cur && !result) {
+        result = ecs_has_id(world, cur, EcsModule);
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
+int32_t box_path_depth(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    int32_t result = 0;
+    ecs_entity_t cur = e;
+    while (cur) {
+        result ++;
+        cur = ecs_get_parent(world, cur);
+    }
 
     return result;
 }

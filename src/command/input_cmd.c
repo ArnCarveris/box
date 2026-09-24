@@ -11,6 +11,8 @@
 
 /** Steps a sweep or a drag walks when the command does not give a count */
 #define BOX_INPUT_CMD_STEPS (8)
+#define BOX_INPUT_CMD_STEPS_MAX (4096)
+#define BOX_INPUT_CMD_FRAMES_MAX (36000)
 
 /** Masks one action of the action list shows */
 #define BOX_INPUT_CMD_BINDINGS (8)
@@ -252,8 +254,16 @@ static void box_input_cmd_spread(
         steps[0] = BOX_INPUT_CMD_STEPS;
     }
 
+    if (steps[0] > BOX_INPUT_CMD_STEPS_MAX) {
+        steps[0] = BOX_INPUT_CMD_STEPS_MAX;
+    }
+
     if (frames[0] <= 0) {
         frames[0] = steps[0];
+    }
+
+    if (frames[0] > BOX_INPUT_CMD_FRAMES_MAX) {
+        frames[0] = BOX_INPUT_CMD_FRAMES_MAX;
     }
 }
 

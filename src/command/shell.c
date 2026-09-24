@@ -84,6 +84,52 @@ static char* box_shell_target(
     return result;
 }
 
+/** Resolve a path argument that names an entity a command may change.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param path The path argument
+ * @param out Receives the entity
+ * @return NULL on success, a one line error the caller frees
+ */
+static char* box_shell_writable(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path,
+    ecs_entity_t *out)
+{
+    char *result = box_shell_target(world, session, path, out);
+    if (!result && box_path_builtin(world, out[0])) {
+        result = flecs_asprintf(
+            BOX_COMMAND_ERROR_PREFIX "cannot change builtin entity '%s'", path);
+    }
+
+    return result;
+}
+
+/** Resolve a path argument that names an entity a command may delete or move.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param path The path argument
+ * @param out Receives the entity
+ * @return NULL on success, a one line error the caller frees
+ */
+static char* box_shell_deletable(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path,
+    ecs_entity_t *out)
+{
+    char *result = box_shell_writable(world, session, path, out);
+    if (!result && box_path_in_module(world, out[0])) {
+        result = flecs_asprintf(
+            BOX_COMMAND_ERROR_PREFIX "cannot change module entity '%s'", path);
+    }
+
+    return result;
+}
+
 /** Test whether an expression holds one component id and not a query.
  *
  * @param expr The expression
@@ -128,6 +174,216 @@ static char* box_shell_id(
     char *result = NULL;
     if (!out[0]) {
         result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "unknown component '%s'", expr);
+    }
+
+    return result;
+}
+
+/** Test whether flecs accepts a component or pair by itself.
+ *
+ * Mirrors the id and constraint trait checks flecs runs on add, which abort
+ * instead of returning an error.
+ *
+ * @param world The world
+ * @param id The component or pair
+ * @return true when the id can be added
+ */
+static bool box_shell_valid_id(
+    const ecs_world_t *world,
+    ecs_id_t id)
+{
+    bool result = ecs_id_is_valid(world, id);
+    if (result && ECS_IS_PAIR(id)) {
+        ecs_entity_t rel = ecs_pair_first(world, id);
+        ecs_entity_t tgt = ecs_pair_second(world, id);
+        ecs_entity_t oneof = ecs_has_id(world, rel, EcsOneOf) ?
+            rel : ecs_get_target(world, rel, EcsOneOf, 0);
+        result = rel && tgt && !ecs_has_id(world, rel, EcsTarget);
+        result = result && (!ecs_has_id(world, tgt, EcsRelationship) ||
+            ecs_has_id(world, rel, EcsTrait));
+        result = result && (!oneof || ecs_has_pair(world, tgt, EcsChildOf, oneof));
+        result = result && !(rel == EcsIsA && ecs_has_id(world, tgt, EcsFinal));
+    } else if (result) {
+        result = !ecs_has_id(world, id, EcsRelationship) &&
+            !ecs_has_id(world, id, EcsTarget);
+    }
+
+    return result;
+}
+
+/** Test whether an entity is used as a component, tag or relationship.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when an entity holds it as an id or as the first element of a pair
+ */
+static bool box_shell_in_use(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_id_in_use(world, e) || ecs_id_in_use(world, ecs_pair(e, EcsWildcard));
+}
+
+/** Test whether an id changes a trait of the entity it is added to.
+ *
+ * @param world The world
+ * @param id The component or pair
+ * @return true for a trait such as Sparse or a trait pair such as (OnDelete, Panic)
+ */
+static bool box_shell_is_trait(
+    const ecs_world_t *world,
+    ecs_id_t id)
+{
+    ecs_entity_t e = ECS_IS_PAIR(id) ? ecs_pair_first(world, id) : id;
+
+    return e != EcsChildOf && e != EcsIsA && ecs_has_id(world, e, EcsTrait);
+}
+
+/** Count the levels of the hierarchy below an entity including itself.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return 1 for an entity without children
+ */
+static int32_t box_shell_height(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    int32_t result = 0;
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            int32_t height = box_shell_height(world, it.entities[i]);
+            result = height > result ? height : result;
+        }
+    }
+
+    return result + 1;
+}
+
+/** Test whether an entity reaches another through a relationship.
+ *
+ * @param world The world
+ * @param from The entity to start from
+ * @param rel The relationship
+ * @param to The entity to find
+ * @return true when to is from or one of its targets, transitively
+ */
+static bool box_shell_reaches(
+    const ecs_world_t *world,
+    ecs_entity_t from,
+    ecs_entity_t rel,
+    ecs_entity_t to)
+{
+    bool result = from == to;
+    int32_t i = 0;
+    ecs_entity_t tgt;
+    while (!result && (tgt = ecs_get_target(world, from, rel, i ++))) {
+        result = box_shell_reaches(world, tgt, rel, to);
+    }
+
+    return result;
+}
+
+/** Test whether deleting an entity trips an (OnDelete, Panic) cleanup policy.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when the entity, a descendant or a pair that targets it panics on delete
+ */
+static bool box_shell_panics(
+    ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = ecs_has_pair(world, e, EcsOnDelete, EcsPanic);
+    ecs_iter_t it = ecs_each_pair(world, EcsOnDeleteTarget, EcsPanic);
+    while (!result && ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count && !result; i ++) {
+            result = ecs_id_in_use(world, ecs_pair(it.entities[i], e));
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    ecs_iter_t children = ecs_children(world, e);
+    while (!result && ecs_children_next(&children)) {
+        int32_t i;
+        for (i = 0; i < children.count && !result; i ++) {
+            result = box_shell_panics(world, children.entities[i]);
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&children);
+    }
+
+    return result;
+}
+
+/** Check that an entity can move under a new parent.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param scope The new parent, 0 for the root
+ * @param to The destination as the user wrote it
+ * @return NULL when the move is allowed, a one line error the caller frees
+ */
+static char* box_shell_reparent(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t scope,
+    const char *to)
+{
+    char *result = NULL;
+    if (box_path_builtin(world, scope)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "cannot move into builtin '%s'", to);
+    } else if (scope && box_shell_reaches(world, scope, EcsChildOf, e)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "cannot move into itself '%s'", to);
+    } else if (box_path_depth(world, scope) + box_shell_height(world, e) >=
+        FLECS_DAG_DEPTH_MAX)
+    {
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "'%s' is too deep", to);
+    }
+
+    return result;
+}
+
+/** Check that a component or pair can be added to or removed from an entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param id The component or pair
+ * @param expr The component expression as the user wrote it
+ * @param add true for an add or set, false for a remove
+ * @return NULL when the change is allowed, a one line error the caller frees
+ */
+static char* box_shell_check_id(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_id_t id,
+    const char *expr,
+    bool add)
+{
+    char *result = NULL;
+    ecs_entity_t rel = ECS_IS_PAIR(id) ? ecs_pair_first(world, id) : 0;
+    ecs_entity_t tgt = ECS_IS_PAIR(id) ? ecs_pair_second(world, id) : 0;
+    if (add && !box_shell_valid_id(world, id)) {
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "cannot add '%s'", expr);
+    } else if ((box_shell_is_trait(world, id) || id == ecs_id(EcsComponent)) &&
+        box_shell_in_use(world, e))
+    {
+        result = flecs_asprintf(
+            BOX_COMMAND_ERROR_PREFIX "cannot change '%s' while it is in use", expr);
+    } else if (add && rel == EcsChildOf) {
+        result = box_shell_reparent(world, e, tgt, expr);
+    } else if (add && rel && ecs_has_id(world, rel, EcsTraversable) &&
+        box_shell_reaches(world, tgt, rel, e))
+    {
+        result = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "'%s' creates a cycle", expr);
     }
 
     return result;
@@ -183,7 +439,7 @@ static void box_shell_collect_root(
 /** Collect the children of a scope, sorted by name.
  *
  * @param world The world
- * @param scope The scope, 0 for the root
+ * @param scope The scope, 0 for the root; a wildcard has no children
  * @param children The vector that receives the children
  */
 static void box_shell_collect(
@@ -193,7 +449,7 @@ static void box_shell_collect(
 {
     if (!scope) {
         box_shell_collect_root(world, children);
-    } else {
+    } else if (!ecs_id_is_wildcard(scope)) {
         box_hierarchy_children(world, scope, box_shell_add_child, children);
     }
 
@@ -222,7 +478,8 @@ static char* box_shell_values(
 
         char *name = ecs_id_str(world, id);
         ecs_entity_t vtype = ecs_get_typeid(world, id);
-        const void *ptr = vtype ? ecs_get_id(world, e, id) : NULL;
+        const void *ptr = vtype && ecs_has(world, vtype, EcsTypeSerializer) ?
+            ecs_get_id(world, e, id) : NULL;
         char *value = ptr ? ecs_ptr_to_expr(world, vtype, ptr) : NULL;
         if (value) {
             ecs_strbuf_append(&buf, "%s: %s\n", name, value);
@@ -417,8 +674,14 @@ static void box_shell_rm(
     ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
     const char *path = *(char**)argv[1].ptr;
     ecs_entity_t e = 0;
-    char *out = box_shell_target(world, session, path, &e);
+    char *out = box_shell_deletable(world, session, path, &e);
     if (out) {
+        goto done;
+    }
+
+    if (box_shell_panics(world, e)) {
+        out = flecs_asprintf(
+            BOX_COMMAND_ERROR_PREFIX "deleting '%s' panics, see its OnDelete policy", path);
         goto done;
     }
 
@@ -449,7 +712,7 @@ static void box_shell_mv(
     const char *to = *(char**)argv[2].ptr;
     ecs_entity_t e = 0;
     char *name = NULL;
-    char *out = box_shell_target(world, session, from, &e);
+    char *out = box_shell_deletable(world, session, from, &e);
     if (out) {
         goto done;
     }
@@ -459,6 +722,13 @@ static void box_shell_mv(
     if (box_path_split(world, cwd, to, &scope, &name)) {
         out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "'%s' is not a valid path", to);
         goto done;
+    }
+
+    if (box_hierarchy_parent(world, e) != scope) {
+        out = box_shell_reparent(world, e, scope, to);
+        if (out) {
+            goto done;
+        }
     }
 
     ecs_entity_t existing = ecs_lookup_child(world, scope, name);
@@ -498,13 +768,18 @@ static void box_shell_add(
     const char *path = *(char**)argv[1].ptr;
     const char *expr = *(char**)argv[2].ptr;
     ecs_entity_t e = 0;
-    char *out = box_shell_target(world, session, path, &e);
+    char *out = box_shell_writable(world, session, path, &e);
     if (out) {
         goto done;
     }
 
     ecs_id_t id = 0;
     out = box_shell_id(world, expr, &id);
+    if (out) {
+        goto done;
+    }
+
+    out = box_shell_check_id(world, e, id, expr, true);
     if (out) {
         goto done;
     }
@@ -535,13 +810,18 @@ static void box_shell_remove(
     const char *path = *(char**)argv[1].ptr;
     const char *expr = *(char**)argv[2].ptr;
     ecs_entity_t e = 0;
-    char *out = box_shell_target(world, session, path, &e);
+    char *out = box_shell_writable(world, session, path, &e);
     if (out) {
         goto done;
     }
 
     ecs_id_t id = 0;
     out = box_shell_id(world, expr, &id);
+    if (out) {
+        goto done;
+    }
+
+    out = box_shell_check_id(world, e, id, expr, false);
     if (out) {
         goto done;
     }
@@ -573,7 +853,7 @@ static void box_shell_set(
     const char *expr = *(char**)argv[2].ptr;
     const char *value = *(char**)argv[3].ptr;
     ecs_entity_t e = 0;
-    char *out = box_shell_target(world, session, path, &e);
+    char *out = box_shell_writable(world, session, path, &e);
     if (out) {
         goto done;
     }
@@ -584,10 +864,22 @@ static void box_shell_set(
         goto done;
     }
 
+    out = box_shell_check_id(world, e, id, expr, true);
+    if (out) {
+        goto done;
+    }
+
     ecs_entity_t type = ecs_get_typeid(world, id);
     const ecs_type_info_t *ti = type ? ecs_get_type_info(world, id) : NULL;
     if (!ti || !ti->size) {
         out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "'%s' has no value", expr);
+        goto done;
+    }
+
+    if (type == ecs_id(EcsPoly) ||
+        (ti->hooks.flags & (ECS_TYPE_HOOK_COPY_ILLEGAL | ECS_TYPE_HOOK_CTOR_ILLEGAL)))
+    {
+        out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "'%s' cannot be set", expr);
         goto done;
     }
 
@@ -662,7 +954,10 @@ static void box_shell_get(
         goto done;
     }
 
-    out = ecs_ptr_to_expr(world, type, ptr);
+    if (ecs_has(world, type, EcsTypeSerializer)) {
+        out = ecs_ptr_to_expr(world, type, ptr);
+    }
+
     if (!out) {
         out = flecs_asprintf(BOX_COMMAND_ERROR_PREFIX "cannot serialize '%s'", expr);
     }
@@ -736,8 +1031,14 @@ static void box_shell_clear(
         goto done;
     }
 
-    out = box_shell_target(world, session, path, &e);
+    out = box_shell_deletable(world, session, path, &e);
     if (out) {
+        goto done;
+    }
+
+    if (box_shell_in_use(world, e)) {
+        out = flecs_asprintf(
+            BOX_COMMAND_ERROR_PREFIX "cannot clear '%s' while it is in use", path);
         goto done;
     }
 
