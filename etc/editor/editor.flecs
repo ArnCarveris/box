@@ -549,11 +549,14 @@ template ValueField : FieldRow {
 }
 
 // Listens for the clicks nothing in the scene took and selects what they hit.
+// The collider of the hit is passed rather than the entity the pick resolved
+// to, which is the root of an instance: the editor resolves the root itself,
+// and inside an opened instance the collider names the child that was clicked.
 template Picker {
   async {
     while true {
       const hit = await on.click(Unhandled)
-      const ok = editor.select(hit.entity)
+      const ok = editor.select(hit.collider)
     }
   }
 }

@@ -182,6 +182,9 @@
 /** Layer mask of a view that lists no layers, which shows every layer */
 #define BOX_VIEW_LAYER_ALL (0xFFFFFFFFu)
 
+/** Opacity the instances of a view are drawn with where the depth of its occluder hides them */
+#define BOX_VIEW_OCCLUDED_OPACITY (0.5f)
+
 /** Cascades a view can split its shadow map into */
 #define BOX_SHADOW_CASCADE_MAX (4)
 
@@ -450,6 +453,7 @@ typedef struct box_view_t {
     float inv_clip[16];     /**< Clip to world of this frame, for the motion pass */
     float prev_clip[16];    /**< World to clip of the previous frame of the view */
     int32_t priority;       /**< Order in the frame, lower renders first */
+    uint32_t occluder;      /**< One past the index of the view whose depth hides it, 0 for none */
     uint32_t layer_mask;    /**< Layers the view shows, BOX_VIEW_LAYER_ALL for every layer */
     uint32_t caster_mask;   /**< Layers that cast its shadows, BOX_VIEW_LAYER_ALL for all */
     uint32_t dynamic_first; /**< First dynamic batch of the view in the packet */

@@ -37,6 +37,10 @@ struct LightModulatorBlock {
 
 override box_solid: bool = false;
 
+// Opacity the pass multiplies every fragment with, below one for the draw of
+// what the depth of an occluder hides, which composites premultiplied over it.
+override box_fade: f32 = 1.0;
+
 struct VertexIn {
   @location(0) pos: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -417,7 +421,7 @@ fn group_composite(in: VertexOut) -> vec4<f32> {
     -> @location(0) vec4<f32> {
   var normal = vec3<f32>(0.0);
   var indirect = vec3<f32>(0.0);
-  return mesh_shade(in, front, &normal, &indirect);
+  return mesh_shade(in, front, &normal, &indirect) * box_fade;
 }
 
 // The second attachment holds the world normal octahedrally in its first two

@@ -82,6 +82,9 @@ done:
 
 /** Point the overlay view at the camera of the primary view of the scene.
  *
+ * The primary view is also the occluder of the overlay, so an overlay draw
+ * behind the scene shows faded instead of over it.
+ *
  * @param world The world
  * @param state The module state
  */
@@ -98,13 +101,15 @@ static void box_draw_follow_camera(
     const View *scene = primary && primary != state->view ?
         ecs_get(world, primary, View) : NULL;
     ecs_entity_t camera = scene ? scene->camera : 0;
+    ecs_entity_t occluder = scene ? primary : 0;
     if (!camera) {
         camera = box_render_active_camera(world);
     }
 
     View *view = ecs_get_mut(world, state->view, View);
-    if (view->camera != camera) {
+    if (view->camera != camera || view->occluder != occluder) {
         view->camera = camera;
+        view->occluder = occluder;
         ecs_modified(world, state->view, View);
     }
 

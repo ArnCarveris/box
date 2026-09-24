@@ -66,6 +66,10 @@ static const WGPUBlendState box_frame_cover_blend = {
 
 /** Create a variant of the mesh pipeline, optionally with the solid constant set.
  *
+ * A fade below one makes the pipeline of the draw behind an occluder: it passes
+ * where the fragment lies behind the depth, writes no depth and multiplies the
+ * fragment by the fade through the box_fade constant.
+ *
  * @param r The renderer
  * @param stride Bytes between two instances in the instance buffer
  * @param offset Bytes from an instance buffer element to its instance data
@@ -75,6 +79,7 @@ static const WGPUBlendState box_frame_cover_blend = {
  * @param hdr The draw writes the float scene target of a view with a chain
  * @param normals One of the BOX_NORMALS constants, what it writes there
  * @param solid Set box_solid, which drops the clip, cutout and shape discards
+ * @param fade Opacity of the draw behind the depth, 1 for a pipeline in front of it
  * @return The pipeline
  */
 static WGPURenderPipeline box_frame_pipeline_create(
@@ -86,7 +91,8 @@ static WGPURenderPipeline box_frame_pipeline_create(
     const WGPUBlendState *blend,
     bool hdr,
     uint32_t normals,
-    bool solid)
+    bool solid,
+    float fade)
 {
     WGPUVertexAttribute vertex_attrs[8] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
@@ -150,12 +156,22 @@ static WGPURenderPipeline box_frame_pipeline_create(
     };
     const char *entries[] = { "fs_main", "fs_normal", "fs_cover", "fs_group",
         "fs_group_cover" };
-    WGPUConstantEntry constant = {
-        .key = { .data = "box_solid", .length = WGPU_STRLEN }, .value = 1.0
-    };
+    bool behind = fade < 1.0f;
+    WGPUConstantEntry constants[2];
+    uint32_t constant_count = 0;
+    if (solid) {
+        constants[constant_count ++] = (WGPUConstantEntry){
+            .key = { .data = "box_solid", .length = WGPU_STRLEN }, .value = 1.0 };
+    }
+
+    if (behind) {
+        constants[constant_count ++] = (WGPUConstantEntry){
+            .key = { .data = "box_fade", .length = WGPU_STRLEN }, .value = fade };
+    }
+
     WGPUFragmentState fragment = {
-        .constantCount = solid ? 1 : 0,
-        .constants = solid ? &constant : NULL,
+        .constantCount = constant_count,
+        .constants = constant_count ? constants : NULL,
         .module = r->mesh_shader,
         .entryPoint = { .data = entries[normals], .length = WGPU_STRLEN },
         .targetCount = lone ? 1u : 2u,
@@ -163,8 +179,9 @@ static WGPURenderPipeline box_frame_pipeline_create(
     };
     WGPUDepthStencilState depth = {
         .format = WGPUTextureFormat_Depth32Float,
-        .depthWriteEnabled = depth_write ? WGPUOptionalBool_True : WGPUOptionalBool_False,
-        .depthCompare = WGPUCompareFunction_Greater,
+        .depthWriteEnabled = depth_write && !behind ?
+            WGPUOptionalBool_True : WGPUOptionalBool_False,
+        .depthCompare = behind ? WGPUCompareFunction_Less : WGPUCompareFunction_Greater,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always },
         .stencilReadMask = 0xFFFFFFFF,
@@ -202,7 +219,7 @@ WGPURenderPipeline box_frame_pipeline(
     uint32_t normals)
 {
     return box_frame_pipeline_create(r, stride, offset, cull,
-        depth_write, blend, hdr, normals, false);
+        depth_write, blend, hdr, normals, false, 1.0f);
 }
 
 void box_frame_resources(
@@ -234,6 +251,8 @@ void box_frame_init(
     r->mesh_shader = box_shader_module(r, BOX_SHADER_MESH);
     r->solid_supported =
         strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
+    r->occluded_supported =
+        strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_fade:") != NULL;
 
     WGPUBindGroupLayout group_layouts[4] = {
         r->view_layout, r->light_layout, r->env_layout, r->probe_layout };
@@ -307,12 +326,45 @@ WGPURenderPipeline box_frame_opaque_pipeline(
     if (!*pipeline) {
         *pipeline = box_frame_pipeline_create(r, sizeof(box_instance_t), 0,
             WGPUCullMode_Back, true, NULL, hdr,
-            normals ? BOX_NORMALS_WRITE : BOX_NORMALS_NONE, true);
+            normals ? BOX_NORMALS_WRITE : BOX_NORMALS_NONE, true, 1.0f);
     }
 
     result = *pipeline;
 done:
     return result;
+}
+
+/** Blend of the draw behind an occluder: premultiplied source over what is there */
+static const WGPUBlendState box_frame_fade_blend = {
+    .color = { WGPUBlendOperation_Add, WGPUBlendFactor_One,
+        WGPUBlendFactor_OneMinusSrcAlpha },
+    .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_One,
+        WGPUBlendFactor_OneMinusSrcAlpha }
+};
+
+/** Mesh pipeline of the pass that draws what the depth of an occluder hides.
+ *
+ * The variant is built the first time a view with an occluder is drawn and
+ * kept until the mesh shader changes.
+ *
+ * @param r The renderer
+ * @param hdr The pass writes the float scene target of a view with a chain
+ * @return The pipeline, NULL when the mesh shader has no fade constant
+ */
+static WGPURenderPipeline box_frame_occluded_pipeline(
+    box_renderer_t *r,
+    bool hdr)
+{
+    uint32_t slot = hdr ? 1 : 0;
+    if (r->occluded_pipeline[slot] || !r->occluded_supported) {
+        goto done;
+    }
+
+    r->occluded_pipeline[slot] = box_frame_pipeline_create(r, sizeof(box_instance_t), 0,
+        WGPUCullMode_Back, false, &box_frame_fade_blend, hdr, BOX_NORMALS_NONE, false,
+        BOX_VIEW_OCCLUDED_OPACITY);
+done:
+    return r->occluded_pipeline[slot];
 }
 
 bool box_frame_rebuild(
@@ -333,6 +385,8 @@ bool box_frame_rebuild(
     if (result) {
         r->solid_supported =
             strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_solid:") != NULL;
+        r->occluded_supported =
+            strstr(box_shader_source(r, BOX_SHADER_MESH), "override box_fade:") != NULL;
         box_transparent_reset(r);
         wgpuShaderModuleRelease(previous);
         uint32_t slot;
@@ -345,6 +399,10 @@ bool box_frame_rebuild(
                 wgpuRenderPipelineRelease(r->normal_pipeline[slot]);
             }
 
+            if (r->occluded_pipeline[slot]) {
+                wgpuRenderPipelineRelease(r->occluded_pipeline[slot]);
+            }
+
             for (uint32_t normal = 0; normal < 2; normal ++) {
                 if (r->solid_pipeline[slot][normal]) {
                     wgpuRenderPipelineRelease(r->solid_pipeline[slot][normal]);
@@ -354,6 +412,7 @@ bool box_frame_rebuild(
 
             r->pipeline[slot] = NULL;
             r->normal_pipeline[slot] = NULL;
+            r->occluded_pipeline[slot] = NULL;
         }
 
         r->pipeline[0] = pipeline;
@@ -547,7 +606,7 @@ static void box_frame_uncovered(
     wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
-    box_cull_draw(r, pass, BOX_HIZ_PASS_NEW);
+    box_cull_draw(r, pass, BOX_HIZ_PASS_NEW, NULL);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 }
@@ -596,6 +655,97 @@ static void box_frame_clear(
     }
 
     out[3] = view->clear[3];
+}
+
+/** Resources of the view whose depth hides a view, when it can start from them.
+ *
+ * @param r The renderer
+ * @param p The packet
+ * @param view The view
+ * @param index Index of the view in the packet
+ * @return The GPU view of the occluder, NULL when it has none of the same size
+ */
+static box_gpu_view_t* box_frame_occluder(
+    box_renderer_t *r,
+    const box_packet_t *p,
+    const box_view_t *view,
+    uint32_t index)
+{
+    box_gpu_view_t *result = NULL;
+    if (!view->occluder || view->occluder > index || view->occluder > r->views.count) {
+        goto done;
+    }
+
+    const box_view_t *source = box_vec_at(&p->views, view->occluder - 1);
+    box_gpu_view_t *v = box_vec_at(&r->views, view->occluder - 1);
+    if (source->target == view->target && v->depth &&
+        v->width == r->v->width && v->height == r->v->height)
+    {
+        result = v;
+    }
+
+done:
+    return result;
+}
+
+/** Start the depth of a view from the depth its occluder left and draw what it hides.
+ *
+ * The depth target of the occluder is copied into the one of the view, and the
+ * instances of the view are drawn where they lie behind it, faded, before the
+ * opaque pass draws them where they lie in front.
+ *
+ * @param r The renderer
+ * @param view The view
+ * @param p The packet
+ * @param occluder The GPU view of the occluder
+ * @param encoder The command encoder
+ * @param color The color attachment of the opaque pass, cleared here when it clears
+ */
+static void box_frame_occluded(
+    box_renderer_t *r,
+    const box_view_t *view,
+    const box_packet_t *p,
+    const box_gpu_view_t *occluder,
+    WGPUCommandEncoder encoder,
+    WGPURenderPassColorAttachment *color)
+{
+    WGPUTexelCopyTextureInfo src = {
+        .texture = occluder->depth, .aspect = WGPUTextureAspect_DepthOnly };
+    WGPUTexelCopyTextureInfo dst = {
+        .texture = r->v->depth, .aspect = WGPUTextureAspect_DepthOnly };
+    WGPUExtent3D size = { r->v->width, r->v->height, 1 };
+    wgpuCommandEncoderCopyTextureToTexture(encoder, &src, &dst, &size);
+
+    WGPURenderPipeline pipeline = box_frame_occluded_pipeline(r, r->effect_scene != NULL);
+    if (!pipeline) {
+        goto done;
+    }
+
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = r->v->depth_view,
+        .depthReadOnly = true
+    };
+    WGPURenderPassDescriptor desc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = color,
+        .depthStencilAttachment = &depth
+    };
+    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "occluded");
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->view_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 1, r->v->light_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
+    if (r->v->culled) {
+        box_cull_draw(r, pass, BOX_HIZ_PASS_VISIBLE, pipeline);
+    } else {
+        box_scene_draw(r, view, p, pass, pipeline);
+    }
+
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+    color->loadOp = WGPULoadOp_Load;
+done:
+    return;
 }
 
 /** Record every pass of one view into its target.
@@ -671,9 +821,14 @@ static void box_frame_view(
         attachments = 2;
     }
 
+    box_gpu_view_t *occluder = box_frame_occluder(r, p, view, index);
+    if (occluder) {
+        box_frame_occluded(r, view, p, occluder, encoder, color);
+    }
+
     WGPURenderPassDepthStencilAttachment depth = {
         .view = r->v->depth_view,
-        .depthLoadOp = WGPULoadOp_Clear,
+        .depthLoadOp = occluder ? WGPULoadOp_Load : WGPULoadOp_Clear,
         .depthStoreOp = WGPUStoreOp_Store,
         .depthClearValue = 0.0f
     };
@@ -690,9 +845,9 @@ static void box_frame_view(
     wgpuRenderPassEncoderSetBindGroup(pass, 2, r->v->env_group, 0, NULL);
     wgpuRenderPassEncoderSetBindGroup(pass, 3, r->probe_group, 0, NULL);
     if (r->v->culled) {
-        box_cull_draw(r, pass, BOX_HIZ_PASS_VISIBLE);
+        box_cull_draw(r, pass, BOX_HIZ_PASS_VISIBLE, NULL);
     } else {
-        box_scene_draw(r, view, p, pass);
+        box_scene_draw(r, view, p, pass, NULL);
     }
 
     wgpuRenderPassEncoderEnd(pass);

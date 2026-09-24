@@ -3,8 +3,11 @@
  * @brief Selection of the editor: instance roots, opened instances and what they hide.
  *
  * A click on a child of a prefab or template instance selects the root of the
- * instance, until that instance is opened. Opening hides every sibling of the
- * instance and of its ancestors, so the instance is seen on its own.
+ * instance, until that instance is opened. An opened instance is not selected
+ * itself, only what it contains, so its bounds never stand in for a child.
+ *
+ * Opening hides every sibling of the instance and of its ancestors except the
+ * cameras and the lights, so the instance is seen on its own.
  */
 
 #include "editor_internal.h"
@@ -92,6 +95,10 @@ ecs_entity_t box_editor_resolve(
         result = e;
     }
 
+    if (opened && result == opened) {
+        result = 0;
+    }
+
     return result;
 }
 
@@ -136,7 +143,25 @@ ecs_entity_t box_editor_select(
     return result;
 }
 
+/** Tell whether an entity lights the scene, so opening an instance keeps it.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when the entity carries a light or the atmosphere
+ */
+static bool box_editor_is_light(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    return ecs_has(world, e, DirectionalLight) || ecs_has(world, e, CelestialLight) ||
+        ecs_has(world, e, PointLight) || ecs_has(world, e, SpotLight) ||
+        ecs_has(world, e, EnvironmentLight) || ecs_has(world, e, Atmosphere);
+}
+
 /** Hide one sibling of an opened instance, remembering it on the level.
+ *
+ * Cameras and lights stay, so the opened instance is seen through the same
+ * camera and under the same light as the scene.
  *
  * @param world The world
  * @param e The sibling
@@ -149,7 +174,8 @@ static void box_editor_hide(
 {
     if (ecs_has_id(world, e, Hidden) || ecs_has_id(world, e, EcsModule) ||
         ecs_has_id(world, e, EcsPrefab) || ecs_has(world, e, EcsComponent) ||
-        ecs_has(world, e, EcsScript) || ecs_has(world, e, Camera))
+        ecs_has(world, e, EcsScript) || ecs_has(world, e, Camera) ||
+        box_editor_is_light(world, e))
     {
         goto done;
     }
@@ -219,7 +245,7 @@ bool box_editor_open(
     editor = box_editor_get(world);
     editor->opened = e;
     editor->depth = ecs_vec_count(&state->levels);
-    editor->selected = e;
+    editor->selected = 0;
     editor->point = -1;
     state->tree_dirty = true;
     box_editor_reveal(world, e);

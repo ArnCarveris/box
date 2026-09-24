@@ -3,8 +3,8 @@
  * @brief The transform gizmos: drawing them over the selection and the math of a drag.
  *
  * The gizmo of the tool is drawn through box.draw every frame at the world
- * position of the selection, sized by its distance to the camera, and the
- * select tool draws a box around the bounds of the selection instead.
+ * position of the selection, sized by its distance to the camera, and every
+ * tool draws a box around the bounds of the selection.
  *
  * A handle that is pressed records where the drag started; every drag maps the
  * cursor ray back onto the axis or the plane of the handle and moves the selection.
@@ -642,8 +642,8 @@ static void box_editor_draw_tool(
 {
     const char *names[] = { NULL, "MoveGizmo", "RotateGizmo", "ScaleGizmo" };
     ecs_entity_t e = editor->selected;
+    box_editor_draw_selection(world, editor, eye);
     if (editor->tool == ToolSelect) {
-        box_editor_draw_selection(world, editor, eye);
         goto done;
     }
 

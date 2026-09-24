@@ -206,6 +206,35 @@ void Draw_overlay_view_draws_the_layer_with_the_scene_camera(void)
     test_uint(v->camera, ecs_lookup(w, "cam"));
 }
 
+void Draw_overlay_view_is_occluded_by_the_scene_view(void)
+{
+    // editor/draw
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 640;
+    packet.height = 360;
+    ecs_entity_t cam = ecs_lookup(w, "cam");
+    ecs_entity_t scene = ecs_entity(w, { .name = "main" });
+    ecs_set(w, scene, View, { .camera = cam, .enabled = true });
+    box_draw(w, &(box_draw_desc_t){ .asset = prefab, .key = 1, .overlay = true });
+    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    test_assert(view != 0);
+    test_uint(ecs_get(w, view, View)->occluder, 0);
+    box_render_extract(w, &packet);
+    ecs_progress(w, 0);
+    const View *v = ecs_get(w, view, View);
+    test_uint(v->camera, cam);
+    test_uint(v->occluder, scene);
+    box_render_extract(w, &packet);
+    test_int(packet.views.count, 2);
+    test_uint(((box_view_t*)box_vec_at(&packet.views, 1))->occluder, 1);
+    ecs_delete(w, scene);
+    box_render_extract(w, &packet);
+    ecs_progress(w, 0);
+    test_uint(ecs_get(w, view, View)->occluder, 0);
+    box_packet_fini(&packet);
+}
+
 void Draw_overlay_layer_is_hidden_from_the_scene_view(void)
 {
     // editor/draw

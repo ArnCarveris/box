@@ -157,7 +157,7 @@ ECS_STRUCT(EditorBinding, {
 #define BOX_EDITOR_GIZMO_SIZE (0.15f)
 
 /** Fraction of the gizmo size the edges of the selection box are thick */
-#define BOX_EDITOR_EDGE_SIZE (0.02f)
+#define BOX_EDITOR_EDGE_SIZE (0.01f)
 
 /** Register the box.editor module.
  *

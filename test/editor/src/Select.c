@@ -25,6 +25,7 @@ void Select_setup(void)
         "using box.transform\n"
         "using box.geometry\n"
         "using box.spline\n"
+        "using box.light\n"
         "template Tree {\n"
         "  trunk {\n"
         "    Position: {0, 1, 0}\n"
@@ -57,6 +58,14 @@ void Select_setup(void)
         "  }\n"
         "  road {\n"
         "    Spline: {points: [{0, 0, 0}, {1, 0, 0}, {2, 0, 1}]}\n"
+        "  }\n"
+        "  sun {\n"
+        "    Rotation: {0.9, -0.6, 0}\n"
+        "    DirectionalLight: {intensity: 1}\n"
+        "  }\n"
+        "  lamp {\n"
+        "    Position: {0, 4, 0}\n"
+        "    PointLight: {intensity: 1, range: 10}\n"
         "  }\n"
         "}\n" });
     test_assert(s2 != 0);
@@ -135,7 +144,7 @@ void Select_open_hides_the_siblings_and_shows_the_instance(void)
     const Editor *ed = ecs_singleton_get(w, Editor);
     test_uint(ed->opened, t1);
     test_int(ed->depth, 1);
-    test_uint(ed->selected, t1);
+    test_uint(ed->selected, 0);
     test_bool(ed->instance, false);
     test_assert(!ecs_has_id(w, t1, Hidden));
     test_assert(!ecs_has_id(w, ecs_lookup(w, "scene.t1.trunk"), Hidden));
@@ -151,9 +160,44 @@ void Select_open_lets_the_children_be_selected(void)
     // editor/templates
     ecs_entity_t t1 = ecs_lookup(w, "scene.t1");
     ecs_entity_t trunk = ecs_lookup(w, "scene.t1.trunk");
+    ecs_entity_t crown = ecs_lookup(w, "scene.t1.crown");
     box_editor_open(w, t1);
     test_uint(box_editor_select(w, trunk), trunk);
+    test_uint(ecs_singleton_get(w, Editor)->selected, trunk);
+    test_uint(box_editor_select(w, crown), crown);
+    test_uint(ecs_singleton_get(w, Editor)->selected, crown);
+}
+
+void Select_open_refuses_to_select_the_opened_instance(void)
+{
+    // editor/templates
+    ecs_entity_t t1 = ecs_lookup(w, "scene.t1");
+    ecs_entity_t trunk = ecs_lookup(w, "scene.t1.trunk");
+    box_editor_open(w, t1);
+    box_editor_select(w, trunk);
+    test_uint(box_editor_select(w, t1), 0);
+    test_uint(ecs_singleton_get(w, Editor)->selected, 0);
+    test_uint(box_editor_resolve(w, t1), 0);
+    test_uint(box_editor_resolve(w, trunk), trunk);
+    test_bool(box_editor_close(w), true);
     test_uint(box_editor_select(w, t1), t1);
+}
+
+void Select_open_keeps_the_lights(void)
+{
+    // editor/templates
+    ecs_entity_t t1 = ecs_lookup(w, "scene.t1");
+    ecs_entity_t sun = ecs_lookup(w, "scene.sun");
+    ecs_entity_t lamp = ecs_lookup(w, "scene.lamp");
+    test_assert(sun != 0);
+    test_assert(lamp != 0);
+    test_bool(box_editor_open(w, t1), true);
+    test_assert(!ecs_has_id(w, sun, Hidden));
+    test_assert(!ecs_has_id(w, lamp, Hidden));
+    test_assert(ecs_has_id(w, ecs_lookup(w, "scene.rock"), Hidden));
+    test_bool(box_editor_close(w), true);
+    test_assert(!ecs_has_id(w, sun, Hidden));
+    test_assert(!ecs_has_id(w, lamp, Hidden));
 }
 
 void Select_close_shows_the_scene_again(void)
@@ -241,6 +285,31 @@ void Select_click_in_the_scene_selects_the_hit(void)
     ecs_progress(w, 0);
     ecs_progress(w, 0);
     test_uint(ecs_singleton_get(w, Editor)->selected, rock);
+}
+
+void Select_click_on_a_child_selects_the_root_until_opened(void)
+{
+    // editor/templates
+    ecs_entity_t t1 = ecs_lookup(w, "scene.t1");
+    ecs_entity_t trunk = ecs_lookup(w, "scene.t1.trunk");
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {390, 298} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_uint(ecs_singleton_get(w, Editor)->selected, t1);
+
+    test_bool(box_editor_open(w, t1), true);
+    test_uint(ecs_singleton_get(w, Editor)->selected, 0);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_uint(ecs_singleton_get(w, Editor)->selected, trunk);
 }
 
 void Select_click_on_empty_space_clears_the_selection(void)

@@ -64,15 +64,19 @@ void Gizmo_select_tool_draws_the_selection_box(void)
     box_editor_modified(w);
     ecs_progress(w, 0);
     ecs_progress(w, 0);
+    edges = 0;
     it = ecs_each(w, DrawInstance);
     while (ecs_each_next(&it)) {
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             if (ecs_get(w, it.entities[i], DrawInstance)->asset == asset) {
-                test_assert(ecs_has_id(w, it.entities[i], Hidden));
+                test_assert(!ecs_has_id(w, it.entities[i], Hidden));
+                edges ++;
             }
         }
     }
+
+    test_int(edges, 12);
 }
 
 void Gizmo_move_tool_draws_the_move_gizmo_at_the_selection(void)
@@ -83,11 +87,17 @@ void Gizmo_move_tool_draws_the_move_gizmo_at_the_selection(void)
     box_editor_modified(w);
     ecs_progress(w, 0);
     ecs_progress(w, 0);
-    test_int(ecs_count(w, DrawInstance), 1);
+    ecs_entity_t edge = ecs_lookup(w, "box.editor.gizmos.SelectionEdge");
+    test_int(ecs_count(w, DrawInstance), 13);
     ecs_entity_t inst = 0;
     ecs_iter_t it = ecs_each(w, DrawInstance);
     while (ecs_each_next(&it)) {
-        inst = it.entities[0];
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            if (ecs_get(w, it.entities[i], DrawInstance)->asset != edge) {
+                inst = it.entities[i];
+            }
+        }
     }
 
     test_uint(ecs_get(w, inst, DrawInstance)->asset, ecs_lookup(w, "box.editor.gizmos.MoveGizmo"));
@@ -108,7 +118,7 @@ void Gizmo_move_tool_draws_the_move_gizmo_at_the_selection(void)
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             const DrawInstance *d = ecs_get(w, it.entities[i], DrawInstance);
-            if (!ecs_has_id(w, it.entities[i], Hidden)) {
+            if (!ecs_has_id(w, it.entities[i], Hidden) && d->asset != edge) {
                 test_uint(d->asset, ecs_lookup(w, "box.editor.gizmos.RotateGizmo"));
                 shown ++;
             }

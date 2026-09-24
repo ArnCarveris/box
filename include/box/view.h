@@ -79,10 +79,16 @@ ECS_STRUCT(CullSettings, {
     float min_dimension_px; /**< Projected size in pixels below which an instance is culled */
 });
 
-/** What a frame draws: a camera, the target it draws into and its settings */
+/** What a frame draws: a camera, the target it draws into and its settings.
+ *
+ * A view with an occluder starts from the depth that view left, so its
+ * instances sit in the scene of the occluder, and what that depth hides is
+ * drawn first at half opacity. The occluder renders before it, at its size.
+ */
 ECS_STRUCT(View, {
     ecs_entity_t camera;  /**< Camera the view renders, a view without one is skipped */
     ecs_entity_t target;  /**< RenderTarget entity, 0 renders into the surface */
+    ecs_entity_t occluder; /**< View whose depth hides this one, what it hides shows faded */
     ecs_entity_t layers[8];        /**< Layers the view shows, empty shows every layer */
     ecs_entity_t shadow_layers[8]; /**< Layers that cast its shadows, empty casts from all */
     ShadowSettings shadows; /**< Shadow settings of the view */

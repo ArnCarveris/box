@@ -36,10 +36,13 @@
                     "spline_is_reported",
                     "open_hides_the_siblings_and_shows_the_instance",
                     "open_lets_the_children_be_selected",
+                    "open_refuses_to_select_the_opened_instance",
+                    "open_keeps_the_lights",
                     "close_shows_the_scene_again",
                     "open_is_recursive",
                     "open_refuses_an_entity_that_is_not_a_root",
                     "click_in_the_scene_selects_the_hit",
+                    "click_on_a_child_selects_the_root_until_opened",
                     "click_on_empty_space_clears_the_selection",
                     "deleted_selection_is_cleared"
                 ],

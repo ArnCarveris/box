@@ -107,7 +107,7 @@ bool box_editor_is_root(
  *
  * @param world The world
  * @param e The entity that was clicked or picked from the tree
- * @return The entity to select
+ * @return The entity to select, 0 when it is the opened instance itself
  */
 ecs_entity_t box_editor_resolve(
     ecs_world_t *world,

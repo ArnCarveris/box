@@ -397,7 +397,8 @@ void box_scene_draw(
     box_renderer_t *r,
     const box_view_t *view,
     const box_packet_t *p,
-    WGPURenderPassEncoder pass)
+    WGPURenderPassEncoder pass,
+    WGPURenderPipeline pipeline)
 {
     uint32_t i;
     for (i = 0; i < r->meshes.count; i ++) {
@@ -406,7 +407,8 @@ void box_scene_draw(
             continue;
         }
 
-        wgpuRenderPassEncoderSetPipeline(pass, box_frame_opaque_pipeline(r, !m->cutout_count));
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline ? pipeline :
+            box_frame_opaque_pipeline(r, !m->cutout_count));
         wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, i, true), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(pass, m->indices, WGPUIndexFormat_Uint32, 0,
@@ -422,7 +424,8 @@ void box_scene_draw(
             continue;
         }
 
-        wgpuRenderPassEncoderSetPipeline(pass, box_frame_opaque_pipeline(r, false));
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline ? pipeline :
+            box_frame_opaque_pipeline(r, false));
         wgpuRenderPassEncoderSetBindGroup(pass, 3, box_bake_group(r, b->mesh, false), 0, NULL);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, r->dynamics,
