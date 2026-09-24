@@ -71,6 +71,7 @@ ECS_STRUCT(Editor, {
     bool spline;            /**< The selection carries a Spline the spline editor edits */
     bool transform;         /**< Position, Rotation and Scale of the selection are editable */
     int32_t depth;          /**< Instances opened inside each other, 0 for none */
+    ecs_entity_t handle;    /**< Gizmo handle being dragged, 0 for none */
 });
 
 /** One visible row of the tree view */
@@ -154,10 +155,10 @@ ECS_STRUCT(EditorBinding, {
 #define BOX_EDITOR_TREE_INTERVAL (30)
 
 /** Fraction of the distance to the camera a gizmo spans */
-#define BOX_EDITOR_GIZMO_SIZE (0.15f)
+#define BOX_EDITOR_GIZMO_SIZE (0.075f)
 
 /** Fraction of the gizmo size the edges of the selection box are thick */
-#define BOX_EDITOR_EDGE_SIZE (0.01f)
+#define BOX_EDITOR_EDGE_SIZE (0.02f)
 
 /** Register the box.editor module.
  *

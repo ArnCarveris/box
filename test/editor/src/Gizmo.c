@@ -513,3 +513,92 @@ void Gizmo_gizmo_of_a_child_moves_it_in_its_parent(void)
     test_flt(p->y, 0);
     test_flt(ecs_get(w, parent, Position)->x, 3);
 }
+
+void Gizmo_dragged_handle_stays_lit_over_another_handle(void)
+{
+    // editor/gizmos
+    box_editor_select(w, rock);
+    box_editor_get(w)->tool = ToolRotate;
+    box_editor_modified(w);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_entity_t inst = 0;
+    ecs_iter_t it = ecs_each(w, DrawInstance);
+    while (ecs_each_next(&it)) {
+        inst = it.entities[0];
+    }
+
+    ecs_entity_t y = ecs_lookup_child(w, inst, "y");
+    ecs_entity_t x = ecs_lookup_child(w, inst, "x");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    PickHit hit, hit_x;
+    bool found = false, found_x = false;
+    float cx = 0, cy = 0;
+    for (cy = -0.5f; cy <= 0.5f && !found; cy += 0.005f) {
+        for (cx = -0.5f; cx <= 0.5f && !found; cx += 0.005f) {
+            found = box_picking_pick(w, view, (vec2){cx, cy}, &hit) && hit.entity == y;
+        }
+    }
+
+    for (cy = -0.5f; cy <= 0.5f && !found_x; cy += 0.005f) {
+        for (cx = -0.5f; cx <= 0.5f && !found_x; cx += 0.005f) {
+            found_x = box_picking_pick(w, view, (vec2){cx, cy}, &hit_x) && hit_x.entity == x;
+        }
+    }
+
+    test_bool(found, true);
+    test_bool(found_x, true);
+    float wx = (hit.cursor.x + 1) * 0.5f * 1280, wy = (1 - hit.cursor.y) * 0.5f * 720;
+    float xx = (hit_x.cursor.x + 1) * 0.5f * 1280, xy = (1 - hit_x.cursor.y) * 0.5f * 720;
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {wx, wy} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_int(ecs_get(w, y, Tint)->a, 255);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 20 });
+    ecs_progress(w, 0);
+    test_bool(box_editor_state(w)->grab.active, true);
+    test_uint(ecs_singleton_get(w, Editor)->handle, y);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {xx, xy} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(box_editor_state(w)->grab.active, true);
+    test_assert(ecs_has_id(w, x, Hovered));
+    test_int(ecs_get(w, y, Tint)->a, 255);
+    test_int(ecs_get(w, x, Tint)->a, 0);
+    int32_t i;
+    for (i = 0; i < 25; i ++) {
+        ecs_progress(w, 0);
+    }
+
+    test_bool(box_editor_state(w)->grab.active, false);
+    test_uint(ecs_singleton_get(w, Editor)->handle, 0);
+    test_int(ecs_get(w, y, Tint)->a, 0);
+    test_int(ecs_get(w, x, Tint)->a, 255);
+}
+
+void Gizmo_backspace_deletes_the_selection(void)
+{
+    // editor/gizmos
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyBackspace });
+    ecs_progress(w, 0);
+    test_assert(!ecs_is_alive(w, rock));
+    ecs_progress(w, 0);
+    test_uint(ecs_singleton_get(w, Editor)->selected, 0);
+    test_assert(ecs_lookup(w, "scene") != 0);
+}
+
+void Gizmo_backspace_in_a_text_input_keeps_the_selection(void)
+{
+    // editor/gizmos
+    box_editor_select(w, rock);
+    ecs_progress(w, 0);
+    ecs_entity_t field = ecs_new(w);
+    ecs_set(w, field, TextInput, { .focused = true });
+    box_input_inject(w, &(InputEvent){ .kind = InputKeyDown, .code = BoxKeyBackspace });
+    ecs_progress(w, 0);
+    test_assert(ecs_is_alive(w, rock));
+    test_uint(ecs_singleton_get(w, Editor)->selected, rock);
+}

@@ -341,6 +341,8 @@ bool box_editor_grab(
     }
 
     grab->active = true;
+    box_editor_get(world)->handle = handle;
+    box_editor_modified(world);
     result = true;
 done:
     return result;
@@ -524,6 +526,8 @@ bool box_editor_drop(
     }
 
     grab->active = false;
+    box_editor_get(world)->handle = 0;
+    box_editor_modified(world);
     if (!ecs_is_alive(world, grab->target)) {
         goto done;
     }
@@ -696,7 +700,7 @@ static void box_editor_draw_spline(
     int32_t i, count = ecs_vec_count(&spline->points);
     for (i = 0; i < count; i ++) {
         vec3 p = mat4_transform_point(&wt, ecs_vec_get_t(&spline->points, vec3, i)[0]);
-        float size = vec3_length(vec3_sub(p, eye)) * BOX_EDITOR_GIZMO_SIZE * 0.15f;
+        float size = vec3_length(vec3_sub(p, eye)) * BOX_EDITOR_GIZMO_SIZE * 0.3f;
         ecs_entity_t handle = box_draw(world, &(box_draw_desc_t){
             .asset = asset, .key = 1000 + (uint64_t)i, .position = p,
             .scale = { size, size, size }, .overlay = true });

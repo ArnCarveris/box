@@ -112,6 +112,7 @@ static void box_editor_fn_tool(
     (void)argc;
     Editor *editor = box_editor_get(ctx->world);
     editor->tool = *(EditorTool*)argv[0].ptr;
+    editor->handle = 0;
     box_editor_state(ctx->world)->grab.active = false;
     box_editor_modified(ctx->world);
     *(bool*)result->ptr = true;

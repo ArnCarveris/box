@@ -129,7 +129,10 @@
                     "scaling_along_x_changes_x_only",
                     "release_drops_the_grab",
                     "tool_change_drops_the_grab",
-                    "gizmo_of_a_child_moves_it_in_its_parent"
+                    "gizmo_of_a_child_moves_it_in_its_parent",
+                    "dragged_handle_stays_lit_over_another_handle",
+                    "backspace_deletes_the_selection",
+                    "backspace_in_a_text_input_keeps_the_selection"
                 ],
                 "setup": true,
                 "teardown": true

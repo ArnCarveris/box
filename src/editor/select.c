@@ -129,6 +129,7 @@ ecs_entity_t box_editor_select(
     EditorState *state = box_editor_state(world);
     Editor *editor = box_editor_get(world);
     state->grab.active = false;
+    editor->handle = 0;
     if (editor->selected != result) {
         editor->selected = result;
         editor->point = -1;

@@ -140,10 +140,61 @@ void box_editor_enable(
         editor->spline = false;
         editor->transform = false;
         editor->depth = 0;
+        editor->handle = 0;
     }
 
     editor->enabled = enabled;
     box_editor_modified(world);
+}
+
+/** Tell whether a text input has the keyboard focus.
+ *
+ * @param world The world
+ * @return true when some TextInput is focused
+ */
+static bool box_editor_typing(
+    ecs_world_t *world)
+{
+    bool result = false;
+    ecs_iter_t it = ecs_each(world, TextInput);
+    while (ecs_each_next(&it)) {
+        TextInput *input = ecs_field(&it, TextInput, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            result = result || input[i].focused;
+        }
+    }
+
+    return result;
+}
+
+/** Delete the selected entity when backspace is pressed outside a text input.
+ *
+ * @param world The world
+ * @param in The input state of the frame
+ */
+static void box_editor_delete_key(
+    ecs_world_t *world,
+    const Input *in)
+{
+    const Editor *editor = ecs_singleton_get(world, Editor);
+    ecs_entity_t e = editor->selected;
+    if (!in || !in->keys[BoxKeyBackspace].pressed || !e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    EditorKind kind = box_editor_kind(world, e);
+    if (kind != KindEntity && kind != KindInstance) {
+        goto done;
+    }
+
+    if (box_editor_state(world)->grab.active || box_editor_typing(world)) {
+        goto done;
+    }
+
+    ecs_delete(world, e);
+done:
+    return;
 }
 
 /** Refresh the models and draw the gizmos of the frame.
@@ -166,6 +217,8 @@ static void BoxEditorUpdate(
     }
 
     const Input *in = ecs_singleton_get(world, Input);
+    box_editor_delete_key(world, in);
+    state = box_editor_state(world);
     if (state->grab.active && in && !in->keys[BoxKeyMouseLeft].state) {
         box_editor_drop(world);
         state = box_editor_state(world);

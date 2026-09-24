@@ -23,9 +23,10 @@ const hover: Tint = {255, 235, 120, 255}
 const plain: Tint = {255, 255, 255, 0}
 const half = 1.5707963
 
-// A part of a gizmo that can be dragged, lit up under the cursor by a Tint that
-// reaches the shapes below it. The shapes carry the color of their axis. The
-// Tint is always there and only changes value, so a hover moves no table.
+// A part of a gizmo that can be dragged, lit up by a Tint that reaches the
+// shapes below it while it is under the cursor or dragged. While a handle is
+// dragged no other handle lights up. The shapes carry the color of their axis.
+// The Tint is always there and only changes value, so a hover moves no table.
 template Handle {
   prop mode: HandleMode = HandleMove
   prop axes: i32 = 1
@@ -35,7 +36,9 @@ template Handle {
   GizmoHandle: {mode: mode, axes: axes}
   Rgb: color
 
-  if this?[Hovered] {
+  const held = Editor[Editor].handle
+
+  if held == this || (held == 0 && this?[Hovered]) {
     Tint: hover
   } else {
     Tint: plain
