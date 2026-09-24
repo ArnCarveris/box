@@ -53,7 +53,8 @@ static void box_view_depth(
     if (r->v->depth_view) wgpuTextureViewRelease(r->v->depth_view);
     if (r->v->depth) wgpuTextureRelease(r->v->depth);
     WGPUTextureDescriptor depth_desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+            WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
         .dimension = WGPUTextureDimension_2D,
         .size = { r->v->width, r->v->height, 1 },
         .format = WGPUTextureFormat_Depth32Float,

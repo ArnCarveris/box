@@ -645,7 +645,12 @@ static void box_ui_console_show(
     ecs_entity_t root,
     bool shown)
 {
-    const UiImpl *ui = root ? ecs_get(world, root, UiImpl) : NULL;
+    Ui *tree = root ? ecs_get_mut(world, root, Ui) : NULL;
+    UiImpl *ui = tree ? ecs_get_mut(world, root, UiImpl) : NULL;
+    if (ui) {
+        box_ui_bind(world, tree, ui);
+    }
+
     View *view = ui && ui->view && ecs_is_alive(world, ui->view) ?
         ecs_get_mut(world, ui->view, View) : NULL;
 

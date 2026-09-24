@@ -696,7 +696,8 @@ done:
 void box_cull_draw(
     box_renderer_t *r,
     WGPURenderPassEncoder pass,
-    uint32_t group)
+    uint32_t group,
+    WGPURenderPipeline pipeline)
 {
     uint64_t stride = sizeof(box_instance_t);
     uint32_t i;
@@ -707,7 +708,7 @@ void box_cull_draw(
             continue;
         }
 
-        wgpuRenderPassEncoderSetPipeline(pass,
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline ? pipeline :
             box_frame_opaque_pipeline(r, draw->baked && !m->cutout_count));
         wgpuRenderPassEncoderSetBindGroup(pass, 3,
             box_bake_group(r, draw->mesh, draw->baked != 0), 0, NULL);

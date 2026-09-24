@@ -183,6 +183,41 @@ bool box_collision_ray(
     float max_dist,
     box_ray_hit_t *out);
 
+/** Decide whether a collider takes part in a ray query.
+ *
+ * @param world The world
+ * @param entity The entity of the collider
+ * @param ctx Context the query was given
+ * @return true when the collider may be hit
+ */
+typedef bool (*box_collision_filter_t)(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    void *ctx);
+
+/** Find the nearest collider a ray hits among the ones a filter accepts.
+ *
+ * The filter is asked only for a collider the ray hits closer than the nearest
+ * hit so far, so it runs a few times per query, not once per collider.
+ *
+ * @param world The world
+ * @param origin Origin of the ray in world space
+ * @param dir Direction of the ray, distances are multiples of its length
+ * @param max_dist Longest distance that counts as a hit
+ * @param filter The filter, NULL accepts every collider
+ * @param ctx Context passed to the filter
+ * @param out Receives the hit, NULL to only ask whether there is one
+ * @return true when the ray hit a collider the filter accepted
+ */
+bool box_collision_ray_filter(
+    const ecs_world_t *world,
+    vec3 origin,
+    vec3 dir,
+    float max_dist,
+    box_collision_filter_t filter,
+    void *ctx,
+    box_ray_hit_t *out);
+
 /** Collect every collider a sphere overlaps.
  *
  * @param world The world

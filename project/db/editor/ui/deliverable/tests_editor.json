@@ -1,0 +1,18 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:42Z",
+  "pass": 7,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.277506,
+  "tests": [
+    {"suite": "Toolbar", "case": "tool_buttons_switch_the_tool", "status": "pass", "elapsed": 0.131138},
+    {"suite": "Toolbar", "case": "active_tool_is_highlighted", "status": "pass", "elapsed": 0.129683},
+    {"suite": "Toolbar", "case": "open_button_appears_for_an_instance", "status": "pass", "elapsed": 0.253972},
+    {"suite": "Toolbar", "case": "open_button_opens_the_instance", "status": "pass", "elapsed": 0.237822},
+    {"suite": "Toolbar", "case": "close_button_appears_while_opened", "status": "pass", "elapsed": 0.238986},
+    {"suite": "Toolbar", "case": "spline_buttons_appear_for_a_spline", "status": "pass", "elapsed": 0.214286},
+    {"suite": "Toolbar", "case": "panels_keep_clicks_from_the_scene", "status": "pass", "elapsed": 0.277393}
+  ]
+}

@@ -268,11 +268,13 @@ void BoxUiImport(
     ECS_META_COMPONENT(world, Layout);
     ECS_META_COMPONENT(world, AttachH);
     ECS_META_COMPONENT(world, AttachV);
+    ECS_META_COMPONENT(world, Order);
     ECS_META_COMPONENT(world, Anchor);
     ECS_META_COMPONENT(world, WorldAnchor);
     ECS_META_COMPONENT(world, Fill);
     ECS_META_COMPONENT(world, Grow);
     ECS_META_COMPONENT(world, Overflow);
+    ECS_META_COMPONENT(world, ScrollFollow);
     ECS_META_COMPONENT(world, Scroll);
     ECS_META_COMPONENT(world, Bounds);
     ECS_META_COMPONENT(world, BoxShadow);
@@ -304,6 +306,7 @@ void BoxUiImport(
     ecs_set_hooks(world, UiNode, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Layout, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Anchor, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, Order, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, WorldAnchor, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, WorldAnchorImpl, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(WorldAnchorImpl), EcsOnInstantiate, EcsDontInherit);

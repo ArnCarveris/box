@@ -17,6 +17,8 @@
                     "script_sets_culling",
                     "camera_fills_the_view",
                     "views_render_in_priority_order",
+                    "occluder_is_the_view_that_renders_before",
+                    "occluder_that_renders_after_is_ignored",
                     "world_without_a_view_does_not_render",
                     "disabled_view_is_skipped",
                     "view_without_camera_is_skipped",

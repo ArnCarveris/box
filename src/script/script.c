@@ -48,6 +48,30 @@ static void box_script_state_dtor(
     }
 }
 
+/** Tell whether a template is loaded incrementally.
+ *
+ * A template declared inside a module is a library template, such as a widget
+ * of box.ui or a part of the editor, whose instances are wanted the moment
+ * they are declared; only the templates of a scene are left pending.
+ *
+ * @param world The world
+ * @param e The template entity
+ * @return true when the instances of the template are expanded over frames
+ */
+static bool box_script_incremental(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = true;
+    ecs_entity_t parent = ecs_get_parent(world, e);
+    while (parent && result) {
+        result = !ecs_has_id(world, parent, EcsModule);
+        parent = ecs_get_parent(world, parent);
+    }
+
+    return result;
+}
+
 /** Mark a script template as manual so its instances are left pending.
  *
  * A world that has not enabled the incremental loading leaves its templates to
@@ -69,7 +93,9 @@ static void box_script_on_script(
 
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
-        if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual)) {
+        if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual) &&
+            box_script_incremental(world, e))
+        {
             templates[count ++] = e;
         }
     }
@@ -103,7 +129,9 @@ static void box_script_on_settings(
         int32_t i;
         for (i = 0; i < sit.count; i ++) {
             ecs_entity_t e = sit.entities[i];
-            if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual)) {
+            if (script[i].template_ && !ecs_has_id(world, e, EcsScriptTemplateManual) &&
+                box_script_incremental(world, e))
+            {
                 ecs_add_id(world, e, EcsScriptTemplateManual);
             }
         }

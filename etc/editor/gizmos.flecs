@@ -1,0 +1,270 @@
+// The gizmos of the scene editor. box.editor loads this script at import into
+// box.editor.gizmos and draws MoveGizmo, RotateGizmo or ScaleGizmo through
+// box.draw over the selection, twelve SelectionEdge instances around the bounds
+// of the selection while the select tool is active, and a PointHandle on every
+// control point of a selected spline. A handle carries a GizmoHandle that says what dragging it
+// changes; the press and the drags reach the editor through editor.grab and
+// editor.pull, so the math lives in the engine and the interaction here.
+module box.editor.gizmos
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.picking
+using box.collision
+using box.editor
+using box.editor.HandleMode
+
+const red: Rgb = {226, 74, 74}
+const green: Rgb = {74, 200, 96}
+const blue: Rgb = {84, 132, 240}
+const white: Rgb = {220, 224, 230}
+const hover: Tint = {255, 235, 120, 255}
+const plain: Tint = {255, 255, 255, 0}
+const half = 1.5707963
+
+// A part of a gizmo that can be dragged, lit up under the cursor by a Tint that
+// reaches the shapes below it. The shapes carry the color of their axis. The
+// Tint is always there and only changes value, so a hover moves no table.
+template Handle {
+  prop mode: HandleMode = HandleMove
+  prop axes: i32 = 1
+  prop color: Rgb = {255, 255, 255}
+
+  Pickable
+  GizmoHandle: {mode: mode, axes: axes}
+  Rgb: color
+
+  if this?[Hovered] {
+    Tint: hover
+  } else {
+    Tint: plain
+  }
+
+  async {
+    while true {
+      const hit = await on.press(this)
+      const ok = editor.grab(this, hit)
+    }
+  }
+
+  async {
+    while true {
+      const hit = await on.drag(this)
+      const ok = editor.pull(this, hit)
+    }
+  }
+}
+
+// Arrows along the axes, squares on the planes and a cube in the middle.
+template MoveGizmo {
+  Handle x(axes: 1, color: red) {
+    Rotation: {0, 0, -half}
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: red
+      CapsuleCollider: {radius: 0.07, height: 0.7}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: red
+      SphereCollider: {radius: 0.12}
+    }
+  }
+
+  Handle y(axes: 2, color: green) {
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: green
+      CapsuleCollider: {radius: 0.07, height: 0.7}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: green
+      SphereCollider: {radius: 0.12}
+    }
+  }
+
+  Handle z(axes: 4, color: blue) {
+    Rotation: {half, 0, 0}
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.7, radius: 0.025, segments: 8}
+      Rgb: blue
+      CapsuleCollider: {radius: 0.07, height: 0.7}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Cone: {length: 0.22, radius: 0.07, segments: 12}
+      Rgb: blue
+      SphereCollider: {radius: 0.12}
+    }
+  }
+
+  Handle xy(axes: 3, color: blue) {
+    Position: {0.35, 0.35, 0}
+    Box: {0.22, 0.22, 0.02}
+  }
+
+  Handle yz(axes: 6, color: red) {
+    Position: {0, 0.35, 0.35}
+    Box: {0.02, 0.22, 0.22}
+  }
+
+  Handle xz(axes: 5, color: green) {
+    Position: {0.35, 0, 0.35}
+    Box: {0.22, 0.02, 0.22}
+  }
+
+  Handle xyz(axes: 7, color: white) {
+    Box: {0.14, 0.14, 0.14}
+  }
+}
+
+// Rings about the axes and a ball in the middle that turns freely.
+template RotateGizmo {
+  Handle x(mode: HandleRotate, axes: 1, color: red) {
+    Rotation: {0, 0, half}
+    ring {
+      Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: red
+      BoxCollider: {half: {0.84, 0.04, 0.84}}
+    }
+  }
+
+  Handle y(mode: HandleRotate, axes: 2, color: green) {
+    ring {
+      Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: green
+      BoxCollider: {half: {0.84, 0.04, 0.84}}
+    }
+  }
+
+  Handle z(mode: HandleRotate, axes: 4, color: blue) {
+    Rotation: {half, 0, 0}
+    ring {
+      Torus: {radius: 0.8, tube: 0.025, segments: 48, rings: 8}
+      Rgb: blue
+      BoxCollider: {half: {0.84, 0.04, 0.84}}
+    }
+  }
+
+  Handle xyz(mode: HandleRotate, axes: 7, color: white) {
+    Sphere: {radius: 0.6, segments: 24}
+    Opacity: {0.15}
+  }
+}
+
+// Cubes at the ends of the axes, squares on the planes and a cube in the middle.
+template ScaleGizmo {
+  Handle x(mode: HandleScale, axes: 1, color: red) {
+    Rotation: {0, 0, -half}
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: red
+      CapsuleCollider: {radius: 0.07, height: 0.8}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Box: {0.14, 0.14, 0.14}
+      Rgb: red
+    }
+  }
+
+  Handle y(mode: HandleScale, axes: 2, color: green) {
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: green
+      CapsuleCollider: {radius: 0.07, height: 0.8}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Box: {0.14, 0.14, 0.14}
+      Rgb: green
+    }
+  }
+
+  Handle z(mode: HandleScale, axes: 4, color: blue) {
+    Rotation: {half, 0, 0}
+    shaft {
+      Position: {0, 0.45, 0}
+      Cylinder: {length: 0.8, radius: 0.025, segments: 8}
+      Rgb: blue
+      CapsuleCollider: {radius: 0.07, height: 0.8}
+    }
+    tip {
+      Position: {0, 0.9, 0}
+      Box: {0.14, 0.14, 0.14}
+      Rgb: blue
+    }
+  }
+
+  Handle xy(mode: HandleScale, axes: 3, color: blue) {
+    Position: {0.35, 0.35, 0}
+    Box: {0.2, 0.2, 0.02}
+  }
+
+  Handle yz(mode: HandleScale, axes: 6, color: red) {
+    Position: {0, 0.35, 0.35}
+    Box: {0.02, 0.2, 0.2}
+  }
+
+  Handle xz(mode: HandleScale, axes: 5, color: green) {
+    Position: {0.35, 0, 0.35}
+    Box: {0.2, 0.02, 0.2}
+  }
+
+  Handle xyz(mode: HandleScale, axes: 7, color: white) {
+    Box: {0.18, 0.18, 0.18}
+  }
+}
+
+// One edge of the box drawn around the bounds of the selection, a unit box along x.
+template SelectionEdge {
+  NoCollider
+  Box: {1, 1, 1}
+  Rgb: {255, 160, 40}
+}
+
+// A control point of a spline, orange while it is the selected point.
+template PointHandle {
+  Pickable
+  GizmoHandle: {mode: HandlePoint, axes: 7}
+  Sphere: {radius: 1, segments: 12}
+
+  const point = Editor[Editor].point
+  const handle = this[GizmoHandle]
+
+  if this?[Hovered] {
+    Tint: hover
+  } else {
+    Tint: plain
+  }
+
+  if handle.index == point {
+    Rgb: {255, 160, 40}
+  } else {
+    Rgb: white
+  }
+
+  async {
+    while true {
+      const hit = await on.press(this)
+      const ok = editor.grab(this, hit)
+      const selected = editor.point(handle.index)
+    }
+  }
+
+  async {
+    while true {
+      const hit = await on.drag(this)
+      const ok = editor.pull(this, hit)
+    }
+  }
+}

@@ -41,6 +41,8 @@
 #include "box/monitor.h"
 #include "box/ui.h"
 #include "box/script.h"
+#include "box/draw.h"
+#include "box/editor.h"
 
 #ifdef __cplusplus
 extern "C" {

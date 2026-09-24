@@ -84,6 +84,18 @@ ECS_STRUCT(Layout, {
     float max_height;     /**< Largest height of the box, 0 for none */
 });
 
+/** Place of an element among the children of a layout.
+ *
+ * A row or a column places its children in child order; a child with an Order
+ * goes before every child with a higher value and after every child with a
+ * lower one, children without one counting as zero.
+ *
+ * Rows a script builds from a list and adds to later keep the order of the list.
+ */
+ECS_STRUCT(Order, {
+    int32_t value; /**< Place among the siblings, lower first */
+});
+
 /** Point of the parent an anchored element attaches to on the x axis */
 ECS_ENUM(AttachH, {
     AttachHSame = 0,   /**< The edge the element is pinned by, inside the padding */
@@ -171,19 +183,26 @@ ECS_ENUM(Overflow, {
     OverflowAuto = 3     /**< The content is clipped and the wheel moves it when it is larger */
 });
 
+/** What the offset of a scrolling element does when its content grows */
+ECS_ENUM(ScrollFollow, {
+    FollowEnd = 0,   /**< An offset at the end stays at the end, so a log shows its last line */
+    FollowStart = 1  /**< The offset stays where it is, so a list keeps showing its top */
+});
+
 /** Clips the content of an element to its box and moves it by an offset.
  *
  * A non Visible axis clips the subtree to the Bounds. The offset, in logical
  * pixels with x right and y down, moves the content but not anchored children.
  *
- * The framework clamps the offset to the content, and an offset at the end stays
- * at the end as the content grows. The wheel moves the innermost Scroll or
- * larger Auto axis under the cursor; Hidden clips but ignores the wheel.
+ * The framework clamps the offset to the content; follow says whether an offset
+ * at the end stays at the end as the content grows. The wheel moves the innermost
+ * Scroll or larger Auto axis under the cursor; Hidden clips but ignores the wheel.
  */
 ECS_STRUCT(Scroll, {
-    Overflow x;   /**< What the element does with content wider than its box */
-    Overflow y;   /**< What the element does with content taller than its box */
-    vec2 offset;  /**< Logical pixels the content is moved by, right and down */
+    Overflow x;          /**< What the element does with content wider than its box */
+    Overflow y;          /**< What the element does with content taller than its box */
+    vec2 offset;         /**< Logical pixels the content is moved by, right and down */
+    ScrollFollow follow; /**< What the offset does when the content grows */
 });
 
 /** Font a text element rasterizes its glyphs with, inherited by its subtree.
@@ -246,8 +265,9 @@ ECS_STRUCT(Bounds, {
  * the typed characters and edit keys; enter moves the line to submitted and
  * clears it. Nothing is taken while the window is unfocused.
  *
- * With history, up and down walk submitted lines. With complete, tab completes
- * the command name or entity path under the caret via box.command.
+ * With history, up and down walk submitted lines and with complete, tab completes
+ * a command name or entity path via box.command. One input holds the focus at a
+ * time: focusing one, or calling text.focus(element), blurs every other input.
  */
 ECS_STRUCT(TextInput, {
     char *value;     /**< The line being edited, UTF-8 */

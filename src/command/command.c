@@ -116,6 +116,7 @@ void BoxCommandImport(
     box_render_cmd_init(world);
     box_fps_cmd_init(world);
     box_stats_cmd_init(world);
+    box_editor_cmd_init(world);
     box_input_cmd_init(world);
     box_http_init(world);
     box_wasm_init(world);

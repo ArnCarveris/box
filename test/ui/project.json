@@ -349,7 +349,9 @@
                     "tab_completes_a_command_name",
                     "caret_sits_at_the_width_of_the_text_before_it",
                     "caret_advances_by_the_width_of_a_typed_space",
-                    "caret_goes_with_the_focus"
+                    "caret_goes_with_the_focus",
+                    "focusing_an_input_takes_the_focus_from_the_others",
+                    "text_focus_gives_an_element_the_keyboard"
                 ],
                 "setup": true,
                 "teardown": true
@@ -405,7 +407,8 @@
                     "offset_moves_the_glyphs_of_a_text",
                     "log_that_grows_stays_at_the_end",
                     "log_that_grows_stays_put_after_a_scroll_up",
-                    "hit_test_skips_a_clipped_node"
+                    "hit_test_skips_a_clipped_node",
+                    "start_follow_keeps_the_offset_as_the_content_grows"
                 ],
                 "setup": true,
                 "teardown": true

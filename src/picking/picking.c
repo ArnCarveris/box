@@ -9,6 +9,7 @@
 ECS_COMPONENT_DECLARE(PickState);
 ECS_TAG_DECLARE(Pickable);
 ECS_TAG_DECLARE(Hovered);
+ECS_TAG_DECLARE(Unhandled);
 
 /** PickSettings constructor: picking is on, with the default reach and threshold.
  *
@@ -119,6 +120,7 @@ void BoxPickingImport(
     ECS_META_COMPONENT(world, Action);
     ECS_TAG_DEFINE(world, Pickable);
     ECS_TAG_DEFINE(world, Hovered);
+    ECS_TAG_DEFINE(world, Unhandled);
     ECS_COMPONENT_DEFINE(world, PickState);
 
     ecs_set_hooks(world, PickSettings, { .ctor = box_pick_settings_ctor });
@@ -149,5 +151,10 @@ void BoxPickingImport(
     ecs_singleton_modified(world, PickSettings);
     box_picking_events_init(world);
 
-    ECS_SYSTEM(world, BoxPickingUpdate, EcsOnLoad, 0);
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "BoxPickingUpdate" }),
+        .phase = EcsOnLoad,
+        .callback = BoxPickingUpdate,
+        .immediate = true
+    });
 }

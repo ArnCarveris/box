@@ -1,0 +1,593 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T22:46:48Z",
+  "pass": 81,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 1.199893,
+  "tests": [
+    {
+      "suite": "Spline",
+      "case": "selecting_a_spline_draws_a_handle_per_point",
+      "status": "pass",
+      "elapsed": 0.212443,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "handles_sit_on_the_world_points",
+      "status": "pass",
+      "elapsed": 0.154968,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "guide_follows_the_selected_spline",
+      "status": "pass",
+      "elapsed": 0.1568,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "guide_is_hidden_without_a_spline",
+      "status": "pass",
+      "elapsed": 0.245107,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "point_selects_a_control_point",
+      "status": "pass",
+      "elapsed": 0.113211,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "point_add_inserts_after_the_selected_point",
+      "status": "pass",
+      "elapsed": 0.115107,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "point_add_extends_the_end",
+      "status": "pass",
+      "elapsed": 0.114514,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "point_remove_deletes_the_selected_point",
+      "status": "pass",
+      "elapsed": 0.115002,
+      "project": "editor"
+    },
+    {
+      "suite": "Spline",
+      "case": "dragging_a_handle_moves_its_point",
+      "status": "pass",
+      "elapsed": 0.228758,
+      "project": "editor"
+    },
+    {
+      "suite": "Eval",
+      "case": "linear_endpoints",
+      "status": "pass",
+      "elapsed": 0.09922,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "linear_midpoint",
+      "status": "pass",
+      "elapsed": 0.099174,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "linear_tangent_and_normal",
+      "status": "pass",
+      "elapsed": 0.098668,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "catmull_passes_through_its_points",
+      "status": "pass",
+      "elapsed": 0.100471,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "catmull_midpoint_matches_the_analytic_value",
+      "status": "pass",
+      "elapsed": 0.100358,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "catmull_of_collinear_points_is_a_line",
+      "status": "pass",
+      "elapsed": 0.100474,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "bezier_endpoints",
+      "status": "pass",
+      "elapsed": 0.099897,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "bezier_midpoint_matches_the_analytic_value",
+      "status": "pass",
+      "elapsed": 0.100718,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "normal_is_perpendicular_to_a_vertical_tangent",
+      "status": "pass",
+      "elapsed": 0.096948,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "tension_changes_the_curve",
+      "status": "pass",
+      "elapsed": 0.095378,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "parameter_clamps_outside_the_range",
+      "status": "pass",
+      "elapsed": 0.095432,
+      "project": "spline"
+    },
+    {
+      "suite": "Eval",
+      "case": "loop_wraps_the_parameter",
+      "status": "pass",
+      "elapsed": 0.094293,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "length_of_a_straight_line",
+      "status": "pass",
+      "elapsed": 0.093725,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "length_of_a_square_loop",
+      "status": "pass",
+      "elapsed": 0.093764,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "length_of_a_collinear_catmull_curve",
+      "status": "pass",
+      "elapsed": 0.093634,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "point_at_a_distance",
+      "status": "pass",
+      "elapsed": 0.093627,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "distance_of_a_parameter",
+      "status": "pass",
+      "elapsed": 0.095734,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "parameter_of_a_distance_round_trips",
+      "status": "pass",
+      "elapsed": 0.095642,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "distance_past_the_end_clamps",
+      "status": "pass",
+      "elapsed": 0.095892,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "loop_wraps_the_distance",
+      "status": "pass",
+      "elapsed": 0.098484,
+      "project": "spline"
+    },
+    {
+      "suite": "ArcLength",
+      "case": "even_steps_along_a_curve",
+      "status": "pass",
+      "elapsed": 0.09529,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "info_is_written_on_set",
+      "status": "pass",
+      "elapsed": 0.094791,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "table_is_rebuilt_when_the_points_change",
+      "status": "pass",
+      "elapsed": 0.097653,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "table_is_rebuilt_when_the_type_changes",
+      "status": "pass",
+      "elapsed": 0.094799,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "table_is_removed_with_the_spline",
+      "status": "pass",
+      "elapsed": 0.094157,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "instance_gets_its_own_table",
+      "status": "pass",
+      "elapsed": 0.094149,
+      "project": "spline"
+    },
+    {
+      "suite": "Cache",
+      "case": "deleting_the_curve_removes_it",
+      "status": "pass",
+      "elapsed": 0.094519,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "no_points",
+      "status": "pass",
+      "elapsed": 0.093741,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "a_single_point",
+      "status": "pass",
+      "elapsed": 0.093708,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "two_identical_points",
+      "status": "pass",
+      "elapsed": 0.093087,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "a_bezier_without_a_full_segment",
+      "status": "pass",
+      "elapsed": 0.091369,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "a_loop_of_two_points",
+      "status": "pass",
+      "elapsed": 0.092381,
+      "project": "spline"
+    },
+    {
+      "suite": "Degenerate",
+      "case": "sampling_an_entity_without_a_spline",
+      "status": "pass",
+      "elapsed": 0.093757,
+      "project": "spline"
+    },
+    {
+      "suite": "Script",
+      "case": "points_from_a_script",
+      "status": "pass",
+      "elapsed": 0.093859,
+      "project": "spline"
+    },
+    {
+      "suite": "Script",
+      "case": "position_function",
+      "status": "pass",
+      "elapsed": 0.093561,
+      "project": "spline"
+    },
+    {
+      "suite": "Script",
+      "case": "point_at_function",
+      "status": "pass",
+      "elapsed": 0.094156,
+      "project": "spline"
+    },
+    {
+      "suite": "Script",
+      "case": "length_function",
+      "status": "pass",
+      "elapsed": 0.093961,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "strip_without_a_profile",
+      "status": "pass",
+      "elapsed": 0.093561,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "slices_follow_the_segment_count",
+      "status": "pass",
+      "elapsed": 0.092576,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "default_slices_per_curve_segment",
+      "status": "pass",
+      "elapsed": 0.092495,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "profile_is_swept_across_the_curve",
+      "status": "pass",
+      "elapsed": 0.095642,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "normals_face_up_for_a_flat_strip",
+      "status": "pass",
+      "elapsed": 0.095339,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "uvs_run_along_the_curve",
+      "status": "pass",
+      "elapsed": 0.095731,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "a_loop_closes_the_sweep",
+      "status": "pass",
+      "elapsed": 0.095334,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "closed_profile_sweeps_a_ring",
+      "status": "pass",
+      "elapsed": 0.09487,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "smooth_shares_the_columns",
+      "status": "pass",
+      "elapsed": 0.095383,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "the_mesh_follows_the_curve",
+      "status": "pass",
+      "elapsed": 0.095391,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "the_mesh_follows_the_profile",
+      "status": "pass",
+      "elapsed": 0.095512,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "bounds_come_from_the_curve",
+      "status": "pass",
+      "elapsed": 0.094716,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "the_sweep_uses_the_curve_of_the_entity",
+      "status": "pass",
+      "elapsed": 0.09566,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "a_sweep_without_a_curve_builds_nothing",
+      "status": "pass",
+      "elapsed": 0.093954,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "removing_the_sweep_removes_the_mesh",
+      "status": "pass",
+      "elapsed": 0.094527,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "deleting_the_curve_removes_the_mesh",
+      "status": "pass",
+      "elapsed": 0.095409,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "the_entity_stays_a_static_instance",
+      "status": "pass",
+      "elapsed": 0.094176,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "two_sweeps_share_one_mesh",
+      "status": "pass",
+      "elapsed": 0.094145,
+      "project": "spline"
+    },
+    {
+      "suite": "Mesh",
+      "case": "a_sweep_from_a_script",
+      "status": "pass",
+      "elapsed": 0.09411,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "moves_by_speed_over_time",
+      "status": "pass",
+      "elapsed": 0.09598,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "offset_places_the_follower",
+      "status": "pass",
+      "elapsed": 0.095053,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "loops_at_the_end",
+      "status": "pass",
+      "elapsed": 0.095181,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "ping_pong_turns_around",
+      "status": "pass",
+      "elapsed": 0.09505,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "stops_at_the_end",
+      "status": "pass",
+      "elapsed": 0.097903,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "orientation_follows_the_tangent",
+      "status": "pass",
+      "elapsed": 0.095128,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "marks_the_entity_dynamic",
+      "status": "pass",
+      "elapsed": 0.092466,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "a_light_follows_a_path",
+      "status": "pass",
+      "elapsed": 0.094638,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "negative_speed_travels_backwards",
+      "status": "pass",
+      "elapsed": 0.096341,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "without_a_spline_nothing_moves",
+      "status": "pass",
+      "elapsed": 0.094876,
+      "project": "spline"
+    },
+    {
+      "suite": "Follow",
+      "case": "speed_is_the_same_on_a_curve",
+      "status": "pass",
+      "elapsed": 0.093725,
+      "project": "spline"
+    },
+    {
+      "suite": "Gpu",
+      "case": "sweep_matches_cpu_geometry",
+      "status": "pass",
+      "elapsed": 0.091819,
+      "project": "spline"
+    },
+    {
+      "suite": "Gpu",
+      "case": "curve_edits_refresh_samples",
+      "status": "pass",
+      "elapsed": 0.092777,
+      "project": "spline"
+    },
+    {
+      "suite": "Gpu",
+      "case": "disabling_clears_samples",
+      "status": "pass",
+      "elapsed": 0.092196,
+      "project": "spline"
+    },
+    {
+      "suite": "Gpu",
+      "case": "clones_own_samples",
+      "status": "pass",
+      "elapsed": 0.09143,
+      "project": "spline"
+    },
+    {
+      "suite": "Gpu",
+      "case": "component_copy_keeps_gpu_mode",
+      "status": "pass",
+      "elapsed": 0.090038,
+      "project": "spline"
+    }
+  ],
+  "projects": [
+    {
+      "project": "editor",
+      "pass": 9,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.342194
+    },
+    {
+      "project": "spline",
+      "pass": 72,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.857699
+    }
+  ]
+}

@@ -17,6 +17,8 @@ typedef struct box_index_ctx_t {
     ecs_vec_t *out;            /**< Entities the query collects, NULL for a ray */
     box_ray_hit_t *hit;        /**< Nearest hit so far, NULL for a set query */
     int32_t count;             /**< Entities the query collected */
+    box_collision_filter_t filter; /**< Accepts the colliders a ray may hit, NULL for all */
+    void *filter_ctx;          /**< Context of the filter */
 } box_index_ctx_t;
 
 void box_index_init(
@@ -157,7 +159,8 @@ static void box_index_test(
     if (q->kind == BoxQueryRay) {
         if (box_collider_ray(c, q->origin, q->dir, q->max_dist, &dist) &&
             (dist < ctx->hit->distance ||
-             (dist == ctx->hit->distance && e < ctx->hit->entity)))
+             (dist == ctx->hit->distance && e < ctx->hit->entity)) &&
+            (!ctx->filter || ctx->filter(ctx->world, e, ctx->filter_ctx)))
         {
             ctx->hit->entity = e;
             ctx->hit->distance = dist;
@@ -287,10 +290,22 @@ bool box_collision_ray(
     float max_dist,
     box_ray_hit_t *out)
 {
+    return box_collision_ray_filter(world, origin, dir, max_dist, NULL, NULL, out);
+}
+
+bool box_collision_ray_filter(
+    const ecs_world_t *world,
+    vec3 origin,
+    vec3 dir,
+    float max_dist,
+    box_collision_filter_t filter,
+    void *filter_ctx,
+    box_ray_hit_t *out)
+{
     box_ray_hit_t hit = { .distance = max_dist };
     box_bvh_query_t q;
     box_bvh_ray_setup(&q, origin, dir, max_dist);
-    box_index_ctx_t ctx = { .hit = &hit };
+    box_index_ctx_t ctx = { .hit = &hit, .filter = filter, .filter_ctx = filter_ctx };
     box_index_walk(world, &q, &ctx);
     if (out) {
         out[0] = hit;

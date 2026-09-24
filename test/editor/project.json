@@ -1,0 +1,169 @@
+{
+    "id": "editor",
+    "type": "application",
+    "value": {
+        "description": "Unit tests for the box.editor module and its overlay",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Command",
+                "testcases": [
+                    "on_turns_the_editor_on",
+                    "no_argument_turns_it_on",
+                    "off_turns_it_off",
+                    "off_clears_the_selection_and_the_opened_instance",
+                    "bad_argument_is_an_error",
+                    "overlay_exists_while_on",
+                    "overlay_is_gone_while_off",
+                    "system_does_nothing_while_off"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Select",
+                "testcases": [
+                    "select_marks_an_entity",
+                    "select_zero_clears",
+                    "child_of_a_template_instance_selects_the_root",
+                    "child_of_a_prefab_instance_selects_the_root",
+                    "root_is_reported_as_an_instance",
+                    "spline_is_reported",
+                    "open_hides_the_siblings_and_shows_the_instance",
+                    "open_lets_the_children_be_selected",
+                    "open_refuses_to_select_the_opened_instance",
+                    "open_keeps_the_lights",
+                    "close_shows_the_scene_again",
+                    "open_is_recursive",
+                    "open_refuses_an_entity_that_is_not_a_root",
+                    "click_in_the_scene_selects_the_hit",
+                    "click_on_a_child_selects_the_root_until_opened",
+                    "click_on_empty_space_clears_the_selection",
+                    "deleted_selection_is_cleared"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Tree",
+                "testcases": [
+                    "rows_list_the_root_entities_by_name",
+                    "collapsed_entity_hides_its_children",
+                    "expand_shows_the_children_below_the_parent",
+                    "selecting_reveals_the_ancestors",
+                    "kinds_are_detected",
+                    "nameless_engine_entities_are_skipped",
+                    "rows_are_widgets_in_model_order",
+                    "clicking_a_row_selects_its_entity",
+                    "clicking_the_arrow_expands_the_row",
+                    "tree_follows_a_scene_that_changed",
+                    "variables_of_flecs_core_have_no_children",
+                    "rows_scroll_with_the_wheel"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Inspector",
+                "testcases": [
+                    "nothing_selected_gives_no_fields",
+                    "fields_list_the_components_of_the_selection",
+                    "members_get_a_widget_by_type",
+                    "nested_struct_members_are_flattened",
+                    "enum_field_lists_its_constants",
+                    "engine_written_components_are_read_only",
+                    "tags_and_pairs_are_listed_by_name",
+                    "fields_are_published_once_per_change",
+                    "assign_sets_a_number",
+                    "assign_sets_an_enum_by_name",
+                    "assign_sets_a_bool",
+                    "assign_sets_a_string",
+                    "assign_sets_an_entity_by_path",
+                    "assign_rejects_a_bad_value",
+                    "submitted_line_of_a_bound_input_is_assigned",
+                    "focused_field_captures_the_input_maps",
+                    "grid_rows_are_widgets",
+                    "clicking_a_checkbox_flips_the_member",
+                    "collapsing_a_component_hides_its_members",
+                    "clicking_a_header_collapses_its_component",
+                    "fields_scroll_with_the_wheel",
+                    "hovering_rows_after_a_collapse",
+                    "rows_keep_the_children_of_their_template"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Source",
+                "testcases": [
+                    "literal_value_is_literal",
+                    "computed_value_is_computed",
+                    "missing_statement_is_none",
+                    "scene_entity_is_editable",
+                    "template_child_with_a_literal_is_editable",
+                    "template_child_with_a_prop_is_not",
+                    "transform_flag_follows_the_source",
+                    "write_through_updates_every_instance",
+                    "assign_on_a_computed_member_is_refused"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Gizmo",
+                "testcases": [
+                    "select_tool_draws_the_selection_box",
+                    "move_tool_draws_the_move_gizmo_at_the_selection",
+                    "gizmo_is_drawn_in_the_overlay_layer",
+                    "gizmo_scales_with_the_distance_to_the_camera",
+                    "handles_are_pickable_through_the_overlay_view",
+                    "dragging_the_x_arrow_moves_along_x",
+                    "dragging_the_xy_plane_keeps_z",
+                    "dragging_the_center_moves_in_the_view_plane",
+                    "rotating_about_y_changes_y_only",
+                    "scaling_along_x_changes_x_only",
+                    "release_drops_the_grab",
+                    "tool_change_drops_the_grab",
+                    "gizmo_of_a_child_moves_it_in_its_parent"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Spline",
+                "testcases": [
+                    "selecting_a_spline_draws_a_handle_per_point",
+                    "handles_sit_on_the_world_points",
+                    "guide_follows_the_selected_spline",
+                    "guide_is_hidden_without_a_spline",
+                    "point_selects_a_control_point",
+                    "point_add_inserts_after_the_selected_point",
+                    "point_add_extends_the_end",
+                    "point_remove_deletes_the_selected_point",
+                    "dragging_a_handle_moves_its_point"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
+                "id": "Toolbar",
+                "testcases": [
+                    "tool_buttons_switch_the_tool",
+                    "active_tool_is_highlighted",
+                    "open_button_appears_for_an_instance",
+                    "open_button_opens_the_instance",
+                    "close_button_appears_while_opened",
+                    "spline_buttons_appear_for_a_spline",
+                    "panels_keep_clicks_from_the_scene"
+                ],
+                "setup": true,
+                "teardown": true
+            }
+        ]
+    }
+}

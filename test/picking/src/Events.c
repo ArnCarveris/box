@@ -670,3 +670,169 @@ void Events_only_the_root_under_the_cursor_hears_the_hover_in_a_row(void)
     test_bool(ecs_has_id(w, a, fired_tag), false);
     test_bool(ecs_has_id(w, ecs_lookup(w, "row.b"), fired_tag), false);
 }
+
+void Events_unhandled_hears_a_click_nothing_took(void)
+{
+    // editor/events
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.picking\n"
+        "template Target {\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "}\n"
+        "template Catch {\n"
+        "  mut hits = 0\n"
+        "  mut who: entity = 0\n"
+        "  async {\n"
+        "    const hit = await on.click(Unhandled)\n"
+        "    who = hit.entity\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "    (LeafFired, who)\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n"
+        "Catch net\n" });
+    test_assert(s != 0);
+
+    ecs_entity_t ball = ecs_lookup(w, "ball");
+    ecs_entity_t net = ecs_lookup(w, "net");
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, net, fired_tag), true);
+    test_bool(ecs_has_pair(w, net, leaf_tag, ball), true);
+}
+
+void Events_unhandled_hears_a_click_on_empty_space(void)
+{
+    // editor/events
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.picking\n"
+        "template Catch {\n"
+        "  mut hits = 0\n"
+        "  mut who: entity = 0\n"
+        "  async {\n"
+        "    const hit = await on.click(Unhandled)\n"
+        "    who = hit.entity\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "  if who != 0 {\n"
+        "    LeafFired\n"
+        "  }\n"
+        "}\n"
+        "Catch net\n" });
+    test_assert(s != 0);
+
+    ecs_entity_t net = ecs_lookup(w, "net");
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, net, fired_tag), true);
+    test_bool(ecs_has_id(w, net, leaf_tag), false);
+}
+
+void Events_a_handler_keeps_a_click_from_unhandled(void)
+{
+    // editor/events
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.picking\n"
+        "template Target {\n"
+        "  mut hits = 0\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "  async {\n"
+        "    await on.click(this)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    LeafFired\n"
+        "  }\n"
+        "}\n"
+        "template Catch {\n"
+        "  mut hits = 0\n"
+        "  async {\n"
+        "    await on.click(Unhandled)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n"
+        "Catch net\n" });
+    test_assert(s != 0);
+
+    ecs_entity_t ball = ecs_lookup(w, "ball");
+    ecs_entity_t net = ecs_lookup(w, "net");
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 1 });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, ball, leaf_tag), true);
+    test_bool(ecs_has_id(w, net, fired_tag), false);
+}
+
+void Events_unhandled_hears_a_drag_nothing_took(void)
+{
+    // editor/events
+    ecs_entity_t s = ecs_script(w, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.collision\n"
+        "using box.picking\n"
+        "template Target {\n"
+        "  Position: {0, 0, 0}\n"
+        "  SphereCollider: {radius: 1}\n"
+        "}\n"
+        "template Catch {\n"
+        "  mut hits = 0\n"
+        "  async {\n"
+        "    await on.drag(Unhandled)\n"
+        "    hits = hits + 1\n"
+        "  }\n"
+        "  if hits > 0 {\n"
+        "    Fired\n"
+        "  }\n"
+        "}\n"
+        "Target ball\n"
+        "Catch net\n" });
+    test_assert(s != 0);
+
+    ecs_entity_t net = ecs_lookup(w, "net");
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {50, 50} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){
+        .kind = InputButtonDown, .code = BoxKeyMouseLeft, .duration = 4 });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {60, 60} });
+    ecs_progress(w, 0);
+    box_input_inject(w, &(InputEvent){ .kind = InputMouseMove, .value = {70, 70} });
+    ecs_progress(w, 0);
+    ecs_progress(w, 0);
+    test_bool(ecs_has_id(w, net, fired_tag), true);
+}

@@ -35,6 +35,7 @@ void View_defaults_of_a_new_view(void)
     ecs_add(w, e, View);
     const View *v = ecs_get(w, e, View);
     test_bool(v->enabled, true);
+    test_uint(v->occluder, 0);
     test_bool(v->shadows.enabled, true);
     test_int(v->shadows.cascades, BOX_SHADOW_CASCADES);
     test_bool(v->culling.enabled, true);
@@ -137,6 +138,56 @@ void View_views_render_in_priority_order(void)
     test_flt(((box_view_t*)box_vec_at(&packet.views, 0))->eye[2], -9);
     test_flt(((box_view_t*)box_vec_at(&packet.views, 1))->eye[2], -5);
     test_int(((box_view_t*)box_vec_at(&packet.views, 0))->priority, -3);
+}
+
+void View_occluder_is_the_view_that_renders_before(void)
+{
+    // views/view
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t scene = ecs_new(w);
+    ecs_add(w, scene, View);
+    View *scene_v = ecs_get_mut(w, scene, View);
+    scene_v->camera = cam;
+    scene_v->priority = 0;
+    ecs_modified(w, scene, View);
+    ecs_entity_t overlay = ecs_new(w);
+    ecs_add(w, overlay, View);
+    View *overlay_v = ecs_get_mut(w, overlay, View);
+    overlay_v->camera = cam;
+    overlay_v->priority = 10;
+    overlay_v->occluder = scene;
+    ecs_modified(w, overlay, View);
+    box_render_extract(w, &packet);
+    test_int(packet.views.count, 2);
+    test_uint(((box_view_t*)box_vec_at(&packet.views, 0))->occluder, 0);
+    test_uint(((box_view_t*)box_vec_at(&packet.views, 1))->occluder, 1);
+}
+
+void View_occluder_that_renders_after_is_ignored(void)
+{
+    // views/view
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 0, -5});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t scene = ecs_new(w);
+    ecs_add(w, scene, View);
+    View *scene_v = ecs_get_mut(w, scene, View);
+    scene_v->camera = cam;
+    scene_v->priority = 10;
+    ecs_modified(w, scene, View);
+    ecs_entity_t overlay = ecs_new(w);
+    ecs_add(w, overlay, View);
+    View *overlay_v = ecs_get_mut(w, overlay, View);
+    overlay_v->camera = cam;
+    overlay_v->priority = 0;
+    overlay_v->occluder = scene;
+    ecs_modified(w, overlay, View);
+    box_render_extract(w, &packet);
+    test_int(packet.views.count, 2);
+    test_uint(((box_view_t*)box_vec_at(&packet.views, 0))->occluder, 0);
+    test_uint(((box_view_t*)box_vec_at(&packet.views, 1))->occluder, 0);
 }
 
 void View_world_without_a_view_does_not_render(void)

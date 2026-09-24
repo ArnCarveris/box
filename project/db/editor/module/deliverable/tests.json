@@ -1,0 +1,390 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T22:46:42Z",
+  "pass": 50,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 1.501658,
+  "tests": [
+    {
+      "suite": "Command",
+      "case": "on_turns_the_editor_on",
+      "status": "pass",
+      "elapsed": 0.109864,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "no_argument_turns_it_on",
+      "status": "pass",
+      "elapsed": 0.109903,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "off_turns_it_off",
+      "status": "pass",
+      "elapsed": 0.110022,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "off_clears_the_selection_and_the_opened_instance",
+      "status": "pass",
+      "elapsed": 0.129898,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "bad_argument_is_an_error",
+      "status": "pass",
+      "elapsed": 0.10712,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "overlay_exists_while_on",
+      "status": "pass",
+      "elapsed": 0.124449,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "overlay_is_gone_while_off",
+      "status": "pass",
+      "elapsed": 0.123832,
+      "project": "editor"
+    },
+    {
+      "suite": "Command",
+      "case": "system_does_nothing_while_off",
+      "status": "pass",
+      "elapsed": 0.109581,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "select_marks_an_entity",
+      "status": "pass",
+      "elapsed": 0.137526,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "select_zero_clears",
+      "status": "pass",
+      "elapsed": 0.139029,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "child_of_a_template_instance_selects_the_root",
+      "status": "pass",
+      "elapsed": 0.138102,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "child_of_a_prefab_instance_selects_the_root",
+      "status": "pass",
+      "elapsed": 0.139289,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "root_is_reported_as_an_instance",
+      "status": "pass",
+      "elapsed": 0.138565,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "spline_is_reported",
+      "status": "pass",
+      "elapsed": 0.141664,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_hides_the_siblings_and_shows_the_instance",
+      "status": "pass",
+      "elapsed": 0.139511,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_lets_the_children_be_selected",
+      "status": "pass",
+      "elapsed": 0.138711,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "close_shows_the_scene_again",
+      "status": "pass",
+      "elapsed": 0.112217,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_is_recursive",
+      "status": "pass",
+      "elapsed": 0.113486,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "open_refuses_an_entity_that_is_not_a_root",
+      "status": "pass",
+      "elapsed": 0.109009,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "click_in_the_scene_selects_the_hit",
+      "status": "pass",
+      "elapsed": 0.316489,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "click_on_empty_space_clears_the_selection",
+      "status": "pass",
+      "elapsed": 0.310844,
+      "project": "editor"
+    },
+    {
+      "suite": "Select",
+      "case": "deleted_selection_is_cleared",
+      "status": "pass",
+      "elapsed": 0.137562,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "rows_list_the_root_entities_by_name",
+      "status": "pass",
+      "elapsed": 0.140405,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "collapsed_entity_hides_its_children",
+      "status": "pass",
+      "elapsed": 0.14118,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "expand_shows_the_children_below_the_parent",
+      "status": "pass",
+      "elapsed": 0.155163,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "selecting_reveals_the_ancestors",
+      "status": "pass",
+      "elapsed": 0.172894,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "kinds_are_detected",
+      "status": "pass",
+      "elapsed": 0.141085,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "nameless_engine_entities_are_skipped",
+      "status": "pass",
+      "elapsed": 0.145027,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "rows_are_widgets_in_model_order",
+      "status": "pass",
+      "elapsed": 0.154823,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "clicking_a_row_selects_its_entity",
+      "status": "pass",
+      "elapsed": 0.310377,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "clicking_the_arrow_expands_the_row",
+      "status": "pass",
+      "elapsed": 0.140629,
+      "project": "editor"
+    },
+    {
+      "suite": "Tree",
+      "case": "tree_follows_a_scene_that_changed",
+      "status": "pass",
+      "elapsed": 0.133999,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "nothing_selected_gives_no_fields",
+      "status": "pass",
+      "elapsed": 0.108967,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "fields_list_the_components_of_the_selection",
+      "status": "pass",
+      "elapsed": 0.18724,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "members_get_a_widget_by_type",
+      "status": "pass",
+      "elapsed": 0.186578,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "nested_struct_members_are_flattened",
+      "status": "pass",
+      "elapsed": 0.187171,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "enum_field_lists_its_constants",
+      "status": "pass",
+      "elapsed": 0.14355,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "engine_written_components_are_read_only",
+      "status": "pass",
+      "elapsed": 0.185795,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "tags_and_pairs_are_listed_by_name",
+      "status": "pass",
+      "elapsed": 0.186797,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "fields_are_published_once_per_change",
+      "status": "pass",
+      "elapsed": 0.316355,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_sets_a_number",
+      "status": "pass",
+      "elapsed": 0.096843,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_sets_an_enum_by_name",
+      "status": "pass",
+      "elapsed": 0.094153,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_sets_a_bool",
+      "status": "pass",
+      "elapsed": 0.121032,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_sets_a_string",
+      "status": "pass",
+      "elapsed": 0.124006,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_sets_an_entity_by_path",
+      "status": "pass",
+      "elapsed": 0.118692,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "assign_rejects_a_bad_value",
+      "status": "pass",
+      "elapsed": 0.118794,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "submitted_line_of_a_bound_input_is_assigned",
+      "status": "pass",
+      "elapsed": 0.193086,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "focused_field_captures_the_input_maps",
+      "status": "pass",
+      "elapsed": 0.128434,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "grid_rows_are_widgets",
+      "status": "pass",
+      "elapsed": 0.299326,
+      "project": "editor"
+    },
+    {
+      "suite": "Inspector",
+      "case": "clicking_a_checkbox_flips_the_member",
+      "status": "pass",
+      "elapsed": 0.299821,
+      "project": "editor"
+    }
+  ],
+  "projects": [
+    {
+      "project": "editor",
+      "pass": 8,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.130019
+    },
+    {
+      "project": "editor",
+      "pass": 14,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.455489
+    },
+    {
+      "project": "editor",
+      "pass": 10,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.310529
+    },
+    {
+      "project": "editor",
+      "pass": 18,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.605621
+    }
+  ]
+}

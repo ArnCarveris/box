@@ -1,0 +1,1069 @@
+{
+  "project": "all",
+  "timestamp": "2026-09-23T22:46:39Z",
+  "pass": 147,
+  "fail": 0,
+  "empty": 0,
+  "elapsed": 1.594331,
+  "tests": [
+    {
+      "suite": "Events",
+      "case": "hover_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.097252,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_waiter_registered_while_already_hovered_resumes_on_the_next_update",
+      "status": "pass",
+      "elapsed": 0.097458,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "the_hovered_tag_follows_the_cursor",
+      "status": "pass",
+      "elapsed": 0.096701,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "press_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.096681,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "release_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.097289,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "click_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.096737,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "drag_resumes_a_handler",
+      "status": "pass",
+      "elapsed": 0.097413,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_drag_does_not_raise_a_click",
+      "status": "pass",
+      "elapsed": 0.097414,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_receives_the_hit",
+      "status": "pass",
+      "elapsed": 0.098178,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "an_event_bubbles_to_the_parent",
+      "status": "pass",
+      "elapsed": 0.097605,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_child_handler_consumes_the_event",
+      "status": "pass",
+      "elapsed": 0.098843,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_still_cursor_runs_no_query",
+      "status": "pass",
+      "elapsed": 0.095967,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "every_view_costs_one_query",
+      "status": "pass",
+      "elapsed": 0.095077,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "disabled_picking_raises_nothing",
+      "status": "pass",
+      "elapsed": 0.095158,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_cancelled_task_drops_its_waiter",
+      "status": "pass",
+      "elapsed": 0.096485,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_fires_the_action_of_the_entity",
+      "status": "pass",
+      "elapsed": 0.094513,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_click_that_fires_an_action_stops_the_bubble",
+      "status": "pass",
+      "elapsed": 0.098726,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_parent_takes_the_click_when_the_child_has_no_action",
+      "status": "pass",
+      "elapsed": 0.096028,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "only_the_root_under_the_cursor_hears_the_hover_in_a_row",
+      "status": "pass",
+      "elapsed": 0.096431,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "unhandled_hears_a_click_nothing_took",
+      "status": "pass",
+      "elapsed": 0.09438,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "unhandled_hears_a_click_on_empty_space",
+      "status": "pass",
+      "elapsed": 0.093349,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "a_handler_keeps_a_click_from_unhandled",
+      "status": "pass",
+      "elapsed": 0.095042,
+      "project": "picking"
+    },
+    {
+      "suite": "Events",
+      "case": "unhandled_hears_a_drag_nothing_took",
+      "status": "pass",
+      "elapsed": 0.093819,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "finds_the_object_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.095754,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "misses_when_the_ray_points_away",
+      "status": "pass",
+      "elapsed": 0.096242,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "takes_the_nearest_of_two_objects",
+      "status": "pass",
+      "elapsed": 0.096302,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "hit_carries_the_normal_of_the_collider",
+      "status": "pass",
+      "elapsed": 0.095382,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "beyond_the_max_distance_is_a_miss",
+      "status": "pass",
+      "elapsed": 0.095379,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_prefab_root",
+      "status": "pass",
+      "elapsed": 0.09468,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "resolves_to_the_template_root",
+      "status": "pass",
+      "elapsed": 0.096084,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_row_of_template_roots_picks_the_one_under_the_cursor",
+      "status": "pass",
+      "elapsed": 0.096315,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_descendant_is_the_target",
+      "status": "pass",
+      "elapsed": 0.098579,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_pickable_between_the_hit_and_the_root_is_the_target",
+      "status": "pass",
+      "elapsed": 0.097713,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "an_entity_outside_a_root_targets_itself",
+      "status": "pass",
+      "elapsed": 0.097695,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "the_view_with_the_highest_priority_picks_first",
+      "status": "pass",
+      "elapsed": 0.097318,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_disabled_view_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.096945,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "a_view_with_a_render_target_does_not_pick",
+      "status": "pass",
+      "elapsed": 0.097107,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "matches_a_brute_force_pick_on_a_smaller_scene",
+      "status": "pass",
+      "elapsed": 0.141007,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "matches_a_brute_force_pick_with_one_more_entity",
+      "status": "pass",
+      "elapsed": 0.14192,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "equal_distance_resolves_to_the_lowest_id",
+      "status": "pass",
+      "elapsed": 0.080881,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "strict_view_picks_the_members_of_its_layers_only",
+      "status": "pass",
+      "elapsed": 0.081715,
+      "project": "picking"
+    },
+    {
+      "suite": "Pick",
+      "case": "scene_view_skips_the_members_of_a_ui_layer",
+      "status": "pass",
+      "elapsed": 0.080417,
+      "project": "picking"
+    },
+    {
+      "suite": "TextInput",
+      "case": "typed_text_reaches_the_line",
+      "status": "pass",
+      "elapsed": 0.100568,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "line_is_shown_as_the_text_of_the_element",
+      "status": "pass",
+      "elapsed": 0.100251,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "unfocused_input_takes_nothing",
+      "status": "pass",
+      "elapsed": 0.098299,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "backspace_removes_the_character_before_the_caret",
+      "status": "pass",
+      "elapsed": 0.100561,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "arrows_move_the_caret_over_the_line",
+      "status": "pass",
+      "elapsed": 0.101271,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "typing_inserts_at_the_caret",
+      "status": "pass",
+      "elapsed": 0.102575,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "enter_submits_the_line_and_empties_it",
+      "status": "pass",
+      "elapsed": 0.100313,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "newline_in_the_typed_text_submits_the_line",
+      "status": "pass",
+      "elapsed": 0.09889,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "history_walks_the_lines_that_were_submitted",
+      "status": "pass",
+      "elapsed": 0.09892,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "history_comes_back_to_the_line_being_typed",
+      "status": "pass",
+      "elapsed": 0.098755,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "tab_completes_a_command_name",
+      "status": "pass",
+      "elapsed": 0.097573,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_sits_at_the_width_of_the_text_before_it",
+      "status": "pass",
+      "elapsed": 0.09531,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_advances_by_the_width_of_a_typed_space",
+      "status": "pass",
+      "elapsed": 0.095513,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "caret_goes_with_the_focus",
+      "status": "pass",
+      "elapsed": 0.093962,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "focusing_an_input_takes_the_focus_from_the_others",
+      "status": "pass",
+      "elapsed": 0.092923,
+      "project": "ui"
+    },
+    {
+      "suite": "TextInput",
+      "case": "text_focus_gives_an_element_the_keyboard",
+      "status": "pass",
+      "elapsed": 0.093465,
+      "project": "ui"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.09921,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "prefab_is_not_a_root",
+      "status": "pass",
+      "elapsed": 0.099673,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "template_instance_is_root",
+      "status": "pass",
+      "elapsed": 0.099838,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "manual_root_aggregates",
+      "status": "pass",
+      "elapsed": 0.099493,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "empty_root_has_no_bounds",
+      "status": "pass",
+      "elapsed": 0.099679,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_children",
+      "status": "pass",
+      "elapsed": 0.099657,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_deep_hierarchy",
+      "status": "pass",
+      "elapsed": 0.100124,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "aggregates_parent_storage",
+      "status": "pass",
+      "elapsed": 0.099109,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "own_bounds_are_included",
+      "status": "pass",
+      "elapsed": 0.093906,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_added_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.094524,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_removed_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.093067,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "child_moved_updates_bounds",
+      "status": "pass",
+      "elapsed": 0.093855,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_out_of_root",
+      "status": "pass",
+      "elapsed": 0.093551,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "reparent_into_other_root",
+      "status": "pass",
+      "elapsed": 0.093785,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "nested_root_counts_once",
+      "status": "pass",
+      "elapsed": 0.094055,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "local_bounds_are_root_space",
+      "status": "pass",
+      "elapsed": 0.092207,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_move_transforms_local_bounds",
+      "status": "pass",
+      "elapsed": 0.094692,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "rigid_root_child_change_reaggregates",
+      "status": "pass",
+      "elapsed": 0.094566,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "non_rigid_root_reaggregates_on_move",
+      "status": "pass",
+      "elapsed": 0.094293,
+      "project": "collision"
+    },
+    {
+      "suite": "Roots",
+      "case": "deleted_root_is_forgotten",
+      "status": "pass",
+      "elapsed": 0.093582,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_shape_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.093979,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "ico_sphere_derives_sphere",
+      "status": "pass",
+      "elapsed": 0.093674,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_shape_derives_box",
+      "status": "pass",
+      "elapsed": 0.093561,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rounded_box_derives_box",
+      "status": "pass",
+      "elapsed": 0.092899,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_shape_derives_capsule",
+      "status": "pass",
+      "elapsed": 0.109461,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "other_shape_derives_aabb",
+      "status": "pass",
+      "elapsed": 0.109196,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "bounds_without_shape_give_aabb",
+      "status": "pass",
+      "elapsed": 0.109201,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "empty_bounds_give_no_collider",
+      "status": "pass",
+      "elapsed": 0.108946,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "no_collider_opts_out",
+      "status": "pass",
+      "elapsed": 0.108539,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "removing_no_collider_restores",
+      "status": "pass",
+      "elapsed": 0.108788,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "adding_no_collider_removes",
+      "status": "pass",
+      "elapsed": 0.108193,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "sphere_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.10832,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "box_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.106239,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "capsule_override_wins_over_shape",
+      "status": "pass",
+      "elapsed": 0.106154,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_sphere",
+      "status": "pass",
+      "elapsed": 0.105581,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_box",
+      "status": "pass",
+      "elapsed": 0.105845,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "scale_applied_to_capsule",
+      "status": "pass",
+      "elapsed": 0.105529,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rotation_turns_box_axes",
+      "status": "pass",
+      "elapsed": 0.105212,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "move_updates_collider",
+      "status": "pass",
+      "elapsed": 0.105763,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "shape_change_updates_collider",
+      "status": "pass",
+      "elapsed": 0.105085,
+      "project": "collision"
+    },
+    {
+      "suite": "Colliders",
+      "case": "rendered_bounds_derive_aabb",
+      "status": "pass",
+      "elapsed": 0.078021,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_sphere",
+      "status": "pass",
+      "elapsed": 0.005347,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_sphere",
+      "status": "pass",
+      "elapsed": 0.004972,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_respects_max_distance",
+      "status": "pass",
+      "elapsed": 0.005033,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_box",
+      "status": "pass",
+      "elapsed": 0.004957,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_rotated_box",
+      "status": "pass",
+      "elapsed": 0.004873,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_box",
+      "status": "pass",
+      "elapsed": 0.005073,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_aabb",
+      "status": "pass",
+      "elapsed": 0.004795,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_side",
+      "status": "pass",
+      "elapsed": 0.00495,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_hits_capsule_cap",
+      "status": "pass",
+      "elapsed": 0.004926,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "ray_misses_capsule",
+      "status": "pass",
+      "elapsed": 0.004884,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.004919,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.005446,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_rotated_box",
+      "status": "pass",
+      "elapsed": 0.005357,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.004723,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "sphere_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.005056,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_sphere",
+      "status": "pass",
+      "elapsed": 0.004995,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_box",
+      "status": "pass",
+      "elapsed": 0.005091,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_capsule",
+      "status": "pass",
+      "elapsed": 0.005011,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "capsule_overlaps_aabb",
+      "status": "pass",
+      "elapsed": 0.005007,
+      "project": "collision"
+    },
+    {
+      "suite": "Intersect",
+      "case": "bounds_of_collider",
+      "status": "pass",
+      "elapsed": 0.00492,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_finds_collider",
+      "status": "pass",
+      "elapsed": 0.074354,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "sphere_misses_far_collider",
+      "status": "pass",
+      "elapsed": 0.078175,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "aabb_finds_collider",
+      "status": "pass",
+      "elapsed": 0.077707,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_finds_nearest",
+      "status": "pass",
+      "elapsed": 0.078602,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "ray_misses",
+      "status": "pass",
+      "elapsed": 0.078303,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "frustum_finds_inside",
+      "status": "pass",
+      "elapsed": 0.078068,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "insert_after_update",
+      "status": "pass",
+      "elapsed": 0.077134,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "remove_drops_from_index",
+      "status": "pass",
+      "elapsed": 0.078627,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "no_collider_not_in_index",
+      "status": "pass",
+      "elapsed": 0.075472,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "move_updates_index",
+      "status": "pass",
+      "elapsed": 0.0818,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "root_groups_children",
+      "status": "pass",
+      "elapsed": 0.081517,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "nested_root_found",
+      "status": "pass",
+      "elapsed": 0.080841,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_found",
+      "status": "pass",
+      "elapsed": 0.080802,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "dynamic_entity_moves_each_frame",
+      "status": "pass",
+      "elapsed": 0.080633,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "disabled_index_finds_nothing",
+      "status": "pass",
+      "elapsed": 0.080804,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_sphere_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.085869,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_aabb_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.079972,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_ray_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.081584,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "random_frustum_matches_brute_force",
+      "status": "pass",
+      "elapsed": 0.082587,
+      "project": "collision"
+    },
+    {
+      "suite": "Index",
+      "case": "many_inserts_and_removes",
+      "status": "pass",
+      "elapsed": 0.082496,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "off_emits_no_lines",
+      "status": "pass",
+      "elapsed": 0.078023,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "sphere_draws_three_circles",
+      "status": "pass",
+      "elapsed": 0.077802,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "box_draws_twelve_edges",
+      "status": "pass",
+      "elapsed": 0.077722,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "capsule_draws_two_circles_and_four_lines",
+      "status": "pass",
+      "elapsed": 0.078704,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "root_bounds_draw_a_box",
+      "status": "pass",
+      "elapsed": 0.076916,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "all_draws_colliders_and_bounds",
+      "status": "pass",
+      "elapsed": 0.075981,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "collider_outside_the_view_is_skipped",
+      "status": "pass",
+      "elapsed": 0.075644,
+      "project": "collision"
+    },
+    {
+      "suite": "Debug",
+      "case": "lines_are_cleared_between_packets",
+      "status": "pass",
+      "elapsed": 0.075295,
+      "project": "collision"
+    }
+  ],
+  "projects": [
+    {
+      "project": "collision",
+      "pass": 89,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.830342
+    },
+    {
+      "project": "picking",
+      "pass": 23,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.290993
+    },
+    {
+      "project": "picking",
+      "pass": 19,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.275052
+    },
+    {
+      "project": "ui",
+      "pass": 16,
+      "fail": 0,
+      "empty": 0,
+      "elapsed": 0.197944
+    }
+  ]
+}

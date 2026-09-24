@@ -6,6 +6,7 @@
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/picking/picking_internal.h"
+#include "../../../src/render/render_internal.h"
 
 static ecs_world_t *w;
 
@@ -457,4 +458,58 @@ void Pick_a_row_of_template_roots_picks_the_one_under_the_cursor(void)
     test_uint(hit.entity, c);
     test_bool(box_picking_pick(w, 0, (vec2){-0.7f, 0}, &hit), true);
     test_uint(hit.entity, a);
+}
+
+void Pick_strict_view_picks_the_members_of_its_layers_only(void)
+{
+    // editor/events
+    ecs_entity_t cam = ecs_entity(w, { .name = "cam" });
+    ecs_set(w, cam, Position, {0, 0, -10});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t layer = ecs_entity(w, { .name = "gizmos" });
+    ecs_entity_t scene_view = ecs_new(w);
+    ecs_set(w, scene_view, View, { .camera = cam, .priority = 0, .enabled = true });
+    ecs_entity_t top_view = ecs_new(w);
+    ecs_set(w, top_view, View, { .camera = cam, .layers = { layer },
+        .strict_layers = true, .priority = 10, .enabled = true });
+
+    ecs_entity_t far_ball = ecs_new(w);
+    ecs_set(w, far_ball, Position, {0, 0, 5});
+    ecs_set(w, far_ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_add_pair(w, far_ball, Layer, layer);
+    ecs_entity_t near_ball = ecs_new(w);
+    ecs_set(w, near_ball, Position, {0, 0, 0});
+    ecs_set(w, near_ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_progress(w, 0);
+
+    PickHit hit;
+    test_bool(box_picking_pick(w, top_view, (vec2){0, 0}, &hit), true);
+    test_uint(hit.entity, far_ball);
+    test_bool(box_picking_pick(w, scene_view, (vec2){0, 0}, &hit), true);
+    test_uint(hit.entity, near_ball);
+}
+
+void Pick_scene_view_skips_the_members_of_a_ui_layer(void)
+{
+    // editor/events
+    ecs_entity_t cam = ecs_entity(w, { .name = "cam" });
+    ecs_set(w, cam, Position, {0, 0, -10});
+    ecs_set(w, cam, Camera, {.fov = 60});
+    ecs_entity_t layer = ecs_entity(w, { .name = "overlay" });
+    box_render_add_ui_layer(w, layer);
+    ecs_entity_t scene_view = ecs_new(w);
+    ecs_set(w, scene_view, View, { .camera = cam, .priority = 0, .enabled = true });
+
+    ecs_entity_t far_ball = ecs_new(w);
+    ecs_set(w, far_ball, Position, {0, 0, 5});
+    ecs_set(w, far_ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_entity_t near_ball = ecs_new(w);
+    ecs_set(w, near_ball, Position, {0, 0, 0});
+    ecs_set(w, near_ball, SphereCollider, {{0, 0, 0}, 1});
+    ecs_add_pair(w, near_ball, Layer, layer);
+    ecs_progress(w, 0);
+
+    PickHit hit;
+    test_bool(box_picking_pick(w, scene_view, (vec2){0, 0}, &hit), true);
+    test_uint(hit.entity, far_ball);
 }

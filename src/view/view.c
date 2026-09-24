@@ -42,6 +42,7 @@ static void box_view_ctor(
     for (i = 0; i < count; i ++) {
         v[i].camera = 0;
         v[i].target = 0;
+        v[i].occluder = 0;
         memset(v[i].layers, 0, sizeof(v[i].layers));
         memset(v[i].shadow_layers, 0, sizeof(v[i].shadow_layers));
         box_shadow_ctor(&v[i].shadows, 1, NULL);

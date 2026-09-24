@@ -47,7 +47,9 @@
                     "a_view_with_a_render_target_does_not_pick",
                     "matches_a_brute_force_pick_on_a_smaller_scene",
                     "matches_a_brute_force_pick_with_one_more_entity",
-                    "equal_distance_resolves_to_the_lowest_id"
+                    "equal_distance_resolves_to_the_lowest_id",
+                    "strict_view_picks_the_members_of_its_layers_only",
+                    "scene_view_skips_the_members_of_a_ui_layer"
                 ],
                 "setup": true,
                 "teardown": true
@@ -73,7 +75,11 @@
                     "a_click_fires_the_action_of_the_entity",
                     "a_click_that_fires_an_action_stops_the_bubble",
                     "a_parent_takes_the_click_when_the_child_has_no_action",
-                    "only_the_root_under_the_cursor_hears_the_hover_in_a_row"
+                    "only_the_root_under_the_cursor_hears_the_hover_in_a_row",
+                    "unhandled_hears_a_click_nothing_took",
+                    "unhandled_hears_a_click_on_empty_space",
+                    "a_handler_keeps_a_click_from_unhandled",
+                    "unhandled_hears_a_drag_nothing_took"
                 ],
                 "setup": true,
                 "teardown": true

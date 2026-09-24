@@ -1,0 +1,25 @@
+{
+  "project": "editor",
+  "timestamp": "2026-09-23T22:46:40Z",
+  "pass": 14,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.455489,
+  "tests": [
+    {"suite": "Select", "case": "select_marks_an_entity", "status": "pass", "elapsed": 0.137526},
+    {"suite": "Select", "case": "select_zero_clears", "status": "pass", "elapsed": 0.139029},
+    {"suite": "Select", "case": "child_of_a_template_instance_selects_the_root", "status": "pass", "elapsed": 0.138102},
+    {"suite": "Select", "case": "child_of_a_prefab_instance_selects_the_root", "status": "pass", "elapsed": 0.139289},
+    {"suite": "Select", "case": "root_is_reported_as_an_instance", "status": "pass", "elapsed": 0.138565},
+    {"suite": "Select", "case": "spline_is_reported", "status": "pass", "elapsed": 0.141664},
+    {"suite": "Select", "case": "open_hides_the_siblings_and_shows_the_instance", "status": "pass", "elapsed": 0.139511},
+    {"suite": "Select", "case": "open_lets_the_children_be_selected", "status": "pass", "elapsed": 0.138711},
+    {"suite": "Select", "case": "close_shows_the_scene_again", "status": "pass", "elapsed": 0.112217},
+    {"suite": "Select", "case": "open_is_recursive", "status": "pass", "elapsed": 0.113486},
+    {"suite": "Select", "case": "open_refuses_an_entity_that_is_not_a_root", "status": "pass", "elapsed": 0.109009},
+    {"suite": "Select", "case": "click_in_the_scene_selects_the_hit", "status": "pass", "elapsed": 0.316489},
+    {"suite": "Select", "case": "click_on_empty_space_clears_the_selection", "status": "pass", "elapsed": 0.310844},
+    {"suite": "Select", "case": "deleted_selection_is_cleared", "status": "pass", "elapsed": 0.137562}
+  ]
+}

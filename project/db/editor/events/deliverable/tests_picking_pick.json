@@ -1,0 +1,30 @@
+{
+  "project": "picking",
+  "timestamp": "2026-09-23T22:46:37Z",
+  "pass": 19,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.275052,
+  "tests": [
+    {"suite": "Pick", "case": "finds_the_object_under_the_cursor", "status": "pass", "elapsed": 0.095754},
+    {"suite": "Pick", "case": "misses_when_the_ray_points_away", "status": "pass", "elapsed": 0.096242},
+    {"suite": "Pick", "case": "takes_the_nearest_of_two_objects", "status": "pass", "elapsed": 0.096302},
+    {"suite": "Pick", "case": "hit_carries_the_normal_of_the_collider", "status": "pass", "elapsed": 0.095382},
+    {"suite": "Pick", "case": "beyond_the_max_distance_is_a_miss", "status": "pass", "elapsed": 0.095379},
+    {"suite": "Pick", "case": "resolves_to_the_prefab_root", "status": "pass", "elapsed": 0.094680},
+    {"suite": "Pick", "case": "resolves_to_the_template_root", "status": "pass", "elapsed": 0.096084},
+    {"suite": "Pick", "case": "a_row_of_template_roots_picks_the_one_under_the_cursor", "status": "pass", "elapsed": 0.096315},
+    {"suite": "Pick", "case": "a_pickable_descendant_is_the_target", "status": "pass", "elapsed": 0.098579},
+    {"suite": "Pick", "case": "a_pickable_between_the_hit_and_the_root_is_the_target", "status": "pass", "elapsed": 0.097713},
+    {"suite": "Pick", "case": "an_entity_outside_a_root_targets_itself", "status": "pass", "elapsed": 0.097695},
+    {"suite": "Pick", "case": "the_view_with_the_highest_priority_picks_first", "status": "pass", "elapsed": 0.097318},
+    {"suite": "Pick", "case": "a_disabled_view_does_not_pick", "status": "pass", "elapsed": 0.096945},
+    {"suite": "Pick", "case": "a_view_with_a_render_target_does_not_pick", "status": "pass", "elapsed": 0.097107},
+    {"suite": "Pick", "case": "matches_a_brute_force_pick_on_a_smaller_scene", "status": "pass", "elapsed": 0.141007},
+    {"suite": "Pick", "case": "matches_a_brute_force_pick_with_one_more_entity", "status": "pass", "elapsed": 0.141920},
+    {"suite": "Pick", "case": "equal_distance_resolves_to_the_lowest_id", "status": "pass", "elapsed": 0.080881},
+    {"suite": "Pick", "case": "strict_view_picks_the_members_of_its_layers_only", "status": "pass", "elapsed": 0.081715},
+    {"suite": "Pick", "case": "scene_view_skips_the_members_of_a_ui_layer", "status": "pass", "elapsed": 0.080417}
+  ]
+}

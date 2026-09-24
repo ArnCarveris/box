@@ -177,6 +177,69 @@ static void box_ui_fn_label(
     *(ecs_entity_t*)result->ptr = e;
 }
 
+/** Find the input of an element: the element itself or its first descendant with one.
+ *
+ * @param world The world
+ * @param e The element
+ * @return The entity that carries a TextInput, 0 when none does
+ */
+static ecs_entity_t box_ui_fn_input_of(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t result = 0;
+    if (ecs_has(world, e, TextInput)) {
+        result = e;
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_children(world, e);
+    while (ecs_children_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count && !result; i ++) {
+            result = box_ui_fn_input_of(world, it.entities[i]);
+        }
+
+        if (result) {
+            ecs_iter_fini(&it);
+            break;
+        }
+    }
+
+done:
+    return result;
+}
+
+/** text.focus: give the input of an element the keyboard, taking it from the others.
+ *
+ * The input is the element itself or its first descendant with a TextInput, so
+ * a widget can wrap its line in a box and focus the box.
+ *
+ * @param ctx The call context
+ * @param argc Number of arguments
+ * @param argv The arguments: the element
+ * @param result Receives whether the element has a TextInput that took the focus
+ */
+static void box_ui_fn_focus(
+    const ecs_function_ctx_t *ctx,
+    int32_t argc,
+    const ecs_value_t *argv,
+    ecs_value_t *result)
+{
+    ecs_world_t *world = ctx->world;
+    ecs_entity_t e = *(ecs_entity_t*)argv[0].ptr;
+    ecs_entity_t target = e && ecs_is_alive(world, e) ? box_ui_fn_input_of(world, e) : 0;
+    TextInput *input = target ? ecs_get_mut(world, target, TextInput) : NULL;
+    (void)argc;
+
+    if (input) {
+        input->focused = true;
+        ecs_modified(world, target, TextInput);
+    }
+
+    *(bool*)result->ptr = input != NULL;
+}
+
 void box_ui_functions_init(
     ecs_world_t *world,
     ecs_entity_t module)
@@ -206,6 +269,16 @@ void box_ui_functions_init(
             { .name = "width", .type = ecs_id(ecs_f32_t) }
         },
         .callback = box_ui_fn_wrap
+    });
+
+    ecs_function(world, {
+        .name = "focus",
+        .parent = scope,
+        .return_type = ecs_id(ecs_bool_t),
+        .params = {
+            { .name = "element", .type = ecs_id(ecs_entity_t) }
+        },
+        .callback = box_ui_fn_focus
     });
 
     ecs_function(world, {

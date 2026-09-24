@@ -5,6 +5,9 @@
  * Script templates are marked manual so new instances stay pending. A PreUpdate
  * system expands the pending instances nearest to the active camera within a
  * count and time budget; without a camera it keeps the script order.
+ *
+ * A template declared inside a module, such as a widget of box.ui, is a library
+ * template whose instances are expanded the moment they are declared.
  */
 
 #ifndef BOX_SCRIPT_H

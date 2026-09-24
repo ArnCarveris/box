@@ -5,6 +5,9 @@
  * Raising an event walks the parent chain of the hit and stops at the first
  * entity with a waiter. The action of a click walks the same chain, so a widget
  * fires the action a key binding fires.
+ *
+ * A press nobody waited for resolves the first waiter on its entity that
+ * registers while the button is still held.
  */
 
 #include "picking_internal.h"
@@ -31,8 +34,16 @@ static void box_pick_wait(
     PickEvent event = (PickEvent)(uintptr_t)ctx->ctx;
     ecs_entity_t entity = argc == 1 ? *(ecs_entity_t*)argv[0].ptr : ctx->entity;
     PickState *state = box_picking_state(ctx->world);
+
     if (!entity || !state) {
         ecs_script_future_reject(future, "on.click expects an entity");
+        ecs_script_future_release(future);
+    } else if (event == PickPress && state->press_missed && state->pressed &&
+        state->press.entity == entity)
+    {
+        state->press_missed = false;
+        ecs_script_future_resolve(future, &(ecs_value_t){
+            .type = ecs_id(PickHit), .ptr = &state->press });
         ecs_script_future_release(future);
     } else {
         box_pick_waiter_t *waiter = ecs_vec_append_t(
@@ -67,6 +78,7 @@ static void box_pick_wait_cancel(
 
 /** Resolve every waiter that listens for an event on one entity.
  *
+
  * @param state The module state
  * @param entity The entity the event reached
  * @param event The interaction that was raised
@@ -151,6 +163,20 @@ ecs_entity_t box_picking_raise(
 
     if (raise) {
         raise[0] = outer;
+    }
+
+    return result;
+}
+
+ecs_entity_t box_picking_raise_unhandled(
+    ecs_world_t *world,
+    PickEvent event,
+    const PickHit *hit)
+{
+    PickState *state = box_picking_state(world);
+    ecs_entity_t result = 0;
+    if (state && box_pick_deliver(state, Unhandled, event, hit)) {
+        result = Unhandled;
     }
 
     return result;

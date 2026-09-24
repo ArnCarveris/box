@@ -1,0 +1,27 @@
+{
+  "project": "ui",
+  "timestamp": "2026-09-23T22:46:38Z",
+  "pass": 16,
+  "fail": 0,
+  "empty": 0,
+  "timeout": 0,
+  "elapsed": 0.197944,
+  "tests": [
+    {"suite": "TextInput", "case": "typed_text_reaches_the_line", "status": "pass", "elapsed": 0.100568},
+    {"suite": "TextInput", "case": "line_is_shown_as_the_text_of_the_element", "status": "pass", "elapsed": 0.100251},
+    {"suite": "TextInput", "case": "unfocused_input_takes_nothing", "status": "pass", "elapsed": 0.098299},
+    {"suite": "TextInput", "case": "backspace_removes_the_character_before_the_caret", "status": "pass", "elapsed": 0.100561},
+    {"suite": "TextInput", "case": "arrows_move_the_caret_over_the_line", "status": "pass", "elapsed": 0.101271},
+    {"suite": "TextInput", "case": "typing_inserts_at_the_caret", "status": "pass", "elapsed": 0.102575},
+    {"suite": "TextInput", "case": "enter_submits_the_line_and_empties_it", "status": "pass", "elapsed": 0.100313},
+    {"suite": "TextInput", "case": "newline_in_the_typed_text_submits_the_line", "status": "pass", "elapsed": 0.098890},
+    {"suite": "TextInput", "case": "history_walks_the_lines_that_were_submitted", "status": "pass", "elapsed": 0.098920},
+    {"suite": "TextInput", "case": "history_comes_back_to_the_line_being_typed", "status": "pass", "elapsed": 0.098755},
+    {"suite": "TextInput", "case": "tab_completes_a_command_name", "status": "pass", "elapsed": 0.097573},
+    {"suite": "TextInput", "case": "caret_sits_at_the_width_of_the_text_before_it", "status": "pass", "elapsed": 0.095310},
+    {"suite": "TextInput", "case": "caret_advances_by_the_width_of_a_typed_space", "status": "pass", "elapsed": 0.095513},
+    {"suite": "TextInput", "case": "caret_goes_with_the_focus", "status": "pass", "elapsed": 0.093962},
+    {"suite": "TextInput", "case": "focusing_an_input_takes_the_focus_from_the_others", "status": "pass", "elapsed": 0.092923},
+    {"suite": "TextInput", "case": "text_focus_gives_an_element_the_keyboard", "status": "pass", "elapsed": 0.093465}
+  ]
+}

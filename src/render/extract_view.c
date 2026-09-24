@@ -217,6 +217,40 @@ static void box_view_targets(
     }
 }
 
+/** Find the view whose depth hides a view among the views that render before it.
+ *
+ * @param world The world
+ * @param state The registry
+ * @param e The view entity
+ * @param index Index of the view in the packet
+ * @param v The view to fill
+ */
+static void box_view_occluder(
+    ecs_world_t *world,
+    const RenderState *state,
+    ecs_entity_t e,
+    int32_t index,
+    box_view_t *v)
+{
+    const View *view = e ? ecs_get(world, e, View) : NULL;
+    v->occluder = 0;
+    if (!view || !view->occluder) {
+        goto done;
+    }
+
+    int32_t i;
+    for (i = 0; i < index; i ++) {
+        const box_view_src_t *src = ecs_vec_get_t(&state->view_list, box_view_src_t, i);
+        if (src->entity == view->occluder) {
+            v->occluder = (uint32_t)i + 1;
+            break;
+        }
+    }
+
+done:
+    return;
+}
+
 /** Fill the target, clear color and size of a view from its component.
  *
  * @param world The world
@@ -655,6 +689,7 @@ static void box_view_fill(
     memset(v, 0, sizeof(box_view_t));
     box_view_layers(world, state, src->entity, ui, v);
     box_view_target(world, src->entity, p, v);
+    box_view_occluder(world, state, src->entity, index, v);
     box_view_camera(world, src->camera, v);
     box_view_cull(ecs_get(world, src->entity, View), v);
     box_view_lod(world, src->entity, v);

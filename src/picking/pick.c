@@ -5,6 +5,10 @@
  * The pick of a frame is one ray query per view that renders into the surface,
  * and only while the cursor moves: a still cursor answers from the hit the last
  * query left behind, so a frame that changes nothing costs no query.
+ *
+ * The update runs immediately on the world, so a hover that re-evaluates a
+ * template restarts its tasks before the press of the same frame is raised, and
+ * a press that found no waiter is kept while the button is held for the task.
  */
 
 #include "picking_internal.h"
@@ -52,7 +56,7 @@ static void box_pick_query(
     state->valid = true;
 }
 
-/** Raise an event on the hit, and on the hit behind it when nothing took it.
+/** Raise an event on the hit, on the hit behind it and last on Unhandled.
  *
  * @param world The world
  * @param state The module state
@@ -71,6 +75,10 @@ static ecs_entity_t box_pick_raise(
         result = box_picking_raise(world, event, &state->fallback);
     }
 
+    if (!result) {
+        result = box_picking_raise_unhandled(world, event, hit);
+    }
+
     return result;
 }
 
@@ -79,7 +87,7 @@ static ecs_entity_t box_pick_raise(
  * A raise without a waiter marks the hover missed, so a waiter registered later
  * in the same hover resolves on its next update. One delivery clears the miss.
  *
- * @param it Iterator of the system, whose stage carries the change
+ * @param it Iterator of the system, which runs immediately on the world
  * @param state The module state
  * @param entity The entity the cursor points at, 0 for none
  */
@@ -90,7 +98,7 @@ static void box_pick_hover(
 {
     if (state->hovered == entity) {
         if (state->hover_missed &&
-            box_pick_raise(it->stage, state, PickHover, &state->hit))
+            box_pick_raise(it->world, state, PickHover, &state->hit))
         {
             state->hover_missed = false;
         }
@@ -99,15 +107,15 @@ static void box_pick_hover(
     }
 
     if (state->hovered && ecs_is_alive(it->world, state->hovered)) {
-        ecs_remove_id(it->stage, state->hovered, Hovered);
+        ecs_remove_id(it->world, state->hovered, Hovered);
     }
 
     state->hovered = entity;
     state->hover_missed = false;
     if (entity) {
-        ecs_add_id(it->stage, entity, Hovered);
+        ecs_add_id(it->world, entity, Hovered);
         state->hover_missed =
-            box_pick_raise(it->stage, state, PickHover, &state->hit) == 0;
+            box_pick_raise(it->world, state, PickHover, &state->hit) == 0;
     }
 
 done:
@@ -155,13 +163,13 @@ static void box_pick_buttons(
     if (pressed) {
         state->press = state->hit;
         state->press_window = in->mouse.window;
+        state->pressed = true;
         state->dragging = false;
-        if (state->hit.entity) {
-            box_pick_raise(it->stage, state, PickPress, &state->hit);
-        }
+        state->press_missed = state->hit.entity != 0 &&
+            box_pick_raise(it->world, state, PickPress, &state->hit) == 0;
     }
 
-    if (down && state->press.entity) {
+    if (down && state->pressed) {
         float dx = in->mouse.window.x - state->press_window.x;
         float dy = in->mouse.window.y - state->press_window.y;
         bool far_enough = (dx * dx + dy * dy) > (threshold * threshold);
@@ -170,18 +178,18 @@ static void box_pick_buttons(
         if (state->dragging && moved) {
             PickHit drag;
             box_pick_drag_hit(it->world, state, in->mouse.normalized, &drag);
-            box_picking_raise(it->stage, PickDrag, &drag);
+            box_pick_raise(it->world, state, PickDrag, &drag);
         }
     }
 
     if (released) {
-        if (state->hit.entity) {
-            box_pick_raise(it->stage, state, PickRelease, &state->hit);
+        box_pick_raise(it->world, state, PickRelease, &state->hit);
+        if (!state->dragging && state->hit.entity == state->press.entity) {
+            box_pick_raise(it->world, state, PickClick, &state->hit);
         }
 
-        if (!state->dragging && state->hit.entity == state->press.entity) {
-            box_pick_raise(it->stage, state, PickClick, &state->hit);
-        }
+        state->pressed = false;
+        state->press_missed = false;
 
         memset(&state->press, 0, sizeof(PickHit));
         state->dragging = false;

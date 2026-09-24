@@ -491,6 +491,8 @@ struct box_renderer_t {
     WGPURenderPipeline solid_pipeline[BOX_EFFECT_FORMATS][2];
     bool solid_supported;
     WGPURenderPipeline normal_pipeline[BOX_EFFECT_FORMATS]; /**< Mesh pipeline writing normals */
+    WGPURenderPipeline occluded_pipeline[BOX_EFFECT_FORMATS]; /**< Faded draw behind the occluder */
+    bool occluded_supported;         /**< The mesh shader declares the box_fade constant */
     box_vec_t effect_pipelines;      /**< box_gpu_effect_t indexed by shader handle */
     WGPUBindGroupLayout effect_layout;  /**< Uniforms, inputs and sampler of an effect pass */
     WGPUPipelineLayout effect_pipeline_layout; /**< Pipeline layout of every effect pass */
@@ -924,12 +926,14 @@ void box_transition_frame(
  * @param view The view being drawn
  * @param p The packet
  * @param pass The render pass
+ * @param pipeline Pipeline every draw uses, NULL for the opaque pipeline of its mesh
  */
 void box_scene_draw(
     box_renderer_t *r,
     const box_view_t *view,
     const box_packet_t *p,
-    WGPURenderPassEncoder pass);
+    WGPURenderPassEncoder pass,
+    WGPURenderPipeline pipeline);
 
 /** Release all mesh and instance buffers.
  *
@@ -990,11 +994,13 @@ void box_cull_dispatch(
  * @param r The renderer
  * @param pass The render pass
  * @param group One of the BOX_HIZ_PASS constants
+ * @param pipeline Pipeline every draw uses, NULL for the opaque pipeline of its mesh
  */
 void box_cull_draw(
     box_renderer_t *r,
     WGPURenderPassEncoder pass,
-    uint32_t group);
+    uint32_t group,
+    WGPURenderPipeline pipeline);
 
 /** Create the pyramid pipelines, the occlusion pass and their shared buffers.
  *
