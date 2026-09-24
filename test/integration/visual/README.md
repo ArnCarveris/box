@@ -17,6 +17,21 @@ Comparison tolerates GPU tie-break speckle: a scene fails only when the largest
 per channel delta exceeds 24 and more than 200 pixels differ by more than 16.
 The runner prints `max`, `mean` and the pixel count for every scene.
 
+Every run writes `index.html` to its output directory (`test/integration/out`
+unless `--out` says otherwise): the baseline, the render and a diff image of
+each scene, failures first. The diff is green where the render is brighter, red
+where it is darker, faint where no channel moved more than 16, and a dimmed grey
+copy of the baseline where the pixels are identical.
+
+To check a change against what the code before it drew rather than against the
+committed baselines, render the old code into one directory and the new code
+against it:
+
+```
+python3 tools/integration.py visual --out /tmp/before                     # at the old commit
+python3 tools/integration.py visual --out /tmp/after --against /tmp/before
+```
+
 Rules for adding one:
 
 - The scene is fully defined in script; anything it needs is reachable from

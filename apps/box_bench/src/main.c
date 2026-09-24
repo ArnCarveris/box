@@ -44,7 +44,40 @@ typedef struct box_bench_t {
     double gpu_shadow_ms;   /**< GPU milliseconds the shadow passes of the resolved frames took */
     int32_t gpu_count;      /**< Frames whose GPU times were resolved */
     uint32_t gpu_frame;     /**< Renderer frame the last GPU times belong to */
+    box_timing_pass_t gpu_passes[BOX_TIMING_PASS_MAX]; /**< GPU milliseconds per pass name */
+    uint32_t gpu_pass_count; /**< Pass names the resolved frames recorded */
 } box_bench_t;
+
+/** Add the time of a resolved pass to the total of its name.
+ *
+ * @param bench The benchmark
+ * @param pass The pass of a resolved frame
+ */
+static void box_bench_gpu_pass(
+    box_bench_t *bench,
+    const box_timing_pass_t *pass)
+{
+    uint32_t i;
+    for (i = 0; i < bench->gpu_pass_count; i ++) {
+        if (!strcmp(bench->gpu_passes[i].name, pass->name)) {
+            break;
+        }
+    }
+
+    if (i == bench->gpu_pass_count) {
+        if (i == BOX_TIMING_PASS_MAX) {
+            goto done;
+        }
+
+        bench->gpu_passes[i] = *pass;
+        bench->gpu_passes[i].time_ms = 0;
+        bench->gpu_pass_count ++;
+    }
+
+    bench->gpu_passes[i].time_ms += pass->time_ms;
+done:
+    return;
+}
 
 /** Add the instance counts of the last rendered frame to the totals.
  *
@@ -84,6 +117,8 @@ static void box_bench_stats(
                 if (!strcmp(gpu.passes[pass].name, "shadow")) {
                     bench->gpu_shadow_ms += gpu.passes[pass].time_ms;
                 }
+
+                box_bench_gpu_pass(bench, &gpu.passes[pass]);
             }
 
             bench->gpu_ms += gpu.frame_ms;
@@ -350,7 +385,14 @@ static void box_bench_report(
         bench->gpu_shadow_ms * gpu_scale, bench->spike_factor, report->budget_ms,
         bench->attribute ? "true" : "false", report->count);
     box_bench_spikes_json(f, world, report);
-    fprintf(f, "%s]\n}\n", report->count ? "\n  " : "");
+    fprintf(f, "%s],\n  \"gpu_passes\": {", report->count ? "\n  " : "");
+    uint32_t pass;
+    for (pass = 0; pass < bench->gpu_pass_count; pass ++) {
+        fprintf(f, "%s\n    \"%s\": %.4f", pass ? "," : "", bench->gpu_passes[pass].name,
+            bench->gpu_passes[pass].time_ms * gpu_scale);
+    }
+
+    fprintf(f, "%s}\n}\n", bench->gpu_pass_count ? "\n  " : "");
     if (f != stdout) {
         fclose(f);
     }
@@ -362,6 +404,11 @@ static void box_bench_report(
         bench->drawn * scale, bench->culled * scale, bench->occluded * scale,
         bench->rebuilds, bench->gpu_ms * gpu_scale, bench->gpu_shadow_ms * gpu_scale,
         report->budget_ms, report->count);
+    for (pass = 0; pass < bench->gpu_pass_count; pass ++) {
+        printf("gpu pass %s %.4f ms\n", bench->gpu_passes[pass].name,
+            bench->gpu_passes[pass].time_ms * gpu_scale);
+    }
+
     box_bench_print_spikes(world, report);
 }
 

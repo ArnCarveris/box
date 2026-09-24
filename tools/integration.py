@@ -3,10 +3,16 @@
 reports and command scenes to session command logs.
 
 Usage:
-  integration.py visual  [--out dir] [--env name] [--frames n] [--update-baseline] [scene.flecs ...]
+  integration.py visual  [--out dir] [--env name] [--frames n] [--update-baseline]
+                         [--against dir] [scene.flecs ...]
   Visual scenes are compared with test/integration/visual/baseline/<scene>.png and fail only when the
   largest channel delta exceeds 24 and more than 200 pixels differ by more than 16 (GPU speckle passes);
   a missing baseline is created, --update-baseline replaces the baselines of the scenes given.
+  --against compares with the <scene>.png renders of an earlier run in that directory instead, which
+  checks a change against what the code before it drew and leaves the baselines alone. A run writes
+  <out>/index.html, a page with the baseline, the render and a diff image of every scene, failures
+  first; the diff is green where the render is brighter, red where it is darker, faint where the
+  delta stays under 16 and a dimmed grey copy of the baseline where the pixels are identical.
   integration.py bench   [--out dir] [--env name] [--frames n] [--spike factor]
                          [--no-attribute] [--fps n] [scene.flecs ...]
   Bench scenes run under a fixed step and fail when a frame exceeded the spike budget, which is
@@ -127,18 +133,144 @@ def compare_images(baseline_path, actual_path):
     return {"ok": ok, "max": max_delta, "mean": round(mean_delta, 4), "px": npx}
 
 
-def compare_baseline(name, png, update):
-    """Store or compare a render against test/integration/visual/baseline/<name>.png."""
+def compare_baseline(name, png, update, against=None):
+    """Store or compare a render against test/integration/visual/baseline/<name>.png, or against
+    the render of the same scene in the directory of an earlier run."""
+    if against:
+        baseline = os.path.join(against, name + ".png")
+        if not os.path.isfile(baseline):
+            return {"ok": False, "status": "no render in %s" % against, "path": None}
+        result = compare_images(baseline, png)
+        result["status"] = "match" if result["ok"] else "differs"
+        result["path"] = baseline
+        return result
     baseline = os.path.join(BASELINE_DIR, name + ".png")
     os.makedirs(BASELINE_DIR, exist_ok=True)
     if update or not os.path.isfile(baseline):
         status = "updated" if os.path.isfile(baseline) else "new"
         with open(png, "rb") as src, open(baseline, "wb") as dst:
             dst.write(src.read())
-        return {"ok": True, "status": status}
+        return {"ok": True, "status": status, "path": baseline}
     result = compare_images(baseline, png)
     result["status"] = "match" if result["ok"] else "differs"
+    result["path"] = baseline
     return result
+
+
+def write_png(path, pixels):
+    """Encode an (h, w, 3) uint8 array as an RGB PNG without external libraries."""
+    import struct
+    import zlib
+    import numpy as np
+    height, width = pixels.shape[:2]
+    rows = np.zeros((height, width * 3 + 1), dtype=np.uint8)
+    rows[:, 1:] = pixels.reshape(height, width * 3)
+
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+    with open(path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n")
+        f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)))
+        f.write(chunk(b"IDAT", zlib.compress(rows.tobytes(), 6)))
+        f.write(chunk(b"IEND", b""))
+
+
+def write_diff(baseline_path, actual_path, out_path):
+    """Write the diff image of a render: green where it is brighter than the baseline, red where it
+    is darker, yellow where only the hue moved, at half strength when no channel moved more than
+    PIXEL_DELTA, over a dimmed grey copy of the baseline where the pixels are identical."""
+    import numpy as np
+    base = read_png(baseline_path).astype(np.int32)
+    actual = read_png(actual_path).astype(np.int32)
+    if base.shape != actual.shape:
+        return False
+    luma_base = base[:, :, 0] * 30 + base[:, :, 1] * 59 + base[:, :, 2] * 11
+    luma_actual = actual[:, :, 0] * 30 + actual[:, :, 1] * 59 + actual[:, :, 2] * 11
+    delta = np.abs(base - actual).max(axis=2)
+    grey = (luma_base // 100 // 4).astype(np.uint8)
+    out = np.repeat(grey[:, :, None], 3, axis=2)
+    strength = np.where(delta > PIXEL_DELTA, 255, 128).astype(np.uint8)
+    brighter = (delta > 0) & (luma_actual > luma_base)
+    darker = (delta > 0) & (luma_actual < luma_base)
+    shifted = (delta > 0) & (luma_actual == luma_base)
+    out[brighter] = 0
+    out[brighter, 1] = strength[brighter]
+    out[darker] = 0
+    out[darker, 0] = strength[darker]
+    out[shifted, 0] = strength[shifted]
+    out[shifted, 1] = strength[shifted]
+    out[shifted, 2] = 0
+    write_png(out_path, out)
+    return True
+
+
+def write_report(results, out, against):
+    """Write <out>/index.html with the baseline, the render and the diff of every scene."""
+    import html
+    rows = []
+    for r in sorted(results, key=lambda r: r["status"] == "pass"):
+        name = os.path.splitext(os.path.basename(r["scene"]))[0]
+        cmp = r["baseline"]
+        current = os.path.join(out, name + ".png") if r["image"] else None
+        baseline = None
+        diff = None
+        if cmp.get("path") and os.path.isfile(cmp["path"]):
+            baseline = os.path.join(out, name + "_baseline.png")
+            if os.path.abspath(cmp["path"]) != os.path.abspath(baseline):
+                with open(cmp["path"], "rb") as src, open(baseline, "wb") as dst:
+                    dst.write(src.read())
+            if current and write_diff(baseline, current, os.path.join(out, name + "_diff.png")):
+                diff = os.path.join(out, name + "_diff.png")
+        detail = cmp.get("status", "")
+        if "max" in cmp:
+            detail = "max %d, mean %.4f, %d px &gt; %d" % (cmp["max"], cmp["mean"], cmp["px"], PIXEL_DELTA)
+        elif "reason" in cmp:
+            detail = html.escape(cmp["reason"])
+        cells = []
+        for path in (baseline, current, diff):
+            if path:
+                ref = html.escape(os.path.basename(path))
+                cells.append('<td><a href="%s" target="_blank"><img src="%s" loading="lazy"></a></td>'
+                             % (ref, ref))
+            else:
+                cells.append('<td><span class="placeholder">&mdash;</span></td>')
+        rows.append('<tr class="%s"><td class="name">%s<br><span class="%s">%s</span><br>'
+                    '<span class="detail">%s</span></td>%s</tr>' % (
+                        r["status"], html.escape(name), r["status"],
+                        "pass" if r["status"] == "pass" else "FAIL", detail, "".join(cells)))
+    failed = sum(1 for r in results if r["status"] != "pass")
+    source = html.escape(against) if against else "test/integration/visual/baseline"
+    page = [
+        '<!DOCTYPE html>',
+        '<html><head><meta charset="utf-8"><title>Box visual scenes</title>',
+        '<style>',
+        'body { font-family: -apple-system, sans-serif; background: #1a1a1a; color: #eee; margin: 20px; }',
+        'h1 { font-weight: 400; } p { color: #aaa; }',
+        'table { border-collapse: collapse; width: 100%; }',
+        'th, td { padding: 10px; border-bottom: 1px solid #333; vertical-align: top; }',
+        'th { text-align: left; background: #222; font-weight: 600; position: sticky; top: 0; }',
+        'img { max-width: 480px; width: 100%; display: block; background: #000; }',
+        '.name { font-weight: 600; min-width: 180px; }',
+        '.pass { color: #8f8; } .fail { color: #f88; }',
+        '.detail { color: #ccc; font-size: 0.9em; font-weight: 400; }',
+        '.placeholder { color: #555; font-style: italic; }',
+        'label { color: #ccc; }',
+        'body.failures tr.pass { display: none; }',
+        '</style></head><body>',
+        '<h1>Visual scenes &mdash; %d failed of %d</h1>' % (failed, len(results)),
+        '<p>Baseline: %s. Diff: green brighter, red darker, faint under a delta of %d, '
+        'grey identical.</p>' % (source, PIXEL_DELTA),
+        '<p><label><input type="checkbox" onchange="document.body.classList.toggle(\'failures\', '
+        'this.checked)"> Only failures</label></p>',
+        '<table>',
+        '<tr><th>Scene</th><th>Baseline</th><th>Current</th><th>Diff</th></tr>',
+        *rows,
+        '</table></body></html>',
+    ]
+    path = os.path.join(out, "index.html")
+    with open(path, "w") as f:
+        f.write("\n".join(page))
+    print("report %s" % path)
 
 
 def visual_scripts(scene):
@@ -154,7 +286,7 @@ def visual_scripts(scene):
     return [*sources, os.path.abspath(scene)]
 
 
-def run_visual(scenes, out, env, frames, width, height, update=False):
+def run_visual(scenes, out, env, frames, width, height, update=False, against=None):
     os.makedirs(out, exist_ok=True)
     results = []
     for scene in scenes:
@@ -168,7 +300,8 @@ def run_visual(scenes, out, env, frames, width, height, update=False):
                      "--headless", "--frames", str(frames), harness_path, *visual_scripts(scene)])
         os.unlink(harness_path)
         rendered = proc.returncode == 0 and os.path.isfile(png)
-        cmp = compare_baseline(name, png, update) if rendered else {"ok": False, "status": "missing"}
+        cmp = (compare_baseline(name, png, update, against) if rendered
+               else {"ok": False, "status": "missing"})
         ok = rendered and cmp["ok"]
         detail = cmp["status"]
         if "max" in cmp:
@@ -178,6 +311,7 @@ def run_visual(scenes, out, env, frames, width, height, update=False):
         print(f"{'PASS' if ok else 'FAIL'} {os.path.relpath(scene, ROOT)} ({detail})")
         if not rendered:
             print(proc.stdout[-2000:], proc.stderr[-2000:])
+    write_report(results, out, against)
     return results
 
 
@@ -327,13 +461,15 @@ def main():
                         help="do not attribute a frame to its slowest system")
     parser.add_argument("--fps", default="60", help="fixed step of a bench run, 0 measures it")
     parser.add_argument("--update-baseline", action="store_true")
+    parser.add_argument("--against", help="compare visual scenes with the renders of an earlier run")
     args = parser.parse_args()
 
     if args.kind == "visual":
         scenes = args.scenes or sorted(glob.glob(os.path.join(VISUAL_DIR, "*.flecs")))
         width, height = (int(v) for v in args.size.split("x"))
         results = run_visual(scenes, args.out or os.path.join(ROOT, "test", "integration", "out"), args.env,
-                             args.frames or 3, width, height, update=args.update_baseline)
+                             args.frames or 3, width, height, update=args.update_baseline,
+                             against=os.path.abspath(args.against) if args.against else None)
     elif args.kind == "command":
         scenes = args.scenes or sorted(s for s in glob.glob(os.path.join(COMMAND_DIR, "*.flecs"))
                                        if not s.endswith("_content.flecs"))
