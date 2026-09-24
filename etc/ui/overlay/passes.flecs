@@ -1,0 +1,30 @@
+// Per pass counts of the last finished frame, read from the PassStats
+// singleton: calls are the draws of a render pass or the dispatches of a
+// compute pass, whose name is drawn in color.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template PassPanel : StatsPanel {
+  prop title = "Passes"
+  prop width: f32 = table_width
+
+  const s = PassStats[PassStats]
+
+  StatCells header(name: "pass ({s.count}/{s.total})", a: "calls", b: "tris", c: "pipes",
+    d: "binds", header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..s.count {
+      const p = s.passes[i]
+      "pass_{i}" {
+        StatCells: {name: p.name, a: "{p.draw_calls + p.dispatches}", b: "{p.triangles}",
+          c: "{p.pipeline_switches}", d: "{p.bind_group_changes}", accent: p.compute}
+      }
+    }
+  }
+}

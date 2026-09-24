@@ -287,23 +287,25 @@ ECS_STRUCT(ComputeStats, {
     ComputeStat passes[16]; /**< The compute passes, in record order */
 });
 
-/** Script the templates of the statistics panels are loaded from, into box.monitor.panels */
-#define BOX_MONITOR_STATS_TEMPLATES "etc/ui/stats_panels.flecs"
-
-/** Script that lays the statistics panels out, loaded into box.monitor.stats */
-#define BOX_MONITOR_STATS_PANEL "etc/ui/stats.flecs"
+/** Script of the overlay, loaded at import into box.monitor.overlay_script.
+ *
+ * It includes etc/ui/overlay/stats.flecs, which lays the statistics panels out in
+ * box.monitor.stats with an exported mut variable per panel, and the widget script
+ * of every panel, whose templates live in box.monitor.panels.
+ *
+ * It also includes the terminal of the console, which exists while the world has
+ * a box.ui.Console.
+ */
+#define BOX_MONITOR_OVERLAY "etc/ui/overlay/overlay.flecs"
 
 /** Frame times the history of the Fps singleton keeps, which the ECS_STRUCT spells out */
 #define BOX_MONITOR_FPS_HISTORY (120)
 
-/** Script the frame rate panel is loaded from at import, into box.monitor.fps_panel */
-#define BOX_MONITOR_FPS_PANEL "etc/ui/fps.flecs"
-
 /** Frame rate of the last second and the most recent frame times.
  *
  * Filled and marked modified every frame. The panel shows while the variable
- * box.monitor.fps_panel.visible is true. The history is oldest first, and slots
- * before the first recorded frame are zero.
+ * box.monitor.stats.fps is true. The history is oldest first, and slots before
+ * the first recorded frame are zero.
  */
 ECS_STRUCT(Fps, {
     double fps;          /**< Frames per second over the last second */

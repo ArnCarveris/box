@@ -1,16 +1,20 @@
 /**
  * @file monitor/panels.c
- * @brief Loads the statistics panels and ties each one to the singleton it reads.
+ * @brief Loads the overlay script and ties each statistics panel to the singleton it reads.
  *
- * The templates load into box.monitor.panels and the layout into box.monitor.stats,
- * whose exported mut variable per panel shows it. Showing a panel adds the
- * singleton it reads, which starts its collection; hiding it removes it again.
+ * BOX_MONITOR_OVERLAY includes the widget scripts, whose templates load into
+ * box.monitor.panels, and the layout, which loads into box.monitor.stats with an
+ * exported mut variable per panel.
+ *
+ * Showing a panel adds the singleton it reads, which starts its collection;
+ * hiding it removes it again. The frame rate panel reads the Fps singleton,
+ * which is always there, so it is not tied.
  */
 
 #include "monitor_internal.h"
 #include "../shader/shader_internal.h"
 
-/** Panels the layout script shows */
+/** Panels the layout script ties to a singleton */
 #define BOX_STATS_PANEL_COUNT (8)
 
 /** A statistics panel: its variable in box.monitor.stats and the singleton it reads */
@@ -35,7 +39,7 @@ static bool box_stats_script(
     bool result = false;
     char resolved[1024];
     if (!box_locate(path, resolved, sizeof(resolved))) {
-        ecs_warn("box.monitor: no statistics panel script at '%s'", path);
+        ecs_warn("box.monitor: no overlay script at '%s'", path);
         goto done;
     }
 
@@ -102,8 +106,7 @@ void box_stats_panels_init(
         { .name = "systems", .component = ecs_id(EcsStats) }
     };
 
-    bool loaded = box_stats_script(world, BOX_MONITOR_STATS_TEMPLATES, "stats_templates");
-    if (!loaded || !box_stats_script(world, BOX_MONITOR_STATS_PANEL, "stats_script")) {
+    if (!box_stats_script(world, BOX_MONITOR_OVERLAY, "overlay_script")) {
         goto done;
     }
 

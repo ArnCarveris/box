@@ -434,6 +434,9 @@ static float box_ui_attach_point(
  * instead, leaving the Bounds of the root untouched. An axis with an attach point puts
  * the edge of the child on that point of the parent box.
  *
+ * The padding of the parent insets the edges, except on an axis the child grows
+ * on, where it was given the whole box and covers the padding.
+ *
  * @param world The world
  * @param root The root of the tree being walked
  * @param parent The place of the parent
@@ -446,6 +449,7 @@ static void box_ui_pin(
     UiPlace *child)
 {
     const Anchor *a = &child->anchor;
+    UiPlace edges = *parent;
     float pw = parent->width;
     float ph = parent->height;
     if (pw <= 0 && ph <= 0 && parent->e == root) {
@@ -456,8 +460,18 @@ static void box_ui_pin(
         }
     }
 
-    child->x = box_ui_align_x(parent, pw, child->width, a->h);
-    child->y = box_ui_align_y(parent, ph, child->height, a->v);
+    if (child->grow_width > 0) {
+        edges.pad_left = 0;
+        edges.pad_right = 0;
+    }
+
+    if (child->grow_height > 0) {
+        edges.pad_top = 0;
+        edges.pad_bottom = 0;
+    }
+
+    child->x = box_ui_align_x(&edges, pw, child->width, a->h);
+    child->y = box_ui_align_y(&edges, ph, child->height, a->v);
     child->x += a->h == AlignRight ? -a->x : a->x;
     child->y += a->v == VAlignTop ? -a->y : a->y;
     if (a->parent_h != AttachHSame) {
@@ -638,10 +652,33 @@ static bool box_ui_flows(
     return !child->aux && !child->has_anchor && !child->has_world;
 }
 
-/** Size of the box of a parent inside its padding on one axis.
+/** Size of the box of a parent on one axis, padding included.
  *
  * The root of a tree without a box of its own offers the view that draws it,
  * like it does to the children it anchors.
+ *
+ * @param world The world
+ * @param root The root of the tree being walked
+ * @param p The place of the parent
+ * @param x True for the width, false for the height
+ * @return The size, 0 when the parent has no box on the axis
+ */
+static float box_ui_outer(
+    ecs_world_t *world,
+    ecs_entity_t root,
+    const UiPlace *p,
+    bool x)
+{
+    float size = x ? p->width : p->height;
+    if (size <= 0 && p->e == root) {
+        const UiImpl *impl = ecs_get(world, root, UiImpl);
+        size = impl ? (x ? impl->width : impl->height) : 0;
+    }
+
+    return size > 0 ? size : 0;
+}
+
+/** Size of the box of a parent inside its padding on one axis.
  *
  * @param world The world
  * @param root The root of the tree being walked
@@ -655,13 +692,8 @@ static float box_ui_inner(
     const UiPlace *p,
     bool x)
 {
-    float size = x ? p->width : p->height;
+    float size = box_ui_outer(world, root, p, x);
     float result = 0;
-    if (size <= 0 && p->e == root) {
-        const UiImpl *impl = ecs_get(world, root, UiImpl);
-        size = impl ? (x ? impl->width : impl->height) : 0;
-    }
-
     if (size > 0) {
         result = size - (x ? p->pad_left + p->pad_right : p->pad_top + p->pad_bottom);
     }
@@ -805,6 +837,9 @@ static void box_ui_shrink_row(
  * is short. In a column or a node that places nothing, children are stretched or
  * narrowed to the box of the node.
  *
+ * An anchored child is pinned to the edges of the node, so it stretches over the
+ * padding too.
+ *
  * @param world The world
  * @param root The root of the tree being walked
  * @param places The places of the walk
@@ -837,11 +872,12 @@ static void box_ui_widths_of(
             continue;
         }
 
+        float room = ch->has_anchor ? box_ui_outer(world, root, p, true) : inner;
         if (ch->grow_width > 0) {
-            box_ui_set_width(world, ch, box_ui_bound(inner,
+            box_ui_set_width(world, ch, box_ui_bound(room,
                 ch->layout.min_width, ch->layout.max_width));
-        } else if (ch->shrinks && ch->width > inner) {
-            box_ui_set_width(world, ch, box_ui_bound(inner, ch->layout.min_width, 0));
+        } else if (ch->shrinks && ch->width > room) {
+            box_ui_set_width(world, ch, box_ui_bound(room, ch->layout.min_width, 0));
         }
     }
 }
@@ -920,6 +956,9 @@ static void box_ui_refit(
  * across a row, and in a node that places nothing, a child that grows is
  * stretched to the box of the node.
  *
+ * An anchored child is pinned to the edges of the node, so it stretches over the
+ * padding too.
+ *
  * @param world The world
  * @param root The root of the tree being walked
  */
@@ -953,7 +992,8 @@ static void box_ui_heights(
                 continue;
             }
 
-            ch->height = box_ui_bound(inner, ch->layout.min_height, ch->layout.max_height);
+            float room = ch->has_anchor ? box_ui_outer(world, root, p, false) : inner;
+            ch->height = box_ui_bound(room, ch->layout.min_height, ch->layout.max_height);
         }
     }
 }

@@ -1,0 +1,34 @@
+// The ten ECS systems that spent the most time per frame over the last second,
+// slowest first, with the cheapest, average and most expensive frame of each,
+// read from the EcsStats singleton.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template SystemsPanel : StatsPanel {
+  prop title = "Systems"
+  prop width: f32 = table_width
+
+  const s = EcsStats[EcsStats]
+
+  StatCells header(name: "system", a: "min", b: "avg", c: "max", header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..10 {
+      const entry = s.slowest[i]
+      if entry.system != 0 {
+        "system_{i}" {
+          StatCells: {name: entry.system.name(), a: "{entry.min_ms:.3}", b: "{entry.time_ms:.3}",
+            c: "{entry.max_ms:.3}"}
+        }
+      }
+    }
+  }
+
+  StatCells total(name: "{s.systems_ran} systems, {s.fps:.0} fps, frame {s.frame_time_avg_ms:.2} ms",
+    name_width: width, cell_width: 0, header: true)
+}

@@ -152,8 +152,11 @@ ECS_STRUCT(Fill, {
 /** Grows a side of an element into the room its parent leaves, by weight.
  *
  * Along the parent row or column the element takes a share of the free room by
- * weight, up to its Layout maximum. Across that axis, or without one, a weight
- * above zero stretches to the parent box. A content sized parent leaves no room.
+ * weight, up to its Layout maximum. A content sized parent leaves no room.
+ *
+ * Across that axis, or without one, a weight above zero stretches to the parent
+ * box inside its padding, or over the padding too when the element has an
+ * Anchor, which is what backs a content sized panel.
  */
 ECS_STRUCT(Grow, {
     float width;  /**< Weight of the width, 0 does not grow it */
@@ -257,13 +260,13 @@ ECS_STRUCT(TextInput, {
 
 /** The in game console, an overlay terminal the backtick key opens.
  *
- * Adding the singleton binds the grave key to toggle open. The first open loads
- * BOX_UI_CONSOLE, which builds the overlay and marks the ConsoleLog and
- * TextInput elements the engine fills.
+ * Adding the singleton binds the grave key to toggle open. The overlay script
+ * box.monitor loads builds the terminal tree while the singleton exists; the engine
+ * takes the tree that holds a ConsoleLog, with its TextInput, and fills both.
  *
- * An open console disables every other input map. A submitted line is set as
- * TerminalInput on its session, whose log is the scrollback, and fires the
- * submit action.
+ * An open console disables every other input map and shows the tree. A submitted
+ * line is set as TerminalInput on its session, whose log is the scrollback, and
+ * fires the submit action.
  */
 ECS_STRUCT(Console, {
     bool open;            /**< The overlay is shown and holds the keyboard */
@@ -330,11 +333,15 @@ ECS_STRUCT(TerminalColors, {
 /** Subtrees one update may lay out before the tree is laid out as a whole */
 #define BOX_UI_SUBTREE_MAX (64)
 
-/** Script the framework installs, which the first open of the console loads */
-#define BOX_UI_CONSOLE "etc/ui/console.flecs"
-
 /** Script the widget library is loaded from at import, into box.ui.widgets */
 #define BOX_UI_WIDGETS "etc/ui/widgets/widgets.flecs"
+
+/** Template of the terminal the overlay script instantiates as the console tree.
+ *
+ * An instance the incremental loading of box.script still holds pending is
+ * expanded the frame the console opens, so the tree takes the text of that frame.
+ */
+#define BOX_UI_TERMINAL "box.ui.terminal.TerminalPanel"
 
 /** Name of the terminal session the console runs its lines on */
 #define BOX_UI_CONSOLE_SESSION "console"

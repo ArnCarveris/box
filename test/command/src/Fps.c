@@ -59,8 +59,8 @@ void Fps_on_shows_the_panel(void)
     test_str(out, "fps panel on\n");
     ecs_os_free(out);
 
-    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), true);
-    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") != 0);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.stats.fps", ecs_bool_t), true);
+    test_assert(ecs_lookup(w, "box.monitor.stats.panel") != 0);
 }
 
 void Fps_off_hides_the_panel(void)
@@ -73,8 +73,8 @@ void Fps_off_hides_the_panel(void)
     test_str(out, "fps panel off\n");
     ecs_os_free(out);
 
-    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), false);
-    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") == 0);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.stats.fps", ecs_bool_t), false);
+    test_assert(ecs_lookup(w, "box.monitor.stats.panel") == 0);
 }
 
 void Fps_first_call_shows_the_panel(void)
@@ -85,8 +85,8 @@ void Fps_first_call_shows_the_panel(void)
     test_bool(error, false);
     test_str(out, "0 fps, mean 0.00 ms, worst 0.00 ms\n");
     ecs_os_free(out);
-    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), true);
-    test_assert(ecs_lookup(w, "box.monitor.fps_panel.panel") != 0);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.stats.fps", ecs_bool_t), true);
+    test_assert(ecs_lookup(w, "box.monitor.stats.panel") != 0);
 }
 
 void Fps_window_falls_back_to_the_current_frame(void)
@@ -124,7 +124,7 @@ void Fps_unknown_state_is_an_error(void)
     test_bool(error, true);
     test_str(out, "expected 'on' or 'off', got 'maybe'");
     ecs_os_free(out);
-    test_bool(ecs_mut_var_get_t(w, "box.monitor.fps_panel.visible", ecs_bool_t), false);
+    test_bool(ecs_mut_var_get_t(w, "box.monitor.stats.fps", ecs_bool_t), false);
 }
 
 void Fps_help_lists_the_command(void)

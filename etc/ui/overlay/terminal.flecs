@@ -1,0 +1,70 @@
+// The terminal widget of the in game console. TerminalPanel is a tree of
+// ordinary UI elements over a Backsplash that spans the left half of the
+// screen: box.ui fills the element with a ConsoleLog with the log of the
+// session of the console and reads the line typed into the one with a
+// TextInput, with its caret, its history and its completion. The overlay
+// script instantiates it while the world has a Console, and box.ui turns its
+// view on and off as the console opens and closes.
+module box.ui.terminal
+include theme
+using box.geometry
+using box.material
+using box.ui
+using box.ui.theme
+
+template TerminalPanel {
+  prop width: f32 = 0.5
+  prop lines = 12
+
+  Ui: {height: 0}
+
+  Backsplash backdrop(corners: 0, screen_width: width, screen_height: 1)
+
+  panel {
+    Anchor: {h: Left, v: Top}
+    Layout: {direction: Column, padding: pad * 2, spacing: pad, h: Left, v: Top}
+    Fill: {width: width, height: 1}
+    Font: {size: font_size}
+
+    scrollback {
+      Layout: {}
+      Fill: {width: 1, height: 0.9}
+      Scroll: {y: Auto}
+      ConsoleLog: {lines: lines}
+      TerminalColors: {
+        text: text_color,
+        muted: dim_color,
+        accent: highlight,
+        error: highlight,
+        path: text_color,
+        type: text_color,
+        number: literal,
+        string: literal
+      }
+      Text: {value: "", align: Left}
+      Rgb: text_color
+    }
+
+    prompt {
+      Anchor: {h: Left, v: Bottom}
+      Layout: {direction: Row, height: line_height + pad, padding: pad / 2, spacing: pad,
+        h: Left, v: Middle}
+      Fill: {width: 1}
+      Border: {radius: radius}
+      Rgb: field
+
+      marker {
+        Text: {value: "$"}
+        Rgb: dim_color
+      }
+
+      input {
+        Layout: {height: line_height}
+        Fill: {width: 1}
+        TextInput: {history: true, complete: true}
+        Text: {value: ""}
+        Rgb: text_color
+      }
+    }
+  }
+}

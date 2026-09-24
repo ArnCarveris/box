@@ -1,0 +1,35 @@
+// Live buffers and the uploads of the last finished frame per usage class,
+// read from the BufferStats singleton.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template BufferPanel : StatsPanel {
+  prop title = "Buffers"
+  prop width: f32 = table_width
+
+  const s = BufferStats[BufferStats]
+  const mb = 1024.0 * 1024.0
+
+  StatCells header(name: "usage", a: "count", b: "MB", c: "uploads", d: "KB up",
+    header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..8 {
+      const u = s.usages[i]
+      if u.buffers > 0 || u.uploads > 0 {
+        "usage_{i}" {
+          StatCells: {name: u.usage, a: "{u.buffers}", b: "{u.bytes / mb:.2}",
+            c: "{u.uploads}", d: "{u.upload_bytes / 1024.0:.1}"}
+        }
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.buffers}", b: "{s.bytes / mb:.2}", c: "{s.uploads}",
+    d: "{s.upload_bytes / 1024.0:.1}", header: true)
+}

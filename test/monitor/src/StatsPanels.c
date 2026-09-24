@@ -358,14 +358,15 @@ void StatsPanels_tables_end_with_their_total(void)
         }
     }
 
-    test_int(count, 4);
-    test_str(ecs_get_name(world, kids[0]), "heading");
-    test_str(ecs_get_name(world, kids[1]), "header");
-    test_str(ecs_get_name(world, kids[2]), "rows");
-    test_str(ecs_get_name(world, kids[3]), "total");
-    ecs_entity_t row = ecs_lookup_child(world, kids[2], "pipeline_0");
+    test_int(count, 5);
+    test_str(ecs_get_name(world, kids[0]), "back");
+    test_str(ecs_get_name(world, kids[1]), "heading");
+    test_str(ecs_get_name(world, kids[2]), "header");
+    test_str(ecs_get_name(world, kids[3]), "rows");
+    test_str(ecs_get_name(world, kids[4]), "total");
+    ecs_entity_t row = ecs_lookup_child(world, kids[3], "pipeline_0");
     test_str(ecs_get(world, ecs_lookup_child(world, row, "name_cell"), Text)->value, "mesh");
-    test_str(ecs_get(world, ecs_lookup_child(world, kids[3], "b_cell"), Text)->value, "4");
+    test_str(ecs_get(world, ecs_lookup_child(world, kids[4], "b_cell"), Text)->value, "4");
     ecs_fini(world);
 }
 

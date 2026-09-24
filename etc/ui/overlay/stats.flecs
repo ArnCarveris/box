@@ -1,15 +1,29 @@
-// The statistics panels. box.monitor loads this script at import into
-// box.monitor.stats and ties every exported mut variable below to the singleton
-// its panel reads: turning a variable on adds the singleton, which starts its
+// The statistics panels: one column in the top right corner of the screen
+// with the frame rate panel on top and every other panel under it. box.monitor
+// ties every exported mut variable below but fps to the singleton its panel
+// reads: turning a variable on adds the singleton, which starts its
 // collection, and turning it off removes it, so a hidden panel costs nothing.
-// The stats command switches the variables. The panels are templates from
-// etc/ui/stats_panels.flecs stacked in one column in the top left corner, so an
-// application that wants another arrangement ships its own etc/ui/stats.flecs.
+// The Fps singleton is always there. The fps and stats commands switch the
+// variables. Every panel is a template from the widget script it is included
+// from, so an application that wants another arrangement ships its own
+// etc/ui/overlay/stats.flecs.
 module box.monitor.stats
+include theme
+include fps
+include renderer
+include gpu
+include passes
+include pipelines
+include bindgroups
+include buffers
+include compute
+include systems
 using flecs.script
 using box.ui
+using box.ui.theme
 using box.monitor.panels
 
+export mut fps = false
 export mut renderer = false
 export mut gpu = false
 export mut pass = false
@@ -19,9 +33,7 @@ export mut buffer = false
 export mut compute = false
 export mut systems = false
 
-const margin = 10
-
-if renderer || gpu || pass || pipeline || bindgroup || buffer || compute || systems {
+if fps || renderer || gpu || pass || pipeline || bindgroup || buffer || compute || systems {
   panel {
     Ui: {height: 0, passthrough: true}
 
@@ -31,8 +43,12 @@ if renderer || gpu || pass || pipeline || bindgroup || buffer || compute || syst
       Fill: {width: 1, height: 1}
 
       stack {
-        Anchor: {h: Left, v: Top, x: margin, y: margin}
-        Layout: {direction: Column, spacing: 6, h: Left, v: Top}
+        Anchor: {h: Right, v: Top, x: margin, y: margin}
+        Layout: {direction: Column, spacing: pad, h: Right, v: Top}
+
+        if fps {
+          FpsPanel fps_stats
+        }
 
         if renderer {
           RendererPanel renderer_stats

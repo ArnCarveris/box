@@ -194,11 +194,11 @@ void Fps_panel_is_hidden_by_default(void)
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_entity_t visible = ecs_lookup(world, "box.monitor.fps_panel.visible");
+    ecs_entity_t visible = ecs_lookup(world, "box.monitor.stats.fps");
     test_assert(visible != 0);
-    test_bool(ecs_mut_var_get_t(world, "box.monitor.fps_panel.visible", ecs_bool_t), false);
+    test_bool(ecs_mut_var_get_t(world, "box.monitor.stats.fps", ecs_bool_t), false);
     ecs_progress(world, 0.02f);
-    test_assert(ecs_lookup(world, "box.monitor.fps_panel.panel") == 0);
+    test_assert(ecs_lookup(world, "box.monitor.stats.panel") == 0);
     ecs_fini(world);
 }
 
@@ -207,14 +207,14 @@ void Fps_panel_shows_while_visible(void)
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    test_int(ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true}), 0);
-    ecs_entity_t panel = ecs_lookup(world, "box.monitor.fps_panel.panel");
+    test_int(ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {true}), 0);
+    ecs_entity_t panel = ecs_lookup(world, "box.monitor.stats.panel");
     test_assert(panel != 0);
     test_assert(ecs_has(world, panel, Ui));
 
-    test_int(ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {false}), 0);
+    test_int(ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {false}), 0);
     test_assert(!ecs_is_alive(world, panel));
-    test_assert(ecs_lookup(world, "box.monitor.fps_panel.panel") == 0);
+    test_assert(ecs_lookup(world, "box.monitor.stats.panel") == 0);
     ecs_fini(world);
 }
 
@@ -223,18 +223,18 @@ void Fps_panel_label_shows_the_frame_rate(void)
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {true});
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_progress(world, 0.02f);
     }
 
     ecs_entity_t label = ecs_lookup(world,
-        "box.monitor.fps_panel.panel.screen.frame.label");
+        "box.monitor.stats.panel.screen.stack.fps_stats.summary.label");
     test_assert(label != 0);
     const Text *text = ecs_get(world, label, Text);
     test_assert(text != NULL);
-    test_str(text->value, "50");
+    test_str(text->value, "50 fps");
     const Rgb *rgb = ecs_get(world, label, Rgb);
     test_assert(rgb->r > rgb->g);
 
@@ -243,7 +243,7 @@ void Fps_panel_label_shows_the_frame_rate(void)
     }
 
     text = ecs_get(world, label, Text);
-    test_str(text->value, "100");
+    test_str(text->value, "100 fps");
     rgb = ecs_get(world, label, Rgb);
     test_assert(rgb->g > rgb->r && rgb->g > rgb->b);
     ecs_fini(world);
@@ -254,13 +254,13 @@ void Fps_panel_draws_one_bar_per_recorded_frame(void)
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {true});
     int32_t i;
     for (i = 0; i < 5; i ++) {
         ecs_progress(world, 0.01f);
     }
 
-    ecs_entity_t frame = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame");
+    ecs_entity_t frame = ecs_lookup(world, "box.monitor.stats.panel.screen.stack.fps_stats.chart");
     test_assert(frame != 0);
     test_assert(ecs_lookup_child(world, frame, "bar_114") == 0);
     for (i = 115; i < 120; i ++) {
@@ -283,12 +283,12 @@ void Fps_slow_frame_turns_its_bar_red(void)
     // monitoring/fps_overlay
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {true});
     ecs_progress(world, 0.01f);
     ecs_progress(world, 0.025f);
     ecs_progress(world, 0.08f);
 
-    ecs_entity_t frame = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame");
+    ecs_entity_t frame = ecs_lookup(world, "box.monitor.stats.panel.screen.stack.fps_stats.chart");
     const Rgb *green = ecs_get(world, ecs_lookup_child(world, frame, "bar_117"), Rgb);
     const Rgb *yellow = ecs_get(world, ecs_lookup_child(world, frame, "bar_118"), Rgb);
     const Rgb *red = ecs_get(world, ecs_lookup_child(world, frame, "bar_119"), Rgb);
@@ -308,18 +308,25 @@ void Fps_panel_follows_the_surface(void)
     Surface *surface = ecs_singleton_ensure(world, Surface);
     surface->width = 960;
     surface->height = 540;
-    ecs_mut_var_set_t(world, "box.monitor.fps_panel.visible", ecs_bool_t, {true});
+    ecs_mut_var_set_t(world, "box.monitor.stats.fps", ecs_bool_t, {true});
     int32_t i;
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0.02f);
     }
 
-    ecs_entity_t back = ecs_lookup(world, "box.monitor.fps_panel.panel.screen.frame.back");
+    ecs_entity_t panel = ecs_lookup(world, "box.monitor.stats.panel.screen.stack.fps_stats");
+    ecs_entity_t back = ecs_lookup_child(world, panel, "back");
     const Bounds *bounds = ecs_get(world, back, Bounds);
+    const Bounds *frame = ecs_get(world, panel, Bounds);
     test_assert(bounds != NULL);
-    test_flt(bounds->width, 492.0f);
-    test_flt(bounds->height, 98.0f);
-    test_flt(bounds->x, 960.0f / 2.0f - 10.0f - 492.0f / 2.0f);
-    test_flt(bounds->y, 540.0f / 2.0f - 10.0f - 98.0f / 2.0f);
+    test_assert(frame != NULL);
+    test_flt(bounds->width, 496.0f);
+    test_flt(bounds->height, 116.0f);
+    test_flt(bounds->width, frame->width);
+    test_flt(bounds->height, frame->height);
+    test_flt(bounds->x, frame->x);
+    test_flt(bounds->y, frame->y);
+    test_flt(bounds->x, 960.0f / 2.0f - 10.0f - 496.0f / 2.0f);
+    test_flt(bounds->y, 540.0f / 2.0f - 10.0f - 116.0f / 2.0f);
     ecs_fini(world);
 }

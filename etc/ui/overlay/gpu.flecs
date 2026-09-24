@@ -1,0 +1,25 @@
+// The GPU time of every pass of the last frame whose timestamps resolved, read
+// from the GpuTimings singleton.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.monitor
+
+template GpuPanel : StatsPanel {
+  prop title = "GPU"
+
+  const g = GpuTimings[GpuTimings]
+
+  if g.supported {
+    StatRow total(label: "Frame", value: "{g.frame_ms:.2} ms", width: width)
+    for i in 0..g.pass_count {
+      "pass_{i}" {
+        StatRow: {label: g.passes[i].name, value: "{g.passes[i].time_ms:.3} ms", width: width,
+          dim: true}
+      }
+    }
+  } else {
+    StatRow unsupported(label: "Timestamps", value: "not supported", width: width, dim: true)
+  }
+}

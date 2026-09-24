@@ -3,14 +3,16 @@
  * @brief The fps command: the frame rate of the last second and the panel switch.
  *
  * The numbers come from the Fps singleton that box.monitor fills every frame.
- * The panel is the box.monitor.fps_panel script and is switched through its
- * exported mut variable. Every call but the off form shows the panel.
+ * The panel is the top one of the statistics column of the overlay script and
+ * is switched through its exported mut variable.
+ *
+ * Every call but the off form shows the panel.
  */
 
 #include "command_internal.h"
 
-/** Path of the exported mut variable the frame rate panel script draws on */
-#define BOX_FPS_PANEL_VISIBLE "box.monitor.fps_panel.visible"
+/** Path of the exported mut variable the statistics layout draws the frame rate panel on */
+#define BOX_FPS_PANEL_VISIBLE "box.monitor.stats.fps"
 
 /** The fps command: print the window of the last second or switch the panel.
  *

@@ -1,5 +1,5 @@
-// The in game console open over a 3D scene: the overlay that the framework
-// script etc/ui/console.flecs builds out of ordinary UI elements, with the
+// The in game console open over a 3D scene: the terminal that the framework
+// script etc/ui/overlay/terminal.flecs builds out of ordinary UI elements, with the
 // scrollback filled from the log of its terminal session and the caret of its
 // input at the start of an empty line. The scene opens the console by setting
 // the singleton and gives its session a line to run before it opens, so the

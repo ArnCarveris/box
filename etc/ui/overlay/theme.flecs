@@ -1,0 +1,53 @@
+// The visual language the overlays of the framework share: one font size, one
+// palette and one backsplash. The terminal and every statistics panel take
+// their Font and their colors from the constants here and put a Backsplash
+// behind their content, so they read as one thing. A Backsplash is a leaf the
+// layout stretches over the whole box of its parent, padding included, unless
+// it names a fraction of the screen, and it blurs what the scene shows through
+// it. An application that wants another look ships its own etc/ui/overlay/theme.flecs.
+module box.ui.theme
+using box.geometry
+using box.material
+using box.ui
+
+export const font_size = 14
+export const line_height = 18
+export const pad = 8
+export const spacing = 2
+export const margin = 10
+export const radius = 6
+
+export const text_color: Rgb = {214, 218, 224}
+export const dim_color: Rgb = {140, 148, 160}
+export const bright_color: Rgb = {238, 240, 244}
+export const highlight: Rgb = {255, 123, 114}
+export const literal: Rgb = {92, 203, 150}
+export const good: Rgb = {74, 214, 97}
+export const warn: Rgb = {242, 199, 64}
+export const bad: Rgb = {232, 71, 66}
+export const field: Rgb = {24, 29, 44}
+
+export const backsplash: Rgb = {12, 13, 17}
+export const backsplash_opacity = 0.85
+export const blur = 48
+
+template Backsplash {
+  prop corners: f32 = 6
+  prop screen_width: f32 = 0
+  prop screen_height: f32 = 0
+
+  HitThrough
+  Anchor: {h: Left, v: Top}
+  Rect
+  Border: {radius: corners}
+  Rgb: backsplash
+  Opacity: {backsplash_opacity}
+  BackdropBlur: {radius: blur}
+
+  if screen_width > 0 || screen_height > 0 {
+    Layout: {}
+    Fill: {width: screen_width, height: screen_height}
+  } else {
+    Grow: {width: 1, height: 1}
+  }
+}

@@ -263,7 +263,6 @@ typedef struct ConsoleImpl {
     ecs_entity_t log;     /**< Element of the tree that shows the scrollback */
     ecs_vec_t captured;   /**< ecs_entity_t of the input maps the console disabled */
     int32_t shown;        /**< Lines of the session log the scrollback shows */
-    bool loaded;          /**< The console script was loaded */
     bool open;            /**< The console was open after the last update */
     uint8_t *styles;      /**< box_terminal_style_t of every byte of the scrollback text */
     int32_t style_count;  /**< Bytes in styles */

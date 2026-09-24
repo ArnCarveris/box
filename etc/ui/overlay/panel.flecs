@@ -1,0 +1,140 @@
+// The frame every statistics panel shares and the rows it is filled with. A
+// panel derives from StatsPanel, a content sized column over a Backsplash with
+// a heading, and adds its rows as children, which follow the heading. StatRow
+// is a label with a value against the right edge, StatCells a table row of a
+// name and four right aligned value columns.
+module box.monitor.panels
+include theme
+using flecs.script
+using box.geometry
+using box.material
+using box.ui
+using box.ui.theme
+
+// Width of the value column of a StatRow panel, without the padding.
+export const row_width = 240
+
+// Width of a table panel: the name column and four value columns.
+export const name_width = 160
+export const cell_width = 64
+export const table_width = name_width + cell_width * 4
+
+// A labelled value on one line, the value against the right edge.
+template StatRow {
+  prop label = ""
+  prop value = ""
+  prop width: f32 = 240
+  prop dim = false
+
+  Layout: {direction: Row, width: width, v: Middle}
+
+  name {
+    HitThrough
+    Grow: {width: 1}
+    Text: {value: label}
+    Rgb: dim_color
+  }
+
+  amount {
+    HitThrough
+    Text: {value: value, align: Right}
+    if dim {
+      Rgb: dim_color
+    } else {
+      Rgb: text_color
+    }
+  }
+}
+
+// A row of a table: a name column and four right aligned value columns. A
+// header row draws every column dim, an accent row draws its name in color.
+template StatCells {
+  prop name = ""
+  prop a = ""
+  prop b = ""
+  prop c = ""
+  prop d = ""
+  prop name_width: f32 = 160
+  prop cell_width: f32 = 64
+  prop header = false
+  prop accent = false
+
+  Layout: {direction: Row, v: Middle}
+
+  name_cell {
+    HitThrough
+    Layout: {width: name_width}
+    Text: {value: name}
+    if header {
+      Rgb: dim_color
+    } else if accent {
+      Rgb: warn
+    } else {
+      Rgb: text_color
+    }
+  }
+
+  a_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: a, align: Right}
+    if header {
+      Rgb: dim_color
+    } else {
+      Rgb: text_color
+    }
+  }
+
+  b_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: b, align: Right}
+    if header {
+      Rgb: dim_color
+    } else {
+      Rgb: text_color
+    }
+  }
+
+  c_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: c, align: Right}
+    if header {
+      Rgb: dim_color
+    } else {
+      Rgb: text_color
+    }
+  }
+
+  d_cell {
+    HitThrough
+    Layout: {width: cell_width}
+    Text: {value: d, align: Right}
+    if header {
+      Rgb: dim_color
+    } else {
+      Rgb: text_color
+    }
+  }
+}
+
+// The frame of a panel: a column with a heading over a Backsplash. A panel
+// derives from it and adds its rows as children, which follow the heading.
+template StatsPanel {
+  prop title = "Statistics"
+  prop width: f32 = 240
+
+  Layout: {direction: Column, padding: pad, spacing: spacing, width: width + pad * 2,
+    h: Left, v: Top}
+  Font: {size: font_size}
+
+  Backsplash back
+
+  heading {
+    HitThrough
+    Layout: {height: line_height, v: Top}
+    Text: {value: title}
+    Rgb: bright_color
+  }
+}

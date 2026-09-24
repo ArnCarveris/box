@@ -173,14 +173,14 @@ void box_monitor_counted(
     uint32_t flags,
     box_counted_write_t write);
 
-/** Load the statistics panel templates and layout and tie each panel to its singleton.
+/** Load the overlay script and tie each statistics panel to its singleton.
  *
  * @param world The world
  */
 void box_stats_panels_init(
     ecs_world_t *world);
 
-/** Register the system that fills the Fps singleton and load the frame rate panel.
+/** Register the system that fills the Fps singleton.
  *
  * @param world The world
  */

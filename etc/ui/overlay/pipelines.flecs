@@ -1,0 +1,31 @@
+// Per pipeline counts of the last finished frame, most switches first, read
+// from the PipelineStats singleton; compute pipelines are drawn in color.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template PipelinePanel : StatsPanel {
+  prop title = "Pipelines"
+  prop width: f32 = table_width
+
+  const s = PipelineStats[PipelineStats]
+
+  StatCells header(name: "pipeline ({s.count}/{s.total})", a: "sets", b: "switch",
+    c: "calls", d: "tris", header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..s.count {
+      const p = s.pipelines[i]
+      "pipeline_{i}" {
+        StatCells: {name: p.name, a: "{p.sets}", b: "{p.switches}",
+          c: "{p.draw_calls + p.dispatches}", d: "{p.triangles}", accent: p.compute}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.sets}", b: "{s.switches}", header: true)
+}

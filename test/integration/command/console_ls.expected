@@ -3,11 +3,11 @@ Grave down for 1 frame
 $ get box.ui.Console box.ui.Console
 {open: true, session: terminals.console, root: console}
 $ get terminals.console box.command.TerminalOutput
-{result: "Watcher\nactions\nbox\ncamera\nconsole\nconsole_map\ncrate\nflecs\nground\nscenes\nsun\nterminals\n", error: false}
+{result: "Users\nWatcher\nactions\nbox\ncamera\nconsole\nconsole_map\ncrate\nflecs\nground\nscenes\nsun\nterminals\nview\n", error: false}
 $ get console.panel.prompt.input box.ui.TextInput
 {value: "", caret: 0, focused: true, history: true, complete: true, submitted: ""}
 $ get console.panel.scrollback box.ui.Text
-{value: "$ ls\nWatcher\nactions\nbox\ncamera\nconsole\nconsole_map\ncrate\nflecs\nground\nscenes\nsun\nterminals\n\n", line_height: 0, align: Left}
+{value: "$ ls\nUsers\nWatcher\nactions\nbox\ncamera\nconsole\nconsole_map\ncrate\nflecs\nground\nscenes\nsun\nterminals\nview\n\n", line_height: 0, align: Left, wrap: false}
 $ capture
 capture_3_0.png
 

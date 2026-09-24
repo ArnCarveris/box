@@ -1,0 +1,32 @@
+// Per compute pass counts of the last finished frame, read from the
+// ComputeStats singleton: dispatches, the workgroups they launched and the
+// state they changed.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template ComputePanel : StatsPanel {
+  prop title = "Compute"
+  prop width: f32 = table_width
+
+  const s = ComputeStats[ComputeStats]
+
+  StatCells header(name: "pass ({s.count}/{s.total})", a: "disp", b: "groups", c: "pipes",
+    d: "binds", header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..s.count {
+      const p = s.passes[i]
+      "pass_{i}" {
+        StatCells: {name: p.name, a: "{p.dispatches}", b: "{p.workgroups}",
+          c: "{p.pipeline_switches}", d: "{p.bind_group_changes}"}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.dispatches}", b: "{s.workgroups}", header: true)
+}

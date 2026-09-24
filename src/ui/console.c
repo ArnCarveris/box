@@ -3,8 +3,8 @@
  * @brief The in game console: its binding, its session and the parts it fills.
  *
  * Adding the Console singleton registers an action and a grave key input map that
- * opens the console script. Its submitted lines go to TerminalInput on the console
- * session, whose log the scrollback shows.
+ * opens the console tree, which the overlay script builds while the singleton
+ * exists. Submitted lines go to TerminalInput on the session the scrollback shows.
  *
  * While open, the console disables every other input map; closing it turns off the
  * view of its tree and gives the maps back.
@@ -12,7 +12,6 @@
 
 #include "ui_internal.h"
 #include "../command/command_internal.h"
-#include "../shader/shader_internal.h"
 #include <ctype.h>
 
 ECS_COMPONENT_DECLARE(ConsoleImpl);
@@ -635,29 +634,79 @@ static ecs_entity_t box_ui_console_session(
     return result;
 }
 
-/** Load the console script and take the two elements it marks.
+/** Turn the view of the console tree on or off.
  *
  * @param world The world
- * @param console The Console singleton
- * @param impl The console state
+ * @param root The root of the console tree
+ * @param shown Whether the overlay is drawn
  */
-static void box_ui_console_load(
+static void box_ui_console_show(
     ecs_world_t *world,
-    Console *console,
-    ConsoleImpl *impl)
+    ecs_entity_t root,
+    bool shown)
 {
-    char resolved[1024];
-    if (!box_locate(BOX_UI_CONSOLE, resolved, sizeof(resolved))) {
-        ecs_err("box.ui: no console script at '%s'", BOX_UI_CONSOLE);
+    const UiImpl *ui = root ? ecs_get(world, root, UiImpl) : NULL;
+    View *view = ui && ui->view && ecs_is_alive(world, ui->view) ?
+        ecs_get_mut(world, ui->view, View) : NULL;
+
+    if (view) {
+        view->enabled = shown;
+        ecs_modified(world, ui->view, View);
+    }
+}
+
+/** Expand the pending instances of the terminal template.
+ *
+ * The incremental loading of box.script leaves a template instance pending until
+ * its drain, which runs after this update, so a console that opens the frame its
+ * tree was declared expands the tree itself.
+ *
+ * @param world The world
+ */
+static void box_ui_console_expand(
+    ecs_world_t *world)
+{
+    ecs_entity_t template_ = ecs_lookup(world, BOX_UI_TERMINAL);
+    if (!template_) {
         goto done;
     }
 
-    ecs_entity_t script = ecs_new(world);
-    if (!ecs_script(world, { .entity = script, .filename = resolved })) {
-        ecs_err("box.ui: failed to load '%s'", resolved);
-        goto done;
+    ecs_vec_t pending;
+    ecs_vec_init_t(NULL, &pending, ecs_entity_t, 0);
+    ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsScriptTemplatePending, template_));
+    while (ecs_each_next(&it)) {
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            ecs_vec_append_t(NULL, &pending, ecs_entity_t)[0] = it.entities[i];
+        }
     }
 
+    int32_t i, count = ecs_vec_count(&pending);
+    for (i = 0; i < count; i ++) {
+        ecs_script_template_update(world,
+            ecs_vec_get_t(&pending, ecs_entity_t, i)[0], template_);
+    }
+
+    ecs_vec_fini_t(NULL, &pending, ecs_entity_t);
+done:
+    return;
+}
+
+/** Find the console tree and take the two elements it marks.
+ *
+ * The tree is the one that holds a ConsoleLog element, which the overlay script
+ * builds while the world has a Console, with the TextInput element of the same
+ * tree.
+ *
+ * A tree that was just found is drawn, and its input focused, only while the
+ * console is open, and its scrollback is filled from the start.
+ *
+ * @param world The world
+ * @return true when a tree was found
+ */
+static bool box_ui_console_resolve(
+    ecs_world_t *world)
+{
     ecs_entity_t log = 0, input = 0, root = 0;
     ecs_iter_t it = ecs_each(world, ConsoleLog);
     while (ecs_each_next(&it) && !log) {
@@ -665,6 +714,11 @@ static void box_ui_console_load(
             log = it.entities[0];
             root = box_ui_root(world, log);
         }
+    }
+
+    bool result = log != 0;
+    if (!result) {
+        goto done;
     }
 
     it = ecs_each(world, TextInput);
@@ -678,19 +732,22 @@ static void box_ui_console_load(
         }
     }
 
-    console = ecs_get_mut(world, ecs_id(Console), Console);
-    impl = box_ui_console_state(world);
+    Console *console = ecs_get_mut(world, ecs_id(Console), Console);
+    ConsoleImpl *impl = box_ui_console_state(world);
     console->root = root;
     impl->log = log;
     impl->input = input;
-    impl->loaded = true;
-    if (!log || !input) {
-        ecs_err("box.ui: '%s' has no ConsoleLog or no TextInput element",
-            BOX_UI_CONSOLE);
+    impl->shown = 0;
+    box_ui_console_show(world, root, console->open);
+    TextInput *line = input ? ecs_get_mut(world, input, TextInput) : NULL;
+    if (line) {
+        line->focused = console->open;
+    } else {
+        ecs_err("box.ui: the console tree has no TextInput element");
     }
 
 done:
-    return;
+    return result;
 }
 
 /** Disable every input map but the one of the console, or give them back.
@@ -745,28 +802,7 @@ done:
     return;
 }
 
-/** Turn the view of the console tree on or off.
- *
- * @param world The world
- * @param root The root of the console tree
- * @param shown Whether the overlay is drawn
- */
-static void box_ui_console_show(
-    ecs_world_t *world,
-    ecs_entity_t root,
-    bool shown)
-{
-    const UiImpl *ui = root ? ecs_get(world, root, UiImpl) : NULL;
-    View *view = ui && ui->view && ecs_is_alive(world, ui->view) ?
-        ecs_get_mut(world, ui->view, View) : NULL;
-
-    if (view) {
-        view->enabled = shown;
-        ecs_modified(world, ui->view, View);
-    }
-}
-
-/** Open the console: import the commands, load the script and take the keyboard.
+/** Open the console: import the commands, show the tree and take the keyboard.
  *
  * @param world The world
  * @param console The Console singleton
@@ -791,10 +827,8 @@ static void box_ui_console_open(
         impl = box_ui_console_state(world);
     }
 
-    if (!impl->loaded) {
-        box_ui_console_load(world, console, impl);
-        console = ecs_get_mut(world, ecs_id(Console), Console);
-        impl = box_ui_console_state(world);
+    if (!console->root || !ecs_is_alive(world, console->root)) {
+        ecs_err("box.ui: no console tree, no overlay script built one");
     }
 
     box_ui_console_show(world, console->root, true);
@@ -963,8 +997,14 @@ void box_ui_console_update(
 
     ConsoleImpl *impl = ecs_singleton_ensure(world, ConsoleImpl);
     box_ui_console_actions(world, impl);
-    impl = box_ui_console_state(world);
     console = ecs_get_mut(world, ecs_id(Console), Console);
+    if (!console->root || !ecs_is_alive(world, console->root)) {
+        box_ui_console_expand(world);
+        box_ui_console_resolve(world);
+        console = ecs_get_mut(world, ecs_id(Console), Console);
+    }
+
+    impl = box_ui_console_state(world);
     const InputAction *action = ecs_get(world, impl->action, InputAction);
     if (action && action->pressed) {
         console->open = !console->open;
@@ -998,6 +1038,12 @@ void box_ui_console_sync(
         box_ui_console_state(world) : NULL;
     if (!impl) {
         goto done;
+    }
+
+    TextInput *input = impl->input && ecs_is_alive(world, impl->input) ?
+        ecs_get_mut(world, impl->input, TextInput) : NULL;
+    if (input && !input->focused) {
+        input->focused = true;
     }
 
     box_ui_console_run(world, console, impl);

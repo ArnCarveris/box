@@ -1,14 +1,13 @@
 /**
  * @file monitor/fps.c
- * @brief The Fps singleton, the frame time ring it is filled from and the panel script.
+ * @brief The Fps singleton and the frame time ring it is filled from.
  *
  * A system samples the frame time and publishes the frame rate, mean, worst and
- * recent frame times of the last second on the Fps singleton. The panel script
- * BOX_MONITOR_FPS_PANEL loads into box.monitor.fps_panel, hidden until visible.
+ * recent frame times of the last second on the Fps singleton, which the frame
+ * rate panel of the overlay script reads.
  */
 
 #include "monitor_internal.h"
-#include "../shader/shader_internal.h"
 
 void box_fps_ring_push(
     box_fps_ring_t *ring,
@@ -120,29 +119,6 @@ static void box_fps_ring_free(
     ecs_os_free(ptr);
 }
 
-/** Load the frame rate panel script into box.monitor.
- *
- * @param world The world
- */
-static void box_fps_panel_load(
-    ecs_world_t *world)
-{
-    char resolved[1024];
-    if (!box_locate(BOX_MONITOR_FPS_PANEL, resolved, sizeof(resolved))) {
-        ecs_warn("box.monitor: no fps panel at '%s'", BOX_MONITOR_FPS_PANEL);
-        goto done;
-    }
-
-    ecs_entity_t script = ecs_entity(world, {
-        .name = "fps_script", .parent = ecs_lookup(world, "box.monitor") });
-    if (!ecs_script(world, { .entity = script, .filename = resolved })) {
-        ecs_err("box.monitor: failed to load '%s'", resolved);
-    }
-
-done:
-    return;
-}
-
 void box_fps_monitor_init(
     ecs_world_t *world)
 {
@@ -159,5 +135,4 @@ void box_fps_monitor_init(
     });
 
     ecs_singleton_add(world, Fps);
-    box_fps_panel_load(world);
 }

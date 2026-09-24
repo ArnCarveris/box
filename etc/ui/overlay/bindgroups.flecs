@@ -1,0 +1,33 @@
+// Bind group set calls per pass and slot of the last finished frame, most
+// changes first, read from the BindGroupStats singleton. A set that binds what
+// the slot already holds is redundant.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.ui.theme
+using box.monitor
+
+template BindGroupPanel : StatsPanel {
+  prop title = "Bind groups"
+  prop width: f32 = table_width
+
+  const s = BindGroupStats[BindGroupStats]
+
+  StatCells header(name: "pass slot ({s.count}/{s.total})", a: "sets", b: "changes",
+    c: "redund", header: true)
+  rows {
+    Layout: {direction: Column, spacing: spacing, h: Left}
+
+    for i in 0..s.count {
+      const g = s.slots[i]
+      "slot_{i}" {
+        StatCells: {name: "{g.pass} {g.slot}", a: "{g.sets}", b: "{g.changes}",
+          c: "{g.sets - g.changes}"}
+      }
+    }
+  }
+
+  StatCells total(name: "total", a: "{s.sets}", b: "{s.changes}", c: "{s.sets - s.changes}",
+    header: true)
+}

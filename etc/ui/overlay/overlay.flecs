@@ -1,0 +1,14 @@
+// The overlay of the framework: the statistics column of stats.flecs and the
+// terminal of the in game console, which share the language of theme.flecs.
+// box.monitor loads this script at import. The terminal exists while the
+// world has a Console singleton; box.ui fills it and shows it while the
+// console is open. An application that wants another overlay ships its own
+// etc/ui/overlay/overlay.flecs.
+include stats
+include terminal
+using box.ui
+using box.ui.terminal
+
+if Console?[Console] {
+  TerminalPanel console
+}

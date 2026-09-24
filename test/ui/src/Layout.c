@@ -870,3 +870,27 @@ void Layout_anchored_grow_fills_the_view_of_a_root_without_a_box(void)
     test_flt(ecs_get(w, overlay, Bounds)->width, 960);
     test_flt(ecs_get(w, overlay, Bounds)->height, 540);
 }
+
+void Layout_anchored_grow_covers_the_padding_of_its_parent(void)
+{
+    // monitoring/overlay
+    ecs_entity_t root = ecs_new(w);
+    ecs_add(w, root, Ui);
+    ecs_entity_t panel = ecs_new_w_pair(w, EcsChildOf, root);
+    ecs_set(w, panel, Layout, {.direction = DirectionColumn, .padding = 8, .spacing = 2});
+    ecs_entity_t back = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, back, Anchor, {.h = AlignLeft, .v = VAlignTop});
+    ecs_set(w, back, Rect, {0, 0});
+    ecs_set(w, back, Grow, {.width = 1, .height = 1});
+    ecs_entity_t row = ecs_new_w_pair(w, EcsChildOf, panel);
+    ecs_set(w, row, Rect, {120, 20});
+    box_ui_update(w);
+
+    test_flt(ecs_get(w, panel, Bounds)->width, 136);
+    test_flt(ecs_get(w, panel, Bounds)->height, 36);
+    test_flt(ecs_get(w, back, Bounds)->width, 136);
+    test_flt(ecs_get(w, back, Bounds)->height, 36);
+    test_flt(ecs_get(w, back, Bounds)->x, ecs_get(w, panel, Bounds)->x);
+    test_flt(ecs_get(w, back, Bounds)->y, ecs_get(w, panel, Bounds)->y);
+    test_flt(ecs_get(w, row, Bounds)->width, 120);
+}

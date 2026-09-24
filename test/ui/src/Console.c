@@ -393,3 +393,60 @@ void Console_script_awaits_the_console_action(void)
     test_bool(ecs_singleton_get(w, Console)->open, true);
     test_bool(ecs_has_id(w, waiter, fired), true);
 }
+
+void Console_typed_characters_accumulate_across_frames(void)
+{
+    // monitoring/overlay
+    ecs_singleton_set(w, Console, { .open = false });
+    ecs_progress(w, 0);
+
+    box_input_inject(w, &(InputEvent){
+        .kind = InputKeyDown, .code = BoxKeyGrave, .duration = 1 });
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'p' });
+    ecs_progress(w, 0);
+    test_bool(ecs_singleton_get(w, Console)->open, true);
+
+    ecs_entity_t input = 0;
+    ecs_iter_t it = ecs_each(w, TextInput);
+    while (ecs_each_next(&it)) {
+        input = it.entities[0];
+        break;
+    }
+
+    test_assert(input != 0);
+    test_str(ecs_get(w, input, TextInput)->value, "p");
+
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'w' });
+    ecs_progress(w, 0);
+    test_str(ecs_get(w, input, TextInput)->value, "pw");
+
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'd' });
+    ecs_progress(w, 0);
+    test_str(ecs_get(w, input, TextInput)->value, "pwd");
+
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = '\n' });
+    ecs_progress(w, 0);
+    ecs_entity_t session = ecs_singleton_get(w, Console)->session;
+    const TerminalOutput *out = ecs_get(w, session, TerminalOutput);
+    test_assert(out != NULL);
+    test_bool(out->error, false);
+    test_str(out->result, "/");
+}
+
+void Console_opens_the_frame_its_tree_is_pending(void)
+{
+    // monitoring/overlay
+    ecs_singleton_ensure(w, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(w, ScriptSettings);
+    ecs_singleton_set(w, Console, { .open = true });
+    box_input_inject(w, &(InputEvent){ .kind = InputChar, .code = 'p' });
+    ecs_progress(w, 0);
+
+    ecs_entity_t root = ecs_singleton_get(w, Console)->root;
+    test_assert(root != 0);
+    test_assert(!ecs_has_pair(w, root, EcsScriptTemplatePending, EcsWildcard));
+    ecs_entity_t input = ecs_lookup_child(w,
+        ecs_lookup_child(w, ecs_lookup_child(w, root, "panel"), "prompt"), "input");
+    test_assert(input != 0);
+    test_str(ecs_get(w, input, TextInput)->value, "p");
+}

@@ -1,0 +1,92 @@
+// The frame rate panel. It reads the box.monitor.Fps singleton, which the
+// engine refreshes and marks modified every frame: a chart with two reference
+// lines at sixty and thirty frames per second and one bar per recorded frame
+// time with the newest on the right, green while the frame stayed above sixty
+// frames per second, yellow above thirty and red below, and under it the mean
+// and worst frame time of the last second with its frame rate in the color of
+// the mean.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.geometry
+using box.material
+using box.ui
+using box.ui.theme
+using box.monitor
+
+const bars = 120
+const bar_w = 3
+const slot = 4
+const chart_h = 60
+const bar_ms = 50
+const green_ms = 1000.0 / 60.0 + 0.05
+const yellow_ms = 1000.0 / 30.0 + 0.05
+
+template FpsPanel : StatsPanel {
+  prop title = "Frame rate"
+  prop width: f32 = bars * slot
+
+  const fps = Fps[Fps]
+
+  chart {
+    HitThrough
+    Layout: {width: bars * slot, height: chart_h}
+
+    line_60 {
+      HitThrough
+      Anchor: {h: Left, v: Bottom, y: chart_h * (1000.0 / 60.0) / bar_ms}
+      Rect: {bars * slot, 1}
+      Rgb: dim_color
+      Opacity: {0.55}
+    }
+
+    line_30 {
+      HitThrough
+      Anchor: {h: Left, v: Bottom, y: chart_h * (1000.0 / 30.0) / bar_ms}
+      Rect: {bars * slot, 1}
+      Rgb: dim_color
+      Opacity: {0.55}
+    }
+
+    for i in 0..bars {
+      if i >= bars - fps.count {
+        const t = fps.history[i]
+        "bar_{i}" {
+          HitThrough
+          Anchor: {h: Left, v: Bottom, x: i * slot + slot - bar_w}
+          Rect: {bar_w, math.clamp(t / bar_ms * chart_h, bar_w, chart_h)}
+          if t <= green_ms {
+            Rgb: good
+          } else if t <= yellow_ms {
+            Rgb: warn
+          } else {
+            Rgb: bad
+          }
+        }
+      }
+    }
+  }
+
+  summary {
+    Layout: {direction: Row, width: width, height: line_height, v: Middle}
+
+    times {
+      HitThrough
+      Grow: {width: 1}
+      Text: {value: "mean {fps.mean_ms:.2} ms, worst {fps.worst_ms:.2} ms"}
+      Rgb: dim_color
+    }
+
+    label {
+      HitThrough
+      Text: {value: "{math.clamp(fps.fps, 0, 999):.0} fps", align: Right}
+      if fps.mean_ms <= green_ms {
+        Rgb: good
+      } else if fps.mean_ms <= yellow_ms {
+        Rgb: warn
+      } else {
+        Rgb: bad
+      }
+    }
+  }
+}

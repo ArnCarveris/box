@@ -44,12 +44,9 @@ RendererCounting
 RendererStats
 SystemMonitor
 SystemTime
-fps_panel
-fps_script
+overlay_script
 panels
 stats
-stats_script
-stats_templates
 
 $ has box.monitor.CpuMonitor box.monitor.CpuMonitor
 true

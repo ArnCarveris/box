@@ -107,7 +107,8 @@
                     "grow_in_a_content_sized_row_takes_no_room",
                     "grow_follows_a_sibling_that_changes",
                     "grow_of_a_nested_row_follows_its_parent",
-                    "anchored_grow_fills_the_view_of_a_root_without_a_box"
+                    "anchored_grow_fills_the_view_of_a_root_without_a_box",
+                    "anchored_grow_covers_the_padding_of_its_parent"
                 ],
                 "setup": true,
                 "teardown": true
@@ -371,7 +372,9 @@
                     "terminal_colors_are_configurable",
                     "submitted_line_fires_the_line_action",
                     "script_is_loaded_once",
-                    "script_awaits_the_console_action"
+                    "script_awaits_the_console_action",
+                    "typed_characters_accumulate_across_frames",
+                    "opens_the_frame_its_tree_is_pending"
                 ],
                 "setup": true,
                 "teardown": true

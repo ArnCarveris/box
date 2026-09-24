@@ -1,0 +1,34 @@
+// What the renderer did in its last finished frame and the memory it holds,
+// read from the RendererStats singleton.
+module box.monitor.panels
+include panel
+using flecs.script
+using box.ui
+using box.monitor
+
+template RendererPanel : StatsPanel {
+  prop title = "Renderer"
+
+  const s = RendererStats[RendererStats]
+  const mb = 1024.0 * 1024.0
+
+  StatRow draw_calls(label: "Draw calls", value: "{s.draw_calls}", width: width)
+  StatRow render_passes(label: "Render passes", value: "{s.render_passes}", width: width)
+  StatRow pipeline_switches(label: "Pipeline switches", value: "{s.pipeline_switches}",
+    width: width)
+  StatRow bind_group_changes(label: "Bind group changes", value: "{s.bind_group_changes}",
+    width: width)
+  StatRow buffer_uploads(label: "Buffer uploads", value: "{s.buffer_uploads}", width: width)
+  StatRow bytes_uploaded(label: "Bytes uploaded", value: "{s.bytes_uploaded}", width: width)
+  StatRow texture_uploads(label: "Texture uploads", value: "{s.texture_uploads}", width: width)
+  StatRow compute_dispatches(label: "Compute dispatches", value: "{s.compute_dispatches}",
+    width: width)
+  StatRow instances(label: "Instances rendered", value: "{s.instances}", width: width)
+  StatRow triangles(label: "Triangles rendered", value: "{s.triangles}", width: width)
+  StatRow gpu_memory(label: "GPU memory", value: "{s.gpu_memory / mb:.1} MB", width: width)
+  StatRow buffer_memory(label: "Buffer memory", value: "{s.buffer_memory / mb:.1} MB",
+    width: width)
+  StatRow texture_memory(label: "Texture memory", value: "{s.texture_memory / mb:.1} MB",
+    width: width)
+  StatRow frame(label: "Frame", value: "{s.frame}", width: width, dim: true)
+}
