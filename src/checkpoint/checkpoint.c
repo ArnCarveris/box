@@ -190,6 +190,49 @@ bool box_checkpoint_in_module(
     return result;
 }
 
+/** Test whether a file lies in the folder of the file of a script under a module.
+ *
+ * @param world The world
+ * @param file The file
+ * @return true when a script under a module was loaded from the folder or above it
+ */
+static bool box_checkpoint_framework_file(
+    const ecs_world_t *world,
+    const char *file)
+{
+    bool result = false;
+    ecs_iter_t it = ecs_each(world, EcsScript);
+    while (!result && ecs_each_next(&it)) {
+        const EcsScript *code = ecs_field(&it, EcsScript, 0);
+        int32_t i;
+        for (i = 0; !result && i < it.count; i ++) {
+            const char *owner = code[i].filename;
+            const char *slash = owner ? strrchr(owner, '/') : NULL;
+            result = slash && !strncmp(owner, file, (size_t)(slash - owner + 1)) &&
+                box_checkpoint_in_module(world, it.entities[i]);
+        }
+    }
+
+    if (result) {
+        ecs_iter_fini(&it);
+    }
+
+    return result;
+}
+
+bool box_checkpoint_framework(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = box_checkpoint_in_module(world, e);
+    const EcsScript *code = ecs_get(world, e, EcsScript);
+    if (!result && code && code->filename) {
+        result = box_checkpoint_framework_file(world, code->filename);
+    }
+
+    return result;
+}
+
 void box_checkpoint_managed(
     ecs_world_t *world,
     ecs_vec_t *scripts)
@@ -200,7 +243,7 @@ void box_checkpoint_managed(
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             if (code[i].script && !code[i].template_ &&
-                !box_checkpoint_in_module(world, it.entities[i]))
+                !box_checkpoint_framework(world, it.entities[i]))
             {
                 ecs_vec_append_t(NULL, scripts, ecs_entity_t)[0] =
                     it.entities[i];

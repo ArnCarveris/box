@@ -263,7 +263,7 @@ void Counters_indirect_draws_are_resolved_from_their_arguments(void)
     ecs_world_t *w = ecs_init();
     ECS_IMPORT(w, Box);
     ecs_entity_t cam = ecs_new(w);
-    ecs_set(w, cam, Position, {0, 160, -1});
+    ecs_set(w, cam, Position, {0, 20, -1});
     ecs_set(w, cam, LookAt, {0, 0, 0});
     ecs_set(w, cam, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(w);

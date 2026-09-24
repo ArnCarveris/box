@@ -64,6 +64,20 @@ bool box_checkpoint_in_module(
     const ecs_world_t *world,
     ecs_entity_t e);
 
+/** Test whether a script is framework state.
+ *
+ * A script under a module is. So is a script whose file sits in the folder of
+ * such a script: flecs creates the scripts a managed script includes at the
+ * root, and an include cannot leave the folder of the script that includes it.
+ *
+ * @param world The world
+ * @param e The script entity
+ * @return true when the script belongs to the framework
+ */
+bool box_checkpoint_framework(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Collect the managed scripts of the world in the order a checkpoint uses.
  *
  * @param world The world

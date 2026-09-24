@@ -23,7 +23,7 @@ static bool box_script_editable(
     const EcsScript *script)
 {
     return script->filename != NULL && script->template_ == NULL &&
-        !box_checkpoint_in_module(world, e);
+        !box_checkpoint_framework(world, e);
 }
 
 /** Get the file name of a path without its folders.
