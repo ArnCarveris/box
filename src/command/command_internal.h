@@ -294,6 +294,13 @@ void box_render_cmd_fini(
 void box_fps_cmd_init(
     ecs_world_t *world);
 
+/** Register the fit command.
+ *
+ * @param world The world
+ */
+void box_fit_cmd_init(
+    ecs_world_t *world);
+
 /** Register the stats command.
  *
  * @param world The world

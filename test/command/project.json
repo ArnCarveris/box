@@ -43,6 +43,26 @@
                 "teardown": true
             },
             {
+                "id": "Fit",
+                "testcases": [
+                    "frames_every_corner_of_the_scene",
+                    "keeps_the_view_direction",
+                    "moves_a_camera_without_lookat_along_its_axis",
+                    "named_camera",
+                    "skips_hidden_entities",
+                    "skips_children_of_the_camera",
+                    "skips_layers_the_view_does_not_show",
+                    "orthographic_camera_sets_its_height",
+                    "reaims_the_camera_controller",
+                    "no_content_is_an_error",
+                    "no_active_camera_is_an_error",
+                    "unknown_camera_is_an_error",
+                    "help_lists_the_command"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Dispatch",
                 "testcases": [
                     "command_with_arguments",

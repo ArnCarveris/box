@@ -1,0 +1,8 @@
+$ fit
+fit camera to 4 entities, center (0.00, 1.45, 0.00), distance 12.83
+
+$ capture
+capture_0_0.png
+
+$ fit nope
+unknown camera 'nope'
