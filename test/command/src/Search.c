@@ -230,7 +230,7 @@ void Search_grep_matches_component_names(void)
     ecs_os_free(out);
 
     out = box_command_run(w, session, "grep Tag", NULL);
-    test_str(out, "scene.a\tTag\n");
+    test_str(out, "scene.a:Tag\n");
     ecs_os_free(out);
 }
 
@@ -246,7 +246,7 @@ void Search_grep_matches_values(void)
     ecs_os_free(out);
 
     out = box_command_run(w, session, "grep 20", NULL);
-    test_str(out, "scene.a\tPoint\t{x: 10, y: 20}\n");
+    test_str(out, "scene.a:Point.y: 20\n");
     ecs_os_free(out);
 }
 
@@ -263,7 +263,7 @@ void Search_grep_with_component_filter(void)
     ecs_os_free(out);
 
     out = box_command_run(w, session, "grep Point 30", NULL);
-    test_str(out, "scene.b\tPoint\t{x: 30, y: 40}\n");
+    test_str(out, "scene.b:Point.x: 30\n");
     ecs_os_free(out);
 
     out = box_command_run(w, session, "grep Point a", NULL);
@@ -295,7 +295,7 @@ void Search_grep_recur_nested_children(void)
     ecs_os_free(out);
 
     out = box_command_run(w, session, "grep_recur 7", NULL);
-    test_str(out, "scene.a.deep\tPoint\t{x: 7, y: 8}\n");
+    test_str(out, "scene.a.deep:Point.x: 7\n");
     ecs_os_free(out);
 }
 
@@ -307,7 +307,7 @@ void Search_grep_recur_from_root(void)
 
     char *out = box_command_run(w, session, "grep_recur Point", NULL);
     test_assert(out != NULL);
-    const char *match = "scene.a.deep\tPoint\t{x: 7, y: 8}\n";
+    const char *match = "scene.a.deep:Point\n";
     const char *first = strstr(out, match);
     test_assert(first != NULL);
     test_assert(strstr(first + 1, match) == NULL);
@@ -315,6 +315,130 @@ void Search_grep_recur_from_root(void)
 
     out = box_command_run(w, session, "logs error 100", NULL);
     test_assert(strstr(out, "cannot serialize") == NULL);
+    ecs_os_free(out);
+}
+
+void Search_grep_prints_only_matching_members(void)
+{
+    // command/search
+    ecs_entity_t a = ecs_entity(w, { .name = "scene.a" });
+    ecs_set_id(w, a, point, sizeof(int32_t) * 2, (int32_t[]){ 10, 20 });
+
+    char *out = box_command_run(w, session, "cd scene", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur 1", NULL);
+    test_str(out, "scene.a:Point.x: 10\n");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur y", NULL);
+    test_str(out, "scene.a:Point.y: 20\n");
+    ecs_os_free(out);
+}
+
+void Search_grep_nested_member(void)
+{
+    // command/search
+    ecs_entity_t shadows = ecs_struct(w, {
+        .entity = ecs_entity(w, { .name = "Shadows" }),
+        .members = {
+            { .name = "enabled", .type = ecs_id(ecs_bool_t) },
+            { .name = "cascades", .type = ecs_id(ecs_i32_t) }
+        }
+    });
+
+    ecs_entity_t view = ecs_struct(w, {
+        .entity = ecs_entity(w, { .name = "View" }),
+        .members = {
+            { .name = "priority", .type = ecs_id(ecs_i32_t) },
+            { .name = "shadows", .type = shadows }
+        }
+    });
+
+    ecs_entity_t a = ecs_entity(w, { .name = "scene.a" });
+    ecs_set_id(w, a, view, sizeof(int32_t) * 3, (int32_t[]){ 1, true, 4 });
+
+    char *out = box_command_run(w, session, "cd scene", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur cascades", NULL);
+    test_str(out, "scene.a:View.shadows.cascades: 4\n");
+    ecs_os_free(out);
+}
+
+void Search_grep_inline_array_elements(void)
+{
+    // command/search
+    ecs_entity_t values = ecs_struct(w, {
+        .entity = ecs_entity(w, { .name = "Values" }),
+        .members = {{ .name = "v", .type = ecs_id(ecs_i32_t), .count = 3 }}
+    });
+
+    ecs_entity_t a = ecs_entity(w, { .name = "scene.a" });
+    ecs_set_id(w, a, values, sizeof(int32_t) * 3, (int32_t[]){ 4, 55, 6 });
+
+    char *out = box_command_run(w, session, "cd scene", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur 55", NULL);
+    test_str(out, "scene.a:Values.v[1]: 55\n");
+    ecs_os_free(out);
+}
+
+void Search_grep_vector_elements(void)
+{
+    // command/search
+    ecs_entity_t vec = ecs_vector(w, {
+        .entity = ecs_entity(w, { .name = "IntVec" }),
+        .type = ecs_id(ecs_i32_t)
+    });
+
+    ecs_entity_t list = ecs_struct(w, {
+        .entity = ecs_entity(w, { .name = "List" }),
+        .members = {{ .name = "items", .type = vec }}
+    });
+
+    ecs_entity(w, { .name = "scene.a" });
+    ecs_add_id(w, ecs_lookup(w, "scene.a"), list);
+    char *out = box_command_run(w, session, "set scene.a List {items: [7, 88, 9]}", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "cd scene", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur 88", NULL);
+    test_str(out, "scene.a:List.items[1]: 88\n");
+    ecs_os_free(out);
+}
+
+void Search_grep_multiline_string_lines(void)
+{
+    // command/search
+    ecs_entity_t text = ecs_struct(w, {
+        .entity = ecs_entity(w, { .name = "Text" }),
+        .members = {{ .name = "value", .type = ecs_id(ecs_string_t) }}
+    });
+
+    ecs_entity_t a = ecs_entity(w, { .name = "scene.a" });
+    ecs_add_id(w, a, text);
+    char *out = box_command_run(w, session,
+        "set scene.a Text {value: \"first\\nthe match\\nlast match\"}", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "cd scene", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur match", NULL);
+    test_str(out,
+        "scene.a:Text.value:2: the match\n"
+        "scene.a:Text.value:3: last match\n");
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "set a Text {value: \"one line\"}", NULL);
+    ecs_os_free(out);
+
+    out = box_command_run(w, session, "grep_recur line", NULL);
+    test_str(out, "scene.a:Text.value: \"one line\"\n");
     ecs_os_free(out);
 }
 

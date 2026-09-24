@@ -10,6 +10,9 @@
 /** Lines printed by next and grep before the output is capped */
 #define BOX_SEARCH_LIMIT (100)
 
+/** Levels of nested members grep descends into before it prints a value whole */
+#define BOX_SEARCH_DEPTH (16)
+
 /** Iteration state of a session, kept on the heap so the iterator can resume */
 typedef struct box_search_iter_t {
     const ecs_query_t *query;  /**< Query being iterated, NULL when idle */
@@ -36,6 +39,16 @@ typedef struct box_search_out_t {
     ecs_strbuf_t buf;  /**< The printed lines */
     int32_t count;     /**< Hits found, including the ones over the limit */
 } box_search_out_t;
+
+/** The component value a grep walks member by member */
+typedef struct box_search_walk_t {
+    ecs_world_t *world;      /**< The world */
+    const char *path;        /**< Path of the entity */
+    const char *id;          /**< Name of the component */
+    const char *text;        /**< The text to search for */
+    box_search_out_t *out;   /**< The output */
+    int32_t hits;            /**< Lines the value added to the output */
+} box_search_walk_t;
 
 ECS_COMPONENT_DECLARE(SearchState);
 
@@ -291,31 +304,202 @@ static int32_t box_search_advance(
 
 /** Append a grep hit, counting the hits that do not fit in the output.
  *
+ * A hit prints as path, path:id, path:id: value or path:id:line: text.
+ *
  * @param out The output
  * @param path Path of the entity
- * @param id Name of the component, NULL for a hit on the entity name
- * @param value Value of the component, NULL when it has none
+ * @param id Component and member, NULL for a hit on the entity name
+ * @param line Line of a multi-line string, 0 for a whole value
+ * @param value The value or the line of a string, NULL when it has none
  */
 static void box_search_append_hit(
     box_search_out_t *out,
     const char *path,
     const char *id,
+    int32_t line,
     const char *value)
 {
     if (out->count < BOX_SEARCH_LIMIT) {
         ecs_strbuf_appendstr(&out->buf, path);
         if (id) {
-            ecs_strbuf_append(&out->buf, "\t%s", id);
+            ecs_strbuf_append(&out->buf, ":%s", id);
+        }
+
+        if (line) {
+            ecs_strbuf_append(&out->buf, ":%d", line);
         }
 
         if (value) {
-            ecs_strbuf_append(&out->buf, "\t%s", value);
+            ecs_strbuf_append(&out->buf, ": %s", value);
         }
 
         ecs_strbuf_appendstr(&out->buf, "\n");
     }
 
     out->count ++;
+}
+
+/** Name a member of a component the way a grep hit prints it.
+ *
+ * @param w The walk
+ * @param member Path of the member inside the component, empty for the value itself
+ * @return Component.member, the caller frees it
+ */
+static char* box_search_member_id(
+    const box_search_walk_t *w,
+    const char *member)
+{
+    char *result;
+    if (member[0]) {
+        result = flecs_asprintf("%s.%s", w->id, member);
+    } else {
+        result = ecs_os_strdup(w->id);
+    }
+
+    return result;
+}
+
+/** Print the lines of a multi-line string member that contain the text.
+ *
+ * @param w The walk
+ * @param member Path of the member inside the component
+ * @param str The string
+ */
+static void box_search_lines(
+    box_search_walk_t *w,
+    const char *member,
+    const char *str)
+{
+    char *id = box_search_member_id(w, member);
+    const char *p = str;
+    int32_t line = 1;
+    while (p) {
+        const char *end = strchr(p, '\n');
+        int32_t len = end ? (int32_t)(end - p) : (int32_t)strlen(p);
+        const char *found = strstr(p, w->text);
+        if (found && (int32_t)(found - p) < len) {
+            char *text = ecs_os_malloc(len + 1);
+            ecs_os_memcpy(text, p, len);
+            text[len] = '\0';
+            box_search_append_hit(w->out, w->path, id, line, text);
+            ecs_os_free(text);
+            w->hits ++;
+        }
+
+        p = end ? end + 1 : NULL;
+        line ++;
+    }
+
+    ecs_os_free(id);
+}
+
+/** Print a value that grep does not split further when it contains the text.
+ *
+ * The text is matched against `member: value`, or the value alone for the
+ * value of the component itself.
+ *
+ * @param w The walk
+ * @param type The type of the value
+ * @param ptr The value
+ * @param member Path of the member inside the component, empty for the value itself
+ */
+static void box_search_leaf(
+    box_search_walk_t *w,
+    ecs_entity_t type,
+    const void *ptr,
+    const char *member)
+{
+    char *value = NULL;
+    if (ecs_has(w->world, type, EcsTypeSerializer)) {
+        value = ecs_ptr_to_expr(w->world, type, ptr);
+    }
+
+    if (!value) {
+        goto done;
+    }
+
+    char *line = member[0] ? flecs_asprintf("%s: %s", member, value) : NULL;
+    if (strstr(line ? line : value, w->text)) {
+        char *id = box_search_member_id(w, member);
+        box_search_append_hit(w->out, w->path, id, 0, value);
+        ecs_os_free(id);
+        w->hits ++;
+    }
+
+    ecs_os_free(line);
+
+done:
+    ecs_os_free(value);
+}
+
+/** Walk a value member by member and print the ones that contain the text.
+ *
+ * Structs, arrays and vectors print one line per member or element, strings
+ * with line breaks one line per matching line and other values print whole.
+ *
+ * @param w The walk
+ * @param type The type of the value
+ * @param ptr The value
+ * @param member Path of the value inside the component, empty for the component
+ * @param count Elements of an inline array member, 0 for a single value
+ * @param depth Nesting level of the value
+ */
+static void box_search_walk(
+    box_search_walk_t *w,
+    ecs_entity_t type,
+    const void *ptr,
+    const char *member,
+    int32_t count,
+    int32_t depth)
+{
+    const EcsType *meta = ecs_get(w->world, type, EcsType);
+    ecs_type_kind_t kind = meta && depth < BOX_SEARCH_DEPTH ?
+        meta->kind : EcsOpaqueType;
+    ecs_entity_t elem_type = count ? type : 0;
+    const void *first = ptr;
+    if (!count && kind == EcsArrayType) {
+        const EcsArray *a = ecs_get(w->world, type, EcsArray);
+        elem_type = a->type;
+        count = a->count;
+    } else if (!count && kind == EcsVectorType) {
+        const EcsVector *v = ecs_get(w->world, type, EcsVector);
+        const ecs_vec_t *vec = ptr;
+        elem_type = v->type;
+        first = vec->array;
+        count = vec->count;
+    }
+
+    if (elem_type) {
+        const EcsComponent *component = ecs_get(w->world, elem_type, EcsComponent);
+        ecs_size_t size = component ? component->size : 0;
+        int32_t i;
+        for (i = 0; i < count && size && first; i ++) {
+            char *name = flecs_asprintf("%s[%d]", member, i);
+            box_search_walk(w, elem_type, ECS_ELEM(first, size, i), name, 0, depth + 1);
+            ecs_os_free(name);
+        }
+    } else if (kind == EcsStructType) {
+        const EcsStruct *st = ecs_get(w->world, type, EcsStruct);
+        int32_t i, members = st ? ecs_vec_count(&st->members) : 0;
+        for (i = 0; i < members; i ++) {
+            const ecs_member_t *m = ecs_vec_get_t(&st->members, ecs_member_t, i);
+            char *name = member[0] ?
+                flecs_asprintf("%s.%s", member, m->name) : ecs_os_strdup(m->name);
+            box_search_walk(w, m->type, ECS_OFFSET(ptr, m->offset), name,
+                m->count > 1 ? m->count : 0, depth + 1);
+            ecs_os_free(name);
+        }
+    } else {
+        const EcsPrimitive *prim = kind == EcsPrimitiveType ?
+            ecs_get(w->world, type, EcsPrimitive) : NULL;
+        const char *str = prim && prim->kind == EcsString ?
+            *(const char* const*)ptr : NULL;
+        if (str && strchr(str, '\n')) {
+            box_search_lines(w, member, str);
+        } else {
+            box_search_leaf(w, type, ptr, member);
+        }
+    }
 }
 
 /** Test whether a component of an entity is hidden from grep.
@@ -335,7 +519,7 @@ static bool box_search_hidden(
     return result;
 }
 
-/** Match the name, component names and component values of an entity.
+/** Match the name, component names and component members of an entity.
  *
  * @param world The world
  * @param e The entity
@@ -354,7 +538,7 @@ static void box_search_scan(
 {
     const char *name = ecs_get_name(world, e);
     if (!filter && name && strstr(name, text)) {
-        box_search_append_hit(out, path, NULL, NULL);
+        box_search_append_hit(out, path, NULL, 0, NULL);
     }
 
     const ecs_type_t *type = ecs_get_type(world, e);
@@ -367,19 +551,19 @@ static void box_search_scan(
 
         char *id_str = ecs_id_str(world, id);
         ecs_entity_t vtype = ecs_get_typeid(world, id);
-        const void *ptr = vtype && ecs_has(world, vtype, EcsTypeSerializer) ?
-            ecs_get_id(world, e, id) : NULL;
-        char *value = ptr ? ecs_ptr_to_expr(world, vtype, ptr) : NULL;
-        bool hit = value && strstr(value, text);
-        if (!hit && (!filter || !value)) {
-            hit = strstr(id_str, text) != NULL;
+        const void *ptr = vtype ? ecs_get_id(world, e, id) : NULL;
+        box_search_walk_t w = {
+            .world = world, .path = path, .id = id_str, .text = text, .out = out
+        };
+
+        if (ptr) {
+            box_search_walk(&w, vtype, ptr, "", 0, 0);
         }
 
-        if (hit) {
-            box_search_append_hit(out, path, id_str, value);
+        if (!w.hits && (!filter || !ptr) && strstr(id_str, text)) {
+            box_search_append_hit(out, path, id_str, 0, NULL);
         }
 
-        ecs_os_free(value);
         ecs_os_free(id_str);
     }
 }

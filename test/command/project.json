@@ -264,6 +264,11 @@
                     "grep_unknown_component",
                     "grep_recur_nested_children",
                     "grep_recur_from_root",
+                    "grep_prints_only_matching_members",
+                    "grep_nested_member",
+                    "grep_inline_array_elements",
+                    "grep_vector_elements",
+                    "grep_multiline_string_lines",
                     "output_capped_at_limit",
                     "delete_session_while_iterating"
                 ],
