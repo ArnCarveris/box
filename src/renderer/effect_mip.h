@@ -84,4 +84,35 @@ static inline uint32_t box_effect_mip_count(
     return count;
 }
 
+/** Weight an upsample pass blends a level of the pyramid into the finer one with.
+ *
+ * The weight of the chain is boosted toward the coarse levels along a curve and cut
+ * off above the high pass frequency, both given as a fraction of the pyramid depth.
+ *
+ * @param weight Weight of the chain
+ * @param curve Low frequency boost, its curvature and the high pass frequency, NULL for none
+ * @param level Level that is blended into the one above it
+ * @param levels Levels of the pyramid
+ * @return The blend constant of the pass
+ */
+static inline float box_effect_mip_blend(
+    float weight,
+    const float *curve,
+    uint32_t level,
+    uint32_t levels)
+{
+    float result = isfinite(weight) ? fmaxf(weight, 0) : 0;
+    if (curve && levels >= 2) {
+        float normalized = (float)level / (float)(levels - 1);
+        float curvature = box_effect_mip_clamp(curve[1], 0, 0.9999f);
+        float boost = (1 - powf(1 - normalized, 1 / (1 - curvature))) *
+            box_effect_mip_clamp(curve[0], 0, 1) * (1 - result);
+        float frequency = box_effect_mip_clamp(curve[2], 0.0001f, 1);
+        float high_pass = 1 - box_effect_mip_clamp((normalized - frequency) / frequency, 0, 1);
+        result = (result + boost) * high_pass;
+    }
+
+    return result;
+}
+
 #endif

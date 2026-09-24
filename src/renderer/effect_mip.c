@@ -406,6 +406,9 @@ WGPUTextureView box_effect_mip_run(
     int32_t size_param = fx->setup_parameter[1];
     int32_t history_param = fx->setup_parameter[2];
     int32_t option_param = fx->setup_parameter[3];
+    int32_t curve_param = fx->setup_parameter[4];
+    const float *curve = curve_param >= 0 && curve_param + 2 < BOX_EFFECT_PARAM_MAX ?
+        &fx->params[curve_param] : NULL;
     float weight = weight_param >= 0 && weight_param < BOX_EFFECT_PARAM_MAX ?
         fx->params[weight_param] : 1.0f;
     if (weight <= 0) {
@@ -445,7 +448,7 @@ WGPUTextureView box_effect_mip_run(
     for (uint32_t level = levels - 1; level > 0; level --) {
         box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[2], r->v->setup_mip_up[level - 1],
             r->v->setup_mip_mips[level - 1], slot, true,
-            weight);
+            box_effect_mip_blend(weight, curve, level, levels));
     }
 
     wgpuBindGroupRelease(first);

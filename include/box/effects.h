@@ -41,6 +41,9 @@ ECS_ENUM(EffectTextureFormat, {
  * A parameter member indexes the float in the effect parameter component that steers the stage,
  * or -1 for none. A mip chain reads weight, maximum size, history and full resolution first mip
  * from parameter0 to parameter3; a temporal filter halves its resolution when parameter0 is set.
+ *
+ * A mip chain reads the low frequency boost, its curvature and the high pass frequency that shape
+ * the weight of every level from parameter4 on, and blends every level with the weight without.
  */
 ECS_STRUCT(EffectSetup, {
     ecs_entity_t shader;        /**< Shader entity of the stage, without one it is skipped */
@@ -50,6 +53,7 @@ ECS_STRUCT(EffectSetup, {
     int32_t parameter1;         /**< Second parameter index of the stage */
     int32_t parameter2;         /**< Third parameter index of the stage */
     int32_t parameter3;         /**< Fourth parameter index of the stage */
+    int32_t parameter4;         /**< Fifth parameter index of the stage, default -1 */
     int32_t workgroup_size;     /**< Compute workgroup edge in pixels, 0 takes 1 */
     int32_t buffer0_size;       /**< Bytes of the compute work buffer */
     int32_t buffer1_size;       /**< Bytes of the compute state buffer, 0 takes 16 */

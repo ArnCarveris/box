@@ -63,11 +63,17 @@ void box_render_mark_subtree(
     ecs_world_t *world,
     ecs_entity_t e)
 {
+    if (ecs_has_id(world, e, EcsPrefab)) {
+        goto done;
+    }
+
     if (ecs_has(world, e, RenderMesh)) {
         box_render_mark_dirty(world, e);
     }
 
     box_hierarchy_children(world, e, box_render_mark_child, NULL);
+done:
+    return;
 }
 
 /** A component that feeds instance data was set.

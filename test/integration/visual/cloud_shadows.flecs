@@ -27,7 +27,7 @@ sun {
   Rotation: {0.9, -0.3, 0}
   DirectionalLight: {intensity: 3.2}
   LightModulator: {shader: plugins.clouds, params: CloudShadows}
-  CloudShadows: {scale: 24, speed: 2, softness: 0.5}
+  CloudShadows: {scale: 24, speed: 2, density: 0.7, softness: 0.5}
 }
 
 plain {

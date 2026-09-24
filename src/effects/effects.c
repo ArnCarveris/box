@@ -56,6 +56,25 @@ static void box_effect_texture_ctor(
     }
 }
 
+/** Construct EffectSetup components that read no parameter beyond the ones a script sets.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti The type info
+ */
+static void box_effect_setup_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    memset(ptr, 0, (size_t)(count * ti->size));
+    EffectSetup *setup = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        setup[i].parameter4 = -1;
+    }
+}
+
 void BoxEffectsImport(
     ecs_world_t *world)
 {
@@ -71,6 +90,7 @@ void BoxEffectsImport(
     ECS_COMPONENT_DEFINE(world, EffectState);
 
     ecs_set_hooks(world, Effect, { .ctor = box_effect_ctor });
+    ecs_set_hooks(world, EffectSetup, { .ctor = box_effect_setup_ctor });
     ecs_set_hooks(world, EffectTexture, { .ctor = box_effect_texture_ctor });
     ecs_set_hooks(world, EffectState, { .ctor = flecs_default_ctor });
 

@@ -261,6 +261,7 @@ static void box_effect_append(
         pass->setup_parameter[1] = setup->parameter1;
         pass->setup_parameter[2] = setup->parameter2;
         pass->setup_parameter[3] = setup->parameter3;
+        pass->setup_parameter[4] = setup->parameter4;
         pass->setup_workgroup_size = setup->workgroup_size > 0 ?
             (uint32_t)setup->workgroup_size : 1;
         pass->setup_buffer_size[0] = setup->buffer0_size > 0 ?

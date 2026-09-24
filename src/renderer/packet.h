@@ -567,7 +567,7 @@ typedef struct box_effect_t {
     uint32_t setup_shader; /**< Shader handle of its setup pass, BOX_SHADER_NONE for none */
     uint32_t setup_kind;   /**< One of the BOX_EFFECT_SETUP constants */
     uint32_t setup_format; /**< BOX_EFFECT_TEXTURE format of the setup targets */
-    int32_t setup_parameter[4]; /**< Indices of the params the setup pass reads, -1 for none */
+    int32_t setup_parameter[5]; /**< Indices of the params the setup pass reads, -1 for none */
     uint32_t setup_workgroup_size; /**< Edge of a workgroup of the compute setup pass */
     uint32_t setup_buffer_size[2]; /**< Bytes of the work buffer and of the state buffer */
     float setup_initial[4]; /**< Value the state buffer starts out with */

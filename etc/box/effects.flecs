@@ -42,7 +42,7 @@ setups {
   filter_chain {
     EffectSetup: {shader: shaders.filter_chain, kind: EffectSetupMipChain,
       format: EffectTextureRgba16Float, parameter0: 0, parameter1: 6,
-      parameter2: 8, parameter3: 10}
+      parameter2: 8, parameter3: 10, parameter4: 1}
   }
   temporal_filter {
     EffectSetup: {shader: shaders.temporal_filter, kind: EffectSetupTemporal,

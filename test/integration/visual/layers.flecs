@@ -108,4 +108,9 @@ all_ball : prefabs.Ball {
   (MaterialLayerOn, box.material.layers.wetness)
 }
 
-view { box.view.View: {camera: camera} }
+view { box.view.View: {camera: camera, material_layers: [
+  {layer: box.material.layers.edge_wear, enabled: true},
+  {layer: box.material.layers.dust, enabled: true},
+  {layer: box.material.layers.grime, enabled: true},
+  {layer: box.material.layers.wetness, enabled: true}
+]} }

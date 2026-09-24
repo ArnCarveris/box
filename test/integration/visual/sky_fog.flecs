@@ -42,7 +42,7 @@ $ { EnvironmentLight: {intensity: 1, source: atmosphere} }
 
 post_effects {
   fog : box.effects.fog {
-    Fog: {color: {0.35, 0.4, 0.48}, density: 0.08, falloff: 0.0067,
+    Fog: {color: {0.787, 0.688, 0.457}, density: 0.00057, falloff: 0.00556,
       max_opacity: 1}
   }
   tonemap : box.effects.tonemap {
