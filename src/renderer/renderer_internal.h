@@ -263,8 +263,8 @@ typedef struct box_gpu_view_t {
     WGPUTextureView depth_sample;    /**< Sampled view of the depth target, read by the pyramid */
     WGPUTexture hiz[2];              /**< Depth pyramids of the view, r32float mip chains */
     WGPUTextureView hiz_view[2];     /**< View of a whole pyramid the occlusion test reads */
-    WGPUTextureView hiz_mips[2][BOX_HIZ_LEVELS_MAX]; /**< Attachment view of one of its levels */
-    WGPUBindGroup hiz_source[2][BOX_HIZ_LEVELS_MAX]; /**< Source of the pass that fills a level */
+    WGPUTextureView hiz_mips[2][BOX_HIZ_LEVELS_MAX]; /**< Storage view of one of its levels */
+    WGPUBindGroup hiz_source[2][BOX_HIZ_LEVELS_MAX]; /**< Source and level of its dispatch */
     uint32_t hiz_levels;             /**< Levels its pyramids hold, 0 when it has none */
     uint32_t hiz_slot;               /**< Pyramid this frame builds, the other one is its history */
     bool hiz_history;                /**< The other pyramid holds the depth of the previous frame */
@@ -599,10 +599,10 @@ struct box_renderer_t {
     uint32_t cull_culled;            /**< Instances the CPU culling of the frame skipped */
     uint32_t cull_tested;            /**< Instances the compute culling of the frame tested */
     uint32_t cull_visible;           /**< Instances the last read back compute culling kept */
-    WGPURenderPipeline hiz_copy;     /**< Depth target into the first level of a pyramid */
-    WGPURenderPipeline hiz_reduce;   /**< One level of a pyramid into the next */
-    WGPUBindGroupLayout hiz_depth_layout; /**< Depth target layout of the copy pass */
-    WGPUBindGroupLayout hiz_level_layout; /**< Level layout of the reduce pass */
+    WGPUComputePipeline hiz_copy;    /**< Depth target into the first level of a pyramid */
+    WGPUComputePipeline hiz_reduce;  /**< One level of a pyramid into the next */
+    WGPUBindGroupLayout hiz_depth_layout; /**< Depth target and level layout of the copy */
+    WGPUBindGroupLayout hiz_level_layout; /**< Source and target level layout of the reduce */
     WGPUComputePipeline hiz_first;   /**< Occlusion pass that keeps what the last frame saw */
     WGPUComputePipeline hiz_second;  /**< Occlusion pass that keeps what the pyramid uncovered */
     WGPUBindGroupLayout hiz_layout;  /**< Uniform, source, visible, arguments, bits and pyramid */

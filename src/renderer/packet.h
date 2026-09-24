@@ -60,6 +60,9 @@
 /** Instances one workgroup of the occlusion pass tests */
 #define BOX_HIZ_GROUP (64)
 
+/** Edge of the square of texels one workgroup of a pyramid level fills */
+#define BOX_HIZ_LEVEL_GROUP (8)
+
 /** Probes one workgroup of the bake passes fills */
 #define BOX_BAKE_GROUP (64)
 

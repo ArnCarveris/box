@@ -6,8 +6,8 @@
  * pyramid accepted, its depth builds this frame's pyramid, and the second draws
  * what the new pyramid accepts that the first did not.
  *
- * A pyramid is a color mip chain filled by render passes, since r32float storage
- * textures are not available on every backend.
+ * A pyramid is an r32float mip chain that one compute pass fills, a dispatch
+ * per level that reads the level below it and writes its own through a storage view.
  */
 
 #include "renderer_internal.h"
@@ -19,26 +19,36 @@
 /** Pyramids a view keeps, the one of this frame and the one of the previous */
 #define BOX_HIZ_SLOTS (2)
 
-/** Create the layout and the pipeline of one pass of a depth pyramid.
+/** Create the layout and the pipeline of the dispatch that fills one level of a pyramid.
  *
  * @param r The renderer
- * @param handle Shader slot of the pass
- * @param sample Sample type of the texture the pass reads
+ * @param handle Shader slot of the dispatch
+ * @param sample Sample type of the texture the dispatch reads
  * @param out_layout The bind group layout to fill
  * @return The pipeline
  */
-static WGPURenderPipeline box_hiz_level_pipeline(
+static WGPUComputePipeline box_hiz_level_pipeline(
     box_renderer_t *r,
     uint32_t handle,
     WGPUTextureSampleType sample,
     WGPUBindGroupLayout *out_layout)
 {
-    WGPUBindGroupLayoutEntry entry = {
-        .binding = 0,
-        .visibility = WGPUShaderStage_Fragment,
-        .texture = { .sampleType = sample, .viewDimension = WGPUTextureViewDimension_2D }
+    WGPUBindGroupLayoutEntry entries[2] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = { .sampleType = sample, .viewDimension = WGPUTextureViewDimension_2D }
+        }, {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Compute,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_WriteOnly,
+                .format = BOX_HIZ_FORMAT,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }
     };
-    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 1, .entries = &entry };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 2, .entries = entries };
     *out_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
     WGPUShaderModule module = box_shader_module(r, handle);
@@ -50,32 +60,15 @@ static WGPURenderPipeline box_hiz_level_pipeline(
     WGPUPipelineLayout pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
-    WGPUColorTargetState target = {
-        .format = BOX_HIZ_FORMAT,
-        .writeMask = WGPUColorWriteMask_Red
-    };
-    WGPUFragmentState fragment = {
-        .module = module,
-        .entryPoint = { .data = "fs_main", .length = WGPU_STRLEN },
-        .targetCount = 1,
-        .targets = &target
-    };
-    WGPURenderPipelineDescriptor desc = {
+    WGPUComputePipelineDescriptor desc = {
         .label = BOX_GPU_LABEL("hiz pyramid"),
         .layout = pipeline_layout,
-        .vertex = {
+        .compute = {
             .module = module,
-            .entryPoint = { .data = "vs_main", .length = WGPU_STRLEN }
-        },
-        .fragment = &fragment,
-        .primitive = {
-            .topology = WGPUPrimitiveTopology_TriangleList,
-            .cullMode = WGPUCullMode_None,
-            .frontFace = WGPUFrontFace_CW
-        },
-        .multisample = { .count = 1, .mask = 0xFFFFFFFF }
+            .entryPoint = { .data = "cs_main", .length = WGPU_STRLEN }
+        }
     };
-    WGPURenderPipeline result = wgpuDeviceCreateRenderPipeline(r->device, &desc);
+    WGPUComputePipeline result = wgpuDeviceCreateComputePipeline(r->device, &desc);
     wgpuPipelineLayoutRelease(pipeline_layout);
     wgpuShaderModuleRelease(module);
 
@@ -236,20 +229,25 @@ void box_hiz_resize(
     v->hiz_history = false;
 }
 
-/** Create the bind group one pass of a pyramid reads its source through.
+/** Create the bind group of the dispatch that fills one level of a pyramid.
  *
  * @param r The renderer
- * @param layout Layout of the pass
- * @param source The texture view the pass reads
+ * @param layout Layout of the dispatch
+ * @param source The texture view the dispatch reads
+ * @param target The storage view of the level the dispatch writes
  * @return The bind group
  */
 static WGPUBindGroup box_hiz_source_group(
     box_renderer_t *r,
     WGPUBindGroupLayout layout,
-    WGPUTextureView source)
+    WGPUTextureView source,
+    WGPUTextureView target)
 {
-    WGPUBindGroupEntry entry = { .binding = 0, .textureView = source };
-    WGPUBindGroupDescriptor desc = { .layout = layout, .entryCount = 1, .entries = &entry };
+    WGPUBindGroupEntry entries[2] = {
+        { .binding = 0, .textureView = source },
+        { .binding = 1, .textureView = target }
+    };
+    WGPUBindGroupDescriptor desc = { .layout = layout, .entryCount = 2, .entries = entries };
 
     return wgpuDeviceCreateBindGroup(r->device, &desc);
 }
@@ -266,7 +264,7 @@ static void box_hiz_create(
     uint32_t levels)
 {
     WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
+        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_TextureBinding |
             WGPUTextureUsage_CopySrc,
         .dimension = WGPUTextureDimension_2D,
         .size = { box_hiz_half(r->v->width), box_hiz_half(r->v->height), 1 },
@@ -299,10 +297,10 @@ static void box_hiz_create(
     }
 
     r->v->hiz_source[slot][0] = box_hiz_source_group(r, r->hiz_depth_layout,
-        r->v->depth_sample);
+        r->v->depth_sample, r->v->hiz_mips[slot][0]);
     for (level = 1; level < levels; level ++) {
         r->v->hiz_source[slot][level] = box_hiz_source_group(r, r->hiz_level_layout,
-            r->v->hiz_mips[slot][level - 1]);
+            r->v->hiz_mips[slot][level - 1], r->v->hiz_mips[slot][level]);
     }
 }
 
@@ -397,33 +395,27 @@ void box_hiz_upload(
     memcpy(r->v->hiz_clip, clip, sizeof(clip));
 }
 
-/** Record one pass of a pyramid, which fills one of its levels.
+/** Record the dispatch of a pyramid that fills one of its levels.
  *
  * @param r The renderer
- * @param encoder The command encoder
- * @param pipeline The pipeline of the pass
- * @param level The level the pass writes
+ * @param pass The compute pass that builds the pyramid
+ * @param pipeline The pipeline of the dispatch
+ * @param level The level the dispatch writes
  */
-static void box_hiz_level_pass(
+static void box_hiz_level_dispatch(
     box_renderer_t *r,
-    WGPUCommandEncoder encoder,
-    WGPURenderPipeline pipeline,
+    WGPUComputePassEncoder pass,
+    WGPUComputePipeline pipeline,
     uint32_t level)
 {
     uint32_t slot = r->v->hiz_slot;
-    WGPURenderPassColorAttachment color = {
-        .view = r->v->hiz_mips[slot][level],
-        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = WGPULoadOp_Load,
-        .storeOp = WGPUStoreOp_Store
-    };
-    WGPURenderPassDescriptor desc = { .colorAttachmentCount = 1, .colorAttachments = &color };
-    WGPURenderPassEncoder pass = box_timing_render(r, encoder, &desc, "depth");
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-    wgpuRenderPassEncoderSetBindGroup(pass, 0, r->v->hiz_source[slot][level], 0, NULL);
-    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
-    wgpuRenderPassEncoderEnd(pass);
-    wgpuRenderPassEncoderRelease(pass);
+    uint32_t width = box_hiz_extent(box_hiz_half(r->v->width), level);
+    uint32_t height = box_hiz_extent(box_hiz_half(r->v->height), level);
+    wgpuComputePassEncoderSetPipeline(pass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, r->v->hiz_source[slot][level], 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(pass,
+        (width + BOX_HIZ_LEVEL_GROUP - 1) / BOX_HIZ_LEVEL_GROUP,
+        (height + BOX_HIZ_LEVEL_GROUP - 1) / BOX_HIZ_LEVEL_GROUP, 1);
 }
 
 /** Level of the pyramid of the current view that fits the grid of the traversal.
@@ -590,12 +582,16 @@ void box_hiz_build(
     box_renderer_t *r,
     WGPUCommandEncoder encoder)
 {
-    box_hiz_level_pass(r, encoder, r->hiz_copy, 0);
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "depth");
+    box_hiz_level_dispatch(r, pass, r->hiz_copy, 0);
 
     uint32_t level;
     for (level = 1; level < r->v->hiz_levels; level ++) {
-        box_hiz_level_pass(r, encoder, r->hiz_reduce, level);
+        box_hiz_level_dispatch(r, pass, r->hiz_reduce, level);
     }
+
+    wgpuComputePassEncoderEnd(pass);
+    wgpuComputePassEncoderRelease(pass);
 
 #ifndef BOX_PLATFORM_WEB
     box_hiz_capture(r, encoder);
@@ -706,8 +702,8 @@ void box_hiz_fini(
     if (r->hiz_first) wgpuComputePipelineRelease(r->hiz_first);
     if (r->hiz_second) wgpuComputePipelineRelease(r->hiz_second);
     if (r->hiz_layout) wgpuBindGroupLayoutRelease(r->hiz_layout);
-    if (r->hiz_copy) wgpuRenderPipelineRelease(r->hiz_copy);
-    if (r->hiz_reduce) wgpuRenderPipelineRelease(r->hiz_reduce);
+    if (r->hiz_copy) wgpuComputePipelineRelease(r->hiz_copy);
+    if (r->hiz_reduce) wgpuComputePipelineRelease(r->hiz_reduce);
     if (r->hiz_depth_layout) wgpuBindGroupLayoutRelease(r->hiz_depth_layout);
     if (r->hiz_level_layout) wgpuBindGroupLayoutRelease(r->hiz_level_layout);
     box_vec_fini(&r->hiz_jobs);
