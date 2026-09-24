@@ -105,7 +105,7 @@ void Spline_guide_follows_the_selected_spline(void)
     test_assert(mesh != NULL);
     test_uint(mesh->spline, road);
     test_flt(ecs_get(w, guide, Position)->y, -2);
-    test_assert(ecs_has_pair(w, guide, Layer, box_draw_overlay_layer(w)));
+    test_assert(ecs_has_pair(w, guide, Layer, box_draw_top_layer(w)));
 }
 
 void Spline_guide_is_hidden_without_a_spline(void)
@@ -202,7 +202,7 @@ void Spline_dragging_a_handle_moves_its_point(void)
     }
 
     test_assert(handle != 0);
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;

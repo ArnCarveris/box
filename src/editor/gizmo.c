@@ -673,7 +673,7 @@ static void box_editor_draw_tool(
 
     box_draw(world, &(box_draw_desc_t){
         .asset = asset, .key = 1, .position = origin, .rotation = rotation,
-        .scale = { size, size, size }, .overlay = true });
+        .scale = { size, size, size }, .overlay = true, .on_top = true });
 done:
     return;
 }
@@ -703,7 +703,7 @@ static void box_editor_draw_spline(
         float size = vec3_length(vec3_sub(p, eye)) * BOX_EDITOR_GIZMO_SIZE * 0.3f;
         ecs_entity_t handle = box_draw(world, &(box_draw_desc_t){
             .asset = asset, .key = 1000 + (uint64_t)i, .position = p,
-            .scale = { size, size, size }, .overlay = true });
+            .scale = { size, size, size }, .overlay = true, .on_top = true });
         const GizmoHandle *h = ecs_get(world, handle, GizmoHandle);
         if (!h || h->index != i || h->mode != HandlePoint) {
             ecs_set(world, handle, GizmoHandle, { .mode = HandlePoint, .axes = 7, .index = i });

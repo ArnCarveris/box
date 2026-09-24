@@ -241,3 +241,49 @@ void Draw_overlay_layer_is_hidden_from_the_scene_view(void)
     box_draw(w, &(box_draw_desc_t){ .asset = prefab, .key = 1, .overlay = true });
     test_bool(box_render_is_ui_layer(w, box_draw_overlay_layer(w)), true);
 }
+
+void Draw_on_top_instance_joins_the_top_layer(void)
+{
+    // editor/draw
+    ecs_entity_t e = box_draw(w, &(box_draw_desc_t){
+        .asset = prefab, .key = 1, .overlay = true, .on_top = true });
+    ecs_entity_t top = box_draw_top_layer(w);
+    test_assert(top != 0);
+    test_assert(top != box_draw_overlay_layer(w));
+    test_assert(ecs_has_pair(w, e, Layer, top));
+    test_assert(!ecs_has_pair(w, e, Layer, box_draw_overlay_layer(w)));
+    test_bool(ecs_get(w, e, DrawInstance)->on_top, true);
+    test_bool(box_render_is_ui_layer(w, top), true);
+    test_assert(ecs_lookup(w, "box.draw.overlay_view") == 0);
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
+    test_assert(view != 0);
+    const View *v = ecs_get(w, view, View);
+    test_uint(v->layers[0], top);
+    test_bool(v->strict_layers, true);
+    test_int(v->priority, BOX_DRAW_TOP_PRIORITY);
+}
+
+void Draw_top_view_is_not_occluded_by_the_scene_view(void)
+{
+    // editor/draw
+    ecs_entity_t cam = ecs_lookup(w, "cam");
+    ecs_entity_t scene = ecs_entity(w, { .name = "main" });
+    ecs_set(w, scene, View, { .camera = cam, .enabled = true });
+    box_draw(w, &(box_draw_desc_t){ .asset = prefab, .key = 1, .overlay = true });
+    box_draw(w, &(box_draw_desc_t){ .asset = prefab, .key = 2, .overlay = true, .on_top = true });
+    box_packet_t packet;
+    box_packet_init(&packet);
+    packet.width = 640;
+    packet.height = 360;
+    box_render_extract(w, &packet);
+    ecs_progress(w, 0);
+    const View *overlay = ecs_get(w, ecs_lookup(w, "box.draw.overlay_view"), View);
+    const View *top = ecs_get(w, ecs_lookup(w, "box.draw.top_view"), View);
+    test_uint(overlay->camera, cam);
+    test_uint(overlay->occluder, scene);
+    test_uint(top->camera, cam);
+    test_uint(top->occluder, 0);
+    box_render_extract(w, &packet);
+    test_int(packet.views.count, 3);
+    box_packet_fini(&packet);
+}

@@ -43,47 +43,95 @@ static bool box_draw_is_template(
     return script != NULL && script->template_ != NULL;
 }
 
-/** Create the view that draws the overlay layer over the scene.
+/** Create the view that draws an overlay layer over the scene.
  *
- * The layer is registered as a UI layer here, on the first overlay draw, so a
+ * The layer is registered as a UI layer here, on the first draw into it, so a
  * world that never draws an overlay keeps its layer registry empty.
  *
  * @param world The world
- * @param state The module state
+ * @param layer The overlay layer the view draws
+ * @param name Name of the view under box.draw
+ * @param priority Order in the frame the view renders at
+ * @return The view entity
  */
-static void box_draw_overlay_view(
+static ecs_entity_t box_draw_view_create(
     ecs_world_t *world,
-    DrawState *state)
+    ecs_entity_t layer,
+    const char *name,
+    int32_t priority)
 {
-    if (state->view && ecs_is_alive(world, state->view)) {
-        goto done;
-    }
-
-    box_render_add_ui_layer(world, state->overlay);
+    box_render_add_ui_layer(world, layer);
     ecs_entity_t module = ecs_lookup(world, "box.draw");
-    ecs_entity_t view = ecs_entity(world, {
-        .name = "overlay_view", .parent = module
-    });
-
+    ecs_entity_t view = ecs_entity(world, { .name = name, .parent = module });
     ecs_set(world, view, View, {
         .camera = 0,
-        .layers = { state->overlay },
-        .priority = BOX_DRAW_OVERLAY_PRIORITY,
+        .layers = { layer },
+        .priority = priority,
         .strict_layers = true,
         .shadows = { .enabled = false },
         .culling = { .enabled = false },
         .enabled = true
     });
 
-    state->view = view;
+    return view;
+}
+
+/** Create the view of the overlay layer a draw goes to when it does not exist yet.
+ *
+ * @param world The world
+ * @param state The module state
+ * @param on_top Whether the draw goes to the layer on top
+ */
+static void box_draw_overlay_view(
+    ecs_world_t *world,
+    DrawState *state,
+    bool on_top)
+{
+    if (on_top && (!state->top_view || !ecs_is_alive(world, state->top_view))) {
+        ecs_entity_t view = box_draw_view_create(
+            world, state->top, "top_view", BOX_DRAW_TOP_PRIORITY);
+        state = box_draw_state(world);
+        state->top_view = view;
+    } else if (!on_top && (!state->view || !ecs_is_alive(world, state->view))) {
+        ecs_entity_t view = box_draw_view_create(
+            world, state->overlay, "overlay_view", BOX_DRAW_OVERLAY_PRIORITY);
+        state = box_draw_state(world);
+        state->view = view;
+    }
+}
+
+/** Point an overlay view at a camera and an occluder.
+ *
+ * @param world The world
+ * @param e The view, 0 when it does not exist yet
+ * @param camera The camera
+ * @param occluder The view whose depth hides this one, 0 for none
+ */
+static void box_draw_view_follow(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t camera,
+    ecs_entity_t occluder)
+{
+    if (!e || !ecs_is_alive(world, e)) {
+        goto done;
+    }
+
+    View *view = ecs_get_mut(world, e, View);
+    if (view->camera != camera || view->occluder != occluder) {
+        view->camera = camera;
+        view->occluder = occluder;
+        ecs_modified(world, e, View);
+    }
+
 done:
     return;
 }
 
-/** Point the overlay view at the camera of the primary view of the scene.
+/** Point the overlay views at the camera of the primary view of the scene.
  *
  * The primary view is also the occluder of the overlay, so an overlay draw
- * behind the scene shows faded instead of over it.
+ * behind the scene shows faded instead of over it. The view on top has none.
  *
  * @param world The world
  * @param state The module state
@@ -92,13 +140,15 @@ static void box_draw_follow_camera(
     ecs_world_t *world,
     DrawState *state)
 {
-    if (!state->view || !ecs_is_alive(world, state->view)) {
+    bool overlay = state->view && ecs_is_alive(world, state->view);
+    bool top = state->top_view && ecs_is_alive(world, state->top_view);
+    if (!overlay && !top) {
         goto done;
     }
 
     RenderState *render = box_render_state(world);
     ecs_entity_t primary = render ? box_render_primary_view(world, render) : 0;
-    const View *scene = primary && primary != state->view ?
+    const View *scene = primary && primary != state->view && primary != state->top_view ?
         ecs_get(world, primary, View) : NULL;
     ecs_entity_t camera = scene ? scene->camera : 0;
     ecs_entity_t occluder = scene ? primary : 0;
@@ -106,13 +156,9 @@ static void box_draw_follow_camera(
         camera = box_render_active_camera(world);
     }
 
-    View *view = ecs_get_mut(world, state->view, View);
-    if (view->camera != camera || view->occluder != occluder) {
-        view->camera = camera;
-        view->occluder = occluder;
-        ecs_modified(world, state->view, View);
-    }
-
+    ecs_entity_t top_view = state->top_view;
+    box_draw_view_follow(world, state->view, camera, occluder);
+    box_draw_view_follow(world, top_view, camera, 0);
 done:
     return;
 }
@@ -177,8 +223,8 @@ static ecs_entity_t box_draw_create(
     }
 
     if (desc->overlay) {
-        ecs_add_pair(world, e, Layer, state->overlay);
-        box_draw_overlay_view(world, state);
+        ecs_add_pair(world, e, Layer, desc->on_top ? state->top : state->overlay);
+        box_draw_overlay_view(world, state, desc->on_top);
     }
 
     return e;
@@ -216,7 +262,8 @@ ecs_entity_t box_draw(
     }
 
     ecs_set(world, result, DrawInstance, {
-        .asset = desc->asset, .key = key, .frame = frame, .overlay = desc->overlay });
+        .asset = desc->asset, .key = key, .frame = frame, .overlay = desc->overlay,
+        .on_top = desc->overlay && desc->on_top });
     ecs_set(world, result, Position, { desc->position.x, desc->position.y, desc->position.z });
     ecs_set(world, result, Rotation, { desc->rotation.x, desc->rotation.y, desc->rotation.z });
     bool unit = desc->scale.x == 0 && desc->scale.y == 0 && desc->scale.z == 0;
@@ -227,7 +274,7 @@ ecs_entity_t box_draw(
     }
 
     if (desc->overlay) {
-        box_draw_layer_subtree(world, result, state->overlay);
+        box_draw_layer_subtree(world, result, desc->on_top ? state->top : state->overlay);
     }
 
 done:
@@ -240,6 +287,14 @@ ecs_entity_t box_draw_overlay_layer(
     DrawState *state = box_draw_state(world);
 
     return state ? state->overlay : 0;
+}
+
+ecs_entity_t box_draw_top_layer(
+    ecs_world_t *world)
+{
+    DrawState *state = box_draw_state(world);
+
+    return state ? state->top : 0;
 }
 
 /** Hide the instances that were not drawn this frame and delete the stale ones.
@@ -325,11 +380,13 @@ void BoxDrawImport(
     ecs_set_scope(world, module);
     ecs_entity_t scope = ecs_entity(world, { .name = "instances" });
     ecs_entity_t overlay = ecs_entity(world, { .name = "overlay" });
+    ecs_entity_t top = ecs_entity(world, { .name = "top" });
 
     DrawState *state = ecs_singleton_ensure(world, DrawState);
     ecs_map_init(&state->instances, NULL);
     state->scope = scope;
     state->overlay = overlay;
+    state->top = top;
     state->frame = -1;
 
     ecs_system(world, {

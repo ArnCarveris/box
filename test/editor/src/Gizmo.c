@@ -145,12 +145,12 @@ void Gizmo_gizmo_is_drawn_in_the_overlay_layer(void)
         inst = it.entities[0];
     }
 
-    ecs_entity_t layer = box_draw_overlay_layer(w);
+    ecs_entity_t layer = box_draw_top_layer(w);
     test_assert(ecs_has_pair(w, inst, Layer, layer));
     ecs_entity_t x = ecs_lookup_child(w, inst, "x");
     test_assert(ecs_has_pair(w, x, Layer, layer));
     test_assert(ecs_has_pair(w, ecs_lookup_child(w, x, "shaft"), Layer, layer));
-    test_assert(ecs_lookup(w, "box.draw.overlay_view") != 0);
+    test_assert(ecs_lookup(w, "box.draw.top_view") != 0);
 }
 
 void Gizmo_gizmo_scales_with_the_distance_to_the_camera(void)
@@ -188,7 +188,7 @@ void Gizmo_handles_are_pickable_through_the_overlay_view(void)
     }
 
     ecs_entity_t x = ecs_lookup_child(w, inst, "x");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx, cy;
@@ -219,7 +219,7 @@ void Gizmo_dragging_the_x_arrow_moves_along_x(void)
     }
 
     ecs_entity_t handle = ecs_lookup_child(w, inst, "x");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;
@@ -265,7 +265,7 @@ void Gizmo_dragging_the_xy_plane_keeps_z(void)
     }
 
     ecs_entity_t handle = ecs_lookup_child(w, inst, "xy");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;
@@ -344,7 +344,7 @@ void Gizmo_rotating_about_y_changes_y_only(void)
     }
 
     ecs_entity_t handle = ecs_lookup_child(w, inst, "y");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;
@@ -390,7 +390,7 @@ void Gizmo_scaling_along_x_changes_x_only(void)
     }
 
     ecs_entity_t handle = ecs_lookup_child(w, inst, "x");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;
@@ -485,7 +485,7 @@ void Gizmo_gizmo_of_a_child_moves_it_in_its_parent(void)
 
     test_flt(ecs_get(w, inst, Position)->x, 3);
     ecs_entity_t handle = ecs_lookup_child(w, inst, "x");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit;
     bool found = false;
     float cx = 0, cy = 0;
@@ -530,7 +530,7 @@ void Gizmo_dragged_handle_stays_lit_over_another_handle(void)
 
     ecs_entity_t y = ecs_lookup_child(w, inst, "y");
     ecs_entity_t x = ecs_lookup_child(w, inst, "x");
-    ecs_entity_t view = ecs_lookup(w, "box.draw.overlay_view");
+    ecs_entity_t view = ecs_lookup(w, "box.draw.top_view");
     PickHit hit, hit_x;
     bool found = false, found_x = false;
     float cx = 0, cy = 0;

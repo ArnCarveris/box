@@ -192,7 +192,7 @@
 #define BOX_VIEW_LAYER_ALL (0xFFFFFFFFu)
 
 /** Opacity the instances of a view are drawn with where the depth of its occluder hides them */
-#define BOX_VIEW_OCCLUDED_OPACITY (0.5f)
+#define BOX_VIEW_OCCLUDED_OPACITY (0.05f)
 
 /** Cascades a view can split its shadow map into */
 #define BOX_SHADOW_CASCADE_MAX (4)

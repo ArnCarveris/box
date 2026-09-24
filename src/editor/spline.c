@@ -3,7 +3,7 @@
  * @brief The spline editor: the guide curve, the selected point and adding or removing points.
  *
  * The guide is one entity of the module with a SplineMesh over the selected
- * spline, drawn in the overlay layer and hidden when no spline is selected.
+ * spline, drawn in the overlay layer on top and hidden when no spline is selected.
  */
 
 #include "editor_internal.h"
@@ -28,7 +28,7 @@ static ecs_entity_t box_editor_guide(
     guide = ecs_entity(world, { .name = "guide", .parent = module });
     ecs_add_id(world, guide, DynamicTransform);
     ecs_add_id(world, guide, Hidden);
-    ecs_add_pair(world, guide, Layer, box_draw_overlay_layer(world));
+    ecs_add_pair(world, guide, Layer, box_draw_top_layer(world));
     ecs_set(world, guide, Rgb, { 255, 200, 60 });
     ecs_set(world, guide, Position, { 0, 0, 0 });
 done:

@@ -14,6 +14,8 @@ typedef struct DrawState {
     ecs_entity_t scope;       /**< box.draw.instances, parent of every instance */
     ecs_entity_t overlay;     /**< Layer of the overlay draws */
     ecs_entity_t view;        /**< View that draws the overlay layer, 0 until needed */
+    ecs_entity_t top;         /**< Layer of the overlay draws on top */
+    ecs_entity_t top_view;    /**< View that draws the layer on top, 0 until needed */
     int64_t frame;            /**< Frame the last draw call was made in */
     int32_t calls;            /**< Draw calls without a key made in that frame */
 } DrawState;
