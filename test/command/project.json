@@ -63,6 +63,19 @@
                 "teardown": true
             },
             {
+                "id": "Save",
+                "testcases": [
+                    "writes_changed_values_to_the_file",
+                    "no_changes_leaves_the_file",
+                    "saves_only_the_changed_script",
+                    "script_without_file",
+                    "skips_framework_scripts",
+                    "help_lists_the_command"
+                ],
+                "setup": true,
+                "teardown": true
+            },
+            {
                 "id": "Dispatch",
                 "testcases": [
                     "command_with_arguments",

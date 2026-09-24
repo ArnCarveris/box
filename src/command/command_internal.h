@@ -301,6 +301,13 @@ void box_fps_cmd_init(
 void box_fit_cmd_init(
     ecs_world_t *world);
 
+/** Register the save command.
+ *
+ * @param world The world
+ */
+void box_save_cmd_init(
+    ecs_world_t *world);
+
 /** Register the stats command.
  *
  * @param world The world
