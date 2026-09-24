@@ -302,14 +302,19 @@ typedef struct box_gpu_view_t {
     WGPUTextureView scene_mips[BOX_BLUR_LEVELS_MAX]; /**< Attachment view of one of its levels */
     WGPUBindGroup scene_down[BOX_BLUR_LEVELS_MAX]; /**< Downsample source, the finer level */
     WGPUBindGroup scene_up[BOX_BLUR_LEVELS_MAX];   /**< Upsample source, the coarser level */
+    WGPUTexture scene_scratch;       /**< Downsampled levels a compute blur mixes up from */
+    WGPUTextureView scene_scratch_mips[BOX_BLUR_LEVELS_MAX]; /**< Storage view of a level */
     uint32_t scene_mips_count;       /**< Levels its blur chain holds */
     WGPUTextureFormat scene_format;  /**< Format of that copy, which follows the scene target */
     WGPUBuffer setup_compute_state;  /**< State buffer a compute setup pass keeps across frames */
     WGPUBuffer setup_compute_work;   /**< Work buffer of the compute setup pass */
     uint32_t setup_compute_size[2];  /**< Bytes of the work buffer and of the state buffer */
     WGPUTexture setup_mip;           /**< Pyramid of the mip chain setup pass */
-    WGPUTextureView setup_mip_view;  /**< View of the finest level of the pyramid */
+    WGPUTextureView setup_mip_view;  /**< View of the finest level of the upsampled pyramid */
     WGPUTextureView setup_mip_mips[BOX_EFFECT_MIP_LEVELS_MAX]; /**< Attachment view of a level */
+    WGPUTexture setup_mip_sum;       /**< Upsampled levels a compute pyramid writes */
+    WGPUTextureView setup_mip_sum_mips[BOX_EFFECT_MIP_LEVELS_MAX]; /**< Storage view of a level */
+    WGPUBuffer setup_mip_weights;    /**< Blend weight of every level of a compute pyramid */
     WGPUBindGroup setup_mip_down[BOX_EFFECT_MIP_LEVELS_MAX]; /**< Downsample source, finer level */
     WGPUBindGroup setup_mip_up[BOX_EFFECT_MIP_LEVELS_MAX];   /**< Upsample source, coarser level */
     uint32_t setup_mip_levels;       /**< Levels the pyramid holds */
@@ -467,8 +472,11 @@ struct box_renderer_t {
     uint32_t sorted_capacity;        /**< Entries the sorted instance buffer can hold */
     WGPUSampler scene_sampler;       /**< Linear sampler of the copy, full level range */
     WGPUBindGroupLayout blur_layout; /**< Source texture and sampler of a blur pass */
-    WGPURenderPipeline blur_down[BOX_EFFECT_FORMATS]; /**< Thirteen tap downsample of a level */
-    WGPURenderPipeline blur_up[BOX_EFFECT_FORMATS]; /**< Eight tap tent upsample, mixed up */
+    WGPURenderPipeline blur_down;    /**< Thirteen tap downsample of a level */
+    WGPURenderPipeline blur_up;      /**< Eight tap tent upsample, mixed up */
+    WGPUBindGroupLayout blur_compute_layout; /**< Source, sampler, base and level of a dispatch */
+    WGPUComputePipeline blur_compute_down; /**< Downsample dispatch of a float copy */
+    WGPUComputePipeline blur_compute_up; /**< Upsample dispatch of a float copy */
     WGPUTexture upscale;             /**< Scaled image the surface views draw into */
     WGPUTextureView upscale_view;    /**< View of that image */
     WGPUBindGroup upscale_group;     /**< Binding of that image and its sampler */
@@ -519,6 +527,8 @@ struct box_renderer_t {
     uint32_t setup_compute_shader;
     WGPUBindGroupLayout setup_mip_layout;
     WGPURenderPipeline setup_mip_pipeline[4];
+    WGPUBindGroupLayout setup_mip_compute_layout; /**< Mip chain layout with target and weight */
+    WGPUComputePipeline setup_mip_compute[4]; /**< First, down, up and history dispatches */
     uint32_t setup_mip_shader;
     WGPUBindGroupLayout motion_layout; /**< Uniform and depth target of the motion pass */
     WGPURenderPipeline motion_pipeline; /**< Pass that writes the motion vectors of a view */
@@ -1512,6 +1522,13 @@ void box_effect_mip_init(
  * @param r The renderer
  */
 void box_effect_mip_fini(
+    box_renderer_t *r);
+
+/** Release the pipelines of the mip chain setup passes, which the next run builds again.
+ *
+ * @param r The renderer
+ */
+void box_effect_mip_release(
     box_renderer_t *r);
 
 /** Release the pyramid of one view.

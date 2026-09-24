@@ -5,9 +5,16 @@
  * The setup shader fills the finest level of a per view pyramid from the source
  * image, downsamples it level by level and adds every coarser level back into the
  * finer one, optionally blending the result with the pyramid of the previous frame.
+ *
+ * A storage format pyramid is filled by one compute pass, a dispatch per level, whose
+ * upsample writes a second chain since a dispatch cannot read what it stores. Other
+ * formats take a render pass per level that blends the upsample into the level.
  */
 
 #include "renderer_internal.h"
+
+/** Bytes between the blend weights of two levels, the uniform offset alignment */
+#define BOX_EFFECT_MIP_WEIGHT_STRIDE (256)
 
 /** Blend state of the upsample pass, which adds the coarser level at a constant weight */
 static const WGPUBlendState box_effect_mip_mix = {
@@ -15,6 +22,41 @@ static const WGPUBlendState box_effect_mip_mix = {
         WGPUBlendFactor_One },
     .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_Zero, WGPUBlendFactor_One }
 };
+
+/** Entry points of the setup shader, in the order of the pipeline arrays */
+static const char *box_effect_mip_entries[2][4] = {
+    { "fs_first", "fs_down", "fs_up", "fs_history" },
+    { "cs_first", "cs_down", "cs_up", "cs_history" }
+};
+
+/** Whether a pyramid format can be written by the compute passes.
+ *
+ * @param format Format of the pyramid
+ * @return Whether the format is a storage format
+ */
+static bool box_effect_mip_storage(
+    WGPUTextureFormat format)
+{
+    return format == WGPUTextureFormat_RGBA16Float;
+}
+
+/** Edge of a level of the pyramid, which halves every level and never drops below one.
+ *
+ * @param size Edge of the finest level in pixels
+ * @param level The level
+ * @return The edge of the level in pixels
+ */
+static uint32_t box_effect_mip_extent(
+    uint32_t size,
+    uint32_t level)
+{
+    uint32_t result = size >> level;
+    if (!result) {
+        result = 1;
+    }
+
+    return result;
+}
 
 /** Create a fullscreen pipeline from a fragment entry point of a setup shader.
  *
@@ -59,13 +101,38 @@ static WGPURenderPipeline box_effect_mip_pipeline(
     return wgpuDeviceCreateRenderPipeline(r->device, &desc);
 }
 
+/** Create a compute pipeline from an entry point of a setup shader.
+ *
+ * @param r The renderer
+ * @param module The shader module
+ * @param layout The pipeline layout
+ * @param entry Name of the compute entry point
+ * @return The pipeline
+ */
+static WGPUComputePipeline box_effect_mip_compute_pipeline(
+    box_renderer_t *r,
+    WGPUShaderModule module,
+    WGPUPipelineLayout layout,
+    const char *entry)
+{
+    WGPUComputePipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("setup mip"),
+        .layout = layout,
+        .compute = {
+            .module = module,
+            .entryPoint = { .data = entry, .length = WGPU_STRLEN }
+        }
+    };
+
+    return wgpuDeviceCreateComputePipeline(r->device, &desc);
+}
+
 void box_effect_mip_init(
     box_renderer_t *r)
 {
-    WGPUBindGroupLayoutEntry entries[4] = {
+    WGPUBindGroupLayoutEntry entries[6] = {
         {
             .binding = 0,
-            .visibility = WGPUShaderStage_Fragment,
             .buffer = {
                 .type = WGPUBufferBindingType_Uniform,
                 .hasDynamicOffset = true,
@@ -73,73 +140,94 @@ void box_effect_mip_init(
             }
         }, {
             .binding = 1,
-            .visibility = WGPUShaderStage_Fragment,
             .texture = {
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
         }, {
             .binding = 2,
-            .visibility = WGPUShaderStage_Fragment,
             .sampler = { .type = WGPUSamplerBindingType_Filtering }
         }, {
             .binding = 3,
-            .visibility = WGPUShaderStage_Fragment,
             .texture = {
                 .sampleType = WGPUTextureSampleType_Float,
                 .viewDimension = WGPUTextureViewDimension_2D
             }
+        }, {
+            .binding = 4,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_WriteOnly,
+                .format = WGPUTextureFormat_RGBA16Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }, {
+            .binding = 5,
+            .buffer = { .type = WGPUBufferBindingType_Uniform, .minBindingSize = 16 }
         }
     };
+
+    uint32_t i;
+    for (i = 0; i < 6; i ++) {
+        entries[i].visibility = WGPUShaderStage_Fragment;
+    }
+
     WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = entries };
     r->setup_mip_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
 
-    WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
-        .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &r->setup_mip_layout
-    };
-    WGPUPipelineLayout layout =
-        wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
-    wgpuPipelineLayoutRelease(layout);
+    for (i = 0; i < 6; i ++) {
+        entries[i].visibility = WGPUShaderStage_Compute;
+    }
+
+    layout_desc.entryCount = 6;
+    r->setup_mip_compute_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
+}
+
+void box_effect_mip_release(
+    box_renderer_t *r)
+{
+    uint32_t i;
+    for (i = 0; i < 4; i ++) {
+        if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
+        if (r->setup_mip_compute[i]) wgpuComputePipelineRelease(r->setup_mip_compute[i]);
+        r->setup_mip_pipeline[i] = NULL;
+        r->setup_mip_compute[i] = NULL;
+    }
+
+    r->setup_mip_shader = BOX_SHADER_NONE;
 }
 
 void box_effect_mip_fini(
     box_renderer_t *r)
 {
-    if (r->setup_mip_pipeline[0]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[0]);
-    if (r->setup_mip_pipeline[1]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[1]);
-    if (r->setup_mip_pipeline[2]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[2]);
-    if (r->setup_mip_pipeline[3]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[3]);
+    box_effect_mip_release(r);
     if (r->setup_mip_layout) wgpuBindGroupLayoutRelease(r->setup_mip_layout);
-    r->setup_mip_pipeline[0] = NULL;
-    r->setup_mip_pipeline[1] = NULL;
-    r->setup_mip_pipeline[2] = NULL;
+    if (r->setup_mip_compute_layout) wgpuBindGroupLayoutRelease(r->setup_mip_compute_layout);
     r->setup_mip_layout = NULL;
-    r->setup_mip_pipeline[3] = NULL;
-    r->setup_mip_shader = BOX_SHADER_NONE;
+    r->setup_mip_compute_layout = NULL;
 }
 
 /** Build the four pipelines of the setup shader of a pass, unless they already exist.
  *
  * @param r The renderer
  * @param fx The pass whose setup shader and format the pipelines are built from
+ * @param compute Build the compute pipelines instead of the render pipelines
  * @return Whether every pipeline exists
  */
 static bool box_effect_mip_ready(
     box_renderer_t *r,
-    const box_effect_t *fx)
+    const box_effect_t *fx,
+    bool compute)
 {
     bool result = true;
-    if (r->setup_mip_shader == fx->setup_shader && r->setup_mip_pipeline[0]) {
+    if (r->setup_mip_shader != fx->setup_shader) {
+        box_effect_mip_release(r);
+        r->setup_mip_shader = fx->setup_shader;
+    }
+
+    if (compute ? r->setup_mip_compute[0] != NULL : r->setup_mip_pipeline[0] != NULL) {
         goto done;
     }
 
-    for (uint32_t i = 0; i < 4; i ++) {
-        if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
-        r->setup_mip_pipeline[i] = NULL;
-    }
-
-    r->setup_mip_shader = fx->setup_shader;
     WGPUShaderModule module = box_shader_module(r, fx->setup_shader);
     if (!module) {
         result = false;
@@ -148,24 +236,27 @@ static bool box_effect_mip_ready(
 
     WGPUPipelineLayoutDescriptor desc = {
         .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &r->setup_mip_layout
+        .bindGroupLayouts = compute ? &r->setup_mip_compute_layout : &r->setup_mip_layout
     };
     WGPUPipelineLayout layout = wgpuDeviceCreatePipelineLayout(r->device, &desc);
     WGPUTextureFormat format = fx->setup_format == BOX_EFFECT_TEXTURE_RG16 ?
         WGPUTextureFormat_RG16Float : WGPUTextureFormat_RGBA16Float;
-    r->setup_mip_pipeline[0] = box_effect_mip_pipeline(r, module, layout,
-        "fs_first", NULL, format);
-    r->setup_mip_pipeline[1] = box_effect_mip_pipeline(r, module, layout,
-        "fs_down", NULL, format);
-    r->setup_mip_pipeline[2] = box_effect_mip_pipeline(r, module, layout,
-        "fs_up", &box_effect_mip_mix, format);
-    r->setup_mip_pipeline[3] = box_effect_mip_pipeline(r, module, layout,
-        "fs_history", NULL, format);
+    uint32_t i;
+    for (i = 0; i < 4; i ++) {
+        const char *entry = box_effect_mip_entries[compute][i];
+        if (compute) {
+            r->setup_mip_compute[i] = box_effect_mip_compute_pipeline(r, module, layout, entry);
+        } else {
+            r->setup_mip_pipeline[i] = box_effect_mip_pipeline(r, module, layout, entry,
+                i == 2 ? &box_effect_mip_mix : NULL, format);
+        }
+
+        result = result && (compute ? r->setup_mip_compute[i] != NULL :
+            r->setup_mip_pipeline[i] != NULL);
+    }
+
     wgpuPipelineLayoutRelease(layout);
     wgpuShaderModuleRelease(module);
-
-    result = r->setup_mip_pipeline[0] && r->setup_mip_pipeline[1] &&
-        r->setup_mip_pipeline[2] && r->setup_mip_pipeline[3];
 done:
     return result;
 }
@@ -195,48 +286,131 @@ void box_effect_mip_view_fini(
     uint32_t level;
     for (level = 0; level < BOX_EFFECT_MIP_LEVELS_MAX; level ++) {
         if (v->setup_mip_mips[level]) wgpuTextureViewRelease(v->setup_mip_mips[level]);
+        if (v->setup_mip_sum_mips[level]) wgpuTextureViewRelease(v->setup_mip_sum_mips[level]);
         if (v->setup_mip_down[level]) wgpuBindGroupRelease(v->setup_mip_down[level]);
         if (v->setup_mip_up[level]) wgpuBindGroupRelease(v->setup_mip_up[level]);
         v->setup_mip_mips[level] = NULL;
+        v->setup_mip_sum_mips[level] = NULL;
         v->setup_mip_down[level] = NULL;
         v->setup_mip_up[level] = NULL;
     }
 
     if (v->setup_mip_view) wgpuTextureViewRelease(v->setup_mip_view);
     if (v->setup_mip) wgpuTextureRelease(v->setup_mip);
+    if (v->setup_mip_sum) wgpuTextureRelease(v->setup_mip_sum);
+    if (v->setup_mip_weights) wgpuBufferRelease(v->setup_mip_weights);
     v->setup_mip_view = NULL;
     v->setup_mip = NULL;
+    v->setup_mip_sum = NULL;
+    v->setup_mip_weights = NULL;
     v->setup_mip_uniform = NULL;
     v->setup_mip_levels = 0;
     v->setup_mip_width = 0;
     v->setup_mip_height = 0;
 }
 
-/** Create a bind group of a pyramid pass.
+/** Create a bind group of a pyramid pass or dispatch.
  *
  * @param r The renderer
  * @param source The image the pass samples
- * @param history The history the pass blends with, NULL binds the source again
+ * @param history The image the pass blends with or adds to, NULL binds the source again
+ * @param target The level a dispatch writes, NULL for a render pass
+ * @param level Level whose blend weight a dispatch reads
  * @return The bind group
  */
 static WGPUBindGroup box_effect_mip_group(
     box_renderer_t *r,
     WGPUTextureView source,
-    WGPUTextureView history)
+    WGPUTextureView history,
+    WGPUTextureView target,
+    uint32_t level)
 {
-    WGPUBindGroupEntry entries[4] = {
+    WGPUBindGroupEntry entries[6] = {
         { .binding = 0, .buffer = r->effect_uniform, .size = sizeof(box_effect_uniform_t) },
         { .binding = 1, .textureView = source },
         { .binding = 2, .sampler = r->effect_sampler },
-        { .binding = 3, .textureView = history ? history : source }
+        { .binding = 3, .textureView = history ? history : source },
+        { .binding = 4, .textureView = target },
+        {
+            .binding = 5,
+            .buffer = r->v->setup_mip_weights,
+            .offset = (uint64_t)level * BOX_EFFECT_MIP_WEIGHT_STRIDE,
+            .size = 16
+        }
     };
     WGPUBindGroupDescriptor desc = {
-        .layout = r->setup_mip_layout,
-        .entryCount = 4,
+        .layout = target ? r->setup_mip_compute_layout : r->setup_mip_layout,
+        .entryCount = target ? 6 : 4,
         .entries = entries
     };
 
     return wgpuDeviceCreateBindGroup(r->device, &desc);
+}
+
+/** Create a view of one level of a pyramid texture.
+ *
+ * @param texture The texture
+ * @param format Format of the texture
+ * @param level The level
+ * @return The view
+ */
+static WGPUTextureView box_effect_mip_level_view(
+    WGPUTexture texture,
+    WGPUTextureFormat format,
+    uint32_t level)
+{
+    WGPUTextureViewDescriptor view_desc = {
+        .format = format,
+        .dimension = WGPUTextureViewDimension_2D,
+        .baseMipLevel = level,
+        .mipLevelCount = 1,
+        .arrayLayerCount = 1,
+        .aspect = WGPUTextureAspect_All
+    };
+
+    return wgpuTextureCreateView(texture, &view_desc);
+}
+
+/** Create the chain the upsample dispatches write, the weight buffer and the dispatch groups.
+ *
+ * @param r The renderer
+ */
+static void box_effect_mip_compute_resize(
+    box_renderer_t *r)
+{
+    box_gpu_view_t *v = r->v;
+    uint32_t levels = v->setup_mip_levels;
+    WGPUBufferDescriptor weights_desc = {
+        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+        .size = (uint64_t)levels * BOX_EFFECT_MIP_WEIGHT_STRIDE
+    };
+    v->setup_mip_weights = wgpuDeviceCreateBuffer(r->device, &weights_desc);
+    if (levels > 1) {
+        WGPUTextureDescriptor desc = {
+            .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_TextureBinding,
+            .dimension = WGPUTextureDimension_2D,
+            .size = { v->setup_mip_width, v->setup_mip_height, 1 },
+            .format = v->setup_mip_format,
+            .mipLevelCount = levels - 1,
+            .sampleCount = 1
+        };
+        v->setup_mip_sum = wgpuDeviceCreateTexture(r->device, &desc);
+    }
+
+    uint32_t level;
+    for (level = 0; level + 1 < levels; level ++) {
+        v->setup_mip_sum_mips[level] =
+            box_effect_mip_level_view(v->setup_mip_sum, v->setup_mip_format, level);
+    }
+
+    for (level = 1; level < levels; level ++) {
+        v->setup_mip_down[level] = box_effect_mip_group(r, v->setup_mip_mips[level - 1], NULL,
+            v->setup_mip_mips[level], 0);
+        WGPUTextureView coarser = level + 1 == levels ?
+            v->setup_mip_mips[level] : v->setup_mip_sum_mips[level];
+        v->setup_mip_up[level - 1] = box_effect_mip_group(r, coarser,
+            v->setup_mip_mips[level - 1], v->setup_mip_sum_mips[level - 1], level);
+    }
 }
 
 /** Recreate the pyramid of the current view, its level views and its bind groups.
@@ -255,6 +429,7 @@ static void box_effect_mip_resize(
     WGPUTextureFormat format)
 {
     box_effect_mip_view_fini(r->v);
+    bool compute = box_effect_mip_storage(format);
     r->v->setup_mip_width = width;
     r->v->setup_mip_height = height;
     r->v->setup_mip_levels = levels;
@@ -262,7 +437,8 @@ static void box_effect_mip_resize(
     r->v->setup_mip_uniform = r->effect_uniform;
 
     WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .usage = WGPUTextureUsage_TextureBinding |
+            (compute ? WGPUTextureUsage_StorageBinding : WGPUTextureUsage_RenderAttachment),
         .dimension = WGPUTextureDimension_2D,
         .size = { r->v->setup_mip_width, r->v->setup_mip_height, 1 },
         .format = format,
@@ -273,32 +449,22 @@ static void box_effect_mip_resize(
 
     uint32_t level;
     for (level = 0; level < levels; level ++) {
-        WGPUTextureViewDescriptor view_desc = {
-            .format = format,
-            .dimension = WGPUTextureViewDimension_2D,
-            .baseMipLevel = level,
-            .mipLevelCount = 1,
-            .arrayLayerCount = 1,
-            .aspect = WGPUTextureAspect_All
-        };
-        r->v->setup_mip_mips[level] = wgpuTextureCreateView(r->v->setup_mip, &view_desc);
+        r->v->setup_mip_mips[level] = box_effect_mip_level_view(r->v->setup_mip, format, level);
     }
 
-    r->v->setup_mip_view = wgpuTextureCreateView(r->v->setup_mip, &(WGPUTextureViewDescriptor){
-        .format = format,
-        .dimension = WGPUTextureViewDimension_2D,
-        .baseMipLevel = 0,
-        .mipLevelCount = 1,
-        .arrayLayerCount = 1,
-        .aspect = WGPUTextureAspect_All
-    });
-
-    for (level = 1; level < levels; level ++) {
-        r->v->setup_mip_down[level] =
-            box_effect_mip_group(r, r->v->setup_mip_mips[level - 1], NULL);
-        r->v->setup_mip_up[level - 1] =
-            box_effect_mip_group(r, r->v->setup_mip_mips[level], NULL);
+    if (compute) {
+        box_effect_mip_compute_resize(r);
+    } else {
+        for (level = 1; level < levels; level ++) {
+            r->v->setup_mip_down[level] =
+                box_effect_mip_group(r, r->v->setup_mip_mips[level - 1], NULL, NULL, 0);
+            r->v->setup_mip_up[level - 1] =
+                box_effect_mip_group(r, r->v->setup_mip_mips[level], NULL, NULL, 0);
+        }
     }
+
+    WGPUTexture result = r->v->setup_mip_sum ? r->v->setup_mip_sum : r->v->setup_mip;
+    r->v->setup_mip_view = box_effect_mip_level_view(result, format, 0);
 }
 
 /** Record one fullscreen pass of the pyramid.
@@ -343,24 +509,141 @@ static void box_effect_mip_pass(
     wgpuRenderPassEncoderRelease(pass);
 }
 
-/** Blend the finest level with the history and write it to the other history texture.
+/** Record the render passes of a pyramid in a format that cannot be a storage texture.
  *
  * @param r The renderer
  * @param encoder The command encoder
+ * @param first The bind group of the pass that reads the source image
+ * @param blend The bind group of the history blend, NULL for none
+ * @param history The history texture the blend writes
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param weight Weight of the chain
+ * @param curve Low frequency boost, its curvature and the high pass frequency, NULL for none
+ */
+static void box_effect_mip_passes(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUBindGroup first,
+    WGPUBindGroup blend,
+    WGPUTextureView history,
+    uint32_t slot,
+    float weight,
+    const float *curve)
+{
+    uint32_t levels = r->v->setup_mip_levels;
+    box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[0], first, r->v->setup_mip_mips[0],
+        slot, false, 0);
+    for (uint32_t level = 1; level < levels; level ++) {
+        box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[1], r->v->setup_mip_down[level],
+            r->v->setup_mip_mips[level], slot, false, 0);
+    }
+
+    for (uint32_t level = levels - 1; level > 0; level --) {
+        box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[2], r->v->setup_mip_up[level - 1],
+            r->v->setup_mip_mips[level - 1], slot, true,
+            box_effect_mip_blend(weight, curve, level, levels));
+    }
+
+    if (blend) {
+        box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[3], blend, history, slot,
+            false, 0);
+    }
+}
+
+/** Record the dispatch of the compute pass of a pyramid that fills one level.
+ *
+ * @param r The renderer
+ * @param pass The compute pass
+ * @param pipeline The pipeline of the dispatch
+ * @param group The bind group of the dispatch
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param level The level whose size the dispatch covers
+ */
+static void box_effect_mip_dispatch(
+    box_renderer_t *r,
+    WGPUComputePassEncoder pass,
+    WGPUComputePipeline pipeline,
+    WGPUBindGroup group,
+    uint32_t slot,
+    uint32_t level)
+{
+    uint32_t width = box_effect_mip_extent(r->v->setup_mip_width, level);
+    uint32_t height = box_effect_mip_extent(r->v->setup_mip_height, level);
+    uint32_t offset = slot * BOX_EFFECT_UNIFORM_STRIDE;
+    wgpuComputePassEncoderSetPipeline(pass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, (width + BOX_MIP_GROUP - 1) / BOX_MIP_GROUP,
+        (height + BOX_MIP_GROUP - 1) / BOX_MIP_GROUP, 1);
+}
+
+/** Record the compute pass of a pyramid in a storage format, a dispatch per level.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ * @param first The bind group of the dispatch that reads the source image
+ * @param blend The bind group of the history blend, NULL for none
+ * @param slot Index of the pass in the packet, which is its uniform slot
+ * @param weight Weight of the chain
+ * @param curve Low frequency boost, its curvature and the high pass frequency, NULL for none
+ */
+static void box_effect_mip_dispatches(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder,
+    WGPUBindGroup first,
+    WGPUBindGroup blend,
+    uint32_t slot,
+    float weight,
+    const float *curve)
+{
+    uint32_t levels = r->v->setup_mip_levels;
+    float weights[BOX_EFFECT_MIP_LEVELS_MAX][BOX_EFFECT_MIP_WEIGHT_STRIDE / sizeof(float)] = {0};
+    for (uint32_t level = 1; level < levels; level ++) {
+        weights[level][0] = box_effect_mip_blend(weight, curve, level, levels);
+    }
+
+    wgpuQueueWriteBuffer(r->gpu_queue, r->v->setup_mip_weights, 0, weights,
+        (size_t)levels * BOX_EFFECT_MIP_WEIGHT_STRIDE);
+
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "setup_mip");
+    box_effect_mip_dispatch(r, pass, r->setup_mip_compute[0], first, slot, 0);
+    for (uint32_t level = 1; level < levels; level ++) {
+        box_effect_mip_dispatch(r, pass, r->setup_mip_compute[1], r->v->setup_mip_down[level],
+            slot, level);
+    }
+
+    for (uint32_t level = levels - 1; level > 0; level --) {
+        box_effect_mip_dispatch(r, pass, r->setup_mip_compute[2], r->v->setup_mip_up[level - 1],
+            slot, level - 1);
+    }
+
+    if (blend) {
+        box_effect_mip_dispatch(r, pass, r->setup_mip_compute[3], blend, slot, 0);
+    }
+
+    wgpuComputePassEncoderEnd(pass);
+    wgpuComputePassEncoderRelease(pass);
+}
+
+/** Pick the history texture this frame writes, creating both on first use.
+ *
+ * @param r The renderer
  * @param slot Index of the pass in the packet, which is its uniform slot
  * @param frame Frame number, the history only counts when it holds the previous frame
- * @return The view of the history texture this frame wrote
+ * @param out_previous Receives the image the blend reads as the previous frame
+ * @return The view of the history texture this frame writes
  */
 static WGPUTextureView box_effect_mip_history(
     box_renderer_t *r,
-    WGPUCommandEncoder encoder,
     uint32_t slot,
-    uint32_t frame)
+    uint32_t frame,
+    WGPUTextureView *out_previous)
 {
     box_gpu_view_t *v = r->v;
     if (!v->setup_mip_history[0]) {
         WGPUTextureDescriptor desc = {
-            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+            .usage = WGPUTextureUsage_TextureBinding |
+                (box_effect_mip_storage(v->setup_mip_format) ?
+                    WGPUTextureUsage_StorageBinding : WGPUTextureUsage_RenderAttachment),
             .dimension = WGPUTextureDimension_2D,
             .size = { v->setup_mip_width, v->setup_mip_height, 1 },
             .format = v->setup_mip_format,
@@ -376,11 +659,8 @@ static WGPUTextureView box_effect_mip_history(
     bool valid = v->setup_mip_history_valid && v->setup_mip_history_slot == slot &&
         v->setup_mip_history_frame + 1 == frame;
     uint32_t next = 1 - v->setup_mip_history_index;
-    WGPUBindGroup group = box_effect_mip_group(r, v->setup_mip_mips[0],
-        valid ? v->setup_mip_history_view[v->setup_mip_history_index] : v->setup_mip_mips[0]);
-    box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[3], group,
-        v->setup_mip_history_view[next], slot, false, 0);
-    wgpuBindGroupRelease(group);
+    *out_previous = valid ? v->setup_mip_history_view[v->setup_mip_history_index] :
+        v->setup_mip_view;
     v->setup_mip_history_index = next;
     v->setup_mip_history_frame = frame;
     v->setup_mip_history_slot = slot;
@@ -398,7 +678,10 @@ WGPUTextureView box_effect_mip_run(
     WGPUCommandEncoder encoder)
 {
     WGPUTextureView result = NULL;
-    if (!src || !box_effect_mip_ready(r, fx)) {
+    WGPUTextureFormat format = fx->setup_format == BOX_EFFECT_TEXTURE_RG16 ?
+        WGPUTextureFormat_RG16Float : WGPUTextureFormat_RGBA16Float;
+    bool compute = box_effect_mip_storage(format);
+    if (!src || !box_effect_mip_ready(r, fx, compute)) {
         goto done;
     }
 
@@ -424,8 +707,6 @@ WGPUTextureView box_effect_mip_run(
     box_effect_mip_size(src->width, src->height, max_dimension, full_size,
         &width, &height);
     uint32_t levels = box_effect_mip_count(width, height);
-    WGPUTextureFormat format = fx->setup_format == BOX_EFFECT_TEXTURE_RG16 ?
-        WGPUTextureFormat_RG16Float : WGPUTextureFormat_RGBA16Float;
     if (r->v->setup_mip_levels != levels || r->v->setup_mip_width != width ||
         r->v->setup_mip_height != height || r->v->setup_mip_format != format ||
         r->v->setup_mip_uniform != r->effect_uniform)
@@ -437,30 +718,33 @@ WGPUTextureView box_effect_mip_run(
     wgpuQueueWriteBuffer(r->gpu_queue, r->effect_uniform,
         (uint64_t)slot * BOX_EFFECT_UNIFORM_STRIDE + 12 * sizeof(float),
         first_step, sizeof(first_step));
-    WGPUBindGroup first = box_effect_mip_group(r, src->view, NULL);
-    box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[0], first, r->v->setup_mip_mips[0],
-        slot, false, 0);
-    for (uint32_t level = 1; level < levels; level ++) {
-        box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[1], r->v->setup_mip_down[level],
-            r->v->setup_mip_mips[level], slot, false, 0);
-    }
 
-    for (uint32_t level = levels - 1; level > 0; level --) {
-        box_effect_mip_pass(r, encoder, r->setup_mip_pipeline[2], r->v->setup_mip_up[level - 1],
-            r->v->setup_mip_mips[level - 1], slot, true,
-            box_effect_mip_blend(weight, curve, level, levels));
-    }
-
-    wgpuBindGroupRelease(first);
+    WGPUTextureView history = NULL;
+    WGPUTextureView previous = NULL;
     if (history_param >= 0 && history_param < BOX_EFFECT_PARAM_MAX &&
         fx->params[history_param] > 0)
     {
-        result = box_effect_mip_history(r, encoder, slot, frame);
+        history = box_effect_mip_history(r, slot, frame, &previous);
     } else {
         box_effect_mip_history_fini(r->v);
-        result = r->v->setup_mip_view;
     }
 
+    WGPUBindGroup first = box_effect_mip_group(r, src->view, NULL,
+        compute ? r->v->setup_mip_mips[0] : NULL, 0);
+    WGPUBindGroup blend = history ? box_effect_mip_group(r, r->v->setup_mip_view, previous,
+        compute ? history : NULL, 0) : NULL;
+    if (compute) {
+        box_effect_mip_dispatches(r, encoder, first, blend, slot, weight, curve);
+    } else {
+        box_effect_mip_passes(r, encoder, first, blend, history, slot, weight, curve);
+    }
+
+    wgpuBindGroupRelease(first);
+    if (blend) {
+        wgpuBindGroupRelease(blend);
+    }
+
+    result = history ? history : r->v->setup_mip_view;
 done:
     return result;
 }

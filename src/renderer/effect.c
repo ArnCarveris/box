@@ -345,12 +345,7 @@ void box_effect_invalidate(
     }
 
     if (r->setup_mip_shader == handle) {
-        for (uint32_t i = 0; i < 4; i ++) {
-            if (r->setup_mip_pipeline[i]) wgpuRenderPipelineRelease(r->setup_mip_pipeline[i]);
-            r->setup_mip_pipeline[i] = NULL;
-        }
-
-        r->setup_mip_shader = BOX_SHADER_NONE;
+        box_effect_mip_release(r);
     }
 
     if (r->setup_temporal_shader == handle) {

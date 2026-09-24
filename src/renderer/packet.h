@@ -63,6 +63,9 @@
 /** Edge of the square of texels one workgroup of a pyramid level fills */
 #define BOX_HIZ_LEVEL_GROUP (8)
 
+/** Edge of the square of texels one workgroup of a bloom or glass blur level fills */
+#define BOX_MIP_GROUP (8)
+
 /** Probes one workgroup of the bake passes fills */
 #define BOX_BAKE_GROUP (64)
 
@@ -80,6 +83,9 @@
 
 /** Screen heights a translucent surface bends the background sample it reads by */
 #define BOX_GLASS_REFRACT (0.03)
+
+/** Weight an upsample of the glass blur gives the tent of the level below it */
+#define BOX_BLUR_MIX_WEIGHT (0.5)
 
 /** Width of the transmittance table, one column per distance through the medium */
 #define BOX_SKY_TRANS_W (256)

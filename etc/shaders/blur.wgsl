@@ -20,10 +20,9 @@ fn tap(uv: vec2<f32>) -> vec4<f32> {
   return textureSampleLevel(src, samp, uv, 0.0);
 }
 
-@fragment fn fs_down(in: Out) -> @location(0) vec4<f32> {
+fn down(uv: vec2<f32>) -> vec4<f32> {
   let ps = 1.0 / vec2<f32>(textureDimensions(src, 0));
   let pl = 2.0 * ps;
-  let uv = in.uv;
   let a = tap(uv + vec2(-pl.x, pl.y));
   let b = tap(uv + vec2(0.0, pl.y));
   let c = tap(uv + pl);
@@ -43,19 +42,54 @@ fn tap(uv: vec2<f32>) -> vec4<f32> {
   return sum;
 }
 
-@fragment fn fs_up(in: Out) -> @location(0) vec4<f32> {
+fn up(uv: vec2<f32>) -> vec4<f32> {
   let o = 0.5 / vec2<f32>(textureDimensions(src, 0));
-  var sum = tap(in.uv + vec2(-o.x * 2.0, 0.0));
-  sum = sum + tap(in.uv + vec2(-o.x, o.y)) * 2.0;
-  sum = sum + tap(in.uv + vec2(0.0, o.y * 2.0));
-  sum = sum + tap(in.uv + vec2(o.x, o.y)) * 2.0;
-  sum = sum + tap(in.uv + vec2(o.x * 2.0, 0.0));
-  sum = sum + tap(in.uv + vec2(o.x, -o.y)) * 2.0;
-  sum = sum + tap(in.uv + vec2(0.0, -o.y * 2.0));
-  sum = sum + tap(in.uv + vec2(-o.x, -o.y)) * 2.0;
+  var sum = tap(uv + vec2(-o.x * 2.0, 0.0));
+  sum = sum + tap(uv + vec2(-o.x, o.y)) * 2.0;
+  sum = sum + tap(uv + vec2(0.0, o.y * 2.0));
+  sum = sum + tap(uv + vec2(o.x, o.y)) * 2.0;
+  sum = sum + tap(uv + vec2(o.x * 2.0, 0.0));
+  sum = sum + tap(uv + vec2(o.x, -o.y)) * 2.0;
+  sum = sum + tap(uv + vec2(0.0, -o.y * 2.0));
+  sum = sum + tap(uv + vec2(-o.x, -o.y)) * 2.0;
   return sum / 12.0;
+}
+
+@fragment fn fs_down(in: Out) -> @location(0) vec4<f32> {
+  return down(in.uv);
+}
+
+@fragment fn fs_up(in: Out) -> @location(0) vec4<f32> {
+  return up(in.uv);
 }
 
 @fragment fn fs_blit(in: Out) -> @location(0) vec4<f32> {
   return tap(in.uv);
+}
+
+@group(0) @binding(2) var base: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+
+fn level_uv(id: vec2<u32>) -> vec2<f32> {
+  return (vec2<f32>(id) + vec2(0.5)) / vec2<f32>(textureDimensions(dst));
+}
+
+@compute @workgroup_size(MIP_GROUP, MIP_GROUP)
+fn cs_down(@builtin(global_invocation_id) id: vec3<u32>) {
+  let size = textureDimensions(dst);
+  if (id.x >= size.x || id.y >= size.y) {
+    return;
+  }
+  textureStore(dst, vec2<i32>(id.xy), down(level_uv(id.xy)));
+}
+
+@compute @workgroup_size(MIP_GROUP, MIP_GROUP)
+fn cs_up(@builtin(global_invocation_id) id: vec3<u32>) {
+  let size = textureDimensions(dst);
+  if (id.x >= size.x || id.y >= size.y) {
+    return;
+  }
+  let tent = up(level_uv(id.xy));
+  let under = textureLoad(base, vec2<i32>(id.xy), 0);
+  textureStore(dst, vec2<i32>(id.xy), vec4(mix(under.rgb, tent.rgb, BLUR_MIX_WEIGHT), tent.a));
 }

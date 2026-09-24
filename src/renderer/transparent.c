@@ -5,6 +5,10 @@
  * The copy is blurred by a pyramid: a thirteen tap downsample down the levels
  * and an eight tap tent upsample mixed back up them, which translucent draws
  * read at the level their roughness asks for.
+ *
+ * A float copy is blurred by one compute pass, a dispatch per level, whose downsample
+ * writes a scratch chain the upsample mixes from since a dispatch cannot read what it
+ * stores. A copy in the swap chain format takes a render pass per level.
  */
 
 #include "renderer_internal.h"
@@ -55,9 +59,6 @@ static const WGPUBlendState box_blur_mix = {
     .alpha = { WGPUBlendOperation_Add, WGPUBlendFactor_One, WGPUBlendFactor_Zero }
 };
 
-/** Weight an upsample pass gives the tent of the level below it */
-#define BOX_BLUR_MIX_WEIGHT (0.5)
-
 void box_transparent_view_fini(
     box_gpu_view_t *v)
 {
@@ -71,34 +72,105 @@ void box_transparent_view_fini(
         v->scene_up[mip] = NULL;
     }
 
+    for (mip = 0; mip < BOX_BLUR_LEVELS_MAX; mip ++) {
+        if (v->scene_scratch_mips[mip]) wgpuTextureViewRelease(v->scene_scratch_mips[mip]);
+        v->scene_scratch_mips[mip] = NULL;
+    }
+
+    if (v->scene_scratch) wgpuTextureRelease(v->scene_scratch);
     if (v->scene_view) wgpuTextureViewRelease(v->scene_view);
     if (v->scene) wgpuTextureRelease(v->scene);
+    v->scene_scratch = NULL;
     v->scene_view = NULL;
     v->scene = NULL;
     v->scene_mips_count = 0;
 }
 
-/** Create the bind group a blur pass reads one level of the chain through.
+/** Create the bind group a blur pass or dispatch reads one level of the chain through.
  *
  * @param r The renderer
  * @param source The level the pass samples
+ * @param base The level a dispatch mixes into what it writes, NULL for a render pass
+ * @param target The level a dispatch writes, NULL for a render pass
  * @return The bind group
  */
 static WGPUBindGroup box_transparent_level_group(
     box_renderer_t *r,
-    uint32_t source)
+    WGPUTextureView source,
+    WGPUTextureView base,
+    WGPUTextureView target)
 {
-    WGPUBindGroupEntry entries[2] = {
-        { .binding = 0, .textureView = r->v->scene_mips[source] },
-        { .binding = 1, .sampler = r->scene_sampler }
+    WGPUBindGroupEntry entries[4] = {
+        { .binding = 0, .textureView = source },
+        { .binding = 1, .sampler = r->scene_sampler },
+        { .binding = 2, .textureView = base },
+        { .binding = 3, .textureView = target }
     };
     WGPUBindGroupDescriptor desc = {
-        .layout = r->blur_layout,
-        .entryCount = 2,
+        .layout = target ? r->blur_compute_layout : r->blur_layout,
+        .entryCount = target ? 4 : 2,
         .entries = entries
     };
 
     return wgpuDeviceCreateBindGroup(r->device, &desc);
+}
+
+/** Create the views of the scratch chain the downsample of a float copy writes.
+ *
+ * Its level k holds the downsample of level k + 1 of the copy, for every level
+ * but the coarsest, which the downsample writes to the copy itself.
+ *
+ * @param r The renderer
+ * @param format Format of the copy
+ */
+static void box_transparent_scratch(
+    box_renderer_t *r,
+    WGPUTextureFormat format)
+{
+    uint32_t levels = r->v->scene_mips_count - 2;
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { box_blur_extent(r->v->width, 1), box_blur_extent(r->v->height, 1), 1 },
+        .format = format,
+        .mipLevelCount = levels,
+        .sampleCount = 1
+    };
+    r->v->scene_scratch = wgpuDeviceCreateTexture(r->device, &desc);
+
+    uint32_t mip;
+    for (mip = 0; mip < levels; mip ++) {
+        WGPUTextureViewDescriptor mip_desc = {
+            .format = format,
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = mip,
+            .mipLevelCount = 1,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_All
+        };
+        r->v->scene_scratch_mips[mip] = wgpuTextureCreateView(r->v->scene_scratch, &mip_desc);
+    }
+}
+
+/** Create the bind groups of the dispatches that blur a float copy.
+ *
+ * @param r The renderer
+ */
+static void box_transparent_compute_groups(
+    box_renderer_t *r)
+{
+    box_gpu_view_t *v = r->v;
+    uint32_t last = v->scene_mips_count - 1;
+    uint32_t mip;
+    for (mip = 1; mip <= last; mip ++) {
+        WGPUTextureView source = mip == 1 ? v->scene_mips[0] : v->scene_scratch_mips[mip - 2];
+        WGPUTextureView target = mip == last ? v->scene_mips[mip] : v->scene_scratch_mips[mip - 1];
+        v->scene_down[mip] = box_transparent_level_group(r, source, source, target);
+        if (mip < last) {
+            v->scene_up[mip] = box_transparent_level_group(r, v->scene_mips[mip + 1],
+                v->scene_scratch_mips[mip - 1], v->scene_mips[mip]);
+        }
+    }
 }
 
 void box_transparent_resize(
@@ -108,10 +180,11 @@ void box_transparent_resize(
     box_transparent_view_fini(r->v);
     r->v->scene_mips_count = box_blur_levels(r->v->width, r->v->height);
     r->v->scene_format = format;
+    bool compute = format == BOX_EFFECT_HDR_FORMAT;
 
     WGPUTextureDescriptor desc = {
-        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
-            WGPUTextureUsage_CopyDst,
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst |
+            (compute ? WGPUTextureUsage_StorageBinding : WGPUTextureUsage_RenderAttachment),
         .dimension = WGPUTextureDimension_2D,
         .size = { r->v->width, r->v->height, 1 },
         .format = format,
@@ -142,24 +215,33 @@ void box_transparent_resize(
         r->v->scene_mips[mip] = wgpuTextureCreateView(r->v->scene, &mip_desc);
     }
 
-    for (mip = 1; r->blur_layout && mip < r->v->scene_mips_count; mip ++) {
-        r->v->scene_down[mip] = box_transparent_level_group(r, mip - 1);
+    if (compute && r->v->scene_mips_count > 2) {
+        box_transparent_scratch(r, format);
+    }
+
+    if (compute && r->blur_compute_layout) {
+        box_transparent_compute_groups(r);
+    }
+
+    for (mip = 1; !compute && r->blur_layout && mip < r->v->scene_mips_count; mip ++) {
+        r->v->scene_down[mip] = box_transparent_level_group(r, r->v->scene_mips[mip - 1],
+            NULL, NULL);
         if (mip + 1 < r->v->scene_mips_count) {
-            r->v->scene_up[mip] = box_transparent_level_group(r, mip + 1);
+            r->v->scene_up[mip] = box_transparent_level_group(r, r->v->scene_mips[mip + 1],
+                NULL, NULL);
         }
     }
 
     r->v->env_dirty = true;
 }
 
-/** Create one full screen pipeline of the blur chain.
+/** Create one full screen pipeline of the blur chain of a copy in the swap chain format.
  *
  * @param r The renderer
  * @param module The module holding both blur entry points
  * @param layout The pipeline layout
  * @param entry Name of the fragment entry point
  * @param blend Blend state of the pass, NULL when the pass replaces its target
- * @param hdr The chain of the view holds linear light in a float copy
  * @return The pipeline
  */
 static WGPURenderPipeline box_transparent_blur_pipeline(
@@ -167,11 +249,10 @@ static WGPURenderPipeline box_transparent_blur_pipeline(
     WGPUShaderModule module,
     WGPUPipelineLayout layout,
     const char *entry,
-    const WGPUBlendState *blend,
-    bool hdr)
+    const WGPUBlendState *blend)
 {
     WGPUColorTargetState target = {
-        .format = hdr ? BOX_EFFECT_HDR_FORMAT : r->format,
+        .format = r->format,
         .blend = blend,
         .writeMask = WGPUColorWriteMask_All
     };
@@ -197,6 +278,84 @@ static WGPURenderPipeline box_transparent_blur_pipeline(
     };
 
     return wgpuDeviceCreateRenderPipeline(r->device, &desc);
+}
+
+/** Create one dispatch pipeline of the blur chain of a float copy.
+ *
+ * @param r The renderer
+ * @param module The module holding both blur entry points
+ * @param layout The pipeline layout
+ * @param entry Name of the compute entry point
+ * @return The pipeline
+ */
+static WGPUComputePipeline box_transparent_blur_compute(
+    box_renderer_t *r,
+    WGPUShaderModule module,
+    WGPUPipelineLayout layout,
+    const char *entry)
+{
+    WGPUComputePipelineDescriptor desc = {
+        .label = BOX_GPU_LABEL("glass blur"),
+        .layout = layout,
+        .compute = {
+            .module = module,
+            .entryPoint = { .data = entry, .length = WGPU_STRLEN }
+        }
+    };
+
+    return wgpuDeviceCreateComputePipeline(r->device, &desc);
+}
+
+/** Create the layout and the pipelines of the dispatches that blur a float copy.
+ *
+ * @param r The renderer
+ * @param module The module holding the blur entry points
+ */
+static void box_transparent_compute_init(
+    box_renderer_t *r,
+    WGPUShaderModule module)
+{
+    WGPUBindGroupLayoutEntry entries[4] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }, {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Compute,
+            .sampler = { .type = WGPUSamplerBindingType_Filtering }
+        }, {
+            .binding = 2,
+            .visibility = WGPUShaderStage_Compute,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Float,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }, {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Compute,
+            .storageTexture = {
+                .access = WGPUStorageTextureAccess_WriteOnly,
+                .format = BOX_EFFECT_HDR_FORMAT,
+                .viewDimension = WGPUTextureViewDimension_2D
+            }
+        }
+    };
+    WGPUBindGroupLayoutDescriptor layout_desc = { .entryCount = 4, .entries = entries };
+    r->blur_compute_layout = wgpuDeviceCreateBindGroupLayout(r->device, &layout_desc);
+
+    WGPUPipelineLayoutDescriptor pipeline_layout_desc = {
+        .bindGroupLayoutCount = 1,
+        .bindGroupLayouts = &r->blur_compute_layout
+    };
+    WGPUPipelineLayout pipeline_layout =
+        wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
+    r->blur_compute_down = box_transparent_blur_compute(r, module, pipeline_layout, "cs_down");
+    r->blur_compute_up = box_transparent_blur_compute(r, module, pipeline_layout, "cs_up");
+    wgpuPipelineLayoutRelease(pipeline_layout);
 }
 
 void box_transparent_init(
@@ -240,15 +399,11 @@ void box_transparent_init(
     WGPUPipelineLayout pipeline_layout =
         wgpuDeviceCreatePipelineLayout(r->device, &pipeline_layout_desc);
 
-    uint32_t slot;
-    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
-        r->blur_down[slot] = box_transparent_blur_pipeline(r, module, pipeline_layout,
-            "fs_down", NULL, slot != 0);
-        r->blur_up[slot] = box_transparent_blur_pipeline(r, module, pipeline_layout,
-            "fs_up", &box_blur_mix, slot != 0);
-    }
-
+    r->blur_down = box_transparent_blur_pipeline(r, module, pipeline_layout, "fs_down", NULL);
+    r->blur_up = box_transparent_blur_pipeline(r, module, pipeline_layout, "fs_up",
+        &box_blur_mix);
     wgpuPipelineLayoutRelease(pipeline_layout);
+    box_transparent_compute_init(r, module);
     wgpuShaderModuleRelease(module);
 }
 
@@ -317,6 +472,54 @@ done:
     return;
 }
 
+/** Record the dispatch of the blur chain of a float copy that writes one level.
+ *
+ * @param r The renderer
+ * @param pass The compute pass that blurs the copy
+ * @param pipeline The pipeline of the dispatch
+ * @param group The levels the dispatch reads and writes
+ * @param level Level of the copy the size of the written level matches
+ */
+static void box_transparent_blur_dispatch(
+    box_renderer_t *r,
+    WGPUComputePassEncoder pass,
+    WGPUComputePipeline pipeline,
+    WGPUBindGroup group,
+    uint32_t level)
+{
+    uint32_t width = box_blur_extent(r->v->width, level);
+    uint32_t height = box_blur_extent(r->v->height, level);
+    wgpuComputePassEncoderSetPipeline(pass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(pass, 0, group, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, (width + BOX_MIP_GROUP - 1) / BOX_MIP_GROUP,
+        (height + BOX_MIP_GROUP - 1) / BOX_MIP_GROUP, 1);
+}
+
+/** Blur a float copy in one compute pass, a dispatch per level.
+ *
+ * @param r The renderer
+ * @param encoder The command encoder
+ */
+static void box_transparent_blur_compute_run(
+    box_renderer_t *r,
+    WGPUCommandEncoder encoder)
+{
+    WGPUComputePassEncoder pass = box_timing_compute(r, encoder, "glass");
+    uint32_t level;
+    for (level = 1; level < r->v->scene_mips_count; level ++) {
+        box_transparent_blur_dispatch(r, pass, r->blur_compute_down, r->v->scene_down[level],
+            level);
+    }
+
+    for (level = r->v->scene_mips_count - 1; level > 1; level --) {
+        box_transparent_blur_dispatch(r, pass, r->blur_compute_up, r->v->scene_up[level - 1],
+            level - 1);
+    }
+
+    wgpuComputePassEncoderEnd(pass);
+    wgpuComputePassEncoderRelease(pass);
+}
+
 /** Record one pass of the blur chain over one level of the copy.
  *
  * @param r The renderer
@@ -365,17 +568,27 @@ void box_transparent_prepare(
     WGPUExtent3D extent = { r->v->width, r->v->height, 1 };
     wgpuCommandEncoderCopyTextureToTexture(encoder, &src, &dst, &extent);
 
-    uint32_t slot = r->v->scene_format == BOX_EFFECT_HDR_FORMAT ? 1 : 0;
+    if (r->v->scene_format == BOX_EFFECT_HDR_FORMAT) {
+        if (r->v->scene_mips_count > 1) {
+            box_transparent_blur_compute_run(r, encoder);
+        }
+
+        goto done;
+    }
+
     uint32_t level;
     for (level = 1; level < r->v->scene_mips_count; level ++) {
-        box_transparent_blur_pass(r, encoder, r->blur_down[slot], r->v->scene_down[level],
+        box_transparent_blur_pass(r, encoder, r->blur_down, r->v->scene_down[level],
             level, false);
     }
 
     for (level = r->v->scene_mips_count - 1; level > 1; level --) {
-        box_transparent_blur_pass(r, encoder, r->blur_up[slot], r->v->scene_up[level - 1],
+        box_transparent_blur_pass(r, encoder, r->blur_up, r->v->scene_up[level - 1],
             level - 1, true);
     }
+
+done:
+    return;
 }
 
 /** Pipeline of one blend and back face mode, created the first time it is drawn.
@@ -632,14 +845,16 @@ void box_transparent_fini(
     if (r->sorted) wgpuBufferRelease(r->sorted);
     if (r->scene_sampler) wgpuSamplerRelease(r->scene_sampler);
     if (r->blur_layout) wgpuBindGroupLayoutRelease(r->blur_layout);
-    uint32_t slot;
-    for (slot = 0; slot < BOX_EFFECT_FORMATS; slot ++) {
-        if (r->blur_down[slot]) wgpuRenderPipelineRelease(r->blur_down[slot]);
-        if (r->blur_up[slot]) wgpuRenderPipelineRelease(r->blur_up[slot]);
-        r->blur_down[slot] = NULL;
-        r->blur_up[slot] = NULL;
-    }
-
+    if (r->blur_down) wgpuRenderPipelineRelease(r->blur_down);
+    if (r->blur_up) wgpuRenderPipelineRelease(r->blur_up);
+    if (r->blur_compute_layout) wgpuBindGroupLayoutRelease(r->blur_compute_layout);
+    if (r->blur_compute_down) wgpuComputePipelineRelease(r->blur_compute_down);
+    if (r->blur_compute_up) wgpuComputePipelineRelease(r->blur_compute_up);
+    r->blur_down = NULL;
+    r->blur_up = NULL;
+    r->blur_compute_layout = NULL;
+    r->blur_compute_down = NULL;
+    r->blur_compute_up = NULL;
     r->sorted = NULL;
     r->sorted_capacity = 0;
     r->scene_sampler = NULL;

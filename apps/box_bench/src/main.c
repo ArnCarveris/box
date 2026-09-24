@@ -421,23 +421,7 @@ static void box_bench_init(
     ecs_world_t *world,
     box_bench_t *bench)
 {
-    ECS_IMPORT(world, BoxCore);
-    ECS_IMPORT(world, BoxJob);
-    ECS_IMPORT(world, BoxSurface);
-    ECS_IMPORT(world, BoxInput);
-    ECS_IMPORT(world, BoxRender);
-    ECS_IMPORT(world, BoxView);
-    ECS_IMPORT(world, BoxGeometry);
-    ECS_IMPORT(world, BoxGltf);
-    ECS_IMPORT(world, BoxTexture);
-    ECS_IMPORT(world, BoxMovement);
-    ECS_IMPORT(world, BoxCollision);
-    ECS_IMPORT(world, BoxPicking);
-    ECS_IMPORT(world, BoxSpline);
-    ECS_IMPORT(world, BoxParticle);
-    ECS_IMPORT(world, BoxController);
-    ECS_IMPORT(world, BoxMonitor);
-    ECS_IMPORT(world, BoxScript);
+    ECS_IMPORT(world, Box);
 
     App *app = ecs_singleton_ensure(world, App);
     app->headless = true;
@@ -470,6 +454,14 @@ int main(
 
     ecs_world_t *world = ecs_init();
     box_bench_init(world, &bench);
+    if (!box_script_load(world, BOX_EFFECTS_BUILTINS) ||
+        !box_script_load(world, BOX_MATERIAL_LAYERS_BUILTINS) ||
+        !box_script_load(world, BOX_LIGHT_MODULATORS_BUILTINS))
+    {
+        result = -1;
+        goto fini;
+    }
+
 
     ecs_time_t load_start;
     ecs_os_get_time(&load_start);

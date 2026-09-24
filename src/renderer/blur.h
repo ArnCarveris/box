@@ -39,6 +39,24 @@ static inline uint32_t box_blur_levels(
     return result;
 }
 
+/** Edge of a level of the chain, which halves every level and never drops below one.
+ *
+ * @param size Edge of the finest level in pixels
+ * @param level The level
+ * @return The edge of the level in pixels
+ */
+static inline uint32_t box_blur_extent(
+    uint32_t size,
+    uint32_t level)
+{
+    uint32_t result = size >> level;
+    if (!result) {
+        result = 1;
+    }
+
+    return result;
+}
+
 /** Level of the chain a roughness reads.
  *
  * The level follows the square root of the roughness, so a quarter of roughness
