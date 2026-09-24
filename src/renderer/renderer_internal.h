@@ -22,6 +22,7 @@
 #include "sky.h"
 #include "particle.h"
 #include "queue.h"
+#include "capture.h"
 
 /** Faces of a cubemap */
 #define BOX_ENV_FACES (6)
@@ -394,22 +395,6 @@ typedef struct box_gpu_texpage_t {
     bool used;             /**< The page holds an array texture */
 } box_gpu_texpage_t;
 
-#ifdef BOX_PLATFORM_WEB
-/** Captures that can wait for their buffer map at the same time */
-#define BOX_CAPTURE_PENDING_MAX (2)
-
-/** A capture whose buffer is being mapped by the browser */
-typedef struct box_capture_t {
-    WGPUBuffer buffer;               /**< Mappable copy of the frame target */
-    uint32_t width;                  /**< Image width in pixels */
-    uint32_t height;                 /**< Image height in pixels */
-    uint32_t stride;                 /**< Bytes per row in the buffer */
-    bool bgra;                       /**< Rows need a BGRA to RGBA swap */
-    bool busy;                       /**< Slot holds a capture in flight */
-    char path[BOX_CAPTURE_PATH_MAX]; /**< PNG the callback writes */
-} box_capture_t;
-#endif
-
 /** Intermediate color target the post process passes share */
 typedef struct box_gpu_pool_t {
     WGPUTexture texture; /**< The target, NULL until the entry is first used */
@@ -659,9 +644,9 @@ struct box_renderer_t {
     volatile bool ready;             /**< Device and targets are usable */
     volatile bool failed;            /**< Device creation failed */
     volatile uint32_t frames;        /**< Frames presented */
-#ifdef BOX_PLATFORM_WEB
     box_capture_t captures[BOX_CAPTURE_PENDING_MAX]; /**< Captures waiting for their map */
-#else
+#ifndef BOX_PLATFORM_WEB
+    box_capture_worker_t capture_worker; /**< Encoder of mapped captures */
     pthread_t thread;                /**< Renderer thread when threaded */
     bool thread_started;             /**< Thread was created */
 #endif
@@ -1929,18 +1914,6 @@ WGPUBindGroup box_bake_group(
  */
 void box_bake_fini(
     box_renderer_t *r);
-
-/** Read back a texture and write it as PNG.
- *
- * @param r The renderer
- * @param texture Texture with CopySrc usage
- * @param path Output file
- * @return 0 on success, nonzero on failure
- */
-int box_capture_texture(
-    box_renderer_t *r,
-    WGPUTexture texture,
-    const char *path);
 
 /** Write an RGBA8 image as PNG.
  *

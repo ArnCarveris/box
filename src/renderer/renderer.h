@@ -200,6 +200,13 @@ uint32_t box_renderer_frames(
 uint32_t box_renderer_errors(
     const box_renderer_t *r);
 
+/** Wait until every capture the renderer took is written to its file.
+ *
+ * @param r The renderer
+ */
+void box_renderer_captures_wait(
+    box_renderer_t *r);
+
 #ifdef __cplusplus
 }
 #endif

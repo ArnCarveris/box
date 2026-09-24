@@ -198,6 +198,7 @@ void box_renderer_destroy(
         box_renderer_discard(r, p);
     }
 
+    box_capture_fini(r);
     box_device_fini(r);
     box_count_destroy(r);
     box_queue_fini(&r->queue);

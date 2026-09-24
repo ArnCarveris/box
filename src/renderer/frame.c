@@ -988,5 +988,6 @@ void box_frame_render(
 
     rendered = true;
 done:
+    box_capture_poll(r);
     box_count_end(r, rendered);
 }

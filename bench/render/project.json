@@ -152,6 +152,13 @@
                     "record_1560_glyphs",
                     "changing_panel_next_to_2000_casters"
                 ]
+            },
+            {
+                "id": "Capture",
+                "benchcases": [
+                    "frame_1080p_without_capture",
+                    "frame_1080p_with_capture"
+                ]
             }
         ]
     }
