@@ -171,6 +171,55 @@ void Shadows_texel_snapping_keeps_the_matrix(void)
     test_bool(box_shadow_matrix_equal(before, v->shadow_matrix), false);
 }
 
+void Shadows_snap_step_keeps_the_matrix_while_the_camera_moves(void)
+{
+    // views/shadows
+    ecs_entity_t sun = ecs_new(w);
+    ecs_set(w, sun, Rotation, {0.9f, -0.6f, 0});
+    ecs_set(w, sun, DirectionalLight, {.intensity = 3});
+    ecs_entity_t cam = ecs_new(w);
+    ecs_set(w, cam, Position, {0, 4, -12});
+    ecs_set(w, cam, Camera, {.fov = 60, .near_ = 0.5f, .far_ = 500});
+    ecs_entity_t view = ecs_new(w);
+    ecs_add(w, view, View);
+    ecs_get_mut(w, view, View)->camera = cam;
+    ecs_modified(w, view, View);
+    ecs_set(w, view, ShadowSettings, {.cascades = 1, .resolution = 2048, .max_distance = 200});
+    box_render_extract(w, &packet);
+
+    box_view_t *v = box_vec_at(&packet.views, 0);
+    float before[16];
+    memcpy(before, v->shadow_matrix, sizeof(before));
+    float texel = 2.0f * v->shadow_bounds[3] / 2048.0f;
+
+    float held[16];
+    memcpy(held, before, sizeof(held));
+    int changes = 0;
+    int step;
+    for (step = 1; step <= 20; step ++) {
+        box_packet_reset(&packet);
+        packet.width = 640;
+        packet.height = 480;
+        ecs_set(w, cam, Position, {texel * (float)step, 4, -12});
+        box_render_extract(w, &packet);
+        v = box_vec_at(&packet.views, 0);
+        if (!box_shadow_matrix_equal(held, v->shadow_matrix)) {
+            memcpy(held, v->shadow_matrix, sizeof(held));
+            changes ++;
+        }
+    }
+
+    test_assert(changes <= 1);
+
+    box_packet_reset(&packet);
+    packet.width = 640;
+    packet.height = 480;
+    ecs_set(w, cam, Position, {v->shadow_bounds[3], 4, -12});
+    box_render_extract(w, &packet);
+    v = box_vec_at(&packet.views, 0);
+    test_bool(box_shadow_matrix_equal(before, v->shadow_matrix), false);
+}
+
 void Shadows_casters_exclude_no_shadow(void)
 {
     // views/shadows

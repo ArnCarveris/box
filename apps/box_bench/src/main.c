@@ -40,6 +40,10 @@ typedef struct box_bench_t {
     double occluded;        /**< Instances the depth pyramid of the measured frames hid */
     double rebuilds;        /**< Cached static cascade layers the measured frames rendered */
     int32_t stat_count;     /**< Frames the instance counts were read on */
+    double gpu_ms;          /**< GPU milliseconds of the resolved frames */
+    double gpu_shadow_ms;   /**< GPU milliseconds the shadow passes of the resolved frames took */
+    int32_t gpu_count;      /**< Frames whose GPU times were resolved */
+    uint32_t gpu_frame;     /**< Renderer frame the last GPU times belong to */
 } box_bench_t;
 
 /** Add the instance counts of the last rendered frame to the totals.
@@ -67,6 +71,24 @@ static void box_bench_stats(
             bench->occluded += stats.occluded;
             bench->rebuilds += stats.shadow_rebuilds;
             bench->stat_count ++;
+
+            box_renderer_gpu_t gpu;
+            box_renderer_set_gpu_timings(impl[i].renderer, true);
+            box_renderer_gpu_timings(impl[i].renderer, &gpu);
+            if (!gpu.supported || !gpu.count || gpu.frame == bench->gpu_frame) {
+                continue;
+            }
+
+            uint32_t pass;
+            for (pass = 0; pass < gpu.count; pass ++) {
+                if (!strcmp(gpu.passes[pass].name, "shadow")) {
+                    bench->gpu_shadow_ms += gpu.passes[pass].time_ms;
+                }
+            }
+
+            bench->gpu_ms += gpu.frame_ms;
+            bench->gpu_frame = gpu.frame;
+            bench->gpu_count ++;
         }
     }
 }
@@ -309,12 +331,14 @@ static void box_bench_report(
     double mean = report->mean_ms * 0.001;
     FILE *f = bench->report ? fopen(bench->report, "w") : stdout;
     double scale = bench->stat_count ? 1.0 / bench->stat_count : 0;
+    double gpu_scale = bench->gpu_count ? 1.0 / bench->gpu_count : 0;
     fprintf(f, "{\n  \"scene\": \"%s\",\n  \"entities\": %d,\n  \"static\": %d,\n"
         "  \"dynamic\": %d,\n  \"churn\": [%d, %d],\n  \"lights\": %d,\n"
         "  \"light_churn\": %d,\n  \"frames\": %d,\n"
         "  \"mean_ms\": %.3f,\n  \"p50_ms\": %.3f,\n  \"p99_ms\": %.3f,\n  \"max_ms\": %.3f,\n"
         "  \"fps\": %.1f,\n  \"drawn\": %.0f,\n  \"culled\": %.0f,\n  \"occluded\": %.0f,\n"
-        "  \"shadow_static_rebuilds\": %.0f,\n  \"spike_factor\": %.2f,\n"
+        "  \"shadow_static_rebuilds\": %.0f,\n  \"gpu_ms\": %.3f,\n"
+        "  \"gpu_shadow_ms\": %.3f,\n  \"spike_factor\": %.2f,\n"
         "  \"spike_budget_ms\": %.3f,\n  \"attributed\": %s,\n  \"spike_count\": %d,\n"
         "  \"spikes\": [",
         bench->scene, entity_count, static_count, entity_count - static_count,
@@ -322,7 +346,8 @@ static void box_bench_report(
         bench->light_churn, bench->spikes.count,
         report->mean_ms, report->p50_ms, report->p99_ms, report->max_ms,
         mean > 0 ? 1.0 / mean : 0, bench->drawn * scale, bench->culled * scale,
-        bench->occluded * scale, bench->rebuilds, bench->spike_factor, report->budget_ms,
+        bench->occluded * scale, bench->rebuilds, bench->gpu_ms * gpu_scale,
+        bench->gpu_shadow_ms * gpu_scale, bench->spike_factor, report->budget_ms,
         bench->attribute ? "true" : "false", report->count);
     box_bench_spikes_json(f, world, report);
     fprintf(f, "%s]\n}\n", report->count ? "\n  " : "");
@@ -332,10 +357,11 @@ static void box_bench_report(
 
     printf("entities %d, mean %.3f ms, p99 %.3f ms, max %.3f ms, %.1f fps, "
         "drawn %.0f, culled %.0f, occluded %.0f, shadow rebuilds %.0f, "
-        "budget %.3f ms, spikes %d\n",
+        "gpu %.3f ms, gpu shadow %.3f ms, budget %.3f ms, spikes %d\n",
         entity_count, report->mean_ms, report->p99_ms, report->max_ms, mean > 0 ? 1.0 / mean : 0,
         bench->drawn * scale, bench->culled * scale, bench->occluded * scale,
-        bench->rebuilds, report->budget_ms, report->count);
+        bench->rebuilds, bench->gpu_ms * gpu_scale, bench->gpu_shadow_ms * gpu_scale,
+        report->budget_ms, report->count);
     box_bench_print_spikes(world, report);
 }
 

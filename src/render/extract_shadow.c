@@ -4,12 +4,19 @@
  *
  * A cascade covers a camera frustum slice fitted with its bounding sphere, and its
  * light matrix is snapped to texel increments to avoid shimmer.
+ *
+ * The snap step is a fraction of the sphere, not one texel, and the cascade is
+ * that much wider than the sphere. A camera that moves less than half a step
+ * keeps the matrix, so the cached static layer of the cascade stays valid.
  */
 
 #include "render_internal.h"
 
 /** Up axis of the light space of a sun that points nearly straight down */
 #define BOX_SHADOW_POLE (0.99f)
+
+/** Snap step of the center of a cascade and the margin around its sphere, in radii */
+#define BOX_SHADOW_SNAP (0.125f)
 
 const ShadowSettings* box_render_shadow_settings(
     ecs_world_t *world,
@@ -184,17 +191,23 @@ static void box_shadow_cascade(
     mat4 inv = mat4_inverse(&view);
     vec3 center = mat4_transform_point(&inv, center_view);
 
-    float texel = 2.0f * radius / (float)s->resolution;
-    vec3 local = mat4_transform_point(light, center);
-    local.x = floorf(local.x / texel) * texel;
-    local.y = floorf(local.y / texel) * texel;
-    local.z = floorf(local.z / texel) * texel;
+    float extent = radius * (1.0f + BOX_SHADOW_SNAP);
+    float texel = 2.0f * extent / (float)s->resolution;
+    float step = roundf(radius * BOX_SHADOW_SNAP / texel) * texel;
+    if (step < texel) {
+        step = texel;
+    }
 
-    float back = radius * (1.0f + BOX_SHADOW_EXTRUDE);
-    float range = back + radius;
+    vec3 local = mat4_transform_point(light, center);
+    local.x = roundf(local.x / step) * step;
+    local.y = roundf(local.y / step) * step;
+    local.z = roundf(local.z / step) * step;
+
+    float back = extent * (1.0f + BOX_SHADOW_EXTRUDE);
+    float range = back + extent;
     mat4 offset = mat4_translation(vec3_new(-local.x, -local.y, -(local.z - back)));
     mat4 light_view = mat4_mul(&offset, light);
-    mat4 proj = mat4_orthographic(2.0f * radius, 1.0f, 0.0f, range);
+    mat4 proj = mat4_orthographic(2.0f * extent, 1.0f, 0.0f, range);
     mat4 m = mat4_mul(&proj, &light_view);
     memcpy(v->shadow_matrix + index * 16, m.v, sizeof(m.v));
 
@@ -203,7 +216,7 @@ static void box_shadow_cascade(
     v->shadow_bounds[index * 4 + 0] = snapped.x;
     v->shadow_bounds[index * 4 + 1] = snapped.y;
     v->shadow_bounds[index * 4 + 2] = snapped.z;
-    v->shadow_bounds[index * 4 + 3] = radius;
+    v->shadow_bounds[index * 4 + 3] = extent;
     v->shadow_split[index] = far_;
     v->shadow_offset[index] = s->normal_offset * texel;
     v->shadow_bias[index] = s->depth_bias * texel / range;

@@ -91,6 +91,7 @@
                     "cascades_cover_the_camera_range",
                     "cascade_holds_the_slice_corners",
                     "texel_snapping_keeps_the_matrix",
+                    "snap_step_keeps_the_matrix_while_the_camera_moves",
                     "casters_exclude_no_shadow",
                     "casters_exclude_transparent",
                     "casters_respect_shadow_layers",
