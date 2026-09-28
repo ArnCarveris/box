@@ -22,7 +22,9 @@
                  entry that reruns only what failed last time (see -Test).
       Run tests  builds and runs the selected test projects (see -Test).
 
-    When box_app or the tests finish the menu comes back with the same settings.
+    When box_app or the tests finish the menu comes back with the same settings, and the
+    next start of the script does too: the choices are saved in .bake/launch_box/menu.json
+    whenever the menu is left. -Build on the command line wins over the saved build mode.
 
     The scene list is cached in .bake/launch_box/scenes.tsv and read again when a scene
     folder changes. F5, in the menu or the scene selector, rescans the folders anyway.
@@ -1103,6 +1105,49 @@ function Complete-Run([int]$Code, [Diagnostics.Stopwatch]$Watch) {
     $Code
 }
 
+# The menu choices are kept in .bake/launch_box/menu.json between runs: the build mode,
+# the scene (by its path in the repository), the tests entry (all, failed or a project
+# name) and the highlighted row.
+function Get-MenuStatePath { Join-Path $Root '.bake/launch_box/menu.json' }
+
+# Saves the menu choices of $State. A failure only warns: it must not stop a run.
+function Save-MenuState($State) {
+    try {
+        $path = Get-MenuStatePath
+        New-Item -ItemType Directory -Force (Split-Path $path) | Out-Null
+        [ordered]@{
+            build = $State.Build
+            scene = if ($State.Scene) { $State.Scene.Rel } else { $null }
+            tests = if ($State.Tests) { [ordered]@{ group = $State.Tests.Group; name = $State.Tests.Name } } else { $null }
+            item  = $State.Item
+        } | ConvertTo-Json | Set-Content -Encoding utf8 $path
+    } catch {
+        Write-Warning "launch_box: could not save the menu choices: $($_.Exception.Message)"
+    }
+}
+
+# Restores saved menu choices into $State. The scene and tests entry come back as stubs
+# the menu loop looks up in the current lists, so ones that are gone fall back to the
+# defaults there. $KeepBuild leaves the build mode alone (-Build given on the command line).
+function Restore-MenuState($State, [bool]$KeepBuild) {
+    $path = Get-MenuStatePath
+    if (-not (Test-Path $path)) { return }
+    try {
+        $saved = Get-Content $path -Raw | ConvertFrom-Json
+    } catch {
+        Write-Warning "launch_box: ignoring unreadable $path"
+        return
+    }
+    if (-not $KeepBuild -and $saved.build -in $BuildModes) { $State.Build = $saved.build }
+    if ($saved.scene) { $State.Scene = [pscustomobject]@{ Rel = [string]$saved.scene } }
+    if ($saved.tests -and $saved.tests.group) {
+        $State.Tests = [pscustomobject]@{ Group = [string]$saved.tests.group; Name = [string]$saved.tests.name }
+    }
+    if ($saved.item -is [ValueType] -and $saved.item -ge $MenuBuild -and $saved.item -le $MenuRunTests) {
+        $State.Item = [int]$saved.item
+    }
+}
+
 # Finds bake3 and sets up the compiler environment, once, before the first build: the
 # menu needs neither, so it comes up without waiting for them.
 $Bake = $null
@@ -1139,10 +1184,15 @@ if (-not $interactive) {
 }
 
 $state = [pscustomobject]@{ Build = $Build; Scene = $null; Tests = $null; Item = $MenuScene }
+Restore-MenuState $state $PSBoundParameters.ContainsKey('Build')
 while ($true) {
     # Rebuilt every time: the failed entry changes with each test run, and F5 in the
     # menu may have refreshed the scenes (read back from the cache here).
     $scenes = @(Get-Scenes)
+    if ($state.Scene) {
+        $rel = $state.Scene.Rel
+        $state.Scene = $scenes | Where-Object { $_.Rel -eq $rel } | Select-Object -First 1
+    }
     $testEntries = @(Get-TestEntries)
     $group = if ($state.Tests) { $state.Tests.Group } else { 'all' }
     $state.Tests = $testEntries | Where-Object {
@@ -1151,6 +1201,7 @@ while ($true) {
     if (-not $state.Tests) { $state.Tests = $testEntries[0] }
 
     $action = Show-MainMenu $state $scenes $testEntries
+    Save-MenuState $state
     if (-not $action) { break }
     $total.Restart()
     try {
