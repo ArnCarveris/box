@@ -28,8 +28,9 @@ class Lint:
         self.path = path
         self.lines = lines
         self.problems = []
-        self.is_bench = path.startswith("bench/") or "/bench/" in path
-        self.is_test = self.is_bench or path.startswith("test/") or "/test/" in path
+        posix = path.replace(os.sep, "/")
+        self.is_bench = posix.startswith("bench/") or "/bench/" in posix
+        self.is_test = self.is_bench or posix.startswith("test/") or "/test/" in posix
         self.is_header = path.endswith(".h")
 
     def report(self, line, message):

@@ -23,11 +23,16 @@ static double box_cpu_slept_ms = 0;
 
 double box_cpu_process_time(void)
 {
+#ifdef _WIN32
+    double result = box_win32_process_time();
+#else
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
-
-    return (double)usage.ru_utime.tv_sec + (double)usage.ru_utime.tv_usec * 1e-6 +
+    double result = (double)usage.ru_utime.tv_sec + (double)usage.ru_utime.tv_usec * 1e-6 +
         (double)usage.ru_stime.tv_sec + (double)usage.ru_stime.tv_usec * 1e-6;
+#endif
+
+    return result;
 }
 
 double box_cpu_wall_time(void)

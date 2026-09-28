@@ -8,13 +8,93 @@
 #include <string.h>
 #include <stdio.h>
 #include "../../../src/command/command_internal.h"
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#include <winsock2.h>
+#else
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#endif
+
+#ifdef _WIN32
+/** A client socket, as Winsock returns it */
+typedef SOCKET http_socket_t;
+#define HTTP_SOCKET_NONE INVALID_SOCKET
+#else
+/** A client socket, as POSIX returns it */
+typedef int http_socket_t;
+#define HTTP_SOCKET_NONE (-1)
+#endif
 
 static ecs_world_t *w;
 static ecs_http_server_t *srv;
+
+/** Close a client socket.
+ *
+ * @param sock The socket
+ */
+static void http_close(
+    http_socket_t sock)
+{
+#ifdef _WIN32
+    closesocket(sock);
+#else
+    close(sock);
+#endif
+}
+
+/** Make a receive on a client socket give up after a while.
+ *
+ * @param sock The socket
+ * @param ms Milliseconds a receive waits
+ */
+static void http_recv_timeout(
+    http_socket_t sock,
+    int32_t ms)
+{
+#ifdef _WIN32
+    DWORD tv = (DWORD)ms;
+#else
+    struct timeval tv = { ms / 1000, (ms % 1000) * 1000 };
+#endif
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+}
+
+/** Connect to a local server, retrying while it starts to listen.
+ *
+ * @param port Port the server listens on
+ * @return The connected socket, HTTP_SOCKET_NONE when it never accepted
+ */
+static http_socket_t http_connect(
+    uint16_t port)
+{
+    http_socket_t result = HTTP_SOCKET_NONE;
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    int32_t i;
+    for (i = 0; i < 50 && result == HTTP_SOCKET_NONE; i ++) {
+        ecs_os_sleep(0, 20000000);
+        http_socket_t sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock == HTTP_SOCKET_NONE) {
+            continue;
+        }
+
+        if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            result = sock;
+        } else {
+            http_close(sock);
+        }
+    }
+
+    return result;
+}
 
 void Http_setup(void)
 {
@@ -318,39 +398,28 @@ void Http_a_connection_survives_a_burst_of_fast_frames(void)
 {
     // ore_engine/headless_http_purge
     ecs_singleton_set(w, HttpServer, { .port = 27791 });
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    test_assert(sock >= 0);
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(27791);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    int32_t i, connected = -1;
-    for (i = 0; i < 50 && connected != 0; i ++) {
-        ecs_os_sleep(0, 20000000);
-        connected = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
-    }
-
-    test_int(connected, 0);
-    struct timeval tv = { 0, 100000 };
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    http_socket_t sock = http_connect(27791);
+    test_assert(sock != HTTP_SOCKET_NONE);
+    http_recv_timeout(sock, 100);
 
     const char *req = "GET /terminal/new HTTP/1.1\r\nHost: localhost\r\n\r\n";
-    test_assert(send(sock, req, strlen(req), 0) == (ssize_t)strlen(req));
+    int len = (int)strlen(req);
+    test_int((int)send(sock, req, len, 0), len);
     ecs_os_sleep(0, 2000000);
 
+    int32_t i;
     for (i = 0; i < 1200; i ++) {
         ecs_progress(w, 1.0f / 60.0f);
     }
 
     char buf[512];
-    ssize_t got = 0;
+    int got = 0;
     for (i = 0; i < 50 && got <= 0; i ++) {
         ecs_progress(w, 1.0f / 60.0f);
-        got = recv(sock, buf, sizeof(buf) - 1, 0);
+        got = (int)recv(sock, buf, (int)sizeof(buf) - 1, 0);
     }
 
-    close(sock);
+    http_close(sock);
     test_assert(got > 0);
     buf[got] = '\0';
     test_assert(strstr(buf, "HTTP/1.1 200") == buf);

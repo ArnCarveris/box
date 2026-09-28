@@ -8,6 +8,9 @@
 #include <math.h>
 #include "../../../src/render/render_internal.h"
 
+/** Pi as a float constant, used instead of the possibly undefined M_PI */
+#define COLLIDERS_PI (3.14159265358979323846f)
+
 void Colliders_sphere_shape_derives_sphere(void)
 {
     // collision/colliders
@@ -350,7 +353,7 @@ void Colliders_rotation_turns_box_axes(void)
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
-    ecs_set(world, e, Rotation, {0, (float)M_PI * 0.5f, 0});
+    ecs_set(world, e, Rotation, {0, COLLIDERS_PI * 0.5f, 0});
     ecs_set(world, e, BoxCollider, {{0, 0, 0}, {1, 1, 1}});
     ecs_progress(world, 0);
 

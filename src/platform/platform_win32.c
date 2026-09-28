@@ -13,6 +13,17 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <intrin.h>
+#include <fcntl.h>
+
+/** Fraction of a second the rate of the time stamp counter is measured over */
+#define BOX_WIN32_TSC_SPAN (500)
+
+/** Ticks per second of the time stamp counter, zero when it cannot be used */
+static double box_win32_tsc_hz = 0;
+
+/** Guards the one time measurement of box_win32_tsc_hz */
+static INIT_ONCE box_win32_tsc_once = INIT_ONCE_STATIC_INIT;
 
 /** A running thread */
 struct box_win32_thread_t {
@@ -238,6 +249,126 @@ int getrusage(
     result = 0;
 done:
     return result;
+}
+
+/** Measure the rate of the time stamp counter, which process cycle times count in.
+ *
+ * Leaves box_win32_tsc_hz at zero when the counter is not invariant or cannot be
+ * read, so box_win32_process_time falls back to GetProcessTimes.
+ *
+ * @param once Unused
+ * @param param Unused
+ * @param ctx Unused
+ * @return TRUE, the measurement does not fail
+ */
+static BOOL CALLBACK box_win32_tsc_measure(
+    PINIT_ONCE once,
+    PVOID param,
+    PVOID *ctx)
+{
+    (void)once;
+    (void)param;
+    (void)ctx;
+#if defined(_M_X64) || defined(_M_IX86)
+    int regs[4];
+    __cpuid(regs, 0x80000000);
+    if ((unsigned)regs[0] < 0x80000007) {
+        goto done;
+    }
+
+    __cpuid(regs, 0x80000007);
+    if (!(regs[3] & (1 << 8))) {
+        goto done;
+    }
+
+    LARGE_INTEGER freq, start, now;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&start);
+    unsigned __int64 tsc_start = __rdtsc();
+    do {
+        QueryPerformanceCounter(&now);
+    } while (now.QuadPart - start.QuadPart < freq.QuadPart / BOX_WIN32_TSC_SPAN);
+
+    unsigned __int64 tsc_end = __rdtsc();
+    box_win32_tsc_hz = (double)(tsc_end - tsc_start) * (double)freq.QuadPart /
+        (double)(now.QuadPart - start.QuadPart);
+done:
+#endif
+
+    return TRUE;
+}
+
+double box_win32_process_time(void)
+{
+    double result = 0;
+    ULONG64 cycles = 0;
+    InitOnceExecuteOnce(&box_win32_tsc_once, box_win32_tsc_measure, NULL, NULL);
+    if (box_win32_tsc_hz > 0 && QueryProcessCycleTime(GetCurrentProcess(), &cycles)) {
+        result = (double)cycles / box_win32_tsc_hz;
+        goto done;
+    }
+
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    result = (double)usage.ru_utime.tv_sec + (double)usage.ru_utime.tv_usec * 1e-6 +
+        (double)usage.ru_stime.tv_sec + (double)usage.ru_stime.tv_usec * 1e-6;
+done:
+    return result;
+}
+
+int box_win32_setenv(
+    const char *name,
+    const char *value,
+    int overwrite)
+{
+    int result = 0;
+    if (!overwrite && getenv(name)) {
+        goto done;
+    }
+
+    result = _putenv_s(name, value) ? -1 : 0;
+done:
+    return result;
+}
+
+int box_win32_unsetenv(
+    const char *name)
+{
+    return _putenv_s(name, "") ? -1 : 0;
+}
+
+FILE* box_win32_fopen_unlinkable(
+    const char *path)
+{
+    FILE *result = NULL;
+    HANDLE h = CreateFileA(path, GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+        goto done;
+    }
+
+    int fd = _open_osfhandle((intptr_t)h, _O_WRONLY | _O_TEXT);
+    if (fd == -1) {
+        CloseHandle(h);
+        goto done;
+    }
+
+    result = _fdopen(fd, "w");
+    if (!result) {
+        _close(fd);
+    }
+
+done:
+    return result;
+}
+
+int box_win32_usleep(
+    unsigned int us)
+{
+    Sleep((DWORD)((us + 999) / 1000));
+
+    return 0;
 }
 
 char* box_win32_realpath(

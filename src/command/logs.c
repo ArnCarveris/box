@@ -187,7 +187,11 @@ static FILE* box_log_open(
     ecs_assert(app->process_dir != NULL, ECS_INVALID_OPERATION, "no process folder");
 
     char *path = flecs_asprintf("%s/log.txt", app->process_dir);
+#ifdef _WIN32
+    FILE *result = box_win32_fopen_unlinkable(path);
+#else
     FILE *result = fopen(path, "w");
+#endif
     if (!result) {
         ecs_warn("failed to open log file %s", path);
     }

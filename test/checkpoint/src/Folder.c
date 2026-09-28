@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include "scratch.h"
 
 void Folder_folder_is_under_the_process_folder(void)
 {
@@ -125,8 +126,10 @@ void Folder_dir_overrides_the_process_folder(void)
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
+    char *custom = scratch_path("box_checkpoint_custom");
+    char *nested = flecs_asprintf("%s/nested", custom);
     Checkpoint *cp = ecs_singleton_ensure(world, Checkpoint);
-    cp->dir = ecs_os_strdup("/tmp/box_checkpoint_custom/nested");
+    cp->dir = ecs_os_strdup(nested);
     ecs_singleton_modified(world, Checkpoint);
 
     test_assert(ecs_script(world, {
@@ -136,7 +139,8 @@ void Folder_dir_overrides_the_process_folder(void)
 
     char *folder = box_checkpoint_write(world, NULL, NULL);
     test_assert(folder != NULL);
-    test_str(folder, "/tmp/box_checkpoint_custom/nested/0");
+    char *expect = flecs_asprintf("%s/0", nested);
+    test_str(folder, expect);
 
     char *path = flecs_asprintf("%s/scene.flecs", folder);
     FILE *file = fopen(path, "r");
@@ -150,9 +154,12 @@ void Folder_dir_overrides_the_process_folder(void)
 
     remove(path);
     rmdir(folder);
-    rmdir("/tmp/box_checkpoint_custom/nested");
-    rmdir("/tmp/box_checkpoint_custom");
+    rmdir(nested);
+    rmdir(custom);
 
+    ecs_os_free(expect);
+    ecs_os_free(nested);
+    ecs_os_free(custom);
     ecs_os_free(path);
     ecs_os_free(folder);
 }

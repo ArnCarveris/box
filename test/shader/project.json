@@ -8,6 +8,12 @@
             "box"
         ]
     },
+    "lang.c": {
+        "${os Windows}": {
+            "include": ["../../src/platform/win32"],
+            "cflags": ["/FIbox_win32.h"]
+        }
+    },
     "test": {
         "testsuites": [
             {

@@ -15,6 +15,7 @@
 #include <io.h>
 #include <process.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,6 +43,9 @@
 #define realpath(path, resolved) box_win32_realpath(path, resolved)
 #define sysconf(name) box_win32_sysconf(name)
 #define getcwd(buf, size) box_win32_getcwd(buf, size)
+#define setenv(name, value, overwrite) box_win32_setenv(name, value, overwrite)
+#define unsetenv(name) box_win32_unsetenv(name)
+#define usleep(us) box_win32_usleep(us)
 
 /** Signed size type of POSIX */
 typedef intptr_t ssize_t;
@@ -65,6 +69,57 @@ char* box_win32_realpath(
 char* box_win32_getcwd(
     char *buf,
     size_t size);
+
+/** Set an environment variable of the process.
+ *
+ * An empty value removes the variable, as _putenv_s does.
+ *
+ * @param name Name of the variable
+ * @param value The value
+ * @param overwrite Zero keeps a variable that is already set
+ * @return 0 on success, -1 on failure
+ */
+int box_win32_setenv(
+    const char *name,
+    const char *value,
+    int overwrite);
+
+/** Remove an environment variable of the process.
+ *
+ * @param name Name of the variable
+ * @return 0 on success, -1 on failure
+ */
+int box_win32_unsetenv(
+    const char *name);
+
+/** Create or truncate a text file for writing that can be deleted while it is open.
+ *
+ * fopen denies deletion to other handles, so a folder that holds an open file cannot
+ * be removed; with delete sharing it can, as on POSIX.
+ *
+ * @param path The file
+ * @return The open file, NULL when it cannot be created
+ */
+FILE* box_win32_fopen_unlinkable(
+    const char *path);
+
+/** Suspend the calling thread, rounded up to whole milliseconds.
+ *
+ * @param us Microseconds to sleep
+ * @return 0
+ */
+int box_win32_usleep(
+    unsigned int us);
+
+/** CPU time the process spent in user and kernel mode.
+ *
+ * GetProcessTimes advances in ticks of about 15.6 ms, too coarse for the CPU monitor
+ * and budget, so with an invariant time stamp counter the cycles of the process are
+ * converted to seconds instead; otherwise this falls back to GetProcessTimes.
+ *
+ * @return Seconds of CPU time
+ */
+double box_win32_process_time(void);
 
 /** Get the system load average, which Windows does not track.
  *

@@ -91,7 +91,15 @@ void App_process_dir_created_and_removed(void)
     ECS_IMPORT(world, Box);
     const App *app = ecs_singleton_get(world, App);
     test_assert(app->process_dir != NULL);
-    test_assert(strncmp(app->process_dir, "/tmp/box/", 9) == 0);
+#ifdef _WIN32
+    char tmp[PATH_MAX];
+    box_win32_temp_dir(tmp, sizeof(tmp));
+    char *root = flecs_asprintf("%s/box/", tmp);
+#else
+    char *root = ecs_os_strdup("/tmp/box/");
+#endif
+    test_assert(strncmp(app->process_dir, root, strlen(root)) == 0);
+    ecs_os_free(root);
     char *dir = ecs_os_strdup(app->process_dir);
     struct stat st;
     test_int(stat(dir, &st), 0);

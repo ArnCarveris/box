@@ -7,7 +7,9 @@
 #include <bake_test.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "../../../src/command/command_internal.h"
+#include "scratch.h"
 
 void Restore_last_checkpoint_is_restored(void)
 {
@@ -259,26 +261,38 @@ void Restore_counters_survive_a_restore(void)
     // checkpoints/restore
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    char *dir = scratch_path("box_restore_counters");
+    char *code = flecs_asprintf("using box.transform\nusing box.checkpoint\n\n"
+        "$ {\n  Checkpoint: {dir: \"%s\"}\n}\n"
+        "\na {\n  Position: {1, 2, 3}\n}\n", dir);
     test_assert(ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
-        .code = "using box.transform\nusing box.checkpoint\n\n"
-            "$ {\n  Checkpoint: {dir: \"/tmp/box_restore_counters\"}\n}\n"
-            "\na {\n  Position: {1, 2, 3}\n}\n"
+        .code = code
     }) != 0);
 
     char *folder = box_checkpoint_write(world, NULL, NULL);
     test_assert(folder != NULL);
-    test_str(folder, "/tmp/box_restore_counters/0");
+    char *expect = flecs_asprintf("%s/0", dir);
+    test_str(folder, expect);
 
     char *restored = box_checkpoint_restore(world, NULL, 0, NULL);
     test_assert(restored != NULL);
 
     const Checkpoint *cp = ecs_singleton_get(world, Checkpoint);
     test_assert(cp != NULL);
-    test_str(cp->dir, "/tmp/box_restore_counters");
+    test_str(cp->dir, dir);
     test_str(cp->last, folder);
     test_int(cp->count, 1);
 
+    char *scene = flecs_asprintf("%s/scene.flecs", folder);
+    remove(scene);
+    rmdir(folder);
+    rmdir(dir);
+
+    ecs_os_free(scene);
+    ecs_os_free(expect);
+    ecs_os_free(code);
+    ecs_os_free(dir);
     ecs_os_free(restored);
     ecs_os_free(folder);
     ecs_fini(world);

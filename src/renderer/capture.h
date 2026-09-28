@@ -8,7 +8,9 @@
 
 #include "gpu.h"
 #include "packet.h"
-#ifndef BOX_PLATFORM_WEB
+#if defined(_WIN32)
+#include "../platform/win32/pthread.h"
+#elif !defined(BOX_PLATFORM_WEB)
 #include <pthread.h>
 #endif
 

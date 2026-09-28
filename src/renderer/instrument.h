@@ -11,7 +11,9 @@
 #define BOX_RENDERER_INSTRUMENT_H
 
 #include "counters.h"
-#ifndef BOX_PLATFORM_WEB
+#if defined(_WIN32)
+#include "../platform/win32/pthread.h"
+#elif !defined(BOX_PLATFORM_WEB)
 #include <pthread.h>
 #endif
 

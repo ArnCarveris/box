@@ -7,12 +7,15 @@
 #include <bake_test.h>
 #include <string.h>
 #include <stdio.h>
+#include "scratch.h"
 
 void Write_writes_a_file_per_script(void)
 {
     // checkpoints/checkpoint_write
-    const char *first = "/tmp/box_checkpoint_first.flecs";
-    const char *second = "/tmp/box_checkpoint_second.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *first = scratch_path("box_checkpoint_first.flecs");
+    char *second = scratch_path("box_checkpoint_second.flecs");
     FILE *file = fopen(first, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n", file);
@@ -23,8 +26,6 @@ void Write_writes_a_file_per_script(void)
     fputs("using box.transform\n\nb {\n  Position: {4, 5, 6}\n}\n", file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = first }) != 0);
     test_assert(ecs_script(world, { .filename = second }) != 0);
 
@@ -46,20 +47,22 @@ void Write_writes_a_file_per_script(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(first);
+    ecs_os_free(first);
     remove(second);
+    ecs_os_free(second);
 }
 
 void Write_values_are_updated(void)
 {
     // checkpoints/checkpoint_write
-    const char *scene = "/tmp/box_checkpoint_values.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *scene = scratch_path("box_checkpoint_values.flecs");
     FILE *file = fopen(scene, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n", file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
 
     ecs_entity_t a = ecs_lookup(world, "a");
@@ -83,20 +86,21 @@ void Write_values_are_updated(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(scene);
+    ecs_os_free(scene);
 }
 
 void Write_layout_and_comments_are_preserved(void)
 {
     // checkpoints/checkpoint_write
-    const char *scene = "/tmp/box_checkpoint_layout.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *scene = scratch_path("box_checkpoint_layout.flecs");
     FILE *file = fopen(scene, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\n// the only entity\na {\n  Position: {1, 2, 3}\n}\n",
         file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_set(world, ecs_lookup(world, "a"), Position, {0, 0, 1});
 
@@ -118,19 +122,20 @@ void Write_layout_and_comments_are_preserved(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(scene);
+    ecs_os_free(scene);
 }
 
 void Write_derived_components_are_left_out(void)
 {
     // checkpoints/checkpoint_write
-    const char *scene = "/tmp/box_checkpoint_derived.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *scene = scratch_path("box_checkpoint_derived.flecs");
     FILE *file = fopen(scene, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n", file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_progress(world, 0);
 
@@ -154,19 +159,20 @@ void Write_derived_components_are_left_out(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(scene);
+    ecs_os_free(scene);
 }
 
 void Write_component_added_at_runtime_is_written(void)
 {
     // checkpoints/checkpoint_write
-    const char *scene = "/tmp/box_checkpoint_added.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *scene = scratch_path("box_checkpoint_added.flecs");
     FILE *file = fopen(scene, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n", file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     test_assert(ecs_script(world, { .filename = scene }) != 0);
     ecs_set(world, ecs_lookup(world, "a"), Rotation, {0, 1, 0});
 
@@ -186,6 +192,7 @@ void Write_component_added_at_runtime_is_written(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(scene);
+    ecs_os_free(scene);
 }
 
 void Write_script_without_a_file_uses_its_name(void)
@@ -285,14 +292,14 @@ void Write_template_body_entities_are_reported(void)
 void Write_checkpoint_reloads_into_the_same_state(void)
 {
     // checkpoints/checkpoint_write
-    const char *scene = "/tmp/box_checkpoint_reload.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    char *scene = scratch_path("box_checkpoint_reload.flecs");
     FILE *file = fopen(scene, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n\na {\n  Position: {1, 2, 3}\n}\n", file);
     fclose(file);
 
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
     ecs_entity_t s = ecs_script(world, { .filename = scene });
     test_assert(s != 0);
     ecs_set(world, ecs_lookup(world, "a"), Position, {7, 8, 9});
@@ -321,4 +328,5 @@ void Write_checkpoint_reloads_into_the_same_state(void)
     ecs_os_free(folder);
     ecs_fini(world);
     remove(scene);
+    ecs_os_free(scene);
 }

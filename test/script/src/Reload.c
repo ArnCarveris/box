@@ -10,18 +10,18 @@
 void Reload_rewritten_file_is_reloaded(void)
 {
     // checkpoints/script_reload
-    const char *path = "/tmp/box_script_reload_rewritten.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
+    char *path = flecs_asprintf(
+        "%s/rewritten.flecs", ecs_singleton_get(world, App)->process_dir);
     FILE *file = fopen(path, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n"
         "a { Position: {1, 2, 3} }\n"
         "b { Position: {4, 5, 6} }\n", file);
     fclose(file);
-
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
-    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -58,24 +58,24 @@ void Reload_rewritten_file_is_reloaded(void)
     test_int(p->y, 8);
     test_int(p->z, 9);
 
+    ecs_os_free(path);
     ecs_fini(world);
-    remove(path);
 }
 
 void Reload_parse_error_keeps_the_scene(void)
 {
     // checkpoints/script_reload
-    const char *path = "/tmp/box_script_reload_broken.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
+    char *path = flecs_asprintf(
+        "%s/broken.flecs", ecs_singleton_get(world, App)->process_dir);
     FILE *file = fopen(path, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n"
         "a { Position: {1, 2, 3} }\n", file);
     fclose(file);
-
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
-    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -107,14 +107,19 @@ void Reload_parse_error_keeps_the_scene(void)
     test_assert(script != NULL);
     test_assert(script->error != NULL);
 
+    ecs_os_free(path);
     ecs_fini(world);
-    remove(path);
 }
 
 void Reload_reloaded_instances_are_pending(void)
 {
     // checkpoints/script_reload
-    const char *path = "/tmp/box_script_reload_template.flecs";
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
+    ecs_singleton_modified(world, ScriptSettings);
+    char *path = flecs_asprintf(
+        "%s/template.flecs", ecs_singleton_get(world, App)->process_dir);
     FILE *file = fopen(path, "w");
     test_assert(file != NULL);
     fputs("using box.transform\n"
@@ -128,11 +133,6 @@ void Reload_reloaded_instances_are_pending(void)
         "  }\n"
         "}\n", file);
     fclose(file);
-
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    ecs_singleton_ensure(world, ScriptSettings)->enabled = true;
-    ecs_singleton_modified(world, ScriptSettings);
 
     ecs_entity_t s = ecs_script(world, {
         .entity = ecs_entity(world, { .name = "scene" }),
@@ -167,6 +167,6 @@ void Reload_reloaded_instances_are_pending(void)
     test_int(ecs_count_id(world, ecs_pair(EcsScriptTemplatePending, t)), 5);
     test_int(ecs_count_id(world, ecs_id(Rotation)), 0);
 
+    ecs_os_free(path);
     ecs_fini(world);
-    remove(path);
 }

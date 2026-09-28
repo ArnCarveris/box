@@ -318,6 +318,7 @@ void Wear_dust_stays_on_upward_faces_when_mirrored(void)
                 const char *path = "/tmp/box_test_dust_faces.png";
                 snprintf(frame->capture_path, BOX_CAPTURE_PATH_MAX, "%s", path);
                 box_renderer_submit(renderer, frame);
+                box_renderer_captures_wait(renderer);
                 int width, height, channels;
                 pixels[dusty] = stbi_load(path, &width, &height, &channels, 4);
                 test_assert(pixels[dusty] != NULL);
