@@ -25,10 +25,10 @@
       Run tests  builds and runs the selected test projects (see -Test).
 
     When box_app or the tests finish the menu comes back with the same settings, and the
-    next start of the script does too: the choices are saved in .bake/launch_box/menu.json
+    next start of the script does too: the choices are saved in .launch_box/menu.json
     whenever the menu is left. -Build on the command line wins over the saved build mode.
 
-    The scene list is cached in .bake/launch_box/scenes.tsv and read again when a scene
+    The scene list is cached in .launch_box/scenes.tsv and read again when a scene
     folder changes. F5, in the menu or the scene selector, rescans the folders anyway.
 
     flecs and bake3 are rebuilt from the repositories next to this one: ../flecs, which
@@ -36,7 +36,7 @@
 
     flecs is built with bake3, never CMake: before every build the launcher checks the
     flecs bundle and, when it is missing or out of date, builds it with bake3 from a
-    project it generates in .bake/launch_box and installs it where bake3 expects the
+    project it generates in .launch_box and installs it where bake3 expects the
     bundle. box itself is always built by bake3.
 
     Scenes are collected from apps/box_app/etc/scenes and test/integration/{visual,
@@ -70,7 +70,7 @@
     test/<name> -- -j <Jobs>, after the clean builds -Build asks for (Box rebuilds box
     and the selected test projects). The exit code is non zero when anything fails.
 
-    Every run keeps each project's --json report in .bake/launch_box/tests-<Cfg>.
+    Every run keeps each project's --json report in .launch_box/tests-<Cfg>.
     'failed' reruns what those reports recorded as failed: each failed case on its own
     (bake3 run test/<name> -- Suite.case), and in full each project that left no
     report because it did not build or crashed. Cases that pass are cleared, so running
@@ -168,7 +168,7 @@ function Import-MsvcEnvironment {
 
     # vcvars takes seconds, so what it changes is cached and replayed until Visual Studio,
     # its toolsets or the Windows SDKs change.
-    $cache = Join-Path $Root '.bake/launch_box/msvc-env.json'
+    $cache = Get-LauncherPath 'msvc-env.json'
     $key = Get-MsvcCacheKey $vsDir $vcvars
     $delta = $null
     if (Test-Path $cache) {
@@ -254,6 +254,24 @@ function Set-LibclangPath {
 
 function ConvertTo-ForwardSlash([string]$Path) { $Path -replace '\\', '/' }
 
+# Path of $Name in .launch_box, the folder the launcher keeps its caches and choices in.
+# It is not under .bake: bake3's clean (the Box build mode) deletes everything there but
+# the bundles. The folder ignores itself for git, and bake3 skips it as a dot folder.
+function Get-LauncherPath([string]$Name) {
+    $dir = Join-Path $Root '.launch_box'
+    if (-not (Test-Path (Join-Path $dir '.gitignore'))) {
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        '*' | Write-Utf8File (Join-Path $dir '.gitignore')
+    }
+    Join-Path $dir $Name
+}
+
+# Writes the text piped in to $Path as UTF-8 without a byte order mark, which bake3's
+# JSON parser rejects. Set-Content -Encoding utf8 writes one in Windows PowerShell 5.1.
+function Write-Utf8File([string]$Path) {
+    [IO.File]::WriteAllText($Path, (@($input) -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+}
+
 $SceneGroups = @(
     @{ Name = 'app';     Dir = 'apps/box_app/etc/scenes' },
     @{ Name = 'visual';  Dir = 'test/integration/visual' },
@@ -282,13 +300,13 @@ function Find-Scenes {
     }
 }
 
-# The scene list, from .bake/launch_box/scenes.tsv while it is current. Scenes are only
+# The scene list, from .launch_box/scenes.tsv while it is current. Scenes are only
 # read from the top level of the scene folders, and adding, removing or renaming a file
 # changes the modification time of its folder, so those times are the cache key. With
 # -Refresh the folders are scanned and the cache rewritten whatever the key says (F5 in
 # the menu), for changes the folder times miss.
 function Get-Scenes([switch]$Refresh) {
-    $cache = Join-Path $Root '.bake/launch_box/scenes.tsv'
+    $cache = Get-LauncherPath 'scenes.tsv'
     $key = ($SceneGroups | ForEach-Object {
         $info = [IO.DirectoryInfo]::new((Join-Path $Root $_.Dir))
         if ($info.Exists) { "$($_.Dir)=$($info.LastWriteTimeUtc.Ticks)" } else { "$($_.Dir)=-" }
@@ -347,7 +365,7 @@ function Get-SceneScripts([string]$Path) {
 # Every test run keeps the --json report of each project here, per configuration, so the
 # failed entry knows what failed last. A project that produced no report (it did not
 # build, or crashed) gets {"broken": true} instead.
-function Get-TestStateDir { Join-Path $Root ".bake/launch_box/tests-$Cfg" }
+function Get-TestStateDir { Get-LauncherPath "tests-$Cfg" }
 
 function Get-TestReportPath([string]$Name) { Join-Path (Get-TestStateDir) "$Name.json" }
 
@@ -811,7 +829,7 @@ function Build-Bake3 {
 # ---------------------------------------------------------------------------
 # box/project.json declares flecs as a bundle, and bake3 builds bundles with CMake. The
 # launcher builds it with bake3 instead: it generates a package project from the bundle
-# checkout in .bake/launch_box/flecs-<Cfg> (bake3 skips dot folders when it discovers
+# checkout in .launch_box/flecs-<Cfg> (bake3 skips dot folders when it discovers
 # projects), builds it, lays the headers and library out like the CMake install, and
 # writes the .bake_bundle_built marker with the fingerprint bake3 compares it to (see
 # bake_bundle_fingerprint in bake3/src/bundle/bundle.c), so bake3 takes the bundle as
@@ -909,7 +927,7 @@ function Initialize-FlecsCheckout($Flecs) {
 # Builds flecs with bake3 as a static library with the defines the bundle passes CMake
 # in CMAKE_C_FLAGS, installs it where bake3 looks for the bundle and writes the marker.
 function Build-FlecsBundle($Flecs, [string]$Fingerprint) {
-    $project = Join-Path $Root ".bake/launch_box/flecs-$Cfg"
+    $project = Get-LauncherPath "flecs-$Cfg"
     $watch = [Diagnostics.Stopwatch]::StartNew()
     Write-Host "launch_box: building flecs with bake3 ($Cfg)" -ForegroundColor Cyan
     if (Test-Path $project) { Remove-Item -Recurse -Force $project }
@@ -932,7 +950,7 @@ function Build-FlecsBundle($Flecs, [string]$Fingerprint) {
             defines      = $defines
             include      = @(ConvertTo-ForwardSlash (Join-Path $Flecs.BuildSrc 'include'))
         }
-    } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $project 'project.json')
+    } | ConvertTo-Json -Depth 5 | Write-Utf8File (Join-Path $project 'project.json')
 
     $code = Invoke-Bake @('rebuild', (ConvertTo-ForwardSlash $project), '--cfg', $Cfg)
     if ($code -ne 0) { return $code }
@@ -1165,10 +1183,10 @@ function Complete-Run([int]$Code, [Diagnostics.Stopwatch]$Watch) {
     $Code
 }
 
-# The menu choices are kept in .bake/launch_box/menu.json between runs: the build mode,
+# The menu choices are kept in .launch_box/menu.json between runs: the build mode,
 # the GPU, the scene (by its path in the repository), the tests entry (all, failed or a
 # project name) and the highlighted row.
-function Get-MenuStatePath { Join-Path $Root '.bake/launch_box/menu.json' }
+function Get-MenuStatePath { Get-LauncherPath 'menu.json' }
 
 # Saves the menu choices of $State. A failure only warns: it must not stop a run.
 function Save-MenuState($State) {
