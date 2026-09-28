@@ -150,6 +150,14 @@ box_renderer_t* box_renderer_create(
         r->desc.canvas_selector = copy;
     }
 
+    r->desc.gpu = NULL;
+    if (desc->gpu) {
+        size_t len = strlen(desc->gpu) + 1;
+        char *copy = malloc(len);
+        memcpy(copy, desc->gpu, len);
+        r->desc.gpu = copy;
+    }
+
     box_queue_init(&r->queue);
 
 #ifndef BOX_PLATFORM_WEB
@@ -203,6 +211,7 @@ void box_renderer_destroy(
     box_count_destroy(r);
     box_queue_fini(&r->queue);
     free((void*)r->desc.canvas_selector);
+    free((void*)r->desc.gpu);
     free(r);
 }
 

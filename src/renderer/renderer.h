@@ -54,6 +54,7 @@ typedef struct box_renderer_desc_t {
     uint32_t anisotropy;          /**< Anisotropic samples of the texture samplers */
     bool vsync;                   /**< Present with vertical sync */
     bool threaded;                /**< Run on a dedicated thread */
+    const char *gpu;              /**< GPU: high-performance, low-power or part of a name */
 } box_renderer_desc_t;
 
 /** Create a renderer and start its thread when requested.

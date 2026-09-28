@@ -4,7 +4,9 @@
  */
 
 #include "renderer_internal.h"
+#include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -293,6 +295,202 @@ static void box_on_adapter_web(
 }
 #endif
 
+/** Turn a GPU choice that names no adapter into the power preference it asks for.
+ *
+ * @param gpu The GPU choice: NULL, "default", "high-performance", "low-power" or a name
+ * @param out Receives the power preference, undefined for no choice or a name
+ * @return Whether the choice is a power preference or none, false when it is a name
+ */
+static bool box_device_power_preference(
+    const char *gpu,
+    WGPUPowerPreference *out)
+{
+    bool result = true;
+    out[0] = WGPUPowerPreference_Undefined;
+    if (!gpu || !gpu[0] || !strcmp(gpu, "default")) {
+        result = true;
+    } else if (!strcmp(gpu, "high-performance")) {
+        out[0] = WGPUPowerPreference_HighPerformance;
+    } else if (!strcmp(gpu, "low-power")) {
+        out[0] = WGPUPowerPreference_LowPower;
+    } else {
+        result = false;
+    }
+
+    return result;
+}
+
+#ifndef BOX_PLATFORM_WEB
+/** Name of a WebGPU backend.
+ *
+ * @param backend The backend
+ * @return Its name
+ */
+static const char* box_device_backend_name(
+    WGPUBackendType backend)
+{
+    const char *result = "other";
+    switch (backend) {
+    case WGPUBackendType_D3D12: result = "D3D12"; break;
+    case WGPUBackendType_Metal: result = "Metal"; break;
+    case WGPUBackendType_Vulkan: result = "Vulkan"; break;
+    case WGPUBackendType_OpenGL: result = "OpenGL"; break;
+    case WGPUBackendType_OpenGLES: result = "OpenGLES"; break;
+    default: break;
+    }
+
+    return result;
+}
+
+/** Name of an adapter type.
+ *
+ * @param type The adapter type
+ * @return Its name
+ */
+static const char* box_device_type_name(
+    WGPUAdapterType type)
+{
+    const char *result = "unknown";
+    switch (type) {
+    case WGPUAdapterType_DiscreteGPU: result = "discrete"; break;
+    case WGPUAdapterType_IntegratedGPU: result = "integrated"; break;
+    case WGPUAdapterType_CPU: result = "cpu"; break;
+    default: break;
+    }
+
+    return result;
+}
+
+/** Bytes of a WebGPU string view.
+ *
+ * @param view The string view
+ * @return Its length, 0 for a view without data
+ */
+static size_t box_device_view_len(
+    WGPUStringView view)
+{
+    size_t result = 0;
+    if (view.data) {
+        result = view.length == WGPU_STRLEN ? strlen(view.data) : view.length;
+    }
+
+    return result;
+}
+
+/** Test whether a WebGPU string view contains a text, ignoring case.
+ *
+ * @param view The string view
+ * @param text The text to look for
+ * @return Whether the text occurs in the view
+ */
+static bool box_device_view_contains(
+    WGPUStringView view,
+    const char *text)
+{
+    size_t len = box_device_view_len(view);
+    size_t text_len = strlen(text);
+    bool result = false;
+    size_t i, j;
+    for (i = 0; !result && i + text_len <= len; i ++) {
+        j = 0;
+        while (j < text_len &&
+            tolower((unsigned char)view.data[i + j]) == tolower((unsigned char)text[j]))
+        {
+            j ++;
+        }
+
+        result = j == text_len;
+    }
+
+    return result;
+}
+
+/** Print the name, backend and type of an adapter to stderr.
+ *
+ * @param prefix Text before the adapter
+ * @param adapter The adapter
+ */
+static void box_device_print_adapter(
+    const char *prefix,
+    WGPUAdapter adapter)
+{
+    WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+    if (wgpuAdapterGetInfo(adapter, &info) == WGPUStatus_Success) {
+        fprintf(stderr, "box: %s%.*s (%s, %s)\n", prefix,
+            (int)box_device_view_len(info.device), info.device.data ? info.device.data : "",
+            box_device_backend_name(info.backendType), box_device_type_name(info.adapterType));
+    }
+
+    wgpuAdapterInfoFreeMembers(info);
+}
+
+/** Test whether an adapter can present to the surface of the renderer.
+ *
+ * @param r The renderer
+ * @param adapter The adapter
+ * @return Whether it can, true when the renderer draws offscreen
+ */
+static bool box_device_supports_surface(
+    box_renderer_t *r,
+    WGPUAdapter adapter)
+{
+    bool result = true;
+    if (r->surface) {
+        WGPUSurfaceCapabilities caps = WGPU_SURFACE_CAPABILITIES_INIT;
+        result = wgpuSurfaceGetCapabilities(r->surface, adapter, &caps) == WGPUStatus_Success &&
+            caps.formatCount > 0;
+        wgpuSurfaceCapabilitiesFreeMembers(caps);
+    }
+
+    return result;
+}
+
+/** Find the first adapter whose name contains the GPU choice and that can present
+ * to the surface. When none does, the adapters there are printed to stderr.
+ *
+ * @param r The renderer
+ * @param gpu Part of the adapter name, compared without case
+ * @return The adapter, NULL when none matches
+ */
+static WGPUAdapter box_device_find_adapter(
+    box_renderer_t *r,
+    const char *gpu)
+{
+    WGPUAdapter result = NULL;
+    size_t i, count = wgpuInstanceEnumerateAdapters(r->instance, NULL, NULL);
+    WGPUAdapter *adapters = calloc(count ? count : 1, sizeof(WGPUAdapter));
+    count = wgpuInstanceEnumerateAdapters(r->instance, NULL, adapters);
+    for (i = 0; i < count && !result; i ++) {
+        WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+        if (wgpuAdapterGetInfo(adapters[i], &info) == WGPUStatus_Success &&
+            box_device_view_contains(info.device, gpu) &&
+            box_device_supports_surface(r, adapters[i]))
+        {
+            result = adapters[i];
+        }
+
+        wgpuAdapterInfoFreeMembers(info);
+    }
+
+    if (!result) {
+        fprintf(stderr, "box: no GPU matches '%s'; the adapters are:\n", gpu);
+        for (i = 0; i < count; i ++) {
+            box_device_print_adapter("  ", adapters[i]);
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (adapters[i] != result) {
+            wgpuAdapterRelease(adapters[i]);
+        }
+    }
+
+    free(adapters);
+
+    return result;
+}
+#endif
+
 int box_device_init(
     box_renderer_t *r)
 {
@@ -307,7 +505,9 @@ int box_device_init(
     box_device_create_surface(r);
 
     WGPURequestAdapterOptions options = { .compatibleSurface = r->surface };
+    bool by_power = box_device_power_preference(r->desc.gpu, &options.powerPreference);
 #ifdef BOX_PLATFORM_WEB
+    (void)by_power;
     WGPURequestAdapterCallbackInfo adapter_info = {
         .mode = WGPUCallbackMode_AllowSpontaneous,
         .callback = box_on_adapter_web,
@@ -315,15 +515,24 @@ int box_device_init(
     };
     wgpuInstanceRequestAdapter(r->instance, &options, adapter_info);
 #else
-    WGPURequestAdapterCallbackInfo adapter_info = {
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .callback = box_on_adapter,
-        .userdata1 = r
-    };
-    wgpuInstanceRequestAdapter(r->instance, &options, adapter_info);
+    if (by_power) {
+        WGPURequestAdapterCallbackInfo adapter_info = {
+            .mode = WGPUCallbackMode_AllowSpontaneous,
+            .callback = box_on_adapter,
+            .userdata1 = r
+        };
+        wgpuInstanceRequestAdapter(r->instance, &options, adapter_info);
+    } else {
+        r->adapter = box_device_find_adapter(r, r->desc.gpu);
+    }
+
     if (!r->adapter) {
         result = -1;
         goto done;
+    }
+
+    if (r->desc.gpu) {
+        box_device_print_adapter("gpu ", r->adapter);
     }
 
     WGPUFeatureName features[1];

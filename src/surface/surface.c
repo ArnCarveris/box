@@ -35,6 +35,7 @@ static void box_surface_open(
         .height = (uint32_t)s->height,
         .vsync = s->vsync,
         .anisotropy = s->anisotropy ? (uint32_t)s->anisotropy : BOX_ANISOTROPY_DEFAULT,
+        .gpu = app->gpu,
 #ifndef BOX_PLATFORM_WEB
         .threaded = true
 #endif

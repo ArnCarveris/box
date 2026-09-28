@@ -6,7 +6,9 @@
 #include <box.h>
 #include <bake_test.h>
 #include "../../../src/render/render_internal.h"
-#include "../../../src/renderer/renderer.h"
+#include "../../../src/renderer/renderer_internal.h"
+#include <ctype.h>
+#include <string.h>
 
 /** Frames a test renders, enough for a resolve to arrive */
 #define GPU_FRAMES (8)
@@ -144,4 +146,74 @@ void Gpu_disabled_timings_stop_the_queries(void)
     test_int(box_renderer_errors(r), 0);
     box_renderer_destroy(r);
     ecs_fini(w);
+}
+
+/** Copy the device name of the adapter a renderer picked, in lower case.
+ *
+ * @param r The renderer
+ * @param out Receives the name
+ * @param size Size of out
+ */
+static void gpu_adapter_name(
+    box_renderer_t *r,
+    char *out,
+    size_t size)
+{
+    WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
+    size_t i, len = 0;
+    out[0] = '\0';
+    if (wgpuAdapterGetInfo(r->adapter, &info) == WGPUStatus_Success && info.device.data) {
+        len = info.device.length == WGPU_STRLEN ? strlen(info.device.data) : info.device.length;
+    }
+
+    for (i = 0; i < len && i + 1 < size; i ++) {
+        out[i] = (char)tolower((unsigned char)info.device.data[i]);
+    }
+
+    out[i] = '\0';
+    wgpuAdapterInfoFreeMembers(info);
+}
+
+void Gpu_a_power_preference_picks_an_adapter(void)
+{
+    // launcher/gpu_selection
+    box_renderer_desc_t desc = { .width = GPU_SIZE, .height = GPU_SIZE, .gpu = "high-performance" };
+    box_renderer_t *r = box_renderer_create(&desc);
+    test_assert(r != NULL);
+    test_assert(r->adapter != NULL);
+    box_renderer_destroy(r);
+
+    desc.gpu = "low-power";
+    r = box_renderer_create(&desc);
+    test_assert(r != NULL);
+    test_assert(r->adapter != NULL);
+    box_renderer_destroy(r);
+}
+
+void Gpu_part_of_an_adapter_name_picks_that_adapter(void)
+{
+    // launcher/gpu_selection
+    char name[256], picked[256];
+    box_renderer_desc_t desc = { .width = GPU_SIZE, .height = GPU_SIZE };
+    box_renderer_t *r = box_renderer_create(&desc);
+    test_assert(r != NULL);
+    gpu_adapter_name(r, name, sizeof(name));
+    box_renderer_destroy(r);
+    test_assert(name[0] != '\0');
+
+    desc.gpu = name;
+    r = box_renderer_create(&desc);
+    test_assert(r != NULL);
+    gpu_adapter_name(r, picked, sizeof(picked));
+    test_str(picked, name);
+    box_renderer_destroy(r);
+}
+
+void Gpu_a_name_no_adapter_has_fails(void)
+{
+    // launcher/gpu_selection
+    box_renderer_desc_t desc = {
+        .width = GPU_SIZE, .height = GPU_SIZE, .gpu = "no adapter is called this"
+    };
+    test_assert(box_renderer_create(&desc) == NULL);
 }

@@ -43,7 +43,8 @@
                 "the_usage_text_lists_the_options_of_the_world",
                 "a_scene_still_loads_next_to_an_option",
                 "an_option_with_a_bad_value_fails",
-                "a_scene_loads_under_the_scenes_scope"
+                "a_scene_loads_under_the_scenes_scope",
+                "gpu_names_the_gpu_to_render_on"
             ]
         }, {
             "id": "App",

@@ -13,6 +13,8 @@
 
       Build      what is rebuilt from scratch before each run; Enter, Space or
                  Left/Right cycle through the modes (see -Build).
+      GPU        the GPU box_app renders on: Default, High performance, Low power
+                 and, on Windows, the adapters of this machine (see -Gpu).
       Scene      opens the scene selector: Up/Down/PgUp/PgDn/Home/End move, typing
                  filters, Backspace edits the filter, Enter picks, Esc goes back.
                  Until a scene is picked box_app runs its default scene.
@@ -75,6 +77,12 @@
     'failed' again only repeats what still fails. A parameterized case reruns with its
     default parameters.
 
+.PARAMETER Gpu
+    GPU box_app renders on, passed to it as --gpu: default (the first adapter wgpu
+    finds), high-performance, low-power, or part of an adapter name such as nvidia. In
+    the menu this is the initial choice; box_app prints the adapter it picked. Tests
+    are not affected.
+
 .PARAMETER Jobs
     Parallel test processes per test project; defaults to 8.
 
@@ -106,6 +114,7 @@ param(
     [switch]$NoMenu,
     [ValidateSet('None', 'Box', 'Flecs', 'Bake3')]
     [string]$Build = 'None',
+    [string]$Gpu = 'default',
     [string]$Test,
     [ValidateRange(1, 256)]
     [int]$Jobs = 8,
@@ -119,6 +128,8 @@ $BakeSource = Join-Path (Split-Path $Root) 'bake3'
 # Build modes in menu order; each one rebuilds everything the ones before it do.
 $BuildModes = @('None', 'Box', 'Flecs', 'Bake3')
 $BuildLabels = @{ None = 'None'; Box = 'Box'; Flecs = 'Box + Flecs'; Bake3 = 'Box + Flecs + Bake3' }
+# GPU choices box_app knows by name, in menu order; adapter names follow them.
+$GpuPresets = [ordered]@{ 'default' = 'Default'; 'high-performance' = 'High performance'; 'low-power' = 'Low power' }
 # $IsWindows only exists from PowerShell 6; Windows PowerShell 5.1 is the Desktop edition.
 $OnWindows = $IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop'
 
@@ -515,8 +526,45 @@ function Step-BuildMode($State, [int]$Step) {
     $State.Build = $BuildModes[($i + $Step + $BuildModes.Count) % $BuildModes.Count]
 }
 
+# Display adapters Windows reports, without its software renderers. Other systems have
+# no quick way to list them, so there the menu offers the presets only.
+function Find-GpuAdapters {
+    if (-not $OnWindows) { return }
+    try {
+        Get-CimInstance Win32_VideoController -ErrorAction Stop |
+            ForEach-Object { $_.Name } |
+            Where-Object { $_ -and $_ -notmatch '^Microsoft Basic' } |
+            Select-Object -Unique
+    } catch {
+    }
+}
+
+# The GPU choices in menu order: the presets, the adapters of this machine, and $Current
+# when it names something else (a choice saved on another machine). The adapters are
+# looked up once, the first time the choices are needed.
+function Get-GpuChoices([string]$Current) {
+    if ($null -eq $script:gpuAdapters) { $script:gpuAdapters = @(Find-GpuAdapters) }
+    $choices = @($GpuPresets.Keys) + @($script:gpuAdapters | Where-Object { $_ -notin $GpuPresets.Keys })
+    if ($Current -and $Current -notin $choices) { $choices += $Current }
+    $choices
+}
+
+function Get-GpuLabel([string]$Value) {
+    if (-not $Value) { return $GpuPresets['default'] }
+    if ($GpuPresets.Contains($Value)) { return $GpuPresets[$Value] }
+    $Value
+}
+
+# Moves $State.Gpu $Step places through the GPU choices, wrapping around.
+function Step-GpuChoice($State, [int]$Step) {
+    $choices = @(Get-GpuChoices $State.Gpu)
+    $i = [Array]::IndexOf($choices, [string]$State.Gpu)
+    if ($i -lt 0) { $i = 0 }
+    $State.Gpu = $choices[($i + $Step + $choices.Count) % $choices.Count]
+}
+
 # Main menu rows, in order. A blank line is drawn before the Tests row.
-$MenuBuild = 0; $MenuScene = 1; $MenuRun = 2; $MenuTests = 3; $MenuRunTests = 4
+$MenuBuild = 0; $MenuGpu = 1; $MenuScene = 2; $MenuRun = 3; $MenuTests = 4; $MenuRunTests = 5
 
 # Main menu: Build mode selection, Scene and Tests selectors, and the Run and Run tests
 # actions. Updates $State.Build, $State.Scene, $State.Tests and $State.Item in place and
@@ -548,6 +596,7 @@ function Show-MainMenu($State, $Scenes, $TestEntries) {
             $tests = '{0,-8} {1}' -f $State.Tests.Group, $State.Tests.Name
             $items = @(
                 "Build      < $($BuildLabels[$State.Build]) >",
+                "GPU        < $(Get-GpuLabel $State.Gpu) >",
                 "Scene      $scene",
                 "Run",
                 "Tests      $tests",
@@ -568,6 +617,8 @@ function Show-MainMenu($State, $Scenes, $TestEntries) {
             Write-Line ''
             $status = if ($State.Item -ge $MenuTests) {
                 "bake3 run $($State.Tests.Rel) -- -j $Jobs"
+            } elseif ($State.Item -eq $MenuGpu) {
+                "box_app --gpu $(if ($State.Gpu) { $State.Gpu } else { 'default' }); it prints the adapter it picks"
             } elseif ($State.Scene) {
                 $State.Scene.Rel
             } else {
@@ -588,11 +639,18 @@ function Show-MainMenu($State, $Scenes, $TestEntries) {
                 'Home'      { $State.Item = 0 }
                 'End'       { $State.Item = $items.Count - 1 }
                 'Escape'    { return $null }
-                'LeftArrow'  { if ($State.Item -eq $MenuBuild) { Step-BuildMode $State -1 } }
-                'RightArrow' { if ($State.Item -eq $MenuBuild) { Step-BuildMode $State 1 } }
+                'LeftArrow'  {
+                    if ($State.Item -eq $MenuBuild) { Step-BuildMode $State -1 }
+                    if ($State.Item -eq $MenuGpu) { Step-GpuChoice $State -1 }
+                }
+                'RightArrow' {
+                    if ($State.Item -eq $MenuBuild) { Step-BuildMode $State 1 }
+                    if ($State.Item -eq $MenuGpu) { Step-GpuChoice $State 1 }
+                }
                 { $_ -eq 'Enter' -or $_ -eq 'Spacebar' } {
                     switch ($State.Item) {
                         $MenuBuild { Step-BuildMode $State 1 }
+                        $MenuGpu { Step-GpuChoice $State 1 }
                         $MenuScene {
                             $pick = Show-PickList 'scene' $Scenes $State.Scene { Get-Scenes -Refresh }
                             # The selector may have refreshed the list; the cache now has it.
@@ -953,7 +1011,7 @@ function Invoke-CleanBuild([string]$Target, [string]$Mode) {
 
 # Builds box_app after the clean builds $Mode asks for, then runs it with $Scripts. The
 # build output is filtered; box_app itself runs on the console.
-function Invoke-Box([string[]]$Scripts, [string]$Mode) {
+function Invoke-Box([string[]]$Scripts, [string]$Mode, [string]$GpuChoice = $Gpu) {
     $code = Invoke-CleanBuild 'apps/box_app' $Mode
     if ($code -ne 0) { return $code }
     if ([Array]::IndexOf($BuildModes, $Mode) -lt 1) {
@@ -961,7 +1019,9 @@ function Invoke-Box([string[]]$Scripts, [string]$Mode) {
         if ($code -ne 0) { return $code }
     }
     $watch = [Diagnostics.Stopwatch]::StartNew()
-    $code = Invoke-Bake (@('run', 'apps/box_app', '--cfg', $Cfg, '--') + $BoxArgs + $Scripts) -Console
+    # --gpu goes first, so a --gpu among the extra arguments of the command line wins.
+    $gpuArgs = if ($GpuChoice) { @('--gpu', $GpuChoice) } else { @() }
+    $code = Invoke-Bake (@('run', 'apps/box_app', '--cfg', $Cfg, '--') + $gpuArgs + $BoxArgs + $Scripts) -Console
     Write-Elapsed 'box_app' $watch $code 'ran for'
     $code
 }
@@ -1106,8 +1166,8 @@ function Complete-Run([int]$Code, [Diagnostics.Stopwatch]$Watch) {
 }
 
 # The menu choices are kept in .bake/launch_box/menu.json between runs: the build mode,
-# the scene (by its path in the repository), the tests entry (all, failed or a project
-# name) and the highlighted row.
+# the GPU, the scene (by its path in the repository), the tests entry (all, failed or a
+# project name) and the highlighted row.
 function Get-MenuStatePath { Join-Path $Root '.bake/launch_box/menu.json' }
 
 # Saves the menu choices of $State. A failure only warns: it must not stop a run.
@@ -1117,6 +1177,7 @@ function Save-MenuState($State) {
         New-Item -ItemType Directory -Force (Split-Path $path) | Out-Null
         [ordered]@{
             build = $State.Build
+            gpu   = $State.Gpu
             scene = if ($State.Scene) { $State.Scene.Rel } else { $null }
             tests = if ($State.Tests) { [ordered]@{ group = $State.Tests.Group; name = $State.Tests.Name } } else { $null }
             item  = $State.Item
@@ -1128,8 +1189,9 @@ function Save-MenuState($State) {
 
 # Restores saved menu choices into $State. The scene and tests entry come back as stubs
 # the menu loop looks up in the current lists, so ones that are gone fall back to the
-# defaults there. $KeepBuild leaves the build mode alone (-Build given on the command line).
-function Restore-MenuState($State, [bool]$KeepBuild) {
+# defaults there. $KeepBuild and $KeepGpu leave the build mode and the GPU alone (-Build
+# and -Gpu given on the command line).
+function Restore-MenuState($State, [bool]$KeepBuild, [bool]$KeepGpu = $false) {
     $path = Get-MenuStatePath
     if (-not (Test-Path $path)) { return }
     try {
@@ -1139,6 +1201,7 @@ function Restore-MenuState($State, [bool]$KeepBuild) {
         return
     }
     if (-not $KeepBuild -and $saved.build -in $BuildModes) { $State.Build = $saved.build }
+    if (-not $KeepGpu -and $saved.gpu -is [string] -and $saved.gpu) { $State.Gpu = $saved.gpu }
     if ($saved.scene) { $State.Scene = [pscustomobject]@{ Rel = [string]$saved.scene } }
     if ($saved.tests -and $saved.tests.group) {
         $State.Tests = [pscustomobject]@{ Group = [string]$saved.tests.group; Name = [string]$saved.tests.name }
@@ -1183,8 +1246,8 @@ if (-not $interactive) {
     exit (Complete-Run (Invoke-Box (Get-SceneScripts $pick.Path) $Build) $total)
 }
 
-$state = [pscustomobject]@{ Build = $Build; Scene = $null; Tests = $null; Item = $MenuScene }
-Restore-MenuState $state $PSBoundParameters.ContainsKey('Build')
+$state = [pscustomobject]@{ Build = $Build; Gpu = $Gpu; Scene = $null; Tests = $null; Item = $MenuScene }
+Restore-MenuState $state $PSBoundParameters.ContainsKey('Build') $PSBoundParameters.ContainsKey('Gpu')
 while ($true) {
     # Rebuilt every time: the failed entry changes with each test run, and F5 in the
     # menu may have refreshed the scenes (read back from the cache here).
@@ -1215,7 +1278,7 @@ while ($true) {
                 $label = $state.Scene.Rel
             }
             Write-Host "launch_box: launching $label" -ForegroundColor Cyan
-            $code = Invoke-Box $scripts $state.Build
+            $code = Invoke-Box $scripts $state.Build $state.Gpu
         }
     } catch {
         # Keep the menu alive: a missing bake3 or scene is reported, not fatal.

@@ -414,3 +414,18 @@ void Args_a_scene_loads_under_the_scenes_scope(void)
     remove(path);
     ecs_fini(world);
 }
+
+void Args_gpu_names_the_gpu_to_render_on(void)
+{
+    // launcher/gpu_selection
+    ecs_world_t *world = args_world();
+    test_assert(ecs_singleton_get(world, App)->gpu == NULL);
+    char *argv[] = { "box", "--gpu", "low-power", "--gpu", "nvidia" };
+    test_int(box_parse_args(world, 5, argv), 0);
+    test_str(ecs_singleton_get(world, App)->gpu, "nvidia");
+
+    char *usage = box_args_usage(world, "box");
+    test_assert(strstr(usage, "--gpu <gpu>") != NULL);
+    ecs_os_free(usage);
+    ecs_fini(world);
+}

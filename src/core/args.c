@@ -241,7 +241,8 @@ char* box_args_usage(
         "  --timeout <s|infinite> stop after s seconds\n"
         "  --cpu-budget <0..1>   fraction of one core to use\n"
         "  --fps <n>             target frame rate, 0 for uncapped\n"
-        "  --port <n>            port of the command endpoints, 0 disables them\n",
+        "  --port <n>            port of the command endpoints, 0 disables them\n"
+        "  --gpu <gpu>           high-performance, low-power or part of an adapter name\n",
         exe);
     for (i = 0; i < count; i ++) {
         box_args_usage_option(world, &buf, &options[i]);
@@ -322,6 +323,10 @@ int box_parse_args(
             i ++;
         } else if (!strcmp(arg, "--port") && value) {
             app->port = atoi(value);
+            i ++;
+        } else if (!strcmp(arg, "--gpu") && value) {
+            ecs_os_free(app->gpu);
+            app->gpu = ecs_os_strdup(value);
             i ++;
         } else if (!strcmp(arg, "--explorer")) {
             ecs_singleton_set(world, EcsRest, {});

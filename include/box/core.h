@@ -33,6 +33,7 @@ ECS_STRUCT(App, {
     double cpu_budget;    /**< Fraction of one core this process may use, 1 for all */
     double target_fps;    /**< Frame rate the loop paces to, 0 for uncapped */
     int32_t port;         /**< Port of the command endpoints, 0 disables the server */
+    char *gpu;            /**< GPU: high-performance, low-power or part of an adapter name */
     int32_t frame;        /**< Frames completed so far, written by the engine */
     char *process_dir;    /**< Folder with temporary files, written by the engine */
 });
