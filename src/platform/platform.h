@@ -156,10 +156,10 @@ int32_t box_platform_key_from_native(
 bool box_window_occluded(
     const box_window_t *w);
 
-/** Get the CAMetalLayer backing the window on macOS.
+/** Get the CAMetalLayer backing the window on macOS, or its HWND on Windows.
  *
  * @param w The window
- * @return The layer, or NULL on other platforms
+ * @return The layer or HWND, or NULL on other platforms
  */
 void* box_window_metal_layer(
     box_window_t *w);

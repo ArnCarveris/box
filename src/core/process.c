@@ -1,6 +1,6 @@
 /**
  * @file core/process.c
- * @brief Per-process temporary folder under /tmp/box/<pid>.
+ * @brief Per-process temporary folder under /tmp/box/<pid> (%TEMP%/box/<pid> on Windows).
  */
 
 #include "core_internal.h"
@@ -55,8 +55,16 @@ static void box_process_cleanup(
 void box_process_init(
     ecs_world_t *world)
 {
-    mkdir("/tmp/box", 0777);
-    char *dir = flecs_asprintf("/tmp/box/%d", (int)getpid());
+#ifdef _WIN32
+    char tmp[PATH_MAX];
+    box_win32_temp_dir(tmp, sizeof(tmp));
+    char *root = flecs_asprintf("%s/box", tmp);
+#else
+    char *root = ecs_os_strdup("/tmp/box");
+#endif
+    mkdir(root, 0777);
+    char *dir = flecs_asprintf("%s/%d", root, (int)getpid());
+    ecs_os_free(root);
     if (mkdir(dir, 0777) && errno != EEXIST) {
         ecs_warn("failed to create process folder %s", dir);
     }

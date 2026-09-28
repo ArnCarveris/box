@@ -159,6 +159,8 @@ static void box_shader_find_exe(
     } else {
         out[0] = '\0';
     }
+#elif defined(_WIN32)
+    box_win32_exe_dir(out, size);
 #else
     (void)size;
 #endif
@@ -317,8 +319,15 @@ char* box_shader_read(
 
     result = ecs_os_malloc((ecs_size_t)size + 1);
     size_t read = fread(result, 1, (size_t)size, f);
-    result[read] = '\0';
     fclose(f);
+    size_t i, len = 0;
+    for (i = 0; i < read; i ++) {
+        if (result[i] != '\r' || i + 1 == read || result[i + 1] != '\n') {
+            result[len ++] = result[i];
+        }
+    }
+
+    result[len] = '\0';
 done:
     return result;
 }

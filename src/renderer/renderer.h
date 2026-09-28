@@ -47,7 +47,7 @@ typedef struct box_renderer_gpu_t {
 
 /** Parameters for creating a renderer */
 typedef struct box_renderer_desc_t {
-    void *metal_layer;            /**< CAMetalLayer of the window, NULL for offscreen */
+    void *metal_layer;            /**< CAMetalLayer (macOS) or HWND (Windows), NULL offscreen */
     const char *canvas_selector;  /**< HTML canvas selector on web, NULL for offscreen */
     uint32_t width;               /**< Initial target width in pixels */
     uint32_t height;              /**< Initial target height in pixels */

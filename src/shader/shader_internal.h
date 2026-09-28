@@ -84,7 +84,8 @@ bool box_locate(
     char *out,
     size_t size);
 
-/** Read a file into a newly allocated, zero terminated buffer.
+/** Read a file into a newly allocated, zero terminated buffer, with CRLF line
+ * endings turned into LF.
  *
  * @param path The file
  * @return The contents, or NULL when the file could not be read

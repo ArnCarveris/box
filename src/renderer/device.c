@@ -6,6 +6,10 @@
 #include "renderer_internal.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 /** Print a WebGPU string view to stderr with a prefix.
  *
@@ -112,7 +116,7 @@ static const WGPULimits* box_device_limits(
     box_renderer_t *r)
 {
     const WGPULimits *result = NULL;
-    r->limits = (WGPULimits)WGPU_LIMITS_INIT;
+    r->limits = WGPU_LIMITS_INIT;
     if (wgpuAdapterGetLimits(r->adapter, &r->limits) == WGPUStatus_Success) {
         result = &r->limits;
     } else {
@@ -160,6 +164,13 @@ static void box_device_create_surface(
         .selector = { .data = r->desc.canvas_selector, .length = WGPU_STRLEN }
     };
     bool has_source = r->desc.canvas_selector != NULL;
+#elif defined(_WIN32)
+    WGPUSurfaceSourceWindowsHWND source = {
+        .chain = { .sType = WGPUSType_SurfaceSourceWindowsHWND },
+        .hinstance = GetModuleHandleW(NULL),
+        .hwnd = r->desc.metal_layer
+    };
+    bool has_source = r->desc.metal_layer != NULL;
 #else
     WGPUSurfaceSourceMetalLayer source = {
         .chain = { .sType = WGPUSType_SurfaceSourceMetalLayer },

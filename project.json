@@ -16,6 +16,11 @@
         "${os Darwin}": {
             "defines": ["GLFW_EXPOSE_NATIVE_COCOA", "BOX_PLATFORM_GLFW"]
         },
+        "${os Windows}": {
+            "defines": ["GLFW_EXPOSE_NATIVE_WIN32", "BOX_PLATFORM_GLFW", "_CRT_SECURE_NO_WARNINGS", "flecs_STATIC"],
+            "include": ["src/platform/win32"],
+            "cflags": ["/FIbox_win32.h"]
+        },
         "${os Emscripten}": {
             "defines": ["BOX_PLATFORM_WEB"],
             "cflags": ["--use-port=emdawnwebgpu"]
@@ -38,6 +43,14 @@
                     "-framework AppKit"
                 ]
             },
+            "${os Windows}": {
+                "defines": ["flecs_STATIC"],
+                "lib": [
+                    "user32", "gdi32", "shell32", "ole32", "oleaut32", "advapi32",
+                    "ws2_32", "userenv", "bcrypt", "ntdll", "opengl32", "propsys",
+                    "runtimeobject", "d3d12", "dxgi", "d3dcompiler", "dbghelp"
+                ]
+            },
             "${os Emscripten}": {
                 "cflags": ["--use-port=emdawnwebgpu"],
                 "ldflags": [
@@ -53,7 +66,7 @@
     },
     "bundle": {
         "flecs": {
-            "repository": "/Users/sandermertens/GitHub/SanderMertens/flecs",
+            "repository": "../flecs",
             "library": "flecs_static",
             "cmake-args": [
                 "-DCMAKE_C_FLAGS=-DFLECS_SCRIPT_MATH -DFLECS_SCRIPT_PLATFORM -DFLECS_CREATE_MEMBER_ENTITIES",
@@ -95,6 +108,23 @@
         }
     },
     "${os Darwin}": {
+        "bundle": {
+            "glfw": {
+                "repository": "https://github.com/glfw/glfw.git",
+                "tag": "3.4",
+                "library": "glfw3",
+                "cmake-args": ["-DGLFW_BUILD_EXAMPLES=OFF", "-DGLFW_BUILD_TESTS=OFF", "-DGLFW_BUILD_DOCS=OFF"]
+            },
+            "wgpu_native": {
+                "repository": "https://github.com/gfx-rs/wgpu-native.git",
+                "tag": "v29.0.1.1",
+                "build-system": "cargo",
+                "library": "wgpu_native",
+                "include": ["ffi", "ffi/webgpu-headers"]
+            }
+        }
+    },
+    "${os Windows}": {
         "bundle": {
             "glfw": {
                 "repository": "https://github.com/glfw/glfw.git",

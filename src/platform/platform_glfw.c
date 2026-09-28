@@ -15,7 +15,7 @@
 /** Window state on desktop */
 struct box_window_t {
     GLFWwindow *window;    /**< GLFW window */
-    void *metal_layer;     /**< CAMetalLayer on macOS */
+    void *metal_layer;     /**< CAMetalLayer on macOS, HWND on Windows */
     box_input_fn input_fn; /**< Sink the input events are reported to */
     void *input_ctx;       /**< Context of the sink */
 };
@@ -280,6 +280,8 @@ box_window_t* box_window_create(
     box_glfw_callbacks(window);
 #ifdef __APPLE__
     result->metal_layer = box_macos_metal_layer(glfwGetCocoaWindow(window));
+#elif defined(_WIN32)
+    result->metal_layer = glfwGetWin32Window(window);
 #endif
     box_window_count ++;
 done:
