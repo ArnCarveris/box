@@ -1,0 +1,7 @@
+{
+    "id": "boxrun",
+    "type": "application",
+    "value": {
+        "use": ["box"]
+    }
+}

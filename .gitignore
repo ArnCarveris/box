@@ -1,0 +1,7 @@
+.bake
+.bake_cache
+.DS_Store
+.vscode
+gcov
+bin
+.clangd
