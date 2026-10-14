@@ -104,3 +104,59 @@ void Material_blended_sort(
     // materials/pbr
     bench_material(b, false);
 }
+
+void Material_tint_subtree(
+    bench_t *b)
+{
+    // materials/tint
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_backend_t backend = { .render = bench_material_drop };
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 10, -20});
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    int32_t i;
+    for (i = 0; i < BENCH_MATERIAL_STATIC; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position,
+            {(float)(i % BENCH_MATERIAL_ROW), 0, (float)(i / BENCH_MATERIAL_ROW)});
+        ecs_set(world, e, Box, {0.5f, 0.5f, 0.5f});
+        ecs_set(world, e, Rgb, {200, 100, 50});
+    }
+
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t group = 0;
+    for (i = 0; i < BENCH_MATERIAL_SHAPES; i ++) {
+        if (!(i % 100)) {
+            group = ecs_new_w_pair(world, EcsChildOf, root);
+            ecs_set(world, group, Tint, {0, 0, 0, 64});
+        }
+
+        ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, group);
+        ecs_set(world, e, Position,
+            {(float)(i % BENCH_MATERIAL_ROW), 2, (float)(i / BENCH_MATERIAL_ROW)});
+        ecs_set(world, e, Box, {0.5f, 0.5f, 0.5f});
+        ecs_set(world, e, Rgb, {50, 100, 200});
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_draws_stats_t stats = {0};
+    uint8_t strength = 0;
+    bench_set_items(b, BENCH_MATERIAL_SHAPES);
+    while (bench_iter(b)) {
+        strength ++;
+        ecs_set(world, root, Tint, {0, 0, 255, strength});
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.processed);
+    }
+
+    bench_counter(b, "processed", (double)stats.processed);
+    bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
+    box_render_sync(world);
+    ecs_fini(world);
+}

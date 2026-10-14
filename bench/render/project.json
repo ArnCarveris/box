@@ -26,7 +26,8 @@
                 "id": "Material",
                 "benchcases": [
                     "dynamic_material",
-                    "blended_sort"
+                    "blended_sort",
+                    "tint_subtree"
                 ]
             },
             {
