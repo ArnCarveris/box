@@ -326,27 +326,27 @@ static void box_collide_surface(
     }
 }
 
-/** Find the nearest points of a capsule and a collider and the normal between them.
+/** Find the nearest points of a capsule segment and a collider.
  *
  * @param c The collider
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
- * @param n Receives the direction from the collider towards the capsule, in its frame
- * @param q Receives the nearest point of the collider or its core, in its frame
- * @return The gap between their surfaces, negative by the depth when they overlap
+ * @param p_out Receives the nearest point of the segment, in the frame of the collider
+ * @param q_out Receives the nearest point of the collider or its core, in its frame
+ * @return The gap between their surfaces, negative when they overlap
  */
 static float box_collide_nearest(
     const box_collider_t *c,
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 n,
-    vec3 q)
+    vec3 p_out,
+    vec3 q_out)
 {
-    vec3 p0, p1, p, d;
+    vec3 p0, p1, p, q;
     vec3 zero = { 0, 0, 0 };
-    float reach = radius, dist, gap = 0;
+    float reach = radius;
     int32_t i;
     box_collide_local(c, a, p0);
     box_collide_local(c, b, p1);
@@ -361,20 +361,35 @@ static float box_collide_nearest(
         reach += c->half[0];
     }
 
-    for (i = 0; i < 3; i ++) {
-        d[i] = p[i] - q[i];
-    }
+    glm_vec3_copy(p, p_out);
+    glm_vec3_copy(q, q_out);
 
-    dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    return glm_vec3_distance(p, q) - reach;
+}
+
+/** Find the direction from a collider towards the nearest point of a capsule segment.
+ *
+ * @param c The collider
+ * @param p The nearest point of the segment, in the frame of the collider
+ * @param q The nearest point of the collider or its core, in its frame
+ * @param n Receives the direction in the frame of the collider
+ * @return How much deeper the capsule is than the gap says, for a segment inside the core
+ */
+static float box_collide_normal(
+    const box_collider_t *c,
+    const vec3 p,
+    const vec3 q,
+    vec3 n)
+{
+    vec3 d = { p[0] - q[0], p[1] - q[1], p[2] - q[2] };
+    float dist = glm_vec3_norm(d), result = 0;
     if (dist > BOX_COLLIDE_TOUCH) {
-        for (i = 0; i < 3; i ++) {
-            n[i] = d[i] / dist;
-        }
+        glm_vec3_scale(d, 1.0f / dist, n);
     } else {
-        gap = box_collide_inside(c, p, n);
+        result = box_collide_inside(c, p, n);
     }
 
-    return dist - reach - gap;
+    return result;
 }
 
 float box_collider_separation(
@@ -384,8 +399,9 @@ float box_collider_separation(
     float radius,
     vec3 normal)
 {
-    vec3 n, q;
-    float result = box_collide_nearest(c, a, b, radius, n, q);
+    vec3 p, q, n;
+    float result = box_collide_nearest(c, a, b, radius, p, q);
+    result -= box_collide_normal(c, p, q, n);
     box_collide_world_dir(c, n, normal);
 
     return result;
@@ -398,10 +414,11 @@ bool box_collider_push(
     float radius,
     box_collider_contact_t *out)
 {
-    vec3 n, q;
-    float separation = box_collide_nearest(c, a, b, radius, n, q);
+    vec3 p, q, n;
+    float separation = box_collide_nearest(c, a, b, radius, p, q);
     bool result = separation < 0;
     if (result) {
+        separation -= box_collide_normal(c, p, q, n);
         box_collide_world_dir(c, n, out->normal);
         box_collide_surface(c, q, n, out->surface);
         out->depth = -separation;
