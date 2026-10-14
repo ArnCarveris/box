@@ -1,0 +1,40 @@
+{
+    "id": "scene",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/render"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Projection",
+                "testcases": [
+                    "perspective",
+                    "offset",
+                    "orthographic",
+                    "surface_size",
+                    "anchor_in_ui_scene",
+                    "follows_target_same_frame",
+                    "follows_camera",
+                    "subtree_same_frame",
+                    "dynamic_anchor",
+                    "behind_camera_hidden",
+                    "off_screen_hidden",
+                    "shown_again",
+                    "missing_view_hidden",
+                    "deleted_target_hidden",
+                    "from_script",
+                    "drawn_at_projection"
+                ]
+            }
+        ]
+    }
+}

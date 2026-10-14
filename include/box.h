@@ -27,6 +27,7 @@
 #include "box/controllers.h"
 #include "box/controllers.h"
 #include "box/perf.h"
+#include "box/projection.h"
 
 #ifdef __cplusplus
 extern "C" {

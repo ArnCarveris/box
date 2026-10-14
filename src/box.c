@@ -29,4 +29,5 @@ void BoxImport(
     ECS_IMPORT(world, BoxCommand);
     ECS_IMPORT(world, BoxPerf);
     ECS_IMPORT(world, BoxPerf);
+    ECS_IMPORT(world, BoxProjection);
 }
