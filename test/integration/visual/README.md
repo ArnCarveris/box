@@ -50,6 +50,10 @@ that ran. The output folder ignores itself in git.
   from the repository root (`test/integration/visual/assets/checker.png`); a `TexturePath`
   finds them from the working directory of `boxrun` upwards. `assets/gen_assets.py` writes
   the PNGs.
+- Shared content: a scene may `include` a script that lives elsewhere, such as a scene of
+  `etc/scenes`, when it lists the file in `<scene>.sources` (a path relative to the scene per
+  line); the runner copies it next to the script it runs. `town_backside` includes the content of
+  `etc/scenes/town.flecs` this way.
 - Static: the camera does not move, and nothing that depends on wall time or history across
   many frames is guarded by a baseline; cover that with a C test.
 - Small: a scene renders in well under a second.
@@ -98,3 +102,4 @@ that ran. The output folder ignores itself in git.
 | `ui_picking` | Hover and press feedback from synthetic input | A menu panel over a 3D view whose buttons and check box are `Interactive` templates reacting to `on.enter`, `on.leave`, `on.press`, `on.release` and `on.click`. The scene queues input through the command functions: a click on the check box (green mark), a press held on "Pressed" (dark blue, yellow border) and the cursor moved onto "Hover" (light blue); "Idle" keeps its color. |
 | `ui_console` | In game console over a 3D view | The default scene (floor, red cube, shadow, effects) under a dark translucent panel covering the left half at full height with a blue line along its right edge, text at the bottom: three lines that ran through `box.console.run` in blue after a `>` prompt, their output (lamp, rope, torch and the cube position) in light grey, a red error line, and an empty input line with a white cursor right after the prompt. |
 | `culling_occlusion` | Hi-Z occlusion under a fast camera | A city of tall blocks seen from above while the camera flies 50 units a frame (a `CameraController` velocity), so the captured frame shows streets the previous frame hid; every block and every orange ball in the visible streets is drawn, exactly as with frustum culling alone (`occlusion: false`). |
+| `town_backside` | The town of `etc/scenes/town.flecs` | The 4 by 4 block town (its `town_content`) from box_old's `town_backside` viewpoint with the view of the etc scene (cascaded shadows, occlusion culling, SSAO, tonemap): a flat roof with laundry and a water tank bottom left, a purple house with a balcony and two cherry trees behind it, a tall timber house on the right with air conditioners and shutters, power lines with sagging wires across the frame and glowing red lanterns in the streets. box_old drew the same layout mirrored left to right and with a black sky. |

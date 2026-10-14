@@ -163,3 +163,54 @@ void Report_script_run(void) {
     box_perf_clock = NULL;
     box_perf_sleep = NULL;
 }
+
+void Report_orbit_json(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    char path[256];
+    snprintf(path, sizeof(path), "/tmp/box_perf_orbit_%d.json", (int)getpid());
+    remove(path);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 3, .frames = 4, .period = 2, .camera = camera, .report = path });
+    for (int i = 0; i < 7; i ++) {
+        ecs_set(world, view, CullStatus, {
+            .frame = i, .instances = 50, .visible = 40 + i, .frustum_culled = 10 - i });
+        ecs_progress(world, 0);
+    }
+
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfDone);
+    static char json[65536];
+    FILE *f = fopen(path, "rb");
+    test_assert(f != NULL);
+    json[fread(json, 1, sizeof(json) - 1, f)] = '\0';
+    fclose(f);
+    test_assert(strstr(json, "\"warmup\": 3") != NULL);
+    test_assert(strstr(json, "\"period\": 2.000") != NULL);
+    test_assert(strstr(json, "\"revolutions\": 0.01") != NULL);
+    test_assert(strstr(json, "\"views\": 1") != NULL);
+    test_assert(strstr(json, "\"samples\": 4") != NULL);
+    test_assert(strstr(json, "\"changes\": 3") != NULL);
+    test_assert(strstr(json, "\"visible\": {\"min\": 43, \"max\": 46") != NULL);
+    test_assert(strstr(json, "\"frustum_culled\": {\"min\": 4, \"max\": 7") != NULL);
+    test_assert(strstr(json, "\"occlusion_culled\": {\"min\": 0, \"max\": 0") != NULL);
+    remove(path);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}

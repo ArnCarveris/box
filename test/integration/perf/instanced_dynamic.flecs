@@ -1,0 +1,66 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.input
+using box.controllers
+using box.perf
+
+// 100,000 static boxes in one instanced batch plus 10,000 dynamic boxes on a turntable above
+// them. The turntable is a camera controller whose Look action holds a fixed delta, so it turns
+// every frame and every dynamic box gets a new world transform: the dynamic batches are filled
+// every frame while the static batch uploads nothing.
+spin {
+  Look {
+    ActionState: {down: true, delta: {4, 0}}
+    flecs.core.Disabled
+  }
+}
+
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {204, 0.2, 129}
+  Rgb: {90, 96, 104}
+}
+
+for x in 0..400 {
+  for z in 0..250 {
+    {
+      Position: {x * 0.5 - 99.75, 0.3 + (x % 5) * 0.1, z * 0.5 - 62.25}
+      Box: {0.35, 0.6 + (x % 5) * 0.2, 0.35}
+      Rgb: {40 + (x % 50) * 4, 80 + (z % 25) * 6, 220 - (x % 50) * 3}
+    }
+  }
+}
+
+turntable {
+  Position: {0, 8, 0}
+  Rotation: {0, 0, 0}
+  CameraController: {actions: spin, sensitivity: 0.01}
+  DynamicTransform
+  DynamicMaterial
+
+  for x in 0..100 {
+    for z in 0..100 {
+      "d_{x}_{z}" {
+        Position: {x * 1.2 - 59.4, (x + z) % 7 * 0.6, z * 1.2 - 59.4}
+        Rotation: {0, (x * 0.1), 0}
+        Box: {0.6, 0.6, 0.6}
+        Rgb: {250 - x * 2, 120 + (z % 20) * 6, 60 + x}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 300, warmup: 60, period: 5, elevation: 30, camera: camera}
+}

@@ -6,8 +6,6 @@ using box.view
 using box.perf
 
 camera {
-  Position: {0, 60, 160}
-  Rotation: {-0.4, 0, 0}
   Camera: {fov: 50}
 }
 
@@ -32,5 +30,5 @@ for x in 0..400 {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }

@@ -9,13 +9,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/** Seconds before a deadline the pacer stops sleeping and spins */
-#define BOX_PERF_SPIN (0.0002)
+/** Seconds before a deadline the pacer stops sleeping and spins.
+ *
+ * Every sleep of the pacer ends at least this long before the deadline, even with the full
+ * timer leeway, so a thread that wakes up this much late on a busy machine still makes it.
+ */
+#define BOX_PERF_SPIN (0.001)
 
-/** Fraction of the time left that one sleep of the pacer asks for.
+/** Fraction of the time left before the spin that one sleep of the pacer asks for.
  *
  * A process without a window gets up to 50% timer leeway on macOS, so a sleep of the whole
- * time left would overshoot the deadline by up to half of it.
+ * time left would overshoot by up to half of it.
  */
 #define BOX_PERF_SLEEP (0.6)
 
@@ -41,7 +45,7 @@ static double box_perf_now(void)
     return result;
 }
 
-/** Wait until a deadline with ever shorter sleeps that cannot overshoot it, then spin.
+/** Wait until a deadline with ever shorter sleeps that end a spin interval before it, then spin.
  *
  * @param deadline Wall seconds to wait for
  * @return The wall clock after the wait
@@ -51,7 +55,7 @@ static double box_perf_wait(
 {
     double now = box_perf_now();
     while (now < deadline) {
-        double left = deadline - now;
+        double left = deadline - now - BOX_PERF_SPIN;
         if (left > BOX_PERF_SPIN) {
             if (box_perf_sleep) {
                 box_perf_sleep(left * BOX_PERF_SLEEP);
@@ -140,9 +144,14 @@ static void BoxPerfOnSet(
     perf->fps = fps;
     perf->frames = run->frames > 0 ? run->frames : 0;
     perf->warmup = run->warmup < BOX_PERF_MIN_WARMUP ? BOX_PERF_MIN_WARMUP : run->warmup;
+    status.warmup = perf->warmup;
+    status.period = run->period;
     perf->run = 0;
     perf->mark = 0;
     perf->bounds = false;
+    perf->cull_frame = -1;
+    ecs_os_memset(perf->cull_last, 0, ECS_SIZEOF(perf->cull_last));
+    ecs_os_memset(perf->cull_sum, 0, ECS_SIZEOF(perf->cull_sum));
     ecs_vec_clear(&perf->intervals);
     ecs_vec_clear(&perf->work);
     if (!valid) {
@@ -307,6 +316,7 @@ static void box_perf_begin(
     const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
     perf->slept = app ? app->slept : 0;
     perf->stalls = render ? render->stalls : 0;
+    perf->measure = perf->mark;
     perf->state = PerfMeasure;
 }
 
@@ -337,6 +347,115 @@ static void box_perf_count(
     status->errors = status->slow + status->fast;
 }
 
+/** Check whether a camera is the orbiting camera or one of its descendants.
+ *
+ * @param world The world
+ * @param e The camera of a view
+ * @param camera The orbiting camera
+ * @return Whether the view sees through the orbit
+ */
+static bool box_perf_follows(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t camera)
+{
+    while (e && e != camera && ecs_is_alive(world, e)) {
+        e = ecs_get_parent(world, e);
+    }
+
+    return camera != 0 && e == camera;
+}
+
+/** Add one culling sample to a range.
+ *
+ * @param range The range to update
+ * @param value The sampled count
+ * @param sum The sum of every sample including this one
+ * @param samples The number of samples including this one
+ */
+static void box_perf_range(
+    PerfRange *range,
+    int32_t value,
+    double sum,
+    int32_t samples)
+{
+    range->min = samples == 1 || value < range->min ? value : range->min;
+    range->max = samples == 1 || value > range->max ? value : range->max;
+    range->mean = sum / (double)samples;
+}
+
+/** Count one culling sample of the orbiting views.
+ *
+ * @param perf The state of the module
+ * @param status The status whose ranges are updated
+ * @param counts The visible, frustum culled and occlusion culled instances
+ */
+static void box_perf_cull_count(
+    box_perf_t *perf,
+    PerfStatus *status,
+    const int32_t counts[3])
+{
+    PerfRange *ranges[3] = {
+        &status->visible, &status->frustum_culled, &status->occlusion_culled
+    };
+    bool changed = false;
+    int32_t i;
+    status->cull_samples ++;
+    for (i = 0; i < 3; i ++) {
+        changed |= status->cull_samples > 1 && counts[i] != perf->cull_last[i];
+        perf->cull_last[i] = counts[i];
+        perf->cull_sum[i] += counts[i];
+        box_perf_range(ranges[i], counts[i], perf->cull_sum[i], status->cull_samples);
+    }
+
+    status->cull_changes += changed;
+}
+
+/** Count the views that render the orbit and sample their culling when the GPU published a
+ * new result.
+ *
+ * @param world The world
+ * @param perf The state of the module
+ * @param status The status to update
+ * @param camera The orbiting camera
+ */
+static void box_perf_sample_cull(
+    ecs_world_t *world,
+    box_perf_t *perf,
+    PerfStatus *status,
+    ecs_entity_t camera)
+{
+    int32_t counts[3] = {0, 0, 0};
+    int64_t frame = -1;
+    int32_t views = 0;
+    ecs_iter_t it = ecs_each(world, View);
+    while (ecs_each_next(&it)) {
+        const View *v = ecs_field(&it, View, 0);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            const CullStatus *cull;
+            if (!box_perf_follows(world, v[i].camera, camera)) {
+                continue;
+            }
+
+            views ++;
+            cull = ecs_get(world, it.entities[i], CullStatus);
+            if (cull) {
+                counts[0] += cull->visible;
+                counts[1] += cull->frustum_culled;
+                counts[2] += cull->occlusion_culled;
+                frame = cull->frame > frame ? cull->frame : frame;
+            }
+        }
+    }
+
+    status->views = views;
+    if (frame >= 0 && frame != perf->cull_frame) {
+        perf->cull_frame = frame;
+        box_perf_cull_count(perf, status, counts);
+    }
+}
+
 /** Complete the run: write the statistics and the report and quit when asked.
  *
  * @param world The world
@@ -365,6 +484,9 @@ static void box_perf_end(
     status->work_max_ms = work.max;
     status->slept_ms = app ? (app->slept - perf->slept) * 1000.0 : 0;
     status->stalls = render ? render->stalls - perf->stalls : 0;
+    status->revolutions = run->period > 0
+        ? (float)((perf->mark - perf->measure) / run->period)
+        : 0.0f;
     status->passed = status->errors == 0 && status->frame == perf->frames;
     status->state = PerfDone;
     perf->state = PerfDone;
@@ -398,6 +520,7 @@ static void BoxPerfFrame(
         now = box_perf_wait(perf->mark + 1.0 / perf->fps);
         if (perf->state == PerfMeasure) {
             box_perf_count(perf, status, now - perf->mark, work);
+            box_perf_sample_cull(it->world, perf, status, box_perf_camera(it->world, run));
         }
     }
 
@@ -446,6 +569,7 @@ void BoxPerfImport(
     ECS_MODULE(world, BoxPerf);
 
     ECS_META_COMPONENT(world, PerfState);
+    ECS_META_COMPONENT(world, PerfRange);
     ECS_META_COMPONENT(world, PerfRun);
     ECS_META_COMPONENT(world, PerfStatus);
     box_owned_hooks(world, PerfRun, BOX_OWNED_STR(PerfRun, report));

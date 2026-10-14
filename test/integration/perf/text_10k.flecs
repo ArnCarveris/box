@@ -1,0 +1,43 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.text
+using box.perf
+
+// 10,000 labels of about five glyphs each, 50,000 glyph instances in the 2D batches of the
+// text atlas, lying on a board. The orbit sees them at every angle and distance.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+board {
+  Position: {0, -0.1, 0}
+  Box: {204, 0.2, 204}
+  Rgb: {48, 54, 70}
+}
+
+labels {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+
+  for x in 0..100 {
+    for y in 0..100 {
+      "t_{x}_{y}" {
+        Position: {x * 2 - 99, y * 2 - 99, 0}
+        Scale: {0.01, 0.01, 1}
+        Text: {value: "{x}:{y}", size: 40, align: Center}
+        Rgb: {250, 220 - (x % 10) * 10, 120 + (y % 10) * 12}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}

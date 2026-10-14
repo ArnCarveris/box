@@ -10,7 +10,9 @@ visual renders every <dir>/<scene>.flecs (test/integration/visual by default) he
 boxrun, a static camera and a fixed delta, and compares the last frame with
 <dir>/baseline/<scene>.png. A scene fails when the difference is strong and widespread: the
 largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
-so GPU speckle and faint drift pass. A missing baseline fails too.
+so GPU speckle and faint drift pass. A missing baseline fails too. A scene that includes scripts
+from elsewhere (`include town_content`) lists them in <scene>.sources, one path relative to the
+scene per line; they are copied next to the harness the scene runs from (visual and perf).
 
 --update-baseline <scene> renders that scene and stores the render as its baseline; repeat it
 for more scenes. Scenes are names or paths; without any, every scene of the folder runs.
@@ -29,7 +31,11 @@ perf runs every <dir>/<scene>.flecs (test/integration/perf by default) headless 
 offscreen surface. The scene sets the box.perf.PerfRun singleton (30, 60, 90 or 120 FPS); the
 engine paces every frame to the target, orbits the camera around the bounds of the shapes and
 counts every frame interval outside [0.9, 1.1] target intervals as an error. A scene passes only
-with zero errors. The results go to <out>/perf.json (test/integration/out by default), which the
+with zero errors, when a view renders the orbiting camera (or a camera under it), when the
+measured frames cover at least one revolution (frames >= fps * period) and when the warmup, the
+only frames not measured, is at most one second. A run is retried only when the load guard refused
+to start it; a run that started is never retried. Each result also holds the range of the visible,
+frustum culled and occlusion culled instances of the orbiting views over the measurement. The results go to <out>/perf.json (test/integration/out by default), which the
 pm page charts, with the 1 minute load average before and after every scene. --stall adds busy
 milliseconds to every frame to prove that the checks fail a slow scene. --max-load waits, up to
 --load-wait seconds, until the load average is at most n before every scene.
@@ -60,7 +66,12 @@ GUARD_WAIT = 10
 PERF_TIMEOUT = 120
 PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
                "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
-               "slept_ms", "stalls", "stall_ms")
+               "slept_ms", "stalls", "stall_ms", "warmup", "period", "revolutions", "views")
+CULL_FIELDS = ("visible", "frustum_culled", "occlusion_culled")
+PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "cull_changes",
+                           "load_before", "load_after") + tuple(
+    "%s_%s" % (name, end) for name in CULL_FIELDS for end in ("min", "max"))
+MAX_SETTLE_SECONDS = 1.0
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_CHANNELS = {0: 1, 2: 3, 4: 2, 6: 4}
 
@@ -246,11 +257,27 @@ def app_project(app):
     return app
 
 
+def copy_sources(scene, folder):
+    sidecar = os.path.splitext(scene)[0] + ".sources"
+    if not os.path.isfile(sidecar):
+        return
+    with open(sidecar) as f:
+        lines = [line.strip() for line in f]
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        source = os.path.normpath(os.path.join(os.path.dirname(scene), line))
+        if not os.path.isfile(source):
+            sys.exit("%s: no source %s" % (display(sidecar), display(source)))
+        shutil.copyfile(source, os.path.join(folder, os.path.basename(source)))
+
+
 def render_scene(scene, png, args):
     width, height = (int(v) for v in args.size.lower().split("x"))
     with open(scene) as f:
         source = f.read()
     harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
+    copy_sources(scene, os.path.dirname(png))
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
@@ -512,10 +539,46 @@ def run_perf_process(cmd, report):
         except subprocess.TimeoutExpired as e:
             log = "perf run timed out\n" + str(e.stdout or "") + str(e.stderr or "")
             code = -1
-        if "cpu oversubscribed" not in log or attempt + 1 == GUARD_RETRIES:
+        refused = "cpu oversubscribed" in log and not os.path.exists(report)
+        if not refused or attempt + 1 == GUARD_RETRIES:
             break
         time.sleep(GUARD_WAIT)
     return code, log
+
+
+def perf_cull(data, result):
+    cull = data.get("cull") or {}
+    result["cull_samples"] = cull.get("samples", 0)
+    result["cull_changes"] = cull.get("changes", 0)
+    for name in CULL_FIELDS:
+        rng = cull.get(name) or {}
+        result[name + "_min"] = rng.get("min", 0)
+        result[name + "_max"] = rng.get("max", 0)
+    visible = (cull.get("visible") or {}).get("mean", 0)
+    hidden = sum((cull.get(name) or {}).get("mean", 0) for name in CULL_FIELDS[1:])
+    result["drawn"] = round(visible)
+    result["culled"] = round(hidden)
+
+
+def perf_problems(data):
+    problems = []
+    fps = data.get("target_fps") or 0
+    period = data.get("period") or 0
+    if not data.get("views"):
+        problems.append("no view renders the orbiting camera")
+    cull = data.get("cull") or {}
+    if cull.get("samples") and not (cull.get("visible") or {}).get("max"):
+        problems.append("the orbiting views draw nothing (beyond the far plane?)")
+    if period <= 0:
+        problems.append("the camera does not orbit (period %g)" % period)
+    if fps and period and data.get("frames", 0) < fps * period:
+        problems.append("the measurement covers %.2f of a revolution, frames must be at least "
+                        "fps * period (%d)" % (data.get("frames", 0) / (fps * period),
+                                               round(fps * period)))
+    if fps and data.get("warmup", 0) > fps * MAX_SETTLE_SECONDS:
+        problems.append("warmup %d frames exceeds the %g s settle period" % (
+            data.get("warmup", 0), MAX_SETTLE_SECONDS))
+    return problems
 
 
 def perf_detail(data):
@@ -525,6 +588,14 @@ def perf_detail(data):
                 data.get("frames", 0), data.get("target_fps", 0), data.get("mean_ms", 0),
                 data.get("p99_ms", 0), data.get("max_ms", 0), data.get("work_mean_ms", 0),
                 data.get("work_p99_ms", 0), data.get("slept_ms", 0)))
+
+
+def cull_detail(result):
+    return ("visible %d..%d, frustum culled %d..%d, occlusion culled %d..%d, %d of %d samples "
+            "changed" % (result["visible_min"], result["visible_max"],
+                         result["frustum_culled_min"], result["frustum_culled_max"],
+                         result["occlusion_culled_min"], result["occlusion_culled_max"],
+                         result["cull_changes"], result["cull_samples"]))
 
 
 def run_perf_scene(scene, out, args):
@@ -537,6 +608,7 @@ def run_perf_scene(scene, out, args):
         if "PerfRun" not in f.read():
             result.update({"detail": "the scene sets no PerfRun", "elapsed": 0})
             return result
+    copy_sources(scene, out)
     with open(harness, "w") as f:
         f.write(perf_script(scene, report, args))
     result["load_before"] = wait_for_load(args.max_load, args.load_wait)
@@ -558,9 +630,14 @@ def run_perf_scene(scene, out, args):
         if key in data:
             result[key] = data[key]
     result["entities"] = data.get("shapes", 0)
+    if data.get("target_fps") and data.get("period"):
+        result["deg_per_frame"] = round(360.0 / (data["target_fps"] * data["period"]), 3)
+    perf_cull(data, result)
     result["intervals_ms"] = data.get("intervals_ms", [])
-    result["status"] = "pass" if data.get("passed") else "fail"
-    result["detail"] = perf_detail(data)
+    problems = perf_problems(data)
+    result["problems"] = problems
+    result["status"] = "pass" if data.get("passed") and not problems else "fail"
+    result["detail"] = "; ".join(problems + [perf_detail(data), cull_detail(result)])
     return result
 
 
@@ -594,7 +671,7 @@ def cmd_perf(args):
     if args.json:
         cases = [dict(r, scene=r["name"]) for r in results]
         write_json(args.json, cases, display(directory), time.time() - start, "Perf",
-                   PERF_FIELDS)
+                   PERF_KEYS)
 
     return 1 if failed else 0
 

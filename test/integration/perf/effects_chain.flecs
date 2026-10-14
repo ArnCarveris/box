@@ -1,0 +1,75 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+using box.perf
+
+// The whole post effect chain on a lit city of 10,000 blocks with 2,500 glowing spheres:
+// auto exposure, SSAO, height fog, bloom and tonemapping, every pass at full HDR resolution.
+exposure {
+  AutoExposure: {speed_up: 3, speed_down: 1}
+}
+
+ssao {
+  Ssao: {radius: 0.8, intensity: 1.5}
+}
+
+fog {
+  HeightFog: {density: 0.02, falloff: 0.2, base_height: 0}
+}
+
+bloom {
+  Bloom: {intensity: 0.3, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {auto_exposure: exposure}
+}
+
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {110, 150, 210, 255}}, effects: [{effect: exposure}, {effect: ssao}, {effect: fog}, {effect: bloom}, {effect: tonemap}]}
+}
+
+sun {
+  Rotation: {-0.6, 2.5, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 235, 210}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {204, 0.2, 204}
+  Rgb: {120, 130, 110}
+}
+
+for x in 0..100 {
+  for z in 0..100 {
+    {
+      Position: {x * 2 - 99, 0.5 + ((x * 5 + z * 3) % 7) * 0.5, z * 2 - 99}
+      Box: {1.2, 1 + ((x * 5 + z * 3) % 7), 1.2}
+      Rgb: {200, 190 - (x % 20) * 3, 180}
+    }
+  }
+}
+
+for x in 0..50 {
+  for z in 0..50 {
+    {
+      Position: {x * 4 - 97, 5.5, z * 4 - 97}
+      Sphere: {segments: 12, smooth: true, radius: 0.3}
+      Rgb: {20, 20, 20}
+      Emissive: {strength: 4, color: {255, 140 + (x % 4) * 30, 60 + (z % 4) * 50}}
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}

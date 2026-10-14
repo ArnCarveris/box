@@ -22,6 +22,12 @@ void fake_sleep(
     fake_time += seconds;
 }
 
+void fake_sleep_late(
+    double seconds)
+{
+    fake_time += seconds * 1.5 + 0.001;
+}
+
 void fake_work(
     ecs_iter_t *it)
 {

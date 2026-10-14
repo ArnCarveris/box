@@ -72,6 +72,43 @@ done:
     return;
 }
 
+/** Append a culling range as a JSON member.
+ *
+ * @param buf The buffer
+ * @param name The name of the member
+ * @param range The range
+ */
+static void box_perf_report_range(
+    ecs_strbuf_t *buf,
+    const char *name,
+    const PerfRange *range)
+{
+    ecs_strbuf_append(buf, "    \"%s\": {\"min\": %d, \"max\": %d, \"mean\": %.1f}",
+        name, range->min, range->max, range->mean);
+}
+
+/** Append the orbit and the culling the orbiting views saw as JSON members.
+ *
+ * @param buf The buffer
+ * @param status The completed status
+ */
+static void box_perf_report_orbit(
+    ecs_strbuf_t *buf,
+    const PerfStatus *status)
+{
+    ecs_strbuf_append(buf,
+        "  \"warmup\": %d,\n  \"period\": %.3f,\n  \"revolutions\": %.3f,\n"
+        "  \"views\": %d,\n  \"cull\": {\n    \"samples\": %d,\n    \"changes\": %d,\n",
+        status->warmup, (double)status->period, (double)status->revolutions, status->views,
+        status->cull_samples, status->cull_changes);
+    box_perf_report_range(buf, "visible", &status->visible);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "frustum_culled", &status->frustum_culled);
+    ecs_strbuf_appendstr(buf, ",\n");
+    box_perf_report_range(buf, "occlusion_culled", &status->occlusion_culled);
+    ecs_strbuf_appendstr(buf, "\n  },\n");
+}
+
 /** Append the statistics of a status as JSON members.
  *
  * @param buf The buffer
@@ -120,6 +157,7 @@ int box_perf_report(
     ecs_strbuf_append(&buf, "{\n  \"scene\": \"%s\",\n  \"target_fps\": %d,\n", scene, target);
     ecs_strbuf_append(&buf, "  \"stall_ms\": %.3f,\n", (double)run->stall);
     box_perf_report_stats(&buf, status);
+    box_perf_report_orbit(&buf, status);
     ecs_strbuf_appendstr(&buf, "  \"intervals_ms\": [");
     for (i = 0; i < count; i ++) {
         ecs_strbuf_append(&buf, i ? ", %.4f" : "%.4f", values[i]);

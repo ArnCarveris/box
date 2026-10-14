@@ -276,3 +276,157 @@ void Orbit_period(void) {
     box_perf_clock = NULL;
     box_perf_sleep = NULL;
 }
+
+void Orbit_cull_ranges(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 6, .period = 1, .camera = camera });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    int32_t visible[6] = {10, 12, 12, 7, 7, 15};
+    int64_t frame[6] = {1, 2, 2, 3, 4, 5};
+    for (int i = 0; i < 6; i ++) {
+        ecs_set(world, view, CullStatus, {
+            .frame = frame[i],
+            .instances = 20,
+            .visible = visible[i],
+            .frustum_culled = 20 - visible[i] - 2,
+            .occlusion_culled = 2 });
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->views, 1);
+    test_int(status->cull_samples, 5);
+    test_int(status->cull_changes, 3);
+    test_int(status->visible.min, 7);
+    test_int(status->visible.max, 15);
+    test_assert(fabs(status->visible.mean - 51.0 / 5.0) < 1e-6);
+    test_int(status->frustum_culled.min, 3);
+    test_int(status->frustum_culled.max, 11);
+    test_int(status->occlusion_culled.min, 2);
+    test_int(status->occlusion_culled.max, 2);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Orbit_views_of_orbit(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t lens = ecs_new_w_pair(world, EcsChildOf, camera);
+    ecs_set(world, lens, Position, {0, 0, 0});
+    ecs_set(world, lens, Camera, {.fov = 12});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Position, {0, 2, 0});
+    ecs_set(world, other, Camera, {.fov = 60});
+
+    ecs_entity_t near = ecs_new(world);
+    ecs_set(world, near, View, {.camera = lens});
+    ecs_entity_t far = ecs_new(world);
+    ecs_set(world, far, View, {.camera = other});
+    ecs_set(world, far, CullStatus, {.frame = 1, .instances = 1, .visible = 1});
+
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 3, .period = 1, .camera = camera });
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->views, 1);
+    test_int(status->cull_samples, 0);
+
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 3, .period = 1, .camera = other });
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->views, 1);
+    test_int(status->cull_samples, 1);
+    test_int(status->visible.max, 1);
+
+    ecs_delete(world, near);
+    ecs_delete(world, far);
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 3, .period = 1, .camera = camera });
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->views, 0);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Orbit_revolutions(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {0, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 60, .warmup = 2, .frames = 90, .period = 0.5f, .camera = camera });
+    for (int i = 0; i < 92; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->warmup, 2);
+    test_flt(status->period, 0.5f);
+    test_assert(fabsf(status->revolutions - 3.0f) < 0.01f);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}

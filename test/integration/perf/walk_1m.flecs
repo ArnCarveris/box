@@ -7,8 +7,10 @@ using box.input
 using box.controllers
 using box.perf
 
-// The walk holds Forward and turns by a fixed Look delta every frame: actions that are
-// disabled keep the ActionState the scene gives them, as no binding resolves them.
+// 1,000,000 boxes, spheres, cylinders and cones (250,000 each) seen from the orbit, while a first
+// person controller walks a circle through them and collides through the spatial index. The walk
+// holds Forward and turns by a fixed Look delta every frame: actions that are disabled keep the
+// ActionState the scene gives them, as no binding resolves them.
 walk {
   Forward {
     ActionState: {down: true}
@@ -27,12 +29,22 @@ player {
   FirstPersonController: {actions: walk}
 }
 
-orbit {
-  Position: {0, 0, 0}
+// The orbit fits the whole field, 2,500 units away, where a shape is far below a pixel and
+// size culled. The view looks through a 5 degree lens turned 3 degrees off the center instead,
+// so it sweeps a ring of the field at a few pixels per shape and shapes enter and leave it
+// every frame. Both cameras have no far plane: the far side of the field is 3,600 units away.
+camera {
+  Camera: {fov: 50, far_: 0}
+
+  lens {
+    Position: {0, 0, 0}
+    Rotation: {0, 0.05, 0}
+    Camera: {fov: 5, far_: 0}
+  }
 }
 
 main_view {
-  View: {camera: player, clear: {enabled: true, color: {24, 28, 36, 255}}}
+  View: {camera: camera.lens, clear: {enabled: true, color: {24, 28, 36, 255}}}
 }
 
 floor {
@@ -71,5 +83,5 @@ for x in 0..500 {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: orbit}
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }

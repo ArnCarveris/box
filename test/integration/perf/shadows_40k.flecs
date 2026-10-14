@@ -1,0 +1,44 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.perf
+
+// 40,000 pillars that all cast into four 2048 texel shadow cascades of a low sun. The orbit
+// changes the view frustum every frame, so the cascades are fitted again and their casters culled
+// again every frame.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 500, split_lambda: 0.7, depth_bias: 2, normal_offset: 1.5, filter_size: 3, fade: 0.2}}
+}
+
+sun {
+  Rotation: {-0.7, 0.6, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {204, 0.2, 204}
+  Rgb: {190, 190, 180}
+}
+
+for x in 0..200 {
+  for z in 0..200 {
+    {
+      Position: {x - 99.5, 0.5 + ((x * 7 + z * 3) % 6) * 0.25, z - 99.5}
+      Box: {0.4, 1 + ((x * 7 + z * 3) % 6) * 0.5, 0.4}
+      Rgb: {200 - (x % 40) * 2, 120 + (z % 30) * 3, 90}
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}
