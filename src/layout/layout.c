@@ -50,9 +50,16 @@ static void box_layout_on_position(
         goto done;
     }
 
+    ecs_entity_t prev = 0;
+    bool laid_out = false;
     for (i = 0; i < it->count; i ++) {
         ecs_entity_t parent = ecs_get_parent(it->world, it->entities[i]);
-        if (parent && ecs_has(it->world, parent, Layout)) {
+        if (parent != prev) {
+            laid_out = parent && ecs_has(it->world, parent, Layout);
+            prev = parent;
+        }
+
+        if (laid_out) {
             box_layout_mark(state, it->entities[i]);
         }
     }
