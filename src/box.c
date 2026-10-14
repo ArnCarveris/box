@@ -9,6 +9,7 @@
 void BoxImport(
     ecs_world_t *world)
 {
+    ECS_IMPORT(world, FlecsScriptMath);
     ECS_IMPORT(world, BoxTransform);
     ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxCamera);
