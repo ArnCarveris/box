@@ -83,16 +83,9 @@ static void box_draws_tinted(
 {
     const box_draw_tint_t *inherited = material->inherited;
     const Tint *tint = material->tint;
-    int32_t i;
-    if ((!inherited || inherited->keep >= 1.0f) && (!tint || !tint->a)) {
-        out[0] = box_draws_linear(color[0]);
-        out[1] = box_draws_linear(color[1]);
-        out[2] = box_draws_linear(color[2]);
-        goto done;
-    }
-
     const uint8_t *own = tint ? &tint->r : NULL;
     float a = tint ? (float)tint->a / 255.0f : 0.0f;
+    int32_t i;
     for (i = 0; i < 3; i ++) {
         float c = (float)color[i] / 255.0f;
         if (inherited) {
@@ -105,9 +98,6 @@ static void box_draws_tinted(
 
         out[i] = box_draws_linear_f(c);
     }
-
-done:
-    return;
 }
 
 /** Hash a batch key.
@@ -326,7 +316,9 @@ void box_draws_material(
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
     const TextureTransform *uv = material->uv;
-    box_draws_tinted(out->color, color ? &color->r : box_draws_default_color, material);
+    out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
+    out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
+    out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
     out->color[3] = box_draws_alpha(material);
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
     out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
@@ -341,6 +333,9 @@ void box_draws_material(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->inherited || material->tint) {
+        box_draws_tinted(out->color, color ? &color->r : box_draws_default_color, material);
+    }
 }
 
 void box_draws_transform(
@@ -846,14 +841,13 @@ static void box_draws_fill_material(
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
-    const void *tints = ecs_field(it, Tint, 11);
+    const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
     ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
     ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
     ecs_size_t uv_step = box_draws_stride(it, uvs, ECS_SIZEOF(TextureTransform), 8);
-    ecs_size_t tint_step = box_draws_stride(it, tints, ECS_SIZEOF(Tint), 11);
     box_draw_tint_t inherited;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
@@ -872,8 +866,8 @@ static void box_draws_fill_material(
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
-            .tint = box_draws_at(tints, tint_step, i),
-            .inherited = &slots[i].tint,
+            .tint = tints ? &tints[i] : NULL,
+            .inherited = slots[i].tinted ? &slots[i].tint : NULL,
             .fade = slots[i].fade
         };
         if (walk) {

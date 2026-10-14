@@ -297,6 +297,7 @@ static void box_draws_update(
     d->stats.processed ++;
     if (drawn) {
         s->fade = box_draws_fade(world, e, &s->tint);
+        s->tinted = s->tint.keep < 1.0f;
         material = (box_draw_material_t){
             .color = ecs_get(world, e, Rgb),
             .opacity = ecs_get(world, e, Opacity),
@@ -304,7 +305,7 @@ static void box_draws_update(
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
             .tint = ecs_get(world, e, Tint),
-            .inherited = &s->tint,
+            .inherited = s->tinted ? &s->tint : NULL,
             .fade = s->fade
         };
         box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
@@ -548,8 +549,7 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone,
                 .oper = EcsOptional
-            },
-            { .id = ecs_id(Tint), .inout = EcsIn, .oper = EcsOptional }
+            }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -571,8 +571,7 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
-            { .id = ecs_id(Tint), .inout = EcsIn, .oper = EcsOptional }
+            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
         },
         .cache_kind = EcsQueryCacheAuto
     });

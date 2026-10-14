@@ -26,6 +26,7 @@ typedef struct DrawSlot {
     int32_t slot;   /**< Slot of the entity in the batch */
     float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
     bool dirty;     /**< The entity is in the list of changed entities */
+    bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
     box_draw_tint_t tint; /**< Tints of the ancestors, composed from the root down */
 } DrawSlot;
 
