@@ -29,6 +29,9 @@
 /** Width and height a page grows to before the next glyph starts a new page */
 #define BOX_TEXT_PAGE_MAX (1024)
 
+/** Most passes box_text_atlas_place makes over the pages before a glyph is drawn as missing */
+#define BOX_TEXT_PLACE_TRIES (8)
+
 /** First backend texture handle of atlas pages, the handles below belong to box.texture */
 #define BOX_TEXT_PAGE_FIRST (0x40000000u)
 
@@ -110,6 +113,7 @@ typedef struct box_text_font_t {
     ecs_vec_t pages;        /**< box_text_page_t*, the atlas of the face */
     bool requested;         /**< A Text uses the font, so the font loads */
     bool relayout;          /**< A page grew, the texts of the font lay out again */
+    bool oversized;         /**< A glyph of the face did not fit a page, which was logged */
 } box_text_font_t;
 
 /** Main thread state of the fonts of a world */

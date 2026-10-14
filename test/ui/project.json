@@ -81,7 +81,9 @@
                     "align_lines",
                     "many_glyphs",
                     "dynamic_transform",
-                    "module_child_fini"
+                    "module_child_fini",
+                    "oversized_glyph_missing",
+                    "font_without_units_fails"
                 ]
             },
             {

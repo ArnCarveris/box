@@ -6,7 +6,11 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 #include "render.h"
+#include "draw.h"
+#include "preprocess.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -805,4 +809,143 @@ void Text_module_child_fini(void) {
     test_assert(b->width > 0);
 
     test_int(ecs_fini(world), 0);
+}
+
+void Text_oversized_glyph_missing(void) {
+    // hardening/font_glyph_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0, loca = 0, glyf = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            head = off;
+        } else if (!memcmp(rec, "loca", 4)) {
+            loca = off;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf = off;
+        }
+    }
+
+    test_assert(head && loca && glyf);
+    test_int((data[head + 50] << 8) | data[head + 51], 0);
+    int32_t glyph_w = 56;
+    uint32_t at = glyf + 2 * (uint32_t)((data[loca + 2 * glyph_w] << 8) |
+        data[loca + 2 * glyph_w + 1]);
+    data[at + 4] = 0x80;
+    data[at + 5] = 0x00;
+    data[at + 8] = 0x7f;
+    data[at + 9] = 0xff;
+
+    char *path = flecs_asprintf("%s/oversized.ttf", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {.value = "WA\xe4\xb8\x80", .size = 20, .font = font});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+    const TextGlyphs *tg = ecs_get(world, e, TextGlyphs);
+    test_assert(tg != NULL);
+    test_int(ecs_vec_count(&tg->glyphs), 3);
+    const box_text_glyph_t *q = ecs_vec_first(&tg->glyphs);
+    test_flt(q[0].width, q[2].width);
+    test_flt(q[0].height, q[2].height);
+    test_flt(q[0].uv[2], q[2].uv[2]);
+    test_flt(q[0].uv[3], q[2].uv[3]);
+    test_assert(q[1].uv[2] != q[2].uv[2] || q[1].uv[3] != q[2].uv[3]);
+    test_assert(q[1].height < 40);
+    test_assert(q[1].width > 0);
+
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
+}
+
+void Text_font_without_units_fails(void) {
+    // hardening/font_glyph_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = ecs_os_malloc((ecs_size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    uint32_t head = 0;
+    int32_t i, tables = (data[4] << 8) | data[5];
+    for (i = 0; i < tables; i ++) {
+        const uint8_t *rec = data + 12 + i * 16;
+        if (!memcmp(rec, "head", 4)) {
+            head = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        }
+    }
+
+    test_assert(head != 0);
+    data[head + 18] = 0;
+    data[head + 19] = 0;
+
+    char *path = flecs_asprintf("%s/no_units.ttf", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+
+    ecs_entity_t font = ecs_new(world);
+    ecs_set(world, font, Font, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Text, {.value = "WA", .size = 20, .font = font});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, Text, {.value = "WA", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    const FontStatus *status = ecs_get(world, font, FontStatus);
+    test_int(status->state, FontFailed);
+    test_assert(status->error != NULL);
+    test_assert(strstr(status->error, "units per em") != NULL);
+    test_flt(ecs_get(world, e, TextBounds)->width, 0);
+    test_assert(ecs_get(world, other, TextBounds)->width > 0);
+
+    ecs_os_free(path);
+    ecs_os_free(data);
+    ecs_os_free(src);
+    ecs_fini(world);
 }
