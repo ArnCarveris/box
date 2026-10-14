@@ -319,6 +319,21 @@ typedef struct box_gpu_forward_t {
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_forward_t;
 
+/** Uniforms of a probe volume, as in Volume of etc/shaders/mesh.wgsl */
+typedef struct box_gpu_volume_uniforms_t {
+    float origin[4];                /**< First probe, w is the spacing */
+    uint32_t size[4];               /**< Probes per axis, w is 1 when views sample the probes */
+} box_gpu_volume_uniforms_t;
+
+/** An irradiance probe volume: grid uniforms, SH of every probe and the validity mask */
+typedef struct box_gpu_volume_t {
+    WGPUBuffer grid;                /**< box_gpu_volume_uniforms_t */
+    WGPUBuffer probes;              /**< BOX_RENDER_SH_COEFFICIENTS vec4 per probe */
+    WGPUBuffer valid;               /**< One bit per probe, set when views sample it */
+    uint32_t count;                 /**< Probes of the volume */
+    WGPUBindGroup group;            /**< Binds the three buffers as group 3 of the forward pass */
+} box_gpu_volume_t;
+
 /** The webgpu backend: device, shared objects and targets */
 typedef struct box_gpu_t {
     WGPUInstance instance;          /**< The instance */
@@ -339,6 +354,9 @@ typedef struct box_gpu_t {
     ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */
     ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
+    WGPUBindGroupLayout volume_layout; /**< Binds the probe volume a view samples */
+    ecs_map_t volumes;              /**< Handle to box_gpu_volume_t */
+    box_gpu_volume_t *no_volume;    /**< 1x1x1 volume of the views that use the hemisphere */
     box_gpu_forward_t forward[BOX_GPU_FORWARD_PIPELINES]; /**< Forward pipelines */
     int32_t forward_count;          /**< Forward pipelines created */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
@@ -588,6 +606,45 @@ WGPUBindGroup box_gpu_material_group(
     box_gpu_t *gpu,
     const box_render_batch_t *b,
     uint32_t anisotropy);
+
+/** Create the layout of the probe volumes and the volume of views without one.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_bake_init(
+    box_gpu_t *gpu);
+
+/** Release the probe volumes and their layout.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_bake_fini(
+    box_gpu_t *gpu);
+
+/** Create, refill or release a probe volume from a BOX_RENDER_VOLUME resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the volume
+ * @param handle Handle of the volume
+ * @param desc Grid, SH and validity mask, NULL for a release
+ * @param size Bytes of the description with its mask
+ */
+void box_gpu_bake_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_volume_desc_t *desc,
+    uint32_t size);
+
+/** Get the bind group of the probe volume a view samples.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The group of its volume, or of the 1x1x1 volume that leaves the hemisphere ambient
+ */
+WGPUBindGroup box_gpu_bake_group(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
 
 /** Create the layouts the forward pass shares.
  *

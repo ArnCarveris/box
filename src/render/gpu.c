@@ -391,6 +391,9 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_TEXTURE) {
             box_gpu_texture_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_texture_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_VOLUME) {
+            box_gpu_bake_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_volume_desc_t) ? data : NULL, r->size);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {

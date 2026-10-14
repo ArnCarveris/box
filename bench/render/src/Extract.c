@@ -4,6 +4,7 @@
  *
  * A world with 100k static and 10k dynamic shapes runs frames against a backend that drops
  * the packets, so a case measures the main thread: transforms, change tracking and extract.
+ * The baked case adds a LightBake whose probe volume stays idle.
  */
 
 #include <box.h>
@@ -36,13 +37,19 @@ static void bench_render_drop(
  *
  * @param b The benchmark
  * @param changed Static shapes moved before every frame
+ * @param baked The scene has a LightBake, so its probe volume is kept every frame
  */
 static void bench_render_extract(
     bench_t *b,
-    int32_t changed)
+    int32_t changed,
+    bool baked)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    if (baked) {
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounds_padding = 1});
+    }
+
     box_render_backend_t backend = { .render = bench_render_drop };
     box_render_set_backend(world, &backend);
     ecs_entity_t camera = ecs_new(world);
@@ -87,6 +94,11 @@ static void bench_render_extract(
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     bench_counter(b, "scattered", (double)stats.scattered);
+    if (baked) {
+        bench_counter(b, "probes",
+            (double)ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes);
+    }
+
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(shapes);
@@ -96,12 +108,19 @@ void Extract_unchanged(
     bench_t *b)
 {
     // renderer/instancing
-    bench_render_extract(b, 0);
+    bench_render_extract(b, 0, false);
 }
 
 void Extract_changed_1pct(
     bench_t *b)
 {
     // renderer/instancing
-    bench_render_extract(b, BENCH_STATIC / 100);
+    bench_render_extract(b, BENCH_STATIC / 100, false);
+}
+
+void Extract_baked_idle(
+    bench_t *b)
+{
+    // baked_lighting/probe_volume
+    bench_render_extract(b, 0, true);
 }

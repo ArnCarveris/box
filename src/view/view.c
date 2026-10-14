@@ -23,6 +23,7 @@ static void box_view_ctor(
     ecs_os_memset(ptr, 0, ti->size * count);
     for (i = 0; i < count; i ++) {
         values[i].lighting.enabled = true;
+        values[i].lighting.baked = true;
         values[i].shadows = (ShadowSettings){
             .cascades = 4,
             .resolution = 2048,
