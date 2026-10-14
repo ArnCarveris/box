@@ -61,7 +61,11 @@
                     "headless_creates_folder",
                     "not_headless_no_folder",
                     "parse_headless_creates_folder",
-                    "removed_at_fini"
+                    "removed_at_fini",
+                    "folder_private",
+                    "existing_folder_refused",
+                    "symlink_refused",
+                    "symlink_inside_not_followed"
                 ]
             },
             {

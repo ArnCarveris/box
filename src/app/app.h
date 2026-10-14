@@ -48,12 +48,30 @@ double box_app_pace(
     double wall_used,
     double budget);
 
-/** Create the temporary folder of the process and remove it when the world is deleted.
+/** Create the private temporary folder of the process, or share the one it created, and
+ * remove it when the last world that uses it is deleted. A folder that already exists at the
+ * path is refused and left alone.
+ *
+ * @param world The world
+ * @return The folder path, which the caller frees, or NULL when it could not be created
+ */
+char* box_app_tmp_open(
+    ecs_world_t *world);
+
+/** Open the temporary folder of a headless process and stop the world when that fails.
  *
  * @param world The world
  * @return The folder path, which the caller frees, or NULL when it could not be created
  */
 char* box_app_tmp_create(
     ecs_world_t *world);
+
+/** Remove a folder of the current user and everything in it without following symbolic
+ * links.
+ *
+ * @param path The folder
+ */
+void box_app_rmtree(
+    const char *path);
 
 #endif

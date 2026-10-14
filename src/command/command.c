@@ -31,7 +31,7 @@ static void box_terminal_session_dtor(
         }
 
         if (s[i].dir) {
-            box_terminal_rmtree(s[i].dir);
+            box_app_rmtree(s[i].dir);
             ecs_os_free(s[i].dir);
         }
 
@@ -64,7 +64,7 @@ static void box_terminal_session_move(
     ecs_os_memset(src_ptr, 0, count * ti->size);
 }
 
-/** Stop the server, remove the session root this module created and free the host.
+/** Stop the server and free the host; the session root is removed with the temporary folder.
  *
  * @param world The world
  * @param ctx The host
@@ -76,10 +76,7 @@ static void box_terminal_host_fini(
     (void)world;
     box_terminal_host_t *host = ctx;
     box_endpoint_fini(host);
-    if (host->root) {
-        box_terminal_rmtree(host->root);
-        ecs_os_free(host->root);
-    }
+    ecs_os_free(host->root);
 
     ecs_os_free(host);
 }

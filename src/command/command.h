@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include <stdio.h>
+#include "../app/app.h"
 
 /** Path of the scope that holds the command functions */
 #define BOX_COMMAND_SCOPE "box.command.commands"
@@ -52,7 +53,7 @@ typedef struct box_terminal_host_t {
     int32_t port_wanted;        /**< Port of the TerminalServer singleton */
     int32_t next;               /**< Counter of generated session handles */
     bool failed;                /**< The running command called box_command_error */
-    char *root;                 /**< Folder this module created for the sessions, or NULL */
+    char *root;                 /**< Temporary folder opened for the sessions, or NULL */
 } box_terminal_host_t;
 
 /** Singleton that points to the host of the world */
@@ -79,13 +80,6 @@ box_terminal_host_t* box_terminal_host(
  */
 const char* box_terminal_root(
     ecs_world_t *world);
-
-/** Remove a folder and everything in it.
- *
- * @param path The folder
- */
-void box_terminal_rmtree(
-    const char *path);
 
 /** Append a command line and its result to the log of a session.
  *

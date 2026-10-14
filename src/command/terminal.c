@@ -4,16 +4,14 @@
  */
 
 #include "command.h"
-#include <dirent.h>
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
 /** Size of the buffer that holds a generated session handle */
 #define BOX_TERMINAL_HANDLE_MAX (32)
 
-/** Create a folder unless it exists.
+/** Create a private folder unless it exists.
  *
  * @param path The folder
  * @return 0 on success, -1 when it could not be created
@@ -22,10 +20,24 @@ static int box_terminal_mkdir(
     const char *path)
 {
     int result = 0;
-    if (mkdir(path, 0777) && errno != EEXIST) {
+    if (mkdir(path, 0700) && errno != EEXIST) {
         ecs_err("cannot create %s: %s", path, strerror(errno));
         result = -1;
     }
+
+    return result;
+}
+
+/** Check that a session name is a single file name inside the session root.
+ *
+ * @param name The name of the session entity, NULL when it has none
+ * @return Whether the name can be used as the session folder
+ */
+static bool box_terminal_name_is_file(
+    const char *name)
+{
+    bool result = name && name[0] && !strchr(name, '/') && strcmp(name, ".") &&
+        strcmp(name, "..");
 
     return result;
 }
@@ -50,7 +62,7 @@ static int box_terminal_open(
         goto done;
     }
 
-    if (name) {
+    if (box_terminal_name_is_file(name)) {
         dir = flecs_asprintf("%s/%s", root, name);
     } else {
         dir = flecs_asprintf("%s/%u", root, (uint32_t)e);
@@ -120,38 +132,6 @@ done:
     return;
 }
 
-void box_terminal_rmtree(
-    const char *path)
-{
-    DIR *dir = opendir(path);
-    struct dirent *entry;
-    if (!dir) {
-        goto done;
-    }
-
-    while ((entry = readdir(dir))) {
-        struct stat st;
-        char *child;
-        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) {
-            continue;
-        }
-
-        child = flecs_asprintf("%s/%s", path, entry->d_name);
-        if (!lstat(child, &st) && S_ISDIR(st.st_mode)) {
-            box_terminal_rmtree(child);
-        } else {
-            unlink(child);
-        }
-
-        ecs_os_free(child);
-    }
-
-    closedir(dir);
-    rmdir(path);
-done:
-    return;
-}
-
 const char* box_terminal_root(
     ecs_world_t *world)
 {
@@ -169,9 +149,8 @@ const char* box_terminal_root(
         goto done;
     }
 
-    root = flecs_asprintf("%s/%d", BOX_TMP_ROOT, (int)getpid());
-    if (box_terminal_mkdir(BOX_TMP_ROOT) || box_terminal_mkdir(root)) {
-        ecs_os_free(root);
+    root = box_app_tmp_open(world);
+    if (!root) {
         goto done;
     }
 

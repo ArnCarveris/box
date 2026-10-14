@@ -56,7 +56,10 @@
                     "resource_symlink_outside",
                     "resource_other_session",
                     "resource_no_session",
-                    "import_without_app"
+                    "import_without_app",
+                    "root_private",
+                    "root_existing_refused",
+                    "name_not_a_path"
                 ]
             },
             {
