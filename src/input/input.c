@@ -109,7 +109,7 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, ActionEvent);
     ECS_COMPONENT_DEFINE(world, InputDevice);
 
-    ecs_set_hooks(world, Input, { .ctor = flecs_default_ctor });
+    box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text));
     ecs_set_hooks(world, InputDevice, {
         .ctor = flecs_default_ctor,
         .dtor = box_input_device_dtor,
@@ -126,6 +126,7 @@ void BoxInputImport(
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;
+    in->text = ecs_os_strdup("");
     ecs_singleton_modified(world, Input);
 
     ecs_system(world, {

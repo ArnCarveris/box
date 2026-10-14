@@ -45,7 +45,9 @@
                     "script_mouse_click",
                     "script_mouse_drag",
                     "mouse_release_no_jump",
-                    "reset_no_jump"
+                    "reset_no_jump",
+                    "text_long_platform",
+                    "text_long_synthetic"
                 ]
             },
             {

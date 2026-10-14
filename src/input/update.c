@@ -6,11 +6,46 @@
 #include "input.h"
 #include <string.h>
 
+/** Make room for a number of bytes in the text of the frame, the terminating zero included.
+ *
+ * @param dev The device state, which tracks the capacity of the buffer
+ * @param in The Input singleton
+ * @param size Bytes the text needs
+ */
+static void box_input_text_reserve(
+    InputDevice *dev,
+    Input *in,
+    int32_t size)
+{
+    int32_t capacity;
+    if (!in->text || in->text != dev->text) {
+        dev->text_capacity = in->text ? (int32_t)strlen(in->text) + 1 : 0;
+    }
+
+    if (size > dev->text_capacity) {
+        capacity = dev->text_capacity * 2 > size ? dev->text_capacity * 2 : size;
+        if (capacity < 32) {
+            capacity = 32;
+        }
+
+        in->text = ecs_os_realloc(in->text, capacity);
+        if (!dev->text_capacity) {
+            in->text[0] = '\0';
+        }
+
+        dev->text_capacity = capacity;
+    }
+
+    dev->text = in->text;
+}
+
 /** Clear the state that only describes one frame.
  *
+ * @param dev The device state
  * @param in The Input singleton
  */
 static void box_input_frame_begin(
+    InputDevice *dev,
     Input *in)
 {
     int32_t i;
@@ -19,6 +54,7 @@ static void box_input_frame_begin(
         in->keys[i].released = false;
     }
 
+    box_input_text_reserve(dev, in, 1);
     in->text[0] = '\0';
     in->mouse.delta[0] = in->mouse.delta[1] = 0;
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
@@ -206,12 +242,14 @@ static void box_input_release_all(
     }
 }
 
-/** Append a code point to the text of the frame as UTF-8, dropping it when the text is full.
+/** Append a code point to the text of the frame as UTF-8, growing the text as needed.
  *
+ * @param dev The device state
  * @param in The Input singleton
  * @param code The unicode code point
  */
 static void box_input_text(
+    InputDevice *dev,
     Input *in,
     int32_t code)
 {
@@ -234,7 +272,8 @@ static void box_input_text(
         utf8[size ++] = (char)(0x80 | (code & 0x3f));
     }
 
-    if (code > 0 && len + (size_t)size < BOX_INPUT_TEXT_MAX) {
+    if (code > 0) {
+        box_input_text_reserve(dev, in, (int32_t)len + size + 1);
         memcpy(&in->text[len], utf8, (size_t)size);
         in->text[len + (size_t)size] = '\0';
     }
@@ -312,7 +351,7 @@ static void box_input_apply(
         box_input_key_up(dev, in, ev->key);
         break;
     case InputText:
-        box_input_text(in, ev->code);
+        box_input_text(dev, in, ev->code);
         break;
     case InputMove:
         in->mouse.pinned = in->mouse.pinned || synthetic;
@@ -443,7 +482,7 @@ void BoxInputUpdate(
     }
 
     in = ecs_singleton_get_mut(world, Input);
-    box_input_frame_begin(in);
+    box_input_frame_begin(dev, in);
     box_input_apply_platform(dev, in);
     box_input_apply_queue(dev, in);
     box_input_derive(in);

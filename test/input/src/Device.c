@@ -994,3 +994,50 @@ void Device_reset_no_jump(void) {
 
     ecs_fini(world);
 }
+
+void Device_text_long_platform(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char expect[1001];
+    for (int32_t i = 0; i < 1000; i ++) {
+        expect[i] = (char)('a' + i % 26);
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = expect[i] });
+    }
+
+    expect[1000] = '\0';
+
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_int((int32_t)strlen(in->text), 1000);
+    test_str(in->text, expect);
+
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "");
+
+    ecs_fini(world);
+}
+
+void Device_text_long_synthetic(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    for (int32_t i = 0; i < 1000; i ++) {
+        box_input_queue(world, &(InputEvent){ .kind = InputText, .code = 0x20ac });
+    }
+
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_int((int32_t)strlen(in->text), 3000);
+    for (int32_t i = 0; i < 1000; i ++) {
+        test_assert(!memcmp(&in->text[i * 3], "\xe2\x82\xac", 3));
+    }
+
+    box_input_queue(world, &(InputEvent){ .kind = InputText, .code = 'x' });
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "x");
+
+    ecs_fini(world);
+}
