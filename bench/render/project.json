@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract and upload of the instanced batches and lights of box.render",
+        "description": "Benchmarks for the extract of the instanced batches and lights and the shadow pass of box.render",
         "public": false,
         "use": [
             "box"
@@ -41,6 +41,13 @@
                     "static_1000",
                     "moving_1000",
                     "scenes_1000"
+                ]
+            },
+            {
+                "id": "Shadow",
+                "benchcases": [
+                    "off_100k",
+                    "on_100k"
                 ]
             }
         ]

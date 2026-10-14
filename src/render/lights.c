@@ -488,11 +488,16 @@ static void box_lights_views(
             out->buffer = s->buffer;
             out->directional = s->directional;
             out->count = (uint32_t)ecs_vec_count(&s->lights);
+            if (s->directional) {
+                glm_vec3_copy(ecs_vec_first_t(&s->lights, box_render_light_t)->position,
+                    out->sun);
+            }
         } else {
             box_lights_send_default(l, p);
             out->buffer = BOX_LIGHTS_DEFAULT_BUFFER;
             out->directional = 1;
             out->count = 1;
+            glm_vec3_copy(ECS_CONST_CAST(float*, box_lights_sun), out->sun);
         }
 
         if (s && s->has_ambient) {

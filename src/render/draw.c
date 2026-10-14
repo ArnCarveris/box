@@ -254,6 +254,8 @@ static void box_draws_key(
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
         ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
+    key->shadow = !ecs_has_id(world, e, NoShadow) &&
+        !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
 }
 
 /** Bring a changed entity into the batch of its key and write its static instance.
@@ -462,6 +464,9 @@ static void box_draws_observers(
         .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnNoShadow", (ecs_observer_desc_t){
+        .query.terms = {{ .id = NoShadow }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
     box_draws_observer(world, d, "DrawsOnScene", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Scene) }},

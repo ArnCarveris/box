@@ -2,7 +2,8 @@
 // pass. The light buffer holds the directional lights first, then the point and spot lights.
 // The view frustum is cut into clusters: grid.x by grid.y tiles of the image and grid.z depth
 // slices spaced logarithmically from cluster.z to cluster.w. A cluster is grid.w + 1 words in
-// the cluster buffer: the number of lights that reach it and their indices.
+// the cluster buffer: the number of lights that reach it and their indices. The shadow members
+// describe the cascaded shadow map of the first directional light, see shadow.wgsl.
 #pragma once
 
 struct View {
@@ -17,6 +18,18 @@ struct View {
     lights: vec4u,
     // x, y, z: clusters per axis, w: lights a cluster lists at most
     grid: vec4u,
+    // World to shadow clip space of each cascade, reversed Z: 1 is nearest the light
+    shadow_matrix: array<mat4x4f, 4>,
+    // View depth each cascade ends at
+    shadow_split: vec4f,
+    // Depth added to the compared depth of each cascade
+    shadow_bias: vec4f,
+    // World distance a lookup in each cascade moves along the normal
+    shadow_offset: vec4f,
+    // x: view depth the fade starts at, y: view depth the shadows end at, z: texel in uv
+    shadow_params: vec4f,
+    // x: cascades, 0 without shadows, y: PCF taps per axis
+    shadow_config: vec4u,
 };
 
 struct Light {
