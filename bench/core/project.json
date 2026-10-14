@@ -28,6 +28,12 @@
                 "benchcases": [
                     "idle"
                 ]
+            },
+            {
+                "id": "Movement",
+                "benchcases": [
+                    "moving_100k"
+                ]
             }
         ]
     }
