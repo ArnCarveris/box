@@ -24,9 +24,9 @@ void Reconfigure_resize_updates_status(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
     ecs_progress(world, 0);
-    ecs_set(world, e, Surface, {.width = 128, .height = 96});
+    ecs_set(world, e, Surface, {.width = 128, .height = 96, .resolution_scale = 1});
     ecs_progress(world, 0);
 
     const SurfaceStatus *status = ecs_get(world, e, SurfaceStatus);
@@ -51,7 +51,7 @@ void Reconfigure_resolution_scale_updates_render_size(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .resolution_scale = 4});
     ecs_progress(world, 0);
@@ -100,7 +100,8 @@ void Reconfigure_remove_stops_rendering(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "removed.png"});
+    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "removed.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -130,7 +131,8 @@ void Reconfigure_delete_stops_rendering(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "deleted.png"});
+    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "deleted.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -159,10 +161,12 @@ void Reconfigure_set_again_after_remove(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "again.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "again.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_remove(world, e, Surface);
-    ecs_set(world, e, Surface, {.width = 16, .height = 8, .write_to_file = "again.png"});
+    ecs_set(world, e, Surface, {.width = 16, .height = 8, .write_to_file = "again.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

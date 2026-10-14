@@ -46,9 +46,10 @@ static void bench_light(
     box_render_backend_t backend = { .render = bench_light_drop };
     box_render_set_backend(world, &backend);
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {0, 0, 0});
     int32_t i;
@@ -97,9 +98,10 @@ static void bench_light_scenes(
         ecs_entity_t scene = ecs_new(world);
         ecs_set(world, scene, Scene, {0});
         ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
-        ecs_set(world, camera, Camera, {.fov = 60});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
         ecs_entity_t view = ecs_new(world);
-        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+            .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
         ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, scene);
         ecs_set(world, group, Position, {0, 0, 0});
         for (i = 0; i < BENCH_LIGHTS / BENCH_LIGHT_SCENES; i ++) {

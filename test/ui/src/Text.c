@@ -21,9 +21,11 @@ void Text_measure_line(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t small = ecs_new(world);
-    ecs_set(world, small, Text, {.value = "Hello world", .size = 16});
+    ecs_set(world, small, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t large = ecs_new(world);
-    ecs_set(world, large, Text, {.value = "Hello world", .size = 32});
+    ecs_set(world, large, Text, {.value = "Hello world", .size = 32,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     const TextBounds *a = ecs_get(world, small, TextBounds);
@@ -49,9 +51,10 @@ void Text_measure_empty(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t empty = ecs_new(world);
-    ecs_set(world, empty, Text, {.value = "", .size = 16});
+    ecs_set(world, empty, Text, {.value = "", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t none = ecs_new(world);
-    ecs_set(world, none, Text, {.size = 16});
+    ecs_set(world, none, Text, {.size = 16, .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, empty, TextBounds)->width, 0);
@@ -59,10 +62,38 @@ void Text_measure_empty(void) {
     test_flt(ecs_get(world, none, TextBounds)->width, 0);
     test_flt(ecs_get(world, none, TextBounds)->height, 0);
 
-    ecs_set(world, empty, Text, {.value = "x", .size = 16});
+    ecs_set(world, empty, Text, {.value = "x", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     test_assert(ecs_get(world, empty, TextBounds)->width > 0);
-    ecs_set(world, empty, Text, {.value = "", .size = 16});
+    ecs_set(world, empty, Text, {.value = "", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     test_flt(ecs_get(world, empty, TextBounds)->width, 0);
+
+    ecs_fini(world);
+}
+
+void Text_zero_literal_draws_nothing(void) {
+    // engine_core/zero_values
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t literal = ecs_new(world);
+    ecs_set(world, literal, Text, {.value = "Hello"});
+    ecs_entity_t constructed = ecs_new(world);
+    ecs_add(world, constructed, Text);
+    const Text *t = ecs_get(world, constructed, Text);
+    test_flt(t->size, 16);
+    test_uint(t->font, ecs_lookup(world, "box.text.DefaultFont"));
+    ecs_get_mut(world, constructed, Text)->value = ecs_os_strdup("Hello");
+    ecs_modified(world, constructed, Text);
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, literal, TextBounds)->width, 0);
+    test_flt(ecs_get(world, literal, TextBounds)->height, 0);
+    test_assert(ecs_get(world, constructed, TextBounds)->width > 0);
 
     ecs_fini(world);
 }
@@ -76,13 +107,17 @@ void Text_measure_newlines(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t one = ecs_new(world);
-    ecs_set(world, one, Text, {.value = "short", .size = 20});
+    ecs_set(world, one, Text, {.value = "short", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t wide = ecs_new(world);
-    ecs_set(world, wide, Text, {.value = "a much longer line", .size = 20});
+    ecs_set(world, wide, Text, {.value = "a much longer line", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t two = ecs_new(world);
-    ecs_set(world, two, Text, {.value = "short\na much longer line", .size = 20});
+    ecs_set(world, two, Text, {.value = "short\na much longer line", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t three = ecs_new(world);
-    ecs_set(world, three, Text, {.value = "a\nb\nc", .size = 20, .line_height = 30});
+    ecs_set(world, three, Text, {.value = "a\nb\nc", .size = 20, .line_height = 30,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     const TextBounds *b1 = ecs_get(world, one, TextBounds);
@@ -104,11 +139,14 @@ void Text_trailing_spaces_not_measured(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t plain = ecs_new(world);
-    ecs_set(world, plain, Text, {.value = "word", .size = 20});
+    ecs_set(world, plain, Text, {.value = "word", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t trailing = ecs_new(world);
-    ecs_set(world, trailing, Text, {.value = "word   ", .size = 20});
+    ecs_set(world, trailing, Text, {.value = "word   ", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t leading = ecs_new(world);
-    ecs_set(world, leading, Text, {.value = "   word", .size = 20});
+    ecs_set(world, leading, Text, {.value = "   word", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     float w = ecs_get(world, plain, TextBounds)->width;
@@ -127,9 +165,11 @@ void Text_wrap_between_words(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t pair = ecs_new(world);
-    ecs_set(world, pair, Text, {.value = "abc abc", .size = 20});
+    ecs_set(world, pair, Text, {.value = "abc abc", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t line = ecs_new(world);
-    ecs_set(world, line, Text, {.value = "abc abc abc abc", .size = 20});
+    ecs_set(world, line, Text, {.value = "abc abc abc abc", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     const TextBounds *bp = ecs_get(world, pair, TextBounds);
@@ -139,14 +179,16 @@ void Text_wrap_between_words(void) {
 
     ecs_entity_t wrapped = ecs_new(world);
     ecs_set(world, wrapped, Text, {
-        .value = "abc abc abc abc", .size = 20, .width = width});
+        .value = "abc abc abc abc", .size = 20, .width = width,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
     const TextBounds *bw = ecs_get(world, wrapped, TextBounds);
     test_flt(bw->height, 2 * height);
     test_assert(bw->width <= width);
     test_assert(bw->width > width * 0.5f);
 
     ecs_set(world, wrapped, Text, {
-        .value = "abc abc abc abc", .size = 20, .width = width * 0.6f});
+        .value = "abc abc abc abc", .size = 20, .width = width * 0.6f,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
     bw = ecs_get(world, wrapped, TextBounds);
     test_flt(bw->height, 4 * height);
     test_assert(bw->width <= width * 0.6f);
@@ -163,14 +205,16 @@ void Text_wrap_long_word(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t whole = ecs_new(world);
-    ecs_set(world, whole, Text, {.value = "abcdefghijklmnop", .size = 20});
+    ecs_set(world, whole, Text, {.value = "abcdefghijklmnop", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
     const TextBounds *b = ecs_get(world, whole, TextBounds);
     float width = b->width, height = b->height;
 
     ecs_entity_t broken = ecs_new(world);
     ecs_set(world, broken, Text, {
-        .value = "abcdefghijklmnop", .size = 20, .width = width / 3});
+        .value = "abcdefghijklmnop", .size = 20, .width = width / 3,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
     b = ecs_get(world, broken, TextBounds);
     test_assert(b->width <= width / 3);
     test_assert(b->height >= 3 * height);
@@ -188,13 +232,17 @@ void Text_kerning(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t t = ecs_new(world);
-    ecs_set(world, t, Text, {.value = "T T", .size = 100});
+    ecs_set(world, t, Text, {.value = "T T", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t o = ecs_new(world);
-    ecs_set(world, o, Text, {.value = "o o", .size = 100});
+    ecs_set(world, o, Text, {.value = "o o", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t to = ecs_new(world);
-    ecs_set(world, to, Text, {.value = "To To", .size = 100});
+    ecs_set(world, to, Text, {.value = "To To", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t space = ecs_new(world);
-    ecs_set(world, space, Text, {.value = "o  o", .size = 100});
+    ecs_set(world, space, Text, {.value = "o  o", .size = 100,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     float wt = ecs_get(world, t, TextBounds)->width;
@@ -217,7 +265,8 @@ void Text_size_change_relayouts(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Text, {.value = "Resize me", .size = 10});
+    ecs_set(world, e, Text, {.value = "Resize me", .size = 10,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
     float w = ecs_get(world, e, TextBounds)->width;
     test_assert(w > 0);
@@ -267,7 +316,8 @@ void Text_font_change_reloads(void) {
     test_int(status->revision, 1);
     test_flt(ecs_get(world, e, TextBounds)->width, w);
 
-    ecs_set(world, e, Text, {.value = "Fonts", .size = 20});
+    ecs_set(world, e, Text, {.value = "Fonts", .size = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
     test_flt(ecs_get(world, e, TextBounds)->width, w);
 
@@ -336,9 +386,11 @@ void Text_measured_by_layout(void) {
     ecs_entity_t row = ecs_new(world);
     ecs_set(world, row, Layout, {.direction = DirectionRow, .spacing = 10});
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, row);
-    ecs_set(world, a, Text, {.value = "first", .size = 16});
+    ecs_set(world, a, Text, {.value = "first", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, row);
-    ecs_set(world, b, Text, {.value = "second\nline", .size = 16});
+    ecs_set(world, b, Text, {.value = "second\nline", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
 
     const TextBounds *ta = ecs_get(world, a, TextBounds);
@@ -348,7 +400,8 @@ void Text_measured_by_layout(void) {
     test_flt(l->height, tb->height);
     test_flt(ecs_get(world, a, LayoutBounds)->width, ta->width);
 
-    ecs_set(world, a, Text, {.value = "first and longer", .size = 16});
+    ecs_set(world, a, Text, {.value = "first and longer", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_progress(world, 0);
     ta = ecs_get(world, a, TextBounds);
     test_flt(ecs_get(world, row, LayoutBounds)->width, ta->width + tb->width + 10);
@@ -366,16 +419,18 @@ void Text_renders_color(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
-    ecs_set(world, e, Text, {.value = "I", .size = 60});
+    ecs_set(world, e, Text, {.value = "I", .size = 60,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 128, 0});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "color.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "color.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -421,16 +476,18 @@ void Text_crisp_at_any_scale(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0.3f, 0, 0});
-    ecs_set(world, e, Text, {.value = "I", .size = 1});
+    ecs_set(world, e, Text, {.value = "I", .size = 1,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 200, .height = 200, .write_to_file = "scale.png"});
+    ecs_set(world, s, Surface, {.width = 200, .height = 200, .write_to_file = "scale.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/scale.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     float scales[5] = { 14, 30, 80, 250, 900 };
     int32_t i, prev = 0;
@@ -476,16 +533,18 @@ void Text_crisp_in_perspective(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Rotation, {0, 0.6f, 0});
-    ecs_set(world, e, Text, {.value = "I", .size = 1});
+    ecs_set(world, e, Text, {.value = "I", .size = 1,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 128, .height = 128, .write_to_file = "far.png"});
+    ecs_set(world, s, Surface, {.width = 128, .height = 128, .write_to_file = "far.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/far.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     float distances[3] = { 2, 20, 200 };
     int32_t d;
@@ -538,22 +597,25 @@ void Text_align_lines(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
-    ecs_set(world, e, Text, {.value = "I\nIIIIIIIIII", .size = 40, .line_height = 50});
+    ecs_set(world, e, Text, {.value = "I\nIIIIIIIIII", .size = 40, .line_height = 50,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 256, .height = 128, .write_to_file = "align.png"});
+    ecs_set(world, s, Surface, {.width = 256, .height = 128, .write_to_file = "align.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/align.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     Align aligns[3] = { AlignLeft, AlignCenter, AlignRight };
     int32_t i, firsts[3], lasts[3], wide_first = 0, wide_last = 0;
     for (i = 0; i < 3; i ++) {
         ecs_set(world, e, Text, {
-            .value = "I\nIIIIIIIIII", .size = 40, .line_height = 50, .align = aligns[i]});
+            .value = "I\nIIIIIIIIII", .size = 40, .line_height = 50, .align = aligns[i],
+                .font = ecs_lookup(world, "box.text.DefaultFont")});
         ecs_progress(world, 0);
         ecs_progress(world, 0);
         ecs_progress(world, 0);
@@ -602,7 +664,7 @@ void Text_many_glyphs(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -632,10 +694,12 @@ void Text_many_glyphs(void) {
     char *value = ecs_strbuf_get(&buf);
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Position, {0, 0, 0});
-    ecs_set(world, e, Text, {.value = value, .size = 20, .line_height = 20});
+    ecs_set(world, e, Text, {.value = value, .size = 20, .line_height = 20,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 1024, .height = 512, .write_to_file = "many.png"});
+    ecs_set(world, s, Surface, {.width = 1024, .height = 512, .write_to_file = "many.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
@@ -684,17 +748,19 @@ void Text_dynamic_transform(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_add(world, e, DynamicTransform);
     ecs_set(world, e, Position, {-20, 0, 0});
-    ecs_set(world, e, Text, {.value = "I", .size = 40});
+    ecs_set(world, e, Text, {.value = "I", .size = 40,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, e, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "move.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "move.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/move.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     float xs[2] = { -20, 20 };
     int32_t i;

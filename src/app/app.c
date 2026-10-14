@@ -128,14 +128,14 @@ done:
 /** Compute the delta time of the next frame.
  *
  * @param app The App singleton
- * @return A fixed step of one frame when headless, 0 to measure it otherwise
+ * @return A fixed step of one frame when headless with a frame rate, 0 to measure it otherwise
  */
 static float box_app_delta(
     const App *app)
 {
     float result = 0;
-    if (app->headless) {
-        result = 1.0f / (app->fps > 0 ? app->fps : (float)BOX_APP_FPS);
+    if (app->headless && app->fps > 0) {
+        result = 1.0f / app->fps;
     }
 
     return result;

@@ -138,9 +138,8 @@ static void BoxPerfOnSet(
 
     perf->state = status.state;
     perf->fps = fps;
-    perf->frames = run->frames > 0 ? run->frames : (int32_t)(fps * BOX_PERF_SECONDS);
-    perf->warmup = run->warmup > 0 ? run->warmup : (int32_t)fps;
-    perf->warmup = perf->warmup < BOX_PERF_MIN_WARMUP ? BOX_PERF_MIN_WARMUP : perf->warmup;
+    perf->frames = run->frames > 0 ? run->frames : 0;
+    perf->warmup = run->warmup < BOX_PERF_MIN_WARMUP ? BOX_PERF_MIN_WARMUP : run->warmup;
     perf->run = 0;
     perf->mark = 0;
     perf->bounds = false;
@@ -205,9 +204,11 @@ static void box_perf_orbit(
     const PerfRun *run,
     ecs_entity_t camera)
 {
-    float period = run->period > 0 ? run->period : BOX_PERF_PERIOD;
-    float elevation = glm_rad(run->elevation != 0 ? run->elevation : BOX_PERF_ELEVATION);
-    float angle = (float)(2.0 * GLM_PI * (box_perf_now() - perf->start) / period);
+    float period = run->period;
+    float elevation = glm_rad(run->elevation);
+    float angle = period > 0
+        ? (float)(2.0 * GLM_PI * (box_perf_now() - perf->start) / period)
+        : 0.0f;
     float d = perf->distance;
     float ce = cosf(elevation);
     mat4 m = GLM_MAT4_IDENTITY_INIT;
@@ -235,7 +236,7 @@ static void box_perf_measure_bounds(
     ecs_entity_t camera)
 {
     const Camera *cam = camera ? ecs_get(world, camera, Camera) : NULL;
-    float fov = cam && cam->fov > 0 ? cam->fov : BOX_CAMERA_FOV;
+    float fov = cam ? cam->fov : BOX_CAMERA_FOV;
     vec3 min, max;
     int32_t shapes = box_perf_bounds(world, min, max);
     PerfStatus *status;
@@ -414,6 +415,31 @@ done:
     return;
 }
 
+/** Construct PerfRun values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_perf_run_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    PerfRun *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (PerfRun){
+            .fps = BOX_PERF_FPS,
+            .frames = (int32_t)(BOX_PERF_FPS * BOX_PERF_SECONDS),
+            .warmup = (int32_t)BOX_PERF_FPS,
+            .period = BOX_PERF_PERIOD,
+            .elevation = BOX_PERF_ELEVATION
+        };
+    }
+}
+
 void BoxPerfImport(
     ecs_world_t *world)
 {
@@ -423,6 +449,7 @@ void BoxPerfImport(
     ECS_META_COMPONENT(world, PerfRun);
     ECS_META_COMPONENT(world, PerfStatus);
     box_owned_hooks(world, PerfRun, BOX_OWNED_STR(PerfRun, report));
+    ecs_set_hooks(world, PerfRun, { .ctor = box_perf_run_ctor });
 
     ecs_singleton_set(world, PerfStatus, { .state = PerfIdle });
 

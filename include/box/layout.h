@@ -66,7 +66,7 @@ ECS_ENUM(SizeMode, {
 /** Size of an element on one axis */
 ECS_STRUCT(Sizing, {
     SizeMode mode; /**< How the size is computed */
-    float value;   /**< Size for SizeModeFixed, weight for SizeModeGrow */
+    float value;   /**< Size for SizeModeFixed, weight for SizeModeGrow, 1 in a new LayoutItem */
     float min;     /**< Smallest size, 0 for no limit */
     float max;     /**< Largest size, 0 for no limit */
 });

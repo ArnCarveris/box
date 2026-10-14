@@ -58,11 +58,11 @@ static ecs_world_t* bench_collision_world(void)
         if (i % 4 == 0) {
             ecs_set(world, e, Box, {s, h, s});
         } else if (i % 4 == 1) {
-            ecs_set(world, e, Sphere, { .radius = s * 0.5f });
+            ecs_set(world, e, Sphere, { .segments = 24, .radius = s * 0.5f });
         } else if (i % 4 == 2) {
-            ecs_set(world, e, Cylinder, { .radius = s * 0.5f, .length = h });
+            ecs_set(world, e, Cylinder, { .segments = 24, .radius = s * 0.5f, .length = h });
         } else {
-            ecs_set(world, e, Cone, { .radius = s * 0.5f, .length = h });
+            ecs_set(world, e, Cone, { .segments = 24, .radius = s * 0.5f, .length = h });
         }
     }
 

@@ -265,6 +265,35 @@ static void box_text_state_init(
     ecs_set(world, s->default_font, Font, { .path = BOX_TEXT_DEFAULT_FONT });
 }
 
+/** Construct Text values with the documented size and box.text.DefaultFont.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info, whose context points to the default font entity
+ */
+static void box_text_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    const ecs_entity_t *font = ti->hooks.ctx;
+    Text *values = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Text){ .size = BOX_TEXT_SIZE_DEFAULT, .font = *font };
+    }
+}
+
+/** Free the default font entity the Text constructor reads.
+ *
+ * @param ctx The entity
+ */
+static void box_text_ctor_free(
+    void *ctx)
+{
+    ecs_os_free(ctx);
+}
+
 /** Register the observers and systems of box.text.
  *
  * @param world The world
@@ -339,4 +368,12 @@ void BoxTextImport(
 
     box_text_systems_init(world);
     box_text_state_init(world);
+
+    ecs_entity_t *font = ecs_os_malloc_t(ecs_entity_t);
+    *font = box_text_state_get(world)->default_font;
+    ecs_set_hooks(world, Text, {
+        .ctor = box_text_ctor,
+        .ctx = font,
+        .ctx_free = box_text_ctor_free
+    });
 }

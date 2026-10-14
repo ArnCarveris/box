@@ -25,7 +25,7 @@ extern "C" {
  *
  * Forward, Back, Left and Right move in the XZ plane along the yaw, Up and Down along Y and
  * Fast multiplies the speed. With collide set the camera is a sphere that slides along the
- * shapes of its scene. A member that is zero takes its default.
+ * shapes of its scene. Members apply as specified, the constructor sets the defaults.
  *
  * While Look is held the cursor turns the camera: Rotation.y is the yaw, Rotation.x the pitch,
  * which stops short of straight up and down. The camera looks along -Z of its rotation, so a
@@ -37,7 +37,7 @@ ECS_STRUCT(CameraController, {
     float sensitivity;     /**< Radians turned per point of cursor movement, 0.003 by default */
     float acceleration;    /**< How fast the velocity follows the input per second, 0 snaps */
     bool invert_y;         /**< Moving the cursor down looks up */
-    ecs_entity_t actions;  /**< Scope of the actions, box.controllers.camera when 0 */
+    ecs_entity_t actions;  /**< Scope of the actions, default box.controllers.camera */
     vec3 velocity;         /**< Velocity in units per second, written by the controller */
     bool collide;          /**< Slide along the shapes of the scene instead of flying through */
     float radius;          /**< Radius of the sphere that collides, 0.25 by default */
@@ -47,7 +47,7 @@ ECS_STRUCT(CameraController, {
  *
  * The Position is the eye, above the feet. WASD walk along the yaw, Look turns, Jump leaves the
  * ground, gravity pulls the feet onto the ground and Crouch lowers the eye and slows down.
- * Fly toggles free flight that moves like a camera controller. A zero setting takes its default.
+ * Fly toggles free flight that moves like a camera controller. The constructor sets the defaults.
  *
  * The body is a capsule from the feet to just above the eye that slides along the shapes of
  * its scene, stands on them, steps onto ledges and only stands up when there is room. The
@@ -62,13 +62,13 @@ ECS_STRUCT(FirstPersonController, {
     float gravity;         /**< Downward acceleration in units per second squared, 18 by default */
     float eye;             /**< Height of the eye above the feet, 1.7 by default */
     float crouch_eye;      /**< Height of the eye above the feet while crouching, 0.9 by default */
-    float ground;          /**< Height of the ground plane where no shape is below, 0 by default */
+    float ground;          /**< Height of the ground plane where no shape is below, default 0 */
     float radius;          /**< Radius of the body, 0.3 by default */
     float step;            /**< Height of the ledges the feet step onto, 0.3 by default */
     float sensitivity;     /**< Radians turned per point of cursor movement, 0.003 by default */
     float acceleration;    /**< How fast the walk or flight follows the input per second, 0 snaps */
     bool invert_y;         /**< Moving the cursor down looks up */
-    ecs_entity_t actions;  /**< Scope of the actions, box.controllers.first_person when 0 */
+    ecs_entity_t actions;  /**< Scope of the actions, default box.controllers.first_person */
     vec3 velocity;         /**< Velocity in units per second, written by the controller */
     float height;          /**< Height of the eye above the feet, written by the controller */
     bool grounded;         /**< The feet stand on the ground, written by the controller */

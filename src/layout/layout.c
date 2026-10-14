@@ -245,6 +245,25 @@ static void box_layout_fini(
     ecs_os_free(state);
 }
 
+/** Construct LayoutItem values whose sizes have a value of one, the weight of a growing size.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_layout_item_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    LayoutItem *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (LayoutItem){ .width = { .value = 1 }, .height = { .value = 1 } };
+    }
+}
+
 void BoxLayoutImport(
     ecs_world_t *world)
 {
@@ -259,6 +278,7 @@ void BoxLayoutImport(
     ECS_META_COMPONENT(world, Sizing);
     ECS_META_COMPONENT(world, LayoutItem);
     ECS_META_COMPONENT(world, LayoutBounds);
+    ecs_set_hooks(world, LayoutItem, { .ctor = box_layout_item_ctor });
 
     ecs_add_pair(world, ecs_id(Layout), EcsWith, ecs_id(LayoutBounds));
     ecs_add_pair(world, ecs_id(Layout), EcsWith, EcsOrderedChildren);

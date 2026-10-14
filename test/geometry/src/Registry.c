@@ -252,9 +252,12 @@ void Registry_star_cache_shared(void) {
     ecs_entity_t e2 = ecs_new(world);
     ecs_entity_t e3 = ecs_new(world);
     ecs_entity_t e4 = ecs_new(world);
-    ecs_set(world, e1, Star, { .points = 5, .radius = 1 });
+    ecs_add(world, e1, Star);
+    ecs_get_mut(world, e1, Star)->points = 5;
+    ecs_get_mut(world, e1, Star)->radius = 1;
+    ecs_modified(world, e1, Star);
     ecs_set(world, e2, Star, { .points = 5, .inner = 0.45f, .radius = 4 });
-    ecs_set(world, e3, Star, { .points = 6, .radius = 1 });
+    ecs_set(world, e3, Star, { .points = 6, .inner = 0.45f, .radius = 1 });
     ecs_set(world, e4, Star, { .points = 5, .inner = 0.3f, .radius = 1 });
 
     uint32_t m1 = ecs_get(world, e1, ShapeMesh)->mesh;

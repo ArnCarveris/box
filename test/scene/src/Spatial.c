@@ -113,7 +113,7 @@ void Spatial_insert_child(void) {
     ecs_set(world, parent, Position, {0, 5, 0});
     ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
     ecs_set(world, child, Position, {1, 0, 0});
-    ecs_set(world, child, Sphere, {.radius = 2});
+    ecs_set(world, child, Sphere, {.segments = 24, .radius = 2});
     ecs_progress(world, 0);
 
     vec3 min, max;

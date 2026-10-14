@@ -21,10 +21,10 @@
 extern "C" {
 #endif
 
-/** Width in points of a surface that does not set one */
+/** Width in points of a constructed surface */
 #define BOX_SURFACE_WIDTH (1280)
 
-/** Height in points of a surface that does not set one */
+/** Height in points of a constructed surface */
 #define BOX_SURFACE_HEIGHT (720)
 
 /** Maximum anisotropic filtering samples of the texture samplers */
@@ -52,9 +52,9 @@ ECS_ENUM(TextureQuality, {
  * where a point is a pixel. Changing a member reconfigures the surface before the next frame.
  */
 ECS_STRUCT(Surface, {
-    int32_t width;                   /**< Requested width in points, 0 for 1280 */
-    int32_t height;                  /**< Requested height in points, 0 for 720 */
-    float resolution_scale;          /**< Divides the pixels the scene is rendered at, 2 is half */
+    int32_t width;                   /**< Requested width in points, default 1280 */
+    int32_t height;                  /**< Requested height in points, default 720 */
+    float resolution_scale;          /**< Divides the render pixels, 2 is half, default 1 */
     bool vsync;                      /**< Present with vertical sync */
     Anisotropy anisotropy;           /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;  /**< Largest dimension a texture is scaled to */

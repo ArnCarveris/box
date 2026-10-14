@@ -78,13 +78,17 @@ void Camera_default_actions_custom_only(void) {
 
     ecs_entity_t scope = ecs_entity(world, { .name = "keys" });
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .actions = scope });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->actions = scope;
     ecs_progress(world, 0.5f);
 
     ecs_entity_t forward = ecs_lookup(world, "box.controllers.camera.Forward");
     test_assert(ecs_has_id(world, forward, EcsDisabled));
 
-    ecs_set(world, cam, CameraController, { 0 });
+    ecs_add(world, cam, CameraController);
+
+    ecs_get_mut(world, cam, CameraController)->actions =
+        ecs_lookup(world, "box.controllers.camera");
     box_input_key(world, KeyW, true);
     ecs_progress(world, 0.5f);
     test_assert(!ecs_has_id(world, forward, EcsDisabled));
@@ -105,9 +109,9 @@ void Camera_adds_position_rotation(void) {
     test_assert(ecs_has(world, cam, WorldTransform));
 
     const CameraController *cc = ecs_get(world, cam, CameraController);
-    test_flt(cc->speed, 0);
+    test_flt(cc->speed, 10);
     test_flt(cc->velocity[0], 0);
-    test_uint(cc->actions, 0);
+    test_uint(cc->actions, ecs_lookup(world, "box.controllers.camera"));
 
     ecs_fini(world);
 }
@@ -343,11 +347,28 @@ void Camera_speed(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .speed = 2 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->speed = 2;
 
     box_input_key_press(world, KeyE, 1);
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, cam, Position)->y, 1);
+
+    ecs_fini(world);
+}
+
+void Camera_zero_speed_stays(void) {
+    // engine_core/zero_values
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_set(world, cam, CameraController, {
+        .boost = 4, .actions = ecs_lookup(world, "box.controllers.camera") });
+
+    box_input_key_press(world, KeyE, 1);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, cam, Position)->y, 0);
 
     ecs_fini(world);
 }
@@ -358,7 +379,8 @@ void Camera_boost(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .boost = 2 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->boost = 2;
 
     box_input_key(world, KeyShiftLeft, true);
     box_input_key(world, KeyS, true);
@@ -395,7 +417,8 @@ void Camera_acceleration(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .acceleration = 2 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->acceleration = 2;
 
     float alpha = 1.0f - expf(-1.0f);
     box_input_key(world, KeyD, true);
@@ -509,7 +532,8 @@ void Camera_look_sensitivity(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .sensitivity = 0.01f });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->sensitivity = 0.01f;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -531,7 +555,9 @@ void Camera_look_invert_y(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .sensitivity = 0.01f, .invert_y = true });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->sensitivity = 0.01f;
+    ecs_get_mut(world, cam, CameraController)->invert_y = true;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -553,7 +579,8 @@ void Camera_pitch_clamped(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .sensitivity = 1 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->sensitivity = 1;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 0, 100 }, .steps = 2, .button = KeyMouseRight
@@ -674,7 +701,8 @@ void Camera_custom_actions(void) {
     ecs_set(world, look, Binding, { .key = KeyMouseLeft });
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .actions = scope });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->actions = scope;
     ecs_entity_t other = ecs_new(world);
     ecs_add(world, other, CameraController);
 
@@ -708,7 +736,8 @@ void Camera_custom_actions_missing(void) {
 
     ecs_entity_t scope = ecs_entity(world, { .name = "empty" });
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, CameraController, { .actions = scope });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->actions = scope;
 
     box_input_key_press(world, KeyW, 1);
     box_input_mouse_drag(world, &(box_input_sweep_t){
@@ -732,7 +761,8 @@ void Camera_multiple_cameras(void) {
     ecs_entity_t a = ecs_new(world);
     ecs_add(world, a, CameraController);
     ecs_entity_t b = ecs_new(world);
-    ecs_set(world, b, CameraController, { .speed = 2 });
+    ecs_add(world, b, CameraController);
+    ecs_get_mut(world, b, CameraController)->speed = 2;
     ecs_set(world, b, Rotation, { 0, (float)GLM_PI, 0 });
 
     box_input_key_press(world, KeyW, 1);
@@ -749,7 +779,7 @@ void Camera_world_transform(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
-    ecs_set(world, cam, Camera, { 0 });
+    ecs_set(world, cam, Camera, { .near_ = 0.1f });
     ecs_add(world, cam, CameraController);
 
     box_input_key_press(world, KeyE, 1);

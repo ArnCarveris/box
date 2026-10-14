@@ -124,7 +124,7 @@ void box_gpu_light_uniforms(
     const box_render_view_lights_t *l = &v->lights;
     box_gpu_buffer_t *b = box_gpu_light_buffer(gpu, v);
     uint32_t capacity = b ? b->size / (uint32_t)sizeof(box_render_light_t) : 0;
-    float near_ = c->near_ > 0 ? c->near_ : BOX_CAMERA_NEAR;
+    float near_ = glm_max(c->near_, 1e-3f);
     float far_ = c->far_ > near_ ? c->far_ : glm_max(BOX_CAMERA_FAR, near_ * 2.0f);
     glm_mat4_copy(ECS_CONST_CAST(vec4*, v->view_matrix), u->view);
     glm_vec4_copy(ECS_CONST_CAST(float*, l->ambient_sky), u->ambient_sky);

@@ -28,7 +28,7 @@ void Shapes2D_rect_size(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -37,7 +37,8 @@ void Shapes2D_rect_size(void) {
     ecs_set(world, rect, Rect, {20, 10});
     ecs_set(world, rect, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "rect.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "rect.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -70,7 +71,7 @@ void Shapes2D_circle_shape(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -79,7 +80,8 @@ void Shapes2D_circle_shape(void) {
     ecs_set(world, circle, Circle, {12});
     ecs_set(world, circle, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "circle.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "circle.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -110,7 +112,7 @@ void Shapes2D_border_radius_rounds_corners(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -120,7 +122,8 @@ void Shapes2D_border_radius_rounds_corners(void) {
     ecs_set(world, rect, Rgb, {255, 255, 255});
     ecs_set(world, rect, Border, {.radius = 12});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "corner.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "corner.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -158,7 +161,7 @@ void Shapes2D_border_width_and_color(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -168,7 +171,8 @@ void Shapes2D_border_width_and_color(void) {
     ecs_set(world, rect, Rgb, {255, 255, 255});
     ecs_set(world, rect, Border, {.width = 4, .color = {255, 0, 0, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "border.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "border.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -213,7 +217,7 @@ void Shapes2D_circle_border_ring(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -223,7 +227,8 @@ void Shapes2D_circle_border_ring(void) {
     ecs_set(world, circle, Rgb, {0, 255, 0});
     ecs_set(world, circle, Border, {.width = 4, .radius = 2, .color = {0, 0, 255, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "ring.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "ring.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -257,7 +262,7 @@ void Shapes2D_line_segment(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -266,7 +271,8 @@ void Shapes2D_line_segment(void) {
     ecs_set(world, line, Line, {.x1 = -20, .y1 = -20, .x2 = 20, .y2 = 20, .width = 4});
     ecs_set(world, line, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "line.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "line.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -284,7 +290,7 @@ void Shapes2D_line_segment(void) {
     test_assert(px[(31 * 64 + 36) * 4] < 10);
     stbi_image_free(px);
 
-    ecs_set(world, line, Line, {.x1 = -20, .y1 = 0.5f, .x2 = 20, .y2 = 0.5f});
+    ecs_set(world, line, Line, {.x1 = -20, .y1 = 0.5f, .x2 = 20, .y2 = 0.5f, .width = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
     px = stbi_load(path, &w, &h, &n, 4);
@@ -327,16 +333,17 @@ void Shapes2D_image_texture_area(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t image = ecs_new(world);
     ecs_set(world, image, Position, {0, 0, 0});
     ecs_set(world, image, Rect, {40, 40});
-    ecs_set(world, image, Image, {.texture = tex});
+    ecs_set(world, image, Image, {.texture = tex, .u1 = 1, .v1 = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "image.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "image.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -370,7 +377,7 @@ void Shapes2D_image_texture_area(void) {
     test_assert(c[0] < 30 && c[1] > 230 && c[2] < 30);
     stbi_image_free(px);
 
-    ecs_set(world, image, Image, {.texture = tex, .u0 = 0.5f, .v0 = 0.5f});
+    ecs_set(world, image, Image, {.texture = tex, .u0 = 0.5f, .v0 = 0.5f, .u1 = 1, .v1 = 1});
     ecs_set(world, image, Rgb, {255, 0, 255});
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -395,7 +402,7 @@ void Shapes2D_opacity_blends(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -409,7 +416,8 @@ void Shapes2D_opacity_blends(void) {
     ecs_set(world, front, Rgb, {0, 0, 255});
     ecs_set(world, front, Opacity, {0.5f});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "opacity.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "opacity.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -441,7 +449,7 @@ void Shapes2D_depth_with_3d_shapes(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -460,7 +468,8 @@ void Shapes2D_depth_with_3d_shapes(void) {
     ecs_set(world, wall, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, wall, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "depth.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "depth.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -492,7 +501,7 @@ void Shapes2D_coplanar_draw_in_order(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -505,7 +514,8 @@ void Shapes2D_coplanar_draw_in_order(void) {
     ecs_set(world, badge, Circle, {8});
     ecs_set(world, badge, Rgb, {0, 255, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "order.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "order.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -533,7 +543,7 @@ void Shapes2D_edges_crisp_at_any_scale(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -542,7 +552,8 @@ void Shapes2D_edges_crisp_at_any_scale(void) {
     ecs_set(world, circle, Circle, {1});
     ecs_set(world, circle, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 160, .height = 160, .write_to_file = "scale.png"});
+    ecs_set(world, e, Surface, {.width = 160, .height = 160, .write_to_file = "scale.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/scale.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     float scales[4] = { 3, 12, 40, 75 };
     int32_t s;
@@ -585,7 +596,7 @@ void Shapes2D_edges_crisp_in_perspective(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -595,7 +606,8 @@ void Shapes2D_edges_crisp_in_perspective(void) {
     ecs_set(world, rect, Border, {.radius = 0.1f});
     ecs_set(world, rect, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 128, .height = 128, .write_to_file = "far.png"});
+    ecs_set(world, e, Surface, {.width = 128, .height = 128, .write_to_file = "far.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/far.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     float distances[3] = { 2, 20, 200 };
     int32_t d;
@@ -639,7 +651,7 @@ void Shapes2D_edges_antialiased_when_rotated(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -649,7 +661,8 @@ void Shapes2D_edges_antialiased_when_rotated(void) {
     ecs_set(world, rect, Rect, {80, 40});
     ecs_set(world, rect, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 128, .height = 128, .write_to_file = "rotated.png"});
+    ecs_set(world, e, Surface, {.width = 128, .height = 128, .write_to_file = "rotated.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -693,7 +706,7 @@ void Shapes2D_changes_update_render(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -705,7 +718,8 @@ void Shapes2D_changes_update_render(void) {
     ecs_set(world, other, Position, {-24, 24, 0});
     ecs_set(world, other, Rect, {4, 4});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "change.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "change.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -760,7 +774,7 @@ void Shapes2D_dynamic_shapes(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -776,7 +790,8 @@ void Shapes2D_dynamic_shapes(void) {
     ecs_set(world, fading, Border, {.radius = 10, .width = 3, .color = {0, 0, 255, 255}});
     ecs_set(world, fading, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "dynamic.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "dynamic.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -822,7 +837,7 @@ void Shapes2D_prefab_instance(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -834,7 +849,8 @@ void Shapes2D_prefab_instance(void) {
     ecs_entity_t inst = ecs_new_w_pair(world, EcsIsA, prefab);
     ecs_set(world, inst, Position, {12, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "prefab.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "prefab.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -866,7 +882,7 @@ void Shapes2D_one_batch_for_all_kinds(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     int32_t i;
@@ -881,7 +897,7 @@ void Shapes2D_one_batch_for_all_kinds(void) {
         ecs_set(world, circle, Circle, {0.5f + (float)i});
         ecs_entity_t line = ecs_new(world);
         ecs_set(world, line, Position, {(float)i, 4, 0});
-        ecs_set(world, line, Line, {.x1 = 0, .y1 = 0, .x2 = 1, .y2 = (float)i});
+        ecs_set(world, line, Line, {.x1 = 0, .y1 = 0, .x2 = 1, .y2 = (float)i, .width = 1});
     }
 
     ecs_progress(world, 0);
@@ -897,7 +913,7 @@ void Shapes2D_one_batch_for_all_kinds(void) {
     ecs_entity_t image = ecs_new(world);
     ecs_set(world, image, Position, {0, 0, 0});
     ecs_set(world, image, Rect, {1, 1});
-    ecs_set(world, image, Image, {.texture = tex});
+    ecs_set(world, image, Image, {.texture = tex, .u1 = 1, .v1 = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(ecs_vec_count(&null->last.batches), 3);
@@ -923,7 +939,7 @@ void Shapes2D_empty_shapes_not_drawn(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t rect = ecs_new(world);
@@ -931,7 +947,7 @@ void Shapes2D_empty_shapes_not_drawn(void) {
     ecs_entity_t circle = ecs_new(world);
     ecs_set(world, circle, Circle, {0});
     ecs_entity_t line = ecs_new(world);
-    ecs_set(world, line, Line, {.x1 = 1, .y1 = 1, .x2 = 1, .y2 = 1});
+    ecs_set(world, line, Line, {.x1 = 1, .y1 = 1, .x2 = 1, .y2 = 1, .width = 1});
     ecs_entity_t decorated = ecs_new(world);
     ecs_set(world, decorated, Border, {.width = 2});
     ecs_set(world, decorated, Image, {0});
@@ -1000,7 +1016,7 @@ void Shapes2D_tint_applies(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -1018,7 +1034,8 @@ void Shapes2D_tint_applies(void) {
     ecs_set(world, circle, Rgb, {255, 255, 255});
     ecs_set(world, circle, Tint, {0, 255, 0, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "tint.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "tint.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -1062,9 +1079,10 @@ void Shapes2D_culled_by_view(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t rect = ecs_new(world);
     ecs_set(world, rect, Position, {0, 10, 0});
@@ -1079,9 +1097,10 @@ void Shapes2D_culled_by_view(void) {
     ecs_set(world, away, Circle, {5});
     ecs_entity_t far_line = ecs_new(world);
     ecs_set(world, far_line, Position, {60, 60, 0});
-    ecs_set(world, far_line, Line, {.x1 = -2, .y1 = -2, .x2 = 2, .y2 = 2});
+    ecs_set(world, far_line, Line, {.x1 = -2, .y1 = -2, .x2 = 2, .y2 = 2, .width = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "culled.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "culled.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

@@ -46,7 +46,12 @@ void Camera_perspective_finite_far(void) {
 
 void Camera_perspective_defaults(void) {
     // renderer/views
-    Camera camera = {0};
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, Camera);
+    Camera camera = *ecs_get(world, e, Camera);
+    ecs_fini(world);
     mat4 proj;
     vec4 near = {0, 0, -0.1f, 1}, top = {0, 1, -1, 1}, out;
     box_camera_projection(&camera, 100, 100, proj);
@@ -59,7 +64,7 @@ void Camera_perspective_defaults(void) {
 
 void Camera_perspective_aspect_follows_surface(void) {
     // renderer/views
-    Camera camera = {.fov = 90};
+    Camera camera = {.fov = 90, .near_ = 0.1f};
     mat4 proj;
     box_camera_projection(&camera, 200, 100, proj);
     test_flt(proj[1][1], 1.0f);
@@ -70,7 +75,7 @@ void Camera_perspective_aspect_follows_surface(void) {
 
 void Camera_aspect_ratio_overrides_surface(void) {
     // renderer/views
-    Camera camera = {.fov = 90, .aspect_ratio = 4};
+    Camera camera = {.fov = 90, .aspect_ratio = 4, .near_ = 0.1f};
     mat4 proj;
     box_camera_projection(&camera, 200, 100, proj);
     test_flt(proj[1][1], 1.0f);
@@ -94,7 +99,13 @@ void Camera_ortho_near_far(void) {
 
 void Camera_ortho_default_far(void) {
     // renderer/views
-    Camera camera = {.ortho = true};
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, Camera);
+    Camera camera = *ecs_get(world, e, Camera);
+    ecs_fini(world);
+    camera.ortho = true;
     mat4 proj;
     vec4 near = {0, 0, -0.1f, 1}, far = {0, 0, -1000, 1}, out;
     box_camera_projection(&camera, 100, 100, proj);
@@ -106,7 +117,7 @@ void Camera_ortho_default_far(void) {
 
 void Camera_ortho_height(void) {
     // renderer/views
-    Camera camera = {.ortho = true, .ortho_height = 4};
+    Camera camera = {.ortho = true, .ortho_height = 4, .near_ = 0.1f, .far_ = 1000};
     mat4 proj;
     vec4 corner = {4, 2, -1, 1}, out;
     box_camera_projection(&camera, 100, 50, proj);
@@ -117,7 +128,13 @@ void Camera_ortho_height(void) {
 
 void Camera_ortho_default_height(void) {
     // renderer/views
-    Camera camera = {.ortho = true};
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t e = ecs_new(world);
+    ecs_add(world, e, Camera);
+    Camera camera = *ecs_get(world, e, Camera);
+    ecs_fini(world);
+    camera.ortho = true;
     mat4 proj;
     vec4 top = {0, 5, -1, 1}, out;
     box_camera_projection(&camera, 100, 100, proj);
@@ -127,7 +144,8 @@ void Camera_ortho_default_height(void) {
 
 void Camera_ortho_scale(void) {
     // renderer/views
-    Camera camera = {.ortho = true, .ortho_height = 4, .ortho_scale = 10};
+    Camera camera = {.ortho = true, .ortho_height = 4, .ortho_scale = 10, .near_ = 0.1f,
+        .far_ = 1000};
     mat4 proj;
     vec4 corner = {10, 5, -1, 1}, out;
     box_camera_projection(&camera, 200, 100, proj);

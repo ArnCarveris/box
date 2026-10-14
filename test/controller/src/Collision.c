@@ -219,7 +219,8 @@ void Collision_step_setting(void) {
     ecs_set(world, step, Position, { 0, 0.25f, -2 });
     ecs_set(world, step, Box, { 2, 0.5f, 2 });
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .step = 0.6f });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->step = 0.6f;
     ecs_progress(world, 0.1f);
 
     box_input_key_press(world, KeyW, 6);
@@ -340,10 +341,10 @@ void Collision_round_shapes(void) {
 
     ecs_entity_t sphere = ecs_new(world);
     ecs_set(world, sphere, Position, { 0, 1, -4 });
-    ecs_set(world, sphere, Sphere, { .radius = 1 });
+    ecs_set(world, sphere, Sphere, { .segments = 24, .radius = 1 });
     ecs_entity_t cylinder = ecs_new(world);
     ecs_set(world, cylinder, Position, { 10, 1, -4 });
-    ecs_set(world, cylinder, Cylinder, { .radius = 1, .length = 2 });
+    ecs_set(world, cylinder, Cylinder, { .segments = 24, .radius = 1, .length = 2 });
     ecs_entity_t a = ecs_new(world);
     ecs_add(world, a, FirstPersonController);
     ecs_entity_t b = ecs_new(world);
@@ -373,10 +374,10 @@ void Collision_round_shapes_slide_around(void) {
 
     ecs_entity_t sphere = ecs_new(world);
     ecs_set(world, sphere, Position, { 0, 1, -4 });
-    ecs_set(world, sphere, Sphere, { .radius = 1 });
+    ecs_set(world, sphere, Sphere, { .segments = 24, .radius = 1 });
     ecs_entity_t cylinder = ecs_new(world);
     ecs_set(world, cylinder, Position, { 10, 1, -4 });
-    ecs_set(world, cylinder, Cylinder, { .radius = 1, .length = 2 });
+    ecs_set(world, cylinder, Cylinder, { .segments = 24, .radius = 1, .length = 2 });
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, { 0.9f, 0, 0 });
     ecs_add(world, a, FirstPersonController);
@@ -485,7 +486,8 @@ void Collision_camera_collide(void) {
     ecs_set(world, wall, Box, { 40, 2, 0.4f });
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, { 0, 1, 0 });
-    ecs_set(world, cam, CameraController, { .collide = true });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->collide = true;
     ecs_entity_t ghost = ecs_new(world);
     ecs_set(world, ghost, Position, { 5, 1, 0 });
     ecs_add(world, ghost, CameraController);
@@ -516,7 +518,9 @@ void Collision_camera_radius(void) {
     ecs_set(world, wall, Box, { 40, 2, 0.4f });
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Position, { 0, 1, 0 });
-    ecs_set(world, cam, CameraController, { .collide = true, .radius = 1 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->collide = true;
+    ecs_get_mut(world, cam, CameraController)->radius = 1;
     ecs_progress(world, 0.1f);
 
     box_input_key(world, KeyW, true);

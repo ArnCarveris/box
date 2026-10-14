@@ -21,7 +21,7 @@ void Frames_trivial_passes(void) {
         .phase = EcsOnUpdate, .run = fake_work });
     fake_work_ms = 2;
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 20 });
 
     int32_t frames = 0;

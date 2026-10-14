@@ -168,17 +168,15 @@ static bool box_surface_offscreen(
     return !app || app->headless || s->texture || is_test;
 }
 
-/** Get a size in points, or its default when it is not set.
+/** Clamp a size in points to the sizes a surface supports.
  *
  * @param value The size of the Surface
- * @param fallback The default
- * @return The size, at most BOX_SURFACE_MAX_SIZE
+ * @return The size, between 1 and BOX_SURFACE_MAX_SIZE
  */
 static int32_t box_surface_points(
-    int32_t value,
-    int32_t fallback)
+    int32_t value)
 {
-    int32_t result = value > 0 ? value : fallback;
+    int32_t result = value > 1 ? value : 1;
 
     return result < BOX_SURFACE_MAX_SIZE ? result : BOX_SURFACE_MAX_SIZE;
 }
@@ -186,20 +184,45 @@ static int32_t box_surface_points(
 /** Divide a size in pixels by the resolution scale.
  *
  * @param pixels The size
- * @param scale The resolution scale, 0 or less for none
+ * @param scale The resolution scale, a scale of 0 or less renders at the largest size
  * @return The render size, between 1 and BOX_SURFACE_MAX_SIZE
  */
 static int32_t box_surface_scaled(
     int32_t pixels,
     float scale)
 {
-    float value = (float)pixels / (scale > 0 ? scale : 1.0f);
-    int32_t result = (int32_t)(value + 0.5f);
+    float value = scale > 0 ? (float)pixels / scale : (float)BOX_SURFACE_MAX_SIZE;
+    int32_t result = value < (float)BOX_SURFACE_MAX_SIZE
+        ? (int32_t)(value + 0.5f)
+        : BOX_SURFACE_MAX_SIZE;
     if (result < 1) {
         result = 1;
     }
 
-    return result < BOX_SURFACE_MAX_SIZE ? result : BOX_SURFACE_MAX_SIZE;
+    return result;
+}
+
+/** Construct Surface values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_surface_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Surface *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Surface){
+            .width = BOX_SURFACE_WIDTH,
+            .height = BOX_SURFACE_HEIGHT,
+            .resolution_scale = 1.0f
+        };
+    }
 }
 
 /** Give a surface its target handle and, unless it renders offscreen, its window.
@@ -220,8 +243,8 @@ static void box_surface_open(
         goto done;
     }
 
-    impl->window_width = box_surface_points(s->width, BOX_SURFACE_WIDTH);
-    impl->window_height = box_surface_points(s->height, BOX_SURFACE_HEIGHT);
+    impl->window_width = box_surface_points(s->width);
+    impl->window_height = box_surface_points(s->height);
     impl->window = box_window_new(impl->window_width, impl->window_height, "box");
     if (!impl->window) {
         ecs_warn("cannot open a window, the surface renders offscreen");
@@ -242,8 +265,8 @@ static void box_surface_measure(
     SurfaceImpl *impl,
     box_render_target_desc_t *desc)
 {
-    int32_t width = box_surface_points(s->width, BOX_SURFACE_WIDTH);
-    int32_t height = box_surface_points(s->height, BOX_SURFACE_HEIGHT);
+    int32_t width = box_surface_points(s->width);
+    int32_t height = box_surface_points(s->height);
     ecs_os_memset_t(desc, 0, box_render_target_desc_t);
     desc->width = width;
     desc->height = height;
@@ -510,6 +533,7 @@ void BoxSurfaceImport(
     ECS_META_COMPONENT(world, TextureQuality);
     ECS_META_COMPONENT(world, Surface);
     box_owned_hooks(world, Surface, BOX_OWNED_STR(Surface, write_to_file));
+    ecs_set_hooks(world, Surface, { .ctor = box_surface_ctor });
     ECS_META_COMPONENT(world, SurfaceStatus);
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
 

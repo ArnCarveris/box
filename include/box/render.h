@@ -21,7 +21,7 @@
 extern "C" {
 #endif
 
-/** Packets in flight when RenderSettings.in_flight is 0 */
+/** Packets in flight of the RenderSettings the module sets */
 #define BOX_RENDER_IN_FLIGHT (2)
 
 /** Largest number of packets in flight */
@@ -29,7 +29,7 @@ extern "C" {
 
 /** How frames travel from the main thread to the renderer, applied before the next frame */
 ECS_STRUCT(RenderSettings, {
-    int32_t in_flight;  /**< Packets in flight, default 2, at most 8, 0 for the default */
+    int32_t in_flight;  /**< Packets in flight, default 2, from 1 to 8 */
     bool main_thread;   /**< The main thread renders the packet, default on in the browser */
 });
 

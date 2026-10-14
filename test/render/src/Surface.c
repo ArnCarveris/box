@@ -23,7 +23,8 @@ void Surface_default_size(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {0});
+    ecs_add(world, e, Surface);
+    ecs_modified(world, e, Surface);
     ecs_progress(world, 0);
 
     const SurfaceStatus *status = ecs_get(world, e, SurfaceStatus);
@@ -75,14 +76,16 @@ void Surface_two_surfaces(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 255, 255}}});
     ecs_entity_t a = ecs_new(world);
-    ecs_set(world, a, Surface, {.width = 64, .height = 32, .write_to_file = "first.png"});
+    ecs_set(world, a, Surface, {.width = 64, .height = 32, .write_to_file = "first.png",
+        .resolution_scale = 1});
     ecs_entity_t b = ecs_new(world);
-    ecs_set(world, b, Surface, {.width = 16, .height = 8, .write_to_file = "second.png"});
+    ecs_set(world, b, Surface, {.width = 16, .height = 8, .write_to_file = "second.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

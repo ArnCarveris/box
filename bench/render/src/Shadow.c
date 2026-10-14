@@ -37,10 +37,11 @@ static void bench_shadow(
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 60, 160});
     ecs_set(world, camera, Rotation, {-0.4f, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 50});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {24, 28, 36, 255}}, .lighting.enabled = true,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .shadows = {.enabled = shadows, .cascades = 4, .resolution = 2048,
             .max_distance = 200, .split_lambda = 0.7f, .depth_bias = 2,
             .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});
@@ -63,7 +64,7 @@ static void bench_shadow(
     }
 
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 1280, .height = 720});
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
     uint32_t word = 0;
     int32_t i;
     for (i = 0; i < 3; i ++) {

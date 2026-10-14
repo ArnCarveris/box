@@ -1007,7 +1007,7 @@ void Shader_gpu_compiles_component(void)
     ecs_entity_t s2 = ecs_new(world);
     ecs_set(world, s2, Shader, {.path = path});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
     ecs_progress(world, 0);
@@ -1040,7 +1040,7 @@ void Shader_gpu_invalid_code(void)
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Shader, {.path = path});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_log_set_level(-4);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1077,7 +1077,7 @@ void Shader_gpu_recompiles_on_change(void)
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Shader, {.path = path});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -1115,7 +1115,7 @@ void Shader_gpu_error_in_status(void)
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Shader, {.path = path});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_log_set_level(-4);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1160,7 +1160,8 @@ void Shader_gpu_error_in_include(void)
     FILE *f_inc = fopen(inc, "w");
     fputs("#pragma once\nconst B = 1.0;\n\nfn g() -> f32 { return undefined_name; }\n", f_inc);
     fclose(f_inc);
-    char *main = flecs_asprintf("%s/main_lines.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    char *main = flecs_asprintf("%s/main_lines.wgsl", ecs_singleton_get(world,
+        AppStatus)->tmp_dir);
     FILE *f_main = fopen(main, "w");
     fputs("const A = 1.0;\n#include \"inc_lines.wgsl\"\nconst C = 1.0;\n", f_main);
     fclose(f_main);
@@ -1168,7 +1169,7 @@ void Shader_gpu_error_in_include(void)
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Shader, {.path = main});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_log_set_level(-4);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1208,7 +1209,7 @@ void Shader_gpu_error_after_directives(void)
     ecs_entity_t s = ecs_new(world);
     ecs_set(world, s, Shader, {.path = main});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_log_set_level(-4);
     ecs_progress(world, 0);
     box_render_sync(world);

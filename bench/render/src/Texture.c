@@ -66,9 +66,10 @@ void Texture_textured_batches(
     }
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     for (i = 0; i < BENCH_TEXTURE_STATIC + BENCH_TEXTURE_DYNAMIC; i ++) {
         int32_t set = i % BENCH_TEXTURE_SETS;
         bool dynamic = i >= BENCH_TEXTURE_STATIC;

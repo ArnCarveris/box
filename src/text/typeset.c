@@ -199,7 +199,7 @@ static void box_text_emit(
     const box_text_placed_t *placed = ecs_vec_first(&run->s->placed);
     const float *widths = ecs_vec_first(&run->s->lines);
     int32_t i, lines = ecs_vec_count(&run->s->lines);
-    float width = 0.0f, size = text->size > 0.0f ? text->size : BOX_TEXT_SIZE_DEFAULT;
+    float width = 0.0f, size = text->size;
     float k = size / (float)BOX_TEXT_EM;
     for (i = 0; i < lines; i ++) {
         width = widths[i] > width ? widths[i] : width;
@@ -252,14 +252,14 @@ void box_text_layout(
     }
 
     ecs_vec_clear(&glyphs->glyphs);
-    box_text_font_t *font = box_text_font_of(world, s, text->font);
+    box_text_font_t *font = text->font ? box_text_font_of(world, s, text->font) : NULL;
     const char *str = text->value;
-    if (!font->face || !str || !str[0]) {
+    if (!font || !font->face || !str || !str[0]) {
         goto write;
     }
 
     float units = box_text_face_metrics(font->face, &ascent, &descent, &gap);
-    float px = (text->size > 0.0f ? text->size : BOX_TEXT_SIZE_DEFAULT) / units;
+    float px = text->size / units;
     metrics[0] = ascent * px;
     metrics[1] = -descent * px;
     metrics[2] = text->line_height > 0.0f

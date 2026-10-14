@@ -156,7 +156,9 @@ void NGon_default_sides(void) {
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
-    ecs_set(world, e1, NGon, { .radius = 1 });
+    ecs_add(world, e1, NGon);
+    ecs_get_mut(world, e1, NGon)->radius = 1;
+    ecs_modified(world, e1, NGon);
     ecs_set(world, e2, NGon, { .sides = 6, .radius = 1 });
     const ShapeMesh *m1 = ecs_get(world, e1, ShapeMesh);
     const ShapeMesh *m2 = ecs_get(world, e2, ShapeMesh);
@@ -175,7 +177,9 @@ void NGon_default_sides_normals(void) {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, NGon, { .radius = 1 });
+    ecs_add(world, e, NGon);
+    ecs_get_mut(world, e, NGon)->radius = 1;
+    ecs_modified(world, e, NGon);
     const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);

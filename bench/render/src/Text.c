@@ -43,16 +43,18 @@ void Text_layout_10k(
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t *texts = ecs_os_malloc_n(ecs_entity_t, BENCH_TEXT_COUNT);
+    ecs_entity_t font = ecs_lookup(world, "box.text.DefaultFont");
     int32_t i, frame = 0;
     for (i = 0; i < BENCH_TEXT_COUNT; i ++) {
         ecs_entity_t e = texts[i] = ecs_new(world);
         ecs_set(world, e, Position,
             {(float)(i % BENCH_TEXT_ROW) * 120, (float)(i / BENCH_TEXT_ROW) * 20, 0});
-        ecs_set(world, e, Text, {.value = "Label number", .size = 14, .width = 60});
+        ecs_set(world, e, Text, {.value = "Label number", .size = 14, .width = 60, .font = font});
         ecs_set(world, e, Rgb, {255, 255, 255});
     }
 
@@ -67,7 +69,8 @@ void Text_layout_10k(
             ecs_set(world, texts[i], Text, {
                 .value = frame % 2 ? "Label number" : "Other label",
                 .size = 14,
-                .width = 60
+                .width = 60,
+                .font = font
             });
         }
 
@@ -98,16 +101,18 @@ void Text_changed_1pct(
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t *texts = ecs_os_malloc_n(ecs_entity_t, BENCH_TEXT_COUNT);
+    ecs_entity_t font = ecs_lookup(world, "box.text.DefaultFont");
     int32_t i, frame = 0;
     for (i = 0; i < BENCH_TEXT_COUNT; i ++) {
         ecs_entity_t e = texts[i] = ecs_new(world);
         ecs_set(world, e, Position,
             {(float)(i % BENCH_TEXT_ROW) * 120, (float)(i / BENCH_TEXT_ROW) * 20, 0});
-        ecs_set(world, e, Text, {.value = "Score 0000", .size = 14});
+        ecs_set(world, e, Text, {.value = "Score 0000", .size = 14, .font = font});
         ecs_set(world, e, Rgb, {255, 255, 255});
     }
 
@@ -122,7 +127,7 @@ void Text_changed_1pct(
         for (i = 0; i < BENCH_TEXT_COUNT / 100; i ++) {
             ecs_entity_t e = texts[(frame * 7919 + i * 101) % BENCH_TEXT_COUNT];
             ecs_os_snprintf(value, ECS_SIZEOF(value), "Score %04d", (frame * 37 + i) % 10000);
-            ecs_set(world, e, Text, {.value = value, .size = 14});
+            ecs_set(world, e, Text, {.value = value, .size = 14, .font = font});
         }
 
         ecs_progress(world, 0);

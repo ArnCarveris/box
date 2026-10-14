@@ -219,8 +219,8 @@ static void box_render_ring_apply(
 {
     int32_t count = ring->settings.in_flight;
     bool main_thread = ring->settings.main_thread || !ecs_os_has_threading();
-    if (count <= 0) {
-        count = BOX_RENDER_IN_FLIGHT;
+    if (count < 1) {
+        count = 1;
     }
 
     if (count > BOX_RENDER_IN_FLIGHT_MAX) {

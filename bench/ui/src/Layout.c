@@ -33,7 +33,7 @@ static ecs_world_t* bench_layout_world(
     for (r = 0; r < BENCH_ROWS; r ++) {
         ecs_entity_t row = ecs_new_w_pair(world, EcsChildOf, root);
         ecs_set(world, row, Layout, { .direction = DirectionRow, .spacing = 1 });
-        ecs_set(world, row, LayoutItem, { .width = { SizeModeGrow } });
+        ecs_set(world, row, LayoutItem, { .width = { SizeModeGrow, 1 } });
         ecs_set(world, row, Rect, {1, 1});
         for (c = 0; c < BENCH_COLS; c ++) {
             ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, row);

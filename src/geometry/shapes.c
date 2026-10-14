@@ -9,20 +9,102 @@
 /** Largest number of segments around an axis */
 #define BOX_MAX_SEGMENTS (512)
 
-/** Apply the default and the limits to a segment count.
+/** Segments around the axis of a constructed round shape */
+#define BOX_SEGMENTS (24)
+
+/** Sides of a constructed NGon */
+#define BOX_NGON_SIDES (6)
+
+/** Subdivisions around the tube of a constructed Torus */
+#define BOX_TORUS_RINGS (12)
+
+/** Subdivisions per corner of a constructed RoundedBox */
+#define BOX_ROUNDED_BOX_SEGMENTS (4)
+
+/** Apply the limits to a segment count.
  *
  * @param value The authored count
- * @param fallback The count used for zero or less
- * @return The count to generate with
+ * @return The count to generate with, from 3 to BOX_MAX_SEGMENTS
  */
 static int32_t box_segments(
-    int32_t value,
-    int32_t fallback)
+    int32_t value)
 {
-    int32_t result = value <= 0 ? fallback : value;
-    result = result < 3 ? 3 : result;
+    int32_t result = value < 3 ? 3 : value;
 
     return result > BOX_MAX_SEGMENTS ? BOX_MAX_SEGMENTS : result;
+}
+
+/** Construct shape values whose first member is a count, set to the count in the context.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info, whose context is the count
+ */
+static void box_shape_count_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    int32_t i;
+    ecs_os_memset(ptr, 0, ti->size * count);
+    for (i = 0; i < count; i ++) {
+        *(int32_t*)ECS_ELEM(ptr, ti->size, i) = (int32_t)(intptr_t)ti->hooks.ctx;
+    }
+}
+
+/** Construct Torus values with the documented subdivisions.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_torus_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Torus *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Torus){ .segments = BOX_SEGMENTS, .rings = BOX_TORUS_RINGS };
+    }
+}
+
+/** Construct RoundedBox values with the documented corner subdivisions.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_rounded_box_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    RoundedBox *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (RoundedBox){ .segments = BOX_ROUNDED_BOX_SEGMENTS };
+    }
+}
+
+/** Give a shape whose first member is a count a constructor that sets it.
+ *
+ * @param world The world
+ * @param component The shape component
+ * @param value The count
+ */
+static void box_shape_count_hooks(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    int32_t value)
+{
+    ecs_set_hooks_id(world, component, &(ecs_type_hooks_t){
+        .ctor = box_shape_count_ctor,
+        .ctx = (void*)(intptr_t)value
+    });
 }
 
 /** Divide two sizes, returning a fallback for a divisor of zero or less.
@@ -184,7 +266,7 @@ static void box_key_ngon(
     const void *value,
     box_shape_key_t *key)
 {
-    key->i[0] = box_segments(((const NGon*)value)->sides, 6);
+    key->i[0] = box_segments(((const NGon*)value)->sides);
 }
 
 /** Scale of an NGon.
@@ -225,7 +307,7 @@ static void box_key_sphere(
     box_shape_key_t *key)
 {
     const Sphere *v = value;
-    key->i[0] = box_segments(v->segments, 24);
+    key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
 }
 
@@ -310,7 +392,7 @@ static void box_key_cylinder(
     box_shape_key_t *key)
 {
     const Cylinder *v = value;
-    key->i[0] = box_segments(v->segments, 24);
+    key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
 }
 
@@ -367,8 +449,8 @@ static void box_key_torus(
     box_shape_key_t *key)
 {
     const Torus *v = value;
-    key->i[0] = box_segments(v->segments, 24);
-    key->i[1] = box_segments(v->rings, 12);
+    key->i[0] = box_segments(v->segments);
+    key->i[1] = box_segments(v->rings);
     key->i[2] = v->smooth;
     key->f[0] = box_shape_quantize(box_ratio(v->tube, v->radius, 0.0f));
 }
@@ -411,7 +493,7 @@ static void box_key_capsule(
 {
     const Capsule *v = value;
     float length = box_ratio(v->length, v->radius, 0.0f);
-    key->i[0] = box_segments(v->segments, 24);
+    key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
     key->f[0] = box_shape_quantize(length > 0.0f ? length : 0.0f);
 }
@@ -455,7 +537,7 @@ static void box_key_tube(
     const Tube *v = value;
     float wall = glm_clamp(box_ratio(v->thickness, v->radius, 1.0f), 0.0f, 1.0f);
     bool full = v->arc <= 0.0f || v->arc >= 2.0f * BOX_PI - 1e-4f;
-    key->i[0] = box_segments(v->segments, 24);
+    key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
     key->f[0] = box_shape_quantize(wall);
     key->f[1] = full ? 0.0f : box_shape_quantize(v->arc);
@@ -487,7 +569,7 @@ static void box_key_frustum(
 {
     const Frustum *v = value;
     float max = glm_max(v->radius_bottom, v->radius_top);
-    key->i[0] = box_segments(v->segments, 24);
+    key->i[0] = box_segments(v->segments);
     key->i[1] = v->smooth;
     key->f[0] = box_shape_quantize(glm_max(box_ratio(v->radius_bottom, max, 1.0f), 0.0f));
     key->f[1] = box_shape_quantize(glm_max(box_ratio(v->radius_top, max, 1.0f), 0.0f));
@@ -543,7 +625,7 @@ static void box_key_rounded_box(
 
     float radius = glm_clamp(box_ratio(v->radius, max, 0.0f), 0.0f, 0.5f * smallest);
     key->f[3] = glm_min(box_shape_quantize(radius), 0.5f * smallest);
-    key->i[0] = v->segments <= 0 ? 4 : (v->segments > 64 ? 64 : v->segments);
+    key->i[0] = v->segments < 1 ? 1 : (v->segments > 64 ? 64 : v->segments);
 }
 
 /** Scale of a RoundedBox.
@@ -686,4 +768,15 @@ void box_geometry_shapes_init(
         box_gen_frustum, box_scale_frustum);
     box_shape_builtin(world, ecs_id(RoundedBox), box_key_rounded_box,
         box_gen_rounded_box, box_scale_rounded_box);
+
+    box_shape_count_hooks(world, ecs_id(NGon), BOX_NGON_SIDES);
+    box_shape_count_hooks(world, ecs_id(Sphere), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(HemiSphere), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(Cone), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(Cylinder), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(Capsule), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(Tube), BOX_SEGMENTS);
+    box_shape_count_hooks(world, ecs_id(Frustum), BOX_SEGMENTS);
+    ecs_set_hooks(world, Torus, { .ctor = box_torus_ctor });
+    ecs_set_hooks(world, RoundedBox, { .ctor = box_rounded_box_ctor });
 }

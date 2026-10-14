@@ -8,44 +8,28 @@
 
 #include "render.h"
 
-/** Longest edge of the first bloom mip a view that does not set it uses */
-#define BOX_EFFECTS_BLOOM_MIP (512)
-
 /** Shortest edge of the first bloom mip */
 #define BOX_EFFECTS_BLOOM_MIP_MIN (8)
 
 /** Highest temporal blend of bloom */
 #define BOX_EFFECTS_BLOOM_TEMPORAL (0.95f)
 
-/** Take a default for a value of zero or less.
- *
- * @param value The value
- * @param fallback The value that replaces zero or less
- * @return The value or the default
- */
-static float box_effects_positive(
-    float value,
-    float fallback)
-{
-    return value > 0 ? value : fallback;
-}
+/** Smallest brightness and log2 luminance range the exposure measures */
+#define BOX_EFFECTS_EXPOSURE_EPSILON (1e-4f)
 
 void box_render_bloom_settings(
     const Bloom *in,
     Bloom *out)
 {
     *out = *in;
-    out->intensity = box_effects_positive(in->intensity, 0.3f);
+    out->intensity = glm_max(in->intensity, 0.0f);
     out->low_frequency_boost = glm_max(in->low_frequency_boost, 0.0f);
     out->low_frequency_boost_curvature = glm_clamp(in->low_frequency_boost_curvature, 0, 0.99f);
-    out->high_pass_frequency = glm_clamp(box_effects_positive(in->high_pass_frequency, 1), 0, 1);
+    out->high_pass_frequency = glm_clamp(in->high_pass_frequency, 0, 1);
     out->threshold = glm_max(in->threshold, 0.0f);
     out->threshold_softness = glm_clamp(in->threshold_softness, 0.0f, 1.0f);
     out->firefly_clamp = glm_max(in->firefly_clamp, 0.0f);
     out->temporal = glm_clamp(in->temporal, 0.0f, BOX_EFFECTS_BLOOM_TEMPORAL);
-    out->max_mip_dimension = in->max_mip_dimension > 0
-        ? in->max_mip_dimension
-        : BOX_EFFECTS_BLOOM_MIP;
     if (out->max_mip_dimension < BOX_EFFECTS_BLOOM_MIP_MIN) {
         out->max_mip_dimension = BOX_EFFECTS_BLOOM_MIP_MIN;
     }
@@ -55,9 +39,9 @@ void box_render_ssao_settings(
     const Ssao *in,
     Ssao *out)
 {
-    out->radius = box_effects_positive(in->radius, 0.5f);
+    out->radius = glm_max(in->radius, 0.0f);
     out->bias = glm_max(in->bias, 0.0f);
-    out->intensity = box_effects_positive(in->intensity, 1.0f);
+    out->intensity = glm_max(in->intensity, 0.0f);
 }
 
 void box_render_fog_settings(
@@ -65,14 +49,11 @@ void box_render_fog_settings(
     HeightFog *out)
 {
     *out = *in;
-    out->density = box_effects_positive(in->density, 0.1f);
+    out->density = glm_max(in->density, 0.0f);
     out->falloff = glm_max(in->falloff, 0.0f);
-    out->max_opacity = glm_clamp(box_effects_positive(in->max_opacity, 1.0f), 0.0f, 1.0f);
+    out->max_opacity = glm_clamp(in->max_opacity, 0.0f, 1.0f);
     out->sun_inscatter = glm_max(in->sun_inscatter, 0.0f);
     out->ambient_inscatter = glm_max(in->ambient_inscatter, 0.0f);
-    if (!in->color.r && !in->color.g && !in->color.b) {
-        out->color = (rgb){191, 158, 140};
-    }
 }
 
 void box_render_exposure_settings(
@@ -81,17 +62,12 @@ void box_render_exposure_settings(
 {
     *out = *in;
     out->target_brightness = glm_max(in->target_brightness, 0.0f);
-    out->min_brightness = box_effects_positive(in->min_brightness, 0.1f);
-    out->max_brightness = glm_max(box_effects_positive(in->max_brightness, 0.3f),
-        out->min_brightness);
-    if (in->max_log_luma <= in->min_log_luma) {
-        out->min_log_luma = -8.0f;
-        out->max_log_luma = 4.0f;
-    }
-
-    out->speed_up = box_effects_positive(in->speed_up, 3.0f);
-    out->speed_down = box_effects_positive(in->speed_down, 1.0f);
-    out->high_percentile = glm_clamp(box_effects_positive(in->high_percentile, 0.95f), 0, 1);
+    out->min_brightness = glm_max(in->min_brightness, BOX_EFFECTS_EXPOSURE_EPSILON);
+    out->max_brightness = glm_max(in->max_brightness, out->min_brightness);
+    out->max_log_luma = glm_max(in->max_log_luma, in->min_log_luma + BOX_EFFECTS_EXPOSURE_EPSILON);
+    out->speed_up = glm_max(in->speed_up, 0.0f);
+    out->speed_down = glm_max(in->speed_down, 0.0f);
+    out->high_percentile = glm_clamp(in->high_percentile, 0, 1);
     out->low_percentile = glm_clamp(in->low_percentile, 0.0f, out->high_percentile);
     out->min_exposure = glm_max(in->min_exposure, 0.0f);
     out->max_exposure = glm_max(in->max_exposure, 0.0f);

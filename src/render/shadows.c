@@ -9,23 +9,11 @@
 
 #include "render.h"
 
-/** Cascades of a view that does not set them */
-#define BOX_SHADOW_CASCADES (4)
-
-/** Edge of a cascade in texels of a view that does not set it */
-#define BOX_SHADOW_RESOLUTION (2048)
-
 /** Smallest edge of a cascade in texels */
 #define BOX_SHADOW_RESOLUTION_MIN (16)
 
 /** Largest edge of a cascade in texels, the 2D texture limit webgpu guarantees */
 #define BOX_SHADOW_RESOLUTION_MAX (8192)
-
-/** View distance the shadows of a view reach when it does not set one */
-#define BOX_SHADOW_DISTANCE (200.0f)
-
-/** PCF taps per axis of a view that does not set them */
-#define BOX_SHADOW_FILTER (3)
 
 /** Above this vertical component the light space takes +Z as its up axis */
 #define BOX_SHADOW_POLE (0.99f)
@@ -45,21 +33,19 @@ static float box_shadow_clampf(
     return value < lo ? lo : (value > hi ? hi : value);
 }
 
-/** Clamp an integer to a range, taking a default for zero or less.
+/** Clamp an integer to a range.
  *
  * @param value The value
- * @param fallback The value that replaces zero or less
+ * @param lo The lower bound
  * @param hi The upper bound
- * @return The resolved value
+ * @return The clamped value
  */
 static int32_t box_shadow_count(
     int32_t value,
-    int32_t fallback,
+    int32_t lo,
     int32_t hi)
 {
-    int32_t result = value > 0 ? value : fallback;
-
-    return result > hi ? hi : result;
+    return value < lo ? lo : (value > hi ? hi : value);
 }
 
 void box_render_shadow_settings(
@@ -67,17 +53,11 @@ void box_render_shadow_settings(
     ShadowSettings *out)
 {
     *out = *settings;
-    out->cascades = box_shadow_count(
-        settings->cascades, BOX_SHADOW_CASCADES, BOX_RENDER_SHADOW_CASCADES);
+    out->cascades = box_shadow_count(settings->cascades, 1, BOX_RENDER_SHADOW_CASCADES);
     out->resolution = box_shadow_count(
-        settings->resolution, BOX_SHADOW_RESOLUTION, BOX_SHADOW_RESOLUTION_MAX);
-    if (out->resolution < BOX_SHADOW_RESOLUTION_MIN) {
-        out->resolution = BOX_SHADOW_RESOLUTION_MIN;
-    }
-
-    out->filter_size = box_shadow_count(
-        settings->filter_size, BOX_SHADOW_FILTER, BOX_RENDER_SHADOW_FILTER_MAX);
-    out->max_distance = settings->max_distance > 0 ? settings->max_distance : BOX_SHADOW_DISTANCE;
+        settings->resolution, BOX_SHADOW_RESOLUTION_MIN, BOX_SHADOW_RESOLUTION_MAX);
+    out->filter_size = box_shadow_count(settings->filter_size, 1, BOX_RENDER_SHADOW_FILTER_MAX);
+    out->max_distance = glm_max(settings->max_distance, 0.0f);
     out->split_lambda = box_shadow_clampf(settings->split_lambda, 0.0f, 1.0f);
     out->fade = box_shadow_clampf(settings->fade, 0.0f, 1.0f);
     out->depth_bias = glm_max(settings->depth_bias, 0.0f);
@@ -249,8 +229,8 @@ static void box_shadows_view(
     }
 
     box_render_shadow_settings(&view->shadows, &s);
-    float near_ = c->near_ > 0 ? c->near_ : BOX_CAMERA_NEAR;
-    float far_ = c->far_ > near_ ? c->far_ : (c->ortho ? BOX_CAMERA_FAR : s.max_distance);
+    float near_ = glm_max(c->near_, 1e-3f);
+    float far_ = c->far_ > near_ || c->ortho ? c->far_ : s.max_distance;
     float distance = glm_min(s.max_distance, far_);
     if (distance <= near_) {
         goto done;

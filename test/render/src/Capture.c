@@ -45,12 +45,13 @@ void Capture_cleared_surface(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 128, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "clear.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "clear.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -81,11 +82,12 @@ void Capture_no_clearing_view_is_black(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.color = {255, 255, 255, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16, .write_to_file = "black.png"});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .write_to_file = "black.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -115,7 +117,7 @@ void Capture_resolution_scale(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {20, 200, 90, 255}}});
@@ -155,14 +157,16 @@ void Capture_after_resize(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 255, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "resize.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "resize.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
-    ecs_set(world, e, Surface, {.width = 48, .height = 40, .write_to_file = "resize.png"});
+    ecs_set(world, e, Surface, {.width = 48, .height = 40, .write_to_file = "resize.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -194,7 +198,8 @@ void Capture_absolute_path(void) {
     char *path = flecs_asprintf("%s/absolute.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     test_assert(path[0] == '/');
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 8, .height = 4, .write_to_file = path});
+    ecs_set(world, e, Surface, {.width = 8, .height = 4, .write_to_file = path,
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -218,7 +223,7 @@ void Capture_view_root_selects_clear(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t other = ecs_new(world);
     ecs_set(world, other, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
@@ -228,7 +233,8 @@ void Capture_view_root_selects_clear(void) {
         .camera = camera, .clear = {.enabled = true, .color = {0, 255, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {
-        .width = 8, .height = 8, .view_root = root, .write_to_file = "root.png"});
+        .width = 8, .height = 8, .view_root = root, .write_to_file = "root.png",
+            .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -256,7 +262,8 @@ void Capture_every_frame(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "frames.png"});
+    ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "frames.png",
+        .resolution_scale = 1});
     char *path = flecs_asprintf("%s/frames.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -268,7 +275,7 @@ void Capture_every_frame(void) {
         test_int(remove(path), 0);
     }
 
-    ecs_set(world, e, Surface, {.width = 8, .height = 8});
+    ecs_set(world, e, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
     test_assert(fopen(path, "rb") == NULL);
@@ -281,18 +288,19 @@ void Capture_main_thread(void) {
     // renderer/device
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    ecs_singleton_set(world, RenderSettings, {.main_thread = true});
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 255, 255, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 16, .write_to_file = "main.png"});
+    ecs_set(world, e, Surface, {.width = 32, .height = 16, .write_to_file = "main.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
 
     char *path = flecs_asprintf("%s/main.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
@@ -322,12 +330,13 @@ void Capture_relative_path_written_before_exit(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 255, 255, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 256, .height = 256, .write_to_file = "exit.png"});
+    ecs_set(world, e, Surface, {.width = 256, .height = 256, .write_to_file = "exit.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);

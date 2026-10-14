@@ -32,7 +32,7 @@
 /** First backend texture handle of atlas pages, the handles below belong to box.texture */
 #define BOX_TEXT_PAGE_FIRST (0x40000000u)
 
-/** Em size of a Text without size, in logical pixels */
+/** Em size of a constructed Text, in logical pixels */
 #define BOX_TEXT_SIZE_DEFAULT (16.0f)
 
 /** Font file of box.text.DefaultFont */
@@ -146,7 +146,7 @@ box_text_state_t* box_text_state_get(
  *
  * @param world The world
  * @param s The registry
- * @param font The font entity of the Text, 0 or an entity without Font for the default font
+ * @param font The font entity of the Text, an entity without Font for the default font
  * @return The font, its face NULL until it loaded
  */
 box_text_font_t* box_text_font_of(

@@ -46,9 +46,10 @@ static void bench_render_extract(
     box_render_backend_t backend = { .render = bench_render_drop };
     box_render_set_backend(world, &backend);
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, BENCH_STATIC);
     int32_t i, next = 0;
     float y = 0;

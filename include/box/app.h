@@ -30,7 +30,7 @@ extern "C" {
 /** Port of the command endpoints when --port is not given */
 #define BOX_APP_PORT (27750)
 
-/** Frame rate of a run that does not pass --fps */
+/** Frame rate the module sets in App before the command line is parsed */
 #define BOX_APP_FPS (60)
 
 /** Settings of the process, filled from the command line before the world runs.
@@ -42,8 +42,8 @@ ECS_STRUCT(App, {
     bool headless;      /**< Run without a window, with a fixed delta time */
     int32_t frames;     /**< Stop after this many frames, 0 for no limit */
     double timeout;     /**< Stop after this many seconds, 0 for none, negative for infinite */
-    float cpu_budget;   /**< Percentage of one core a headless run may use, default 100 */
-    float fps;          /**< Target frame rate, 0 for uncapped */
+    float cpu_budget;   /**< Percent of one core a headless run may use, default 100, 0 no limit */
+    float fps;          /**< Target frame rate, default 60, 0 uncapped with a measured delta */
     int32_t port;       /**< Port of the command endpoints, 0 disables them */
     bool unguarded;     /**< A headless run starts on an oversubscribed machine */
     bool unpaced;       /**< A headless run ignores its CPU budget */

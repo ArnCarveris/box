@@ -242,7 +242,10 @@ void Sphere_default_segments(void) {
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
-    ecs_set(world, e1, Sphere, { .smooth = true, .radius = 1 });
+    ecs_add(world, e1, Sphere);
+    ecs_get_mut(world, e1, Sphere)->smooth = true;
+    ecs_get_mut(world, e1, Sphere)->radius = 1;
+    ecs_modified(world, e1, Sphere);
     ecs_set(world, e2, Sphere, { .segments = 24, .smooth = true, .radius = 1 });
     const ShapeMesh *m1 = ecs_get(world, e1, ShapeMesh);
     const ShapeMesh *m2 = ecs_get(world, e2, ShapeMesh);
@@ -261,7 +264,10 @@ void Sphere_default_segments_normals(void) {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Sphere, { .smooth = true, .radius = 1 });
+    ecs_add(world, e, Sphere);
+    ecs_get_mut(world, e, Sphere)->smooth = true;
+    ecs_get_mut(world, e, Sphere)->radius = 1;
+    ecs_modified(world, e, Sphere);
     const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);

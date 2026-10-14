@@ -21,23 +21,23 @@
 extern "C" {
 #endif
 
-/** Field of view in degrees of a camera that does not set one */
+/** Field of view in degrees of a constructed camera */
 #define BOX_CAMERA_FOV (60.0f)
 
-/** Near plane distance of a camera that does not set one */
+/** Near plane distance of a constructed camera */
 #define BOX_CAMERA_NEAR (0.1f)
 
-/** Far plane distance of an orthographic camera that does not set one */
+/** Far plane distance of a constructed camera */
 #define BOX_CAMERA_FAR (1000.0f)
 
-/** Visible height in world units of an orthographic camera that does not set one */
+/** Visible height in world units of a constructed orthographic camera */
 #define BOX_CAMERA_ORTHO_HEIGHT (10.0f)
 
-/** Perspective or orthographic camera, zero fields take engine defaults */
+/** Perspective or orthographic camera, values apply as specified, defaults are set by its ctor */
 ECS_STRUCT(Camera, {
     float fov;           /**< Vertical field of view in degrees, default 60 */
     float near_;         /**< Near plane distance, default 0.1 */
-    float far_;          /**< Far plane distance, 0 is infinite in perspective, 1000 in ortho */
+    float far_;          /**< Far plane distance, default 1000, 0 has none in perspective */
     float aspect_ratio;  /**< Width over height, 0 follows the surface */
     bool ortho;          /**< Use an orthographic projection */
     float ortho_height;  /**< Visible height in world units when orthographic, default 10 */

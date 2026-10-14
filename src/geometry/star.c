@@ -17,7 +17,7 @@ static void box_star_key(
 {
     const Star *star = value;
     key->i[0] = star->points < 3 ? 3 : (star->points > 256 ? 256 : star->points);
-    key->f[0] = box_shape_quantize(star->inner > 0.0f ? star->inner : 0.45f);
+    key->f[0] = box_shape_quantize(glm_clamp(star->inner, 0.0f, 1.0f));
 }
 
 /** Generate a star with unit outer radius in the XY plane facing +Z.
@@ -62,9 +62,29 @@ static void box_star_scale(
     scale[2] = 1.0f;
 }
 
+/** Construct Star values with the documented inner radius.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_star_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Star *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Star){ .inner = 0.45f };
+    }
+}
+
 void box_geometry_star_init(
     ecs_world_t *world)
 {
+    ecs_set_hooks(world, Star, { .ctor = box_star_ctor });
     box_shape_register(world, &(box_shape_desc_t){
         .component = ecs_id(Star),
         .key = box_star_key,

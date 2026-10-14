@@ -10,37 +10,37 @@
 /** Pitch the eye stops at, short of looking straight up or down */
 #define BOX_FIRST_PERSON_PITCH_MAX (1.55f)
 
-/** Walking units per second when the controller does not say */
+/** Walking units per second of a constructed controller */
 #define BOX_FIRST_PERSON_SPEED (4.0f)
 
-/** Units per second while crouching when the controller does not say */
+/** Units per second while crouching of a constructed controller */
 #define BOX_FIRST_PERSON_CROUCH_SPEED (2.0f)
 
-/** Units per second in free flight when the controller does not say */
+/** Units per second in free flight of a constructed controller */
 #define BOX_FIRST_PERSON_FLY_SPEED (10.0f)
 
-/** Flight speed multiplier while Fast is held when the controller does not say */
+/** Flight speed multiplier while Fast is held of a constructed controller */
 #define BOX_FIRST_PERSON_BOOST (4.0f)
 
-/** Upward speed of a jump when the controller does not say */
+/** Upward speed of a jump of a constructed controller */
 #define BOX_FIRST_PERSON_JUMP (5.0f)
 
-/** Downward acceleration when the controller does not say */
+/** Downward acceleration of a constructed controller */
 #define BOX_FIRST_PERSON_GRAVITY (18.0f)
 
-/** Height of the eye above the feet when the controller does not say */
+/** Height of the eye above the feet of a constructed controller */
 #define BOX_FIRST_PERSON_EYE (1.7f)
 
-/** Height of the eye while crouching when the controller does not say */
+/** Height of the eye while crouching of a constructed controller */
 #define BOX_FIRST_PERSON_CROUCH_EYE (0.9f)
 
-/** Radians per point of cursor movement when the controller does not say */
+/** Radians per point of cursor movement of a constructed controller */
 #define BOX_FIRST_PERSON_SENSITIVITY (0.003f)
 
-/** Radius of the body when the controller does not say */
+/** Radius of the body of a constructed controller */
 #define BOX_FIRST_PERSON_RADIUS (0.3f)
 
-/** Height of the ledges the feet step onto when the controller does not say */
+/** Height of the ledges the feet step onto of a constructed controller */
 #define BOX_FIRST_PERSON_STEP (0.3f)
 
 /** Height of the top of the body above the eye */
@@ -65,30 +65,43 @@ const box_controller_action_t box_first_person_actions[BoxFirstPersonActionCount
 
 /** What the actions of one scope ask a first person controller for this frame */
 typedef struct box_first_person_input_t {
-    ecs_entity_t scope;                       /**< Scope of the actions, 0 for the defaults */
+    ecs_entity_t scope;                       /**< Scope of the actions, 0 for none */
     bool held[BoxFirstPersonActionCount];     /**< Which actions are down */
     bool pressed[BoxFirstPersonActionCount];  /**< Which actions went down this frame */
     vec2 look;                                /**< Cursor movement of the Look action */
 } box_first_person_input_t;
 
-/** Value of a controller member, which takes its default when it is zero.
- *
- * @param value The member
- * @param fallback The default
- * @return The value to use
- */
-static float box_first_person_value(
-    float value,
-    float fallback)
+void box_first_person_controller_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
-    return value != 0 ? value : fallback;
+    const ecs_entity_t *scope = ti->hooks.ctx;
+    FirstPersonController *values = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        values[i] = (FirstPersonController){
+            .speed = BOX_FIRST_PERSON_SPEED,
+            .crouch_speed = BOX_FIRST_PERSON_CROUCH_SPEED,
+            .fly_speed = BOX_FIRST_PERSON_FLY_SPEED,
+            .boost = BOX_FIRST_PERSON_BOOST,
+            .jump = BOX_FIRST_PERSON_JUMP,
+            .gravity = BOX_FIRST_PERSON_GRAVITY,
+            .eye = BOX_FIRST_PERSON_EYE,
+            .crouch_eye = BOX_FIRST_PERSON_CROUCH_EYE,
+            .radius = BOX_FIRST_PERSON_RADIUS,
+            .step = BOX_FIRST_PERSON_STEP,
+            .sensitivity = BOX_FIRST_PERSON_SENSITIVITY,
+            .actions = *scope
+        };
+    }
 }
 
 /** Read the state of the first person actions of a controller.
  *
  * @param world The world
  * @param map The default action map
- * @param scope Scope of the actions, 0 for the default actions
+ * @param scope Scope of the actions, 0 for none
  * @param out The input, written
  */
 static void box_first_person_read(
@@ -101,9 +114,9 @@ static void box_first_person_read(
     ecs_os_zeromem(out);
     out->scope = scope;
     for (i = 0; i < BoxFirstPersonActionCount; i ++) {
-        ecs_entity_t action = scope
-            ? ecs_lookup_child(world, scope, box_first_person_actions[i].name)
-            : map->actions[i];
+        ecs_entity_t action = scope == map->scope
+            ? map->actions[i]
+            : (scope ? ecs_lookup_child(world, scope, box_first_person_actions[i].name) : 0);
         const ActionState *state = action && ecs_is_alive(world, action)
             ? ecs_get(world, action, ActionState)
             : NULL;
@@ -132,7 +145,7 @@ static bool box_first_person_turn(
     const box_first_person_input_t *in,
     Rotation *r)
 {
-    float sensitivity = box_first_person_value(fp->sensitivity, BOX_FIRST_PERSON_SENSITIVITY);
+    float sensitivity = fp->sensitivity;
     float dy = fp->invert_y ? -in->look[1] : in->look[1];
     float yaw = r->y - in->look[0] * sensitivity;
     float pitch = r->x - dy * sensitivity;
@@ -162,14 +175,14 @@ static float box_first_person_speed(
     const FirstPersonController *fp,
     const box_first_person_input_t *in)
 {
-    float result = box_first_person_value(fp->speed, BOX_FIRST_PERSON_SPEED);
+    float result = fp->speed;
     if (fp->flying) {
-        result = box_first_person_value(fp->fly_speed, BOX_FIRST_PERSON_FLY_SPEED);
+        result = fp->fly_speed;
         if (in->held[BoxFirstPersonFast]) {
-            result *= box_first_person_value(fp->boost, BOX_FIRST_PERSON_BOOST);
+            result *= fp->boost;
         }
     } else if (fp->crouched) {
-        result = box_first_person_value(fp->crouch_speed, BOX_FIRST_PERSON_CROUCH_SPEED);
+        result = fp->crouch_speed;
     }
 
     return result;
@@ -230,12 +243,12 @@ static void box_first_person_state(
     }
 
     if (!fp->flying && fp->grounded && in->pressed[BoxFirstPersonJump]) {
-        fp->velocity[1] = box_first_person_value(fp->jump, BOX_FIRST_PERSON_JUMP);
+        fp->velocity[1] = fp->jump;
         fp->grounded = false;
     }
 
     if (!fp->flying && !fp->grounded) {
-        fp->velocity[1] -= box_first_person_value(fp->gravity, BOX_FIRST_PERSON_GRAVITY) * dt;
+        fp->velocity[1] -= fp->gravity * dt;
     }
 }
 
@@ -255,11 +268,11 @@ static void box_first_person_body(
     box_controller_body_t *body)
 {
     bool walking = fp->grounded && !fp->flying;
-    float step = box_first_person_value(fp->step, BOX_FIRST_PERSON_STEP);
+    float step = fp->step;
     *body = (box_controller_body_t){
         .entity = e,
         .scene = box_render_scene_of(world, e),
-        .radius = box_first_person_value(fp->radius, BOX_FIRST_PERSON_RADIUS),
+        .radius = fp->radius,
         .height = height + BOX_FIRST_PERSON_HEAD,
         .step = walking ? step : 0,
         .probe = walking && fp->velocity[1] <= 0 ? step : 0
@@ -282,7 +295,7 @@ static void box_first_person_crouch(
     const Position *p)
 {
     bool crouch = !fp->flying && in->held[BoxFirstPersonCrouch];
-    float eye = box_first_person_value(fp->eye, BOX_FIRST_PERSON_EYE);
+    float eye = fp->eye;
     if (fp->crouched && !crouch && fp->height > 0 && fp->height < eye) {
         box_controller_body_t body;
         Position feet = { p->x, p->y - fp->height, p->z };
@@ -311,10 +324,8 @@ static bool box_first_person_step(
     Position *p,
     float dt)
 {
-    float eye = box_first_person_value(fp->eye, BOX_FIRST_PERSON_EYE);
-    float height = fp->crouched
-        ? box_first_person_value(fp->crouch_eye, BOX_FIRST_PERSON_CROUCH_EYE)
-        : eye;
+    float eye = fp->eye;
+    float height = fp->crouched ? fp->crouch_eye : eye;
     float previous = fp->height > 0 ? fp->height : height;
     Position feet = { p->x, p->y - previous, p->z };
     Position eye_pos = { 0 };
@@ -369,7 +380,7 @@ void BoxFirstPersonActionsActivate(
     while (ecs_iter_next(it)) {
         const FirstPersonController *fp = ecs_field(it, FirstPersonController, 0);
         for (i = 0; i < it->count; i ++) {
-            used = used || !fp[i].actions;
+            used = used || fp[i].actions == map->scope;
         }
     }
 
