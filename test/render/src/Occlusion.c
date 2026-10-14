@@ -2,7 +2,7 @@
  * @file Occlusion.c
  * @brief Tests for Hi-Z occlusion culling: CullStatus counts per view and captured pixels.
  *
- * Views use the zero CullSettings, which cull with occlusion. The camera looks down -z from
+ * Views enable culling with occlusion. The camera looks down -z from
  * the origin unless a test moves it; shapes are unlit, so a red box shows red. A change shows
  * in the capture of the frame it was made in, which is what keeps fast cameras free of holes.
  */
@@ -26,9 +26,10 @@ void Occlusion_wall_hides_object(void) {
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, -10});
@@ -45,7 +46,7 @@ void Occlusion_wall_hides_object(void) {
     ecs_set(world, tiny, Position, {1, 0, -5});
     ecs_set(world, tiny, Box, {0.01f, 0.01f, 0.01f});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -79,9 +80,10 @@ void Occlusion_wall_moved_shows_object_same_frame(void) {
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, -10});
@@ -92,7 +94,8 @@ void Occlusion_wall_moved_shows_object_same_frame(void) {
     ecs_set(world, hidden, Box, {2, 2, 2});
     ecs_set(world, hidden, Rgb, {255, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "moved.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "moved.png",
+        .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -140,9 +143,10 @@ void Occlusion_camera_cut_shows_object_same_frame(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 0});
     ecs_set(world, camera, Rotation, {0, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, -10});
@@ -157,7 +161,8 @@ void Occlusion_camera_cut_shows_object_same_frame(void) {
     }
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "cut.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "cut.png",
+        .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -204,9 +209,11 @@ void Occlusion_slot_moves_keep_instances_drawn(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 2.5f, 0});
@@ -229,7 +236,8 @@ void Occlusion_slot_moves_keep_instances_drawn(void) {
     }
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "slots.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "slots.png",
+        .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -283,9 +291,11 @@ void Occlusion_batch_replaced_draws_at_once(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, 0});
@@ -296,12 +306,13 @@ void Occlusion_batch_replaced_draws_at_once(void) {
     for (i = 0; i < 4; i ++) {
         spheres[i] = ecs_new(world);
         ecs_set(world, spheres[i], Position, {(float)i * 2 - 3, 0, -5});
-        ecs_set(world, spheres[i], Sphere, {.radius = 0.6f});
+        ecs_set(world, spheres[i], Sphere, {.segments = 24, .radius = 0.6f});
         ecs_set(world, spheres[i], Rgb, {255, 0, 0});
     }
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "batch.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "batch.png",
+        .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -321,7 +332,7 @@ void Occlusion_batch_replaced_draws_at_once(void) {
         ecs_delete(world, spheres[i]);
         ecs_entity_t c = ecs_new(world);
         ecs_set(world, c, Position, {(float)i * 2 - 3, 0, -5});
-        ecs_set(world, c, Cylinder, {.length = 1.2f, .radius = 0.6f});
+        ecs_set(world, c, Cylinder, {.segments = 24, .length = 1.2f, .radius = 0.6f});
         ecs_set(world, c, Rgb, {0, 0, 255});
     }
 
@@ -354,9 +365,10 @@ void Occlusion_frustum_only_and_disabled(void) {
     ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.frustum_only = true});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .min_dimension_px = 1}});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, -10});
     ecs_set(world, wall, Box, {30, 30, 1});
@@ -367,7 +379,7 @@ void Occlusion_frustum_only_and_disabled(void) {
     ecs_set(world, away, Position, {100, 0, -10});
     ecs_set(world, away, Box, {1, 1, 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -387,7 +399,7 @@ void Occlusion_frustum_only_and_disabled(void) {
     test_int(status->frustum_culled, 1);
     test_int(status->occlusion_culled, 0);
 
-    ecs_set(world, view, View, {.camera = camera, .culling.disabled = true});
+    ecs_set(world, view, View, {.camera = camera});
     start = ecs_get_world_info(world)->frame_count_total + 1;
     for (i = 0; i < 100; i ++) {
         ecs_progress(world, 0);
@@ -419,9 +431,10 @@ void Occlusion_hidden_caster_casts_shadow(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 5, 4});
     ecs_set(world, camera, Rotation, {-0.6f, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true,
         .shadows = {.enabled = true, .cascades = 4, .resolution = 2048, .max_distance = 200,
             .split_lambda = 0.7f, .depth_bias = 2, .normal_offset = 1.5f, .filter_size = 3,
@@ -444,7 +457,8 @@ void Occlusion_hidden_caster_casts_shadow(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_4, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "caster.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "caster.png",
+        .resolution_scale = 1});
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
@@ -493,9 +507,10 @@ void Occlusion_camera_cuts_match_frustum_only(void) {
         ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
 
         ecs_entity_t camera = ecs_new(world);
-        ecs_set(world, camera, Camera, {.fov = 60});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
         ecs_entity_t view = ecs_new(world);
-        ecs_set(world, view, View, {.camera = camera, .culling.frustum_only = mode == 1,
+        ecs_set(world, view, View, {.camera = camera,
+            .culling = {.enabled = true, .occlusion = mode != 1, .min_dimension_px = 1},
             .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
         ecs_entity_t floor = ecs_new(world);
         ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -509,13 +524,14 @@ void Occlusion_camera_cuts_match_frustum_only(void) {
                 ecs_set(world, b, Rgb, {(uint8_t)(40 + x * 20), (uint8_t)(40 + z * 20), 160});
                 ecs_entity_t s = ecs_new(world);
                 ecs_set(world, s, Position, {(float)x * 4 - 16, 0.5f, (float)z * 4 - 16});
-                ecs_set(world, s, Sphere, {.radius = 0.5f});
+                ecs_set(world, s, Sphere, {.segments = 24, .radius = 0.5f});
                 ecs_set(world, s, Rgb, {250, (uint8_t)(x * 25), (uint8_t)(z * 25)});
             }
         }
 
         ecs_entity_t e = ecs_new(world);
-        ecs_set(world, e, Surface, {.width = 128, .height = 72, .write_to_file = "cuts.png"});
+        ecs_set(world, e, Surface, {.width = 128, .height = 72, .write_to_file = "cuts.png",
+            .resolution_scale = 1});
         char *path = flecs_asprintf("%s/cuts.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
         for (f = 0; f < 12; f ++) {
             float *p = poses[f % 6];

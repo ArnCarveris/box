@@ -6,9 +6,8 @@
 #define BOX_VIEW_IMPL
 #include <box.h>
 
-/** Construct View values that are lit, with the documented shadow defaults.
- *
- * The CullSettings stay zero, which culls with occlusion and the default smallest size.
+/** Construct View values that are lit, with the documented shadow defaults, and that cull
+ * with occlusion and a smallest size of one pixel.
  *
  * @param ptr The components
  * @param count Number of components
@@ -33,6 +32,11 @@ static void box_view_ctor(
             .normal_offset = 1.5f,
             .filter_size = 3,
             .fade = 0.2f
+        };
+        values[i].culling = (CullSettings){
+            .enabled = true,
+            .occlusion = true,
+            .min_dimension_px = 1.0f
         };
     }
 }
