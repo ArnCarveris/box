@@ -169,6 +169,27 @@ done:
     return;
 }
 
+/** Free the glyph slots of entities that lose their Text.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnTextRemove(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        box_draws_text_remove(it->world, d, it->entities[i]);
+    }
+
+done:
+    return;
+}
+
 /** Mark every entity of the changed subtrees, the roots included.
  *
  * @param world The world
@@ -277,25 +298,22 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
 }
 
-/** Bring a changed entity into the batch of its key and write its static instance.
+/** Bring the shape of a changed entity into the batch of its key and write its instance.
  *
  * @param world The world
  * @param d The state
  * @param e The entity
+ * @param s Its DrawSlot
  */
-static void box_draws_update(
+static void box_draws_update_shape(
     ecs_world_t *world,
     box_render_draws_t *d,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    DrawSlot *s)
 {
     box_draw_key_t key;
     box_draw_batch_t *b;
     box_draw_material_t material;
-    DrawSlot *s = ecs_is_alive(world, e) ? ecs_get_mut(world, e, DrawSlot) : NULL;
-    if (!s) {
-        goto done;
-    }
-
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
     s->dirty = false;
@@ -343,6 +361,31 @@ done:
     return;
 }
 
+/** Bring a changed entity into the batches of its shape and text and write their instances.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+static void box_draws_update(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    DrawSlot *s = ecs_is_alive(world, e) ? ecs_get_mut(world, e, DrawSlot) : NULL;
+    if (!s) {
+        goto done;
+    }
+
+    box_draws_update_shape(world, d, e, s);
+    if (ecs_has(world, e, TextSlots)) {
+        box_draws_text_update(world, d, e);
+    }
+
+done:
+    return;
+}
+
 /** Bring the changed entities into their batches.
  *
  * @param world The world
@@ -353,6 +396,7 @@ static void box_draws_process(
     box_render_draws_t *d)
 {
     int32_t i;
+    box_draws_text_dynamic(world, d);
     box_draws_walk(world, d);
     for (i = 0; i < ecs_vec_count(&d->dirty); i ++) {
         box_draws_update(world, d, *ecs_vec_get_t(&d->dirty, ecs_entity_t, i));
@@ -478,6 +522,12 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Shape2D) }},
         .events = { EcsOnSet } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTextGlyphs", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(TextGlyphs) }},
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnTextRemove", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Text) }},
+        .events = { EcsOnRemove } }, BoxDrawsOnTextRemove);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
@@ -615,6 +665,7 @@ void box_render_draws_init(
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;
     d->refs = 1;
     box_draws_queries(world, d);
+    box_draws_text_init(world, d);
     box_draws_observers(world, d);
     box_draws_transform_observers(world, d);
 
