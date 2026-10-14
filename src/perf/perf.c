@@ -525,6 +525,35 @@ static void box_perf_end(
     }
 }
 
+/** Check whether a scene with LightBake is still baking, which a run waits for.
+ *
+ * @param world The world
+ * @return Whether a bake with probes and a budget has not converged
+ */
+static bool box_perf_baking(
+    ecs_world_t *world)
+{
+    bool result = false;
+    int32_t i;
+    if (!ecs_id(LightBake) || !ecs_id(LightBakeStatus)) {
+        goto done;
+    }
+
+    ecs_iter_t it = ecs_each(world, LightBakeStatus);
+    while (ecs_each_next(&it)) {
+        const LightBakeStatus *status = ecs_field(&it, LightBakeStatus, 0);
+        for (i = 0; i < it.count; i ++) {
+            const LightBake *bake = ecs_get(world, it.entities[i], LightBake);
+            if (bake && bake->budget_ms > 0 && status[i].probes > 0 && !status[i].converged) {
+                result = true;
+            }
+        }
+    }
+
+done:
+    return result;
+}
+
 /** Pace the frame to the target interval, measure it and advance the run.
  *
  * @param it The iterator of the system
@@ -559,6 +588,11 @@ static void BoxPerfFrame(
 
     perf->mark = now;
     perf->run ++;
+    if (perf->state == PerfWarmup && box_perf_baking(it->world)) {
+        perf->run = 0;
+        ecs_vec_clear(&perf->work);
+    }
+
     if (perf->state == PerfWarmup && perf->run >= perf->warmup) {
         box_perf_begin(it->world, perf);
         status->state = PerfMeasure;
