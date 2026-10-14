@@ -1,270 +1,305 @@
 /**
  * @file render/draw.c
- * @brief Extracts the shapes of the world into meshes, instances and one batch per entity.
+ * @brief Tracks which shapes changed and keeps them in their instanced batch.
  *
- * Meshes come from the mesh cache and are sent once per backend; the renderer holds a cache
- * reference to every mesh it received, so a handle is not reused before it was destroyed.
+ * Observers collect changed entities and the roots of changed subtrees, so an extract only
+ * visits what changed; static instances are written once per change, dynamic ones per frame.
  */
 
-#include "render.h"
-#include "../geometry/mesh_cache.h"
+#include "draw.h"
 
-/** Main thread state of the forward pass extract */
-typedef struct box_render_draws_t {
-    ecs_query_t *query;         /**< Shapes with their transform, color and scene */
-    ecs_map_t meshes;           /**< Mesh handles the backend received */
-    ecs_vec_t instances;        /**< box_render_instance_t of the frame */
-    ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
-    uint32_t capacity;          /**< Instances the instance buffer holds */
-    const void *backend;        /**< Context of the backend the meshes were sent to */
-    void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
-} box_render_draws_t;
+ECS_COMPONENT_DECLARE(DrawSlot);
 
-/** Color of a shape without Rgb, display encoded */
-static const uint8_t box_render_default_color[3] = { 204, 204, 204 };
-
-/** Convert a display encoded channel to linear light.
+/** Construct DrawSlot values that are not in a batch.
  *
- * @param value The channel
- * @return The linear value
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
  */
-static float box_render_linear(
-    uint8_t value)
+static void box_draw_slot_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
-    float c = (float)value / 255.0f;
-
-    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+    DrawSlot *slots = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        slots[i] = (DrawSlot){ .batch = -1, .slot = -1 };
+    }
 }
 
-/** Free the extract state.
+/** Copy DrawSlot values: a copy is a new entity that has no slot yet.
  *
- * The mesh references are not released: the mesh cache is freed with the world.
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_draw_slot_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)src;
+    box_draw_slot_ctor(dst, count, ti);
+}
+
+/** Move DrawSlot values with the entity they belong to.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_draw_slot_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ecs_os_memcpy(dst, src, ti->size * count);
+}
+
+/** Drop a reference to the state, freeing it with the last one.
  *
  * @param ctx The state
  */
-static void box_render_draws_free(
+static void box_draws_free(
     void *ctx)
 {
     box_render_draws_t *d = ctx;
+    if (-- d->refs) {
+        goto done;
+    }
+
+    box_draws_batches_fini(d);
     ecs_map_fini(&d->meshes);
-    ecs_vec_fini_t(NULL, &d->instances, box_render_instance_t);
     ecs_vec_fini_t(NULL, &d->released, uint32_t);
+    ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
     ecs_os_free(d);
+done:
+    return;
 }
 
-/** Forget what an earlier backend received, so meshes and the buffer are sent again.
+/** Add an entity to the changed entities unless it is in the list.
  *
  * @param world The world
  * @param d The state
- * @param cache The mesh cache
+ * @param e The entity
  */
-static void box_render_draws_backend(
+static void box_draws_mark(
     ecs_world_t *world,
     box_render_draws_t *d,
-    box_mesh_cache_t *cache)
+    ecs_entity_t e)
 {
-    const box_render_backend_t *backend = box_render_get_backend(world);
-    if (backend->ctx == d->backend && backend->render == d->render) {
+    DrawSlot *s = ecs_get_mut(world, e, DrawSlot);
+    if (s && !s->dirty) {
+        s->dirty = true;
+        *ecs_vec_append_t(NULL, &d->dirty, ecs_entity_t) = e;
+    }
+}
+
+/** Mark the entities of an observer event as changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnChange(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
         goto done;
     }
 
-    ecs_map_iter_t it = ecs_map_iter(&d->meshes);
-    while (ecs_map_next(&it)) {
-        box_mesh_cache_release(cache, (uint32_t)ecs_map_key(&it));
+    for (i = 0; i < it->count; i ++) {
+        box_draws_mark(it->world, d, it->entities[i]);
     }
 
-    ecs_map_clear(&d->meshes);
-    d->capacity = 0;
-    d->backend = backend->ctx;
-    d->render = backend->render;
 done:
     return;
 }
 
-/** Destroy the meshes only the renderer still references.
+/** Remember the entities of an observer event as roots of changed subtrees.
  *
- * @param p The packet
- * @param d The state
- * @param cache The mesh cache
+ * @param it The iterator of the observer
  */
-static void box_render_draws_release(
-    box_render_packet_t *p,
-    box_render_draws_t *d,
-    box_mesh_cache_t *cache)
+static void BoxDrawsOnMove(
+    ecs_iter_t *it)
 {
+    box_render_draws_t *d = it->ctx;
     int32_t i;
-    ecs_vec_clear(&d->released);
-    ecs_map_iter_t it = ecs_map_iter(&d->meshes);
-    while (ecs_map_next(&it)) {
-        uint32_t handle = (uint32_t)ecs_map_key(&it);
-        if (box_mesh_cache_refs(cache, handle) <= 1) {
-            *ecs_vec_append_t(NULL, &d->released, uint32_t) = handle;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        *ecs_vec_append_t(NULL, &d->moved, ecs_entity_t) = it->entities[i];
+    }
+
+done:
+    return;
+}
+
+/** Free the slots of entities that lose their shape.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnRemove(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    for (i = 0; i < it->count; i ++) {
+        DrawSlot *s = ecs_get_mut(it->world, it->entities[i], DrawSlot);
+        if (s && s->batch >= 0) {
+            box_draws_slot_remove(it->world, d, s->batch, s->slot);
+            s->batch = -1;
+            s->slot = -1;
         }
     }
 
-    for (i = 0; i < ecs_vec_count(&d->released); i ++) {
-        uint32_t handle = *ecs_vec_get_t(&d->released, uint32_t, i);
-        box_render_packet_resource(p, BOX_RENDER_MESH, BOX_RENDER_DESTROY, handle, 0);
-        box_mesh_cache_release(cache, handle);
-        ecs_map_remove(&d->meshes, handle);
-    }
-}
-
-/** Send a mesh to the backend unless it has it, taking a cache reference to it.
- *
- * @param p The packet
- * @param d The state
- * @param cache The mesh cache
- * @param handle The mesh handle
- * @return Whether the backend has the mesh
- */
-static bool box_render_draws_mesh(
-    box_render_packet_t *p,
-    box_render_draws_t *d,
-    box_mesh_cache_t *cache,
-    uint32_t handle)
-{
-    bool result = true;
-    const box_mesh_t *mesh;
-    if (ecs_map_get(&d->meshes, handle)) {
-        goto done;
-    }
-
-    mesh = box_mesh_cache_get(cache, handle);
-    if (!mesh || !mesh->vertex_count || !mesh->index_count) {
-        result = false;
-        goto done;
-    }
-
-    uint32_t vertex_size = (uint32_t)mesh->vertex_count * (uint32_t)sizeof(box_vertex_t);
-    uint32_t index_size = (uint32_t)mesh->index_count * (uint32_t)sizeof(uint32_t);
-    box_render_mesh_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_MESH,
-        BOX_RENDER_CREATE, handle,
-        (uint32_t)sizeof(box_render_mesh_desc_t) + vertex_size + index_size);
-    uint8_t *data = (uint8_t*)(desc + 1);
-    desc->vertex_count = (uint32_t)mesh->vertex_count;
-    desc->index_count = (uint32_t)mesh->index_count;
-    ecs_os_memcpy(data, mesh->vertices, (ecs_size_t)vertex_size);
-    ecs_os_memcpy(data + vertex_size, mesh->indices, (ecs_size_t)index_size);
-    box_mesh_cache_keep(cache, handle);
-    ecs_map_insert(&d->meshes, handle, 1);
 done:
-    return result;
+    return;
 }
 
-/** Write the instance data of a shape: its model matrix, normal matrix and color.
+/** Mark every entity of the changed subtrees, the roots included.
  *
- * @param out The instance
- * @param transform World transform of the entity, NULL for the identity
- * @param shape Mesh and instance scale of the entity
- * @param color Base color of the entity, NULL for the default color
- */
-static void box_render_draws_instance(
-    box_render_instance_t *out,
-    const WorldTransform *transform,
-    const ShapeMesh *shape,
-    const Rgb *color)
-{
-    mat3 m, inv;
-    int32_t i;
-    if (transform) {
-        glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), out->model);
-    } else {
-        glm_mat4_identity(out->model);
-    }
-
-    glm_vec4_scale(out->model[0], shape->scale[0], out->model[0]);
-    glm_vec4_scale(out->model[1], shape->scale[1], out->model[1]);
-    glm_vec4_scale(out->model[2], shape->scale[2], out->model[2]);
-    glm_mat4_pick3(out->model, m);
-    glm_mat3_inv(m, inv);
-    glm_mat3_transpose(inv);
-    for (i = 0; i < 3; i ++) {
-        glm_vec4(inv[i], 0, out->normal[i]);
-    }
-
-    out->color[0] = box_render_linear(color ? color->r : box_render_default_color[0]);
-    out->color[1] = box_render_linear(color ? color->g : box_render_default_color[1]);
-    out->color[2] = box_render_linear(color ? color->b : box_render_default_color[2]);
-    out->color[3] = 1.0f;
-}
-
-/** Append a batch of one instance for every shape of a query result.
- *
- * @param it The query result
- * @param p The packet
+ * @param world The world
  * @param d The state
- * @param cache The mesh cache
  */
-static void box_render_draws_table(
-    ecs_iter_t *it,
-    box_render_packet_t *p,
-    box_render_draws_t *d,
-    box_mesh_cache_t *cache)
+static void box_draws_walk(
+    ecs_world_t *world,
+    box_render_draws_t *d)
 {
-    const ShapeMesh *shapes = ecs_field(it, ShapeMesh, 0);
-    const WorldTransform *transforms = ecs_field(it, WorldTransform, 1);
-    const Rgb *colors = ecs_field(it, Rgb, 2);
-    bool color_self = ecs_field_is_self(it, 2);
-    bool scene_set = ecs_field_is_set(it, 3);
-    bool scene_self = ecs_field_is_self(it, 3);
-    ecs_entity_t scene = scene_set && !scene_self ? ecs_field_src(it, 3) : 0;
     int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        if (!shapes[i].mesh || !box_render_draws_mesh(p, d, cache, shapes[i].mesh)) {
+    for (i = 0; i < ecs_vec_count(&d->moved); i ++) {
+        ecs_entity_t root = *ecs_vec_get_t(&d->moved, ecs_entity_t, i);
+        if (!ecs_is_alive(world, root)) {
             continue;
         }
 
-        uint32_t index = (uint32_t)ecs_vec_count(&d->instances);
-        box_render_draws_instance(
-            ecs_vec_append_t(NULL, &d->instances, box_render_instance_t),
-            transforms ? &transforms[i] : NULL, &shapes[i],
-            colors ? &colors[color_self ? i : 0] : NULL);
-        box_render_batch_t *b = box_render_packet_batch(p);
-        b->scene = scene_set && scene_self ? it->entities[i] : scene;
-        b->pipeline = BOX_RENDER_SHADER_MESH;
-        b->mesh = shapes[i].mesh;
-        b->instances = BOX_RENDER_BUFFER_DRAWS;
-        b->first_instance = index;
-        b->instance_count = 1;
+        *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = root;
+        while (ecs_vec_count(&d->walk)) {
+            ecs_entity_t e = *ecs_vec_last_t(&d->walk, ecs_entity_t);
+            ecs_vec_remove_last(&d->walk);
+            box_draws_mark(world, d, e);
+            ecs_iter_t it = ecs_children(world, e);
+            while (ecs_children_next(&it)) {
+                int32_t c;
+                for (c = 0; c < it.count; c ++) {
+                    *ecs_vec_append_t(NULL, &d->walk, ecs_entity_t) = it.entities[c];
+                }
+            }
+        }
     }
+
+    ecs_vec_clear(&d->moved);
 }
 
-/** Upload the instances of the frame, growing the instance buffer when they do not fit.
+/** Compute the batch key of a shape.
  *
- * @param p The packet
- * @param d The state
+ * @param world The world
+ * @param e The entity
+ * @param shape Its mesh
+ * @param key Receives the key
  */
-static void box_render_draws_upload(
-    box_render_packet_t *p,
-    box_render_draws_t *d)
+static void box_draws_key(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const ShapeMesh *shape,
+    box_draw_key_t *key)
 {
-    uint32_t count = (uint32_t)ecs_vec_count(&d->instances);
-    uint32_t size = count * (uint32_t)sizeof(box_render_instance_t);
-    if (!count) {
+    ecs_os_memset_t(key, 0, box_draw_key_t);
+    key->scene = ecs_has(world, e, Scene)
+        ? e
+        : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
+    key->mesh = shape->mesh;
+    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
+        ecs_has_id(world, e, DynamicMaterial) ||
+        ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
+}
+
+/** Bring a changed entity into the batch of its key and write its static instance.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+static void box_draws_update(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    box_draw_key_t key;
+    box_draw_batch_t *b;
+    DrawSlot *s = ecs_is_alive(world, e) ? ecs_get_mut(world, e, DrawSlot) : NULL;
+    if (!s) {
         goto done;
     }
 
-    if (count > d->capacity) {
-        uint32_t capacity = d->capacity ? d->capacity : 64;
-        while (capacity < count) {
-            capacity *= 2;
-        }
-
-        box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
-            BOX_RENDER_CREATE, BOX_RENDER_BUFFER_DRAWS, sizeof(box_render_buffer_desc_t));
-        desc->size = capacity * (uint32_t)sizeof(box_render_instance_t);
-        desc->usage = BOX_RENDER_BUFFER_INSTANCE;
-        d->capacity = capacity;
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
+    s->dirty = false;
+    d->stats.processed ++;
+    if (drawn) {
+        box_draws_key(world, e, shape, &key);
     }
 
-    void *dst = box_render_packet_upload(p, BOX_RENDER_BUFFER_DRAWS, 0, size);
-    ecs_os_memcpy(dst, ecs_vec_first(&d->instances), (ecs_size_t)size);
+    if (s->batch >= 0) {
+        b = box_draws_batch(d, s->batch);
+        if (drawn && !ecs_os_memcmp_t(&b->key, &key, box_draw_key_t)) {
+            goto write;
+        }
+
+        box_draws_slot_remove(world, d, s->batch, s->slot);
+        s->batch = -1;
+        s->slot = -1;
+    }
+
+    if (!drawn) {
+        goto done;
+    }
+
+    s->batch = box_draws_batch_ensure(d, &key);
+    s->slot = box_draws_slot_add(d, s->batch, e);
+    b = box_draws_batch(d, s->batch);
+write:
+    box_draws_instance(ecs_vec_get_t(&b->instances, box_render_instance_t, s->slot),
+        ecs_get(world, e, WorldTransform), shape, ecs_get(world, e, Rgb));
+    box_draws_slot_changed(b, s->slot);
 done:
     return;
 }
 
-/** Send new meshes, destroy unused ones and add the shapes the views of the frame draw.
+/** Bring the changed entities into their batches.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_process(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    int32_t i;
+    box_draws_walk(world, d);
+    for (i = 0; i < ecs_vec_count(&d->dirty); i ++) {
+        box_draws_update(world, d, *ecs_vec_get_t(&d->dirty, ecs_entity_t, i));
+    }
+
+    ecs_vec_clear(&d->dirty);
+}
+
+/** Update the batches with what changed and send what the views of the frame draw.
  *
  * @param it The iterator of the system
  */
@@ -275,55 +310,195 @@ static void BoxRenderExtractDraws(
     ecs_world_t *world = it->world;
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     box_render_packet_t *p = box_render_packet(world);
+    const box_render_backend_t *backend = box_render_get_backend(world);
     if (!cache) {
         goto done;
     }
 
-    box_render_draws_backend(world, d, cache);
-    box_render_draws_release(p, d, cache);
-    if (!ecs_vec_count(&p->views)) {
-        goto done;
+    if (backend->ctx != d->backend || backend->render != d->render) {
+        box_draws_reset_backend(d, cache);
+        d->backend = backend->ctx;
+        d->render = backend->render;
     }
 
-    ecs_vec_clear(&d->instances);
-    ecs_iter_t qit = ecs_query_iter(world, d->query);
-    while (ecs_query_next(&qit)) {
-        box_render_draws_table(&qit, p, d, cache);
-    }
-
-    box_render_draws_upload(p, d);
+    d->stats.processed = 0;
+    d->stats.scattered = 0;
+    d->stats.upload_bytes = 0;
+    box_draws_process(world, d);
+    box_draws_send(world, d, p);
 done:
     return;
+}
+
+/** Register an observer of the instanced batches.
+ *
+ * @param world The world
+ * @param d The state
+ * @param name Name of the observer
+ * @param desc Terms and events of the observer
+ * @param callback What the observer does
+ */
+static void box_draws_observer(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    const char *name,
+    ecs_observer_desc_t desc,
+    ecs_iter_action_t callback)
+{
+    desc.entity = ecs_entity(world, { .name = name });
+    desc.callback = callback;
+    desc.ctx = d;
+    desc.ctx_free = box_draws_free;
+    d->refs ++;
+    ecs_observer_init(world, &desc);
+}
+
+/** Register the observers that collect changed entities and changed subtrees.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    box_draws_observer(world, d, "DrawsOnShape", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(ShapeMesh) }},
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnShapeRemove", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(ShapeMesh) }},
+        .events = { EcsOnRemove } }, BoxDrawsOnRemove);
+    box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Rgb) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
+        .query.terms = {
+            { .id = ecs_id(WorldTransform) },
+            { .id = DynamicTransform, .oper = EcsNot }
+        },
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
+    box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicMaterial }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnScene", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Scene) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnChildOf", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnParent", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(EcsParent) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+}
+
+/** Register the observers of the components a static transform is computed from.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_transform_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    ecs_entity_t components[3] = { ecs_id(Position), ecs_id(Rotation), ecs_id(Scale) };
+    const char *names[3] = { "DrawsOnPosition", "DrawsOnRotation", "DrawsOnScale" };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
+            .query.terms = {
+                { .id = components[i] },
+                { .id = DynamicTransform, .oper = EcsNot },
+                { .id = ManualTransform, .oper = EcsNot }
+            },
+            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+    }
+}
+
+/** Create the queries of the dynamic shapes.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_queries(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    d->dynamic_transform = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(ShapeMesh), .inout = EcsIn },
+            { .id = ecs_id(DrawSlot), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
+            { .id = DynamicTransform, .inout = EcsInOutNone }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+
+    d->dynamic_material = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(ShapeMesh), .inout = EcsIn },
+            { .id = ecs_id(DrawSlot), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
+            {
+                .id = DynamicMaterial,
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone
+            },
+            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
 }
 
 void box_render_draws_init(
     ecs_world_t *world)
 {
     box_render_draws_t *d = ecs_os_calloc_t(box_render_draws_t);
-    ecs_map_init(&d->meshes, NULL);
-    ecs_vec_init_t(NULL, &d->instances, box_render_instance_t, 0);
-    ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
-    d->query = ecs_query(world, {
-        .terms = {
-            { .id = ecs_id(ShapeMesh), .inout = EcsIn },
-            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
-            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
-            {
-                .id = ecs_id(Scene),
-                .src.id = EcsSelf | EcsUp,
-                .trav = EcsChildOf,
-                .inout = EcsInOutNone,
-                .oper = EcsOptional
-            }
-        },
-        .cache_kind = EcsQueryCacheAuto
+    ECS_COMPONENT_DEFINE(world, DrawSlot);
+    ecs_set_hooks(world, DrawSlot, {
+        .ctor = box_draw_slot_ctor,
+        .copy = box_draw_slot_copy,
+        .move = box_draw_slot_move
     });
+    ecs_add_pair(world, ecs_id(ShapeMesh), EcsWith, ecs_id(DrawSlot));
+
+    ecs_vec_init_t(NULL, &d->batches, box_draw_batch_t, 0);
+    ecs_vec_init_t(NULL, &d->free_batches, int32_t, 0);
+    ecs_vec_init_t(NULL, &d->free_buffers, uint32_t, 0);
+    ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
+    ecs_map_init(&d->lookup, NULL);
+    ecs_map_init(&d->meshes, NULL);
+    d->next_buffer = BOX_RENDER_BUFFER_FIRST;
+    d->refs = 1;
+    box_draws_queries(world, d);
+    box_draws_observers(world, d);
+    box_draws_transform_observers(world, d);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractDraws" }),
         .phase = RenderExtract,
         .run = BoxRenderExtractDraws,
         .ctx = d,
-        .ctx_free = box_render_draws_free
+        .ctx_free = box_draws_free
     });
+}
+
+void box_render_draws_stats(
+    const ecs_world_t *world,
+    box_render_draws_stats_t *stats)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *s = system ? ecs_system_get(world, system) : NULL;
+    ecs_os_memset_t(stats, 0, box_render_draws_stats_t);
+    if (s && s->ctx) {
+        *stats = ((const box_render_draws_t*)s->ctx)->stats;
+    }
 }

@@ -62,7 +62,7 @@ void Forward_simple_scene(void) {
     test_int(stats.passes, 1);
     test_int(stats.draws, 2);
     test_int(stats.meshes, 2);
-    test_int(stats.buffers, 1);
+    test_int(stats.buffers, 2);
     test_int(stats.shaders, 2);
     test_int(stats.errors, 0);
     test_int(stats.shader_errors, 0);

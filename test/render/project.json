@@ -174,6 +174,27 @@
                     "mesh_shader_on_demand",
                     "target_view_root"
                 ]
+            },
+            {
+                "id": "Instancing",
+                "testcases": [
+                    "batch_per_mesh",
+                    "batch_per_scene",
+                    "add_joins_batch",
+                    "remove_swaps_last",
+                    "mesh_change_moves_batch",
+                    "scene_change_moves_batch",
+                    "unchanged_uploads_nothing",
+                    "changed_scatters_slot",
+                    "parent_move_updates_children",
+                    "dynamic_uploads_every_frame",
+                    "dynamic_material_descendants",
+                    "dynamic_tag_moves_batch",
+                    "many_changes_upload_all",
+                    "empty_batch_released",
+                    "no_alloc_steady_state",
+                    "gpu_scatter_readback"
+                ]
             }
         ]
     }

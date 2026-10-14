@@ -413,17 +413,17 @@ done:
     return;
 }
 
-/** Check whether a batch of a packet draws with a shader.
+/** Check whether a batch or a scatter of a packet runs a shader.
  *
  * @param p The packet
  * @param handle Handle of the shader
- * @return Whether a batch uses the shader as its pipeline
+ * @return Whether a batch uses the shader as its pipeline, or it scatters and runs a scatter
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
     uint32_t handle)
 {
-    bool result = false;
+    bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
     int32_t i;
     for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
         if (ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline == handle) {
@@ -643,4 +643,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_BLIT, false);
     box_shader_builtin(world, state, builtin, "mesh", "etc/shaders/mesh.wgsl",
         BOX_RENDER_SHADER_MESH, true);
+    box_shader_builtin(world, state, builtin, "scatter", "etc/shaders/scatter.wgsl",
+        BOX_RENDER_SHADER_SCATTER, true);
 }

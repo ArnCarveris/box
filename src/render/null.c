@@ -55,6 +55,7 @@ static void box_render_null_render(
     null->views += ecs_vec_count(&packet->views);
     null->batches += ecs_vec_count(&packet->batches);
     null->uploads += ecs_vec_count(&packet->uploads);
+    null->scatters += ecs_vec_count(&packet->scatters);
     null->resources += ecs_vec_count(&packet->resources);
     null->targets += ecs_vec_count(&packet->targets);
     for (i = 0; i < ecs_vec_count(&packet->uploads); i ++) {

@@ -241,6 +241,7 @@ static int box_gpu_init(
 
     box_gpu_blit_init(gpu);
     box_gpu_draw_init(gpu);
+    box_gpu_scatter_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
     result = 0;
@@ -296,6 +297,7 @@ static void box_gpu_render(
     }
 
     box_gpu_upload(gpu, packet);
+    box_gpu_scatter(gpu, packet);
     count = ecs_vec_count(&packet->targets);
     for (i = 0; i < count; i ++) {
         box_gpu_target_render(gpu, packet,
@@ -328,6 +330,7 @@ static void box_gpu_fini(
         box_gpu_shader_fini(gpu);
         ecs_map_fini(&gpu->shaders);
         box_gpu_draw_fini(gpu);
+        box_gpu_scatter_fini(gpu);
     }
 
     box_gpu_blit_reset(gpu);
@@ -416,6 +419,9 @@ void box_gpu_count(
         break;
     case BOX_GPU_STAT_DRAW:
         gpu->stats.draws ++;
+        break;
+    case BOX_GPU_STAT_SCATTER:
+        gpu->stats.scatters ++;
         break;
     }
 

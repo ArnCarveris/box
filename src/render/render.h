@@ -20,8 +20,20 @@
 /** Shader handle of the engine shader of the forward pass that draws meshes */
 #define BOX_RENDER_SHADER_MESH (2)
 
-/** Buffer handle of the instance buffer of the forward pass */
-#define BOX_RENDER_BUFFER_DRAWS (1)
+/** Shader handle of the engine compute shader that scatters changed instances into slots */
+#define BOX_RENDER_SHADER_SCATTER (3)
+
+/** Buffer handle of the change buffer the scatter pass reads changed instances from */
+#define BOX_RENDER_BUFFER_CHANGES (1)
+
+/** First buffer handle of the instance buffers of batches */
+#define BOX_RENDER_BUFFER_FIRST (16)
+
+/** Byte alignment of a scatter segment in the change buffer, the storage offset alignment */
+#define BOX_RENDER_SCATTER_ALIGN (256)
+
+/** Words of the header of a scatter segment: count, words per instance and two unused */
+#define BOX_RENDER_SCATTER_HEADER (4)
 
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
@@ -120,6 +132,19 @@ typedef struct box_render_instance_t {
     vec4 color;             /**< Linear base color */
 } box_render_instance_t;
 
+/** Compute pass that copies changed instances from the change buffer into their slots.
+ *
+ * The segment at offset holds BOX_RENDER_SCATTER_HEADER words (count, words per instance)
+ * followed by count entries of a slot index and the words of the instance.
+ */
+typedef struct box_render_scatter_t {
+    uint32_t buffer;        /**< Handle of the instance buffer the slots are in */
+    uint32_t changes;       /**< Handle of the buffer holding the segment */
+    uint32_t offset;        /**< Byte offset of the segment, a BOX_RENDER_SCATTER_ALIGN multiple */
+    uint32_t size;          /**< Bytes of the segment */
+    uint32_t count;         /**< Instances the segment holds */
+} box_render_scatter_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -160,8 +185,8 @@ typedef struct box_render_batch_t {
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
- * than an earlier one does not allocate. Resources apply first, then uploads, then every
- * target is cleared, drawn by its views and presented.
+ * than an earlier one does not allocate. Resources apply first, then uploads, then the
+ * scatters, then every target is cleared, drawn by its views and presented.
  */
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
@@ -169,6 +194,7 @@ typedef struct box_render_packet_t {
     float delta;            /**< Seconds the frame advanced the world */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
+    ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */
     ecs_vec_t views;        /**< box_render_view_t in render order */
     ecs_vec_t batches;      /**< box_render_batch_t */
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
@@ -202,6 +228,7 @@ typedef struct box_render_null_t {
     int64_t views;              /**< Views received in total */
     int64_t batches;            /**< Batches received in total */
     int64_t uploads;            /**< Uploads received in total */
+    int64_t scatters;           /**< Scatters received in total */
     int64_t resources;          /**< Resource changes received in total */
     int64_t bytes;              /**< Upload bytes received in total */
     int64_t targets;            /**< Targets received in total */
@@ -230,6 +257,8 @@ typedef struct box_render_gpu_stats_t {
     int32_t buffers;            /**< Buffers alive */
     int32_t passes;             /**< View passes rendered */
     int32_t draws;              /**< Draw calls recorded */
+    int32_t scatters;           /**< Scatter dispatches recorded */
+    int32_t scattered;          /**< Instances the scatter dispatches copied */
 } box_render_gpu_stats_t;
 
 /** Packet ring between the main thread and the consumer of the packets */
@@ -302,15 +331,54 @@ const box_render_backend_t* box_render_get_backend(
 void box_render_use_gpu(
     ecs_world_t *world);
 
-/** Register the system that extracts the shapes of the world for the forward pass.
+/** Copy bytes of a buffer of the GPU backend of a world into memory, waiting for the copy.
  *
- * Every entity with a ShapeMesh becomes one instance in the instance buffer and one batch,
- * drawn by the views whose camera is in the same scene.
+ * Only call this when the main thread renders (RenderSettings.main_thread), after
+ * box_render_sync, so the device is used by one thread.
+ *
+ * @param world The world
+ * @param handle Handle of the buffer
+ * @param offset Byte offset in the buffer, a multiple of 4
+ * @param size Bytes to copy, a multiple of 4
+ * @param out Receives the bytes
+ * @return Whether the backend is the GPU backend and the bytes were copied
+ */
+bool box_render_gpu_read_buffer(
+    ecs_world_t *world,
+    uint32_t handle,
+    uint32_t offset,
+    uint32_t size,
+    void *out);
+
+/** Counters of the instanced batches of a world, written by the draw extract */
+typedef struct box_render_draws_stats_t {
+    int32_t batches;            /**< Batches alive */
+    int32_t instances;          /**< Static instances in batches */
+    int32_t dynamic;            /**< Dynamic instances in batches */
+    int32_t processed;          /**< Changed entities processed by the last extract */
+    int32_t scattered;          /**< Instances the last extract sent through the scatter pass */
+    int64_t upload_bytes;       /**< Bytes the last extract uploaded into instance buffers */
+} box_render_draws_stats_t;
+
+/** Register the observers and the system that keep the shapes of the world in batches.
+ *
+ * Shapes are instanced in batches keyed by scene, mesh, pipeline and whether they are dynamic,
+ * which persist between frames. Static instances live in instance buffers that are updated
+ * on change through the scatter pass, dynamic instances are uploaded every frame.
  *
  * @param world The world
  */
 void box_render_draws_init(
     ecs_world_t *world);
+
+/** Read the counters of the instanced batches of a world.
+ *
+ * @param world The world
+ * @param stats Receives the counters
+ */
+void box_render_draws_stats(
+    const ecs_world_t *world,
+    box_render_draws_stats_t *stats);
 
 /** Initialize the vectors of a packet.
  *
@@ -394,6 +462,14 @@ void* box_render_packet_upload(
     uint32_t buffer,
     uint32_t offset,
     uint32_t size);
+
+/** Append a scatter to a packet.
+ *
+ * @param p The packet
+ * @return The zeroed scatter
+ */
+box_render_scatter_t* box_render_packet_scatter(
+    box_render_packet_t *p);
 
 /** Append a resource change to a packet.
  *

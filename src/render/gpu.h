@@ -104,6 +104,10 @@ typedef struct box_gpu_t {
     WGPUBindGroup view_group;       /**< Binds the view buffer with a dynamic offset */
     int32_t view_capacity;          /**< Views the view buffer holds */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
+    WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
+    WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
+    WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
+    int32_t scatter_revision;       /**< Revision of the shader the pipeline was made with */
     ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
@@ -130,7 +134,8 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_BUFFER_CREATED,    /**< A buffer was created */
     BOX_GPU_STAT_BUFFER_DESTROYED,  /**< A buffer was released */
     BOX_GPU_STAT_PASS,              /**< A view pass was rendered */
-    BOX_GPU_STAT_DRAW               /**< A draw call was recorded */
+    BOX_GPU_STAT_DRAW,              /**< A draw call was recorded */
+    BOX_GPU_STAT_SCATTER            /**< A scatter dispatch was recorded */
 } box_gpu_stat_t;
 
 /** Queue the outcome of a shader compilation for the main thread.
@@ -299,6 +304,29 @@ void box_gpu_draw_views(
     const box_render_target_t *frame,
     WGPUCommandEncoder encoder,
     WGPUTextureView color);
+
+/** Create the layouts of the scatter pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_scatter_init(
+    box_gpu_t *gpu);
+
+/** Release the pipeline and layouts of the scatter pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_scatter_fini(
+    box_gpu_t *gpu);
+
+/** Run the scatters of a packet, after its uploads and before its targets render.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_scatter(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Record a copy of a presented image into the readback buffer of its target.
  *

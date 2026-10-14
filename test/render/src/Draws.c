@@ -35,6 +35,8 @@ void Draws_shape_sends_mesh_and_batch(void) {
     test_assert(mesh != NULL);
 
     const box_render_packet_t *p = &null->last;
+    test_int(ecs_vec_count(&p->batches), 1);
+    const box_render_batch_t *b = ecs_vec_first_t(&p->batches, box_render_batch_t);
     int32_t i, meshes = 0, buffers = 0;
     for (i = 0; i < ecs_vec_count(&p->resources); i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(&p->resources, box_render_resource_t, i);
@@ -55,9 +57,9 @@ void Draws_shape_sends_mesh_and_batch(void) {
         } else if (r->kind == BOX_RENDER_BUFFER) {
             const box_render_buffer_desc_t *desc = box_render_packet_data(p, r->data);
             test_int(r->op, BOX_RENDER_CREATE);
-            test_uint(r->handle, BOX_RENDER_BUFFER_DRAWS);
+            test_uint(r->handle, b->instances);
             test_assert(desc->size >= sizeof(box_render_instance_t));
-            test_uint(desc->usage, BOX_RENDER_BUFFER_INSTANCE);
+            test_uint(desc->usage, BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE);
             buffers ++;
         }
     }
@@ -66,16 +68,14 @@ void Draws_shape_sends_mesh_and_batch(void) {
     test_int(buffers, 1);
     test_int(ecs_vec_count(&p->uploads), 1);
     const box_render_upload_t *u = ecs_vec_first_t(&p->uploads, box_render_upload_t);
-    test_uint(u->buffer, BOX_RENDER_BUFFER_DRAWS);
+    test_uint(u->buffer, b->instances);
     test_uint(u->offset, 0);
     test_uint(u->size, sizeof(box_render_instance_t));
-    test_int(ecs_vec_count(&p->batches), 1);
-    const box_render_batch_t *b = ecs_vec_first_t(&p->batches, box_render_batch_t);
     test_int(b->view, -1);
     test_uint(b->scene, 0);
     test_uint(b->pipeline, BOX_RENDER_SHADER_MESH);
     test_uint(b->mesh, shape->mesh);
-    test_uint(b->instances, BOX_RENDER_BUFFER_DRAWS);
+    test_assert(b->instances >= BOX_RENDER_BUFFER_FIRST);
     test_uint(b->first_instance, 0);
     test_uint(b->instance_count, 1);
 
@@ -113,19 +113,17 @@ void Draws_shared_mesh_sent_once(void) {
     }
 
     test_int(meshes, 1);
-    test_int(ecs_vec_count(&p->batches), 2);
-    test_uint(ecs_vec_get_t(&p->batches, box_render_batch_t, 0)->mesh, mesh);
-    test_uint(ecs_vec_get_t(&p->batches, box_render_batch_t, 1)->mesh, mesh);
-    test_uint(ecs_vec_get_t(&p->batches, box_render_batch_t, 1)->first_instance, 1);
+    test_int(ecs_vec_count(&p->batches), 1);
+    test_uint(ecs_vec_first_t(&p->batches, box_render_batch_t)->mesh, mesh);
+    test_uint(ecs_vec_first_t(&p->batches, box_render_batch_t)->first_instance, 0);
+    test_uint(ecs_vec_first_t(&p->batches, box_render_batch_t)->instance_count, 2);
     test_int(box_mesh_cache_refs(box_mesh_cache_of(world), mesh), 3);
 
     ecs_progress(world, 0);
     box_render_sync(world);
     test_int(ecs_vec_count(&p->resources), 0);
-    test_int(ecs_vec_count(&p->batches), 2);
-    test_int(ecs_vec_count(&p->uploads), 1);
-    test_uint(ecs_vec_first_t(&p->uploads, box_render_upload_t)->size,
-        2 * sizeof(box_render_instance_t));
+    test_int(ecs_vec_count(&p->batches), 1);
+    test_int(ecs_vec_count(&p->uploads), 0);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -182,8 +180,11 @@ void Draws_removed_shape_destroys_mesh(void) {
     box_render_sync(world);
 
     const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->resources), 1);
-    const box_render_resource_t *r = ecs_vec_first_t(&p->resources, box_render_resource_t);
+    test_int(ecs_vec_count(&p->resources), 2);
+    const box_render_resource_t *r = ecs_vec_get_t(&p->resources, box_render_resource_t, 0);
+    test_int(r->kind, BOX_RENDER_BUFFER);
+    test_int(r->op, BOX_RENDER_DESTROY);
+    r = ecs_vec_get_t(&p->resources, box_render_resource_t, 1);
     test_int(r->kind, BOX_RENDER_MESH);
     test_int(r->op, BOX_RENDER_DESTROY);
     test_uint(r->handle, mesh);
@@ -223,15 +224,16 @@ void Draws_reused_handle_sent_again(void) {
 
     const box_mesh_t *sphere = box_mesh_cache_get(box_mesh_cache_of(world), mesh);
     const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->resources), 1);
+    test_int(ecs_vec_count(&p->resources), 2);
     const box_render_resource_t *r = ecs_vec_first_t(&p->resources, box_render_resource_t);
     test_int(r->kind, BOX_RENDER_MESH);
     test_int(r->op, BOX_RENDER_CREATE);
     test_uint(r->handle, mesh);
     const box_render_mesh_desc_t *desc = box_render_packet_data(p, r->data);
     test_uint(desc->vertex_count, sphere->vertex_count);
+    test_int(ecs_vec_get_t(&p->resources, box_render_resource_t, 1)->kind, BOX_RENDER_BUFFER);
     test_int(ecs_vec_count(&p->batches), 1);
-    test_int(null->resources, 4);
+    test_int(null->resources, 6);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -265,12 +267,12 @@ void Draws_instance_data(void) {
     const box_render_upload_t *u = ecs_vec_first_t(&p->uploads, box_render_upload_t);
     test_uint(u->size, 2 * sizeof(box_render_instance_t));
     const box_render_instance_t *inst = box_render_packet_data(p, u->data);
-    const box_render_batch_t *batches = ecs_vec_first_t(&p->batches, box_render_batch_t);
-    int32_t ia = batches[0].first_instance;
-    int32_t ib = batches[1].first_instance;
+    test_int(ecs_vec_count(&p->batches), 1);
+    int32_t ia = 0;
+    int32_t ib = 1;
     if (inst[ia].color[1] > 0.5f) {
-        ia = batches[1].first_instance;
-        ib = batches[0].first_instance;
+        ia = 1;
+        ib = 0;
     }
 
     test_flt(inst[ia].model[0][0], 2);
@@ -414,7 +416,8 @@ void Draws_instance_buffer_grows(void) {
     test_uint(desc->size, 128 * sizeof(box_render_instance_t));
     test_uint(ecs_vec_first_t(&p->uploads, box_render_upload_t)->size,
         65 * sizeof(box_render_instance_t));
-    test_int(ecs_vec_count(&p->batches), 65);
+    test_int(ecs_vec_count(&p->batches), 1);
+    test_uint(ecs_vec_first_t(&p->batches, box_render_batch_t)->instance_count, 65);
 
     ecs_fini(world);
     box_render_null_free(null);

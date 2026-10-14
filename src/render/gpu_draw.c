@@ -206,7 +206,7 @@ void box_gpu_buffer_apply(
     }
 
     if (desc->usage & BOX_RENDER_BUFFER_STORAGE) {
-        usage |= WGPUBufferUsage_Storage;
+        usage |= WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc;
     }
 
     b = ecs_os_calloc_t(box_gpu_buffer_t);
