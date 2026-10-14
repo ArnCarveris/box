@@ -205,6 +205,21 @@
                     "unchanged_lights_upload_nothing",
                     "component_defaults"
                 ]
+            },
+            {
+                "id": "Scene",
+                "testcases": [
+                    "view_renders_scene_of_camera",
+                    "two_views_two_scenes",
+                    "nested_scene_nearest_ancestor",
+                    "reparent_moves_subtree",
+                    "reparent_parent_storage",
+                    "scene_added_and_removed",
+                    "camera_reparented_switches_scene",
+                    "lights_isolated_in_overlapping_scenes",
+                    "light_follows_reparent",
+                    "light_moves_with_scene_added"
+                ]
             }
         ]
     }
