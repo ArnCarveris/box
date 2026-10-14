@@ -106,8 +106,9 @@ ECS_STRUCT(TextureTransform, {
 
 /** Texture entities for each PBR layer, 0 for none, inherited by instances.
  *
- * A texture entity has a TexturePath (box/texture.h); until it loaded, or when it is missing,
- * the layer has no effect. Back faces drawn with BackFacePlain do not sample the textures.
+ * A texture entity has a TexturePath (box/texture.h), or is the texture of a Surface, whose
+ * image of the same frame it then samples; until it loaded, or when it is missing, the layer
+ * has no effect. Back faces drawn with BackFacePlain do not sample the textures.
  */
 ECS_STRUCT(PbrTextures, {
     ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded */

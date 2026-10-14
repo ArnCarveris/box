@@ -336,6 +336,31 @@ done:
     return result;
 }
 
+/** Render the targets of a packet: the ones materials sample first, then the others, each
+ * group in packet order.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+static void box_gpu_targets_render(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, pass, count = ecs_vec_count(&packet->targets);
+    for (pass = 0; pass < 2; pass ++) {
+        for (i = 0; i < count; i ++) {
+            const box_render_target_t *frame = ecs_vec_get_t(
+                &packet->targets, box_render_target_t, i);
+            box_gpu_target_t *t = ecs_map_get_deref(
+                &gpu->targets, box_gpu_target_t, frame->handle);
+            bool texture = t && t->desc.texture;
+            if (texture == (pass == 0)) {
+                box_gpu_target_render(gpu, packet, frame);
+            }
+        }
+    }
+}
+
 /** Apply the target and shader resources of a packet and render its targets.
  *
  * @param ctx The backend
@@ -384,11 +409,7 @@ static void box_gpu_render(
     box_gpu_texture_mips(gpu);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
-    count = ecs_vec_count(&packet->targets);
-    for (i = 0; i < count; i ++) {
-        box_gpu_target_render(gpu, packet,
-            ecs_vec_get_t(&packet->targets, box_render_target_t, i));
-    }
+    box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);
 }

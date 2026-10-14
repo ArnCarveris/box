@@ -254,7 +254,9 @@ done:
     return;
 }
 
-/** Describe the target of a surface: its size, render size and window layer.
+/** Describe the target of a surface: its size in pixels and points, render size and window
+ * layer. Offscreen a point is a pixel; a window reports both, so a retina window has two
+ * pixels per point.
  *
  * @param s The surface
  * @param impl The engine side of the surface, whose window follows the requested size
@@ -270,7 +272,10 @@ static void box_surface_measure(
     ecs_os_memset_t(desc, 0, box_render_target_desc_t);
     desc->width = width;
     desc->height = height;
+    desc->point_width = width;
+    desc->point_height = height;
     desc->vsync = s->vsync;
+    desc->texture = s->texture != 0;
     if (impl->window) {
         if (width != impl->window_width || height != impl->window_height) {
             box_window_resize(impl->window, width, height);
@@ -279,6 +284,7 @@ static void box_surface_measure(
         }
 
         box_window_size(impl->window, &desc->width, &desc->height);
+        box_window_points(impl->window, &desc->point_width, &desc->point_height);
         desc->layer = box_window_layer(impl->window);
     }
 
@@ -338,7 +344,7 @@ static float box_surface_linear(
 }
 
 /** Find the clear color of a surface: the color of its first view that clears, skipping the
- * views of captures.
+ * views of captures and, without a view_root, the views other surfaces claim.
  *
  * @param world The world
  * @param s The surface
@@ -359,7 +365,7 @@ static void box_surface_clear(
             continue;
         }
 
-        if (s->view_root && !ecs_has_pair(world, v->view, EcsChildOf, s->view_root)) {
+        if (s->view_root ? v->parent != s->view_root : v->claimed) {
             continue;
         }
 
@@ -423,6 +429,10 @@ static void box_surface_frame(
         p, impl->handle, box_surface_capture(world, s, impl));
     ecs_os_memcpy_n(target->clear, clear, float, 4);
     target->view_root = s->view_root;
+    if (s->texture) {
+        box_render_texture_target(world, s->texture, impl->handle);
+    }
+
 done:
     return;
 }
@@ -454,6 +464,29 @@ static void box_surface_release(
     }
 }
 
+/** Mark the views of the packet whose parent is the view_root of a surface, which surfaces
+ * without a view_root then skip.
+ *
+ * @param world The world
+ * @param p The packet
+ */
+static void box_surface_claim(
+    ecs_world_t *world,
+    box_render_packet_t *p)
+{
+    int32_t i, v, count = ecs_vec_count(&p->views);
+    ecs_iter_t it = ecs_each(world, Surface);
+    while (ecs_each_next(&it)) {
+        const Surface *s = ecs_field(&it, Surface, 0);
+        for (i = 0; i < it.count; i ++) {
+            for (v = 0; s[i].view_root && v < count; v ++) {
+                box_render_view_t *view = ecs_vec_get_t(&p->views, box_render_view_t, v);
+                view->claimed |= view->parent == s[i].view_root;
+            }
+        }
+    }
+}
+
 /** Describe every surface in the packet of the frame and release removed ones.
  *
  * @param it The iterator of the system
@@ -463,6 +496,8 @@ static void BoxSurfaceExtract(
 {
     box_surface_state_t *state = it->ctx;
     box_surface_release(it->world, state);
+    box_render_texture_targets_clear(it->world);
+    box_surface_claim(it->world, box_render_packet(it->world));
     while (ecs_iter_next(it)) {
         const Surface *s = ecs_field(it, Surface, 0);
         SurfaceImpl *impl = ecs_field(it, SurfaceImpl, 1);

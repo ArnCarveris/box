@@ -527,7 +527,7 @@ done:
  * @param frame The target of the packet
  * @param v The view
  * @return Whether the view is assigned to the target, or, when neither is exclusive, the view
- * is under the view root of the target or the target has none
+ * is under the view root of the target, or the target has none and no surface claims the view
  */
 static bool box_gpu_target_has_view(
     const box_render_target_t *frame,
@@ -535,9 +535,9 @@ static bool box_gpu_target_has_view(
 {
     bool assigned = v->target || frame->exclusive;
 
-    return assigned
-        ? v->target == frame->handle
-        : !frame->view_root || v->parent == frame->view_root;
+    bool root = frame->view_root ? v->parent == frame->view_root : !v->claimed;
+
+    return assigned ? v->target == frame->handle : root;
 }
 
 /** Write the uniforms of the views a target renders into the view buffer.
@@ -568,7 +568,7 @@ static int32_t box_gpu_view_write(
         mat4 proj;
         ecs_os_memset_t(u, 0, box_gpu_view_uniforms_t);
         box_camera_projection(&v->camera_data,
-            (float)t->desc.width, (float)t->desc.height, proj);
+            (float)t->desc.point_width, (float)t->desc.point_height, proj);
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;

@@ -120,6 +120,17 @@ void box_window_size(
     *height = h;
 }
 
+void box_window_points(
+    box_window_t *window,
+    int32_t *width,
+    int32_t *height)
+{
+    int w = 0, h = 0;
+    glfwGetWindowSize(window->window, &w, &h);
+    *width = w;
+    *height = h;
+}
+
 void box_window_resize(
     box_window_t *window,
     int32_t width,
@@ -165,6 +176,16 @@ void box_window_poll(void)
 }
 
 void box_window_size(
+    box_window_t *window,
+    int32_t *width,
+    int32_t *height)
+{
+    (void)window;
+    *width = 0;
+    *height = 0;
+}
+
+void box_window_points(
     box_window_t *window,
     int32_t *width,
     int32_t *height)
