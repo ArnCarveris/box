@@ -40,7 +40,9 @@
                 "id": "Shapes2D",
                 "benchcases": [
                     "dynamic_material",
-                    "changed_1pct"
+                    "changed_1pct",
+                    "ui_tree_idle",
+                    "ui_tree_add_remove"
                 ]
             },
             {
