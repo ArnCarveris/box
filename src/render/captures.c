@@ -4,6 +4,10 @@
  *
  * A capture becomes an offscreen target that exists for one packet: the packet creates it,
  * renders the view of the capture into it and writes the PNG, the next packet destroys it.
+ *
+ * A camera that a view renders is captured as that view renders it, with its lighting,
+ * shadows, culling and effects; a camera without a view, or the camera of a description,
+ * is captured lit, without shadows or effects and with the default culling.
  */
 
 #include "render.h"
@@ -115,24 +119,54 @@ static float box_render_capture_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
+/** Find the view of the packet that renders a camera, the first in creation order.
+ *
+ * @param p The packet, whose views are sorted by creation
+ * @param camera The camera
+ * @return The view, NULL when no view renders the camera
+ */
+static const box_render_view_t* box_render_capture_view_of(
+    const box_render_packet_t *p,
+    ecs_entity_t camera)
+{
+    const box_render_view_t *result = NULL;
+    int32_t i, count = ecs_vec_count(&p->views);
+    for (i = 0; i < count && !result; i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        if (v->view && !v->target && v->camera == camera) {
+            result = v;
+        }
+    }
+
+    return result;
+}
+
 /** Fill the view of a capture from its camera entity or its description.
  *
+ * A camera that a view renders is captured with the settings of that view: its lighting,
+ * shadows, culling and effects, which the later extracts resolve from the view entity.
+ *
  * @param world The world
+ * @param p The packet
  * @param d The capture
  * @param v The zeroed view
  * @return 0 when the view was filled, -1 when the camera entity has no Camera
  */
 static int box_render_capture_camera(
     ecs_world_t *world,
+    const box_render_packet_t *p,
     const box_render_capture_desc_t *d,
     box_render_view_t *v)
 {
+    const box_render_view_t *source = NULL;
     int result = -1;
     const Camera *data = NULL;
     const WorldTransform *transform = NULL;
     if (!d->camera) {
         v->camera_data = d->camera_data;
         v->scene = d->scene;
+        v->cull.enabled = true;
+        v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
         ecs_os_memcpy_t(v->camera_transform, d->transform, mat4);
         result = 0;
         goto done;
@@ -141,6 +175,15 @@ static int box_render_capture_camera(
     data = ecs_is_alive(world, d->camera) ? ecs_get(world, d->camera, Camera) : NULL;
     if (!data) {
         goto done;
+    }
+
+    source = box_render_capture_view_of(p, d->camera);
+    if (source) {
+        v->view = source->view;
+        v->cull = source->cull;
+    } else {
+        v->cull.enabled = true;
+        v->cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
     }
 
     transform = ecs_get(world, d->camera, WorldTransform);
@@ -172,7 +215,7 @@ static void box_render_capture_send(
     const box_render_capture_desc_t *d)
 {
     box_render_view_t view = {0};
-    if (box_render_capture_camera(world, d, &view)) {
+    if (box_render_capture_camera(world, p, d, &view)) {
         ecs_err("capture '%s' skipped: its camera is gone", d->path);
         goto done;
     }
@@ -188,8 +231,6 @@ static void box_render_capture_send(
     glm_mat4_inv(view.camera_transform, view.view_matrix);
     view.clear = d->clear;
     view.target = handle;
-    view.cull.enabled = true;
-    view.cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
     box_render_view_t *v = box_render_packet_view(p);
     *v = view;
 
