@@ -297,8 +297,20 @@
                     "offscreen_caster_shadows_view",
                     "blended_order_kept",
                     "views_cull_separately",
-                    "dynamic_moves_out",
-                    "default_settings"
+                    "dynamic_moves_out"
+                ]
+            },
+            {
+                "id": "Occlusion",
+                "testcases": [
+                    "wall_hides_object",
+                    "wall_moved_shows_object_same_frame",
+                    "camera_cut_shows_object_same_frame",
+                    "slot_moves_keep_instances_drawn",
+                    "batch_replaced_draws_at_once",
+                    "frustum_only_and_disabled",
+                    "hidden_caster_casts_shadow",
+                    "camera_cuts_match_frustum_only"
                 ]
             }
         ]

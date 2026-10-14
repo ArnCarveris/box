@@ -45,7 +45,7 @@ static void bench_cull(
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {24, 28, 36, 255}}, .lighting.enabled = true,
-        .culling = {.enabled = culled, .min_dimension_px = 1},
+        .culling = {.disabled = !culled, .min_dimension_px = 1},
         .shadows = {.enabled = shadows, .cascades = 4, .resolution = 2048,
             .max_distance = 200, .split_lambda = 0.7f, .depth_bias = 2,
             .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});

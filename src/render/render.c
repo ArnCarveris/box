@@ -217,8 +217,11 @@ static void box_render_extract_view(
     v->scene = box_render_scene_of(world, camera);
     v->camera_data = *data;
     v->clear = view->clear;
-    v->cull.enabled = view->culling.enabled;
-    v->cull.min_dimension = glm_max(view->culling.min_dimension_px, 0.0f);
+    v->cull.enabled = !view->culling.disabled;
+    v->cull.occlusion = v->cull.enabled && !view->culling.frustum_only;
+    v->cull.min_dimension = view->culling.min_dimension_px == 0
+        ? BOX_RENDER_CULL_MIN_DIMENSION
+        : glm_max(view->culling.min_dimension_px, 0.0f);
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {
@@ -283,6 +286,7 @@ void BoxRenderImport(
 
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
+    ECS_META_COMPONENT(world, CullStatus);
     ECS_COMPONENT_DEFINE(world, RenderRing);
 
     ecs_set_hooks(world, RenderRing, {
@@ -325,6 +329,7 @@ void BoxRenderImport(
     box_render_draws_init(world);
     box_render_lights_init(world);
     box_render_shadows_init(world);
+    box_render_cull_status_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),

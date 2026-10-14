@@ -358,8 +358,8 @@ static void box_gpu_target_configure(
         box_gpu_target_scene(gpu, t);
     }
 
-    t->depth = box_gpu_texture(gpu, d->render_width, d->render_height,
-        BOX_GPU_DEPTH_FORMAT, WGPUTextureUsage_RenderAttachment);
+    t->depth = box_gpu_texture(gpu, d->render_width, d->render_height, BOX_GPU_DEPTH_FORMAT,
+        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding);
     t->depth_view = wgpuTextureCreateView(t->depth, NULL);
 
     box_gpu_count(gpu, BOX_GPU_STAT_CONFIGURED);

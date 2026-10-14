@@ -3,8 +3,10 @@
  * @brief Meshes, buffers and the forward pass of the webgpu backend.
  *
  * Every view of a target renders in order into its color texture with a depth buffer that is
- * cleared to 0 and compared with greater, and draws the batches of the scene of its camera
- * indirectly, with the instances its cull pass kept.
+ * cleared to 0 and compared with greater, and draws the batches of its scene indirectly.
+ *
+ * A view that culls by occlusion draws twice: what its early cull phase kept, then what the
+ * late phase found visible behind the depth of the first draw, with the blended draws.
  */
 
 #include "gpu.h"
@@ -541,7 +543,7 @@ static int32_t box_gpu_view_write(
 {
     int32_t i, result = 0, count = ecs_vec_count(&packet->views);
     ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
-    box_gpu_cull_begin(gpu);
+    box_gpu_cull_begin(gpu, packet);
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
         if (!box_gpu_target_has_view(frame, v)) {
@@ -574,20 +576,23 @@ static int32_t box_gpu_view_write(
     return result;
 }
 
-/** Record the indirect draws of the batches a view renders, in packet order.
+/** Record the indirect draws of the batches a view renders in a pass, in packet order.
  *
  * @param gpu The backend
  * @param pass The render pass of the view
  * @param format The format of the color target
  * @param packet The packet
  * @param slot Slot of the view in the view buffer
+ * @param phase 0 for every draw of a view without occlusion, 1 for the opaque draws of the
+ * early phase, 2 for what the late phase kept and the blended draws
  */
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     WGPUTextureFormat format,
     const box_render_packet_t *packet,
-    int32_t slot)
+    int32_t slot,
+    int32_t phase)
 {
     const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, -1);
     WGPURenderPipeline bound = NULL;
@@ -599,7 +604,7 @@ static void box_gpu_draw_batches(
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b);
-        if (!pipeline) {
+        if (!pipeline || (phase == 1 && b->view != -1)) {
             continue;
         }
 
@@ -614,10 +619,65 @@ static void box_gpu_draw_batches(
             material = group;
         }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 2)) {
+        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, phase == 2 && b->view == -1)) {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
     }
+}
+
+/** Record a render pass of a view and its draws of one phase.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param color The texture view the view renders into
+ * @param packet The packet
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
+ * @param phase 0 for the only pass, 1 for the early and 2 for the late pass of a view that
+ * culls by occlusion
+ */
+static void box_gpu_draw_pass(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView color,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    int32_t slot,
+    int32_t phase)
+{
+    WGPURenderPassColorAttachment attachment = {
+        .view = color,
+        .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+        .loadOp = v->clear.enabled && phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
+        .storeOp = WGPUStoreOp_Store,
+        .clearValue = {
+            box_gpu_linear(v->clear.color.r),
+            box_gpu_linear(v->clear.color.g),
+            box_gpu_linear(v->clear.color.b),
+            (double)v->clear.color.a / 255.0
+        }
+    };
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = t->depth_view,
+        .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
+        .depthStoreOp = phase == 1 ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .depthClearValue = 0.0f
+    };
+    WGPURenderPassDescriptor desc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = &attachment,
+        .depthStencilAttachment = &depth
+    };
+    uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+    WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    box_gpu_draw_batches(gpu, pass, t->format, packet, slot, phase);
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+    wgpuBindGroupRelease(group);
 }
 
 void box_gpu_draw_views(
@@ -639,45 +699,21 @@ void box_gpu_draw_views(
             continue;
         }
 
-        WGPURenderPassColorAttachment attachment = {
-            .view = color,
-            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-            .loadOp = v->clear.enabled ? WGPULoadOp_Clear : WGPULoadOp_Load,
-            .storeOp = WGPUStoreOp_Store,
-            .clearValue = {
-                box_gpu_linear(v->clear.color.r),
-                box_gpu_linear(v->clear.color.g),
-                box_gpu_linear(v->clear.color.b),
-                (double)v->clear.color.a / 255.0
-            }
-        };
-        WGPURenderPassDepthStencilAttachment depth = {
-            .view = t->depth_view,
-            .depthLoadOp = WGPULoadOp_Clear,
-            .depthStoreOp = WGPUStoreOp_Discard,
-            .depthClearValue = 0.0f
-        };
-        WGPURenderPassDescriptor desc = {
-            .colorAttachmentCount = 1,
-            .colorAttachments = &attachment,
-            .depthStencilAttachment = &depth
-        };
-        uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+        bool occludes = box_gpu_cull_occludes(gpu, slot);
         box_gpu_light_cluster(gpu, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
-        WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
-        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        box_gpu_draw_batches(gpu, pass, t->format, packet, slot);
+        box_gpu_draw_pass(gpu, t, encoder, color, packet, v, slot, occludes ? 1 : 0);
+        if (occludes) {
+            box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
+            box_gpu_draw_pass(gpu, t, encoder, color, packet, v, slot, 2);
+        }
 
-        wgpuRenderPassEncoderEnd(pass);
-        wgpuRenderPassEncoderRelease(pass);
-        wgpuBindGroupRelease(group);
         box_gpu_count(gpu, BOX_GPU_STAT_PASS);
         slot ++;
     }
 
+    box_gpu_cull_finish(gpu, encoder);
 done:
     return;
 }

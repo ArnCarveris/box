@@ -29,7 +29,7 @@ void Culling_offscreen_not_drawn(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     float inside[4][2] = {{-2, -2}, {2, -2}, {-2, 2}, {2, 2}};
     float outside[12][3] = {
@@ -89,7 +89,7 @@ void Culling_edge_objects_drawn(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     float edges[4][2] = {{6.5f, 0}, {-6.5f, 0}, {0, 6.5f}, {0, -6.5f}};
     int32_t i;
@@ -147,7 +147,7 @@ void Culling_bounds_follow_scale_and_rotation(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {0, 18, 0});
@@ -191,7 +191,7 @@ void Culling_disabled_draws_all(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = false});
+    ecs_set(world, view, View, {.camera = camera, .culling.disabled = true});
     int32_t i;
     for (i = 0; i < 10; i ++) {
         ecs_entity_t e = ecs_new(world);
@@ -209,7 +209,7 @@ void Culling_disabled_draws_all(void) {
     test_int(stats.tested, 10);
     test_int(stats.visible, 10);
 
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true});
+    ecs_set(world, view, View, {.camera = camera});
     ecs_progress(world, 0);
     box_render_sync(world);
     test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
@@ -232,7 +232,7 @@ void Culling_min_dimension(void) {
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
-        .culling = {.enabled = true, .min_dimension_px = 8},
+        .culling = {.min_dimension_px = 8},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t large = ecs_new(world);
     ecs_set(world, large, Position, {-1, 0, -5});
@@ -260,7 +260,7 @@ void Culling_min_dimension(void) {
     test_assert(px[(32 * 64 + 43) * 4] < 20);
     stbi_image_free(px);
 
-    ecs_set(world, view, View, {.camera = camera, .culling = {.enabled = true},
+    ecs_set(world, view, View, {.camera = camera, .culling = {.min_dimension_px = -1},
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -290,7 +290,7 @@ void Culling_offscreen_caster_shadows_view(void) {
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true,
         .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
@@ -347,7 +347,7 @@ void Culling_blended_order_kept(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t back = ecs_new(world);
     ecs_set(world, back, Position, {0, 0, -1});
@@ -404,9 +404,9 @@ void Culling_views_cull_separately(void) {
     ecs_set(world, right_camera, Position, {20, 0, 10});
     ecs_set(world, right_camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t left = ecs_new(world);
-    ecs_set(world, left, View, {.camera = left_camera, .culling.enabled = true});
+    ecs_set(world, left, View, {.camera = left_camera});
     ecs_entity_t right = ecs_new(world);
-    ecs_set(world, right, View, {.camera = right_camera, .culling.enabled = true});
+    ecs_set(world, right, View, {.camera = right_camera});
     int32_t i;
     for (i = 0; i < 3; i ++) {
         ecs_entity_t e = ecs_new(world);
@@ -449,7 +449,7 @@ void Culling_dynamic_moves_out(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t mover = ecs_new(world);
     ecs_add(world, mover, DynamicTransform);
@@ -481,19 +481,5 @@ void Culling_dynamic_moves_out(void) {
 
     stbi_image_free(px);
     ecs_os_free(path);
-    ecs_fini(world);
-}
-
-void Culling_default_settings(void) {
-    // culling/frustum
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    ecs_entity_t view = ecs_new(world);
-    ecs_add(world, view, View);
-    const View *v = ecs_get(world, view, View);
-    test_assert(v != NULL);
-    test_bool(v->culling.enabled, true);
-    test_flt(v->culling.min_dimension_px, 1);
-
     ecs_fini(world);
 }
