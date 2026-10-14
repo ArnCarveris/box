@@ -231,6 +231,29 @@
                     "unchanged_lights_upload_nothing",
                     "component_defaults"
                 ]
+            },
+            {
+                "id": "Shapes2D",
+                "testcases": [
+                    "rect_size",
+                    "circle_shape",
+                    "border_radius_rounds_corners",
+                    "border_width_and_color",
+                    "circle_border_ring",
+                    "line_segment",
+                    "image_texture_area",
+                    "opacity_blends",
+                    "depth_with_3d_shapes",
+                    "coplanar_draw_in_order",
+                    "edges_crisp_at_any_scale",
+                    "edges_crisp_in_perspective",
+                    "edges_antialiased_when_rotated",
+                    "changes_update_render",
+                    "dynamic_shapes",
+                    "prefab_instance",
+                    "one_batch_for_all_kinds",
+                    "empty_shapes_not_drawn"
+                ]
             }
         ]
     }
