@@ -69,7 +69,14 @@
                     "dynamic_unnotified_move_after_idle",
                     "static_moved_over_frames_then_queried",
                     "static_moved_then_removed_then_queried",
-                    "static_moved_back_then_queried"
+                    "static_moved_back_then_queried",
+                    "created_in_post_update",
+                    "created_in_pre_store",
+                    "created_in_on_store",
+                    "moved_in_post_update",
+                    "moved_in_pre_store",
+                    "moved_in_on_store",
+                    "parent_moved_in_pre_store"
                 ]
             }
         ]
