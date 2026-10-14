@@ -267,6 +267,27 @@
                     "fade_softens_last_cascade",
                     "default_settings"
                 ]
+            },
+            {
+                "id": "Effects",
+                "testcases": [
+                    "bloom_spreads_past_emissive_edge",
+                    "bloom_threshold_keeps_dim_edges",
+                    "bloom_intensity_change_applies",
+                    "tonemap_compresses_hdr",
+                    "tonemap_keeps_hue_of_bright_colors",
+                    "exposure_adapts_over_frames",
+                    "exposure_deterministic_with_fixed_delta",
+                    "fog_darkens_with_distance",
+                    "fog_lit_by_scene_sun",
+                    "ssao_darkens_crease",
+                    "chain_order_matters",
+                    "chain_reconfigured_on_change",
+                    "view_without_clear_composites_over",
+                    "zero_literal_takes_defaults",
+                    "default_settings",
+                    "script_entry_enabled_by_default"
+                ]
             }
         ]
     }

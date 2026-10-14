@@ -1,0 +1,61 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.effects
+
+bloom {
+  Bloom: {intensity: 0.35, threshold: 1, threshold_softness: 0.5}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {0, 2.5, 8}
+  Rotation: {-0.25, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {6, 6, 10, 255}}, effects: [{effect: bloom}, {effect: tonemap}]}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {50, 50, 56}
+}
+
+for i in 0..5 {
+  {
+    Position: {i * 1.8 - 3.6, 0.7, -0.8}
+    Sphere: {segments: 32, smooth: true, radius: 0.5}
+    Rgb: {20, 20, 20}
+    Emissive: {strength: i * 2, color: {255, 140, 60}}
+  }
+}
+
+bar {
+  Position: {0, 2.6, -2}
+  Box: {6, 0.15, 0.15}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 6, color: {120, 200, 255}}
+}
+
+lit_box {
+  Position: {2.4, 0.5, 1.6}
+  Rotation: {0, 0.6, 0}
+  Box: {1, 1, 1}
+  Rgb: {200, 200, 200}
+}
+
+dim_box {
+  Position: {-2.4, 0.5, 1.6}
+  Rotation: {0, -0.6, 0}
+  Box: {1, 1, 1}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 0.8, color: {80, 255, 120}}
+}

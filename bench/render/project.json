@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract of the instanced batches and lights and the shadow pass of box.render",
+        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass and the effect passes of box.render",
         "public": false,
         "use": [
             "box"
@@ -48,6 +48,19 @@
                 "benchcases": [
                     "off_100k",
                     "on_100k"
+                ]
+            },
+            {
+                "id": "Effects",
+                "benchcases": [
+                    "none",
+                    "disabled",
+                    "tonemap",
+                    "auto_exposure",
+                    "bloom",
+                    "ssao",
+                    "fog",
+                    "all"
                 ]
             }
         ]
