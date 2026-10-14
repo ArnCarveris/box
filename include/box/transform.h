@@ -3,8 +3,11 @@
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
  * WorldTransform is kept equal to parent * T * R * S: by observers for static
- * entities, every frame in EcsPreStore for DynamicTransform entities. DynamicTransform
- * spreads to every descendant and is removed from them with the root.
+ * entities, every frame in EcsPreStore for DynamicTransform entities.
+ *
+ * DynamicTransform spreads to every descendant. A descendant that only inherited it loses
+ * it with the root; one tagged by the application or with a component that implies it
+ * (`(With, DynamicTransform)`, such as Velocity) stays dynamic.
  */
 
 #ifndef BOX_TRANSFORM_H
