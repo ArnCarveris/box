@@ -9,7 +9,8 @@
 // Instance words of a rectangle: shape.x is the corner radius and shape.y the border width, in
 // units of half its smaller side, shape.zw the linear border color as four half floats, and
 // emissive.w its width over its height. A line: shape.xy is the start, shape.zw the end and
-// emissive.w the negated width.
+// emissive.w the negated width; its quad is scaled to bounds centered on the origin that hold
+// both ends, twice the largest coordinate plus the width on each axis.
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -71,7 +72,8 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
         let b = bitcast<vec2f>(v.shape.zw);
         let len = length(b - a);
         axis = select(vec2f(1.0, 0.0), (b - a) / len, len > 0.0);
-        origin = (a + b) * 0.5;
+        to_model = 1.0 / (2.0 * max(abs(a), abs(b)) + vec2f(-v.emissive.w));
+        origin = (a + b) * 0.5 * to_model;
         extent = vec2f(len, -v.emissive.w) * 0.5;
     } else {
         let aspect = max(v.emissive.w, 1e-6);
@@ -81,8 +83,8 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
         o.border = vec4f(unpack2x16float(v.shape.z), unpack2x16float(v.shape.w));
     }
 
-    let dir_x = axis * to_model.x;
-    let dir_y = vec2f(-axis.y, axis.x) * to_model.y;
+    let dir_x = axis * to_model;
+    let dir_y = vec2f(-axis.y, axis.x) * to_model;
     let corner = sign(v.position.xy);
     let edge = corner * extent;
     let clip = mvp * vec4f(origin + dir_x * edge.x + dir_y * edge.y, 0.0, 1.0);

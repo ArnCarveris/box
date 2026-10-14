@@ -455,6 +455,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnShapeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
+    box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Shape2D) }},
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);

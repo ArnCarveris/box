@@ -6,6 +6,7 @@
  */
 
 #include "shape2d.h"
+#include <math.h>
 
 ECS_COMPONENT_DECLARE(Shape2D);
 
@@ -106,6 +107,9 @@ static bool box_shape2d_geometry(
     if (out->kind == BOX_SHAPE2D_RECT) {
         scale[0] = out->size[0];
         scale[1] = out->size[1];
+    } else if (out->kind == BOX_SHAPE2D_LINE) {
+        scale[0] = 2.0f * glm_max(fabsf(out->line[0]), fabsf(out->line[2])) + out->width;
+        scale[1] = 2.0f * glm_max(fabsf(out->line[1]), fabsf(out->line[3])) + out->width;
     }
 
     return result;
@@ -149,8 +153,9 @@ static void box_shape2d_fill(
 
 /** Bring the ShapeMesh and Shape2D of an entity up to date with its 2D components.
  *
- * Both come with the shape through the With trait, so they are written in place; an entity
- * that lost its last 2D shape loses them through the stage.
+ * Both come with the shape through the With trait, so they are written in place; ShapeMesh
+ * only when its mesh or scale changes. An entity that lost its last 2D shape loses them through
+ * the stage. A line scales the quad to bounds centered on the origin that hold both ends.
  *
  * @param it The observer iterator
  * @param shape The registered quad
@@ -183,7 +188,7 @@ static void box_shape2d_resolve(
         ecs_modified(it->stage, e, Shape2D);
     }
 
-    if (mesh) {
+    if (mesh && (!mesh->mesh != !drawn || ecs_os_memcmp(mesh->scale, scale, ECS_SIZEOF(vec3)))) {
         uint32_t handle = drawn ? box_mesh_cache_acquire(shape->cache, shape, NULL) : 0;
         box_mesh_cache_release(shape->cache, mesh->mesh);
         mesh->mesh = handle;
