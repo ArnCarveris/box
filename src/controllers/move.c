@@ -3,8 +3,8 @@
  * @brief Moves a controller capsule through its scene: slide, step up and ground probe.
  *
  * A move reads the shapes around the swept capsule from the spatial index once, then walks the
- * motion in steps as long as the capsule is clear of every shape (conservative advancement),
- * at least half the radius, and pushes the capsule out after each step.
+ * motion in steps of half the radius, or as far as the capsule is clear of every shape when the
+ * motion is long (conservative advancement), and pushes the capsule out after each step.
  */
 
 #include "controllers.h"
@@ -16,6 +16,9 @@
 
 /** Longest step of a move as a fraction of the radius */
 #define BOX_MOVE_FRACTION (0.5f)
+
+/** Even steps a move is split into at the most, a longer move advances conservatively */
+#define BOX_MOVE_STEPS (8)
 
 /** Overlap a contact needs before it counts */
 #define BOX_MOVE_EPS (1e-5f)
@@ -267,8 +270,9 @@ static float box_move_clearance(
 
 /** Move the capsule by a motion, pushing it out after every step.
  *
- * A step goes as far as the capsule is clear of every shape, and at least half the radius,
- * which the push can always undo. No length of motion skips over a shape.
+ * A motion of a few times half the radius goes in even steps the push can always undo. A
+ * longer one advances conservatively: a step goes as far as the capsule is clear of every
+ * shape and at least half the radius, so no length of motion skips over a shape.
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -281,18 +285,23 @@ static void box_move_slide(
 {
     float remaining = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
     float limit = m->body->radius * BOX_MOVE_FRACTION;
+    int32_t i, steps = remaining > limit ? (int32_t)ceilf(remaining / limit) : 1;
     vec3 dir = { 0, 0, 0 };
-    if (remaining > 0) {
+    if (steps <= BOX_MOVE_STEPS) {
+        glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, dir);
+        remaining = 0;
+    } else {
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / remaining, dir);
+        steps = 0;
+    }
+
+    for (i = 0; i < steps; i ++) {
+        glm_vec3_add(pos, dir, pos);
+        box_move_push(m, pos);
     }
 
     while (remaining > 0) {
-        float step = remaining;
-        if (remaining > limit) {
-            step = fmaxf(limit, box_move_clearance(m, pos, dir));
-            step = fminf(step, remaining);
-        }
-
+        float step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir)), remaining);
         glm_vec3_muladds(dir, step, pos);
         box_move_push(m, pos);
         remaining -= step;
