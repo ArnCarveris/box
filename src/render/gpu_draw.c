@@ -97,6 +97,7 @@ void box_gpu_draw_init(
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
+    box_gpu_effects_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -162,6 +163,7 @@ void box_gpu_draw_fini(
     box_gpu_forward_reset(gpu);
     box_gpu_light_fini(gpu);
     box_gpu_shadow_fini(gpu);
+    box_gpu_effects_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -621,10 +623,11 @@ void box_gpu_draw_views(
             continue;
         }
 
+        WGPUTextureView hdr = box_gpu_effects_begin(gpu, t, packet, v);
         WGPURenderPassColorAttachment attachment = {
-            .view = color,
+            .view = hdr ? hdr : color,
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-            .loadOp = v->clear.enabled ? WGPULoadOp_Clear : WGPULoadOp_Load,
+            .loadOp = v->clear.enabled || hdr ? WGPULoadOp_Clear : WGPULoadOp_Load,
             .storeOp = WGPUStoreOp_Store,
             .clearValue = {
                 box_gpu_linear(v->clear.color.r),
@@ -633,10 +636,14 @@ void box_gpu_draw_views(
                 (double)v->clear.color.a / 255.0
             }
         };
+        if (hdr && !v->clear.enabled) {
+            attachment.clearValue = (WGPUColor){0};
+        }
+
         WGPURenderPassDepthStencilAttachment depth = {
             .view = t->depth_view,
             .depthLoadOp = WGPULoadOp_Clear,
-            .depthStoreOp = WGPUStoreOp_Discard,
+            .depthStoreOp = hdr ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
             .depthClearValue = 0.0f
         };
         WGPURenderPassDescriptor desc = {
@@ -650,11 +657,15 @@ void box_gpu_draw_views(
         WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        box_gpu_draw_batches(gpu, pass, t->format, packet, i);
+        box_gpu_draw_batches(gpu, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, i);
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
         wgpuBindGroupRelease(group);
+        if (hdr) {
+            box_gpu_effects_run(gpu, t, encoder, packet, v, color);
+        }
+
         box_gpu_count(gpu, BOX_GPU_STAT_PASS);
         slot ++;
     }

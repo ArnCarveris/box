@@ -52,6 +52,12 @@
 /** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
+/** Color format of the HDR target a view with effects renders into */
+#define BOX_GPU_HDR_FORMAT (WGPUTextureFormat_RGBA16Float)
+
+/** Effect passes, HDR targets and the state effects keep across frames */
+typedef struct box_gpu_effects_t box_gpu_effects_t;
+
 /** Forward pipelines by color format, blend mode and back face mode, at most */
 #define BOX_GPU_FORWARD_PIPELINES (64)
 
@@ -208,6 +214,7 @@ typedef struct box_gpu_t {
     ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
+    box_gpu_effects_t *effects;     /**< Effect passes of the views */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -594,6 +601,60 @@ void box_gpu_shadow_render(
 WGPUTextureView box_gpu_shadow_binding(
     box_gpu_t *gpu,
     const box_render_view_t *v);
+
+/** Create the layouts, sampler and placeholders of the effect passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_effects_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts, HDR targets and the state of the effect passes.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_effects_fini(
+    box_gpu_t *gpu);
+
+/** Get the HDR target a view with effects renders its forward pass into.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param v The view
+ * @return The HDR image, NULL for a view without effects, which renders into the target
+ */
+WGPUTextureView box_gpu_effects_begin(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v);
+
+/** Record the effect passes of a view over its HDR image, the last one writing the target.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param encoder The encoder of the frame
+ * @param packet The packet
+ * @param v The view, whose forward pass rendered into the image box_gpu_effects_begin returned
+ * @param color The texture view of the target the views render into
+ */
+void box_gpu_effects_run(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    const box_render_view_t *v,
+    WGPUTextureView color);
+
+/** Release the HDR targets and effect state that the targets of a packet did not use.
+ *
+ * @param gpu The backend
+ * @param packet The packet that rendered
+ */
+void box_gpu_effects_sweep(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Create the layouts of the scatter pass.
  *

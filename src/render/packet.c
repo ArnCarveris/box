@@ -16,6 +16,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->views, box_render_view_t, 0);
     ecs_vec_init_t(NULL, &p->batches, box_render_batch_t, 0);
     ecs_vec_init_t(NULL, &p->targets, box_render_target_t, 0);
+    ecs_vec_init_t(NULL, &p->effects, box_render_effect_t, 0);
     ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
 }
 
@@ -28,6 +29,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->views, box_render_view_t);
     ecs_vec_fini_t(NULL, &p->batches, box_render_batch_t);
     ecs_vec_fini_t(NULL, &p->targets, box_render_target_t);
+    ecs_vec_fini_t(NULL, &p->effects, box_render_effect_t);
     ecs_vec_fini_t(NULL, &p->data, uint8_t);
 }
 
@@ -44,6 +46,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->views);
     ecs_vec_clear(&p->batches);
     ecs_vec_clear(&p->targets);
+    ecs_vec_clear(&p->effects);
     ecs_vec_clear(&p->data);
     if (ecs_vec_size(&p->data) > BOX_RENDER_DATA_KEEP) {
         ecs_vec_fini_t(NULL, &p->data, uint8_t);
@@ -83,6 +86,7 @@ void box_render_packet_copy(
     box_render_vec_copy(&dst->views, &src->views, ECS_SIZEOF(box_render_view_t));
     box_render_vec_copy(&dst->batches, &src->batches, ECS_SIZEOF(box_render_batch_t));
     box_render_vec_copy(&dst->targets, &src->targets, ECS_SIZEOF(box_render_target_t));
+    box_render_vec_copy(&dst->effects, &src->effects, ECS_SIZEOF(box_render_effect_t));
     box_render_vec_copy(&dst->data, &src->data, ECS_SIZEOF(uint8_t));
 }
 

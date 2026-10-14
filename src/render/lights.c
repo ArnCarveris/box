@@ -489,8 +489,9 @@ static void box_lights_views(
             out->directional = s->directional;
             out->count = (uint32_t)ecs_vec_count(&s->lights);
             if (s->directional) {
-                glm_vec3_copy(ecs_vec_first_t(&s->lights, box_render_light_t)->position,
-                    out->sun);
+                box_render_light_t *sun = ecs_vec_first_t(&s->lights, box_render_light_t);
+                glm_vec3_copy(sun->position, out->sun);
+                glm_vec3_copy(sun->color, out->sun_color);
             }
         } else {
             box_lights_send_default(l, p);
@@ -498,6 +499,8 @@ static void box_lights_views(
             out->directional = 1;
             out->count = 1;
             glm_vec3_copy(ECS_CONST_CAST(float*, box_lights_sun), out->sun);
+            glm_vec3_scale(ECS_CONST_CAST(float*, box_lights_sun_color), GLM_PIf,
+                out->sun_color);
         }
 
         if (s && s->has_ambient) {
