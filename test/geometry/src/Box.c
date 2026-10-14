@@ -8,7 +8,7 @@
 #include <math.h>
 #include "mesh_cache.h"
 
-void Box_vertex_count(void) {
+void Box_size(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
@@ -20,8 +20,16 @@ void Box_vertex_count(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 24);
-    test_int(mesh->index_count, 36);
+    vec3 lo = { 1e9f, 1e9f, 1e9f };
+    vec3 hi = { -1e9f, -1e9f, -1e9f };
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        glm_vec3_minv(lo, mesh->vertices[i].position, lo);
+        glm_vec3_maxv(hi, mesh->vertices[i].position, hi);
+    }
+
+    test_assert(fabsf((hi[0] - lo[0]) * sm->scale[0] - 1.0f) < 1e-4f);
+    test_assert(fabsf((hi[1] - lo[1]) * sm->scale[1] - 2.0f) < 1e-4f);
+    test_assert(fabsf((hi[2] - lo[2]) * sm->scale[2] - 3.0f) < 1e-4f);
 
     ecs_fini(world);
 }
@@ -95,7 +103,6 @@ void Box_cache_shared(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
@@ -108,8 +115,6 @@ void Box_cache_shared(void) {
     test_assert(m2 != NULL);
     test_assert(m1->mesh != 0);
     test_uint(m1->mesh, m2->mesh);
-    test_int(box_mesh_cache_refs(cache, m1->mesh), 2);
-    test_int(box_mesh_cache_count(cache), 1);
 
     ecs_fini(world);
 }

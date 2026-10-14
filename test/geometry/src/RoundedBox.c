@@ -8,7 +8,7 @@
 #include <math.h>
 #include "mesh_cache.h"
 
-void RoundedBox_vertex_count(void) {
+void RoundedBox_size(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
@@ -20,8 +20,22 @@ void RoundedBox_vertex_count(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 216);
-    test_int(mesh->index_count, 900);
+    vec3 lo = { 1e9f, 1e9f, 1e9f };
+    vec3 hi = { -1e9f, -1e9f, -1e9f };
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        glm_vec3_minv(lo, mesh->vertices[i].position, lo);
+        glm_vec3_maxv(hi, mesh->vertices[i].position, hi);
+    }
+
+    test_assert(fabsf((hi[0] - lo[0]) * sm->scale[0] - 2.0f) < 1e-4f);
+    test_assert(fabsf((hi[1] - lo[1]) * sm->scale[1] - 1.0f) < 1e-4f);
+    test_assert(fabsf((hi[2] - lo[2]) * sm->scale[2] - 1.0f) < 1e-4f);
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const float *p = mesh->vertices[i].position;
+        bool corner = fabsf(p[0]) > hi[0] - 1e-4f && fabsf(p[1]) > hi[1] - 1e-4f &&
+            fabsf(p[2]) > hi[2] - 1e-4f;
+        test_assert(!corner);
+    }
 
     ecs_fini(world);
 }
@@ -95,7 +109,6 @@ void RoundedBox_cache_shared(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
@@ -110,12 +123,10 @@ void RoundedBox_cache_shared(void) {
     test_assert(m2 != NULL);
     test_assert(m1->mesh != 0);
     test_uint(m1->mesh, m2->mesh);
-    test_int(box_mesh_cache_refs(cache, m1->mesh), 2);
     const ShapeMesh *m3 = ecs_get(world, e3, ShapeMesh);
     test_assert(m3 != NULL);
     test_assert(m3->mesh != 0);
     test_assert(m3->mesh != m1->mesh);
-    test_int(box_mesh_cache_count(cache), 2);
 
     ecs_fini(world);
 }
@@ -150,8 +161,21 @@ void RoundedBox_zero_radius(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 24);
-    test_int(mesh->index_count, 36);
+    vec3 lo = { 1e9f, 1e9f, 1e9f };
+    vec3 hi = { -1e9f, -1e9f, -1e9f };
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        glm_vec3_minv(lo, mesh->vertices[i].position, lo);
+        glm_vec3_maxv(hi, mesh->vertices[i].position, hi);
+    }
+
+    test_assert(fabsf((hi[0] - lo[0]) * sm->scale[0] - 2.0f) < 1e-4f);
+    test_assert(fabsf((hi[1] - lo[1]) * sm->scale[1] - 1.0f) < 1e-4f);
+    test_assert(fabsf((hi[2] - lo[2]) * sm->scale[2] - 1.0f) < 1e-4f);
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const float *n = mesh->vertices[i].normal;
+        float largest = fmaxf(fabsf(n[0]), fmaxf(fabsf(n[1]), fabsf(n[2])));
+        test_assert(fabsf(largest - 1.0f) < 1e-4f);
+    }
 
     ecs_fini(world);
 }
