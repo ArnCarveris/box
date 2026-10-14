@@ -1,0 +1,35 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera_rig {
+  Rotation: {0, 0.7854, 0}
+
+  camera {
+    Position: {0, 12, 16.97}
+    Rotation: {-0.6155, 0, 0}
+    Camera: {ortho: true, ortho_height: 9}
+  }
+}
+
+main_view {
+  View: {camera: camera_rig.camera, clear: {enabled: true, color: {44, 40, 52, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {9, 0.2, 9}
+  Rgb: {150, 150, 160}
+}
+
+for x in 0..4 {
+  for z in 0..4 {
+    {
+      Position: {x * 2 - 3, 0.5 + (x + z) * 0.25, z * 2 - 3}
+      Box: {1, 1 + (x + z) * 0.5, 1}
+      Rgb: {60 + x * 50, 90 + z * 30, 220 - x * 30 - z * 20}
+    }
+  }
+}
