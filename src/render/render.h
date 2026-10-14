@@ -519,6 +519,36 @@ void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
 
+/** Register the cached query that knows the scene of every entity in a scene.
+ *
+ * @param world The world
+ */
+void box_render_scenes_init(
+    ecs_world_t *world);
+
+/** Get the scene an entity belongs to from the cached scene membership query.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The entity when it has Scene, else its nearest ancestor with Scene, 0 for the
+ * default scene
+ */
+ecs_entity_t box_render_scene_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the scene of an entity of a query result with an optional Scene(self|up) term.
+ *
+ * @param it The iterator
+ * @param field Index of the Scene field
+ * @param row Row of the entity in the result
+ * @return The entity when it has Scene, else the source of the field, 0 for the default scene
+ */
+ecs_entity_t box_render_scene_field(
+    const ecs_iter_t *it,
+    int8_t field,
+    int32_t row);
+
 /** Register the system that resolves the shadow settings of every view of the packet.
  *
  * Runs after the light extract, because a view only renders shadows when its scene has a

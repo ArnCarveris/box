@@ -86,41 +86,11 @@ static void box_ambient_light_ctor(
     }
 }
 
-/** Construct View values that are lit, with the documented shadow defaults.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_light_view_ctor(
-    void *ptr,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    View *values = ptr;
-    int32_t i;
-    ecs_os_memset(ptr, 0, ti->size * count);
-    for (i = 0; i < count; i ++) {
-        values[i].lighting.enabled = true;
-        values[i].shadows = (ShadowSettings){
-            .cascades = 4,
-            .resolution = 2048,
-            .max_distance = 200.0f,
-            .split_lambda = 0.7f,
-            .depth_bias = 2.0f,
-            .normal_offset = 1.5f,
-            .filter_size = 3,
-            .fade = 0.2f
-        };
-    }
-}
-
 void BoxLightImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxLight);
     ECS_IMPORT(world, BoxTypes);
-    ECS_IMPORT(world, BoxView);
 
     ECS_META_COMPONENT(world, DirectionalLight);
     ECS_META_COMPONENT(world, PointLight);
@@ -130,5 +100,4 @@ void BoxLightImport(
     ecs_set_hooks(world, PointLight, { .ctor = box_point_light_ctor });
     ecs_set_hooks(world, SpotLight, { .ctor = box_spot_light_ctor });
     ecs_set_hooks(world, AmbientLight, { .ctor = box_ambient_light_ctor });
-    ecs_set_hooks(world, View, { .ctor = box_light_view_ctor });
 }
