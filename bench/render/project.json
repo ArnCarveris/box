@@ -28,6 +28,12 @@
                     "dynamic_material",
                     "blended_sort"
                 ]
+            },
+            {
+                "id": "Texture",
+                "benchcases": [
+                    "textured_batches"
+                ]
             }
         ]
     }
