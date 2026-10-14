@@ -2,9 +2,9 @@
  * @file render/gpu_shadow.c
  * @brief Cascaded shadow maps of the webgpu backend.
  *
- * Before a view with shadows draws, its opaque shadow casters, the same instanced batches the
- * forward pass draws, render with the engine shader etc/shaders/shadow.wgsl into every
- * cascade of the shared shadow map, depth only and with reversed Z.
+ * Before a view with shadows draws, the opaque casters the cull pass kept in each cascade
+ * render with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only
+ * and with reversed Z.
  *
  * The forward pass then samples the map through a comparison sampler.
  */
@@ -54,10 +54,11 @@ void box_gpu_shadow_init(
         .aspect = WGPUTextureAspect_DepthOnly
     };
     gpu->shadow_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+    WGPUBindGroupLayout groups[2] = { gpu->shadow_layout, gpu->instance_layout };
     gpu->shadow_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &gpu->shadow_layout
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = groups
         });
     gpu->shadow_sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
     gpu->shadow_empty = wgpuDeviceCreateTexture(gpu->device, &empty);
@@ -224,22 +225,15 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
     WGPUVertexAttribute vertex_attr = {
         .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0
     };
-    WGPUVertexAttribute instance_attrs[4];
-    int32_t i;
+    WGPUVertexAttribute slot_attr = {
+        .format = WGPUVertexFormat_Uint32, .offset = 0, .shaderLocation = 3
+    };
     if (!s || !s->module) {
         goto done;
     }
 
     if (gpu->shadow && gpu->shadow_revision == s->revision) {
         goto done;
-    }
-
-    for (i = 0; i < 4; i ++) {
-        instance_attrs[i] = (WGPUVertexAttribute){
-            .format = WGPUVertexFormat_Float32x4,
-            .offset = (uint64_t)i * 16,
-            .shaderLocation = (uint32_t)(3 + i)
-        };
     }
 
     WGPUVertexBufferLayout buffers[2] = {
@@ -251,9 +245,9 @@ static WGPURenderPipeline box_gpu_shadow_pipeline(
         },
         {
             .stepMode = WGPUVertexStepMode_Instance,
-            .arrayStride = sizeof(box_render_instance_t),
-            .attributeCount = 4,
-            .attributes = instance_attrs
+            .arrayStride = sizeof(uint32_t),
+            .attributeCount = 1,
+            .attributes = &slot_attr
         }
     };
     WGPUDepthStencilState depth = {
@@ -340,41 +334,23 @@ done:
     return;
 }
 
-/** Record the draws of the shadow casters of a view into the current cascade.
+/** Record the indirect draws of the shadow casters the cull pass kept in a cascade.
  *
  * @param gpu The backend
  * @param pass The shadow pass of the cascade
  * @param packet The packet
- * @param v The view
+ * @param cv The cull view of the cascade
  */
 static void box_gpu_shadow_draw(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
-    const box_render_view_t *v)
+    const box_gpu_cull_view_t *cv)
 {
-    int32_t i, count = ecs_vec_count(&packet->batches);
-    for (i = 0; i < count; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (b->view != -1 || b->scene != v->scene || b->pipeline != BOX_RENDER_SHADER_MESH ||
-            b->blend != Opaque || !b->shadow || !b->instance_count)
-        {
-            continue;
-        }
-
-        box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
-        box_gpu_buffer_t *inst = ecs_map_get_deref(
-            &gpu->buffers, box_gpu_buffer_t, b->instances);
-        if (!m || !inst) {
-            continue;
-        }
-
-        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, inst->buffer, 0, WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderSetIndexBuffer(
-            pass, m->indices, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
-        wgpuRenderPassEncoderDrawIndexed(
-            pass, m->index_count, b->instance_count, 0, 0, b->first_instance);
+    int32_t i;
+    for (i = 0; i < cv->draw_count; i ++) {
+        box_gpu_cull_draw(gpu, pass, packet, ecs_vec_get_t(
+            &gpu->cull.draws, box_gpu_cull_draw_t, cv->first_draw + i), 1);
     }
 }
 
@@ -406,6 +382,7 @@ void box_gpu_shadow_render(
         .entries = &entry
     });
     for (i = 0; i < v->shadows.cascades; i ++) {
+        const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, i);
         uint32_t offset = (uint32_t)((slot * BOX_RENDER_SHADOW_CASCADES + i) *
             BOX_GPU_CASCADE_STRIDE);
         WGPURenderPassDepthStencilAttachment depth = {
@@ -418,7 +395,10 @@ void box_gpu_shadow_render(
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetPipeline(pass, pipeline);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-        box_gpu_shadow_draw(gpu, pass, packet, v);
+        if (cv) {
+            box_gpu_shadow_draw(gpu, pass, packet, cv);
+        }
+
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
     }

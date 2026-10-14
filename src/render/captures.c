@@ -188,6 +188,8 @@ static void box_render_capture_send(
     glm_mat4_inv(view.camera_transform, view.view_matrix);
     view.clear = d->clear;
     view.target = handle;
+    view.cull.enabled = true;
+    view.cull.min_dimension = BOX_RENDER_CULL_MIN_DIMENSION;
     box_render_view_t *v = box_render_packet_view(p);
     *v = view;
 

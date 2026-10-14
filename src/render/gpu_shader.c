@@ -184,7 +184,7 @@ void box_gpu_shader_apply(
     s->revision ++;
     if (handle == BOX_RENDER_SHADER_BLIT) {
         box_gpu_blit_reset(gpu);
-    } else if (handle == BOX_RENDER_SHADER_MESH) {
+    } else if (handle == BOX_RENDER_SHADER_MESH || handle == BOX_RENDER_SHADER_SHAPE2D) {
         box_gpu_forward_reset(gpu);
     }
 

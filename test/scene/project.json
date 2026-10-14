@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../src/render"
+            "../../src/render",
+            "../../src/spatial"
         ]
     },
     "test": {
@@ -33,6 +34,37 @@
                     "deleted_target_hidden",
                     "from_script",
                     "drawn_at_projection"
+                ]
+            },
+            {
+                "id": "Spatial",
+                "testcases": [
+                    "insert",
+                    "insert_rotated_scaled",
+                    "insert_child",
+                    "move_static",
+                    "move_parent_moves_child",
+                    "move_dynamic",
+                    "static_to_dynamic",
+                    "remove_shape",
+                    "delete_entity",
+                    "delete_parent",
+                    "prefab_not_indexed",
+                    "reparent_across_scenes",
+                    "reparent_parent_storage_across_scenes",
+                    "scene_added_and_removed",
+                    "nested_scene",
+                    "scene_deleted",
+                    "scene_scoping",
+                    "ray_nearest",
+                    "ray_max_distance",
+                    "ray_from_inside",
+                    "ray_all_sorted",
+                    "ray_filter",
+                    "overlap_box_and_sphere",
+                    "random_vs_brute_force",
+                    "random_moves_vs_brute_force",
+                    "rebuild_keeps_results"
                 ]
             }
         ]

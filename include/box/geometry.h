@@ -161,16 +161,56 @@ ECS_STRUCT(Star, {
     float radius;   /**< Outer radius */
 });
 
-/** Filled rectangle in the XY plane */
+/** Filled rectangle in the XY plane, centered on the origin and facing +Z.
+ *
+ * The 2D shapes (Rect, Circle, Line) are quads shaded with an analytic signed distance, so
+ * their edges stay crisp at any scale, distance and angle; they share one instanced batch.
+ *
+ * They are unlit: the color is the Rgb times the albedo texture plus the emission. Overlapping
+ * 2D shapes at the same depth draw over each other in the order of their batch.
+ */
 ECS_STRUCT(Rect, {
     float width;  /**< Width */
     float height; /**< Height */
 });
 
-/** Filled disc in the XY plane. */
+/** Filled disc in the XY plane, centered on the origin and facing +Z */
 ECS_STRUCT(Circle, {
-    float radius;     /**< Radius */
-    int32_t segments; /**< Segments around the rim, 0 to derive them from the radius */
+    float radius; /**< Radius */
+});
+
+/** Line segment in the XY plane with square ends, in the local space of the entity */
+ECS_STRUCT(Line, {
+    float x1;    /**< X of the start */
+    float y1;    /**< Y of the start */
+    float x2;    /**< X of the end */
+    float y2;    /**< Y of the end */
+    float width; /**< Width across the segment, 0 for 1 */
+});
+
+/** Rounded corners and an inner border of the Rect or Circle of the entity.
+ *
+ * The border lies inside the edge of the shape and the fill (the Rgb of the entity) inside the
+ * border. The radius rounds the corners of a Rect and is clamped to half its smaller side.
+ */
+ECS_STRUCT(Border, {
+    float width;  /**< Width of the border, 0 for none */
+    float radius; /**< Corner radius of a Rect */
+    rgba color;   /**< Color of the border, default opaque black */
+});
+
+/** Area of a texture shown on the Rect or Circle of the entity.
+ *
+ * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image; a u1
+ * or v1 of zero is one, so a zeroed Image shows the whole texture. The texture is multiplied
+ * with the Rgb of the entity, which defaults to white for an Image.
+ */
+ECS_STRUCT(Image, {
+    ecs_entity_t texture; /**< Entity with a TexturePath */
+    float u0;             /**< Left edge of the area */
+    float v0;             /**< Top edge of the area */
+    float u1;             /**< Right edge of the area, 0 for 1 */
+    float v1;             /**< Bottom edge of the area, 0 for 1 */
 });
 
 /** Vertex of a shape mesh, laid out to be copied into a vertex buffer as is */
