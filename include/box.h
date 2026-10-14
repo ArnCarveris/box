@@ -31,6 +31,7 @@
 #include "box/projection.h"
 #include "box/spatial.h"
 #include "box/picking.h"
+#include "box/console.h"
 
 #ifdef __cplusplus
 extern "C" {

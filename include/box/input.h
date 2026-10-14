@@ -194,6 +194,100 @@ void box_input_platform_push(
     ecs_world_t *world,
     const InputEvent *event);
 
+/** Translate a glfw key code, a GLFW_KEY_* value, to a key.
+ *
+ * Codes name a position on a US layout, so W is the key left of E on every layout.
+ *
+ * @param key The glfw key code
+ * @return The key, KeyNone for a code without a key
+ */
+Key box_input_glfw_key(
+    int32_t key);
+
+/** Translate a glfw mouse button, a GLFW_MOUSE_BUTTON_* value, to a key.
+ *
+ * @param button The glfw button
+ * @return KeyMouseLeft, KeyMouseRight or KeyMouseMiddle, KeyNone for other buttons
+ */
+Key box_input_glfw_button(
+    int32_t button);
+
+/** Push the platform event of a glfw key callback.
+ *
+ * @param world The world
+ * @param key The glfw key code
+ * @param action GLFW_RELEASE (0), GLFW_PRESS (1) or GLFW_REPEAT (2)
+ */
+void box_input_glfw_on_key(
+    ecs_world_t *world,
+    int32_t key,
+    int32_t action);
+
+/** Push the platform event of a glfw mouse button callback.
+ *
+ * @param world The world
+ * @param button The glfw button
+ * @param action GLFW_RELEASE (0) or GLFW_PRESS (1)
+ */
+void box_input_glfw_on_button(
+    ecs_world_t *world,
+    int32_t button,
+    int32_t action);
+
+/** Translate the code of a browser keyboard event, such as KeyW or ArrowLeft, to a key.
+ *
+ * @param code The KeyboardEvent.code value
+ * @return The key, KeyNone for a code without a key
+ */
+Key box_input_dom_key(
+    const char *code);
+
+/** Translate the button of a browser mouse event to a key.
+ *
+ * @param button The MouseEvent.button value, 0 left, 1 middle, 2 right
+ * @return KeyMouseLeft, KeyMouseMiddle or KeyMouseRight, KeyNone for other buttons
+ */
+Key box_input_dom_button(
+    int32_t button);
+
+/** Push the platform events of a browser keydown or keyup: the key and the typed text.
+ *
+ * A keydown whose key value is one printable character types it, unless control or meta is
+ * held.
+ *
+ * @param world The world
+ * @param code The KeyboardEvent.code value
+ * @param key The KeyboardEvent.key value
+ * @param down Whether the event is a keydown
+ * @param repeat Whether the browser repeats a held key
+ * @param shortcut Whether control or meta is held
+ * @return Whether the page must not act on the event: a mapped key that is not a function key
+ * and not part of a shortcut
+ */
+bool box_input_dom_on_key(
+    ecs_world_t *world,
+    const char *code,
+    const char *key,
+    bool down,
+    bool repeat,
+    bool shortcut);
+
+/** Push the platform event of a browser wheel event in the units of glfw: one per wheel
+ * notch, positive y when the wheel turns away from the user.
+ *
+ * A notch is 100 pixels or 3 lines; a page counts as one notch.
+ *
+ * @param world The world
+ * @param dx WheelEvent.deltaX
+ * @param dy WheelEvent.deltaY
+ * @param mode WheelEvent.deltaMode, 0 pixels, 1 lines, 2 pages
+ */
+void box_input_dom_on_wheel(
+    ecs_world_t *world,
+    double dx,
+    double dy,
+    int32_t mode);
+
 /** Append an event to the synthetic queue.
  *
  * The queue applies in order, one event after the other; an event waits its delay in frames

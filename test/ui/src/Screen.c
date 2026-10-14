@@ -183,6 +183,52 @@ void Screen_resolution_scale_keeps_ui_size(void) {
     ecs_fini(world);
 }
 
+void Screen_pixel_ratio_scales_pixels(void) {
+    // scenes/projection_points
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 100});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {0, 0, 0});
+    ecs_set(world, rect, Rect, {20, 10});
+    ecs_set(world, rect, Rgb, {0, 255, 0});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "ratio.png",
+        .resolution_scale = 1, .pixel_ratio = 2});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    const SurfaceStatus *status = ecs_get(world, s, SurfaceStatus);
+    test_assert(status != NULL);
+    test_int(status->point_width, 64);
+    test_int(status->render_width, 128);
+    char *path = flecs_asprintf("%s/ratio.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, i, wide = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 128);
+    for (i = 0; i < 128; i ++) {
+        wide += px[(64 * 128 + i) * 4 + 1] > 128;
+    }
+
+    test_assert(wide >= 38);
+    test_assert(wide <= 44);
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
 void Screen_views_stack_in_view_order(void) {
     // ui/screen
     ecs_world_t *world = ecs_init();

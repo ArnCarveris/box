@@ -59,6 +59,7 @@ ECS_STRUCT(Surface, {
     int32_t width;                   /**< Requested width in points, default 1280 */
     int32_t height;                  /**< Requested height in points, default 720 */
     float resolution_scale;          /**< Divides the render pixels, 2 is half, default 1 */
+    float pixel_ratio;               /**< Offscreen pixels per point, default 1, 0 or less is 1 */
     bool vsync;                      /**< Present with vertical sync */
     Anisotropy anisotropy;           /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;  /**< Largest dimension a texture is scaled to */
@@ -75,6 +76,8 @@ ECS_STRUCT(Surface, {
 ECS_STRUCT(SurfaceStatus, {
     int32_t width;          /**< Width of the presented image in pixels */
     int32_t height;         /**< Height of the presented image in pixels */
+    int32_t point_width;    /**< Width in points, the size cameras and anchors count in */
+    int32_t point_height;   /**< Height in points */
     int32_t render_width;   /**< Width the views render at, after resolution_scale */
     int32_t render_height;  /**< Height the views render at */
     bool window;            /**< The surface presents to a window, not to an offscreen texture */

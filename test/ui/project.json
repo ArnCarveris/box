@@ -87,6 +87,7 @@
                     "hud_over_3d_scene",
                     "ortho_scale_counts_points",
                     "resolution_scale_keeps_ui_size",
+                    "pixel_ratio_scales_pixels",
                     "views_stack_in_view_order",
                     "unlit_ui_view_draws_base_color",
                     "ui_view_skips_culling",
@@ -125,6 +126,30 @@
                     "scroll",
                     "layout_bounds",
                     "unhandled_goes_to_screen"
+                ]
+            },
+            {
+                "id": "Console",
+                "testcases": [
+                    "toggle_opens",
+                    "toggle_closes",
+                    "escape_closes",
+                    "toggle_remapped",
+                    "typing_goes_to_input",
+                    "typing_fires_no_actions",
+                    "close_restores_actions",
+                    "enter_runs_line",
+                    "line_logged_in_session",
+                    "error_output",
+                    "history",
+                    "cursor_editing",
+                    "scroll",
+                    "view_stacked_last",
+                    "rebuilt_after_delete",
+                    "look_from_script",
+                    "run_from_script",
+                    "scrollback_limit",
+                    "renders_over_scene"
                 ]
             }
         ]

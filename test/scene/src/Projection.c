@@ -131,6 +131,46 @@ void Projection_surface_size(void) {
     ecs_fini(world);
 }
 
+void Projection_surface_points(void) {
+    // scenes/projection_points
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 400, .height = 200, .resolution_scale = 1,
+        .pixel_ratio = 2});
+    ecs_entity_t target = ecs_new(world);
+    ecs_set(world, target, Position, {150, -20, 0});
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, ProjectedAnchor, {.target = target, .view = view});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    const SurfaceStatus *status = ecs_get(world, surface, SurfaceStatus);
+    test_assert(status != NULL);
+    test_int(status->width, 800);
+    test_int(status->point_width, 400);
+    const Position *p = ecs_get(world, label, Position);
+    test_assert(fabsf(p->x - 150.0f) < 0.01f);
+    test_assert(fabsf(p->y + 20.0f) < 0.01f);
+    test_assert(!ecs_has(world, label, ProjectedHidden));
+
+    ecs_set(world, target, Position, {250, 0, 0});
+    ecs_progress(world, 0);
+    test_assert(ecs_has(world, label, ProjectedHidden));
+
+    box_render_sync(world);
+    ecs_fini(world);
+}
+
 void Projection_anchor_in_ui_scene(void) {
     // scenes/projection
     ecs_world_t *world = ecs_init();
