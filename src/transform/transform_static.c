@@ -7,7 +7,8 @@
 
 /** Entities whose static transform must be recomputed this frame */
 typedef struct {
-    ecs_vec_t value; /**< Vector of ecs_entity_t */
+    ecs_vec_t value;  /**< Vector of ecs_entity_t */
+    ecs_vec_t manual; /**< ManualTransform entities whose WorldTransform was set */
 } TransformStaticDirtyEntities;
 
 static void transformTree(
@@ -24,16 +25,19 @@ static void TransformStaticDirtyEntities_free(
     TransformStaticDirtyEntities *ptr)
 {
     ecs_vec_fini_t(NULL, &ptr->value, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->manual, ecs_entity_t);
 }
 
 ECS_CTOR(TransformStaticDirtyEntities, ptr, {
     ecs_vec_init_t(NULL, &ptr->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &ptr->manual, ecs_entity_t, 0);
 })
 
 ECS_MOVE(TransformStaticDirtyEntities, dst, src, {
     TransformStaticDirtyEntities_free(dst);
     *dst = *src;
     ecs_vec_init_t(NULL, &src->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &src->manual, ecs_entity_t, 0);
 })
 
 ECS_DTOR(TransformStaticDirtyEntities, ptr, {
@@ -83,6 +87,22 @@ static void TransformStatic_OnStatic(
 {
     transformStaticDirty(it,
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->other_table));
+}
+
+/** Add ManualTransform entities whose WorldTransform was set to the manual list.
+ *
+ * @param it The observer iterator
+ */
+static void TransformStatic_OnManual(
+    ecs_iter_t *it)
+{
+    TransformStaticDirtyEntities *dirty = box_transform_dynamic(it->world, it->table) ? NULL :
+        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities);
+    if (dirty) {
+        for (int i = 0; i < it->count; i ++) {
+            ecs_vec_append_t(NULL, &dirty->manual, ecs_entity_t)[0] = it->entities[i];
+        }
+    }
 }
 
 /** Remove the world transform of entities that lose their position.
@@ -256,7 +276,23 @@ static void transformRoot(
     }
 }
 
-/** Transform all entities in the dirty list and clear the list.
+/** Order entity ids for qsort.
+ *
+ * @param a The first entity
+ * @param b The second entity
+ * @return Negative, zero or positive as a is below, equal to or above b
+ */
+static int transformCompareEntity(
+    const void *a,
+    const void *b)
+{
+    ecs_entity_t ea = *(const ecs_entity_t*)a, eb = *(const ecs_entity_t*)b;
+
+    return (ea > eb) - (ea < eb);
+}
+
+/** Transform all entities in the dirty list, then the subtrees of the manual list once per
+ * entity, and clear both lists.
  *
  * @param it The system iterator
  */
@@ -275,7 +311,20 @@ static void TransformStatic(
         transformRoot(it->world, entities[i], version);
     }
 
+    count = ecs_vec_count(&dirty->manual);
+    entities = ecs_vec_first(&dirty->manual);
+    if (count > 1) {
+        qsort(entities, (size_t)count, sizeof(ecs_entity_t), transformCompareEntity);
+    }
+
+    for (i = 0; i < count; i ++) {
+        if (!i || entities[i] != entities[i - 1]) {
+            transformRoot(it->world, entities[i], version);
+        }
+    }
+
     ecs_vec_clear(&dirty->value);
+    ecs_vec_clear(&dirty->manual);
 }
 
 void TransformStaticImport(
@@ -328,7 +377,7 @@ void TransformStaticImport(
             { .id = ManualTransform, .inout = EcsInOutFilter }
         },
         .events = { EcsOnSet },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnManual
     });
 
     ecs_observer(world, {

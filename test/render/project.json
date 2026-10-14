@@ -164,7 +164,8 @@
                     "no_alloc_steady_state",
                     "gpu_changes_rendered",
                     "box_created_in_on_store",
-                    "box_moved_in_on_store"
+                    "box_moved_in_on_store",
+                    "manual_parent_move_updates_children"
                 ]
             },
             {

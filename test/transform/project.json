@@ -718,7 +718,9 @@
                     "static_parent_manual_child_static_grandchild_composes",
                     "manual_childof_static_child_follows_manual_change",
                     "manual_parent_static_child_follows_manual_change",
-                    "manual_childof_static_child_follows_modified"
+                    "manual_childof_static_child_follows_modified",
+                    "manual_childof_static_child_follows_last_of_two_writes",
+                    "manual_childof_static_child_follows_write_every_frame"
                 ]
             },
             {

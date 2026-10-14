@@ -67,7 +67,11 @@ extern ECS_TAG_DECLARE(DynamicTransform);
 /** Prefab with DynamicTransform that the descendants of dynamic entities inherit it from */
 extern ECS_DECLARE(DynamicTransformSpread);
 
-/** The engine does not write WorldTransform, the application does */
+/** The engine does not write WorldTransform, the application does.
+ *
+ * Static descendants follow when the application writes it with ecs_set, or through a pointer
+ * followed by ecs_modified; a write without an event leaves them at the old transform.
+ */
 extern ECS_TAG_DECLARE(ManualTransform);
 
 /** Test whether the entities of a table are dynamic.

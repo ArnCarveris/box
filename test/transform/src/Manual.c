@@ -1496,3 +1496,48 @@ void Manual_manual_childof_static_child_follows_modified(void) {
 
     ecs_fini(world);
 }
+
+void Manual_manual_childof_static_child_follows_last_of_two_writes(void) {
+    // core_fixes/manual_static_children
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t manual = ecs_new(world);
+    ecs_add(world, manual, ManualTransform);
+    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {10.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, manual);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 11.0f);
+
+    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {20.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {30.0f, 0.0f, 0.0f, 1.0f}}});
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 31.0f);
+
+    ecs_fini(world);
+}
+
+void Manual_manual_childof_static_child_follows_write_every_frame(void) {
+    // core_fixes/manual_static_children
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxTransform);
+
+    ecs_entity_t manual = ecs_new(world);
+    ecs_add(world, manual, ManualTransform);
+    ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, manual);
+    ecs_set(world, child, Position, {1.0f, 0.0f, 0.0f});
+
+    for (int i = 1; i <= 3; i ++) {
+        ecs_set(world, manual, WorldTransform, {{{1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {10.0f * (float)i, 0.0f, 0.0f, 1.0f}}});
+        ecs_progress(world, 0);
+        test_flt(ecs_get(world, child, WorldTransform)->m[3][0], 10.0f * (float)i + 1.0f);
+    }
+
+    ecs_fini(world);
+}

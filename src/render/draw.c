@@ -207,16 +207,26 @@ static void BoxDrawsOnDynamicKind(
     }
 }
 
-/** Remember the static entities whose WorldTransform was set.
+/** Remember the static entities whose WorldTransform was set, and the ManualTransform ones as
+ * roots of changed subtrees, since their static descendants follow them.
  *
  * @param it The iterator of the observer
  */
 static void BoxDrawsOnStaticWorld(
     ecs_iter_t *it)
 {
-    if (!box_transform_dynamic(it->world, it->table)) {
+    if (box_transform_dynamic(it->world, it->table)) {
+        goto done;
+    }
+
+    if (ecs_table_has_id(it->world, it->table, ManualTransform)) {
+        BoxDrawsOnMove(it);
+    } else {
         BoxDrawsOnChange(it);
     }
+
+done:
+    return;
 }
 
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D

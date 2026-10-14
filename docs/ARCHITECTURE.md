@@ -141,7 +141,9 @@ target in the same frame. `RenderExtract` and `RenderSubmit` are phases that dep
 `WorldTransform` is parent * T * R * S. Static entities are updated by observers and the
 `TransformStatic` system on change; entities with `DynamicTransform` (inherited by every
 descendant) are recomputed every frame. `ManualTransform` means the application writes
-`WorldTransform`. Hierarchies use `ChildOf` or the `Parent` component.
+`WorldTransform`; its static descendants follow when it is written with `ecs_set` or followed
+by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `ChildOf` or the
+`Parent` component.
 
 ## Surfaces and the GPU device
 
