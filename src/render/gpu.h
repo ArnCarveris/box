@@ -108,7 +108,8 @@ typedef struct box_gpu_t {
     ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
-    ecs_os_mutex_t lock;            /**< Protects the counters */
+    ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */
+    ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
 } box_gpu_t;
 
@@ -131,6 +132,21 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_PASS,              /**< A view pass was rendered */
     BOX_GPU_STAT_DRAW               /**< A draw call was recorded */
 } box_gpu_stat_t;
+
+/** Queue the outcome of a shader compilation for the main thread.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the shader
+ * @param revision Revision of the compiled code
+ * @param message Error text, NULL when the module compiled
+ * @param label Label of the shader, used to prefix the message
+ */
+void box_gpu_shader_report(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    int32_t revision,
+    const char *message,
+    const char *label);
 
 /** Count an event of the backend.
  *

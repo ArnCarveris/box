@@ -13,6 +13,7 @@
 /** Outcome of the error scope around the creation of a module */
 typedef struct box_gpu_compile_t {
     const char *label;  /**< Label of the shader */
+    char *message;      /**< Text of the error the scope caught */
     bool failed;        /**< The scope caught an error */
 } box_gpu_compile_t;
 
@@ -45,6 +46,7 @@ static void box_gpu_shader_on_scope(
     }
 
     compile->failed = true;
+    compile->message = flecs_asprintf("%.*s", len, message.data ? message.data : "");
     ecs_err("shader '%s' failed to compile: %.*s", compile->label, len,
         message.data ? message.data : "");
 done:
@@ -56,12 +58,16 @@ done:
  * @param gpu The backend
  * @param code The code
  * @param label The label of the module
+ * @param handle Handle of the shader
+ * @param revision Revision of the code
  * @return The module, NULL when it failed to compile
  */
 static WGPUShaderModule box_gpu_shader_compile(
     box_gpu_t *gpu,
     const char *code,
-    const char *label)
+    const char *label,
+    uint32_t handle,
+    int32_t revision)
 {
     box_gpu_compile_t compile = { .label = label };
     WGPUShaderSourceWGSL wgsl = {
@@ -86,11 +92,42 @@ static WGPUShaderModule box_gpu_shader_compile(
 
         result = NULL;
         box_gpu_count(gpu, BOX_GPU_STAT_SHADER_ERROR);
+        box_gpu_shader_report(gpu, handle, revision,
+            compile.message ? compile.message : "shader module creation failed", label);
     } else {
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
+        box_gpu_shader_report(gpu, handle, revision, NULL, label);
     }
 
+    ecs_os_free(compile.message);
+
     return result;
+}
+
+void box_gpu_shader_report(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    int32_t revision,
+    const char *message,
+    const char *label)
+{
+    box_render_shader_result_t result = { .handle = handle, .revision = revision };
+    if (message) {
+        const char *at = strstr(message, "wgsl:");
+        const char *text = strstr(message, "error: ");
+        int32_t len;
+        text = text ? text + 7 : message;
+        len = (int32_t)strcspn(text, "\n");
+        if (at) {
+            result.message = flecs_asprintf("%s:%d: %.*s", label, atoi(at + 5), len, text);
+        } else {
+            result.message = flecs_asprintf("%s: %.*s", label, len, text);
+        }
+    }
+
+    ecs_os_mutex_lock(gpu->lock);
+    *ecs_vec_append_t(NULL, &gpu->results, box_render_shader_result_t) = result;
+    ecs_os_mutex_unlock(gpu->lock);
 }
 
 /** Release a shader and its handle.
@@ -128,7 +165,8 @@ void box_gpu_shader_apply(
     }
 
     const char *code = (const char*)(desc + 1);
-    WGPUShaderModule module = box_gpu_shader_compile(gpu, code, code + desc->code_size);
+    WGPUShaderModule module = box_gpu_shader_compile(gpu, code, code + desc->code_size,
+        handle, desc->revision);
     if (!module) {
         goto done;
     }

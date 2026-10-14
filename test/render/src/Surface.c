@@ -185,3 +185,38 @@ void Surface_no_surface_no_target(void) {
     ecs_fini(world);
     box_render_null_free(null);
 }
+
+void Surface_view_root_renders_views_under_it(void) {
+    // renderer/shader_errors
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t root = ecs_new(world);
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, a, View, {.camera = camera});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, root);
+    ecs_set(world, b, View, {.camera = camera});
+    ecs_entity_t other = ecs_new(world);
+    ecs_set(world, other, View, {.camera = camera});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 8, .height = 8, .view_root = root});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    box_render_gpu_stats_t stats;
+    test_assert(box_render_gpu_stats(world, &stats));
+    test_int(stats.passes, 2);
+
+    ecs_set(world, e, Surface, {.width = 8, .height = 8});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    box_render_gpu_stats(world, &stats);
+    test_int(stats.passes, 5);
+
+    ecs_fini(world);
+}

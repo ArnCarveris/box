@@ -1243,3 +1243,51 @@ void Shader_gpu_recompiles_on_change(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Shader_gpu_error_in_status(void) {
+    // renderer/shader_errors
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *path = flecs_asprintf("%s/invalid.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    FILE *f = fopen(path, "w");
+    fputs("#define X 1\nconst A = 1.0;\nfn f() -> f32 { return undefined_name; }\n", f);
+    fclose(f);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Shader, {.path = path});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_log_set_level(-1);
+    ecs_progress(world, 0);
+
+    const ShaderStatus *st = ecs_get(world, s, ShaderStatus);
+    test_assert(st != NULL);
+    test_bool(st->ok, false);
+    test_assert(st->error != NULL);
+    test_assert(strstr(st->error, "invalid.wgsl:2: ") != NULL);
+    test_assert(strstr(st->error, "undefined_name") != NULL);
+    test_int(st->revision, 1);
+
+    f = fopen(path, "w");
+    fputs("const A = 2.0;\n", f);
+    fclose(f);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_progress(world, 0);
+
+    st = ecs_get(world, s, ShaderStatus);
+    test_bool(st->ok, true);
+    test_assert(st->error == NULL);
+    test_int(st->revision, 2);
+
+    ecs_os_free(path);
+    ecs_fini(world);
+}

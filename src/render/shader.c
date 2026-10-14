@@ -21,6 +21,8 @@ typedef struct box_shader_t {
     bool pending;           /**< The code changed since the backend received it */
     int32_t revision;       /**< Times preprocessing produced new code */
     char *code;             /**< Last code that preprocessed without error */
+    char *gpu_error;        /**< Error the GPU reported for the revision, NULL when it compiled */
+    bool prep_failed;       /**< The last preprocessing failed */
     char *label;            /**< Path the code was read from, the label of the module */
     ecs_vec_t files;        /**< box_shader_file_t the last preprocessing read */
 } box_shader_t;
@@ -216,6 +218,7 @@ static void box_shader_free(
     box_shader_files_fini(&s->files);
     ecs_os_free(s->code);
     ecs_os_free(s->label);
+    ecs_os_free(s->gpu_error);
     ecs_os_free(s);
 }
 
@@ -300,17 +303,22 @@ static void box_shader_compile(
         out.code = NULL;
         s->pending = true;
         s->revision ++;
+        ecs_os_free(s->gpu_error);
+        s->gpu_error = NULL;
     }
 
     if (out.error) {
         ecs_err("%s", out.error);
     }
 
+    s->prep_failed = out.error != NULL;
+    char *error = out.error ? out.error : s->gpu_error;
     ecs_set(world, s->entity, ShaderStatus, {
         .revision = s->revision,
-        .ok = out.error == NULL,
-        .error = out.error
+        .ok = error == NULL,
+        .error = error
     });
+
     box_shader_output_fini(&out);
 done:
     return;
@@ -335,6 +343,7 @@ static void box_shader_send(
         char *code = (char*)(desc + 1);
         desc->code_size = code_size;
         desc->label_size = label_size;
+        desc->revision = s->revision;
         ecs_os_memcpy(code, s->code, code_size);
         ecs_os_memcpy(code + code_size, s->label, label_size);
     }
@@ -426,6 +435,42 @@ static bool box_shader_used(
     return result;
 }
 
+/** Apply the compile results the GPU backend produced to the shaders and their status.
+ *
+ * @param world The world or a stage
+ * @param state The module state
+ */
+static void box_shader_results(
+    ecs_world_t *world,
+    box_shader_state_t *state)
+{
+    box_render_shader_result_t r;
+    while (box_render_gpu_shader_result(world, &r)) {
+        ecs_map_iter_t it = ecs_map_iter(&state->shaders);
+        while (ecs_map_next(&it)) {
+            box_shader_t *s = ecs_map_ptr(&it);
+            if (s->handle != r.handle || s->revision != r.revision) {
+                continue;
+            }
+
+            ecs_os_free(s->gpu_error);
+            s->gpu_error = r.message;
+            r.message = NULL;
+            if (!s->prep_failed && ecs_has(world, s->entity, ShaderStatus)) {
+                ecs_set(world, s->entity, ShaderStatus, {
+                    .revision = s->revision,
+                    .ok = s->gpu_error == NULL,
+                    .error = s->gpu_error
+                });
+            }
+
+            break;
+        }
+
+        ecs_os_free(r.message);
+    }
+}
+
 /** Preprocess changed shaders and send new code and removed shaders to the renderer.
  *
  * @param it The iterator of the system
@@ -440,6 +485,7 @@ static void BoxShaderExtract(
     int32_t i;
     box_shader_backend(state, box_render_get_backend(world));
     box_shader_poll(world, state);
+    box_shader_results(world, state);
     for (i = 0; i < ecs_vec_count(&state->destroyed); i ++) {
         box_render_packet_resource(box_render_packet(world), BOX_RENDER_SHADER,
             BOX_RENDER_DESTROY, *ecs_vec_get_t(&state->destroyed, uint32_t, i), 0);

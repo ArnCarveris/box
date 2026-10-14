@@ -23,7 +23,8 @@
                     "status_written",
                     "two_surfaces_two_targets",
                     "target_every_frame",
-                    "no_surface_no_target"
+                    "no_surface_no_target",
+                    "view_root_renders_views_under_it"
                 ]
             },
             {
@@ -117,7 +118,8 @@
                     "gpu_compiles_engine_shader",
                     "gpu_compiles_component",
                     "gpu_invalid_code",
-                    "gpu_recompiles_on_change"
+                    "gpu_recompiles_on_change",
+                    "gpu_error_in_status"
                 ]
             },
             {

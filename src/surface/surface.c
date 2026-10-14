@@ -394,6 +394,7 @@ static void box_surface_frame(
     box_render_target_t *target = box_render_packet_target(
         p, impl->handle, box_surface_capture(world, s, impl));
     ecs_os_memcpy_n(target->clear, clear, float, 4);
+    target->view_root = s->view_root;
 done:
     return;
 }

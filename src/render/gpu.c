@@ -351,6 +351,12 @@ static void box_gpu_free(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&gpu->results); i ++) {
+        ecs_os_free(ecs_vec_get_t(&gpu->results, box_render_shader_result_t, i)->message);
+    }
+
+    ecs_vec_fini_t(NULL, &gpu->results, box_render_shader_result_t);
     ecs_os_mutex_free(gpu->lock);
     ecs_os_free(gpu);
 }
@@ -420,6 +426,7 @@ box_render_backend_t box_render_gpu_backend(void)
 {
     box_gpu_t *gpu = ecs_os_calloc_t(box_gpu_t);
     gpu->lock = ecs_os_mutex_new();
+    ecs_vec_init_t(NULL, &gpu->results, box_render_shader_result_t, 0);
     box_render_backend_t result = {
         .ctx = gpu,
         .init = box_gpu_init,
@@ -448,6 +455,27 @@ bool box_render_gpu_stats(
     return result;
 }
 
+bool box_render_gpu_shader_result(
+    ecs_world_t *world,
+    box_render_shader_result_t *result)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool found = false;
+    if (backend->render == box_gpu_render) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        if (ecs_vec_count(&gpu->results)) {
+            *result = *ecs_vec_first_t(&gpu->results, box_render_shader_result_t);
+            ecs_vec_remove_ordered_t(&gpu->results, box_render_shader_result_t, 0);
+            found = true;
+        }
+
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return found;
+}
+
 #else
 
 box_render_backend_t box_render_gpu_backend(void)
@@ -464,6 +492,16 @@ bool box_render_gpu_stats(
 {
     (void)world;
     ecs_os_memset_t(stats, 0, box_render_gpu_stats_t);
+
+    return false;
+}
+
+bool box_render_gpu_shader_result(
+    ecs_world_t *world,
+    box_render_shader_result_t *result)
+{
+    (void)world;
+    (void)result;
 
     return false;
 }

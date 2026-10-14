@@ -127,7 +127,15 @@ typedef struct box_render_instance_t {
 typedef struct box_render_shader_desc_t {
     uint32_t code_size;     /**< Bytes of the code after the description */
     uint32_t label_size;    /**< Bytes of the label after the code */
+    int32_t revision;       /**< Revision of the code, reported back with the compile result */
 } box_render_shader_desc_t;
+
+/** Outcome of the compilation of a shader module, produced on the render thread */
+typedef struct box_render_shader_result_t {
+    uint32_t handle;        /**< Handle of the shader */
+    int32_t revision;       /**< Revision of the code that was compiled */
+    char *message;          /**< Error text, NULL when the module compiled, freed by the caller */
+} box_render_shader_result_t;
 
 /** A target the frame renders into and presents, optionally captured to a PNG file */
 typedef struct box_render_target_t {
@@ -265,6 +273,16 @@ box_render_backend_t box_render_gpu_backend(void);
 bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
+
+/** Take the oldest shader compile result the GPU backend of a world has not handed out yet.
+ *
+ * @param world The world
+ * @param result Receives the result, its message is released with ecs_os_free
+ * @return Whether there was a result
+ */
+bool box_render_gpu_shader_result(
+    ecs_world_t *world,
+    box_render_shader_result_t *result);
 
 /** Get the backend of a world.
  *
