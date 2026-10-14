@@ -80,6 +80,34 @@
                     "many_glyphs",
                     "dynamic_transform"
                 ]
+            },
+            {
+                "id": "Screen",
+                "testcases": [
+                    "hud_over_3d_scene",
+                    "ortho_scale_counts_points",
+                    "resolution_scale_keeps_ui_size",
+                    "views_stack_in_view_order",
+                    "unlit_ui_view_draws_base_color",
+                    "ui_view_skips_culling",
+                    "effects_of_3d_view_skip_ui",
+                    "children_draw_over_parents",
+                    "parent_storage_children_draw_over_parents",
+                    "siblings_follow_child_order",
+                    "order_stable_after_removal",
+                    "text_draws_over_background",
+                    "translucent_parent_under_children",
+                    "explicit_z_orders_siblings",
+                    "layout_children_draw_over_background",
+                    "world_space_scale",
+                    "world_space_rotated_children",
+                    "texture_surface_sampled_by_image",
+                    "texture_surface_sampled_by_material",
+                    "texture_surface_removed",
+                    "texture_surface_not_sampled_by_itself",
+                    "view_root_views_skipped_by_other_surfaces",
+                    "script"
+                ]
             }
         ]
     }

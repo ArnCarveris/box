@@ -1,0 +1,396 @@
+// UI example: a UI is content (layout, 2D shapes, text) in a scene, seen through a camera and
+// rendered by a view. Shows a screen space HUD and a menu stacked over the 3D view, a nameplate
+// placed by projecting a 3D entity, a world space panel and a curved render-to-texture screen.
+// Fly with WASD (QE for down/up), hold the right mouse button to look around.
+
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.surface
+using box.controllers
+using box.layout
+using box.text
+using box.projection
+
+window {
+  Surface: {width: 1280, height: 720, vsync: true}
+}
+
+// The 3D scene: the default scene, drawn first by the view that clears
+
+camera {
+  Position: {0, 2.2, 7}
+  Rotation: {-0.2, 0, 0}
+  Camera: {fov: 60}
+  CameraController: {}
+}
+
+world_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {-0.9, 2.6, 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 244, 225}
+}
+
+$ {
+  AmbientLight: {sky: {90, 110, 140}, ground: {40, 36, 30}, intensity: 0.6}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {30, 0.1, 30}
+  Rgb: {140, 150, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+hero {
+  Position: {-1.2, 0.9, 1}
+  Capsule: {segments: 24, smooth: true, length: 0.8, radius: 0.45}
+  Rgb: {220, 90, 60}
+}
+
+crate {
+  Position: {1.6, 0.5, 1.4}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {200, 150, 80}
+}
+
+// World space UI: layout content in the 3D scene, logical pixels scaled to world units
+
+template Row {
+  prop label: string = "Item"
+  prop value: string = "0"
+
+  Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
+  LayoutItem: {width: {mode: Grow}}
+  Rect: {1, 1}
+  Rgb: {52, 58, 76}
+  Border: {radius: 6}
+
+  name {
+    Text: {value: label, size: 16}
+    Rgb: {225, 230, 240}
+  }
+
+  gap {
+    LayoutItem: {width: {mode: Grow}}
+  }
+
+  amount {
+    Text: {value: value, size: 16}
+    Rgb: {255, 220, 90}
+  }
+}
+
+board {
+  Position: {-2.8, 1.8, 0.6}
+  Rotation: {0, 0.5, 0}
+  Scale: {0.008, 0.008, 0.008}
+  Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
+  LayoutItem: {width: {mode: Fixed, value: 300}}
+  Rect: {1, 1}
+  Rgb: {30, 34, 46}
+  Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
+
+  title {
+    Text: {value: "Quest Board", size: 28}
+    Rgb: {255, 255, 255}
+  }
+
+  wolves {
+    Row: {label: "Wolves", value: "3 / 5"}
+  }
+
+  herbs {
+    Row: {label: "Herbs", value: "8 / 8"}
+  }
+}
+
+// Render-to-texture UI: a surface with a texture renders the view of a UI scene and the
+// slices of a curved screen sample that texture
+
+screen_texture {}
+
+screen_ui {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  dashboard {
+    Layout: {direction: Column, spacing: 10, padding: {16, 16, 20, 20}}
+    LayoutItem: {width: {mode: Fixed, value: 512}, height: {mode: Fixed, value: 160}}
+    Rect: {1, 1}
+    Rgb: {14, 22, 40}
+    Border: {width: 3, color: {60, 200, 230, 255}}
+
+    title {
+      Text: {value: "REACTOR", size: 36}
+      Rgb: {120, 230, 250}
+    }
+
+    status {
+      Text: {value: "Output 82%   Coolant low", size: 22}
+      Rgb: {250, 210, 90}
+    }
+  }
+}
+
+screen_views {
+  view {
+    View: {
+      camera: screen_ui.camera,
+      clear: {enabled: true, color: {0, 0, 0, 255}},
+      lighting: {enabled: false},
+      culling: {enabled: false}
+    }
+  }
+}
+
+screen_surface {
+  Surface: {width: 512, height: 160, texture: screen_texture, view_root: screen_views}
+}
+
+template Slice {
+  prop offset: f32 = 0
+
+  Quad: {0.305, 0.94}
+  Rgb: {0, 0, 0}
+  PbrMaterial: {metallic: 0, roughness: 1}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {albedo: screen_texture, emissive: screen_texture}
+  TextureTransform: {scale_x: 0.0625, scale_y: 1, offset_x: offset, offset_y: 0}
+  TextureWrap: WrapClamp
+}
+
+screen {
+  Position: {2.6, 2.1, 1.8}
+
+  slice_0 {
+    Position: {-2.0449, 0, -2.1951}
+    Rotation: {0, 0.75, 0}
+    Slice: {offset: 0}
+  }
+
+  slice_1 {
+    Position: {-1.8156, 0, -2.3883}
+    Rotation: {0, 0.65, 0}
+    Slice: {offset: 0.0625}
+  }
+
+  slice_2 {
+    Position: {-1.5681, 0, -2.5576}
+    Rotation: {0, 0.55, 0}
+    Slice: {offset: 0.125}
+  }
+
+  slice_3 {
+    Position: {-1.3049, 0, -2.7013}
+    Rotation: {0, 0.45, 0}
+    Slice: {offset: 0.1875}
+  }
+
+  slice_4 {
+    Position: {-1.0287, 0, -2.8181}
+    Rotation: {0, 0.35, 0}
+    Slice: {offset: 0.25}
+  }
+
+  slice_5 {
+    Position: {-0.7419, 0, -2.9068}
+    Rotation: {0, 0.25, 0}
+    Slice: {offset: 0.3125}
+  }
+
+  slice_6 {
+    Position: {-0.4477, 0, -2.9664}
+    Rotation: {0, 0.15, 0}
+    Slice: {offset: 0.375}
+  }
+
+  slice_7 {
+    Position: {-0.1499, 0, -2.9963}
+    Rotation: {0, 0.05, 0}
+    Slice: {offset: 0.4375}
+  }
+
+  slice_8 {
+    Position: {0.1499, 0, -2.9963}
+    Rotation: {0, -0.05, 0}
+    Slice: {offset: 0.5}
+  }
+
+  slice_9 {
+    Position: {0.4477, 0, -2.9664}
+    Rotation: {0, -0.15, 0}
+    Slice: {offset: 0.5625}
+  }
+
+  slice_10 {
+    Position: {0.7419, 0, -2.9068}
+    Rotation: {0, -0.25, 0}
+    Slice: {offset: 0.625}
+  }
+
+  slice_11 {
+    Position: {1.0287, 0, -2.8181}
+    Rotation: {0, -0.35, 0}
+    Slice: {offset: 0.6875}
+  }
+
+  slice_12 {
+    Position: {1.3049, 0, -2.7013}
+    Rotation: {0, -0.45, 0}
+    Slice: {offset: 0.75}
+  }
+
+  slice_13 {
+    Position: {1.5681, 0, -2.5576}
+    Rotation: {0, -0.55, 0}
+    Slice: {offset: 0.8125}
+  }
+
+  slice_14 {
+    Position: {1.8156, 0, -2.3883}
+    Rotation: {0, -0.65, 0}
+    Slice: {offset: 0.875}
+  }
+
+  slice_15 {
+    Position: {2.0449, 0, -2.1951}
+    Rotation: {0, -0.75, 0}
+    Slice: {offset: 0.9375}
+  }
+}
+
+// Screen space UI: a scene with an orthographic camera at ortho_scale 1, so one logical
+// pixel is one point, drawn by a view after the 3D view without clear, lighting or culling
+
+hud {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  status {
+    Position: {-500, 300, 0}
+    Layout: {direction: Column, spacing: 6, padding: {8, 8, 10, 10}}
+    Rect: {1, 1}
+    Rgb: {16, 20, 28}
+    Opacity: {0.85}
+    Border: {width: 1, radius: 8, color: {90, 110, 150, 255}}
+
+    title {
+      Text: {value: "Explorer", size: 18}
+      Rgb: {255, 255, 255}
+    }
+
+    track {
+      Layout: {padding: {2, 2, 2, 2}}
+      LayoutItem: {width: {mode: Fixed, value: 180}, height: {mode: Fixed, value: 14}}
+      Rect: {1, 1}
+      Rgb: {40, 44, 56}
+      Border: {radius: 4}
+
+      fill {
+        LayoutItem: {h: Left, width: {mode: Fixed, value: 130}, height: {mode: Grow}}
+        Rect: {1, 1}
+        Rgb: {90, 210, 110}
+        Border: {radius: 3}
+      }
+    }
+  }
+
+  // A nameplate that follows the hero: its position is projected through the 3D view
+  hero_plate {
+    ProjectedAnchor: {target: hero, view: world_view, offset: {0, 1.2, 0}}
+    Layout: {direction: Column, spacing: 3, padding: {4, 4, 6, 6}, h: Center}
+    Rect: {1, 1}
+    Rgb: {16, 20, 28}
+    Border: {radius: 5}
+
+    name {
+      Text: {value: "Hero", size: 14}
+      Rgb: {255, 255, 255}
+    }
+
+    life {
+      Rect: {64, 5}
+      Rgb: {90, 210, 110}
+    }
+  }
+}
+
+hud_view {
+  View: {camera: hud.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}
+
+// A menu is another UI scene, stacked over the HUD because its view comes later
+
+menu {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  panel {
+    Position: {470, 280, 0}
+    Layout: {direction: Column, spacing: 8, padding: {12, 12, 14, 14}, h: Center}
+    LayoutItem: {width: {mode: Fixed, value: 200}}
+    Rect: {1, 1}
+    Rgb: {34, 38, 50}
+    Border: {width: 2, radius: 12, color: {120, 140, 200, 255}}
+
+    title {
+      Text: {value: "Menu", size: 20}
+      Rgb: {255, 255, 255}
+    }
+
+    resume {
+      Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
+      LayoutItem: {width: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {70, 150, 90}
+      Border: {radius: 6}
+
+      text {
+        Text: {value: "Resume", size: 16}
+        Rgb: {255, 255, 255}
+      }
+    }
+
+    quit {
+      Layout: {direction: Row, padding: {6, 6, 10, 10}, h: Center}
+      LayoutItem: {width: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {170, 70, 60}
+      Border: {radius: 6}
+
+      text {
+        Text: {value: "Quit", size: 16}
+        Rgb: {255, 255, 255}
+      }
+    }
+  }
+}
+
+menu_view {
+  View: {camera: menu.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}
