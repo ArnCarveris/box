@@ -1,0 +1,48 @@
+{
+    "id": "perf",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Orbit",
+                "testcases": [
+                    "fits_bounds",
+                    "looks_at_center",
+                    "moves_every_frame",
+                    "first_camera_when_unset",
+                    "elevation",
+                    "no_shapes"
+                ]
+            },
+            {
+                "id": "Frames",
+                "testcases": [
+                    "trivial_passes",
+                    "early_frames_sleep",
+                    "slow_frames_fail",
+                    "warmup_not_measured",
+                    "invalid_fps",
+                    "sets_app_fps",
+                    "restart_on_set",
+                    "quit_when_done",
+                    "budget_sleep_reported"
+                ]
+            },
+            {
+                "id": "Report",
+                "testcases": [
+                    "writes_json",
+                    "failed_run",
+                    "status_reflected",
+                    "script_run"
+                ]
+            }
+        ]
+    }
+}
