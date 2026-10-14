@@ -3,8 +3,8 @@
  * @brief Registers box.spatial and keeps the index of every scene up to date.
  *
  * Observers collect changed shapes and the roots of changed subtrees, so an update only
- * places what changed. The shapes with DynamicTransform are placed by the first query after
- * a frame, so a frame without queries does no work for them.
+ * computes the bounds of what changed. Moved static leaves and DynamicTransform shapes are
+ * placed by the first query after a frame, so a frame without queries does not move leaves.
  */
 
 #include "index.h"
@@ -162,6 +162,74 @@ static void BoxSpatialOnMove(
         for (i = 0; i < it->count; i ++) {
             *ecs_vec_append_t(NULL, &index->moved, ecs_entity_t) = it->entities[i];
         }
+    }
+}
+
+/** Test whether a table has a component a static transform is computed from.
+ *
+ * @param world The world
+ * @param table The table
+ * @return true when it has Position, Rotation or Scale
+ */
+static bool box_spatial_has_local(
+    const ecs_world_t *world,
+    const ecs_table_t *table)
+{
+    return ecs_table_has_id(world, table, ecs_id(Position)) ||
+        ecs_table_has_id(world, table, ecs_id(Rotation)) ||
+        ecs_table_has_id(world, table, ecs_id(Scale));
+}
+
+/** Remember the entities whose Position, Rotation or Scale changed as roots of changed
+ * subtrees, unless they have DynamicTransform or ManualTransform.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnLocal(
+    ecs_iter_t *it)
+{
+    if (!ecs_table_has_id(it->world, it->table, DynamicTransform) &&
+        !ecs_table_has_id(it->world, it->table, ManualTransform))
+    {
+        BoxSpatialOnMove(it);
+    }
+}
+
+/** Remember the entities whose WorldTransform was set as roots of changed subtrees, unless
+ * they have DynamicTransform.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnWorld(
+    ecs_iter_t *it)
+{
+    if (!ecs_table_has_id(it->world, it->table, DynamicTransform)) {
+        BoxSpatialOnMove(it);
+    }
+}
+
+/** Remember the entities that gain or lose DynamicTransform or ManualTransform as roots of
+ * changed subtrees when their transform components make them start or stop counting as
+ * moved static entities.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnKind(
+    ecs_iter_t *it)
+{
+    const ecs_table_t *other = it->other_table;
+    bool result = false;
+    if (other && it->event_id == DynamicTransform) {
+        result = ecs_table_has_id(it->world, other, ecs_id(WorldTransform)) ||
+            (box_spatial_has_local(it->world, other) &&
+            !ecs_table_has_id(it->world, other, ManualTransform));
+    } else if (other) {
+        result = box_spatial_has_local(it->world, other) &&
+            !ecs_table_has_id(it->world, other, DynamicTransform);
+    }
+
+    if (result) {
+        BoxSpatialOnMove(it);
     }
 }
 
@@ -395,7 +463,7 @@ static void box_spatial_dynamic(
     }
 }
 
-/** Place the dynamic entities when they may have moved since they were last placed.
+/** Move the static leaves of the last update and place the dynamic entities, once per update.
  *
  * @param world The world
  * @param index The index
@@ -406,6 +474,7 @@ static void box_spatial_sync(
 {
     if (index->stale) {
         index->stale = false;
+        box_spatial_move(index);
         box_spatial_dynamic(world, index, box_mesh_cache_of(world));
     }
 }
@@ -421,7 +490,8 @@ box_spatial_t* box_spatial_of(
     return index;
 }
 
-/** Place the changed entities, commit the static trees and mark the dynamic entities stale.
+/** Compute the bounds of the changed entities, commit the new static ones and mark the
+ * leaves stale.
  *
  * @param world The world
  * @param index The index
@@ -534,6 +604,9 @@ static void box_spatial_observer(
 
 /** Register the observers of the components a static transform is computed from.
  *
+ * The filters on DynamicTransform and ManualTransform run in the callbacks, which costs less
+ * per event than observers with Not terms and fires for the same changes.
+ *
  * @param world The world
  * @param index The index
  */
@@ -546,20 +619,19 @@ static void box_spatial_transform_observers(
     int32_t i;
     for (i = 0; i < 3; i ++) {
         box_spatial_observer(world, index, names[i], (ecs_observer_desc_t){
-            .query.terms = {
-                { .id = components[i] },
-                { .id = DynamicTransform, .oper = EcsNot },
-                { .id = ManualTransform, .oper = EcsNot }
-            },
-            .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnMove);
+            .query.terms = {{ .id = components[i] }},
+            .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnLocal);
     }
 
     box_spatial_observer(world, index, "SpatialOnWorldTransform", (ecs_observer_desc_t){
-        .query.terms = {
-            { .id = ecs_id(WorldTransform) },
-            { .id = DynamicTransform, .oper = EcsNot }
-        },
-        .events = { EcsOnSet } }, BoxSpatialOnMove);
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet } }, BoxSpatialOnWorld);
+    box_spatial_observer(world, index, "SpatialOnDynamicKind", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnKind);
+    box_spatial_observer(world, index, "SpatialOnManualKind", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ManualTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnKind);
 }
 
 /** Register the observers that collect changed entities and changed subtrees.

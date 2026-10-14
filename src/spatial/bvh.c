@@ -169,7 +169,9 @@ box_bvh_node_t* box_bvh_get(
     const box_bvh_t *tree,
     int32_t node)
 {
-    return ecs_vec_get_t(&tree->nodes, box_bvh_node_t, node);
+    ecs_assert(node >= 0 && node < ecs_vec_count(&tree->nodes), ECS_INVALID_PARAMETER, NULL);
+
+    return &((box_bvh_node_t*)tree->nodes.array)[node];
 }
 
 void box_bvh_init(
