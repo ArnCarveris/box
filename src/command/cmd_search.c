@@ -20,7 +20,7 @@
 typedef struct SearchIter {
     ecs_entity_t query; /**< Query entity being iterated, 0 when not iterating */
     int32_t offset;     /**< Rows returned so far */
-    int32_t mark;       /**< Lines the session had logged when iter or next last ran */
+    int64_t mark;       /**< Lines the session had logged when iter or next last ran */
 } SearchIter;
 
 /** An entity grep searches, with the path it is sorted and printed by */
@@ -41,16 +41,16 @@ ECS_COMPONENT_DECLARE(SearchIter);
  *
  * @param world The world
  * @param session The session entity
- * @return The number of logged lines
+ * @return The number of lines the session logged since it opened
  */
-static int32_t box_search_logged(
+static int64_t box_search_logged(
     ecs_world_t *world,
     ecs_entity_t session)
 {
     const TerminalSession *s = ecs_get(world, session, TerminalSession);
-    int32_t result = 0;
+    int64_t result = 0;
     if (s) {
-        result = ecs_vec_count(&s->entries);
+        result = s->total;
     }
 
     return result;
@@ -366,11 +366,21 @@ static void box_search_next(
     ecs_world_t *world = ctx->world;
     ecs_entity_t session = *(ecs_entity_t*)argv[0].ptr;
     int32_t count = *(ecs_i32_t*)argv[1].ptr;
-    int32_t logged = box_search_logged(world, session);
+    int64_t logged = box_search_logged(world, session);
     SearchIter *st = ecs_get_mut(world, session, SearchIter);
     const ecs_query_t *q = NULL;
     ecs_strbuf_t buf = ECS_STRBUF_INIT;
     int32_t seen;
+    if (count < 0 || count > BOX_COMMAND_NEXT_MAX) {
+        box_command_error(ctx, result, "count: %d is out of range, 0 to %d", count,
+            BOX_COMMAND_NEXT_MAX);
+        if (st && logged - st->mark <= 1) {
+            st->mark = logged;
+        }
+
+        goto done;
+    }
+
     if (st && st->query && logged - st->mark <= 1 && ecs_is_alive(world, st->query)) {
         q = ecs_query_get(world, st->query);
     }

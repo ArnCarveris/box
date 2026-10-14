@@ -4,16 +4,18 @@
  */
 
 #include "command.h"
-#include <dirent.h>
 #include <errno.h>
-#include <string.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/stat.h>
 
 /** Size of the buffer that holds a generated session handle */
 #define BOX_TERMINAL_HANDLE_MAX (32)
 
-/** Create a folder unless it exists.
+/** Most idle sessions closed in one frame */
+#define BOX_TERMINAL_IDLE_BATCH (64)
+
+/** Create a private folder unless it exists.
  *
  * @param path The folder
  * @return 0 on success, -1 when it could not be created
@@ -22,10 +24,36 @@ static int box_terminal_mkdir(
     const char *path)
 {
     int result = 0;
-    if (mkdir(path, 0777) && errno != EEXIST) {
+    if (mkdir(path, 0700) && errno != EEXIST) {
         ecs_err("cannot create %s: %s", path, strerror(errno));
         result = -1;
     }
+
+    return result;
+}
+
+/** Read the wall clock.
+ *
+ * @return Seconds since an arbitrary epoch
+ */
+static double box_terminal_now(void)
+{
+    ecs_time_t now;
+    ecs_os_get_time(&now);
+
+    return ecs_time_to_double(now);
+}
+
+/** Check that a session name is a single file name inside the session root.
+ *
+ * @param name The name of the session entity, NULL when it has none
+ * @return Whether the name can be used as the session folder
+ */
+static bool box_terminal_name_is_file(
+    const char *name)
+{
+    bool result = name && name[0] && !strchr(name, '/') && strcmp(name, ".") &&
+        strcmp(name, "..");
 
     return result;
 }
@@ -42,6 +70,7 @@ static int box_terminal_open(
     ecs_entity_t e,
     TerminalSession *out)
 {
+    const TerminalLimits *limits = ecs_singleton_get(world, TerminalLimits);
     const char *root = box_terminal_root(world);
     const char *name = ecs_get_name(world, e);
     char *dir = NULL, *sub = NULL, *log = NULL;
@@ -50,7 +79,7 @@ static int box_terminal_open(
         goto done;
     }
 
-    if (name) {
+    if (box_terminal_name_is_file(name)) {
         dir = flecs_asprintf("%s/%s", root, name);
     } else {
         dir = flecs_asprintf("%s/%u", root, (uint32_t)e);
@@ -66,6 +95,14 @@ static int box_terminal_open(
     if (!out->log) {
         ecs_err("cannot open %s: %s", log, strerror(errno));
     }
+
+    if (limits) {
+        out->history = limits->history;
+        out->images_max = limits->images;
+        out->log_size = limits->log_size;
+    }
+
+    out->active = box_terminal_now();
 
     out->dir = dir;
     dir = NULL;
@@ -94,6 +131,7 @@ static void box_terminal_on_add(
         }
 
         ecs_vec_init_t(NULL, &s.entries, box_command_entry_t, 0);
+        ecs_vec_init_t(NULL, &s.images, box_terminal_image_t, 0);
         ecs_set(it->stage, e, TerminalStatus, { .dir = s.dir });
         ecs_set_ptr(it->stage, e, TerminalSession, &s);
     }
@@ -120,38 +158,6 @@ done:
     return;
 }
 
-void box_terminal_rmtree(
-    const char *path)
-{
-    DIR *dir = opendir(path);
-    struct dirent *entry;
-    if (!dir) {
-        goto done;
-    }
-
-    while ((entry = readdir(dir))) {
-        struct stat st;
-        char *child;
-        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) {
-            continue;
-        }
-
-        child = flecs_asprintf("%s/%s", path, entry->d_name);
-        if (!lstat(child, &st) && S_ISDIR(st.st_mode)) {
-            box_terminal_rmtree(child);
-        } else {
-            unlink(child);
-        }
-
-        ecs_os_free(child);
-    }
-
-    closedir(dir);
-    rmdir(path);
-done:
-    return;
-}
-
 const char* box_terminal_root(
     ecs_world_t *world)
 {
@@ -169,9 +175,8 @@ const char* box_terminal_root(
         goto done;
     }
 
-    root = flecs_asprintf("%s/%d", BOX_TMP_ROOT, (int)getpid());
-    if (box_terminal_mkdir(BOX_TMP_ROOT) || box_terminal_mkdir(root)) {
-        ecs_os_free(root);
+    root = box_app_tmp_open(world);
+    if (!root) {
         goto done;
     }
 
@@ -179,6 +184,89 @@ const char* box_terminal_root(
     result = root;
 done:
     return result;
+}
+
+/** Move a full commands.log to commands.log.1 and start a new one.
+ *
+ * @param s The session
+ * @param size Bytes of the entry that is about to be written
+ */
+static void box_terminal_log_rotate(
+    TerminalSession *s,
+    int32_t size)
+{
+    long written = ftell(s->log);
+    char *log, *old;
+    if (written <= 0 || written + size <= s->log_size) {
+        goto done;
+    }
+
+    log = flecs_asprintf("%s/%s", s->dir, BOX_TERMINAL_LOG);
+    old = flecs_asprintf("%s.1", log);
+    fclose(s->log);
+    if (rename(log, old)) {
+        ecs_warn("cannot move %s: %s", log, strerror(errno));
+    }
+
+    s->log = fopen(log, "w");
+    if (!s->log) {
+        ecs_err("cannot open %s: %s", log, strerror(errno));
+    }
+
+    ecs_os_free(old);
+    ecs_os_free(log);
+done:
+    return;
+}
+
+/** Add a line to the history ring of a session, replacing the oldest when it is full.
+ *
+ * @param s The session
+ * @param line The command line
+ * @param result The output, NULL when it is not kept
+ * @param error The command failed
+ */
+static void box_terminal_history_add(
+    TerminalSession *s,
+    const char *line,
+    const char *result,
+    bool error)
+{
+    box_command_entry_t *entry;
+    if (s->history <= 0) {
+        goto done;
+    }
+
+    if (ecs_vec_count(&s->entries) < s->history) {
+        entry = ecs_vec_append_t(NULL, &s->entries, box_command_entry_t);
+    } else {
+        entry = ecs_vec_get_t(&s->entries, box_command_entry_t,
+            (int32_t)(s->total % s->history));
+        ecs_os_free(entry->line);
+        ecs_os_free(entry->result);
+    }
+
+    entry->line = ecs_os_strdup(line);
+    entry->result = result ? ecs_os_strdup(result) : NULL;
+    entry->error = error;
+done:
+    return;
+}
+
+int32_t box_terminal_history_count(
+    const TerminalSession *s)
+{
+    return ecs_vec_count(&s->entries);
+}
+
+const box_command_entry_t* box_terminal_history_get(
+    const TerminalSession *s,
+    int32_t i)
+{
+    int32_t count = ecs_vec_count(&s->entries);
+    int32_t first = count < s->history ? 0 : (int32_t)(s->total % count);
+
+    return ecs_vec_get_t(&s->entries, box_command_entry_t, (first + i) % count);
 }
 
 void box_terminal_log(
@@ -190,31 +278,91 @@ void box_terminal_log(
 {
     TerminalSession *s = ecs_get_mut(world, session, TerminalSession);
     TerminalStatus *status = ecs_get_mut(world, session, TerminalStatus);
-    box_command_entry_t *entry;
+    char *text;
     if (!s) {
         goto done;
     }
 
-    entry = ecs_vec_append_t(NULL, &s->entries, box_command_entry_t);
-    entry->line = ecs_os_strdup(line);
-    entry->result = result ? ecs_os_strdup(result) : NULL;
-    entry->error = error;
+    box_terminal_history_add(s, line, result, error);
+    s->total ++;
+    s->active = box_terminal_now();
     if (status) {
-        status->commands = ecs_vec_count(&s->entries);
+        status->commands = (int32_t)(s->total < INT32_MAX ? s->total : INT32_MAX);
     }
 
-    if (s->log) {
-        if (result && result[0]) {
-            fprintf(s->log, "$ %s\n%s\n", line, result);
-        } else {
-            fprintf(s->log, "$ %s\n", line);
-        }
+    if (!s->log) {
+        goto done;
+    }
 
+    if (result && result[0]) {
+        text = flecs_asprintf("$ %s\n%s\n", line, result);
+    } else {
+        text = flecs_asprintf("$ %s\n", line);
+    }
+
+    box_terminal_log_rotate(s, ecs_os_strlen(text));
+    if (s->log) {
+        fputs(text, s->log);
         fflush(s->log);
     }
 
+    ecs_os_free(text);
 done:
     return;
+}
+
+/** Delete the oldest image of a session that the renderer is done with.
+ *
+ * @param s The session
+ * @param rendered RenderStatus.rendered, packets the renderer finished
+ * @return Whether an image was deleted or dropped
+ */
+static bool box_terminal_image_evict(
+    TerminalSession *s,
+    int32_t rendered)
+{
+    int32_t i, count = ecs_vec_count(&s->images);
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        box_terminal_image_t *image = ecs_vec_get_t(&s->images, box_terminal_image_t, i);
+        result = !unlink(image->path) || (errno == ENOENT && rendered >= image->packet);
+        if (result) {
+            ecs_os_free(image->path);
+            ecs_vec_remove_ordered_t(&s->images, box_terminal_image_t, i);
+        }
+    }
+
+    return result;
+}
+
+int box_terminal_image(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path)
+{
+    TerminalSession *s = ecs_get_mut(world, session, TerminalSession);
+    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
+    int32_t submitted = status ? status->submitted : 0;
+    int32_t rendered = status ? status->rendered : 0;
+    box_terminal_image_t *image;
+    int result = BOX_TERMINAL_IMAGE_NONE;
+    if (!s || s->images_max <= 0) {
+        goto done;
+    }
+
+    result = BOX_TERMINAL_IMAGE_PENDING;
+    while (ecs_vec_count(&s->images) >= s->images_max) {
+        if (!box_terminal_image_evict(s, rendered)) {
+            goto done;
+        }
+    }
+
+    image = ecs_vec_append_t(NULL, &s->images, box_terminal_image_t);
+    image->path = ecs_os_strdup(path);
+    image->packet = submitted + BOX_TERMINAL_IMAGE_PACKETS;
+    result = 0;
+done:
+    return result;
 }
 
 ecs_entity_t box_terminal_cwd(
@@ -230,24 +378,53 @@ ecs_entity_t box_terminal_cwd(
     return result;
 }
 
+bool box_terminal_full(
+    ecs_world_t *world,
+    int32_t *open)
+{
+    const TerminalLimits *limits = ecs_singleton_get(world, TerminalLimits);
+    ecs_entity_t scope = ecs_lookup(world, BOX_TERMINAL_SCOPE);
+    ecs_iter_t it = ecs_children(world, scope);
+    int32_t count = 0, i;
+    while (ecs_children_next(&it)) {
+        for (i = 0; i < it.count; i ++) {
+            count += ecs_has(world, it.entities[i], TerminalSession);
+        }
+    }
+
+    if (open) {
+        open[0] = count;
+    }
+
+    return limits && count >= limits->sessions;
+}
+
 ecs_entity_t box_terminal_new(
     ecs_world_t *world)
 {
     box_terminal_host_t *host = box_terminal_host(world);
     ecs_entity_t scope = ecs_lookup(world, BOX_TERMINAL_SCOPE);
     char handle[BOX_TERMINAL_HANDLE_MAX];
+    ecs_entity_t result = 0;
+    int32_t open = 0;
+    if (box_terminal_full(world, &open)) {
+        ecs_err("cannot open a terminal session: %d are open", open);
+        goto done;
+    }
+
     do {
         host->next ++;
         ecs_os_snprintf(handle, BOX_TERMINAL_HANDLE_MAX, "s%d", host->next);
     } while (ecs_lookup_child(world, scope, handle));
 
-    ecs_entity_t result = ecs_entity(world, { .name = handle, .parent = scope });
+    result = ecs_entity(world, { .name = handle, .parent = scope });
     ecs_add(world, result, Terminal);
     if (!ecs_has(world, result, TerminalSession)) {
         ecs_delete(world, result);
         result = 0;
     }
 
+done:
     return result;
 }
 
@@ -268,11 +445,57 @@ ecs_entity_t box_terminal_lookup(
     return result;
 }
 
+/** Close the sessions box_terminal_new opened that ran no command for longer than
+ * TerminalLimits.idle_timeout.
+ *
+ * @param it Iterator of the system
+ */
+static void BoxTerminalIdle(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const TerminalLimits *limits = ecs_singleton_get(world, TerminalLimits);
+    ecs_entity_t scope = ecs_lookup(world, BOX_TERMINAL_SCOPE);
+    ecs_entity_t idle[BOX_TERMINAL_IDLE_BATCH];
+    double now = box_terminal_now();
+    int32_t count = 0, i;
+    ecs_iter_t cit;
+    if (!limits || !scope) {
+        goto done;
+    }
+
+    cit = ecs_children(world, scope);
+    while (ecs_children_next(&cit)) {
+        for (i = 0; i < cit.count; i ++) {
+            const TerminalSession *s = ecs_get(world, cit.entities[i], TerminalSession);
+            if (s && count < BOX_TERMINAL_IDLE_BATCH &&
+                now - s->active >= limits->idle_timeout)
+            {
+                idle[count ++] = cit.entities[i];
+            }
+        }
+    }
+
+    for (i = 0; i < count; i ++) {
+        ecs_delete(world, idle[i]);
+    }
+
+done:
+    return;
+}
+
 void box_terminal_init(
     ecs_world_t *world,
     box_terminal_host_t *host)
 {
     (void)host;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "TerminalIdle" }),
+        .phase = EcsOnLoad,
+        .run = BoxTerminalIdle,
+        .immediate = true
+    });
+
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TerminalOnAdd" }),
         .query.terms = {{ .id = ecs_id(Terminal) }},
