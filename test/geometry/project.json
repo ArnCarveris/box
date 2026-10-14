@@ -225,6 +225,7 @@
                     "colors",
                     "cache_shared",
                     "update_content",
+                    "ensure_modified_leak",
                     "scale"
                 ]
             },
