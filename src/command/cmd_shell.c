@@ -211,6 +211,7 @@ static void box_shell_cd(
     const char *path = *(char**)argv[1].ptr;
     ecs_entity_t e = 0;
     char *cwd = NULL;
+    Terminal *t;
     if (box_shell_resolve(ctx, result, session, path ? path : "/", BoxShellScope, &e)) {
         goto done;
     }
@@ -221,8 +222,12 @@ static void box_shell_cd(
         goto done;
     }
 
-    ecs_set(world, session, Terminal, { .cwd = cwd });
     *(char**)result->ptr = flecs_asprintf("/%s", cwd ? cwd : "");
+    t = ecs_get_mut(world, session, Terminal);
+    ecs_os_free(t->cwd);
+    t->cwd = cwd;
+    cwd = NULL;
+    ecs_modified(world, session, Terminal);
 done:
     ecs_os_free(cwd);
 }

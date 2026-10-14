@@ -167,4 +167,5 @@ void BoxCommandImport(
     box_history_init(world);
     box_logs_init(world);
     box_shell_init(world);
+    box_search_init(world);
 }

@@ -6,27 +6,100 @@
 #include "command.h"
 #include <string.h>
 
-/** Parse a component or pair expression such as Position or (Likes, Bob).
+/** Resolve a name to an entity: a path from the root, a symbol or a child of a module.
  *
  * @param world The world
- * @param expr The expression
- * @return The id, 0 when the expression does not name one
+ * @param name The name, without surrounding whitespace
+ * @param len Length of the name
+ * @return The entity, 0 when the name resolves to none
  */
-static ecs_id_t box_component_id(
+static ecs_entity_t box_command_name(
     ecs_world_t *world,
-    const char *expr)
+    const char *name,
+    ecs_size_t len)
 {
-    ecs_id_t result = 0;
-    if (!expr[0] || strpbrk(expr, "|!?*$") || (expr[0] != '(' && strchr(expr, ','))) {
+    char *str = ecs_os_malloc(len + 1);
+    ecs_entity_t result;
+    ecs_iter_t it;
+    int32_t i;
+    ecs_os_memcpy(str, name, len);
+    str[len] = '\0';
+    result = ecs_lookup(world, str);
+    if (!result) {
+        result = ecs_lookup_symbol(world, str, false, false);
+    }
+
+    if (result || !len || strchr(str, '.')) {
         goto done;
     }
 
-    result = ecs_id_from_str(world, expr);
-    if (!result && expr[0] != '(') {
-        result = ecs_lookup_symbol(world, expr, true, false);
+    it = ecs_each_id(world, EcsModule);
+    while (ecs_each_next(&it)) {
+        for (i = 0; i < it.count && !result; i ++) {
+            result = ecs_lookup_child(world, it.entities[i], str);
+        }
     }
 
 done:
+    ecs_os_free(str);
+
+    return result;
+}
+
+/** Resolve one element of a pair, skipping the whitespace around it.
+ *
+ * @param world The world
+ * @param start First character of the element
+ * @param end Character after the element
+ * @return The entity, 0 when the element resolves to none
+ */
+static ecs_entity_t box_command_element(
+    ecs_world_t *world,
+    const char *start,
+    const char *end)
+{
+    while (start < end && strchr(" \t", start[0])) {
+        start ++;
+    }
+
+    while (end > start && strchr(" \t", end[-1])) {
+        end --;
+    }
+
+    return box_command_name(world, start, (ecs_size_t)(end - start));
+}
+
+ecs_id_t box_command_component(
+    ecs_world_t *world,
+    const char *expr)
+{
+    int prev = ecs_log_set_level(-4);
+    ecs_id_t result = ecs_id_from_str(world, expr);
+    const char *comma = strchr(expr, ',');
+    ecs_size_t len = ecs_os_strlen(expr);
+    ecs_entity_t rel, tgt;
+    ecs_log_set_level(prev);
+    if (result || !len || strpbrk(expr, "|!?$")) {
+        goto done;
+    }
+
+    if (expr[0] != '(') {
+        result = comma || strchr(expr, ' ') ? 0 : box_command_name(world, expr, len);
+        goto done;
+    }
+
+    if (!comma || expr[len - 1] != ')' || strchr(comma + 1, ',')) {
+        goto done;
+    }
+
+    rel = box_command_element(world, expr + 1, comma);
+    tgt = box_command_element(world, comma + 1, expr + len - 1);
+    result = rel && tgt ? ecs_pair(rel, tgt) : 0;
+done:
+    if (result && !ECS_IS_PAIR(result) && ecs_has(world, result, EcsMember)) {
+        result = 0;
+    }
+
     return result;
 }
 
@@ -50,7 +123,7 @@ static int box_component_parse(
     int32_t i, depth = 0;
     int result = -1;
     member[0] = NULL;
-    id[0] = box_component_id(world, expr);
+    id[0] = box_command_component(world, expr);
     if (id[0]) {
         result = 0;
         goto done;
@@ -63,7 +136,7 @@ static int box_component_parse(
         }
 
         head[i] = '\0';
-        id[0] = box_component_id(world, head);
+        id[0] = box_command_component(world, head);
         if (id[0]) {
             member[0] = ecs_os_strdup(expr + i + 1);
             result = 0;

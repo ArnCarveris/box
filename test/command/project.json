@@ -91,6 +91,52 @@
                     "unknown_level",
                     "no_color_codes"
                 ]
+            },
+            {
+                "id": "Search",
+                "testcases": [
+                    "query_create",
+                    "query_one_result",
+                    "query_invalid",
+                    "query_invalid_name",
+                    "query_show",
+                    "query_list",
+                    "query_replace",
+                    "query_per_session",
+                    "query_deleted_with_session",
+                    "iter_unknown",
+                    "iter_next",
+                    "next_count",
+                    "next_exact_end",
+                    "next_empty_query",
+                    "other_command_ends_iteration",
+                    "failed_command_ends_iteration",
+                    "quiet_command_ends_iteration",
+                    "iteration_per_session",
+                    "iter_restarts",
+                    "done",
+                    "query_deleted_while_iterating",
+                    "has_component",
+                    "has_pair",
+                    "has_expression",
+                    "has_named_query",
+                    "has_relative_to_cwd",
+                    "has_invalid",
+                    "grep_name",
+                    "grep_component_name",
+                    "grep_value",
+                    "grep_long_value",
+                    "grep_component_filter",
+                    "grep_unknown_component",
+                    "grep_no_match",
+                    "grep_not_recursive",
+                    "grep_root",
+                    "grep_recur",
+                    "grep_recur_root",
+                    "grep_recur_component",
+                    "grep_limit",
+                    "commands_are_script_functions"
+                ]
             }
         ]
     }

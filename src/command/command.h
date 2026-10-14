@@ -151,6 +151,13 @@ void box_logs_init(
 void box_history_init(
     ecs_world_t *world);
 
+/** Register the search commands: query, iter, next, done, has, grep and grep_recur.
+ *
+ * @param world The world
+ */
+void box_search_init(
+    ecs_world_t *world);
+
 /** Access a shell command needs to the entity of a path */
 typedef enum box_shell_access_t {
     BoxShellScope,      /**< Any entity or the root */
@@ -192,5 +199,18 @@ void box_shell_init(
  */
 void box_component_init(
     ecs_world_t *world);
+
+/** Resolve a component or pair argument such as Position, box.transform.Position or (Rel, Tgt).
+ *
+ * Names that are not a path from the root resolve as a symbol, then as a child of a module.
+ * Struct members are not components, so Position.x resolves to nothing.
+ *
+ * @param world The world
+ * @param expr The component or pair
+ * @return The id, 0 when the expression names none
+ */
+ecs_id_t box_command_component(
+    ecs_world_t *world,
+    const char *expr);
 
 #endif

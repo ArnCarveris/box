@@ -75,8 +75,8 @@ done:
     return;
 }
 
-/** Count the frame, stop the world when App says so and sleep when a headless process
- * used more than its CPU budget since the previous frame.
+/** Count the frame, start the clock on the first frame, stop the world when App says so and
+ * sleep when a headless process used more than its CPU budget since the previous frame.
  *
  * @param it The iterator of the system
  */
@@ -90,6 +90,10 @@ static void BoxAppFrame(
     double wall = box_app_wall_time();
     if (!app || !status) {
         goto done;
+    }
+
+    if (clock->wall == 0) {
+        clock->start = wall;
     }
 
     status->frame ++;

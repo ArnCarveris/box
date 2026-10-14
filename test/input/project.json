@@ -1,0 +1,51 @@
+{
+    "id": "input",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Device",
+                "testcases": [
+                    "import",
+                    "key_press",
+                    "key_press_frames",
+                    "key_down_up",
+                    "key_down_held",
+                    "key_press_sequence",
+                    "key_type",
+                    "key_type_no_key",
+                    "key_from_name",
+                    "key_name",
+                    "mouse_move",
+                    "mouse_move_normalized",
+                    "mouse_sweep",
+                    "mouse_sweep_one_frame",
+                    "mouse_release",
+                    "mouse_click",
+                    "mouse_drag",
+                    "mouse_scroll",
+                    "focus_lost_releases_keys",
+                    "focus_ignores_platform",
+                    "platform_poll",
+                    "platform_replace",
+                    "platform_tap_in_one_frame",
+                    "platform_resize_unfocused",
+                    "reset",
+                    "pending",
+                    "script_key_down",
+                    "script_key_modifiers",
+                    "script_key_repeat",
+                    "script_mouse_move",
+                    "script_mouse_click",
+                    "script_mouse_drag"
+                ]
+            }
+        ]
+    }
+}
