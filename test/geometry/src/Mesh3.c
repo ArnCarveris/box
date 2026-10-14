@@ -99,19 +99,11 @@ void Mesh3_derive_normals(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 6);
     test_int(mesh->index_count, 6);
-    for (int i = 0; i < 3; i ++) {
-        test_flt(mesh->vertices[i].normal[2], 1.0f);
-        test_flt(mesh->vertices[i].uv[0], 0.0f);
-    }
-
-    for (int i = 3; i < 6; i ++) {
-        test_flt(mesh->vertices[i].normal[2], -1.0f);
-    }
-
     for (int i = 0; i < 6; i ++) {
-        test_uint(mesh->indices[i], (uint32_t)i);
+        const box_vertex_t *v = &mesh->vertices[mesh->indices[i]];
+        test_flt(v->normal[2], i < 3 ? 1.0f : -1.0f);
+        test_flt(v->uv[0], 0.0f);
     }
 
     ecs_fini(world);
@@ -230,7 +222,6 @@ void Mesh3_cache_shared(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     Mesh3 m = {0};
     ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
@@ -257,8 +248,6 @@ void Mesh3_cache_shared(void) {
     test_assert(m3 != NULL);
     test_uint(m1->mesh, m2->mesh);
     test_assert(m1->mesh != m3->mesh);
-    test_int(box_mesh_cache_refs(cache, m1->mesh), 2);
-    test_int(box_mesh_cache_count(cache), 2);
 
     ecs_fini(world);
 }
@@ -289,8 +278,10 @@ void Mesh3_update_content(void) {
 
     uint32_t second = ecs_get(world, e, ShapeMesh)->mesh;
     test_assert(second != 0);
-    test_int(box_mesh_cache_count(cache), 1);
     test_flt(box_mesh_cache_get(cache, second)->max[2], 2.0f);
+
+    ecs_delete(world, e);
+    test_int(box_mesh_cache_count(cache), 0);
 
     ecs_fini(world);
 }

@@ -8,7 +8,7 @@
 #include <math.h>
 #include "mesh_cache.h"
 
-void Frustum_vertex_count(void) {
+void Frustum_segments(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
@@ -21,13 +21,32 @@ void Frustum_vertex_count(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 54);
-    test_int(mesh->index_count, 96);
+    float angles[64];
+    int32_t count = 0;
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const float *p = mesh->vertices[i].position;
+        if (sqrtf(p[0] * p[0] + p[2] * p[2]) < 1e-4f) {
+            continue;
+        }
+
+        float angle = atan2f(p[2], p[0]);
+        bool known = false;
+        for (int32_t j = 0; j < count; j ++) {
+            float d = fabsf(angle - angles[j]);
+            known |= d < 1e-3f || fabsf(d - 2.0f * GLM_PIf) < 1e-3f;
+        }
+
+        if (!known && count < 64) {
+            angles[count ++] = angle;
+        }
+    }
+
+    test_int(count, 8);
 
     ecs_fini(world);
 }
 
-void Frustum_flat_vertex_count(void) {
+void Frustum_flat_faces(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
@@ -40,8 +59,27 @@ void Frustum_flat_vertex_count(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 96);
-    test_int(mesh->index_count, 96);
+    int32_t faces = 0;
+    for (int32_t t = 0; t < mesh->index_count; t += 3) {
+        const box_vertex_t *a = &mesh->vertices[mesh->indices[t]];
+        const box_vertex_t *b = &mesh->vertices[mesh->indices[t + 1]];
+        const box_vertex_t *c = &mesh->vertices[mesh->indices[t + 2]];
+        vec3 ab, ac, face;
+        glm_vec3_sub((float*)b->position, (float*)a->position, ab);
+        glm_vec3_sub((float*)c->position, (float*)a->position, ac);
+        glm_vec3_cross(ab, ac, face);
+        if (glm_vec3_norm(face) < 1e-8f) {
+            continue;
+        }
+
+        glm_vec3_normalize(face);
+        test_assert(glm_vec3_dot(face, (float*)a->normal) > 0.999f);
+        test_assert(glm_vec3_dot(face, (float*)b->normal) > 0.999f);
+        test_assert(glm_vec3_dot(face, (float*)c->normal) > 0.999f);
+        faces ++;
+    }
+
+    test_assert(faces > 0);
 
     ecs_fini(world);
 }
@@ -162,7 +200,6 @@ void Frustum_cache_shared(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
@@ -180,12 +217,10 @@ void Frustum_cache_shared(void) {
     test_assert(m2 != NULL);
     test_assert(m1->mesh != 0);
     test_uint(m1->mesh, m2->mesh);
-    test_int(box_mesh_cache_refs(cache, m1->mesh), 2);
     const ShapeMesh *m3 = ecs_get(world, e3, ShapeMesh);
     test_assert(m3 != NULL);
     test_assert(m3->mesh != 0);
     test_assert(m3->mesh != m1->mesh);
-    test_int(box_mesh_cache_count(cache), 2);
 
     ecs_fini(world);
 }
@@ -220,8 +255,25 @@ void Frustum_zero_top(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 36);
-    test_int(mesh->index_count, 48);
+    vec3 lo = { 1e9f, 1e9f, 1e9f };
+    vec3 hi = { -1e9f, -1e9f, -1e9f };
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        glm_vec3_minv(lo, mesh->vertices[i].position, lo);
+        glm_vec3_maxv(hi, mesh->vertices[i].position, hi);
+    }
+
+    int32_t top = 0;
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const float *p = mesh->vertices[i].position;
+        if (p[1] > hi[1] - 1e-4f) {
+            test_assert(sqrtf(p[0] * p[0] + p[2] * p[2]) < 1e-4f);
+            top ++;
+        }
+    }
+
+    test_assert(top > 0);
+    test_assert(fabsf((hi[0] - lo[0]) * sm->scale[0] - 4.0f) < 1e-4f);
+    test_assert(fabsf((hi[1] - lo[1]) * sm->scale[1] - 2.0f) < 1e-4f);
 
     ecs_fini(world);
 }

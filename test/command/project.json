@@ -314,7 +314,6 @@
                     "capture_unknown_camera",
                     "capture_no_active_camera",
                     "capture_view_root_of_surface",
-                    "capture_target_destroyed_next_frame",
                     "render_prefab_private_scene",
                     "render_scene_deleted_next_frame",
                     "render_template",

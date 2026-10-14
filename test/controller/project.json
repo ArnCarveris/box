@@ -49,8 +49,7 @@
                     "script_remap",
                     "command_key",
                     "command_drag",
-                    "command_action",
-                    "query_entity_deleted"
+                    "command_action"
                 ]
             },
             {

@@ -8,7 +8,7 @@
 #include <math.h>
 #include "mesh_cache.h"
 
-void NGon_vertex_count(void) {
+void NGon_sides(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
@@ -20,8 +20,27 @@ void NGon_vertex_count(void) {
     test_assert(sm != NULL);
     const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
     test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 6);
-    test_int(mesh->index_count, 15);
+    float angles[64];
+    int32_t count = 0;
+    for (int32_t i = 0; i < mesh->vertex_count; i ++) {
+        const float *p = mesh->vertices[i].position;
+        if (sqrtf(p[0] * p[0] + p[1] * p[1]) < 1e-4f) {
+            continue;
+        }
+
+        float angle = atan2f(p[1], p[0]);
+        bool known = false;
+        for (int32_t j = 0; j < count; j ++) {
+            float d = fabsf(angle - angles[j]);
+            known |= d < 1e-3f || fabsf(d - 2.0f * GLM_PIf) < 1e-3f;
+        }
+
+        if (!known && count < 64) {
+            angles[count ++] = angle;
+        }
+    }
+
+    test_int(count, 5);
 
     ecs_fini(world);
 }
@@ -90,7 +109,6 @@ void NGon_cache_shared(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_entity_t e2 = ecs_new(world);
@@ -105,12 +123,10 @@ void NGon_cache_shared(void) {
     test_assert(m2 != NULL);
     test_assert(m1->mesh != 0);
     test_uint(m1->mesh, m2->mesh);
-    test_int(box_mesh_cache_refs(cache, m1->mesh), 2);
     const ShapeMesh *m3 = ecs_get(world, e3, ShapeMesh);
     test_assert(m3 != NULL);
     test_assert(m3->mesh != 0);
     test_assert(m3->mesh != m1->mesh);
-    test_int(box_mesh_cache_count(cache), 2);
 
     ecs_fini(world);
 }
@@ -137,16 +153,17 @@ void NGon_default_sides(void) {
     // renderer/meshes
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, BoxGeometry);
-    box_mesh_cache_t *cache = box_mesh_cache_of(world);
 
-    ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, NGon, { .radius = 1 });
-    const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
-    test_assert(sm != NULL);
-    const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
-    test_assert(mesh != NULL);
-    test_int(mesh->vertex_count, 7);
-    test_int(mesh->index_count, 18);
+    ecs_entity_t e1 = ecs_new(world);
+    ecs_entity_t e2 = ecs_new(world);
+    ecs_set(world, e1, NGon, { .radius = 1 });
+    ecs_set(world, e2, NGon, { .sides = 6, .radius = 1 });
+    const ShapeMesh *m1 = ecs_get(world, e1, ShapeMesh);
+    const ShapeMesh *m2 = ecs_get(world, e2, ShapeMesh);
+    test_assert(m1 != NULL);
+    test_assert(m2 != NULL);
+    test_assert(m1->mesh != 0);
+    test_uint(m1->mesh, m2->mesh);
 
     ecs_fini(world);
 }

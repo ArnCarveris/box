@@ -17,7 +17,7 @@
             {
                 "id": "Box",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -27,7 +27,7 @@
             {
                 "id": "Quad",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -37,7 +37,7 @@
             {
                 "id": "Triangle",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -47,7 +47,7 @@
             {
                 "id": "RightTriangle",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -57,7 +57,7 @@
             {
                 "id": "TrianglePrism",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -67,7 +67,7 @@
             {
                 "id": "RightTrianglePrism",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -77,7 +77,7 @@
             {
                 "id": "NGon",
                 "testcases": [
-                    "vertex_count",
+                    "sides",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -89,8 +89,8 @@
             {
                 "id": "Sphere",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -103,8 +103,8 @@
             {
                 "id": "HemiSphere",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -115,8 +115,8 @@
             {
                 "id": "IcoSphere",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "subdivision",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -129,8 +129,8 @@
             {
                 "id": "Cone",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -141,8 +141,8 @@
             {
                 "id": "Cylinder",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -153,8 +153,8 @@
             {
                 "id": "Torus",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -165,8 +165,8 @@
             {
                 "id": "Capsule",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -179,8 +179,8 @@
             {
                 "id": "Tube",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -192,8 +192,8 @@
             {
                 "id": "Frustum",
                 "testcases": [
-                    "vertex_count",
-                    "flat_vertex_count",
+                    "segments",
+                    "flat_faces",
                     "normals",
                     "flat_normals",
                     "uvs",
@@ -206,7 +206,7 @@
             {
                 "id": "RoundedBox",
                 "testcases": [
-                    "vertex_count",
+                    "size",
                     "normals",
                     "uvs",
                     "cache_shared",
@@ -237,7 +237,6 @@
                     "shared_release",
                     "change_topology",
                     "change_size",
-                    "handle_reused",
                     "different_shapes",
                     "quantized_proportions",
                     "bounds",

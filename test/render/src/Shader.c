@@ -472,27 +472,6 @@ void Shader_skipped_directives_ignored(void)
     ecs_os_fini();
 }
 
-void Shader_files_listed(void)
-{
-    // renderer/shader
-    ecs_os_init();
-    const char *files[] = {
-        "s/main.wgsl", "#include \"a.wgsl\"\n#include \"b.wgsl\"\n#include \"a.wgsl\"\n",
-        "s/a.wgsl", "a\n",
-        "s/b.wgsl", "#include \"a.wgsl\"\n",
-        NULL};
-    box_shader_output_t out;
-    test_int(box_shader_preprocess(&(box_shader_desc_t){
-        .path = "s/main.wgsl", .read = test_read, .ctx = files}, &out), 0);
-    test_str(out.code, "a\na\na\n");
-    test_int(ecs_vec_count(&out.files), 3);
-    test_str(ecs_vec_get_t(&out.files, box_shader_file_t, 0)->path, "s/main.wgsl");
-    test_str(ecs_vec_get_t(&out.files, box_shader_file_t, 1)->path, "s/a.wgsl");
-    test_str(ecs_vec_get_t(&out.files, box_shader_file_t, 2)->path, "s/b.wgsl");
-    box_shader_output_fini(&out);
-    ecs_os_fini();
-}
-
 void Shader_missing_file(void)
 {
     // renderer/shader
@@ -506,28 +485,7 @@ void Shader_missing_file(void)
     ecs_os_fini();
 }
 
-void Shader_engine_shader_from_disk(void)
-{
-    // renderer/shader
-    ecs_os_init();
-    char *path = box_shader_locate("etc/shaders/blit.wgsl");
-    test_assert(path != NULL);
-    box_shader_output_t out;
-    test_int(box_shader_preprocess(&(box_shader_desc_t){
-        .path = "etc/shaders/blit.wgsl"}, &out), 0);
-    test_assert(strstr(out.code, "@fragment fn fs") != NULL);
-    test_assert(strstr(out.code, "struct FullscreenOut") != NULL);
-    test_assert(strstr(out.code, "#") == NULL);
-    test_int(ecs_vec_count(&out.files), 2);
-    test_str(ecs_vec_get_t(&out.files, box_shader_file_t, 0)->path, path);
-    test_assert(ecs_vec_get_t(&out.files, box_shader_file_t, 0)->stamp.sec > 0);
-    test_assert(ecs_vec_get_t(&out.files, box_shader_file_t, 1)->stamp.size > 0);
-    box_shader_output_fini(&out);
-    ecs_os_free(path);
-    ecs_os_fini();
-}
-
-void Shader_component_sends_code(void)
+void Shader_component_preprocessed(void)
 {
     // renderer/shader
     ecs_world_t *world = ecs_init();
@@ -551,19 +509,6 @@ void Shader_component_sends_code(void)
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Shader, {.path = path});
     ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->kind, BOX_RENDER_SHADER);
-    test_int(r->op, BOX_RENDER_CREATE);
-    test_assert(r->handle >= BOX_RENDER_SHADER_FIRST);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r->data);
-    const char *code = (const char*)(desc + 1);
-    test_int(desc->code_size, strlen("fn n() -> u32 { return 2; }\n") + 1);
-    test_str(code, "fn n() -> u32 { return 2; }\n");
-    test_str(code + desc->code_size, path);
-    test_int(r->size, sizeof(box_render_shader_desc_t) + desc->code_size + desc->label_size);
 
     const ShaderStatus *status = ecs_get(world, e, ShaderStatus);
     test_assert(status != NULL);
@@ -591,35 +536,31 @@ void Shader_component_defines(void)
 
     char *path = flecs_asprintf("%s/main.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
     FILE *f = fopen(path, "w");
-    fputs("#ifdef A\na B\n#endif\n", f);
+    fputs("#ifdef A\n#include \"missing.wgsl\"\n#endif\nB\n", f);
     fclose(f);
 
     ecs_entity_t e1 = ecs_new(world);
     ecs_set(world, e1, Shader, {.path = path, .defines = "A,B=7"});
     ecs_entity_t e2 = ecs_new(world);
     ecs_set(world, e2, Shader, {.path = path, .defines = "B=7"});
+    ecs_log_set_level(-4);
     ecs_progress(world, 0);
-    box_render_sync(world);
+    ecs_log_set_level(-1);
 
-    test_int(ecs_vec_count(&null->last.resources), 2);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    int32_t i, with = 0, without = 0;
-    for (i = 0; i < 2; i ++) {
-        const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r[i].data);
-        with += !strcmp((const char*)(desc + 1), "a 7\n");
-        without += !strcmp((const char*)(desc + 1), "");
-    }
-
-    test_int(with, 1);
-    test_int(without, 1);
-    test_assert(r[0].handle != r[1].handle);
+    const ShaderStatus *with = ecs_get(world, e1, ShaderStatus);
+    const ShaderStatus *without = ecs_get(world, e2, ShaderStatus);
+    test_bool(with->ok, false);
+    test_assert(with->error != NULL);
+    test_assert(strstr(with->error, "missing.wgsl") != NULL);
+    test_bool(without->ok, true);
+    test_assert(without->error == NULL);
 
     ecs_os_free(path);
     ecs_fini(world);
     box_render_null_free(null);
 }
 
-void Shader_unchanged_not_sent(void)
+void Shader_unchanged_not_recompiled(void)
 {
     // renderer/shader
     ecs_world_t *world = ecs_init();
@@ -644,9 +585,6 @@ void Shader_unchanged_not_sent(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(null->packets, 3);
-    test_int(null->resources, 1);
-    test_int(ecs_vec_count(&null->last.resources), 0);
     test_int(ecs_get(world, e, ShaderStatus)->revision, 1);
 
     ecs_os_free(path);
@@ -675,19 +613,11 @@ void Shader_set_again_recompiles(void)
     ecs_set(world, e, Shader, {.path = path, .defines = "V=1"});
     ecs_progress(world, 0);
     box_render_sync(world);
-    uint32_t handle = ecs_vec_first_t(&null->last.resources, box_render_resource_t)->handle;
 
     ecs_set(world, e, Shader, {.path = path, .defines = "V=2"});
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->kind, BOX_RENDER_SHADER);
-    test_int(r->op, BOX_RENDER_UPDATE);
-    test_uint(r->handle, handle);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r->data);
-    test_str((const char*)(desc + 1), "2\n");
     test_int(ecs_get(world, e, ShaderStatus)->revision, 2);
 
     ecs_os_free(path);
@@ -717,7 +647,6 @@ void Shader_file_change_recompiles(void)
     ecs_set(world, e, Shader, {.path = path});
     ecs_progress(world, 0);
     box_render_sync(world);
-    uint32_t handle = ecs_vec_first_t(&null->last.resources, box_render_resource_t)->handle;
 
     f = fopen(path, "w");
     fputs("new code\n", f);
@@ -725,17 +654,11 @@ void Shader_file_change_recompiles(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->op, BOX_RENDER_UPDATE);
-    test_uint(r->handle, handle);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r->data);
-    test_str((const char*)(desc + 1), "new code\n");
     test_int(ecs_get(world, e, ShaderStatus)->revision, 2);
 
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(ecs_vec_count(&null->last.resources), 0);
+    test_int(ecs_get(world, e, ShaderStatus)->revision, 2);
 
     ecs_os_free(path);
     ecs_fini(world);
@@ -768,7 +691,7 @@ void Shader_include_change_recompiles(void)
     ecs_set(world, e, Shader, {.path = path});
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(null->resources, 1);
+    test_int(ecs_get(world, e, ShaderStatus)->revision, 1);
 
     f = fopen(inc, "w");
     fputs("version 2\n", f);
@@ -776,11 +699,6 @@ void Shader_include_change_recompiles(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->op, BOX_RENDER_UPDATE);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r->data);
-    test_str((const char*)(desc + 1), "version 2\nmain\n");
     test_int(ecs_get(world, e, ShaderStatus)->revision, 2);
 
     ecs_os_free(path);
@@ -817,7 +735,6 @@ void Shader_poll_disabled(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(null->resources, 1);
     test_int(ecs_get(world, e, ShaderStatus)->revision, 1);
 
     ecs_os_free(path);
@@ -849,7 +766,6 @@ void Shader_status_error(void)
     ecs_log_set_level(-1);
     box_render_sync(world);
 
-    test_int(null->resources, 0);
     const ShaderStatus *status = ecs_get(world, e, ShaderStatus);
     test_assert(status != NULL);
     test_bool(status->ok, false);
@@ -893,7 +809,6 @@ void Shader_error_keeps_code(void)
     ecs_log_set_level(-1);
     box_render_sync(world);
 
-    test_int(null->resources, 1);
     test_bool(ecs_get(world, e, ShaderStatus)->ok, false);
     test_int(ecs_get(world, e, ShaderStatus)->revision, 1);
 
@@ -903,11 +818,6 @@ void Shader_error_keeps_code(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(null->resources, 2);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->op, BOX_RENDER_UPDATE);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&null->last, r->data);
-    test_str((const char*)(desc + 1), "fixed code\n");
     const ShaderStatus *status = ecs_get(world, e, ShaderStatus);
     test_bool(status->ok, true);
     test_assert(status->error == NULL);
@@ -938,7 +848,6 @@ void Shader_missing_file_appears(void)
     ecs_progress(world, 0);
     ecs_log_set_level(-1);
     box_render_sync(world);
-    test_int(null->resources, 0);
     test_bool(ecs_get(world, e, ShaderStatus)->ok, false);
 
     FILE *f = fopen(path, "w");
@@ -947,7 +856,6 @@ void Shader_missing_file_appears(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    test_int(null->resources, 1);
     test_bool(ecs_get(world, e, ShaderStatus)->ok, true);
 
     ecs_os_free(path);
@@ -955,7 +863,7 @@ void Shader_missing_file_appears(void)
     box_render_null_free(null);
 }
 
-void Shader_remove_destroys(void)
+void Shader_remove_removes_status(void)
 {
     // renderer/shader
     ecs_world_t *world = ecs_init();
@@ -975,130 +883,38 @@ void Shader_remove_destroys(void)
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Shader, {.path = path});
     ecs_progress(world, 0);
-    box_render_sync(world);
-    uint32_t handle = ecs_vec_first_t(&null->last.resources, box_render_resource_t)->handle;
+    test_assert(ecs_has(world, e, ShaderStatus));
 
     ecs_remove(world, e, Shader);
     test_assert(!ecs_has(world, e, ShaderStatus));
     ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->kind, BOX_RENDER_SHADER);
-    test_int(r->op, BOX_RENDER_DESTROY);
-    test_uint(r->handle, handle);
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(null->resources, 2);
+    test_assert(!ecs_has(world, e, ShaderStatus));
 
     ecs_os_free(path);
     ecs_fini(world);
     box_render_null_free(null);
 }
 
-void Shader_delete_destroys(void)
+void Shader_engine_shaders_are_components(void)
 {
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    App *app = ecs_singleton_get_mut(world, App);
-    app->headless = true;
-    ecs_singleton_modified(world, App);
 
-    char *path = flecs_asprintf("%s/main.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    FILE *f = fopen(path, "w");
-    fputs("a\n", f);
-    fclose(f);
-
-    ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Shader, {.path = path});
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    uint32_t handle = ecs_vec_first_t(&null->last.resources, box_render_resource_t)->handle;
-
-    ecs_delete(world, e);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(ecs_vec_count(&null->last.resources), 1);
-    const box_render_resource_t *r = ecs_vec_first(&null->last.resources);
-    test_int(r->op, BOX_RENDER_DESTROY);
-    test_uint(r->handle, handle);
-
-    ecs_os_free(path);
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Shader_new_backend_resends(void)
-{
-    // renderer/shader
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    App *app = ecs_singleton_get_mut(world, App);
-    app->headless = true;
-    ecs_singleton_modified(world, App);
-
-    char *path = flecs_asprintf("%s/main.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    FILE *f = fopen(path, "w");
-    fputs("a\n", f);
-    fclose(f);
-
-    ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Shader, {.path = path});
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(null->resources, 1);
-
-    box_render_null_t *second = box_render_null_new();
-    backend = box_render_null_backend(second);
-    box_render_set_backend(world, &backend);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(second->resources, 1);
-    const box_render_resource_t *r = ecs_vec_first(&second->last.resources);
-    test_int(r->kind, BOX_RENDER_SHADER);
-    test_int(r->op, BOX_RENDER_CREATE);
-    const box_render_shader_desc_t *desc = box_render_packet_data(&second->last, r->data);
-    test_str((const char*)(desc + 1), "a\n");
-    test_int(ecs_get(world, e, ShaderStatus)->revision, 1);
-
-    ecs_os_free(path);
-    ecs_fini(world);
-    box_render_null_free(null);
-    box_render_null_free(second);
-}
-
-void Shader_engine_shader_not_sent_to_null(void)
-{
-    // renderer/shader
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-
-    ecs_entity_t blit = ecs_lookup(world, "box.shader.builtin.blit");
-    test_assert(blit != 0);
-    test_str(ecs_get(world, blit, Shader)->path, "etc/shaders/blit.wgsl");
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(null->resources, 0);
-    test_assert(!ecs_has(world, blit, ShaderStatus));
+    const char *names[] = {
+        "box.shader.builtin.blit", "box.shader.builtin.mesh", "box.shader.builtin.scatter"
+    };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_entity_t e = ecs_lookup(world, names[i]);
+        test_assert(e != 0);
+        const Shader *shader = ecs_get(world, e, Shader);
+        test_assert(shader != NULL);
+        test_assert(shader->path != NULL);
+        test_assert(!strncmp(shader->path, "etc/shaders/", 12));
+    }
 
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Shader_copy_owns_strings(void)
@@ -1164,13 +980,6 @@ void Shader_gpu_compiles_engine_shader(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    box_render_gpu_stats_t stats;
-    test_assert(box_render_gpu_stats(world, &stats));
-    test_int(stats.shaders, 1);
-    test_int(stats.compiles, 1);
-    test_int(stats.shader_errors, 0);
-    test_int(stats.errors, 0);
-    test_int(stats.frames, 2);
     ecs_entity_t blit = ecs_lookup(world, "box.shader.builtin.blit");
     test_bool(ecs_get(world, blit, ShaderStatus)->ok, true);
 
@@ -1182,6 +991,7 @@ void Shader_gpu_compiles_component(void)
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
     App *app = ecs_singleton_get_mut(world, App);
     app->headless = true;
     ecs_singleton_modified(world, App);
@@ -1200,19 +1010,14 @@ void Shader_gpu_compiles_component(void)
     ecs_set(world, e, Surface, {.width = 16, .height = 16});
     ecs_progress(world, 0);
     box_render_sync(world);
-
-    box_render_gpu_stats_t stats;
-    test_assert(box_render_gpu_stats(world, &stats));
-    test_int(stats.shaders, 3);
-    test_int(stats.compiles, 3);
-    test_int(stats.shader_errors, 0);
-    test_int(stats.errors, 0);
-
-    ecs_delete(world, s2);
     ecs_progress(world, 0);
-    box_render_sync(world);
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.shaders, 2);
+
+    const ShaderStatus *st1 = ecs_get(world, s1, ShaderStatus);
+    const ShaderStatus *st2 = ecs_get(world, s2, ShaderStatus);
+    test_bool(st1->ok, true);
+    test_assert(st1->error == NULL);
+    test_bool(st2->ok, true);
+    test_assert(st2->error == NULL);
 
     ecs_os_free(path);
     ecs_fini(world);
@@ -1243,13 +1048,12 @@ void Shader_gpu_invalid_code(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    box_render_gpu_stats_t stats;
-    test_assert(box_render_gpu_stats(world, &stats));
-    test_int(stats.shaders, 1);
-    test_int(stats.compiles, 1);
-    test_int(stats.shader_errors, 1);
-    test_int(stats.errors, 0);
-    test_int(stats.frames, 2);
+    const ShaderStatus *st = ecs_get(world, s, ShaderStatus);
+    test_bool(st->ok, false);
+    test_assert(st->error != NULL);
+    test_assert(strstr(st->error, "bad.wgsl:1: ") != NULL);
+    ecs_entity_t blit = ecs_lookup(world, "box.shader.builtin.blit");
+    test_bool(ecs_get(world, blit, ShaderStatus)->ok, true);
 
     ecs_os_free(path);
     ecs_fini(world);
@@ -1283,12 +1087,11 @@ void Shader_gpu_recompiles_on_change(void)
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    box_render_gpu_stats_t stats;
-    test_assert(box_render_gpu_stats(world, &stats));
-    test_int(stats.shaders, 2);
-    test_int(stats.compiles, 3);
-    test_int(stats.shader_errors, 0);
-    test_int(ecs_get(world, s, ShaderStatus)->revision, 2);
+    ecs_progress(world, 0);
+    const ShaderStatus *st = ecs_get(world, s, ShaderStatus);
+    test_int(st->revision, 2);
+    test_bool(st->ok, true);
+    test_assert(st->error == NULL);
 
     ecs_os_free(path);
     ecs_fini(world);

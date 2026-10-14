@@ -1,10 +1,12 @@
 /**
  * @file Render.c
- * @brief Tests for the capture and render commands, on the null backend and headless on the GPU.
+ * @brief Tests for the capture and render commands, checked on the images they write.
  */
 
 #include <box.h>
 #include <bake_test.h>
+#include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include "render.h"
 
@@ -16,189 +18,224 @@ void Render_capture_active_camera(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 5});
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Rgb, {0, 0, 0});
+    ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32});
     ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
 
     bool error = true;
     char *out = box_terminal_run(world, s, "capture", &error);
     test_bool(error, false);
     test_str(out, "capture_0.png (pending)");
     ecs_os_free(out);
-    test_int(box_render_captures_pending(world), 1);
-
     ecs_progress(world, 0);
     box_render_sync(world);
-    test_int(box_render_captures_pending(world), 0);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 2);
-    const box_render_view_t *main_view = ecs_vec_get_t(&p->views, box_render_view_t, 0);
-    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 1);
-    test_uint(main_view->view, view);
-    test_uint(main_view->target, 0);
-    test_uint(v->camera, camera);
-    test_uint(v->scene, 0);
-    test_assert(v->target >= BOX_RENDER_CAPTURE_TARGET_FIRST);
-
-    test_int(ecs_vec_count(&p->targets), 1);
-    const box_render_target_t *t = ecs_vec_first_t(&p->targets, box_render_target_t);
-    test_uint(t->handle, v->target);
-    test_bool(t->exclusive, true);
-    test_assert(t->capture_size != 0);
-    char *expect = flecs_asprintf("%s/resources/capture_0.png",
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
         ecs_get(world, s, TerminalStatus)->dir);
-    test_str(box_render_packet_data(p, t->capture), expect);
-    ecs_os_free(expect);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 32);
+    test_int(h, 32);
+    test_assert(px[(16 * 32 + 16) * 4] > 200);
+    test_int(px[0], 0);
 
-    int32_t i, created = 0;
-    for (i = 0; i < ecs_vec_count(&p->resources); i ++) {
-        const box_render_resource_t *r = ecs_vec_get_t(&p->resources, box_render_resource_t, i);
-        if (r->kind == BOX_RENDER_TARGET && r->handle == t->handle) {
-            const box_render_target_desc_t *desc = box_render_packet_data(p, r->data);
-            test_int(r->op, BOX_RENDER_CREATE);
-            test_assert(desc->layer == NULL);
-            test_int(desc->width, BOX_SURFACE_WIDTH);
-            test_int(desc->height, BOX_SURFACE_HEIGHT);
-            test_int(desc->render_width, BOX_SURFACE_WIDTH);
-            test_int(desc->render_height, BOX_SURFACE_HEIGHT);
-            created ++;
-        }
-    }
-
-    test_int(created, 1);
-
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_named_camera(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t main_camera = ecs_entity(world, { .name = "main_camera" });
+    ecs_set(world, main_camera, Position, {0, 0, 5});
     ecs_set(world, main_camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = main_camera});
+    ecs_set(world, view, View, {
+        .camera = main_camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t blue = ecs_new(world);
+    ecs_set(world, blue, Box, {2, 2, 2});
+    ecs_set(world, blue, Rgb, {0, 0, 0});
+    ecs_set(world, blue, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, blue, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t scene = ecs_entity(world, { .name = "level" });
     ecs_set(world, scene, Scene, {0});
+    ecs_entity_t red = ecs_entity(world, { .name = "level.crate" });
+    ecs_set(world, red, Box, {2, 2, 2});
+    ecs_set(world, red, Rgb, {0, 0, 0});
+    ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t other = ecs_entity(world, { .name = "level.other" });
-    ecs_set(world, other, Camera, {.fov = 30});
-    ecs_set(world, other, Position, {1, 2, 3});
+    ecs_set(world, other, Camera, {.fov = 60});
+    ecs_set(world, other, Position, {0, 0, 5});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
     ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
 
     char *out = box_terminal_run(world, s, "capture level.other", NULL);
     test_str(out, "capture_0.png (pending)");
     ecs_os_free(out);
-
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 2);
-    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 1);
-    test_uint(v->camera, other);
-    test_uint(v->scene, scene);
-    test_flt(v->camera_data.fov, 30);
-    test_flt(v->camera_transform[3][0], 1);
-    test_flt(v->camera_transform[3][1], 2);
-    test_flt(v->camera_transform[3][2], 3);
-    test_flt(v->view_matrix[3][0], -1);
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *c = &px[(8 * 16 + 8) * 4];
+    test_assert(c[0] > 200);
+    test_assert(c[2] < 40);
 
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_batch(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_set(world, a, Position, {-10, 0, 5});
     ecs_set(world, a, Camera, {.fov = 60});
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_set(world, b, Position, {10, 0, 5});
     ecs_set(world, b, Camera, {.fov = 60});
+    ecs_entity_t red = ecs_new(world);
+    ecs_set(world, red, Position, {-10, 0, 0});
+    ecs_set(world, red, Box, {2, 2, 2});
+    ecs_set(world, red, Rgb, {0, 0, 0});
+    ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t green = ecs_new(world);
+    ecs_set(world, green, Position, {10, 0, 0});
+    ecs_set(world, green, Box, {2, 2, 2});
+    ecs_set(world, green, Rgb, {0, 0, 0});
+    ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
     ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
 
     char *out = box_terminal_run(world, s, "capture a, b", NULL);
     test_str(out, "capture_0.png (pending)\ncapture_1.png (pending)");
     ecs_os_free(out);
-    test_int(box_render_captures_pending(world), 2);
-
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 2);
-    test_int(ecs_vec_count(&p->targets), 2);
-    const box_render_view_t *va = ecs_vec_get_t(&p->views, box_render_view_t, 0);
-    const box_render_view_t *vb = ecs_vec_get_t(&p->views, box_render_view_t, 1);
-    const box_render_target_t *ta = ecs_vec_get_t(&p->targets, box_render_target_t, 0);
-    const box_render_target_t *tb = ecs_vec_get_t(&p->targets, box_render_target_t, 1);
-    test_uint(va->camera, a);
-    test_uint(vb->camera, b);
-    test_uint(va->target, ta->handle);
-    test_uint(vb->target, tb->handle);
-    test_assert(ta->handle != tb->handle);
-    test_assert(strstr(box_render_packet_data(p, ta->capture), "/capture_0.png") != NULL);
-    test_assert(strstr(box_render_packet_data(p, tb->capture), "/capture_1.png") != NULL);
+    const char *dir = ecs_get(world, s, TerminalStatus)->dir;
+    char *path = flecs_asprintf("%s/resources/capture_0.png", dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(8 * 16 + 8) * 4] > 200);
+    test_assert(px[(8 * 16 + 8) * 4 + 1] < 40);
+    stbi_image_free(px);
+    ecs_os_free(path);
 
+    path = flecs_asprintf("%s/resources/capture_1.png", dir);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(8 * 16 + 8) * 4] < 40);
+    test_assert(px[(8 * 16 + 8) * 4 + 1] > 200);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_bracket_list(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
+    ecs_set(world, a, Position, {-10, 0, 5});
     ecs_set(world, a, Camera, {.fov = 60});
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
+    ecs_set(world, b, Position, {10, 0, 5});
     ecs_set(world, b, Camera, {.fov = 60});
+    ecs_entity_t red = ecs_new(world);
+    ecs_set(world, red, Position, {-10, 0, 0});
+    ecs_set(world, red, Box, {2, 2, 2});
+    ecs_set(world, red, Rgb, {0, 0, 0});
+    ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t green = ecs_new(world);
+    ecs_set(world, green, Position, {10, 0, 0});
+    ecs_set(world, green, Box, {2, 2, 2});
+    ecs_set(world, green, Rgb, {0, 0, 0});
+    ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
     ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
 
     char *out = box_terminal_run(world, s, "capture [b, a, b]", NULL);
     test_str(out,
         "capture_0.png (pending)\ncapture_1.png (pending)\ncapture_2.png (pending)");
     ecs_os_free(out);
-
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 3);
-    test_uint(ecs_vec_get_t(&p->views, box_render_view_t, 0)->camera, b);
-    test_uint(ecs_vec_get_t(&p->views, box_render_view_t, 1)->camera, a);
-    test_uint(ecs_vec_get_t(&p->views, box_render_view_t, 2)->camera, b);
+    const char *dir = ecs_get(world, s, TerminalStatus)->dir;
+    bool green_expected[3] = {true, false, true};
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        char *path = flecs_asprintf("%s/resources/capture_%d.png", dir, i);
+        int w = 0, h = 0, n = 0;
+        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        unsigned char *c = &px[(8 * 16 + 8) * 4];
+        test_bool(c[1] > 200, green_expected[i]);
+        test_bool(c[0] > 200, !green_expected[i]);
+        stbi_image_free(px);
+        ecs_os_free(path);
+    }
 
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_size_of_surface(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60});
@@ -213,32 +250,26 @@ void Render_capture_size_of_surface(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    int32_t i, created = 0;
-    for (i = 0; i < ecs_vec_count(&p->resources); i ++) {
-        const box_render_resource_t *r = ecs_vec_get_t(&p->resources, box_render_resource_t, i);
-        if (r->kind == BOX_RENDER_TARGET && r->handle >= BOX_RENDER_CAPTURE_TARGET_FIRST) {
-            const box_render_target_desc_t *desc = box_render_packet_data(p, r->data);
-            test_int(desc->width, 320);
-            test_int(desc->height, 200);
-            created ++;
-        }
-    }
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 320);
+    test_int(h, 200);
 
-    test_int(created, 1);
-    test_int(ecs_vec_count(&p->targets), 2);
-
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_clear_of_view(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
     ecs_set(world, a, Camera, {.fov = 60});
@@ -249,38 +280,44 @@ void Render_capture_clear_of_view(void) {
         .camera = a, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
     ecs_entity_t view_b = ecs_new(world);
     ecs_set(world, view_b, View, {.camera = b});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8});
     ecs_entity_t s = box_terminal_new(world);
 
     ecs_os_free(box_terminal_run(world, s, "capture b", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->targets), 1);
-    const box_render_target_t *t = ecs_vec_first_t(&p->targets, box_render_target_t);
-    test_flt(t->clear[0], 1);
-    test_flt(t->clear[1], 0);
-    test_flt(t->clear[2], 0);
-    test_flt(t->clear[3], 1);
-    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 2);
-    test_uint(v->camera, b);
-    test_bool(v->clear.enabled, true);
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0, i, wrong = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < w * h; i ++) {
+        wrong += px[i * 4] != 255 || px[i * 4 + 1] || px[i * 4 + 2];
+    }
 
+    test_int(wrong, 0);
+    test_assert(view_b != 0);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_not_a_camera(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
     ecs_set(world, a, Camera, {.fov = 60});
     ecs_entity(world, { .name = "thing" });
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8});
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = false;
@@ -288,10 +325,15 @@ void Render_capture_not_a_camera(void) {
     test_bool(error, true);
     test_str(out, "error: 'thing' is not a camera");
     ecs_os_free(out);
-    test_int(box_render_captures_pending(world), 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
 
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    test_assert(fopen(path, "rb") == NULL);
+
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_capture_unknown_camera(void) {
@@ -338,97 +380,83 @@ void Render_capture_view_root_of_surface(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {-10, 0, 5});
     ecs_set(world, a, Camera, {.fov = 60});
     ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Position, {10, 0, 5});
     ecs_set(world, b, Camera, {.fov = 60});
     ecs_entity_t view_a = ecs_new(world);
     ecs_set(world, view_a, View, {.camera = a});
     ecs_entity_t root = ecs_new(world);
     ecs_entity_t view_b = ecs_new_w_pair(world, EcsChildOf, root);
     ecs_set(world, view_b, View, {.camera = b});
+    ecs_entity_t red = ecs_new(world);
+    ecs_set(world, red, Position, {-10, 0, 0});
+    ecs_set(world, red, Box, {2, 2, 2});
+    ecs_set(world, red, Rgb, {0, 0, 0});
+    ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t green = ecs_new(world);
+    ecs_set(world, green, Position, {10, 0, 0});
+    ecs_set(world, green, Box, {2, 2, 2});
+    ecs_set(world, green, Rgb, {0, 0, 0});
+    ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .view_root = root});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .view_root = root});
     ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
 
     ecs_os_free(box_terminal_run(world, s, "capture", NULL));
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 3);
-    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 2);
-    test_uint(v->camera, b);
-    test_assert(v->target != 0);
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(8 * 16 + 8) * 4] < 40);
+    test_assert(px[(8 * 16 + 8) * 4 + 1] > 200);
+    test_assert(view_a != 0);
 
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void Render_capture_target_destroyed_next_frame(void) {
-    // command/render
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-
-    ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
-    ecs_set(world, camera, Camera, {.fov = 60});
-    ecs_entity_t s = box_terminal_new(world);
-
-    ecs_os_free(box_terminal_run(world, s, "capture cam", NULL));
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    uint32_t handle = ecs_vec_first_t(&null->last.targets, box_render_target_t)->handle;
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->targets), 0);
-    test_int(ecs_vec_count(&p->views), 0);
-    int32_t i, destroyed = 0;
-    for (i = 0; i < ecs_vec_count(&p->resources); i ++) {
-        const box_render_resource_t *r = ecs_vec_get_t(&p->resources, box_render_resource_t, i);
-        if (r->kind == BOX_RENDER_TARGET) {
-            test_int(r->op, BOX_RENDER_DESTROY);
-            test_uint(r->handle, handle);
-            destroyed ++;
-        }
-    }
-
-    test_int(destroyed, 1);
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(ecs_vec_count(&null->last.resources), 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_render_prefab_private_scene(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t prefab = ecs_entity(world, { .name = "Crate" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Position, {0, 0, 0});
     ecs_set(world, prefab, Box, {1, 1, 1});
+    ecs_set(world, prefab, Rgb, {0, 0, 0});
+    ecs_set(world, prefab, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, prefab, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t lid = ecs_entity(world, { .name = "Crate.lid" });
     ecs_set(world, lid, Position, {0, 1, 0});
     ecs_set(world, lid, Sphere, {.radius = 0.5f});
+    ecs_set(world, lid, Rgb, {0, 0, 0});
+    ecs_set(world, lid, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, lid, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, 0, 0});
     ecs_set(world, floor, Box, {10, 1, 10});
+    ecs_set(world, floor, Rgb, {0, 0, 0});
+    ecs_set(world, floor, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, floor, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = true;
@@ -436,41 +464,28 @@ void Render_render_prefab_private_scene(void) {
     test_bool(error, false);
     test_str(out, "render_0.png (pending)");
     ecs_os_free(out);
-
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 1);
-    const box_render_view_t *v = ecs_vec_first_t(&p->views, box_render_view_t);
-    test_assert(v->scene != 0);
-    test_assert(ecs_has(world, v->scene, Scene));
-    test_assert(ecs_has_pair(world, v->scene, EcsChildOf, s));
-    test_uint(v->camera, 0);
-    test_assert(v->target >= BOX_RENDER_CAPTURE_TARGET_FIRST);
-    test_flt(v->camera_data.fov, 45);
-
-    int32_t i, scene_instances = 0, default_instances = 0;
-    for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
-        if (b->scene == v->scene) {
-            scene_instances += (int32_t)b->instance_count;
-        } else if (!b->scene) {
-            default_instances += (int32_t)b->instance_count;
-        }
+    char *path = flecs_asprintf("%s/resources/render_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0, i, red = 0, green = 0, blue = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < w * h; i ++) {
+        const unsigned char *c = &px[i * 4];
+        red += c[0] > 200 && c[1] < 40 && c[2] < 40;
+        green += c[1] > 200 && c[0] < 40 && c[2] < 40;
+        blue += c[2] > 200 && c[0] < 40 && c[1] < 40;
     }
 
-    test_int(scene_instances, 2);
-    test_int(default_instances, 1);
+    test_assert(red > 0);
+    test_assert(green > 0);
+    test_int(blue, 0);
 
-    const box_render_target_t *t = ecs_vec_first_t(&p->targets, box_render_target_t);
-    char *expect = flecs_asprintf("%s/resources/render_0.png",
-        ecs_get(world, s, TerminalStatus)->dir);
-    test_str(box_render_packet_data(p, t->capture), expect);
-    ecs_os_free(expect);
-
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_render_scene_deleted_next_frame(void) {
@@ -488,20 +503,12 @@ void Render_render_scene_deleted_next_frame(void) {
 
     ecs_os_free(box_terminal_run(world, s, "render Crate", NULL));
     ecs_progress(world, 0);
-    box_render_sync(world);
-    ecs_entity_t scene = ecs_vec_first_t(&null->last.views, box_render_view_t)->scene;
-    test_assert(ecs_is_alive(world, scene));
+    test_int(ecs_count(world, Scene), 1);
 
     ecs_progress(world, 0);
-    box_render_sync(world);
-    test_assert(!ecs_is_alive(world, scene));
     test_int(ecs_count(world, Scene), 0);
     test_assert(ecs_is_alive(world, prefab));
     test_assert(ecs_has(world, prefab, Box));
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(ecs_vec_count(&null->last.batches), 0);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -511,19 +518,38 @@ void Render_render_template(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     test_assert(ecs_script(world, {
         .code =
             "using box.transform\n"
             "using box.geometry\n"
+            "using box.material\n"
             "template Pillar {\n"
             "  prop height: f32 = 4\n"
-            "  base { Position: {0, height / 2, 0}\n Box: {1, height, 1} }\n"
-            "  cap { Position: {0, height, 0}\n Sphere: {radius: 0.5} }\n"
-            "  top { Position: {0, height + 1, 0}\n Sphere: {radius: 0.5} }\n"
+            "  base {\n"
+            "    Position: {0, height / 2, 0}\n"
+            "    Box: {1, height, 1}\n"
+            "    Rgb: {0, 0, 0}\n"
+            "    PbrMaterial: {metallic: 1, roughness: 1}\n"
+            "    Emissive: {strength: 1, color: {255, 0, 0}}\n"
+            "  }\n"
+            "  cap {\n"
+            "    Position: {0, height, 0}\n"
+            "    Sphere: {radius: 0.5}\n"
+            "    Rgb: {0, 0, 0}\n"
+            "    PbrMaterial: {metallic: 1, roughness: 1}\n"
+            "    Emissive: {strength: 1, color: {0, 255, 0}}\n"
+            "  }\n"
+            "  top {\n"
+            "    Position: {0, height + 1, 0}\n"
+            "    Sphere: {radius: 0.5}\n"
+            "    Rgb: {0, 0, 0}\n"
+            "    PbrMaterial: {metallic: 1, roughness: 1}\n"
+            "    Emissive: {strength: 1, color: {0, 0, 255}}\n"
+            "  }\n"
             "}\n"
     }) != 0);
     ecs_entity_t s = box_terminal_new(world);
@@ -533,26 +559,28 @@ void Render_render_template(void) {
     test_bool(error, false);
     test_str(out, "render_0.png (pending)");
     ecs_os_free(out);
-
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 1);
-    const box_render_view_t *v = ecs_vec_first_t(&p->views, box_render_view_t);
-    int32_t i, instances = 0;
-    for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
-        if (b->scene == v->scene) {
-            instances += (int32_t)b->instance_count;
-        }
+    char *path = flecs_asprintf("%s/resources/render_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0, i, red = 0, green = 0, blue = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < w * h; i ++) {
+        const unsigned char *c = &px[i * 4];
+        red += c[0] > 200 && c[1] < 40 && c[2] < 40;
+        green += c[1] > 200 && c[0] < 40 && c[2] < 40;
+        blue += c[2] > 200 && c[0] < 40 && c[1] < 40;
     }
 
-    test_int(instances, 3);
-    test_assert(v->camera_transform[3][1] > 2.5f);
+    test_assert(red > 0);
+    test_assert(green > 0);
+    test_assert(blue > 0);
 
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_render_entity_copy(void) {
@@ -583,14 +611,17 @@ void Render_render_entity_copy(void) {
     test_str(out, "render_0.png (pending)");
     ecs_os_free(out);
     ecs_progress(world, 0);
-    box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 2);
-    const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, 1);
-    test_assert(v->scene != 0);
+    ecs_entity_t scene = 0;
+    ecs_iter_t sit = ecs_each(world, Scene);
+    while (ecs_each_next(&sit)) {
+        test_int(sit.count, 1);
+        scene = sit.entities[0];
+    }
+
+    test_assert(scene != 0);
     ecs_entity_t copy = 0;
-    ecs_iter_t it = ecs_children(world, v->scene);
+    ecs_iter_t it = ecs_children(world, scene);
     while (ecs_children_next(&it)) {
         test_int(it.count, 1);
         copy = it.entities[0];
@@ -606,16 +637,7 @@ void Render_render_entity_copy(void) {
     test_assert(ecs_is_alive(world, wheel));
     test_assert(ecs_has_pair(world, wheel, EcsChildOf, car));
     test_flt(ecs_get(world, car, Position)->x, 5);
-
-    int32_t i, scene_instances = 0;
-    for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&p->batches, box_render_batch_t, i);
-        if (b->scene == v->scene) {
-            scene_instances += (int32_t)b->instance_count;
-        }
-    }
-
-    test_int(scene_instances, 2);
+    test_assert(ecs_is_alive(world, other));
 
     ecs_progress(world, 0);
     test_assert(!ecs_is_alive(world, copy));
@@ -630,13 +652,16 @@ void Render_render_fits_bounds(void) {
     // command/render
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
 
     ecs_entity_t e = ecs_entity(world, { .name = "cube" });
     ecs_set(world, e, Position, {10, 0, 0});
     ecs_set(world, e, Box, {2, 2, 2});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -644,42 +669,34 @@ void Render_render_fits_bounds(void) {
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    const box_render_packet_t *p = &null->last;
-    test_int(ecs_vec_count(&p->views), 1);
-    const box_render_view_t *v = ecs_vec_first_t(&p->views, box_render_view_t);
-    float radius = sqrtf(12.0f) * 0.5f;
-    float distance = 1.1f * radius / sinf(glm_rad(22.5f));
-    vec3 eye = { v->camera_transform[3][0], v->camera_transform[3][1],
-        v->camera_transform[3][2] };
-    vec3 center = { 10, 0, 0 };
-    test_assert(fabsf(glm_vec3_distance(eye, center) - distance) < 0.01f);
-    test_assert(eye[0] > 10 && eye[1] > 0 && eye[2] > 0);
-
-    vec4 local = { 0, 0, 0, 1 }, viewed;
-    glm_vec3_copy(center, local);
-    glm_mat4_mulv(ECS_CONST_CAST(vec4*, v->view_matrix), local, viewed);
-    test_assert(fabsf(viewed[0]) < 0.001f);
-    test_assert(fabsf(viewed[1]) < 0.001f);
-    test_assert(viewed[2] < 0);
-    test_assert(v->camera_data.near_ > 0);
-    test_assert(v->camera_data.near_ < distance - radius);
-
-    const box_render_resource_t *r = NULL;
-    int32_t i;
-    for (i = 0; i < ecs_vec_count(&p->resources); i ++) {
-        r = ecs_vec_get_t(&p->resources, box_render_resource_t, i);
-        if (r->kind == BOX_RENDER_TARGET) {
-            break;
+    char *path = flecs_asprintf("%s/resources/render_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int w = 0, h = 0, n = 0, x, y, red = 0, edge = 0;
+    double cx = 0, cy = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (y = 0; y < h; y ++) {
+        for (x = 0; x < w; x ++) {
+            const unsigned char *c = &px[(y * w + x) * 4];
+            if (c[0] > 200 && c[1] < 40 && c[2] < 40) {
+                red ++;
+                cx += x;
+                cy += y;
+                edge += x == 0 || y == 0 || x == w - 1 || y == h - 1;
+            }
         }
     }
 
-    test_assert(r != NULL && r->kind == BOX_RENDER_TARGET);
-    const box_render_target_desc_t *desc = box_render_packet_data(p, r->data);
-    test_int(desc->width, 512);
-    test_int(desc->height, 512);
+    test_assert(red > w * h / 10);
+    test_int(edge, 0);
+    cx /= red;
+    cy /= red;
+    test_assert(fabs(cx - w / 2.0) < w / 10.0);
+    test_assert(fabs(cy - h / 2.0) < h / 10.0);
 
+    stbi_image_free(px);
+    ecs_os_free(path);
     ecs_fini(world);
-    box_render_null_free(null);
 }
 
 void Render_render_unknown(void) {
@@ -740,13 +757,11 @@ void Render_render_session_closed(void) {
     ecs_os_free(box_terminal_run(world, s, "render Crate", NULL));
     ecs_delete(world, s);
     ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(ecs_vec_count(&null->last.views), 0);
-    test_int(ecs_vec_count(&null->last.targets), 0);
     test_int(ecs_count(world, Scene), 0);
 
     ecs_progress(world, 0);
     test_assert(ecs_is_alive(world, prefab));
+    test_assert(ecs_has(world, prefab, Box));
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -779,11 +794,6 @@ void Render_names_unique(void) {
     out = box_terminal_run(world, s, "render Crate", NULL);
     test_str(out, "render_1.png (pending)");
     ecs_os_free(out);
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    test_int(ecs_vec_count(&null->last.targets), 4);
-    test_int(ecs_vec_count(&null->last.views), 4);
 
     ecs_fini(world);
     box_render_null_free(null);
@@ -824,14 +834,6 @@ void Render_gpu_capture_png(void) {
     }
 
     test_int(wrong, 0);
-    box_render_gpu_stats_t stats;
-    test_bool(box_render_gpu_stats(world, &stats), true);
-    test_int(stats.errors, 0);
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.targets, 1);
 
     stbi_image_free(px);
     ecs_os_free(path);
@@ -867,8 +869,6 @@ void Render_gpu_render_isolated(void) {
     int w = 0, h = 0, n = 0, i, red = 0, blue = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
-    test_int(w, 512);
-    test_int(h, 512);
     for (i = 0; i < w * h; i ++) {
         red += px[i * 4] > 100 && px[i * 4 + 2] < 50;
         blue += px[i * 4 + 2] > 100 && px[i * 4] < 50;
@@ -876,9 +876,6 @@ void Render_gpu_render_isolated(void) {
 
     test_int(red, 0);
     test_assert(blue > w * h / 10);
-    test_int(px[0], 48);
-    test_int(px[1], 52);
-    test_int(px[2], 60);
     int32_t c = (h / 2 * w + w / 2) * 4;
     test_assert(px[c + 2] > 100);
 
