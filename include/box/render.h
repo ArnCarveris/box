@@ -40,6 +40,7 @@ ECS_STRUCT(RenderStatus, {
     int32_t in_flight;  /**< Packets submitted or being filled that are not yet rendered */
     int32_t stalls;     /**< Frames the main thread waited for a free packet */
     bool threaded;      /**< A render thread consumes the packets */
+    int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged */
 });
 
 /** Register the box.render module.

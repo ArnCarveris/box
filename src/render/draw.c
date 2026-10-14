@@ -354,6 +354,11 @@ static void BoxRenderExtractDraws(
     d->stats.upload_bytes = 0;
     box_draws_process(world, d);
     box_draws_send(world, d, p);
+    RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
+    if (status) {
+        status->upload_bytes = d->stats.upload_bytes;
+    }
+
 done:
     return;
 }
