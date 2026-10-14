@@ -4,7 +4,7 @@
  * window, to the world owning the window.
  *
  * glfw runs the callbacks inside glfwPollEvents on the main thread, which box.surface calls once
- * per frame in SurfacePoll, before InputUpdate applies the events of the frame.
+ * per frame in SurfacePoll (PreFrame), before InputUpdate (OnLoad) applies them.
  */
 
 #include "input.h"
@@ -134,7 +134,8 @@ static void box_glfw_scroll(
     box_glfw_push(window, &(InputEvent){ .kind = InputScroll, .value = { (float)x, (float)y } });
 }
 
-/** Push a focus change.
+/** Push a focus change. A gain first reports where the cursor is, because macOS sends no
+ * cursor moves to a window without focus and the click that focuses it has no move of its own.
  *
  * @param window The glfw window
  * @param focused Nonzero when the window has keyboard focus
@@ -143,6 +144,12 @@ static void box_glfw_focus(
     GLFWwindow *window,
     int focused)
 {
+    double x = 0, y = 0;
+    if (focused) {
+        glfwGetCursorPos(window, &x, &y);
+        box_glfw_cursor(window, x, y);
+    }
+
     box_glfw_push(window, &(InputEvent){ .kind = InputFocus, .code = focused ? 1 : 0 });
 }
 

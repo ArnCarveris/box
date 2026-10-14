@@ -193,7 +193,7 @@ void box_input_platform_set(
  * always apply. The delay of the event is ignored.
  *
  * Only events of Input.surface apply, or of any surface while it is 0. A focus gain of another
- * surface releases the held keys and gives it the input at the size it last reported.
+ * surface releases the held keys; a surface gaining focus takes its last size and cursor.
  *
  * @param world The world
  * @param event The event

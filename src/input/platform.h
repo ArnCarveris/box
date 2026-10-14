@@ -18,8 +18,8 @@ typedef struct box_input_glfw_target_t {
 
 /** Send the events of a glfw window, stamped with its surface, to the input of a world.
  *
- * box.surface polls glfw once per frame in SurfacePoll, which runs before InputUpdate, so the
- * events of a frame apply in that frame. Does nothing when the world has not imported box.input.
+ * box.surface polls glfw once per frame in SurfacePoll, in the PreFrame phase before the OnLoad
+ * InputUpdate, so the events of a frame apply in that frame. Does nothing without box.input.
  *
  * @param target World and surface of the window, must outlive the callbacks
  * @param window The GLFWwindow
@@ -30,6 +30,9 @@ void box_input_glfw_attach(
 
 /** Send the events of the page canvas, stamped with a surface, to the input of a world by
  * installing the browser backend, unless the world already has a backend.
+ *
+ * Like the renderer, the backend gives the canvas to the next surface once its surface is gone:
+ * the surface attached next, else the first surface without a texture.
  *
  * Does nothing when the world has not imported box.input or the page has no canvas.
  *

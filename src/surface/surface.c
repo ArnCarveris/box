@@ -609,7 +609,7 @@ void BoxSurfaceImport(
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "SurfacePoll" }),
-        .phase = EcsOnLoad,
+        .phase = EcsPreFrame,
         .query.terms = {{ .id = ecs_id(SurfaceImpl), .inout = EcsIn }},
         .run = BoxSurfacePoll
     });

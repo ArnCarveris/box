@@ -292,63 +292,99 @@ static void box_input_move(
     box_input_emit_mouse(dev, in, 0);
 }
 
-/** Find the size a surface last reported.
+/** Find what a surface last reported.
  *
  * @param dev The device state
  * @param surface The surface
- * @return The entry of the surface, NULL when it never reported a size
+ * @return The entry of the surface, NULL when it never sent a size or a move
  */
-static box_input_surface_size_t* box_input_surface_size(
+static box_input_surface_t* box_input_surface_find(
     InputDevice *dev,
     ecs_entity_t surface)
 {
-    box_input_surface_size_t *sizes = ecs_vec_first_t(&dev->sizes, box_input_surface_size_t);
-    box_input_surface_size_t *result = NULL;
+    box_input_surface_t *surfaces = ecs_vec_first_t(&dev->surfaces, box_input_surface_t);
+    box_input_surface_t *result = NULL;
     int32_t i;
-    for (i = 0; i < ecs_vec_count(&dev->sizes) && !result; i ++) {
-        if (sizes[i].surface == surface) {
-            result = &sizes[i];
+    for (i = 0; i < ecs_vec_count(&dev->surfaces) && !result; i ++) {
+        if (surfaces[i].surface == surface) {
+            result = &surfaces[i];
         }
     }
 
     return result;
 }
 
-/** Remember the size a surface reported, forgetting the surfaces that no longer exist.
+/** Remember the size or cursor position a surface reported, forgetting the surfaces that no
+ * longer exist when a new one is added.
  *
  * @param world The world
  * @param dev The device state
- * @param ev The resize event of the surface
+ * @param ev A resize or move event of the surface
  */
-static void box_input_surface_resize(
+static void box_input_surface_remember(
     ecs_world_t *world,
     InputDevice *dev,
     const InputEvent *ev)
 {
-    box_input_surface_size_t *entry = box_input_surface_size(dev, ev->surface);
-    box_input_surface_size_t *sizes;
+    box_input_surface_t *entry = box_input_surface_find(dev, ev->surface);
+    box_input_surface_t *surfaces;
     int32_t i = 0;
     if (!entry) {
-        sizes = ecs_vec_first_t(&dev->sizes, box_input_surface_size_t);
-        while (i < ecs_vec_count(&dev->sizes)) {
-            if (ecs_is_alive(world, sizes[i].surface)) {
+        surfaces = ecs_vec_first_t(&dev->surfaces, box_input_surface_t);
+        while (i < ecs_vec_count(&dev->surfaces)) {
+            if (ecs_is_alive(world, surfaces[i].surface)) {
                 i ++;
             } else {
-                sizes[i] = sizes[ecs_vec_count(&dev->sizes) - 1];
-                ecs_vec_remove_last(&dev->sizes);
+                surfaces[i] = surfaces[ecs_vec_count(&dev->surfaces) - 1];
+                ecs_vec_remove_last(&dev->surfaces);
             }
         }
 
-        entry = ecs_vec_append_t(NULL, &dev->sizes, box_input_surface_size_t);
+        entry = ecs_vec_append_t(NULL, &dev->surfaces, box_input_surface_t);
+        ecs_os_zeromem(entry);
         entry->surface = ev->surface;
     }
 
-    entry->size[0] = ev->value[0];
-    entry->size[1] = ev->value[1];
+    if (ev->kind == InputResize) {
+        entry->size[0] = ev->value[0];
+        entry->size[1] = ev->value[1];
+        entry->has_size = true;
+    } else if (!ev->normalized) {
+        entry->position[0] = ev->value[0];
+        entry->position[1] = ev->value[1];
+        entry->has_position = true;
+    }
+}
+
+/** Give the input to a surface that gains the focus: its last reported size and, unless a
+ * synthetic cursor is pinned, its last cursor position, from which the next move measures.
+ *
+ * @param dev The device state
+ * @param in The Input singleton
+ * @param surface The surface
+ */
+static void box_input_surface_take(
+    InputDevice *dev,
+    Input *in,
+    ecs_entity_t surface)
+{
+    const box_input_surface_t *entry = box_input_surface_find(dev, surface);
+    in->surface = surface;
+    dev->has_position = false;
+    if (entry && entry->has_size) {
+        in->size[0] = entry->size[0];
+        in->size[1] = entry->size[1];
+    }
+
+    if (entry && entry->has_position && !in->mouse.pinned) {
+        in->mouse.position[0] = entry->position[0];
+        in->mouse.position[1] = entry->position[1];
+        dev->has_position = true;
+    }
 }
 
 /** Change the focus, releasing every held key and action when it is lost or moves to another
- * surface, which then takes the input with its last reported size.
+ * surface. A surface that gains the focus takes the input at its last cursor position.
  *
  * @param dev The device state
  * @param in The Input singleton
@@ -361,23 +397,17 @@ static void box_input_set_focus(
 {
     bool focused = ev->code != 0;
     bool moved = focused && ev->surface && ev->surface != in->surface;
-    const box_input_surface_size_t *size;
     if (!focused || moved) {
         box_input_release_all(dev, in);
         box_input_hold_release_all(dev);
     }
 
-    if (focused != in->focused || moved) {
+    if (focused != in->focused) {
         dev->has_position = false;
     }
 
-    if (moved) {
-        in->surface = ev->surface;
-        size = box_input_surface_size(dev, ev->surface);
-        if (size) {
-            in->size[0] = size->size[0];
-            in->size[1] = size->size[1];
-        }
+    if (ev->surface && focused && (moved || !in->focused)) {
+        box_input_surface_take(dev, in, ev->surface);
     }
 
     in->focused = focused;
@@ -457,11 +487,11 @@ static bool box_input_platform_accept(
 {
     bool own = !ev->surface || !in->surface || ev->surface == in->surface;
     bool result;
-    if (ev->kind == InputResize) {
-        if (ev->surface) {
-            box_input_surface_resize(world, dev, ev);
-        }
+    if (ev->surface && (ev->kind == InputResize || ev->kind == InputMove)) {
+        box_input_surface_remember(world, dev, ev);
+    }
 
+    if (ev->kind == InputResize) {
         result = own;
     } else if (ev->kind == InputFocus) {
         result = own || ev->code != 0;

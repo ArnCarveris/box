@@ -128,7 +128,9 @@
                     "surfaces_input_follows_focus",
                     "surfaces_focus_lost",
                     "surfaces_untagged_events",
-                    "surfaces_deleted_surface"
+                    "surfaces_deleted_surface",
+                    "surfaces_focus_takes_cursor",
+                    "surfaces_focus_keeps_pinned_cursor"
                 ]
             }
         ]

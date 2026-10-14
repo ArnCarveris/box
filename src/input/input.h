@@ -43,11 +43,14 @@ typedef struct box_input_hold_t {
     bool pressed;        /**< The hold started since the actions last resolved */
 } box_input_hold_t;
 
-/** Last window size a surface reported */
-typedef struct box_input_surface_size_t {
+/** Last window size and cursor position a surface reported */
+typedef struct box_input_surface_t {
     ecs_entity_t surface; /**< The surface */
     vec2 size;            /**< Its size in points */
-} box_input_surface_size_t;
+    vec2 position;        /**< Cursor position of its last move, in its points */
+    bool has_size;        /**< The surface reported a size */
+    bool has_position;    /**< The surface reported a cursor position */
+} box_input_surface_t;
 
 /** Queues and backend of the module, a private singleton */
 typedef struct InputDevice {
@@ -59,7 +62,7 @@ typedef struct InputDevice {
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
     ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
-    ecs_vec_t sizes;               /**< box_input_surface_size_t of the surfaces that resized */
+    ecs_vec_t surfaces;            /**< box_input_surface_t of the surfaces that sent events */
     ecs_entity_t source;           /**< Surface stamped on pushed events that name none */
     bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;

@@ -22,7 +22,8 @@ typedef struct box_web_t {
     ecs_world_t *world;     /**< World the events are pushed to */
     ecs_entity_t surface;   /**< Surface that presents to the canvas, stamped on the events */
     ecs_entity_t status;    /**< SurfaceStatus component, 0 until the world has one */
-    vec2 size;              /**< Point size of the first surface, the canvas */
+    ecs_entity_t component; /**< Surface component, 0 until the world has one */
+    vec2 size;              /**< Point size of the surface that presents to the canvas */
 } box_web_t;
 
 /** Check whether the page has the canvas, which a run under node does not.
@@ -213,6 +214,42 @@ static void box_web_callbacks(
     emscripten_set_blur_callback(BOX_WEB_CANVAS, web, false, web ? box_web_focus : NULL);
 }
 
+/** Follow the canvas to another surface once its surface is gone: the first surface without a
+ * texture, which the renderer gives the canvas next.
+ *
+ * @param world The world
+ * @param web The backend state
+ */
+static void box_web_follow(
+    ecs_world_t *world,
+    box_web_t *web)
+{
+    ecs_entity_t next = 0;
+    ecs_iter_t it;
+    int32_t i;
+    if (!web->component) {
+        web->component = ecs_lookup(world, "box.surface.Surface");
+    }
+
+    if (!web->component || (web->surface && ecs_is_alive(world, web->surface))) {
+        goto done;
+    }
+
+    it = ecs_each_id(world, web->component);
+    while (ecs_each_next(&it)) {
+        const Surface *s = ecs_field_w_size(&it, sizeof(Surface), 0);
+        for (i = 0; i < it.count; i ++) {
+            if (!s[i].texture && (!next || it.entities[i] < next)) {
+                next = it.entities[i];
+            }
+        }
+    }
+
+    web->surface = next;
+done:
+    return;
+}
+
 /** Push the point size of the surface of the canvas when it changed, the poll of the backend.
  *
  * @param world The world
@@ -229,6 +266,7 @@ static void box_web_poll(
         web->status = ecs_lookup(world, "box.surface.SurfaceStatus");
     }
 
+    box_web_follow(world, web);
     s = web->status && ecs_is_alive(world, web->surface) ?
         ecs_get_id(world, web->surface, web->status) : NULL;
     if (!s) {
@@ -265,6 +303,15 @@ void box_input_web_attach(
 {
     box_web_t *web;
     if (!ecs_lookup(world, "box.input") || !box_web_has_canvas()) {
+        goto done;
+    }
+
+    if (box_input_device(world)->backend.poll == box_web_poll) {
+        web = box_input_device(world)->backend.ctx;
+        if (!web->surface || !ecs_is_alive(world, web->surface)) {
+            web->surface = surface;
+        }
+
         goto done;
     }
 
