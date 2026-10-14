@@ -146,12 +146,11 @@ void BoxCameraActionsActivate(
 {
     ecs_world_t *world = it->world;
     CameraActionMap *map = ecs_singleton_get_mut(world, CameraActionMap);
-    ecs_iter_t qit = ecs_query_iter(world, map->controllers);
     bool used = false;
     int32_t i;
-    while (ecs_query_next(&qit)) {
-        const CameraController *cc = ecs_field(&qit, CameraController, 0);
-        for (i = 0; i < qit.count; i ++) {
+    while (ecs_iter_next(it)) {
+        const CameraController *cc = ecs_field(it, CameraController, 0);
+        for (i = 0; i < it->count; i ++) {
             used = used || !cc[i].actions;
         }
     }

@@ -39,7 +39,6 @@ extern const box_controller_action_t box_camera_actions[BoxCameraActionCount];
 typedef struct CameraActionMap {
     ecs_entity_t scope;                          /**< box.controllers.camera */
     ecs_entity_t actions[BoxCameraActionCount];  /**< The actions, by box_camera_action_t */
-    ecs_query_t *controllers;                    /**< Entities with a CameraController */
     bool active;                                 /**< The actions are enabled */
 } CameraActionMap;
 

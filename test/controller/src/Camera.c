@@ -933,3 +933,20 @@ void Camera_command_action(void) {
 
     ecs_fini(world);
 }
+
+void Camera_query_entity_deleted(void) {
+    // controllers/camera_query_fini
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t q = ecs_lookup(world, "box.controllers.CameraControllers");
+    if (q) {
+        ecs_delete(world, q);
+    }
+
+    ecs_entity_t cam = ecs_entity(world, { .name = "Cam" });
+    ecs_set(world, cam, CameraController, { 0 });
+    ecs_progress(world, 0.0f);
+
+    ecs_fini(world);
+}

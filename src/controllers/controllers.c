@@ -20,27 +20,6 @@ const box_controller_action_t box_camera_actions[BoxCameraActionCount] = {
     [BoxCameraLook] = { "Look", "Turn the camera with the cursor while held", KeyMouseRight }
 };
 
-/** Release the query of the action map.
- *
- * @param ptr The components
- * @param count Number of components
- * @param ti Type info
- */
-static void box_camera_action_map_dtor(
-    void *ptr,
-    int32_t count,
-    const ecs_type_info_t *ti)
-{
-    CameraActionMap *map = ptr;
-    int32_t i;
-    (void)ti;
-    for (i = 0; i < count; i ++) {
-        if (map[i].controllers) {
-            ecs_query_fini(map[i].controllers);
-        }
-    }
-}
-
 /** Create the default camera actions, disabled and each bound to its key.
  *
  * @param world The world
@@ -75,7 +54,6 @@ void BoxControllersImport(
     ecs_set_hooks(world, CameraController, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, CameraActionMap, {
         .ctor = flecs_default_ctor,
-        .dtor = box_camera_action_map_dtor,
         .flags = ECS_TYPE_HOOK_COPY_ILLEGAL | ECS_TYPE_HOOK_MOVE_ILLEGAL
     });
     ecs_add_pair(world, ecs_id(CameraController), EcsWith, ecs_id(Position));
@@ -90,17 +68,13 @@ void BoxControllersImport(
 
     CameraActionMap *map = ecs_singleton_ensure(world, CameraActionMap);
     box_controllers_camera_actions(world, map);
-    map->controllers = ecs_query(world, {
-        .entity = ecs_entity(world, { .name = "CameraControllers" }),
-        .terms = {{ .id = ecs_id(CameraController), .inout = EcsIn }},
-        .cache_kind = EcsQueryCacheAuto
-    });
 
     box_first_person_actions_create(world, ecs_singleton_ensure(world, FirstPersonActionMap));
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "CameraActionsActivate" }),
         .phase = EcsPreFrame,
+        .query.terms = {{ .id = ecs_id(CameraController), .inout = EcsIn }},
         .run = BoxCameraActionsActivate,
         .immediate = true
     });
