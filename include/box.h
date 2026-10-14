@@ -1,5 +1,10 @@
-#ifndef TRANSFORM_H
-#define TRANSFORM_H
+/**
+ * @file box.h
+ * @brief Includes the headers of every box module.
+ */
+
+#ifndef BOX_H
+#define BOX_H
 
 /* This generated file contains includes for project dependencies */
 #include "box/bake_config.h"
@@ -14,11 +19,16 @@
 #include "box/effects.h"
 #include "box/movement.h"
 #include "box/layout.h"
+#include "box/app.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/** Register the box module and every module it contains.
+ *
+ * @param world The world
+ */
 void BoxImport(
     ecs_world_t *world);
 

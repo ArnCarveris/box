@@ -1,0 +1,91 @@
+{
+    "id": "core",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/app"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Args",
+                "testcases": [
+                    "defaults",
+                    "headless",
+                    "frames",
+                    "timeout_seconds",
+                    "timeout_infinite",
+                    "cpu_budget",
+                    "cpu_budget_percent_sign",
+                    "fps",
+                    "port",
+                    "scene",
+                    "all_options",
+                    "unknown_option",
+                    "missing_value",
+                    "invalid_frames",
+                    "invalid_timeout",
+                    "invalid_cpu_budget",
+                    "invalid_port",
+                    "two_scenes"
+                ]
+            },
+            {
+                "id": "Stop",
+                "testcases": [
+                    "frames",
+                    "timeout",
+                    "frames_before_timeout",
+                    "no_limit",
+                    "timeout_infinite",
+                    "run_headless_frames",
+                    "run_headless_requires_limit",
+                    "run_headless_timeout_infinite",
+                    "run_headless_fixed_delta",
+                    "run_loads_scene",
+                    "run_missing_scene"
+                ]
+            },
+            {
+                "id": "TmpDir",
+                "testcases": [
+                    "headless_creates_folder",
+                    "not_headless_no_folder",
+                    "parse_headless_creates_folder",
+                    "removed_at_fini"
+                ]
+            },
+            {
+                "id": "Guard",
+                "testcases": [
+                    "load_above_cores",
+                    "load_at_cores",
+                    "load_below_cores",
+                    "env_sets_unguarded",
+                    "env_zero_keeps_guard",
+                    "env_unset_keeps_guard",
+                    "run_unguarded"
+                ]
+            },
+            {
+                "id": "Pacing",
+                "testcases": [
+                    "sleep_over_budget",
+                    "no_sleep_within_budget",
+                    "budget_above_one_core",
+                    "sleeps_when_over_budget",
+                    "unpaced_never_sleeps",
+                    "not_headless_never_sleeps",
+                    "env_sets_unpaced"
+                ]
+            }
+        ]
+    }
+}
