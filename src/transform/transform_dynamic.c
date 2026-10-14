@@ -178,8 +178,9 @@ static void TransformDynamic_Unspread(
 {
     ecs_world_t *world = it->stage;
     bool inherited = ecs_table_has_id(it->world, it->table, DynamicTransformInherited);
+    int count = transformDeleting(it) ? 0 : it->count;
 
-    for (int i = 0; i < it->count; i ++) {
+    for (int i = 0; i < count; i ++) {
         if (inherited) {
             ecs_remove(world, it->entities[i], DynamicTransformInherited);
         }

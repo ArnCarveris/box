@@ -49,8 +49,8 @@ ECS_COMPONENT_DECLARE(TransformStaticDirtyEntities);
 static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
-    TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
-        it->world, TransformStaticDirtyEntities);
+    TransformStaticDirtyEntities *dirty = transformDeleting(it) ? NULL :
+        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities);
     if (dirty) {
         for (int i = 0; i < it->count; i ++) {
             ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
@@ -65,7 +65,9 @@ static void TransformStatic_OnChange(
 static void Transform_OnRemovePosition(
     ecs_iter_t *it)
 {
-    for (int i = 0; i < it->count; i ++) {
+    int count = transformDeleting(it) ? 0 : it->count;
+
+    for (int i = 0; i < count; i ++) {
         ecs_remove(it->stage, it->entities[i], WorldTransform);
         ecs_remove(it->stage, it->entities[i], WorldTransformVersion);
     }

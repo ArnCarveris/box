@@ -67,6 +67,14 @@ const WorldTransform* transformGetParentWorldTransform(
     return t;
 }
 
+bool transformDeleting(
+    const ecs_iter_t *it)
+{
+    return it->event == EcsOnRemove && (!it->other_table ||
+        (!ecs_table_get_type(it->other_table)->count && it->table &&
+            ecs_table_has_flags(it->table, EcsTableMarkedForDelete)));
+}
+
 void BoxTransformImport(
     ecs_world_t *world)
 {
