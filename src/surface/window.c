@@ -3,10 +3,12 @@
  * @brief glfw windows with a CAMetalLayer that the webgpu backend presents to.
  *
  * glfw requires the main thread, so windows are opened, polled and closed by systems and
- * hooks; only the layer is handed to the render thread.
+ * hooks; only the layer is handed to the render thread. A window sends its input events to the
+ * world that opened it; in the browser the canvas does, while the first target presents to it.
  */
 
 #include "surface.h"
+#include "../input/platform.h"
 
 #ifdef BOX_PLATFORM_GLFW
 
@@ -61,6 +63,7 @@ static void* box_window_metal_layer(
 }
 
 box_window_t* box_window_new(
+    ecs_world_t *world,
     int32_t width,
     int32_t height,
     const char *title)
@@ -87,6 +90,7 @@ box_window_t* box_window_new(
     result->window = window;
     result->layer = box_window_metal_layer(window);
     box_window_count ++;
+    box_input_glfw_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)), window);
 done:
     return result;
 }
@@ -154,6 +158,7 @@ bool box_window_closed(
 #else
 
 box_window_t* box_window_new(
+    ecs_world_t *world,
     int32_t width,
     int32_t height,
     const char *title)
@@ -161,6 +166,7 @@ box_window_t* box_window_new(
     (void)width;
     (void)height;
     (void)title;
+    box_input_web_attach(ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world)));
 
     return NULL;
 }

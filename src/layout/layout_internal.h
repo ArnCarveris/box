@@ -39,6 +39,11 @@ typedef struct {
     bool writing;                 /**< The layout is writing its results */
 } box_layout_state_t;
 
+/** Singleton that owns the state of the layout module, freed after every observer ran */
+typedef struct LayoutRegistry {
+    box_layout_state_t *state; /**< The state */
+} LayoutRegistry;
+
 /** Lay out the tree under a root and write the results to its elements.
  *
  * @param world The world

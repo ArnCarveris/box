@@ -110,3 +110,30 @@ void Surface_two_surfaces(void) {
     ecs_os_free(path_b);
     ecs_fini(world);
 }
+
+void Surface_module_child_fini(void) {
+    // renderer/surface_fini_crash
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_null_t *null = box_render_null_new();
+    box_render_backend_t backend = box_render_null_backend(null);
+    box_render_set_backend(world, &backend);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t m = ecs_entity(world, { .name = "game" });
+    ecs_add_id(world, m, EcsModule);
+    ecs_entity_t e = ecs_entity(world, { .name = "screen", .parent = m });
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    const SurfaceStatus *status = ecs_get(world, e, SurfaceStatus);
+    test_assert(status != NULL);
+    test_int(status->width, 64);
+    test_int(status->height, 32);
+
+    test_int(ecs_fini(world), 0);
+    box_render_null_free(null);
+}

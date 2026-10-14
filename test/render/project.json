@@ -21,7 +21,8 @@
                 "testcases": [
                     "default_size",
                     "status_written",
-                    "two_surfaces"
+                    "two_surfaces",
+                    "module_child_fini"
                 ]
             },
             {

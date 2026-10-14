@@ -1,0 +1,166 @@
+using flecs.script
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.text
+using box.picking
+
+const wait = box.command.commands.mouse.sweep(0, "[220, 295]", "[220, 295]", 1, 1)
+const click = box.command.commands.mouse.click(0, "left", "[220, 295]", 1)
+const move = box.command.commands.mouse.move(0, "[320, 180]", false)
+const press = box.command.commands.mouse.button(0, "left", true)
+const release = box.command.commands.mouse.button(0, "left", false)
+const hover = box.command.commands.mouse.move(0, "[320, 120]", false)
+
+world_camera {
+  Position: {0, 2.5, 7}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 55}
+}
+
+world_view {
+  View: {camera: world_camera, clear: {enabled: true, color: {120, 150, 190, 255}}}
+}
+
+sun {
+  Rotation: {-0.9, 2.6, 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 244, 225}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {24, 0.1, 24}
+  Rgb: {140, 150, 125}
+}
+
+crate {
+  Position: {-3.2, 0.5, 0}
+  Rotation: {0, 0.4, 0}
+  Box: {1, 1, 1}
+  Rgb: {200, 150, 80}
+}
+
+template PickButton {
+  prop label: string = "Button"
+  mut hover = false
+  mut down = false
+
+  Interactive
+  Rect: {200, 44}
+  Border: {radius: 8}
+
+  if down {
+    Rgb: {30, 90, 200}
+    Border: {radius: 8, width: 3, color: {255, 220, 90, 255}}
+  } else {
+    if hover {
+      Rgb: {110, 150, 220}
+    } else {
+      Rgb: {60, 70, 96}
+    }
+  }
+
+  text {
+    Position: {0, 0, 0}
+    Text: {value: label, size: 18}
+    Rgb: {255, 255, 255}
+  }
+
+  async {
+    while true {
+      await on.enter(this)
+      hover = true
+      await on.leave(this)
+      hover = false
+    }
+  }
+
+  async {
+    while true {
+      await on.press(this)
+      down = true
+    }
+  }
+}
+
+template PickCheck {
+  mut checked = false
+
+  Interactive
+  Rect: {28, 28}
+  Rgb: {30, 34, 46}
+  Border: {radius: 6, width: 3, color: {170, 180, 200, 255}}
+
+  if checked {
+    mark {
+      Position: {0, 0, 0}
+      Rect: {14, 14}
+      Rgb: {90, 210, 110}
+      Border: {radius: 3}
+    }
+  }
+
+  async {
+    while true {
+      await on.click(this)
+      checked = !checked
+    }
+  }
+}
+
+menu {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  panel {
+    Position: {0, 0, 0}
+    Rect: {280, 310}
+    Rgb: {16, 20, 28}
+    Opacity: {0.9}
+    Border: {radius: 12}
+
+    title {
+      Position: {0, 120, 0}
+      Text: {value: "Picking", size: 22}
+      Rgb: {255, 220, 90}
+    }
+
+    hovered {
+      Position: {0, 60, 0}
+      PickButton: {label: "Hover"}
+    }
+
+    pressed {
+      Position: {0, 0, 0}
+      PickButton: {label: "Pressed"}
+    }
+
+    idle {
+      Position: {0, -60, 0}
+      PickButton: {label: "Idle"}
+    }
+
+    check {
+      Position: {-100, -115, 0}
+      PickCheck: {}
+    }
+
+    check_label {
+      Position: {-10, -115, 0}
+      Text: {value: "Clicked", size: 16}
+      Rgb: {200, 210, 230}
+    }
+  }
+}
+
+menu_view {
+  View: {camera: menu.camera, lighting: {enabled: false}, culling: {enabled: false}}
+}

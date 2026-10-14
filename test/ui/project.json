@@ -54,7 +54,9 @@
                     "reparent",
                     "unchanged_tree_not_laid_out",
                     "root_item",
-                    "script"
+                    "script",
+                    "module_child_fini",
+                    "module_child_text_fini"
                 ]
             },
             {
@@ -78,7 +80,8 @@
                     "crisp_in_perspective",
                     "align_lines",
                     "many_glyphs",
-                    "dynamic_transform"
+                    "dynamic_transform",
+                    "module_child_fini"
                 ]
             },
             {
@@ -108,6 +111,57 @@
                     "texture_surface_not_sampled_by_itself",
                     "view_root_views_skipped_by_other_surfaces",
                     "script"
+                ]
+            },
+            {
+                "id": "Picking",
+                "testcases": [
+                    "screen_ui_over_3d",
+                    "stacked_views_fall_through",
+                    "reverse_view_order",
+                    "world_panel_occluded",
+                    "render_to_texture",
+                    "nameplate",
+                    "bubbling",
+                    "hover_enter_leave",
+                    "hover_follows_moving_element",
+                    "press_drag_release",
+                    "scroll",
+                    "layout_bounds",
+                    "unhandled_goes_to_screen",
+                    "capture_drag_leaves_element",
+                    "capture_drag_across_second_view",
+                    "capture_release_outside",
+                    "capture_cleared_after_release",
+                    "capture_cleared_when_deleted"
+                ]
+            },
+            {
+                "id": "Console",
+                "testcases": [
+                    "toggle_opens",
+                    "toggle_closes",
+                    "escape_closes",
+                    "toggle_remapped",
+                    "typing_goes_to_input",
+                    "typing_fires_no_actions",
+                    "close_restores_actions",
+                    "enter_runs_line",
+                    "line_logged_in_session",
+                    "error_output",
+                    "history",
+                    "cursor_editing",
+                    "scroll",
+                    "view_stacked_last",
+                    "rebuilt_after_delete",
+                    "look_from_script",
+                    "run_from_script",
+                    "scrollback_limit",
+                    "renders_over_scene",
+                    "covers_left_half",
+                    "width_fraction",
+                    "follows_resize",
+                    "scrollback_follows_height"
                 ]
             }
         ]

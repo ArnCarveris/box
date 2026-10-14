@@ -76,6 +76,36 @@
                     "script_tap_sequence",
                     "script_wait_no_action"
                 ]
+            },
+            {
+                "id": "Platform",
+                "testcases": [
+                    "glfw_key_letters_digits",
+                    "glfw_key_named",
+                    "glfw_key_unknown",
+                    "glfw_button",
+                    "dom_key_letters_digits",
+                    "dom_key_named",
+                    "dom_key_unknown",
+                    "dom_button",
+                    "glfw_key_press_release",
+                    "glfw_key_unknown_ignored",
+                    "glfw_button_press_release",
+                    "dom_key_text",
+                    "dom_key_utf8_text",
+                    "dom_key_shortcut",
+                    "dom_key_function_not_consumed",
+                    "dom_key_grave",
+                    "dom_key_repeat",
+                    "dom_wheel",
+                    "binding_action",
+                    "binding_modifier",
+                    "camera_keys_like_synthetic",
+                    "camera_look_like_synthetic",
+                    "camera_look_needs_right_button",
+                    "camera_dom_like_synthetic",
+                    "camera_focus_lost_stops"
+                ]
             }
         ]
     }

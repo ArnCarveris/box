@@ -13,14 +13,18 @@
 /** A platform window that a surface presents to */
 typedef struct box_window_t box_window_t;
 
-/** Open a window, available when built with BOX_PLATFORM_GLFW.
+/** Open a window, available when built with BOX_PLATFORM_GLFW, whose input events go to a world.
  *
+ * In the browser no window opens, but the page canvas sends its input events to the world.
+ *
+ * @param world The world or a stage of it
  * @param width Width in points
  * @param height Height in points
  * @param title Title of the window
  * @return The window, NULL when windows are not available or it could not be opened
  */
 box_window_t* box_window_new(
+    ecs_world_t *world,
     int32_t width,
     int32_t height,
     const char *title);

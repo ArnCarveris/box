@@ -11,9 +11,30 @@
 /** One script event the frame emits after the Input singleton is written */
 typedef struct box_input_emit_t {
     bool is_mouse;                    /**< The event is a mouse event, else a keyboard event */
-    EcsScriptMouseEvent mouse;        /**< Mouse event to emit */
+    bool is_scroll;                   /**< The mouse event is a wheel movement in its delta */
+    EcsScriptMouseEvent mouse;        /**< Mouse event to emit, aimed at the screen */
     EcsScriptKeyboardEvent keyboard;  /**< Keyboard event to emit */
 } box_input_emit_t;
+
+/** Take one event of the frame in place of flecs.script.event.
+ *
+ * @param world The world
+ * @param emit The event, a mouse event aimed at the screen entity or a keyboard event
+ * @param ctx Context of the router
+ */
+typedef void (*box_input_route_t)(
+    ecs_world_t *world,
+    const box_input_emit_t *emit,
+    void *ctx);
+
+/** Receives the events of a frame in order instead of flecs.script.event.
+ *
+ * box.picking installs one to aim the mouse events at the entities under the cursor.
+ */
+typedef struct box_input_router_t {
+    box_input_route_t route; /**< Takes one event */
+    void *ctx;               /**< Passed to route */
+} box_input_router_t;
 
 /** A synthetic hold of an action */
 typedef struct box_input_hold_t {
@@ -29,6 +50,7 @@ typedef struct InputDevice {
     ecs_vec_t emits;               /**< box_input_emit_t of the frame */
     ecs_vec_t holds;               /**< box_input_hold_t of the synthetic action holds */
     box_input_platform_t backend;  /**< Backend that feeds real device input */
+    box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
     bool has_position;             /**< A cursor position arrived since focus was gained */
 } InputDevice;
@@ -59,6 +81,25 @@ void box_input_actions_import(
  * @return The device state
  */
 InputDevice* box_input_device(
+    ecs_world_t *world);
+
+/** Install the router that takes the events of every frame, replacing the previous one.
+ *
+ * Without a router mouse events go to the screen entity and wheel movements are dropped.
+ *
+ * @param world The world
+ * @param router The router, NULL to emit the events directly again
+ */
+void box_input_router_set(
+    ecs_world_t *world,
+    const box_input_router_t *router);
+
+/** Get the screen entity, the target of mouse events that no entity takes.
+ *
+ * @param world The world
+ * @return The box.input.screen entity
+ */
+ecs_entity_t box_input_screen(
     ecs_world_t *world);
 
 /** Count the frames until the synthetic queue is drained.
