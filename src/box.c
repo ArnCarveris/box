@@ -21,4 +21,5 @@ void BoxImport(
     ECS_IMPORT(world, BoxLayout);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxRender);
 }

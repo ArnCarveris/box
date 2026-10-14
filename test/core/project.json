@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../src/app",
-            "../../src/jobs"
+            "../../src/jobs",
+            "../../src/render"
         ]
     },
     "test": {
@@ -109,6 +110,32 @@
                     "shutdown_with_finished",
                     "shutdown_idle_workers",
                     "worker_count"
+                ]
+            },
+            {
+                "id": "RenderPacket",
+                "testcases": [
+                    "defaults",
+                    "packet_per_frame",
+                    "render_thread_owns_backend",
+                    "main_thread_consumes",
+                    "backpressure_full_ring",
+                    "backpressure_stalls_main_thread",
+                    "in_flight_setting",
+                    "in_flight_clamped",
+                    "settings_change_drains",
+                    "switch_to_main_thread",
+                    "no_alloc_after_warmup",
+                    "no_alloc_after_warmup_main_thread",
+                    "buffers_kept_across_packets",
+                    "shutdown_with_packets_in_flight",
+                    "shutdown_without_frames",
+                    "set_backend_replaces",
+                    "backend_init_fails",
+                    "view_contents",
+                    "view_without_camera",
+                    "batch_upload_resource_contents",
+                    "headless_fixed_delta"
                 ]
             }
         ]
