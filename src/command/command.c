@@ -173,4 +173,5 @@ void BoxCommandImport(
     box_search_init(world);
     box_cmd_script_init(world);
     box_cmd_input_init(world);
+    box_cmd_render_init(world);
 }

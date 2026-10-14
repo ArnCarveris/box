@@ -395,13 +395,18 @@ done:
  *
  * @param frame The target of the packet
  * @param v The view
- * @return Whether the view is under the view root of the target, or it has none
+ * @return Whether the view is assigned to the target, or, when neither is exclusive, the view
+ * is under the view root of the target or the target has none
  */
 static bool box_gpu_target_has_view(
     const box_render_target_t *frame,
     const box_render_view_t *v)
 {
-    return !frame->view_root || v->parent == frame->view_root;
+    bool assigned = v->target || frame->exclusive;
+
+    return assigned
+        ? v->target == frame->handle
+        : !frame->view_root || v->parent == frame->view_root;
 }
 
 /** Write the uniforms of the views a target renders into the view buffer.

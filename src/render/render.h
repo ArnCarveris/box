@@ -35,6 +35,9 @@
 /** Words of the header of a scatter segment: count, words per instance and two unused */
 #define BOX_RENDER_SCATTER_HEADER (4)
 
+/** First target handle of captures, the handles below belong to surfaces */
+#define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
+
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
 
@@ -91,6 +94,7 @@ typedef struct box_render_view_t {
     mat4 view_matrix;           /**< Inverse of the camera transform */
     Camera camera_data;         /**< Settings of the camera */
     ClearSettings clear;        /**< Clear settings of the view */
+    uint32_t target;            /**< Handle of the only target that renders the view, 0 for any */
 } box_render_view_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -169,6 +173,7 @@ typedef struct box_render_target_t {
     float clear[4];         /**< Linear color the target is cleared to before the views */
     uint32_t capture;       /**< Offset of the PNG path in the packet data */
     uint32_t capture_size;  /**< Bytes of the path with its terminator, 0 when not captured */
+    bool exclusive;         /**< Renders only the views whose target is this handle */
 } box_render_target_t;
 
 /** Instanced draw of one mesh with one pipeline, drawn by the views of its scene */
@@ -379,6 +384,50 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** A one-off render of a camera into an offscreen image that is written as a PNG file.
+ *
+ * The camera is an entity read when the frame is extracted, or, when camera is 0, the
+ * settings, transform and scene in the description.
+ */
+typedef struct box_render_capture_desc_t {
+    ecs_entity_t camera;        /**< Entity with Camera, 0 to use the fields below */
+    Camera camera_data;         /**< Settings of the camera when camera is 0 */
+    mat4 transform;             /**< World transform of the camera when camera is 0 */
+    ecs_entity_t scene;         /**< Scene root drawn when camera is 0, 0 for the default scene */
+    ClearSettings clear;        /**< Clear of the image, opaque black when not enabled */
+    int32_t width;              /**< Width of the image in pixels */
+    int32_t height;             /**< Height of the image in pixels */
+    const char *path;           /**< PNG file, copied */
+} box_render_capture_desc_t;
+
+/** Register the capture queue and the system that adds the captures to the packet.
+ *
+ * @param world The world
+ */
+void box_render_captures_init(
+    ecs_world_t *world);
+
+/** Ask for a capture in the next extracted frame.
+ *
+ * The image is written on the thread that renders the packet of that frame, through a
+ * temporary offscreen target; the world switches to the GPU backend unless it was given one.
+ *
+ * @param world The world
+ * @param desc The capture
+ * @return 0 when the capture was queued, -1 when the description is invalid
+ */
+int box_render_capture(
+    ecs_world_t *world,
+    const box_render_capture_desc_t *desc);
+
+/** Get the number of captures that were requested and not yet added to a packet.
+ *
+ * @param world The world
+ * @return The number of queued captures
+ */
+int32_t box_render_captures_pending(
+    const ecs_world_t *world);
 
 /** Initialize the vectors of a packet.
  *

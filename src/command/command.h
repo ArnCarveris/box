@@ -227,4 +227,11 @@ void box_cmd_script_init(
 void box_cmd_input_init(
     ecs_world_t *world);
 
+/** Register the capture and render commands and the system that completes renders.
+ *
+ * @param world The world
+ */
+void box_cmd_render_init(
+    ecs_world_t *world);
+
 #endif
