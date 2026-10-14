@@ -715,7 +715,10 @@
                     "manual_parent_static_child_composes",
                     "manual_parent_dynamic_child_composes",
                     "manual_parent_dynamic_child_follows_manual_change",
-                    "static_parent_manual_child_static_grandchild_composes"
+                    "static_parent_manual_child_static_grandchild_composes",
+                    "manual_childof_static_child_follows_manual_change",
+                    "manual_parent_static_child_follows_manual_change",
+                    "manual_childof_static_child_follows_modified"
                 ]
             },
             {
