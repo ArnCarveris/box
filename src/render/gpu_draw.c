@@ -86,13 +86,14 @@ void box_gpu_draw_init(
     };
     WGPUBindGroupLayoutDescriptor layout = { .entryCount = 5, .entries = entries };
     box_gpu_cull_init(gpu);
+    box_gpu_bake_init(gpu);
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
-    WGPUBindGroupLayout groups[3] = {
-        gpu->view_layout, gpu->material_layout, gpu->instance_layout
+    WGPUBindGroupLayout groups[4] = {
+        gpu->view_layout, gpu->material_layout, gpu->instance_layout, gpu->volume_layout
     };
     gpu->mesh_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 3,
+            .bindGroupLayoutCount = 4,
             .bindGroupLayouts = groups
         });
     ecs_map_init(&gpu->meshes, NULL);
@@ -171,6 +172,7 @@ void box_gpu_draw_fini(
     box_gpu_light_fini(gpu);
     box_gpu_shadow_fini(gpu);
     box_gpu_cull_fini(gpu);
+    box_gpu_bake_fini(gpu);
     box_gpu_effects_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
@@ -699,6 +701,7 @@ static void box_gpu_draw_pass(
     WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
+    wgpuRenderPassEncoderSetBindGroup(pass, 3, box_gpu_bake_group(gpu, v), 0, NULL);
     box_gpu_draw_batches(gpu, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, slot, phase);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
