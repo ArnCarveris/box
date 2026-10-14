@@ -279,6 +279,9 @@ void box_draws_material(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->shape2d) {
+        box_draws_shape2d(out, material);
+    }
 }
 
 void box_draws_transform(
@@ -782,6 +785,7 @@ static void box_draws_fill_material(
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
+    const Shape2D *shapes2d = ecs_field(it, Shape2D, 11);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
@@ -805,6 +809,7 @@ static void box_draws_fill_material(
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
+            .shape2d = shapes2d ? &shapes2d[i] : NULL,
             .fade = walk ? box_draws_fade(it->world, it->entities[i]) : slots[i].fade
         };
         box_render_instance_t *inst = ecs_vec_get_t(

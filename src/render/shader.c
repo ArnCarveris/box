@@ -712,4 +712,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_SCATTER, true);
     box_shader_builtin(world, state, builtin, "cluster", "etc/shaders/cluster.wgsl",
         BOX_RENDER_SHADER_CLUSTER, true);
+    box_shader_builtin(world, state, builtin, "shape2d", "etc/shaders/shape2d.wgsl",
+        BOX_RENDER_SHADER_SHAPE2D, true);
 }

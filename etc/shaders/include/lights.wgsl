@@ -9,6 +9,8 @@ struct View {
     view_proj: mat4x4f,
     view: mat4x4f,
     camera: vec4f,
+    // x, y: render width and height in pixels, z, w: their inverse
+    viewport: vec4f,
     ambient_sky: vec4f,
     ambient_ground: vec4f,
     // x, y: inverse projection scale of x and y, z, w: near and far of the depth slices

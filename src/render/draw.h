@@ -10,7 +10,7 @@
 #define BOX_RENDER_DRAW_H
 
 #include "render.h"
-#include "../geometry/mesh_cache.h"
+#include "../geometry/shape2d.h"
 #include "../texture/texture.h"
 
 /** Batch and slot of a shape, added with every ShapeMesh */
@@ -43,6 +43,7 @@ typedef struct box_draw_material_t {
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
+    const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
 } box_draw_material_t;
 
@@ -182,6 +183,18 @@ void box_draws_transform(
  * @param material Material components of the entity
  */
 void box_draws_material(
+    box_render_instance_t *out,
+    const box_draw_material_t *material);
+
+/** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
+ *
+ * Material holds the corner radius, border width and border color of a rectangle or the end
+ * points of a line, emissive w the aspect of a rectangle or the negated width of a line.
+ *
+ * @param out The instance
+ * @param material Material components of the entity, with its Shape2D
+ */
+void box_draws_shape2d(
     box_render_instance_t *out,
     const box_draw_material_t *material);
 

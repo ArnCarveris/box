@@ -237,6 +237,7 @@ static void box_draws_key(
     const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
     const PbrTextures *textures = ecs_get(world, e, PbrTextures);
     const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
+    const Shape2D *shape2d = ecs_get(world, e, Shape2D);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
@@ -252,7 +253,11 @@ static void box_draws_key(
         ? e
         : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
     key->mesh = shape->mesh;
-    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
+    if (shape2d && shape2d->texture) {
+        key->textures[0] = shape2d->texture;
+    }
+
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
         ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
@@ -289,6 +294,7 @@ static void box_draws_update(
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
+            .shape2d = ecs_get(world, e, Shape2D),
             .fade = s->fade
         };
         box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
@@ -526,7 +532,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone,
                 .oper = EcsOptional
-            }
+            },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -548,7 +555,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
+            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });

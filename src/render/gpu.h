@@ -117,6 +117,7 @@ typedef struct box_gpu_view_uniforms_t {
     mat4 view_proj;                 /**< Projection times view matrix */
     mat4 view;                      /**< View matrix, the inverse of the camera transform */
     vec4 camera;                    /**< World position of the camera */
+    vec4 viewport;                  /**< Render width and height in pixels, and their inverse */
     vec4 ambient_sky;               /**< Linear ambient light from above */
     vec4 ambient_ground;            /**< Linear ambient light from below */
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
@@ -130,8 +131,9 @@ typedef struct box_gpu_blit_t {
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_blit_t;
 
-/** Pipeline of the forward pass for one color format, blend mode and back face mode */
+/** Pipeline of the forward pass for one shader, color format, blend mode and back face mode */
 typedef struct box_gpu_forward_t {
+    uint32_t shader;                /**< Shader handle, the mesh or the 2D shape shader */
     WGPUTextureFormat format;       /**< Format of the color target */
     uint32_t blend;                 /**< BlendMode */
     uint32_t back_face;             /**< BackFaceMode */
