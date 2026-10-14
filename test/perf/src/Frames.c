@@ -6,6 +6,13 @@
 #include <box.h>
 #include <bake_test.h>
 #include "fake.h"
+#include <math.h>
+#ifdef __APPLE__
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+#include <mach/thread_policy.h>
+#include <pthread.h>
+#endif
 
 void Frames_trivial_passes(void) {
     // testing/perf_flake
@@ -399,6 +406,192 @@ void Frames_late_wakeups_absorbed(void) {
     test_assert(status->max_ms < status->target_ms + 0.05);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_realtime_during_run(void) {
+    // testing/pacer_priority
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    fake_work_ms = 3;
+    ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 4, .frames = 10 });
+#ifdef __APPLE__
+    mach_port_t thread = pthread_mach_thread_np(pthread_self());
+    thread_time_constraint_policy_data_t policy;
+    mach_msg_type_number_t count;
+    boolean_t standard;
+    mach_timebase_info_data_t tb;
+    mach_timebase_info(&tb);
+    double interval = 1e9 / 120.0 * (double)tb.denom / (double)tb.numer;
+    double work = 3e6 * (double)tb.denom / (double)tb.numer;
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, false);
+    test_assert(fabs((double)policy.period - interval) < interval * 0.01);
+    test_assert(fabs((double)policy.constraint - interval) < interval * 0.01);
+    test_assert(policy.computation <= policy.constraint);
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfMeasure);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, false);
+    test_assert((double)policy.computation >= work);
+    test_assert(policy.computation <= policy.constraint);
+
+    for (int i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfDone);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, true);
+#endif
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_no_realtime_without_run(void) {
+    // testing/pacer_priority
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+#ifdef __APPLE__
+    mach_port_t thread = pthread_mach_thread_np(pthread_self());
+    thread_time_constraint_policy_data_t policy;
+    mach_msg_type_number_t count;
+    boolean_t standard;
+
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, true);
+
+    ecs_singleton_set(world, PerfRun, { .fps = 50, .warmup = 2, .frames = 10 });
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfInvalid);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, true);
+#endif
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_realtime_reset_on_remove(void) {
+    // testing/pacer_priority
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 100 });
+#ifdef __APPLE__
+    mach_port_t thread = pthread_mach_thread_np(pthread_self());
+    thread_time_constraint_policy_data_t policy;
+    mach_msg_type_number_t count;
+    boolean_t standard;
+
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, false);
+
+    ecs_singleton_remove(world, PerfRun);
+    ecs_progress(world, 0);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, true);
+#endif
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_realtime_reset_on_fini(void) {
+    // testing/pacer_priority
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_singleton_set(world, PerfRun, { .fps = 90, .warmup = 2, .frames = 100 });
+#ifdef __APPLE__
+    mach_port_t thread = pthread_mach_thread_np(pthread_self());
+    thread_time_constraint_policy_data_t policy;
+    mach_msg_type_number_t count;
+    boolean_t standard;
+
+    for (int i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, false);
+
+    ecs_fini(world);
+    count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+    standard = FALSE;
+    thread_policy_get(thread, THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy,
+        &count, &standard);
+    test_bool(standard, true);
+#else
+    ecs_fini(world);
+#endif
+
     box_perf_clock = NULL;
     box_perf_sleep = NULL;
 }

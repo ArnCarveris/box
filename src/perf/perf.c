@@ -23,6 +23,9 @@
  */
 #define BOX_PERF_SLEEP (0.6)
 
+/** Factor on the median work of the warmup frames that the real-time schedule asks for */
+#define BOX_PERF_WORK_MARGIN (1.5)
+
 double (*box_perf_clock)(void) = NULL;
 
 void (*box_perf_sleep)(double seconds) = NULL;
@@ -91,6 +94,7 @@ static void box_perf_free(
     void *ctx)
 {
     box_perf_t *perf = ctx;
+    box_perf_priority_reset(&perf->priority);
     ecs_vec_fini_t(NULL, &perf->intervals, double);
     ecs_vec_fini_t(NULL, &perf->work, double);
     ecs_os_free(perf);
@@ -148,6 +152,8 @@ static void BoxPerfOnSet(
     status.period = run->period;
     perf->run = 0;
     perf->mark = 0;
+    perf->priority.refused = false;
+    box_perf_priority_reset(&perf->priority);
     perf->bounds = false;
     perf->cull_frame = -1;
     ecs_os_memset(perf->cull_last, 0, ECS_SIZEOF(perf->cull_last));
@@ -303,7 +309,24 @@ done:
     return;
 }
 
-/** Start the measurement: remember the budget sleep and the stalls before it.
+/** Give the pacing thread a real-time schedule of one frame per target interval, unless the
+ * platform refused it before in this run.
+ *
+ * @param perf The state of the module
+ * @param computation Seconds of CPU time a frame needs
+ */
+static void box_perf_schedule(
+    box_perf_t *perf,
+    double computation)
+{
+    if (!perf->priority.refused) {
+        perf->priority.refused = !box_perf_priority_set(
+            &perf->priority, 1.0 / perf->fps, computation);
+    }
+}
+
+/** Start the measurement: fit the schedule to the work of the warmup frames and remember the
+ * budget sleep and the stalls before it.
  *
  * @param world The world
  * @param perf The state of the module
@@ -314,6 +337,13 @@ static void box_perf_begin(
 {
     const AppStatus *app = ecs_singleton_get(world, AppStatus);
     const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
+    box_perf_stats_t warmup;
+    box_perf_stats(&perf->work, &warmup);
+    ecs_vec_clear(&perf->work);
+    if (warmup.p50 > 0) {
+        box_perf_schedule(perf, warmup.p50 * 0.001 * BOX_PERF_WORK_MARGIN + BOX_PERF_SPIN);
+    }
+
     perf->slept = app ? app->slept : 0;
     perf->stalls = render ? render->stalls : 0;
     perf->measure = perf->mark;
@@ -490,6 +520,7 @@ static void box_perf_end(
     status->passed = status->errors == 0 && status->frame == perf->frames;
     status->state = PerfDone;
     perf->state = PerfDone;
+    box_perf_priority_reset(&perf->priority);
     if (run->report && run->report[0]) {
         box_perf_report(world, run, status, &perf->intervals);
     }
@@ -511,16 +542,23 @@ static void BoxPerfFrame(
     PerfStatus *status = ecs_singleton_get_mut(it->world, PerfStatus);
     double now;
     if (!run || !status || (perf->state != PerfWarmup && perf->state != PerfMeasure)) {
+        box_perf_priority_reset(&perf->priority);
         goto done;
     }
 
     now = box_perf_now();
     if (perf->mark > 0) {
         double work = now - perf->mark;
+        if (!perf->priority.active) {
+            box_perf_schedule(perf, 0.5 / perf->fps);
+        }
+
         now = box_perf_wait(perf->mark + 1.0 / perf->fps);
         if (perf->state == PerfMeasure) {
             box_perf_count(perf, status, now - perf->mark, work);
             box_perf_sample_cull(it->world, perf, status, box_perf_camera(it->world, run));
+        } else {
+            ecs_vec_append_t(NULL, &perf->work, double)[0] = work * 1000.0;
         }
     }
 
