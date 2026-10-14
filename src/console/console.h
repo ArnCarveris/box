@@ -8,9 +8,6 @@
 
 #include <box.h>
 
-/** Bytes of typed text the console collects between two updates */
-#define BOX_CONSOLE_TYPED_MAX (256)
-
 /** Lines of input history the console keeps */
 #define BOX_CONSOLE_HISTORY_MAX (256)
 
@@ -68,8 +65,7 @@ typedef struct box_console_t {
     char *line;                 /**< The input line, UTF-8 */
     int32_t length;             /**< Bytes of the input line */
     int32_t cursor;             /**< Byte of the input line the cursor sits before */
-    char typed[BOX_CONSOLE_TYPED_MAX]; /**< Text typed since the last update */
-    int32_t typed_length;       /**< Bytes of typed text */
+    ecs_vec_t typed;            /**< char of the text typed since the last update */
     bool pressed[BOX_KEY_COUNT];/**< Keys pressed since the last update */
     float wheel;                /**< Wheel movement since the last update */
     int32_t scroll;             /**< Scrollback lines scrolled up from the newest */

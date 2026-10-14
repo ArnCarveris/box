@@ -43,7 +43,14 @@
                     "script_key_repeat",
                     "script_mouse_move",
                     "script_mouse_click",
-                    "script_mouse_drag"
+                    "script_mouse_drag",
+                    "mouse_release_no_jump",
+                    "reset_no_jump",
+                    "release_unpinned_keeps_delta",
+                    "reset_unpinned_keeps_delta",
+                    "text_long_platform",
+                    "text_long_synthetic",
+                    "text_replaced_from_outside"
                 ]
             },
             {
@@ -74,7 +81,20 @@
                     "script_dragged",
                     "script_parent_target",
                     "script_tap_sequence",
-                    "script_wait_no_action"
+                    "script_wait_no_action",
+                    "chord_most_specific",
+                    "chord_two_modifiers",
+                    "chord_unbound_modifier",
+                    "chord_bound_modifier",
+                    "chord_ignore_modifiers",
+                    "chord_ignore_modifiers_masked",
+                    "chord_script",
+                    "chord_modifier_released_first",
+                    "chord_modifier_after_key",
+                    "chord_equal_specificity",
+                    "chord_extra_modifier",
+                    "chord_disabled_no_mask",
+                    "chord_disabled_modifier_unbound"
                 ]
             },
             {
