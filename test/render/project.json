@@ -205,6 +205,27 @@
                     "unchanged_lights_upload_nothing",
                     "component_defaults"
                 ]
+            },
+            {
+                "id": "Shadow",
+                "testcases": [
+                    "splits_uniform",
+                    "splits_logarithmic",
+                    "splits_mix_by_lambda",
+                    "splits_end_at_max_distance",
+                    "splits_end_at_camera_far",
+                    "cascade_contains_slice",
+                    "cascade_snapped_to_texels",
+                    "cascade_reversed_z",
+                    "box_casts_shadow",
+                    "disabled_casts_no_shadow",
+                    "no_shadow_casts_none",
+                    "no_shadow_parent_casts_none",
+                    "no_shadow_removed_casts_again",
+                    "beyond_max_distance_unshadowed",
+                    "fade_softens_last_cascade",
+                    "default_settings"
+                ]
             }
         ]
     }
