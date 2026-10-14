@@ -1,0 +1,63 @@
+using box.transform
+using box.material
+using box.camera
+using box.view
+using box.text
+using box.layout
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+tiny {
+  Position: {-170, 166, 0}
+  Text: {value: "Tiny text at 8 px: the quick brown fox", size: 8}
+  Rgb: {230, 230, 230}
+}
+
+small {
+  Position: {-150, 150, 0}
+  Text: {value: "Small text at 12 px: kerning To Te Ty LT WA", size: 12}
+  Rgb: {230, 230, 230}
+}
+
+body {
+  Position: {-190, 90, 0}
+  Text: {
+    value: "Body text at 16 px wraps between words when it passes its width of 220 pixels.",
+    size: 16,
+    width: 220,
+    align: Center
+  }
+  Rgb: {250, 200, 90}
+}
+
+title {
+  Position: {150, 140, 0}
+  Text: {value: "Title 40", size: 40}
+  Rgb: {120, 200, 255}
+}
+
+large {
+  Position: {-130, -90, 0}
+  Text: {value: "Ag&", size: 130}
+  Rgb: {255, 255, 255}
+}
+
+huge {
+  Position: {165, -80, 0}
+  Text: {value: "eS", size: 280}
+  Rgb: {240, 110, 90}
+}
+
+turned {
+  Position: {130, 75, 0}
+  Rotation: {0, 0, 0.3}
+  Text: {value: "Rotated", size: 28}
+  Rgb: {160, 240, 140}
+}

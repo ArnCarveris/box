@@ -1,0 +1,60 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.text
+
+camera {
+  Position: {0, 2.8, 7.5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+ground {
+  Rotation: {-1.5708, 0, 0}
+
+  board {
+    Position: {0, 30, -0.01}
+    Rect: {14, 80}
+    Rgb: {48, 54, 70}
+  }
+
+  for i in 0..12 {
+    {
+      Position: {(i % 2) * 6 - 3, i * 5 + 2, 0}
+      Scale: {0.02, 0.02, 1}
+      Text: {value: "Mile {i}", size: 60, align: Center}
+      Rgb: {250, 220, 120}
+    }
+  }
+}
+
+sign {
+  Position: {-2.6, 1.6, 0}
+  Rotation: {0, 0.5, 0}
+  Scale: {0.01, 0.01, 1}
+
+  panel {
+    Position: {0, 0, -0.5}
+    Rect: {300, 120}
+    Rgb: {30, 90, 160}
+  }
+
+  label {
+    Position: {0, 0, 0}
+    Text: {value: "World space\nsign, turned", size: 40, align: Center}
+    Rgb: {255, 255, 255}
+  }
+}
+
+far {
+  Position: {3, 4, -60}
+  Scale: {0.2, 0.2, 1}
+  Text: {value: "Far away", size: 40}
+  Rgb: {140, 230, 140}
+}

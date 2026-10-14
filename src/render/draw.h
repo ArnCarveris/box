@@ -13,6 +13,7 @@
 #include "render.h"
 #include "../geometry/shape2d.h"
 #include "../texture/texture.h"
+#include "../text/text.h"
 
 /** Tints composed into one mix: a display encoded color becomes color * keep + add */
 typedef struct box_draw_tint_t {
@@ -44,7 +45,22 @@ typedef struct box_draw_key_t {
     bool dynamic;           /**< Instances are uploaded every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
     ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
+    uint32_t atlas;         /**< Texture handle of the glyph atlas page of a glyph batch, or 0 */
 } box_draw_key_t;
+
+/** Batch and slot of one glyph of a Text */
+typedef struct box_draw_glyph_slot_t {
+    int32_t batch;  /**< Index of the batch */
+    int32_t slot;   /**< Slot of the glyph in the batch */
+} box_draw_glyph_slot_t;
+
+/** Slots of the glyphs of a Text, one per glyph of its TextGlyphs, added with every Text */
+typedef struct TextSlots {
+    ecs_vec_t slots; /**< box_draw_glyph_slot_t */
+} TextSlots;
+
+/** Component id of TextSlots */
+extern ECS_COMPONENT_DECLARE(TextSlots);
 
 /** The material components of a shape, NULL for the ones it does not have */
 typedef struct box_draw_material_t {
@@ -76,6 +92,7 @@ typedef struct box_draw_batch_t {
     bool full;              /**< Upload every instance instead of the changed slots */
     bool ready;             /**< The backend has the mesh and the instances this frame */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
+    ecs_vec_t glyphs;       /**< int32_t per slot of a glyph batch, the glyph of its Text */
     ecs_vec_t instances;    /**< box_render_instance_t per slot */
     ecs_vec_t changed;      /**< int32_t, slots of a static batch the GPU does not have */
 } box_draw_batch_t;
@@ -84,6 +101,9 @@ typedef struct box_draw_batch_t {
 typedef struct box_render_draws_t {
     ecs_query_t *dynamic_transform; /**< Shapes with DynamicTransform */
     ecs_query_t *dynamic_material;  /**< Shapes with DynamicMaterial and no DynamicTransform */
+    ecs_query_t *dynamic_texts;     /**< Texts with DynamicTransform */
+    ecs_query_t *dynamic_text_materials; /**< Texts with DynamicMaterial, self or up */
+    uint32_t text_mesh;         /**< Mesh handle of the glyph quad */
     ecs_vec_t batches;          /**< box_draw_batch_t by index */
     ecs_vec_t free_batches;     /**< int32_t, indices of batches not in use */
     ecs_map_t lookup;           /**< Key hash to the index of the first batch plus one */
@@ -139,6 +159,20 @@ int32_t box_draws_slot_add(
     box_render_draws_t *d,
     int32_t index,
     ecs_entity_t e);
+
+/** Add a slot for a glyph of a Text to a glyph batch.
+ *
+ * @param d The state
+ * @param index Index of the batch
+ * @param e The entity of the Text
+ * @param glyph The glyph of the Text
+ * @return The slot
+ */
+int32_t box_draws_glyph_add(
+    box_render_draws_t *d,
+    int32_t index,
+    ecs_entity_t e,
+    int32_t glyph);
 
 /** Remove a slot from a batch, moving the last slot into it.
  *
@@ -266,6 +300,46 @@ void box_draws_send(
     ecs_world_t *world,
     box_render_draws_t *d,
     box_render_packet_t *p);
+
+/** Register the glyph batches of the texts: their slots, quad mesh and observers.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_text_init(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Bring the glyphs of a changed Text into their batches and write their instances.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_text_update(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Remove every glyph slot of a Text.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_text_remove(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Mark the texts whose instances change every frame.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_text_dynamic(
+    ecs_world_t *world,
+    box_render_draws_t *d);
 
 /** Release every batch and the GPU state of the batches.
  *

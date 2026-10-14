@@ -10,8 +10,11 @@
 // units of half its smaller side, shape.zw the linear border color as four half floats, and
 // emissive.w its width over its height. A line: shape.xy is the start, shape.zw the end and
 // emissive.w the negated width; its quad is scaled to bounds centered on the origin that hold
-// both ends, twice the largest coordinate plus the width on each axis. Instances are read by
-// the slot the cull pass wrote, from the instance buffer of the batch (group 2).
+// both ends, twice the largest coordinate plus the width on each axis. A glyph of a Text has an
+// emissive.w of 0: its quad is the glyph area, uv the area of the atlas page and shape.xy the
+// distance range of the page; its coverage comes from the multi channel signed distance field
+// of the page (distance_map, a linear layer), so the edge stays sharp at any scale. Instances
+// are read by the slot the cull pass wrote, from the instance buffer of the batch (group 2).
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -20,6 +23,7 @@ override blend_mode: u32 = 0u;
 @group(0) @binding(0) var<uniform> view: View;
 
 @group(1) @binding(0) var albedo_map: texture_2d<f32>;
+@group(1) @binding(2) var distance_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
 // The instance layout of the forward pass with the material words read as integers.
@@ -52,6 +56,8 @@ struct VertexOut {
     @location(5) @interpolate(flat) color: vec4f,
     @location(6) @interpolate(flat) emissive: vec3f,
     @location(7) @interpolate(flat) uv_transform: vec4f,
+    // 1 for a glyph, 0 for a shape
+    @location(8) @interpolate(flat) glyph: f32,
 };
 
 // Pixels the image moves per model unit along a direction, at a projected point.
@@ -74,7 +80,11 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     var o: VertexOut;
     o.params = vec2f(0.0);
     o.border = vec4f(0.0);
-    if (inst.emissive.w < 0.0) {
+    let glyph = inst.emissive.w == 0.0;
+    if (glyph) {
+        extent = vec2f(0.5);
+        o.params = vec2f(bitcast<f32>(inst.shape.x), bitcast<f32>(inst.shape.y));
+    } else if (inst.emissive.w < 0.0) {
         let a = bitcast<vec2f>(inst.shape.xy);
         let b = bitcast<vec2f>(inst.shape.zw);
         let len = length(b - a);
@@ -97,7 +107,8 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     let clip = mvp * vec4f(origin + dir_x * edge.x + dir_y * edge.y, 0.0, 1.0);
     let ppu = vec2f(pixels_per_unit(mvp, clip, dir_x), pixels_per_unit(mvp, clip, dir_y));
     let limit = 2.0 * max(extent.x, extent.y);
-    let pad = select(vec2f(0.0), min(1.0 / max(ppu, vec2f(1e-9)), vec2f(limit)), ppu > vec2f(0.0));
+    let grow = min(1.0 / max(ppu, vec2f(1e-9)), vec2f(limit));
+    let pad = select(vec2f(0.0), grow, (ppu > vec2f(0.0)) & vec2<bool>(!glyph));
     let q = edge + corner * pad;
     o.pos = mvp * vec4f(origin + dir_x * q.x + dir_y * q.y, 0.0, 1.0);
     o.local = q;
@@ -106,6 +117,7 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     o.color = inst.color;
     o.emissive = inst.emissive.rgb;
     o.uv_transform = inst.uv;
+    o.glyph = select(0.0, 1.0, glyph);
     return o;
 }
 
@@ -119,6 +131,23 @@ fn rounded_box(p: vec2f, extent: vec2f, radius: f32) -> f32 {
 // Part of a pixel covered by the inside of an edge at a distance, the pixel being px wide.
 fn coverage(d: f32, px: f32) -> f32 {
     return clamp(0.5 - d / max(px, 1e-6), 0.0, 1.0);
+}
+
+fn median(v: vec3f) -> f32 {
+    return max(min(v.r, v.g), min(max(v.r, v.g), v.b));
+}
+
+// Coverage of a glyph: the median of the field is the distance to its outline, scaled from
+// the range of the page to screen pixels (at least one, so small text stays smooth). The mip
+// level stays at most one below the page, so a minified glyph never reaches its neighbors.
+fn glyph_coverage(uv: vec2f, range: vec2f) -> f32 {
+    let size = vec2f(textureDimensions(distance_map));
+    let footprint = max(length(dpdx(uv) * size), length(dpdy(uv) * size));
+    let level = clamp(log2(max(footprint, 1e-9)), 0.0, 1.0);
+    let field = textureSampleLevel(distance_map, material_sampler, uv, level);
+    let texels = vec2f(1.0) / max(fwidth(uv), vec2f(1e-9));
+    let spread = max(0.5 * dot(range, texels), 1.0);
+    return clamp((median(field.rgb) - 0.5) * spread + 0.5, 0.0, 1.0);
 }
 
 fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
@@ -151,10 +180,15 @@ fn output(color: vec3f, alpha: f32, cover: f32) -> vec4f {
     let inner_px = length(vec2f(dpdx(inner), dpdy(inner)));
     let uv = clamp(f.uv, vec2f(0.0), vec2f(1.0)) * f.uv_transform.xy + f.uv_transform.zw;
     let texel = textureSample(albedo_map, material_sampler, uv);
-    let cover = coverage(d, px);
+    let glyph = f.glyph > 0.5;
+    let glyph_cover = glyph_coverage(uv, f.params);
+    let shape_cover = coverage(d, px);
     let fill = select(1.0, coverage(inner, inner_px), f.params.y > 0.0);
-    let color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill) + f.emissive;
-    let alpha = cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
+    let shape_color = mix(f.border.rgb, f.color.rgb * texel.rgb, fill);
+    let color = select(shape_color, f.color.rgb, glyph) + f.emissive;
+    let shape_alpha = shape_cover * thin * f.color.a * mix(f.border.a, texel.a, fill);
+    let alpha = select(shape_alpha, glyph_cover * f.color.a, glyph);
+    let cover = select(shape_cover, glyph_cover, glyph);
     if (alpha <= 0.001) {
         discard;
     }

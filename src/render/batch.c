@@ -122,6 +122,7 @@ static uint64_t box_draws_hash(
     }
 
     h ^= (uint64_t)key->shadow * 0x94D049BB133111EBull;
+    h ^= ((uint64_t)key->atlas + 1) * 0xD6E8FEB86659FD93ull;
 
     return h ^ (h >> 29);
 }
@@ -139,7 +140,7 @@ static bool box_draws_key_eq(
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
         a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
-        a->shadow == b->shadow;
+        a->shadow == b->shadow && a->atlas == b->atlas;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -175,6 +176,7 @@ int32_t box_draws_batch_ensure(
         b = ecs_vec_append_t(NULL, &d->batches, box_draw_batch_t);
         ecs_os_memset_t(b, 0, box_draw_batch_t);
         ecs_vec_init_t(NULL, &b->entities, ecs_entity_t, 0);
+        ecs_vec_init_t(NULL, &b->glyphs, int32_t, 0);
         ecs_vec_init_t(NULL, &b->instances, box_render_instance_t, 0);
         ecs_vec_init_t(NULL, &b->changed, int32_t, 0);
     }
@@ -226,6 +228,7 @@ static void box_draws_batch_free(
     }
 
     ecs_vec_clear(&b->entities);
+    ecs_vec_clear(&b->glyphs);
     ecs_vec_clear(&b->instances);
     ecs_vec_clear(&b->changed);
     b->alive = false;
@@ -266,6 +269,41 @@ int32_t box_draws_slot_add(
     return result;
 }
 
+int32_t box_draws_glyph_add(
+    box_render_draws_t *d,
+    int32_t index,
+    ecs_entity_t e,
+    int32_t glyph)
+{
+    int32_t result = box_draws_slot_add(d, index, e);
+    *ecs_vec_append_t(NULL, &box_draws_batch(d, index)->glyphs, int32_t) = glyph;
+
+    return result;
+}
+
+/** Point the slot entry of a moved glyph at its new slot.
+ *
+ * @param world The world
+ * @param b The glyph batch
+ * @param moved The entity of the moved glyph
+ * @param from The slot the glyph was in
+ * @param to The slot the glyph moves to
+ */
+static void box_draws_glyph_moved(
+    ecs_world_t *world,
+    box_draw_batch_t *b,
+    ecs_entity_t moved,
+    int32_t from,
+    int32_t to)
+{
+    int32_t glyph = *ecs_vec_get_t(&b->glyphs, int32_t, from);
+    TextSlots *slots = ecs_get_mut(world, moved, TextSlots);
+    *ecs_vec_get_t(&b->glyphs, int32_t, to) = glyph;
+    if (slots && glyph < ecs_vec_count(&slots->slots)) {
+        ecs_vec_get_t(&slots->slots, box_draw_glyph_slot_t, glyph)->slot = to;
+    }
+}
+
 void box_draws_slot_remove(
     ecs_world_t *world,
     box_render_draws_t *d,
@@ -276,7 +314,11 @@ void box_draws_slot_remove(
     int32_t last = ecs_vec_count(&b->entities) - 1;
     if (slot != last) {
         ecs_entity_t moved = *ecs_vec_get_t(&b->entities, ecs_entity_t, last);
-        DrawSlot *s = ecs_get_mut(world, moved, DrawSlot);
+        DrawSlot *s = b->key.atlas ? NULL : ecs_get_mut(world, moved, DrawSlot);
+        if (b->key.atlas) {
+            box_draws_glyph_moved(world, b, moved, last, slot);
+        }
+
         *ecs_vec_get_t(&b->entities, ecs_entity_t, slot) = moved;
         *ecs_vec_get_t(&b->instances, box_render_instance_t, slot) =
             *ecs_vec_get_t(&b->instances, box_render_instance_t, last);
@@ -289,6 +331,9 @@ void box_draws_slot_remove(
 
     ecs_vec_remove_last(&b->entities);
     ecs_vec_remove_last(&b->instances);
+    if (b->key.atlas) {
+        ecs_vec_remove_last(&b->glyphs);
+    }
 }
 
 float box_draws_alpha(
@@ -565,6 +610,10 @@ static void box_draws_batch_textures(
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         ecs_entity_t e = b->key.textures[i];
         out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
+    }
+
+    if (b->key.atlas) {
+        out->textures[2] = b->key.atlas;
     }
 
     out->wrap = b->key.wrap;
@@ -1022,6 +1071,7 @@ void box_draws_batches_fini(
     for (i = 0; i < ecs_vec_count(&d->batches); i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
         ecs_vec_fini_t(NULL, &b->entities, ecs_entity_t);
+        ecs_vec_fini_t(NULL, &b->glyphs, int32_t);
         ecs_vec_fini_t(NULL, &b->instances, box_render_instance_t);
         ecs_vec_fini_t(NULL, &b->changed, int32_t);
     }
