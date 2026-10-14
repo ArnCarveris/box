@@ -2,7 +2,8 @@
  * @file render/draw.h
  * @brief Instanced batches of the forward pass, shared by the change tracking and the extract.
  *
- * Shapes live in batches keyed by scene, mesh, pipeline and whether they are dynamic; a
+ * Shapes live in batches keyed by scene, mesh, pipeline, whether they are dynamic and whether
+ * they cast shadows; a
  * batch keeps one slot per entity, swap-removed so its instances stay contiguous.
  */
 
@@ -31,6 +32,7 @@ typedef struct box_draw_key_t {
     uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
     uint8_t back_face;      /**< BackFaceMode */
     bool dynamic;           /**< Instances are uploaded every frame */
+    bool shadow;            /**< Instances cast shadows, false under NoShadow */
 } box_draw_key_t;
 
 /** The material components of a shape, NULL for the ones it does not have */

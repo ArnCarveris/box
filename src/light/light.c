@@ -86,7 +86,7 @@ static void box_ambient_light_ctor(
     }
 }
 
-/** Construct View values that are lit.
+/** Construct View values that are lit, with the documented shadow defaults.
  *
  * @param ptr The components
  * @param count Number of components
@@ -102,6 +102,16 @@ static void box_light_view_ctor(
     ecs_os_memset(ptr, 0, ti->size * count);
     for (i = 0; i < count; i ++) {
         values[i].lighting.enabled = true;
+        values[i].shadows = (ShadowSettings){
+            .cascades = 4,
+            .resolution = 2048,
+            .max_distance = 200.0f,
+            .split_lambda = 0.7f,
+            .depth_bias = 2.0f,
+            .normal_offset = 1.5f,
+            .filter_size = 3,
+            .fade = 0.2f
+        };
     }
 }
 

@@ -31,8 +31,14 @@
 /** Depth format of the views, cleared to 0 and compared with greater for reversed Z */
 #define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32Float)
 
-/** Bytes between the uniforms of two views, the dynamic offset alignment of webgpu */
-#define BOX_GPU_VIEW_STRIDE (256)
+/** Bytes between the uniforms of two views, a multiple of the dynamic offset alignment */
+#define BOX_GPU_VIEW_STRIDE (768)
+
+/** Bytes between the matrices of two cascades, the dynamic offset alignment of webgpu */
+#define BOX_GPU_CASCADE_STRIDE (256)
+
+/** Depth format of the shadow maps, cleared to 0 and compared with greater for reversed Z */
+#define BOX_GPU_SHADOW_FORMAT (WGPUTextureFormat_Depth32Float)
 
 /** Forward pipelines by color format, blend mode and back face mode, at most */
 #define BOX_GPU_FORWARD_PIPELINES (64)
@@ -92,6 +98,12 @@ typedef struct box_gpu_view_uniforms_t {
     vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
     uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
     uint32_t grid[4];               /**< Clusters per axis, lights per cluster at most */
+    mat4 shadow_matrix[BOX_RENDER_SHADOW_CASCADES]; /**< World to shadow clip per cascade */
+    vec4 shadow_split;              /**< View depth each cascade ends at */
+    vec4 shadow_bias;               /**< Depth added to the compared depth per cascade */
+    vec4 shadow_offset;             /**< World offset along the normal per cascade */
+    vec4 shadow_params;             /**< Fade start, shadow end, texel in uv, unused */
+    uint32_t shadow_config[4];      /**< Cascades, 0 without shadows, PCF taps, two unused */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -132,6 +144,21 @@ typedef struct box_gpu_t {
     ecs_vec_t clusters;             /**< WGPUBuffer, the cluster buffer of each view slot */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
+    WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */
+    WGPUPipelineLayout shadow_pipeline_layout; /**< Pipeline layout of the shadow pass */
+    WGPURenderPipeline shadow;      /**< Shadow pipeline, NULL until the shader exists */
+    int32_t shadow_revision;        /**< Revision of the shader the pipeline was made with */
+    WGPUSampler shadow_sampler;     /**< Comparison sampler of the shadow lookups */
+    WGPUTexture shadow_empty;       /**< Shadow map bound by views without shadows */
+    WGPUTextureView shadow_empty_view; /**< Array view of the empty shadow map */
+    WGPUTexture shadow_map;         /**< Shadow map the views render their cascades into */
+    WGPUTextureView shadow_map_view; /**< Array view of the shadow map */
+    WGPUTextureView shadow_layers[BOX_RENDER_SHADOW_CASCADES]; /**< View of each cascade */
+    int32_t shadow_resolution;      /**< Edge of the shadow map, 0 before it exists */
+    int32_t shadow_cascades;        /**< Layers of the shadow map */
+    WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
+    int32_t shadow_capacity;        /**< Views the cascade buffer holds */
+    ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
     WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
@@ -399,7 +426,8 @@ void box_gpu_light_cluster(
     const box_render_view_t *v,
     int32_t slot);
 
-/** Create the bind group of the forward pass of a view: its uniforms, lights and clusters.
+/** Create the bind group of the forward pass of a view: its uniforms, lights, clusters and
+ * shadow map.
  *
  * @param gpu The backend
  * @param v The view
@@ -410,6 +438,69 @@ WGPUBindGroup box_gpu_light_group(
     box_gpu_t *gpu,
     const box_render_view_t *v,
     int32_t slot);
+
+/** Create the layouts, sampler and empty shadow map of the shadow pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_shadow_init(
+    box_gpu_t *gpu);
+
+/** Release the pipeline, layouts, textures and buffers of the shadow pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_shadow_fini(
+    box_gpu_t *gpu);
+
+/** Fit the cascades of a view to its projection and write the shadow members of its uniforms.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param proj Projection of the view for its target
+ * @param slot Slot of the view in the view buffer
+ * @param u The uniforms
+ */
+void box_gpu_shadow_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    mat4 proj,
+    int32_t slot,
+    box_gpu_view_uniforms_t *u);
+
+/** Write the cascade matrices of the views of a target into the cascade buffer.
+ *
+ * @param gpu The backend
+ * @param count Views of the target
+ */
+void box_gpu_shadow_upload(
+    box_gpu_t *gpu,
+    int32_t count);
+
+/** Record the shadow passes of a view: its casters drawn into every cascade.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param packet The packet with the batches
+ * @param index Index of the view in the packet
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_shadow_render(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot);
+
+/** Get the shadow map a view samples.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @return The array view of the shadow map, the empty one for a view without shadows
+ */
+WGPUTextureView box_gpu_shadow_binding(
+    box_gpu_t *gpu,
+    const box_render_view_t *v);
 
 /** Create the layouts of the scatter pass.
  *

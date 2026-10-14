@@ -50,7 +50,7 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entries[3] = {
+    WGPUBindGroupLayoutEntry entries[5] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
@@ -69,9 +69,22 @@ void box_gpu_draw_init(
             .binding = 2,
             .visibility = WGPUShaderStage_Fragment,
             .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 3,
+            .visibility = WGPUShaderStage_Fragment,
+            .texture = {
+                .sampleType = WGPUTextureSampleType_Depth,
+                .viewDimension = WGPUTextureViewDimension_2DArray
+            }
+        },
+        {
+            .binding = 4,
+            .visibility = WGPUShaderStage_Fragment,
+            .sampler = { .type = WGPUSamplerBindingType_Comparison }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 3, .entries = entries };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 5, .entries = entries };
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     gpu->mesh_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
@@ -82,6 +95,7 @@ void box_gpu_draw_init(
     ecs_map_init(&gpu->buffers, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
     box_gpu_light_init(gpu);
+    box_gpu_shadow_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -146,6 +160,7 @@ void box_gpu_draw_fini(
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
     box_gpu_forward_reset(gpu);
     box_gpu_light_fini(gpu);
+    box_gpu_shadow_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -516,10 +531,12 @@ static int32_t box_gpu_view_write(
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
         box_gpu_light_uniforms(gpu, v, proj, u);
+        box_gpu_shadow_uniforms(gpu, v, proj, result, u);
         result ++;
     }
 
     if (result) {
+        box_gpu_shadow_upload(gpu, result);
         box_gpu_view_reserve(gpu, result);
         wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
             ecs_vec_first(&gpu->view_data), (size_t)result * BOX_GPU_VIEW_STRIDE);
@@ -621,6 +638,7 @@ void box_gpu_draw_views(
         };
         uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
         box_gpu_light_cluster(gpu, encoder, v, slot);
+        box_gpu_shadow_render(gpu, encoder, packet, i, slot);
         WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);

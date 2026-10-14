@@ -4,6 +4,7 @@
 // The model matrix is affine: the w of its first columns holds metallic and roughness, the w
 // of the normal columns holds the emitted color.
 #include "include/lights.wgsl"
+#include "include/shadow.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
 override blend_mode: u32 = 0u;
@@ -140,12 +141,15 @@ fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
-// lights of the scene, then the point and spot lights of the cluster of the fragment.
+// lights of the scene, the first one through its shadow map, then the point and spot lights
+// of the cluster of the fragment.
 fn lights_direct(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     var sum = vec3f(0.0);
+    let shadow = shadow_factor(world, s.normal);
     for (var i = 0u; i < view.lights.x; i++) {
         let light = lights[i];
-        sum += brdf(s, v, normalize(light.position), light.color);
+        let visible = select(1.0, shadow, i == 0u);
+        sum += brdf(s, v, normalize(light.position), light.color) * visible;
     }
 
     if (view.lights.y > view.lights.x) {

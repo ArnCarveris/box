@@ -61,6 +61,7 @@ static uint64_t box_draws_hash(
     h ^= ((uint64_t)key->mesh + 0x632BE59BD9B4E019ull) * 0xC2B2AE3D27D4EB4Full;
     h ^= ((uint64_t)key->pipeline * 2 + key->dynamic) * 0x165667B19E3779F9ull;
     h ^= ((uint64_t)key->blend * 2 + key->back_face + 1) * 0x27D4EB2F165667C5ull;
+    h ^= (uint64_t)key->shadow * 0x94D049BB133111EBull;
 
     return h ^ (h >> 29);
 }
@@ -76,7 +77,8 @@ static bool box_draws_key_eq(
     const box_draw_key_t *b)
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
-        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic;
+        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
+        a->shadow == b->shadow;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -513,6 +515,7 @@ static uint32_t box_draws_send_batch(
     out->pipeline = b->key.pipeline;
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
+    out->shadow = b->key.shadow;
     out->mesh = b->key.mesh;
     out->instances = b->buffer;
     out->first_instance = 0;
@@ -613,6 +616,7 @@ static void box_draws_send_blended(
             out->pipeline = b->key.pipeline;
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
+            out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             out->instances = b->buffer;
             out->first_instance = (uint32_t)sorted[i].slot;

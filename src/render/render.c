@@ -320,6 +320,7 @@ void BoxRenderImport(
     box_render_captures_init(world);
     box_render_draws_init(world);
     box_render_lights_init(world);
+    box_render_shadows_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),
