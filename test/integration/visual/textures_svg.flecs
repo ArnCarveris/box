@@ -64,7 +64,7 @@ wide {
 
 lit_box {
   Position: {0, -1.6, 0}
-  Rotation: {0.5, 0.7, 0}
+  Rotation: {0.3754, 0.7649, 0.3384}
   Box: {2, 2, 2}
   Rgb: {255, 255, 255}
   PbrMaterial: {roughness: 0.7}
