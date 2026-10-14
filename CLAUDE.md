@@ -104,6 +104,17 @@ test suites.
 `pm deliver` and `pm done` encode; brief every agent with `python3 project/pm.py
 brief <epic>/<task> --files <owned paths>` instead of writing a prompt by hand.
 
+Every task goes through the review loop before it closes: a review agent writes
+`deliverable/review/review.md` (findings `### R<n> [blocker|major|minor] title`, or `None.`),
+an agent addresses each finding and answers it under `## Round <k>` in `response.md`, and a
+verifier, who may not raise new issues, writes `verification_r<k>.md` and `verification.md`
+ending in `Verdict: ALL ADDRESSED` or `Verdict: OPEN: R<n>, ...`; an open verdict goes back
+to the response step. Implementation agents run `pm deliver` but never `pm done`; the
+coordinator runs the loop, delivers again and closes the task. `pm done` refuses a task
+without a passing review or with reports older than it, `pm check` reports a completed one
+as a problem, and `pm review <epic>/<task>` prints the state and the next step. Tasks
+completed before the gate (`REVIEW_SINCE` in `pm.py`) are exempt.
+
 A task that touches a hot path (transform propagation, mesh generation, extract,
 command dispatch) adds or updates a benchcase under `bench/<module>` and attaches
 the report of the affected bench project as `deliverable/bench.json`:

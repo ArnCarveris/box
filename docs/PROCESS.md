@@ -67,10 +67,51 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
-9. **Close.** `python3 project/pm.py done <epic>/<task>` refuses while
-   `tests.json` or `bench.json` is missing and prints what it wants; a task that
-   changes nothing that runs per frame sets `"bench": false` in its
-   `progress.json` instead. `--force` completes anyway and says so.
+9. **Review.** The implementation agent stops after `pm deliver` and never runs
+   `pm done`. The coordinator puts every task through the review loop described in
+   [Closing a task](#closing-a-task) and closes it once the verification passes.
+
+10. **Close.** `python3 project/pm.py done <epic>/<task>` refuses while
+    `tests.json` or `bench.json` is missing, while the review loop has not passed, or
+    while a report predates the review, and prints what it wants; a task that
+    changes nothing that runs per frame sets `"bench": false` in its
+    `progress.json` instead. `--force` completes anyway and says so, loudly when it
+    skips the review.
+
+## Closing a task
+
+After each task:
+
+1. **Review.** A review agent reads the change (`git diff <range>`), the task and
+   epic README, `DESIGN.md` and `CLAUDE.md`, and writes
+   `deliverable/review/review.md`: a `## Findings` section with one
+   `### R<n> [blocker|major|minor] <title>` block per finding (File, Problem,
+   Expected), or `None.` when there is nothing to fix.
+2. **Respond.** An agent addresses every open finding, by fixing the code with a test
+   that proves it or by explaining with evidence why it is not a defect, and appends a
+   `## Round <k>` section to `deliverable/review/response.md` with one
+   `R<n>: fixed in <commit> — ...` or `R<n>: not a defect — ...` line per finding.
+3. **Verify.** A verifying agent judges only the listed findings, never new ones, and
+   writes `deliverable/review/verification_r<k>.md`, copied to `verification.md`:
+   one `R<n>: ADDRESSED|NOT ADDRESSED — <evidence>` line per finding and a closing
+   `Verdict: ALL ADDRESSED` or `Verdict: OPEN: R<n>, ...`. An open verdict goes back
+   to step 2 for round k+1.
+4. **Deliver.** Once the verdict is `ALL ADDRESSED` (or the review had no findings),
+   rerun `pm deliver`, so `tests.json` and `bench*.json` postdate the review, and
+   close with `pm done`. The review folder is part of the deliverable and shows in
+   the task's deliverable listing on the status page.
+
+`python3 project/pm.py review <epic>/<task>` prints the state of the loop: the
+findings by severity, the response rounds, the open findings, what is missing and
+the next step (review, respond, verify, deliver or done). `pm done` enforces it:
+it wants `review.md`; with findings, an answer to every `R<n>` in `response.md`, a
+`verification.md` equal to the latest round that marks every finding ADDRESSED,
+judges nothing else and ends with `Verdict: ALL ADDRESSED`; and reports that are
+newer than `review.md` and `verification.md` (the report `timestamp`, else the
+author date of the file's last commit, else its mtime). `pm check` reports a
+completed task without a passing review as a problem. The gate (`REVIEW_SINCE` in
+`pm.py`) covers every open task and every task started on or after
+2026-10-14T22:50Z; tasks completed before it are exempt.
 
 ## Closing an epic
 
