@@ -1,0 +1,35 @@
+{
+    "id": "bench_transform",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for static and dynamic propagation of box.transform",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Static",
+                "benchcases": [
+                    "deep_childof",
+                    "deep_parent",
+                    "wide_childof",
+                    "wide_parent",
+                    "deep_leaf_childof",
+                    "wide_leaf_childof"
+                ]
+            },
+            {
+                "id": "Dynamic",
+                "benchcases": [
+                    "deep_childof",
+                    "deep_parent",
+                    "wide_childof",
+                    "wide_parent"
+                ]
+            }
+        ]
+    }
+}
