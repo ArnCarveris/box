@@ -1,6 +1,6 @@
 /**
  * @file input/queue.c
- * @brief The platform push and the synthetic queue: key taps, typing, cursor walks and focus.
+ * @brief The platform push and the synthetic queue: keys, typing, cursor walks, focus, actions.
  */
 
 #include "input.h"
@@ -83,16 +83,18 @@ static void box_input_queue_move(
     });
 }
 
-/** Queue a cursor walk, holding a button during it when one is given.
+/** Queue a cursor walk, holding a button or an action during it when one is given.
  *
  * @param world The world
  * @param walk The walk
  * @param button Button held during the walk, KeyNone for none
+ * @param action Action held during the walk, 0 for none
  */
 static void box_input_walk(
     ecs_world_t *world,
     const box_input_sweep_t *walk,
-    Key button)
+    Key button,
+    ecs_entity_t action)
 {
     int32_t steps = walk->steps > 0 ? walk->steps : BOX_INPUT_SWEEP_STEPS;
     int32_t frames = walk->frames > 0 ? walk->frames : steps;
@@ -100,6 +102,10 @@ static void box_input_walk(
     box_input_queue_move(world, walk->from[0], walk->from[1], walk->normalized, 0);
     if (button) {
         box_input_queue_key(world, InputKeyDown, button, 0);
+    }
+
+    if (action) {
+        box_input_queue(world, &(InputEvent){ .kind = InputActionDown, .action = action });
     }
 
     for (i = 1; i <= steps; i ++) {
@@ -113,6 +119,11 @@ static void box_input_walk(
 
     if (button) {
         box_input_queue_key(world, InputKeyUp, button, 1);
+    }
+
+    if (action) {
+        box_input_queue(world, &(InputEvent){
+            .kind = InputActionUp, .action = action, .delay = 1 });
     }
 }
 
@@ -195,7 +206,7 @@ void box_input_mouse_sweep(
     ecs_world_t *world,
     const box_input_sweep_t *sweep)
 {
-    box_input_walk(world, sweep, KeyNone);
+    box_input_walk(world, sweep, KeyNone, 0);
 }
 
 void box_input_mouse_release(
@@ -223,7 +234,34 @@ void box_input_mouse_drag(
     ecs_world_t *world,
     const box_input_sweep_t *drag)
 {
-    box_input_walk(world, drag, drag->button ? drag->button : KeyMouseLeft);
+    box_input_walk(world, drag, drag->button ? drag->button : KeyMouseLeft, 0);
+}
+
+void box_input_action(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    bool down)
+{
+    box_input_queue(world, &(InputEvent){
+        .kind = down ? InputActionDown : InputActionUp, .action = action });
+}
+
+void box_input_action_press(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    int32_t frames)
+{
+    box_input_queue(world, &(InputEvent){ .kind = InputActionDown, .action = action });
+    box_input_queue(world, &(InputEvent){
+        .kind = InputActionUp, .action = action, .delay = frames > 0 ? frames : 1 });
+}
+
+void box_input_action_drag(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    const box_input_sweep_t *drag)
+{
+    box_input_walk(world, drag, KeyNone, action);
 }
 
 void box_input_mouse_scroll(

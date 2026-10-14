@@ -45,6 +45,37 @@
                     "script_mouse_click",
                     "script_mouse_drag"
                 ]
+            },
+            {
+                "id": "Action",
+                "testcases": [
+                    "import",
+                    "binding_key",
+                    "binding_child",
+                    "binding_self",
+                    "binding_multiple",
+                    "binding_modifier",
+                    "binding_mouse_button",
+                    "binding_disabled",
+                    "binding_prefab",
+                    "tap_in_one_frame",
+                    "drag_delta",
+                    "hold",
+                    "hold_and_binding",
+                    "press",
+                    "press_one_frame",
+                    "drag",
+                    "reset_releases_holds",
+                    "focus_lost_releases_holds",
+                    "deleted_action",
+                    "script_bindings",
+                    "script_pressed_released",
+                    "script_held",
+                    "script_dragged",
+                    "script_parent_target",
+                    "script_tap_sequence",
+                    "script_wait_no_action"
+                ]
             }
         ]
     }

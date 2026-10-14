@@ -15,17 +15,43 @@ typedef struct box_input_emit_t {
     EcsScriptKeyboardEvent keyboard;  /**< Keyboard event to emit */
 } box_input_emit_t;
 
+/** A synthetic hold of an action */
+typedef struct box_input_hold_t {
+    ecs_entity_t action; /**< The action entity */
+    bool down;           /**< The hold is active */
+    bool pressed;        /**< The hold started since the actions last resolved */
+} box_input_hold_t;
+
 /** Queues and backend of the module, a private singleton */
 typedef struct InputDevice {
     ecs_vec_t platform;            /**< InputEvent pushed by the backend since the last frame */
     ecs_vec_t queue;               /**< InputEvent of the synthetic queue, applied in order */
     ecs_vec_t emits;               /**< box_input_emit_t of the frame */
+    ecs_vec_t holds;               /**< box_input_hold_t of the synthetic action holds */
     box_input_platform_t backend;  /**< Backend that feeds real device input */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
     bool has_position;             /**< A cursor position arrived since focus was gained */
 } InputDevice;
 
 extern ECS_COMPONENT_DECLARE(InputDevice);
+
+/** Private state of the action layer, a singleton */
+typedef struct InputActions {
+    ecs_vec_t waiters;      /**< box_input_waiter_t of the script tasks awaiting an action */
+    ecs_vec_t events;       /**< box_input_action_event_t the frame raises */
+    ecs_map_t bound;        /**< Action entity to the BOX_INPUT_BOUND_* bits of this frame */
+    ecs_query_t *bindings;  /**< Entities with a Binding */
+    ecs_query_t *actions;   /**< Entities with an Action and its ActionState */
+} InputActions;
+
+extern ECS_COMPONENT_DECLARE(InputActions);
+
+/** Register the action hooks, the ActionUpdate system and the on.* functions.
+ *
+ * @param world The world
+ */
+void box_input_actions_import(
+    ecs_world_t *world);
 
 /** Get the device state of a world.
  *
@@ -50,6 +76,24 @@ const char* box_input_key_value(
  */
 Key box_input_key_from_char(
     int32_t code);
+
+/** Start or end a synthetic hold of an action.
+ *
+ * @param dev The device state
+ * @param action The action entity
+ * @param down Whether the hold starts
+ */
+void box_input_hold(
+    InputDevice *dev,
+    ecs_entity_t action,
+    bool down);
+
+/** End every synthetic hold of an action.
+ *
+ * @param dev The device state
+ */
+void box_input_hold_release_all(
+    InputDevice *dev);
 
 /** Clear the per frame state, apply the platform and synthetic events and emit them.
  *
