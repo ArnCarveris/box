@@ -52,8 +52,7 @@ typedef struct InputDevice {
     box_input_platform_t backend;  /**< Backend that feeds real device input */
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
-    char *text;                    /**< Buffer of Input.text the capacity belongs to */
-    int32_t text_capacity;         /**< Bytes allocated for text */
+    ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
     bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 

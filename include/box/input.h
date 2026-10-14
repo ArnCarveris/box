@@ -101,7 +101,7 @@ ECS_STRUCT(Mouse, {
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
-    char *text;         /**< Text typed this frame as UTF-8, grows to fit, owned */
+    char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
 });

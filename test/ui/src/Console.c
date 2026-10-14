@@ -920,3 +920,67 @@ void Console_scrollback_follows_height(void) {
     test_assert(ecs_lookup(world, CONSOLE_LOG ".line_20") == 0);
     ecs_fini(world);
 }
+
+void Console_paste_long(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_progress(world, 0);
+
+    ecs_entity_t t = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    char paste[1001];
+    for (int32_t i = 0; i < 1000; i ++) {
+        paste[i] = (char)('a' + i % 26);
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = paste[i] });
+    }
+
+    paste[1000] = '\0';
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    test_str(ecs_get(world, before, Text)->value, paste);
+    test_str(ecs_singleton_get(world, Input)->text, "");
+
+    ecs_fini(world);
+}
+
+void Console_null_text(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_progress(world, 0);
+
+    ecs_entity_t t = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, t, "key.type `", NULL));
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_singleton_set(world, Input, { .focused = true });
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, t, "key.type \"ab\"", NULL));
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    test_str(ecs_get(world, before, Text)->value, "ab");
+
+    ecs_fini(world);
+}

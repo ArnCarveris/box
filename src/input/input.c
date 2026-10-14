@@ -31,6 +31,7 @@ static void box_input_device_dtor(
         ecs_vec_fini_t(NULL, &dev[i].queue, InputEvent);
         ecs_vec_fini_t(NULL, &dev[i].emits, box_input_emit_t);
         ecs_vec_fini_t(NULL, &dev[i].holds, box_input_hold_t);
+        ecs_vec_fini_t(NULL, &dev[i].text, char);
     }
 }
 
@@ -123,6 +124,7 @@ void BoxInputImport(
     ecs_vec_init_t(NULL, &dev->queue, InputEvent, 0);
     ecs_vec_init_t(NULL, &dev->emits, box_input_emit_t, 0);
     ecs_vec_init_t(NULL, &dev->holds, box_input_hold_t, 0);
+    ecs_vec_init_t(NULL, &dev->text, char, 0);
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;
