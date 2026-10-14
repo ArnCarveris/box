@@ -42,30 +42,11 @@ ECS_DTOR(TransformStaticDirtyEntities, ptr, {
 
 ECS_COMPONENT_DECLARE(TransformStaticDirtyEntities);
 
-/** Test whether the entities of a table have a dynamic or manual transform.
- *
- * The observers filter on these tags here instead of with Not terms: a Not term fires the
- * observer for every entity of the table when one entity gains or loses the tag.
- *
- * @param world The world
- * @param table The table, NULL for none
- * @return True when the table has DynamicTransform or ManualTransform
- */
-static bool transformStaticSkipTable(
-    const ecs_world_t *world,
-    const ecs_table_t *table)
-{
-    bool result = table && (ecs_table_has_id(world, table, DynamicTransform) ||
-        ecs_table_has_id(world, table, ManualTransform));
-
-    return result;
-}
-
-/** Append the entities of an iterator to the dirty list.
+/** Add entities with a changed transform input to the dirty list.
  *
  * @param it The observer iterator
  */
-static void transformStaticAppendDirty(
+static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
     TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
@@ -77,33 +58,6 @@ static void transformStaticAppendDirty(
     }
 }
 
-/** Add static entities with a changed transform input to the dirty list.
- *
- * @param it The observer iterator
- */
-static void TransformStatic_OnChange(
-    ecs_iter_t *it)
-{
-    if (!transformStaticSkipTable(it->world, it->table)) {
-        transformStaticAppendDirty(it);
-    }
-}
-
-/** Add entities that become static by losing DynamicTransform or ManualTransform.
- *
- * @param it The observer iterator
- */
-static void TransformStatic_OnBecomeStatic(
-    ecs_iter_t *it)
-{
-    const ecs_table_t *dst = it->other_table;
-    if (dst && ecs_table_has_id(it->world, dst, ecs_id(Position)) &&
-        !transformStaticSkipTable(it->world, dst))
-    {
-        transformStaticAppendDirty(it);
-    }
-}
-
 /** Remove the world transform of entities that lose their position.
  *
  * @param it The observer iterator
@@ -111,11 +65,9 @@ static void TransformStatic_OnBecomeStatic(
 static void Transform_OnRemovePosition(
     ecs_iter_t *it)
 {
-    if (!it->table || !ecs_table_has_id(it->world, it->table, ManualTransform)) {
-        for (int i = 0; i < it->count; i ++) {
-            ecs_remove(it->stage, it->entities[i], WorldTransform);
-            ecs_remove(it->stage, it->entities[i], WorldTransformVersion);
-        }
+    for (int i = 0; i < it->count; i ++) {
+        ecs_remove(it->stage, it->entities[i], WorldTransform);
+        ecs_remove(it->stage, it->entities[i], WorldTransformVersion);
     }
 }
 
@@ -302,7 +254,9 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
         .query.terms = {
-            { .id = ecs_id(Position), .src.id = EcsSelf }
+            { .id = ecs_id(Position), .src.id = EcsSelf },
+            { .id = DynamicTransform, .oper = EcsNot },
+            { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
         .callback = TransformStatic_OnChange
@@ -311,7 +265,9 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
         .query.terms = {
-            { .id = ecs_id(Rotation), .src.id = EcsSelf }
+            { .id = ecs_id(Rotation), .src.id = EcsSelf },
+            { .id = DynamicTransform, .oper = EcsNot },
+            { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
         .callback = TransformStatic_OnChange
@@ -320,7 +276,9 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnScale" }),
         .query.terms = {
-            { .id = ecs_id(Scale), .src.id = EcsSelf }
+            { .id = ecs_id(Scale), .src.id = EcsSelf },
+            { .id = DynamicTransform, .oper = EcsNot },
+            { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
         .callback = TransformStatic_OnChange
@@ -329,7 +287,8 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "Transform_OnRemovePosition" }),
         .query.terms = {
-            { .id = ecs_id(Position), .src.id = EcsSelf }
+            { .id = ecs_id(Position), .src.id = EcsSelf },
+            { .id = ManualTransform, .oper = EcsNot, .inout = EcsInOutFilter }
         },
         .events = { EcsOnRemove },
         .callback = Transform_OnRemovePosition
@@ -338,7 +297,9 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnChildOf" }),
         .query.terms = {
-            { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf }
+            { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf },
+            { .id = DynamicTransform, .oper = EcsNot },
+            { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnAdd, EcsOnRemove },
         .callback = TransformStatic_OnChange
@@ -347,24 +308,12 @@ void TransformStaticImport(
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnParent" }),
         .query.terms = {
-            { .id = ecs_id(EcsParent), .src.id = EcsSelf }
+            { .id = ecs_id(EcsParent), .src.id = EcsSelf },
+            { .id = DynamicTransform, .oper = EcsNot },
+            { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
         .callback = TransformStatic_OnChange
-    });
-
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnRemoveDynamic" }),
-        .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnRemove },
-        .callback = TransformStatic_OnBecomeStatic
-    });
-
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnRemoveManual" }),
-        .query.terms = {{ .id = ManualTransform }},
-        .events = { EcsOnRemove },
-        .callback = TransformStatic_OnBecomeStatic
     });
 
     ecs_system(world, {

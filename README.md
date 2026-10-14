@@ -13,6 +13,25 @@ engine reacts to component changes. See `DESIGN.md` for the full brief and
 - For wasm builds: emsdk, with `emsdk_env.sh` sourced, and the Rust target for resvg:
   `rustup target add wasm32-unknown-emscripten`
 
+## Flecs version
+
+Box builds the exact HEAD of the branch checked out in `../../flecs`: the `flecs` bundle in
+`project.json` pins no tag or commit and takes no patches. Bake clones it once into
+`.bake/bundles/flecs/default/src` and warns when that checkout is behind `../../flecs`. To pick
+up a new flecs HEAD, fast-forward the checkout and rebuild:
+
+```sh
+bake3 bundle update flecs && bake3 --local-env
+```
+
+When the update refuses (flecs history was rewritten, or `../../flecs` switched branch), clone
+it again with `rm -rf .bake/bundles/flecs && bake3 --local-env`. Check that the commit box is
+built against matches `../../flecs`:
+
+```sh
+git -C .bake/bundles/flecs/default/src log -1 --format=%h; git -C ../../flecs log -1 --format=%h
+```
+
 ## Build and run
 
 ```sh
