@@ -24,7 +24,7 @@ void Render_capture_active_camera(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -34,7 +34,7 @@ void Render_capture_active_camera(void) {
     ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, box, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -71,7 +71,7 @@ void Render_capture_named_camera(void) {
 
     ecs_entity_t main_camera = ecs_entity(world, { .name = "main_camera" });
     ecs_set(world, main_camera, Position, {0, 0, 5});
-    ecs_set(world, main_camera, Camera, {.fov = 60});
+    ecs_set(world, main_camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = main_camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -88,10 +88,10 @@ void Render_capture_named_camera(void) {
     ecs_set(world, red, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, red, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t other = ecs_entity(world, { .name = "level.other" });
-    ecs_set(world, other, Camera, {.fov = 60});
+    ecs_set(world, other, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_set(world, other, Position, {0, 0, 5});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -125,10 +125,10 @@ void Render_capture_batch(void) {
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
     ecs_set(world, a, Position, {-10, 0, 5});
-    ecs_set(world, a, Camera, {.fov = 60});
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {10, 0, 5});
-    ecs_set(world, b, Camera, {.fov = 60});
+    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t red = ecs_new(world);
     ecs_set(world, red, Position, {-10, 0, 0});
     ecs_set(world, red, Box, {2, 2, 2});
@@ -142,7 +142,7 @@ void Render_capture_batch(void) {
     ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -183,10 +183,10 @@ void Render_capture_bracket_list(void) {
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
     ecs_set(world, a, Position, {-10, 0, 5});
-    ecs_set(world, a, Camera, {.fov = 60});
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
     ecs_set(world, b, Position, {10, 0, 5});
-    ecs_set(world, b, Camera, {.fov = 60});
+    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t red = ecs_new(world);
     ecs_set(world, red, Position, {-10, 0, 0});
     ecs_set(world, red, Box, {2, 2, 2});
@@ -200,7 +200,7 @@ void Render_capture_bracket_list(void) {
     ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -238,11 +238,11 @@ void Render_capture_size_of_surface(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 320, .height = 200});
+    ecs_set(world, surface, Surface, {.width = 320, .height = 200, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -272,16 +272,16 @@ void Render_capture_clear_of_view(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
-    ecs_set(world, a, Camera, {.fov = 60});
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t b = ecs_entity(world, { .name = "b" });
-    ecs_set(world, b, Camera, {.fov = 60});
+    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view_a = ecs_new(world);
     ecs_set(world, view_a, View, {
         .camera = a, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
     ecs_entity_t view_b = ecs_new(world);
     ecs_set(world, view_b, View, {.camera = b});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 8, .height = 8});
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
 
     ecs_os_free(box_terminal_run(world, s, "capture b", NULL));
@@ -314,10 +314,10 @@ void Render_capture_not_a_camera(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t a = ecs_entity(world, { .name = "a" });
-    ecs_set(world, a, Camera, {.fov = 60});
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity(world, { .name = "thing" });
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 8, .height = 8});
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = false;
@@ -364,7 +364,7 @@ void Render_capture_no_active_camera(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t s = box_terminal_new(world);
     bool error = false;
     char *out = box_terminal_run(world, s, "capture", &error);
@@ -386,10 +386,10 @@ void Render_capture_view_root_of_surface(void) {
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-10, 0, 5});
-    ecs_set(world, a, Camera, {.fov = 60});
+    ecs_set(world, a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t b = ecs_new(world);
     ecs_set(world, b, Position, {10, 0, 5});
-    ecs_set(world, b, Camera, {.fov = 60});
+    ecs_set(world, b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view_a = ecs_new(world);
     ecs_set(world, view_a, View, {.camera = a});
     ecs_entity_t root = ecs_new(world);
@@ -408,7 +408,8 @@ void Render_capture_view_root_of_surface(void) {
     ecs_set(world, green, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, green, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .view_root = root});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .view_root = root,
+        .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -592,7 +593,7 @@ void Render_render_entity_copy(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t car = ecs_entity(world, { .name = "car" });
@@ -776,7 +777,7 @@ void Render_names_unique(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t prefab = ecs_entity(world, { .name = "Crate" });
     ecs_add_id(world, prefab, EcsPrefab);
     ecs_set(world, prefab, Box, {1, 1, 1});
@@ -808,12 +809,12 @@ void Render_gpu_capture_png(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 128, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 32});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
     ecs_progress(world, 0);
 
@@ -850,12 +851,12 @@ void Render_gpu_capture_first_frame(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 64});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 64, .resolution_scale = 1});
     ecs_entity_t shape = ecs_new(world);
     ecs_set(world, shape, Position, {0, 0, 0});
     ecs_set(world, shape, Box, {2, 2, 2});
@@ -898,7 +899,7 @@ void Render_gpu_capture_effects(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t fog = ecs_new(world);
     ecs_set(world, fog, HeightFog, {.density = 0.5f, .falloff = 0.1f, .max_opacity = 1,
         .color = {40, 200, 40}, .sun_inscatter = 1, .ambient_inscatter = 1});
@@ -921,7 +922,7 @@ void Render_gpu_capture_effects(void) {
     ecs_set(world, shape, Emissive, {.strength = 3, .color = {255, 0, 0}});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 64, .height = 64,
-        .write_to_file = "capture_effects.png"});
+        .write_to_file = "capture_effects.png", .resolution_scale = 1});
     ecs_entity_t s = box_terminal_new(world);
 
     ecs_os_free(box_terminal_run(world, s, "capture", NULL));

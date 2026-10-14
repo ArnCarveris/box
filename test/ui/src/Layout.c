@@ -385,10 +385,10 @@ void Layout_grow_zero_weight(void) {
     ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1 } });
     ecs_progress(world, 0);
 
-    test_flt(ecs_get(world, a, LayoutBounds)->width, 100);
-    test_flt(ecs_get(world, b, LayoutBounds)->width, 100);
-    test_flt(ecs_get(world, a, Position)->x, -50);
-    test_flt(ecs_get(world, b, Position)->x, 50);
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 0);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 200);
+    test_flt(ecs_get(world, a, Position)->x, -100);
+    test_flt(ecs_get(world, b, Position)->x, 0);
 
     ecs_fini(world);
 }
@@ -434,7 +434,7 @@ void Layout_grow_column(void) {
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, a, LayoutItem, { .height = { SizeModeFixed, 50 } });
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
-    ecs_set(world, b, LayoutItem, { .height = { SizeModeGrow } });
+    ecs_set(world, b, LayoutItem, { .height = { SizeModeGrow, 1 } });
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, b, LayoutBounds)->height, 140);
@@ -456,10 +456,10 @@ void Layout_grow_cross_axis(void) {
         .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 100 } });
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, a, LayoutItem, {
-        .width = { SizeModeFixed, 50 }, .height = { SizeModeGrow } });
+        .width = { SizeModeFixed, 50 }, .height = { SizeModeGrow, 1 } });
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, b, LayoutItem, {
-        .width = { SizeModeFixed, 50 }, .height = { SizeModeGrow, .max = 30 } });
+        .width = { SizeModeFixed, 50 }, .height = { SizeModeGrow, 1, .max = 30 } });
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, a, LayoutBounds)->height, 70);
@@ -473,7 +473,7 @@ void Layout_grow_cross_axis(void) {
         .width = { SizeModeFixed, 80 }, .height = { SizeModeFixed, 100 } });
     ecs_entity_t d = ecs_new_w_pair(world, EcsChildOf, c);
     ecs_set(world, d, LayoutItem, {
-        .width = { SizeModeGrow }, .height = { SizeModeFixed, 10 } });
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeFixed, 10 } });
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, d, LayoutBounds)->width, 80);
@@ -494,7 +494,7 @@ void Layout_grow_direction_none(void) {
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, a, Rect, {1, 1});
     ecs_set(world, a, LayoutItem, {
-        .width = { SizeModeGrow }, .height = { SizeModeGrow } });
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, a, LayoutBounds)->width, 180);
@@ -742,7 +742,7 @@ void Layout_rect_written(void) {
     ecs_set(world, a, Rect, {30, 20});
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, b, Rect, {1, 1});
-    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow }, .height = { SizeModeGrow } });
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, p, Rect)->width, 210);

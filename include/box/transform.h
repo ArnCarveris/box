@@ -3,7 +3,7 @@
  * @brief Transform components: local pose, world matrix and static/dynamic tags.
  *
  * WorldTransform is kept equal to parent * T * R * S: by observers for static
- * entities, every PostUpdate for DynamicTransform entities. DynamicTransform
+ * entities, every frame in EcsPreStore for DynamicTransform entities. DynamicTransform
  * spreads to every descendant and is removed from them with the root.
  */
 

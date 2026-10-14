@@ -22,7 +22,7 @@ void Material_default_material(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -35,7 +35,8 @@ void Material_default_material(void) {
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Box, {2, 2, 2});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "default.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "default.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -65,7 +66,7 @@ void Material_base_color(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -73,7 +74,8 @@ void Material_base_color(void) {
     ecs_set(world, box, Box, {2, 2, 2});
     ecs_set(world, box, Rgb, {255, 0, 128});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "base.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "base.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -101,7 +103,7 @@ void Material_pbr_material(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
@@ -116,7 +118,8 @@ void Material_pbr_material(void) {
     ecs_set(world, metal, Rgb, {128, 128, 128});
     ecs_set(world, metal, PbrMaterial, {.metallic = 1, .roughness = 0.25f});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "pbr.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "pbr.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -163,7 +166,7 @@ void Material_emissive(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -186,7 +189,8 @@ void Material_emissive(void) {
     ecs_set(world, color, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, color, Emissive, {.strength = 1, .color = {255, 0, 128}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "emissive.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "emissive.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -219,7 +223,7 @@ void Material_opacity_hierarchy(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -247,7 +251,8 @@ void Material_opacity_hierarchy(void) {
     ecs_set(world, parented, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, parented, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "fade.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "fade.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -277,7 +282,7 @@ void Material_parent_opacity_updates_children(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -294,7 +299,8 @@ void Material_parent_opacity_updates_children(void) {
     ecs_set(world, child, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, child, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "parent.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "parent.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -338,7 +344,7 @@ void Material_blend_mode_change(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -355,7 +361,8 @@ void Material_blend_mode_change(void) {
     ecs_set(world, glow, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_set(world, glow, BlendMode, {Additive});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mode.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mode.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -390,7 +397,7 @@ void Material_back_face_mode_removed(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -402,7 +409,8 @@ void Material_back_face_mode_removed(void) {
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_set(world, quad, BackFaceMode, {BackFacePlain});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "face.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "face.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -435,7 +443,7 @@ void Material_blended_after_opaque_back_to_front(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -460,7 +468,8 @@ void Material_blended_after_opaque_back_to_front(void) {
     ecs_set(world, wall, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, wall, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "sort.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "sort.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -488,11 +497,11 @@ void Material_blended_sorted_per_view(void) {
 
     ecs_entity_t front = ecs_new(world);
     ecs_set(world, front, Position, {0, 0, 6});
-    ecs_set(world, front, Camera, {.fov = 60});
+    ecs_set(world, front, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t back = ecs_new(world);
     ecs_set(world, back, Position, {0, 0, -6});
     ecs_set(world, back, Rotation, {0, (float)GLM_PI, 0});
-    ecs_set(world, back, Camera, {.fov = 60});
+    ecs_set(world, back, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t root_front = ecs_new(world);
     ecs_entity_t root_back = ecs_new(world);
     ecs_entity_t v1 = ecs_new_w_pair(world, EcsChildOf, root_front);
@@ -517,10 +526,12 @@ void Material_blended_sorted_per_view(void) {
     ecs_set(world, blue, Opacity, {0.5f});
     ecs_entity_t s1 = ecs_new(world);
     ecs_set(world, s1, Surface, {
-        .width = 32, .height = 32, .view_root = root_front, .write_to_file = "front.png"});
+        .width = 32, .height = 32, .view_root = root_front, .write_to_file = "front.png",
+            .resolution_scale = 1});
     ecs_entity_t s2 = ecs_new(world);
     ecs_set(world, s2, Surface, {
-        .width = 32, .height = 32, .view_root = root_back, .write_to_file = "back.png"});
+        .width = 32, .height = 32, .view_root = root_back, .write_to_file = "back.png",
+            .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -555,7 +566,7 @@ void Material_blended_scene_filter(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
@@ -576,7 +587,8 @@ void Material_blended_scene_filter(void) {
     ecs_set(world, mine, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_set(world, mine, Opacity, {0.5f});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "filter.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "filter.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -605,7 +617,7 @@ void Material_change_uploads_only_changed(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t shapes[20];
@@ -644,7 +656,7 @@ void Material_dynamic_material_per_frame(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -655,7 +667,8 @@ void Material_dynamic_material_per_frame(void) {
     ecs_set(world, box, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, box, Emissive, {.strength = 0, .color = {255, 255, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dynmat.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dynmat.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -690,7 +703,8 @@ void Material_dynamic_transform_keeps_material(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -710,7 +724,8 @@ void Material_dynamic_transform_keeps_material(void) {
     ecs_set(world, b, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, b, Emissive, {.strength = 1, .color = {255, 0, 0}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "keep.png"});
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "keep.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
@@ -754,7 +769,7 @@ void Material_dynamic_opacity_blends(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
@@ -767,7 +782,8 @@ void Material_dynamic_opacity_blends(void) {
     ecs_set(world, pane, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, pane, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dynfade.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dynfade.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -802,7 +818,7 @@ void Material_blended_no_alloc_steady_state(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     int32_t i;
@@ -845,7 +861,7 @@ void Material_gpu_alpha_blend(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -870,7 +886,8 @@ void Material_gpu_alpha_blend(void) {
     ecs_set(world, glow, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_set(world, glow, BlendMode, {Additive});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "blend.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "blend.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -907,7 +924,7 @@ void Material_gpu_back_face_plain(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -927,7 +944,8 @@ void Material_gpu_back_face_plain(void) {
     ecs_set(world, plain, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_set(world, plain, BackFaceMode, {BackFacePlain});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "back.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "back.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

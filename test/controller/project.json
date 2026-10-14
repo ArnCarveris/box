@@ -29,6 +29,7 @@
                     "forward_ignores_pitch",
                     "fast",
                     "speed",
+                    "zero_speed_stays",
                     "boost",
                     "release_stops",
                     "acceleration",

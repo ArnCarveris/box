@@ -29,13 +29,14 @@ void Scene_view_renders_scene_of_camera(void) {
     ecs_set(world, b, Scene, {0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 10});
-    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {0, 0, 10});
-    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_default = ecs_new(world);
     ecs_set(world, cam_default, Position, {0, 0, 10});
-    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, red, Position, {-2, 0, 0});
     ecs_set(world, red, Box, {1, 1, 1});
@@ -52,7 +53,8 @@ void Scene_view_renders_scene_of_camera(void) {
     ecs_set(world, view, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -105,10 +107,10 @@ void Scene_two_views_two_scenes(void) {
     ecs_set(world, b, Scene, {0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 10});
-    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {4, 0, 10});
-    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, red, Position, {2, 0, 1});
     ecs_set(world, red, Box, {1, 1, 1});
@@ -127,7 +129,8 @@ void Scene_two_views_two_scenes(void) {
     ecs_entity_t view_b = ecs_new(world);
     ecs_set(world, view_b, View, {.camera = cam_b, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -165,10 +168,12 @@ void Scene_nested_scene_nearest_ancestor(void) {
     ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, inner);
     ecs_entity_t cam_outer = ecs_new_w_pair(world, EcsChildOf, outer);
     ecs_set(world, cam_outer, Position, {0, 0, 10});
-    ecs_set(world, cam_outer, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_outer, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t cam_inner = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, cam_inner, Position, {0, 0, 10});
-    ecs_set(world, cam_inner, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_inner, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, outer);
     ecs_set(world, red, Position, {-2, 0, 0});
     ecs_set(world, red, Box, {1, 1, 1});
@@ -181,7 +186,8 @@ void Scene_nested_scene_nearest_ancestor(void) {
     ecs_set(world, view, View, {.camera = cam_outer,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -221,13 +227,14 @@ void Scene_reparent_moves_subtree(void) {
     ecs_set(world, b, Scene, {0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 10});
-    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {0, 0, 10});
-    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_default = ecs_new(world);
     ecs_set(world, cam_default, Position, {0, 0, 10});
-    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, group, Position, {0, 0, 0});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, group);
@@ -243,7 +250,8 @@ void Scene_reparent_moves_subtree(void) {
     ecs_set(world, view, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -311,10 +319,10 @@ void Scene_reparent_parent_storage(void) {
     ecs_set(world, b, Scene, {0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 10});
-    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_a, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {0, 0, 10});
-    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_b, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t group = ecs_new_w_parent(world, a, NULL);
     ecs_set(world, group, Position, {0, 0, 0});
     ecs_entity_t red = ecs_new_w_parent(world, group, NULL);
@@ -325,7 +333,8 @@ void Scene_reparent_parent_storage(void) {
     ecs_set(world, view, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -368,10 +377,12 @@ void Scene_scene_added_and_removed(void) {
     ecs_entity_t group = ecs_new(world);
     ecs_entity_t cam_group = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, cam_group, Position, {0, 0, 10});
-    ecs_set(world, cam_group, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_group, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t cam_default = ecs_new(world);
     ecs_set(world, cam_default, Position, {0, 0, 10});
-    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, cam_default, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, red, Position, {-2, 0, 0});
     ecs_set(world, red, Box, {1, 1, 1});
@@ -384,7 +395,8 @@ void Scene_scene_added_and_removed(void) {
     ecs_set(world, view, View, {.camera = cam_default,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -442,7 +454,8 @@ void Scene_camera_reparented_switches_scene(void) {
     ecs_set(world, b, Scene, {0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t red = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, red, Position, {-2, 0, 0});
     ecs_set(world, red, Box, {1, 1, 1});
@@ -455,7 +468,8 @@ void Scene_camera_reparented_switches_scene(void) {
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -496,10 +510,10 @@ void Scene_lights_isolated_in_overlapping_scenes(void) {
     ecs_set(world, b, AmbientLight, {.intensity = 0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 6});
-    ecs_set(world, cam_a, Camera, {.fov = 60});
+    ecs_set(world, cam_a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {0, 0, 6});
-    ecs_set(world, cam_b, Camera, {.fov = 60});
+    ecs_set(world, cam_b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t wall_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, wall_a, Position, {0, 0, -1});
     ecs_set(world, wall_a, Box, {20, 20, 0.1f});
@@ -522,7 +536,8 @@ void Scene_lights_isolated_in_overlapping_scenes(void) {
     ecs_set(world, view, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png"});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -570,10 +585,10 @@ void Scene_light_follows_reparent(void) {
     ecs_set(world, b, DirectionalLight, {.intensity = 0});
     ecs_entity_t cam_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, cam_a, Position, {0, 0, 6});
-    ecs_set(world, cam_a, Camera, {.fov = 60});
+    ecs_set(world, cam_a, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t cam_b = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cam_b, Position, {0, 0, 6});
-    ecs_set(world, cam_b, Camera, {.fov = 60});
+    ecs_set(world, cam_b, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t wall_a = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, wall_a, Position, {0, 0, -1});
     ecs_set(world, wall_a, Box, {20, 20, 0.1f});
@@ -593,7 +608,8 @@ void Scene_light_follows_reparent(void) {
     ecs_set(world, view_a, View, {.camera = cam_a,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png"});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -638,7 +654,7 @@ void Scene_light_moves_with_scene_added(void) {
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t wall = ecs_new(world);
     ecs_set(world, wall, Position, {0, 0, -1});
     ecs_set(world, wall, Box, {20, 20, 0.1f});
@@ -653,7 +669,8 @@ void Scene_light_moves_with_scene_added(void) {
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = true});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png"});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 32, .write_to_file = "lit.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

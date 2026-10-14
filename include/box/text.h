@@ -53,17 +53,17 @@ ECS_STRUCT(FontStatus, {
  */
 ECS_STRUCT(Text, {
     char *value;        /**< The string, UTF-8 */
-    float size;         /**< Em size in logical pixels, 0 for 16 */
+    float size;         /**< Em size in logical pixels, default 16 */
     float line_height;  /**< Logical pixels between two baselines, 0 for the spacing of the font */
     float width;        /**< Width lines wrap at, 0 to break at newlines only */
     Align align;        /**< Alignment of the lines inside the block */
-    ecs_entity_t font;  /**< Entity with a Font, 0 for box.text.DefaultFont */
+    ecs_entity_t font;  /**< Entity with a Font, default box.text.DefaultFont, 0 for none */
 });
 
 /** Size of the block of lines of a Text, in logical pixels, written by the engine.
  *
  * The width is the widest line without trailing spaces, the height the line count times the
- * line height. Both are 0 for an empty string or while the font is not loaded.
+ * line height. Both are 0 for an empty string, without a font or while the font is not loaded.
  */
 ECS_STRUCT(TextBounds, {
     float width;  /**< Width of the widest line */

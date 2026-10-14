@@ -21,7 +21,7 @@ void Forward_simple_scene(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {10, 10, 10, 255}}});
@@ -34,7 +34,8 @@ void Forward_simple_scene(void) {
     ecs_set(world, ball, Sphere, {.segments = 24, .smooth = true, .radius = 0.8f});
     ecs_set(world, ball, Rgb, {0, 0, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -85,7 +86,8 @@ void Forward_depth_nearer_wins(void) {
     ecs_set(world, far, Box, {2, 2, 2});
     ecs_set(world, far, Rgb, {255, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "depth.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "depth.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -118,11 +120,11 @@ void Forward_view_order(void) {
 
     ecs_entity_t c1 = ecs_new(world);
     ecs_set(world, c1, Position, {0, 0, 5});
-    ecs_set(world, c1, Camera, {.fov = 60});
+    ecs_set(world, c1, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t c2 = ecs_new(world);
     ecs_set(world, c2, Position, {0, 0, 5});
     ecs_set(world, c2, Rotation, {0, GLM_PIf, 0});
-    ecs_set(world, c2, Camera, {.fov = 60});
+    ecs_set(world, c2, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t v1 = ecs_new(world);
     ecs_set(world, v1, View, {
         .camera = c1, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
@@ -133,7 +135,8 @@ void Forward_view_order(void) {
     ecs_set(world, box, Box, {2, 2, 2});
     ecs_set(world, box, Rgb, {0, 255, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "order.png"});
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "order.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -181,7 +184,7 @@ void Forward_scene_filter(void) {
     ecs_set(world, root, Scene, {0});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -190,7 +193,8 @@ void Forward_scene_filter(void) {
     ecs_set(world, box, Box, {2, 2, 2});
     ecs_set(world, box, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -207,7 +211,7 @@ void Forward_scene_filter(void) {
 
     ecs_entity_t inner = ecs_new_w_pair(world, EcsChildOf, root);
     ecs_set(world, inner, Position, {0, 0, 5});
-    ecs_set(world, inner, Camera, {.fov = 60});
+    ecs_set(world, inner, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t overlay = ecs_new(world);
     ecs_set(world, overlay, View, {.camera = inner});
     ecs_progress(world, 0);
@@ -234,7 +238,8 @@ void Forward_ortho_camera(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 4});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 4, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -243,7 +248,8 @@ void Forward_ortho_camera(void) {
     ecs_set(world, box, Box, {2, 2, 2});
     ecs_set(world, box, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "ortho.png"});
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "ortho.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -278,12 +284,13 @@ void Forward_shape_added_and_removed(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16, .write_to_file = "added.png"});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .write_to_file = "added.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

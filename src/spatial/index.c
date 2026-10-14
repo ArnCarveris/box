@@ -29,7 +29,9 @@ box_spatial_item_t* box_spatial_item(
     const box_spatial_scene_t *s,
     int32_t item)
 {
-    return ecs_vec_get_t(&s->items, box_spatial_item_t, item);
+    ecs_assert(item >= 0 && item < ecs_vec_count(&s->items), ECS_INVALID_PARAMETER, NULL);
+
+    return &((box_spatial_item_t*)s->items.array)[item];
 }
 
 /** Create the empty index of a scene.
@@ -46,6 +48,7 @@ static box_spatial_scene_t* box_spatial_scene_new(
     box_bvh_init(&s->trees[BOX_SPATIAL_DYNAMIC]);
     ecs_vec_init_t(NULL, &s->items, box_spatial_item_t, 0);
     ecs_vec_init_t(NULL, &s->pending, int32_t, 0);
+    ecs_vec_init_t(NULL, &s->moved, int32_t, 0);
     s->free_item = -1;
 
     return s;
@@ -62,6 +65,7 @@ static void box_spatial_scene_free(
     box_bvh_fini(&s->trees[BOX_SPATIAL_DYNAMIC]);
     ecs_vec_fini_t(NULL, &s->items, box_spatial_item_t);
     ecs_vec_fini_t(NULL, &s->pending, int32_t);
+    ecs_vec_fini_t(NULL, &s->moved, int32_t);
     ecs_os_free(s);
 }
 
@@ -172,6 +176,7 @@ int32_t box_spatial_item_add(
 
     it->entity = e;
     it->tree = tree;
+    it->moved = false;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
     s->count ++;
@@ -197,10 +202,13 @@ bool box_spatial_item_set(
         }
 
         it->tree = tree;
+        it->moved = false;
         box_spatial_item_place(s, item);
-    } else if (node >= 0) {
-        float margin = tree == BOX_SPATIAL_DYNAMIC ? box_spatial_margin(min, max) : 0;
-        it->node = box_bvh_move(&s->trees[tree], node, min, max, margin);
+    } else if (node >= 0 && tree == BOX_SPATIAL_DYNAMIC) {
+        it->node = box_bvh_move(&s->trees[tree], node, min, max, box_spatial_margin(min, max));
+    } else if (node >= 0 && !it->moved) {
+        it->moved = true;
+        *ecs_vec_append_t(NULL, &s->moved, int32_t) = item;
     }
 
     return it->node != node;
@@ -217,6 +225,7 @@ void box_spatial_item_remove(
     }
 
     it->entity = 0;
+    it->moved = false;
     it->node = s->free_item;
     s->free_item = item;
     s->count --;
@@ -251,6 +260,7 @@ void box_spatial_scene_rebuild(
     int32_t *nodes = ecs_vec_first(&index->nodes);
     for (i = 0; i < count; i ++) {
         box_spatial_item_t *it = box_spatial_item(s, i);
+        it->moved = false;
         if (it->entity && it->tree == BOX_SPATIAL_STATIC) {
             glm_vec3_copy(it->min, leaf[leaves].min);
             glm_vec3_copy(it->max, leaf[leaves].max);
@@ -265,6 +275,28 @@ void box_spatial_scene_rebuild(
     }
 
     ecs_vec_clear(&s->pending);
+    ecs_vec_clear(&s->moved);
+}
+
+/** Give the moved static items of a scene their new bounds in its tree.
+ *
+ * @param s The scene
+ */
+static void box_spatial_scene_move(
+    box_spatial_scene_t *s)
+{
+    int32_t i, count = ecs_vec_count(&s->moved);
+    int32_t *moved = ecs_vec_first(&s->moved);
+    for (i = 0; i < count; i ++) {
+        box_spatial_item_t *it = box_spatial_item(s, moved[i]);
+        if (it->moved) {
+            it->moved = false;
+            it->node = box_bvh_move(
+                &s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max, 0);
+        }
+    }
+
+    ecs_vec_clear(&s->moved);
 }
 
 /** Put the waiting static items of a scene in its tree.
@@ -302,6 +334,16 @@ static void box_spatial_scene_commit(
     ecs_vec_clear(&s->pending);
 done:
     return;
+}
+
+void box_spatial_move(
+    box_spatial_t *index)
+{
+    box_spatial_scene_move(index->root);
+    ecs_map_iter_t it = ecs_map_iter(&index->scenes);
+    while (ecs_map_next(&it)) {
+        box_spatial_scene_move(ecs_map_ptr(&it));
+    }
 }
 
 void box_spatial_commit(

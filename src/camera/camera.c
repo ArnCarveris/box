@@ -6,17 +6,28 @@
 #define BOX_CAMERA_IMPL
 #include <box.h>
 
-/** Pick a camera setting, or its default when the setting is not positive.
+/** Construct Camera values with the documented defaults.
  *
- * @param value The setting
- * @param fallback The default
- * @return The value to use
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
  */
-static float box_camera_or(
-    float value,
-    float fallback)
+static void box_camera_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
-    return value > 0 ? value : fallback;
+    Camera *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Camera){
+            .fov = BOX_CAMERA_FOV,
+            .near_ = BOX_CAMERA_NEAR,
+            .far_ = BOX_CAMERA_FAR,
+            .ortho_height = BOX_CAMERA_ORTHO_HEIGHT
+        };
+    }
 }
 
 /** Build a reversed Z orthographic projection.
@@ -32,9 +43,9 @@ static void box_camera_ortho(
     float height,
     mat4 out)
 {
-    float n = box_camera_or(camera->near_, BOX_CAMERA_NEAR);
-    float f = box_camera_or(camera->far_, BOX_CAMERA_FAR);
-    float visible = box_camera_or(camera->ortho_height, BOX_CAMERA_ORTHO_HEIGHT);
+    float n = camera->near_;
+    float f = camera->far_;
+    float visible = camera->ortho_height;
     if (camera->ortho_scale > 0 && height > 0) {
         visible = height / camera->ortho_scale;
     }
@@ -58,8 +69,8 @@ static void box_camera_perspective(
     float aspect,
     mat4 out)
 {
-    float n = box_camera_or(camera->near_, BOX_CAMERA_NEAR);
-    float fov = box_camera_or(camera->fov, BOX_CAMERA_FOV);
+    float n = camera->near_;
+    float fov = camera->fov;
     float focal = 1.0f / tanf(glm_rad(fov) * 0.5f);
     glm_mat4_zero(out);
     out[0][0] = focal / aspect;
@@ -98,4 +109,5 @@ void BoxCameraImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Camera);
+    ecs_set_hooks(world, Camera, { .ctor = box_camera_ctor });
 }

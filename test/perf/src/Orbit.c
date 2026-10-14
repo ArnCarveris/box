@@ -25,7 +25,7 @@ void Orbit_fits_bounds(void) {
     ecs_set(world, b, Position, {5, 2, 0});
     ecs_set(world, b, Box, {1, 1, 1});
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, {
         .fps = 120, .warmup = 2, .frames = 2, .camera = camera });
@@ -66,7 +66,7 @@ void Orbit_looks_at_center(void) {
     ecs_set(world, a, Position, {10, 3, -4});
     ecs_set(world, a, Box, {4, 6, 2});
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 45});
+    ecs_set(world, camera, Camera, {.fov = 45, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, {
         .fps = 120, .warmup = 2, .frames = 20, .period = 1, .camera = camera });
@@ -111,7 +111,7 @@ void Orbit_moves_every_frame(void) {
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Box, {2, 2, 2});
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, {
         .fps = 60, .warmup = 2, .frames = 10, .period = 2, .camera = camera });
@@ -152,7 +152,7 @@ void Orbit_first_camera_when_unset(void) {
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 100});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 2, .frames = 2 });
     for (int i = 0; i < 3; i ++) {
@@ -184,7 +184,7 @@ void Orbit_elevation(void) {
     ecs_set(world, a, Position, {0, 0, 0});
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, {
         .fps = 120, .warmup = 2, .frames = 2, .elevation = 45, .camera = camera });
@@ -214,7 +214,7 @@ void Orbit_no_shapes(void) {
     box_perf_sleep = fake_sleep;
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
 
     ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 2, .frames = 2 });
     for (int i = 0; i < 3; i ++) {
@@ -243,7 +243,7 @@ void Orbit_period(void) {
     ecs_set(world, a, Position, {4, 0, 0});
     ecs_set(world, a, Box, {1, 1, 1});
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_singleton_set(world, PerfRun, {
         .fps = 120, .warmup = 2, .frames = 400, .period = 1, .camera = camera });
     ecs_progress(world, 0);

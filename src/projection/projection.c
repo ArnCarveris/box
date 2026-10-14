@@ -59,8 +59,8 @@ static void box_projection_surface_size(
                 *width = (float)st[i].width;
                 *height = (float)st[i].height;
             } else {
-                *width = s[i].width > 0 ? (float)s[i].width : BOX_SURFACE_WIDTH;
-                *height = s[i].height > 0 ? (float)s[i].height : BOX_SURFACE_HEIGHT;
+                *width = (float)s[i].width;
+                *height = (float)s[i].height;
             }
         }
     }

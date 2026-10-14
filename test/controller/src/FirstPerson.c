@@ -28,7 +28,8 @@ void FirstPerson_default_bindings(void) {
         "Forward", "Back", "Left", "Right", "Up", "Down", "Fast", "Look", "Jump", "Crouch", "Fly"
     };
     Key keys[] = {
-        KeyW, KeyS, KeyA, KeyD, KeyE, KeyQ, KeyShiftLeft, KeyMouseRight, KeySpace, KeyCtrlLeft, KeyF
+        KeyW, KeyS, KeyA, KeyD, KeyE, KeyQ, KeyShiftLeft, KeyMouseRight, KeySpace, KeyCtrlLeft,
+            KeyF
     };
     ecs_entity_t scope = ecs_lookup(world, "box.controllers.first_person");
     for (int32_t i = 0; i < 11; i ++) {
@@ -88,12 +89,12 @@ void FirstPerson_adds_position_rotation(void) {
     test_assert(ecs_has(world, fp, WorldTransform));
 
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
-    test_flt(c->speed, 0);
+    test_flt(c->speed, 4);
     test_flt(c->ground, 0);
     test_flt(c->height, 0);
     test_bool(c->grounded, false);
     test_bool(c->flying, false);
-    test_uint(c->actions, 0);
+    test_uint(c->actions, ecs_lookup(world, "box.controllers.first_person"));
 
     ecs_fini(world);
 }
@@ -294,7 +295,8 @@ void FirstPerson_speed(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .speed = 6 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->speed = 6;
 
     box_input_key_press(world, KeyS, 1);
     ecs_progress(world, 0.5f);
@@ -310,7 +312,8 @@ void FirstPerson_acceleration(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .acceleration = 2 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->acceleration = 2;
 
     float alpha = 1.0f - expf(-1.0f);
     box_input_key(world, KeyD, true);
@@ -368,7 +371,9 @@ void FirstPerson_look_sensitivity_invert_y(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .sensitivity = 0.01f, .invert_y = true });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->sensitivity = 0.01f;
+    ecs_get_mut(world, fp, FirstPersonController)->invert_y = true;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -390,7 +395,8 @@ void FirstPerson_pitch_clamped(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .sensitivity = 1 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->sensitivity = 1;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 0, 100 }, .steps = 2, .button = KeyMouseRight
@@ -412,7 +418,9 @@ void FirstPerson_jump(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .jump = 10, .gravity = 10 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->jump = 10;
+    ecs_get_mut(world, fp, FirstPersonController)->gravity = 10;
     ecs_progress(world, 0.1f);
     test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
 
@@ -511,7 +519,8 @@ void FirstPerson_fall(void) {
 
     ecs_entity_t fp = ecs_new(world);
     ecs_set(world, fp, Position, { 0, 10, 0 });
-    ecs_set(world, fp, FirstPersonController, { .gravity = 10 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->gravity = 10;
 
     ecs_progress(world, 0.1f);
     const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
@@ -537,7 +546,8 @@ void FirstPerson_ground_height(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .ground = 2 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->ground = 2;
 
     ecs_progress(world, 0.5f);
     test_assert(fabsf(ecs_get(world, fp, Position)->y - 3.7f) < 0.0001f);
@@ -572,7 +582,9 @@ void FirstPerson_eye(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .eye = 2.5f, .crouch_eye = 1.5f });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->eye = 2.5f;
+    ecs_get_mut(world, fp, FirstPersonController)->crouch_eye = 1.5f;
 
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, fp, Position)->y, 2.5f);
@@ -627,7 +639,8 @@ void FirstPerson_crouch_speed(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .crouch_speed = 1 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->crouch_speed = 1;
 
     box_input_key(world, KeyCtrlLeft, true);
     box_input_key(world, KeyD, true);
@@ -673,7 +686,8 @@ void FirstPerson_fly_no_gravity(void) {
 
     ecs_entity_t fp = ecs_new(world);
     ecs_set(world, fp, Position, { 0, 10, 0 });
-    ecs_set(world, fp, FirstPersonController, { .flying = true });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->flying = true;
 
     for (int32_t i = 0; i < 4; i ++) {
         ecs_progress(world, 0.5f);
@@ -694,7 +708,8 @@ void FirstPerson_fly_up_down(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .flying = true });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->flying = true;
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, fp, Position)->y, 1.7f);
 
@@ -726,7 +741,8 @@ void FirstPerson_fly_moves_like_camera(void) {
     ecs_entity_t fp = ecs_new(world);
     ecs_set(world, fp, Position, { 0, 5, 0 });
     ecs_set(world, fp, Rotation, { 0.5f, 0, 0 });
-    ecs_set(world, fp, FirstPersonController, { .flying = true });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->flying = true;
 
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
@@ -758,7 +774,10 @@ void FirstPerson_fly_speed_boost(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .flying = true, .fly_speed = 2, .boost = 3 });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->flying = true;
+    ecs_get_mut(world, fp, FirstPersonController)->fly_speed = 2;
+    ecs_get_mut(world, fp, FirstPersonController)->boost = 3;
 
     box_input_key_press(world, KeyS, 1);
     ecs_progress(world, 0.5f);
@@ -844,7 +863,8 @@ void FirstPerson_custom_actions(void) {
     ecs_set(world, jump, Binding, { .key = KeyEnter });
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, FirstPersonController, { .actions = scope });
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->actions = scope;
     ecs_progress(world, 0.1f);
     ecs_entity_t def = ecs_lookup(world, "box.controllers.first_person.Forward");
     test_assert(ecs_has_id(world, def, EcsDisabled));
@@ -894,7 +914,7 @@ void FirstPerson_world_transform(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t fp = ecs_new(world);
-    ecs_set(world, fp, Camera, { 0 });
+    ecs_set(world, fp, Camera, { .near_ = 0.1f });
     ecs_add(world, fp, FirstPersonController);
 
     box_input_key_press(world, KeyD, 1);

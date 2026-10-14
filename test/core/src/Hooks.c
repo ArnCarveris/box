@@ -305,7 +305,8 @@ void Hooks_surface(void) {
 
     const char *literal = "none.png";
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, { .write_to_file = ECS_CONST_CAST(char*, literal) });
+    ecs_set(world, e, Surface, { .write_to_file = ECS_CONST_CAST(char*, literal),
+        .resolution_scale = 1 });
     char *orig = ecs_get(world, e, Surface)->write_to_file;
     test_assert(orig != literal);
     test_str(orig, literal);

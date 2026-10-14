@@ -100,8 +100,8 @@ static bool box_shape2d_geometry(
         out->line[1] = line->y1;
         out->line[2] = line->x2;
         out->line[3] = line->y2;
-        out->width = line->width > 0.0f ? line->width : 1.0f;
-        result = line->x1 != line->x2 || line->y1 != line->y2;
+        out->width = glm_max(line->width, 0.0f);
+        result = out->width > 0.0f && (line->x1 != line->x2 || line->y1 != line->y2);
     }
 
     if (out->kind == BOX_SHAPE2D_RECT) {
@@ -141,11 +141,9 @@ static void box_shape2d_fill(
     }
 
     if (image) {
-        float u1 = image->u1 != 0.0f ? image->u1 : 1.0f;
-        float v1 = image->v1 != 0.0f ? image->v1 : 1.0f;
         out->texture = image->texture;
-        out->uv[0] = u1 - image->u0;
-        out->uv[1] = v1 - image->v0;
+        out->uv[0] = image->u1 - image->u0;
+        out->uv[1] = image->v1 - image->v0;
         out->uv[2] = image->u0;
         out->uv[3] = image->v0;
     }
@@ -252,6 +250,44 @@ static void box_border_ctor(
     }
 }
 
+/** Construct Line values one unit wide.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_line_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Line *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Line){ .width = 1.0f };
+    }
+}
+
+/** Construct Image values that show the whole texture.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti The type info
+ */
+static void box_image_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    Image *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (Image){ .u1 = 1.0f, .v1 = 1.0f };
+    }
+}
+
 void box_geometry_shapes2d_init(
     ecs_world_t *world)
 {
@@ -263,6 +299,8 @@ void box_geometry_shapes2d_init(
     ECS_COMPONENT_DEFINE(world, Shape2D);
     ecs_set_hooks(world, Shape2D, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, Border, { .ctor = box_border_ctor });
+    ecs_set_hooks(world, Line, { .ctor = box_line_ctor });
+    ecs_set_hooks(world, Image, { .ctor = box_image_ctor });
     box_shape_t *quad = box_mesh_cache_add_shape(box_mesh_cache_of(world),
         &(box_shape_desc_t){
             .component = ecs_id(Rect),

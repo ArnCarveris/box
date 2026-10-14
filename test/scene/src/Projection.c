@@ -21,7 +21,7 @@ void Projection_perspective(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -48,7 +48,7 @@ void Projection_offset(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t parent = ecs_new(world);
@@ -75,7 +75,8 @@ void Projection_orthographic(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -101,11 +102,11 @@ void Projection_surface_size(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 400, .height = 200});
+    ecs_set(world, surface, Surface, {.width = 400, .height = 200, .resolution_scale = 1});
     ecs_entity_t target = ecs_new(world);
     ecs_set(world, target, Position, {50, -20, 0});
     ecs_entity_t label = ecs_new(world);
@@ -136,7 +137,8 @@ void Projection_anchor_in_ui_scene(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -145,7 +147,8 @@ void Projection_anchor_in_ui_scene(void) {
     ecs_set(world, ui, Scene, {0});
     ecs_entity_t ui_camera = ecs_new_w_pair(world, EcsChildOf, ui);
     ecs_set(world, ui_camera, Position, {0, 0, 100});
-    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t ui_view = ecs_new(world);
     ecs_set(world, ui_view, View, {.camera = ui_camera});
     ecs_entity_t label = ecs_new_w_pair(world, EcsChildOf, ui);
@@ -172,7 +175,8 @@ void Projection_follows_target_same_frame(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -212,7 +216,8 @@ void Projection_follows_camera(void) {
     ecs_set(world, rig, Position, {0, 0, 0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, rig);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -243,7 +248,8 @@ void Projection_subtree_same_frame(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -277,7 +283,8 @@ void Projection_dynamic_anchor(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -307,7 +314,7 @@ void Projection_behind_camera_hidden(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -347,7 +354,7 @@ void Projection_off_screen_hidden(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .far_ = 20});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .far_ = 20, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -378,7 +385,8 @@ void Projection_shown_again(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -412,7 +420,8 @@ void Projection_missing_view_hidden(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -439,7 +448,8 @@ void Projection_deleted_target_hidden(void) {
     ECS_IMPORT(world, Box);
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
     ecs_entity_t target = ecs_new(world);
@@ -506,7 +516,8 @@ void Projection_drawn_at_projection(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -516,7 +527,8 @@ void Projection_drawn_at_projection(void) {
     ecs_set(world, ui, Scene, {0});
     ecs_entity_t ui_camera = ecs_new_w_pair(world, EcsChildOf, ui);
     ecs_set(world, ui_camera, Position, {0, 0, 10});
-    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, ui_camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t ui_view = ecs_new(world);
     ecs_set(world, ui_view, View, {.camera = ui_camera, .lighting.enabled = false});
     ecs_entity_t label = ecs_new_w_pair(world, EcsChildOf, ui);
@@ -527,7 +539,7 @@ void Projection_drawn_at_projection(void) {
     ecs_set(world, plate, Rgb, {255, 0, 0});
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {
-        .width = 64, .height = 32, .write_to_file = "projection.png"});
+        .width = 64, .height = 32, .write_to_file = "projection.png", .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

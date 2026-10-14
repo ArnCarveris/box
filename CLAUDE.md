@@ -22,6 +22,14 @@ after every block, no `return` inside a nested block (use `goto done`), lines
 under 100 characters, functions under 200 lines, files under 2000 lines, and a
 doc comment on every type and member.
 
+## Component values
+
+- Zero values are literal: a component value applies exactly as specified, so an all-zero struct
+  or a zero field never stands for a default (an all-zero CullSettings disables culling, a zero
+  speed does not move). Defaults live in constructors (`ecs_set_hooks` ctor, composed with
+  `box_owned_hooks`), which script `Foo: {...}` and `ecs_add` start from; a C literal starts from
+  zero. Zero may only mean a documented mode that is its literal meaning, such as "0 for none".
+
 ## Flecs rules that bit us
 
 - Import `Box` and nothing else, in applications, tests and benchmarks alike. Component
@@ -51,10 +59,10 @@ doc comment on every type and member.
 - `PointLight` and `SpotLight` default to intensity 1 through their ctor, but a C literal
   `ecs_set(e, PointLight, {.range = 5})` writes 0 into the intensity, which means off. Set
   the intensity in C; script `PointLight: {range: 5}` keeps the default.
-- `View` constructs with `lighting.enabled = true`, but a C literal
-  `ecs_set(e, View, {.camera = c})` writes 0 into `lighting.enabled`, so the view renders
-  unlit (base color and emission only). Set `.lighting.enabled = true` in C; script
-  `View: {camera: c}` keeps the default.
+- `View` constructs with `lighting.enabled = true` and culling enabled, but a C literal
+  `ecs_set(e, View, {.camera = c})` writes 0 into `lighting` and `culling`, so the view renders
+  unlit (base color and emission only) and draws every instance. Set `.lighting.enabled = true`
+  and `.culling` in C; script `View: {camera: c}` keeps the defaults.
 
 ## Tests
 

@@ -357,7 +357,8 @@ void Texture_texture_quality_caps_size(void) {
     ecs_os_free(px);
 
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 32, .height = 32, .texture_quality = TextureQualityLow});
+    ecs_set(world, s, Surface, {.width = 32, .height = 32, .texture_quality = TextureQualityLow,
+        .resolution_scale = 1});
     ecs_entity_t tex = ecs_new(world);
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t small = ecs_new(world);
@@ -420,7 +421,7 @@ void Texture_gpu_emissive_layer(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -437,7 +438,8 @@ void Texture_gpu_emissive_layer(void) {
     ecs_set(world, plain, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, plain, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "emissive.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "emissive.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -486,7 +488,7 @@ void Texture_gpu_albedo_layer(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
@@ -504,7 +506,8 @@ void Texture_gpu_albedo_layer(void) {
     ecs_set(world, tinted, PbrMaterial, {.roughness = 1});
     ecs_set(world, tinted, PbrTextures, {.albedo = tex});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "albedo.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "albedo.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -553,7 +556,7 @@ void Texture_gpu_wrap_repeat(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -566,7 +569,8 @@ void Texture_gpu_wrap_repeat(void) {
     ecs_set(world, quad, TextureTransform, {.scale_x = 2, .scale_y = 1});
     ecs_set(world, quad, TextureWrap, {WrapRepeat});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "repeat.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "repeat.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -612,7 +616,7 @@ void Texture_gpu_wrap_clamp(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -625,7 +629,8 @@ void Texture_gpu_wrap_clamp(void) {
     ecs_set(world, quad, TextureTransform, {.scale_x = 2, .scale_y = 1});
     ecs_set(world, quad, TextureWrap, {WrapClamp});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "clamp.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "clamp.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -671,7 +676,7 @@ void Texture_gpu_wrap_mirror(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -684,7 +689,8 @@ void Texture_gpu_wrap_mirror(void) {
     ecs_set(world, quad, TextureTransform, {.scale_x = 2, .scale_y = 1});
     ecs_set(world, quad, TextureWrap, {WrapMirror});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mirror.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mirror.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -730,7 +736,7 @@ void Texture_gpu_transform_change(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -751,7 +757,8 @@ void Texture_gpu_transform_change(void) {
     ecs_set(world, moving, PbrTextures, {.emissive = tex});
     ecs_set(world, moving, TextureTransform, {.scale_x = 1, .scale_y = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "offset.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "offset.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -810,7 +817,7 @@ void Texture_gpu_anisotropy(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0.5f, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -825,7 +832,7 @@ void Texture_gpu_anisotropy(void) {
     ecs_set(world, floor, TextureTransform, {.scale_x = 10, .scale_y = 100});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "aniso.png",
-        .anisotropy = AnisotropyOff});
+        .anisotropy = AnisotropyOff, .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -897,7 +904,7 @@ void Texture_gpu_normal_layer(void) {
     ecs_set(world, dark, TexturePath, {.path = away});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
@@ -915,7 +922,8 @@ void Texture_gpu_normal_layer(void) {
     ecs_set(world, b, PbrMaterial, {.roughness = 1});
     ecs_set(world, b, PbrTextures, {.normal = dark});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "normal.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "normal.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -966,7 +974,7 @@ void Texture_gpu_reload_changes_image(void) {
     ecs_set(world, tex, TexturePath, {.path = red});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -977,7 +985,8 @@ void Texture_gpu_reload_changes_image(void) {
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_set(world, quad, PbrTextures, {.emissive = tex});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "reload.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "reload.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1035,7 +1044,7 @@ void Texture_gpu_deleted_texture_unbinds(void) {
     ecs_set(world, tex, TexturePath, {.path = file});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -1046,7 +1055,8 @@ void Texture_gpu_deleted_texture_unbinds(void) {
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_set(world, quad, PbrTextures, {.emissive = tex});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unbind.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unbind.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1106,7 +1116,7 @@ void Texture_gpu_inherited_from_prefab(void) {
     ecs_set(world, green_tex, TexturePath, {.path = green});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -1119,7 +1129,8 @@ void Texture_gpu_inherited_from_prefab(void) {
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
     test_assert(!ecs_owns(world, quad, PbrTextures));
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "prefab.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "prefab.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);
@@ -1167,7 +1178,7 @@ void Texture_gpu_svg_colors(void) {
     ecs_set(world, tex, TexturePath, {.path = file, .width = 64, .height = 64});
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
@@ -1178,7 +1189,8 @@ void Texture_gpu_svg_colors(void) {
     ecs_set(world, quad, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_set(world, quad, PbrTextures, {.emissive = tex});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "svg.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "svg.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_sync(world);

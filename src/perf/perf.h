@@ -8,6 +8,9 @@
 
 #include <box.h>
 
+/** Target frame rate of a constructed PerfRun */
+#define BOX_PERF_FPS (60.0f)
+
 /** State of the run in progress, shared by the observer and the systems of the module */
 typedef struct box_perf_t {
     PerfState state;      /**< Progress of the run */

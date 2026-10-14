@@ -10,43 +10,49 @@
 /** Pitch the camera stops at, short of looking straight up or down */
 #define BOX_CAMERA_PITCH_MAX (1.55f)
 
-/** Units per second when the controller does not say */
+/** Units per second of a constructed controller */
 #define BOX_CAMERA_SPEED (10.0f)
 
-/** Speed multiplier while Fast is held when the controller does not say */
+/** Speed multiplier while Fast is held of a constructed controller */
 #define BOX_CAMERA_BOOST (4.0f)
 
-/** Radians per point of cursor movement when the controller does not say */
+/** Radians per point of cursor movement of a constructed controller */
 #define BOX_CAMERA_SENSITIVITY (0.003f)
 
-/** Radius of the colliding sphere when the controller does not say */
+/** Radius of the colliding sphere of a constructed controller */
 #define BOX_CAMERA_RADIUS (0.25f)
 
 /** What the actions of one scope ask a camera for this frame */
 typedef struct box_camera_input_t {
-    ecs_entity_t scope;                 /**< Scope of the actions, 0 for the defaults */
+    ecs_entity_t scope;                 /**< Scope of the actions, 0 for none */
     bool held[BoxCameraActionCount];    /**< Which actions are down */
     vec2 look;                          /**< Cursor movement of the Look action this frame */
 } box_camera_input_t;
 
-/** Value of a controller member, which takes its default when it is zero.
- *
- * @param value The member
- * @param fallback The default
- * @return The value to use
- */
-static float box_camera_value(
-    float value,
-    float fallback)
+void box_camera_controller_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
-    return value != 0 ? value : fallback;
+    const ecs_entity_t *scope = ti->hooks.ctx;
+    CameraController *values = ptr;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        values[i] = (CameraController){
+            .speed = BOX_CAMERA_SPEED,
+            .boost = BOX_CAMERA_BOOST,
+            .sensitivity = BOX_CAMERA_SENSITIVITY,
+            .actions = *scope,
+            .radius = BOX_CAMERA_RADIUS
+        };
+    }
 }
 
 /** Read the state of the camera actions of a controller.
  *
  * @param world The world
  * @param map The default action map
- * @param scope Scope of the actions, 0 for the default actions
+ * @param scope Scope of the actions, 0 for none
  * @param out The input, written
  */
 static void box_camera_read(
@@ -59,9 +65,9 @@ static void box_camera_read(
     ecs_os_zeromem(out);
     out->scope = scope;
     for (i = 0; i < BoxCameraActionCount; i ++) {
-        ecs_entity_t action = scope
-            ? ecs_lookup_child(world, scope, box_camera_actions[i].name)
-            : map->actions[i];
+        ecs_entity_t action = scope == map->scope
+            ? map->actions[i]
+            : (scope ? ecs_lookup_child(world, scope, box_camera_actions[i].name) : 0);
         const ActionState *state = action && ecs_is_alive(world, action)
             ? ecs_get(world, action, ActionState)
             : NULL;
@@ -89,7 +95,7 @@ static bool box_camera_turn(
     const box_camera_input_t *in,
     Rotation *r)
 {
-    float sensitivity = box_camera_value(cc->sensitivity, BOX_CAMERA_SENSITIVITY);
+    float sensitivity = cc->sensitivity;
     float dy = cc->invert_y ? -in->look[1] : in->look[1];
     float yaw = r->y - in->look[0] * sensitivity;
     float pitch = r->x - dy * sensitivity;
@@ -132,11 +138,11 @@ static void box_camera_accelerate(
     vec3 dir = { right * c - forward * s, up, -forward * c - right * s };
     vec3 target = { 0, 0, 0 };
     float len = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
-    float speed = box_camera_value(cc->speed, BOX_CAMERA_SPEED);
+    float speed = cc->speed;
     float alpha = cc->acceleration > 0 ? 1.0f - expf(-cc->acceleration * dt) : 1.0f;
     int32_t i;
     if (held[BoxCameraFast]) {
-        speed *= box_camera_value(cc->boost, BOX_CAMERA_BOOST);
+        speed *= cc->boost;
     }
 
     for (i = 0; i < 3; i ++) {
@@ -161,7 +167,7 @@ static bool box_camera_move(
     Position *p,
     float dt)
 {
-    float radius = cc->collide ? box_camera_value(cc->radius, BOX_CAMERA_RADIUS) : 0;
+    float radius = cc->collide ? cc->radius : 0;
     box_controller_body_t body = {
         .entity = e,
         .scene = cc->collide ? box_render_scene_of(world, e) : 0,
@@ -187,7 +193,7 @@ void BoxCameraActionsActivate(
     while (ecs_iter_next(it)) {
         const CameraController *cc = ecs_field(it, CameraController, 0);
         for (i = 0; i < it->count; i ++) {
-            used = used || !cc[i].actions;
+            used = used || cc[i].actions == map->scope;
         }
     }
 

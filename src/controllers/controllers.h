@@ -203,6 +203,17 @@ bool box_controller_ground_below(
     const box_controller_body_t *body,
     const Position *feet);
 
+/** Construct CameraController values with the documented defaults and the default actions.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info, whose context points to the scope of the default camera actions
+ */
+void box_camera_controller_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
+
 /** Enable the default camera actions while a controller uses them, else disable them.
  *
  * @param it Iterator of the system, which has no terms
@@ -225,6 +236,17 @@ void BoxCameraControllerUpdate(
 void box_first_person_actions_create(
     ecs_world_t *world,
     FirstPersonActionMap *map);
+
+/** Construct FirstPersonController values with the documented defaults and the default actions.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info, whose context points to the scope of the default first person actions
+ */
+void box_first_person_controller_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti);
 
 /** Enable the default first person actions while a controller uses them, else disable them.
  *

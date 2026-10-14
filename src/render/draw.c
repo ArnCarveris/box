@@ -254,9 +254,38 @@ float box_draws_fade(
     return result;
 }
 
+/** Get the scene of a changed shape, looked up once per table while the changes are processed.
+ *
+ * Every entity of a table without Scene and without a non fragmenting parent has the scene of
+ * the table, and the hierarchy does not change while the changes are processed.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ * @return The scene, 0 for the default scene
+ */
+static ecs_entity_t box_draws_scene(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e)
+{
+    const ecs_table_t *table = ecs_get_table(world, e);
+    ecs_entity_t result = d->scene_of;
+    if (!table || table != d->scene_table) {
+        result = box_render_scene_of(world, e);
+        bool shared = table && !ecs_table_has_id(world, table, ecs_id(Scene)) &&
+            !ecs_table_has_id(world, table, ecs_id(EcsParent));
+        d->scene_table = shared ? table : NULL;
+        d->scene_of = result;
+    }
+
+    return result;
+}
+
 /** Compute the batch key of a shape.
  *
  * @param world The world
+ * @param d The state
  * @param e The entity
  * @param shape Its mesh
  * @param alpha Resolved alpha of the shape
@@ -264,6 +293,7 @@ float box_draws_fade(
  */
 static void box_draws_key(
     ecs_world_t *world,
+    box_render_draws_t *d,
     ecs_entity_t e,
     const ShapeMesh *shape,
     float alpha,
@@ -284,7 +314,7 @@ static void box_draws_key(
         key->textures[3] = textures->normal;
     }
 
-    key->scene = box_render_scene_of(world, e);
+    key->scene = box_draws_scene(world, d, e);
     key->mesh = shape->mesh;
     key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
     if (shape2d && shape2d->texture) {
@@ -332,7 +362,7 @@ static void box_draws_update_shape(
             .inherited = s->tinted ? &s->tint : NULL,
             .fade = s->fade
         };
-        box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
+        box_draws_key(world, d, e, shape, box_draws_alpha(&material), &key);
     }
 
     if (s->batch >= 0) {
@@ -398,10 +428,12 @@ static void box_draws_process(
     int32_t i;
     box_draws_text_dynamic(world, d);
     box_draws_walk(world, d);
+    d->scene_table = NULL;
     for (i = 0; i < ecs_vec_count(&d->dirty); i ++) {
         box_draws_update(world, d, *ecs_vec_get_t(&d->dirty, ecs_entity_t, i));
     }
 
+    d->scene_table = NULL;
     ecs_vec_clear(&d->dirty);
 }
 

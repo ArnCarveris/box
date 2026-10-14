@@ -68,20 +68,20 @@ ECS_STRUCT(RightTrianglePrism, {
 
 /** Flat regular polygon */
 ECS_STRUCT(NGon, {
-    int32_t sides; /**< Number of sides, 0 for 6 */
+    int32_t sides; /**< Number of sides, default 6, at least 3 */
     float radius;  /**< Circumradius */
 });
 
 /** UV sphere */
 ECS_STRUCT(Sphere, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Radius */
 });
 
 /** Upper half of a UV sphere */
 ECS_STRUCT(HemiSphere, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Radius */
 });
@@ -95,7 +95,7 @@ ECS_STRUCT(IcoSphere, {
 
 /** Cone along Y */
 ECS_STRUCT(Cone, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Base radius */
@@ -103,7 +103,7 @@ ECS_STRUCT(Cone, {
 
 /** Cylinder along Y */
 ECS_STRUCT(Cylinder, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Radius */
@@ -111,8 +111,8 @@ ECS_STRUCT(Cylinder, {
 
 /** Ring in the XZ plane with major radius and tube radius */
 ECS_STRUCT(Torus, {
-    int32_t segments; /**< Subdivisions around the ring, 0 for 24 */
-    int32_t rings;    /**< Subdivisions around the tube, 0 for 12 */
+    int32_t segments; /**< Subdivisions around the ring, default 24 */
+    int32_t rings;    /**< Subdivisions around the tube, default 12 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Major radius */
     float tube;       /**< Tube radius */
@@ -120,7 +120,7 @@ ECS_STRUCT(Torus, {
 
 /** Capsule along Y, length is the cylinder part */
 ECS_STRUCT(Capsule, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Cylinder length */
     float radius;     /**< Radius */
@@ -128,7 +128,7 @@ ECS_STRUCT(Capsule, {
 
 /** Hollow cylinder with wall thickness, arc limits the sweep in radians */
 ECS_STRUCT(Tube, {
-    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments; /**< Subdivisions around the axis, default 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Outer radius */
@@ -138,7 +138,7 @@ ECS_STRUCT(Tube, {
 
 /** Truncated cone with separate bottom and top radius */
 ECS_STRUCT(Frustum, {
-    int32_t segments;    /**< Subdivisions around the axis, 0 for 24 */
+    int32_t segments;    /**< Subdivisions around the axis, default 24 */
     bool smooth;         /**< Smooth shading */
     float length;        /**< Height */
     float radius_bottom; /**< Bottom radius */
@@ -151,13 +151,13 @@ ECS_STRUCT(RoundedBox, {
     float y;          /**< Height */
     float z;          /**< Depth */
     float radius;     /**< Corner radius */
-    int32_t segments; /**< Subdivisions per corner rounded up to even, 0 for 4 */
+    int32_t segments; /**< Subdivisions per corner rounded up to even, default 4 */
 });
 
 /** Flat star polygon in the XY plane, the worked example of the shape registry */
 ECS_STRUCT(Star, {
     int32_t points; /**< Points of the star, at least three */
-    float inner;    /**< Inner radius relative to the outer one, 0 for 0.45 */
+    float inner;    /**< Inner radius relative to the outer one, default 0.45 */
     float radius;   /**< Outer radius */
 });
 
@@ -185,7 +185,7 @@ ECS_STRUCT(Line, {
     float y1;    /**< Y of the start */
     float x2;    /**< X of the end */
     float y2;    /**< Y of the end */
-    float width; /**< Width across the segment, 0 for 1 */
+    float width; /**< Width across the segment, default 1 */
 });
 
 /** Rounded corners and an inner border of the Rect or Circle of the entity.
@@ -201,16 +201,16 @@ ECS_STRUCT(Border, {
 
 /** Area of a texture shown on the Rect or Circle of the entity.
  *
- * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image; a u1
- * or v1 of zero is one, so a zeroed Image shows the whole texture. The texture is multiplied
+ * The area is u0, v0 to u1, v1 in texture coordinates, with v 0 at the top of the image; a
+ * constructed Image shows the whole texture. The texture is multiplied
  * with the Rgb of the entity, which defaults to white for an Image.
  */
 ECS_STRUCT(Image, {
     ecs_entity_t texture; /**< Entity with a TexturePath */
     float u0;             /**< Left edge of the area */
     float v0;             /**< Top edge of the area */
-    float u1;             /**< Right edge of the area, 0 for 1 */
-    float v1;             /**< Bottom edge of the area, 0 for 1 */
+    float u1;             /**< Right edge of the area, default 1 */
+    float v1;             /**< Bottom edge of the area, default 1 */
 });
 
 /** Vertex of a shape mesh, laid out to be copied into a vertex buffer as is */

@@ -25,7 +25,7 @@ void Light_point_light_reaches_its_range(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -39,7 +39,8 @@ void Light_point_light_reaches_its_range(void) {
     ecs_set(world, light, Position, {-3, 0, 0});
     ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "point.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "point.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -71,7 +72,7 @@ void Light_point_light_color(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -90,7 +91,8 @@ void Light_point_light_color(void) {
     ecs_set(world, blue, PointLight, {.intensity = 2, .range = 3});
     ecs_set(world, blue, Rgb, {0, 0, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "color.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "color.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -122,7 +124,7 @@ void Light_spot_light_cone(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -138,7 +140,8 @@ void Light_spot_light_cone(void) {
     ecs_set(world, spot, SpotLight, {
         .intensity = 20, .range = 10, .inner_angle = 10, .outer_angle = 15});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "spot.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "spot.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -168,7 +171,7 @@ void Light_directional_light_direction(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -182,7 +185,8 @@ void Light_directional_light_direction(void) {
     ecs_set(world, sun, Rotation, {0, (float)GLM_PI, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "sun.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "sun.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -221,7 +225,7 @@ void Light_lights_replace_default_sun(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -232,7 +236,8 @@ void Light_lights_replace_default_sun(void) {
     ecs_set(world, wall, Rgb, {255, 255, 255});
     ecs_set(world, wall, PbrMaterial, {.roughness = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "default.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "default.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -282,7 +287,7 @@ void Light_light_scoped_to_scene(void) {
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -298,7 +303,8 @@ void Light_light_scoped_to_scene(void) {
     ecs_set(world, other, Position, {3, 0, 0});
     ecs_set(world, other, PointLight, {.intensity = 4, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -333,7 +339,7 @@ void Light_nested_scene_keeps_its_lights(void) {
     ecs_set(world, inner, Scene, {0});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, outer);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -349,7 +355,8 @@ void Light_nested_scene_keeps_its_lights(void) {
     ecs_set(world, nested, Position, {3, 0, 0});
     ecs_set(world, nested, PointLight, {.intensity = 4, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "nested.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "nested.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -377,7 +384,7 @@ void Light_lighting_disabled_is_unlit(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -394,7 +401,8 @@ void Light_lighting_disabled_is_unlit(void) {
     ecs_set(world, light, Position, {-3, 0, 0});
     ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unlit.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "unlit.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -434,7 +442,7 @@ void Light_ambient_light_of_scene(void) {
         .sky = {255, 255, 255}, .ground = {255, 255, 255}, .intensity = 1});
     ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -447,7 +455,8 @@ void Light_ambient_light_of_scene(void) {
     ecs_set(world, away, DirectionalLight, {.intensity = 1});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "ambient.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "ambient.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -494,7 +503,7 @@ void Light_intensity_zero_lights_nothing(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -508,7 +517,8 @@ void Light_intensity_zero_lights_nothing(void) {
     ecs_set(world, light, Position, {-3, 0, 0});
     ecs_set(world, light, PointLight, {.intensity = 0, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "off.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "off.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -536,7 +546,7 @@ void Light_moved_light_follows_transform(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -552,7 +562,8 @@ void Light_moved_light_follows_transform(void) {
     ecs_set(world, light, Position, {0, 0, 0});
     ecs_set(world, light, PointLight, {.intensity = 4, .range = 3});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "moved.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "moved.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -587,7 +598,7 @@ void Light_many_point_lights(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true});
@@ -607,7 +618,8 @@ void Light_many_point_lights(void) {
     }
 
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "many.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "many.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -635,7 +647,7 @@ void Light_unchanged_lights_upload_nothing(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t scene = ecs_new(world);

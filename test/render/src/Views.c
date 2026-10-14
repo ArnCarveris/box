@@ -22,7 +22,7 @@ void Views_creation_order(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, View, {
         .camera = camera, .clear = {.enabled = true, .color = {255, 0, 0, 255}}});
@@ -35,7 +35,8 @@ void Views_creation_order(void) {
     ecs_add(world, a, Moved);
     ecs_add(world, b, Moved);
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "order.png"});
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "order.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -99,18 +100,19 @@ void Views_camera_scene(void) {
     ecs_set(world, blue, Emissive, {.strength = 1, .color = {0, 0, 255}});
     ecs_entity_t c_outer = ecs_new_w_pair(world, EcsChildOf, outer);
     ecs_set(world, c_outer, Position, {0, 0, 5});
-    ecs_set(world, c_outer, Camera, {.fov = 60});
+    ecs_set(world, c_outer, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t c_inner = ecs_new_w_pair(world, EcsChildOf, group);
     ecs_set(world, c_inner, Position, {0, 0, 5});
-    ecs_set(world, c_inner, Camera, {.fov = 60});
+    ecs_set(world, c_inner, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t c_default = ecs_new(world);
     ecs_set(world, c_default, Position, {0, 0, 5});
-    ecs_set(world, c_default, Camera, {.fov = 60});
+    ecs_set(world, c_default, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = c_outer, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_entity_t cameras[3] = {c_outer, c_inner, c_default};
     int32_t i;
     for (i = 0; i < 3; i ++) {
@@ -143,7 +145,7 @@ void Views_view_matrix(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_set(world, camera, Position, {1, 2, 3});
     ecs_set(world, camera, Rotation, {0, GLM_PI_2f, 0});
     ecs_entity_t view = ecs_new(world);
@@ -162,7 +164,8 @@ void Views_view_matrix(void) {
     ecs_set(world, behind, PbrMaterial, {.metallic = 1, .roughness = 1});
     ecs_set(world, behind, Emissive, {.strength = 1, .color = {0, 255, 0}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .write_to_file = "look.png"});
+    ecs_set(world, surface, Surface, {.width = 16, .height = 16, .write_to_file = "look.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -194,7 +197,7 @@ void Views_no_camera_skipped(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t not_camera = ecs_new(world);
     ecs_entity_t dead = ecs_new(world);
     ecs_delete(world, dead);
@@ -210,7 +213,8 @@ void Views_no_camera_skipped(void) {
     ecs_set(world, b3, View, {
         .camera = dead, .clear = {.enabled = true, .color = {0, 255, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "skip.png"});
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .write_to_file = "skip.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

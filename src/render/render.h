@@ -32,7 +32,7 @@
 /** Shader handle of the engine compute shader that culls the instances of a view */
 #define BOX_RENDER_SHADER_CULL (6)
 
-/** Projected size in pixels below which a view culls an instance when its View sets 0 */
+/** Projected size in pixels below which a capture of a camera without a view culls */
 #define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
 
 /** Shader handle of the engine shader of the tone map and exposure passes and the effect output */
@@ -661,8 +661,7 @@ ecs_entity_t box_render_scene_field(
 void box_render_shadows_init(
     ecs_world_t *world);
 
-/** Resolve shadow settings: zero cascades, resolution, distance and filter take the default,
- * everything is clamped to its valid range.
+/** Resolve shadow settings: every field is clamped to its valid range, values apply as set.
  *
  * @param settings The settings of a view
  * @param out Receives the resolved settings
@@ -733,8 +732,7 @@ void box_render_shadow_cascade(
 void box_render_effects_init(
     ecs_world_t *world);
 
-/** Resolve settings of effects: the constructor defaults that zero fields stand for and the
- * valid range of every field.
+/** Resolve settings of effects: clamp every field to its valid range, values apply as set.
  *
  * @param in The settings of an effect entity
  * @param out Receives the resolved settings

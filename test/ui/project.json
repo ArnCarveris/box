@@ -62,6 +62,7 @@
                 "testcases": [
                     "measure_line",
                     "measure_empty",
+                    "zero_literal_draws_nothing",
                     "measure_newlines",
                     "trailing_spaces_not_measured",
                     "wrap_between_words",

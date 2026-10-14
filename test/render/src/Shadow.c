@@ -59,7 +59,8 @@ void Shadow_splits_end_at_max_distance(void) {
     ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.5f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
-        .shadows = {.enabled = true, .cascades = 3, .max_distance = 50, .split_lambda = 0.5f}});
+        .shadows = {.enabled = true, .cascades = 3, .max_distance = 50, .split_lambda = 0.5f,
+            .resolution = 2048, .filter_size = 3}});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -90,10 +91,11 @@ void Shadow_splits_end_at_camera_far(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60, .far_ = 30});
+    ecs_set(world, camera, Camera, {.fov = 60, .far_ = 30, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
-        .shadows = {.enabled = true, .cascades = 2, .max_distance = 200}});
+        .shadows = {.enabled = true, .cascades = 2, .max_distance = 200, .resolution = 2048,
+            .filter_size = 3}});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -115,7 +117,7 @@ void Shadow_splits_end_at_camera_far(void) {
 
 void Shadow_cascade_contains_slice(void) {
     // lighting/shadows
-    Camera c = {.fov = 60};
+    Camera c = {.fov = 60, .near_ = 0.1f};
     mat4 camera, proj;
     float dir[3] = {0.3f, 0.8f, 0.5f};
     glm_vec3_normalize(dir);
@@ -147,7 +149,7 @@ void Shadow_cascade_contains_slice(void) {
 
 void Shadow_cascade_snapped_to_texels(void) {
     // lighting/shadows
-    Camera c = {.fov = 60};
+    Camera c = {.fov = 60, .near_ = 0.1f};
     mat4 a, b, proj;
     float dir[3] = {-0.4f, 0.7f, 0.2f};
     int32_t res = 2048;
@@ -175,7 +177,7 @@ void Shadow_cascade_snapped_to_texels(void) {
 
 void Shadow_cascade_reversed_z(void) {
     // lighting/shadows
-    Camera c = {.fov = 60};
+    Camera c = {.fov = 60, .near_ = 0.1f};
     mat4 camera, proj;
     float dir[3] = {0, 1, 0};
     glm_mat4_identity(camera);
@@ -202,11 +204,12 @@ void Shadow_box_casts_shadow(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
-        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f}});
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -220,7 +223,8 @@ void Shadow_box_casts_shadow(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "cast.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "cast.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -251,7 +255,7 @@ void Shadow_disabled_casts_no_shadow(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
@@ -269,7 +273,8 @@ void Shadow_disabled_casts_no_shadow(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "disabled.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "disabled.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -298,11 +303,12 @@ void Shadow_no_shadow_casts_none(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
-        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f}});
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -317,7 +323,8 @@ void Shadow_no_shadow_casts_none(void) {
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_add(world, caster, NoShadow);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "ghost.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "ghost.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -346,11 +353,12 @@ void Shadow_no_shadow_parent_casts_none(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
-        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f}});
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -367,7 +375,8 @@ void Shadow_no_shadow_parent_casts_none(void) {
     ecs_add(world, group, NoShadow);
     ecs_add_pair(world, caster, EcsChildOf, group);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "group.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "group.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -396,11 +405,12 @@ void Shadow_no_shadow_removed_casts_again(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
-        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f}});
+        .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
+            .cascades = 4, .resolution = 2048, .max_distance = 200, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -415,7 +425,8 @@ void Shadow_no_shadow_removed_casts_again(void) {
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_add(world, caster, NoShadow);
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "removed.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "removed.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -457,12 +468,12 @@ void Shadow_beyond_max_distance_unshadowed(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
         .shadows = {.enabled = true, .depth_bias = 2, .normal_offset = 1.5f, .fade = 0.2f,
-            .max_distance = 5}});
+            .max_distance = 5, .cascades = 4, .resolution = 2048, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -476,7 +487,8 @@ void Shadow_beyond_max_distance_unshadowed(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "beyond.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "beyond.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -505,12 +517,12 @@ void Shadow_fade_softens_last_cascade(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 10, 0});
     ecs_set(world, camera, Rotation, {-(float)GLM_PI_2, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = true,
         .shadows = {.enabled = true, .cascades = 1, .max_distance = 20, .fade = 1,
-            .depth_bias = 2, .normal_offset = 1.5f}});
+            .depth_bias = 2, .normal_offset = 1.5f, .resolution = 2048, .filter_size = 3}});
     ecs_singleton_set(world, AmbientLight, {.intensity = 0});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -524,7 +536,8 @@ void Shadow_fade_softens_last_cascade(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "fade.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "fade.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

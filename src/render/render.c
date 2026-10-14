@@ -217,11 +217,9 @@ static void box_render_extract_view(
     v->scene = box_render_scene_of(world, camera);
     v->camera_data = *data;
     v->clear = view->clear;
-    v->cull.enabled = !view->culling.disabled;
-    v->cull.occlusion = v->cull.enabled && !view->culling.frustum_only;
-    v->cull.min_dimension = view->culling.min_dimension_px == 0
-        ? BOX_RENDER_CULL_MIN_DIMENSION
-        : glm_max(view->culling.min_dimension_px, 0.0f);
+    v->cull.enabled = view->culling.enabled;
+    v->cull.occlusion = view->culling.enabled && view->culling.occlusion;
+    v->cull.min_dimension = view->culling.min_dimension_px;
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {

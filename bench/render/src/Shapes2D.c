@@ -46,9 +46,10 @@ void Shapes2D_dynamic_material(
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     int32_t i;
     for (i = 0; i < BENCH_SHAPES2D_STATIC + BENCH_SHAPES2D_DYNAMIC; i ++) {
         bool dynamic = i >= BENCH_SHAPES2D_STATIC;
@@ -103,9 +104,10 @@ void Shapes2D_changed_1pct(
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_STATIC);
     int32_t i;
     for (i = 0; i < BENCH_SHAPES2D_STATIC; i ++) {

@@ -26,7 +26,7 @@ void Tint_mix_by_strength(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -55,7 +55,8 @@ void Tint_mix_by_strength(void) {
     ecs_set(world, black, Rgb, {200, 100, 50});
     ecs_set(world, black, Tint, {0, 0, 0, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mix.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mix.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -95,7 +96,7 @@ void Tint_compose_childof(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -116,7 +117,8 @@ void Tint_compose_childof(void) {
     ecs_set(world, grandchild, Box, {1.2f, 1.2f, 0.1f});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "childof.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "childof.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -152,7 +154,7 @@ void Tint_compose_parent(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -172,7 +174,8 @@ void Tint_compose_parent(void) {
     ecs_set(world, grandchild, Box, {1.2f, 1.2f, 0.1f});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "parent.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "parent.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -204,7 +207,7 @@ void Tint_compose_mixed(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -225,7 +228,8 @@ void Tint_compose_mixed(void) {
     ecs_set(world, b_shape, Box, {1.2f, 1.2f, 0.1f});
     ecs_set(world, b_shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mixed.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mixed.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -257,7 +261,7 @@ void Tint_own_tint_after_ancestors(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -273,7 +277,8 @@ void Tint_own_tint_after_ancestors(void) {
     ecs_set(world, below, Box, {1.2f, 1.2f, 0.1f});
     ecs_set(world, below, Rgb, {255, 255, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "own.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "own.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -305,7 +310,7 @@ void Tint_change_updates_descendants(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -316,7 +321,8 @@ void Tint_change_updates_descendants(void) {
     ecs_set(world, grandchild, Box, {2, 2, 0.1f});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "change.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "change.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -366,7 +372,7 @@ void Tint_remove_tint(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -379,7 +385,8 @@ void Tint_remove_tint(void) {
     ecs_set(world, grandchild, Box, {2, 2, 0.1f});
     ecs_set(world, grandchild, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "remove.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "remove.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -429,7 +436,7 @@ void Tint_reparent_childof(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -442,7 +449,8 @@ void Tint_reparent_childof(void) {
     ecs_set(world, shape, Box, {2, 2, 0.1f});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -492,7 +500,7 @@ void Tint_reparent_parent(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -507,7 +515,8 @@ void Tint_reparent_parent(void) {
     ecs_set(world, shape, Box, {2, 2, 0.1f});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "move.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -557,7 +566,7 @@ void Tint_leave_hierarchy(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -573,7 +582,8 @@ void Tint_leave_hierarchy(void) {
     ecs_set(world, right, Box, {1.2f, 1.2f, 0.1f});
     ecs_set(world, right, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "leave.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "leave.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -617,7 +627,7 @@ void Tint_dynamic_material(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -629,7 +639,8 @@ void Tint_dynamic_material(void) {
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_set(world, shape, Tint, {0, 0, 0, 0});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dyn.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dyn.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -680,7 +691,7 @@ void Tint_dynamic_material_inherited(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -693,7 +704,8 @@ void Tint_dynamic_material_inherited(void) {
     ecs_set(world, shape, Box, {2, 2, 0.1f});
     ecs_set(world, shape, Rgb, {128, 192, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dyninh.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "dyninh.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 
@@ -733,7 +745,7 @@ void Tint_keeps_opacity(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 6});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}, .lighting.enabled = false});
@@ -748,7 +760,8 @@ void Tint_keeps_opacity(void) {
     ecs_set(world, shape, Box, {2, 2, 0.1f});
     ecs_set(world, shape, Rgb, {0, 0, 255});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "opacity.png"});
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "opacity.png",
+        .resolution_scale = 1});
     ecs_progress(world, 0);
     box_render_sync(world);
 

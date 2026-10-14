@@ -148,6 +148,17 @@
                     "view",
                     "owning_components_have_hooks"
                 ]
+            },
+            {
+                "id": "Movement",
+                "testcases": [
+                    "linear",
+                    "angular",
+                    "zero_velocity",
+                    "without_velocity",
+                    "child_follows_parent",
+                    "moving_child"
+                ]
             }
         ]
     }

@@ -21,12 +21,14 @@ void Instancing_added_shape_rendered(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "add.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "add.png",
+        .resolution_scale = 1});
     int32_t i;
     for (i = 0; i < 4; i ++) {
         ecs_entity_t e = ecs_new(world);
@@ -77,12 +79,14 @@ void Instancing_removed_shape_disappears(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 2});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 2, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 40, .height = 8, .write_to_file = "rm.png"});
+    ecs_set(world, surface, Surface, {.width = 40, .height = 8, .write_to_file = "rm.png",
+        .resolution_scale = 1});
     ecs_entity_t shapes[10];
     int32_t i;
     for (i = 0; i < 10; i ++) {
@@ -128,12 +132,14 @@ void Instancing_shape_change_renders_new_mesh(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "mesh.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "mesh.png",
+        .resolution_scale = 1});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-2, 0, 0});
     ecs_set(world, a, Box, {2, 2, 2});
@@ -184,12 +190,14 @@ void Instancing_scene_change_updates_render(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "scene.png",
+        .resolution_scale = 1});
     ecs_entity_t root = ecs_new(world);
     ecs_set(world, root, Scene, {0});
     ecs_entity_t group = ecs_new(world);
@@ -248,7 +256,7 @@ void Instancing_unchanged_uploads_nothing(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     int32_t i;
@@ -281,7 +289,7 @@ void Instancing_changed_uploads_only_changes(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t shapes[100];
@@ -322,12 +330,14 @@ void Instancing_parent_move_updates_children(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "move.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "move.png",
+        .resolution_scale = 1});
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {0, -2, 0});
     ecs_entity_t group = ecs_new_w_pair(world, EcsChildOf, parent);
@@ -376,12 +386,14 @@ void Instancing_dynamic_uploads_every_frame(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "dyn.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "dyn.png",
+        .resolution_scale = 1});
     int32_t i;
     for (i = 0; i < 50; i ++) {
         ecs_entity_t e = ecs_new(world);
@@ -435,12 +447,14 @@ void Instancing_dynamic_material_descendants(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "dmat.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "dmat.png",
+        .resolution_scale = 1});
     ecs_entity_t parent = ecs_new(world);
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, parent);
     ecs_set(world, a, Position, {-2, 0, 0});
@@ -488,7 +502,7 @@ void Instancing_dynamic_tag_toggles_uploads(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t a = ecs_new(world);
@@ -526,7 +540,7 @@ void Instancing_no_alloc_steady_state(void) {
     box_render_set_backend(world, &backend);
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera});
     ecs_entity_t shapes[1000];
@@ -576,12 +590,14 @@ void Instancing_gpu_changes_rendered(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 40, .height = 40, .write_to_file = "grid.png"});
+    ecs_set(world, surface, Surface, {.width = 40, .height = 40, .write_to_file = "grid.png",
+        .resolution_scale = 1});
     ecs_entity_t shapes[100];
     int32_t i;
     for (i = 0; i < 100; i ++) {

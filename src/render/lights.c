@@ -13,9 +13,6 @@
 /** Lights the light buffer of a scene holds at least */
 #define BOX_LIGHTS_MIN_CAPACITY (16)
 
-/** Range of a point or spot light that has none */
-#define BOX_LIGHTS_RANGE (10.0f)
-
 /** Buffer handle of the shared buffer that holds the default sun */
 #define BOX_LIGHTS_DEFAULT_BUFFER (BOX_RENDER_BUFFER_LIGHT_FIRST)
 
@@ -178,7 +175,7 @@ static void box_lights_axis(
  * @param transform World transform of the light, NULL for the origin
  * @param rgb Color of the light, NULL for white
  * @param intensity Radiance scale
- * @param range Distance at which the light reaches zero, 0 for the default
+ * @param range Distance at which the light reaches zero
  * @return The light
  */
 static box_render_light_t* box_lights_add_point(
@@ -195,7 +192,7 @@ static box_render_light_t* box_lights_add_point(
         glm_vec3_zero(out->position);
     }
 
-    out->range = range > 0 ? range : BOX_LIGHTS_RANGE;
+    out->range = range;
     box_lights_color(rgb, intensity, out->color);
     glm_vec3_copy((vec3){0, 0, 1}, out->direction);
     out->spot_scale = 0.0f;
@@ -247,12 +244,12 @@ static void box_lights_collect(
                 }
             } else if (kind == 1) {
                 const PointLight *p = &ecs_field(&it, PointLight, 0)[i];
-                if (p->intensity > 0) {
+                if (p->intensity > 0 && p->range > 0) {
                     box_lights_add_point(s, transform, rgb, p->intensity, p->range);
                 }
             } else {
                 const SpotLight *sp = &ecs_field(&it, SpotLight, 0)[i];
-                if (sp->intensity > 0) {
+                if (sp->intensity > 0 && sp->range > 0) {
                     float outer = glm_clamp(sp->outer_angle, 0.01f, 89.9f);
                     float inner = glm_clamp(sp->inner_angle, 0.0f, outer);
                     float cos_outer = cosf(glm_rad(outer));

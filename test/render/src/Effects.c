@@ -26,7 +26,7 @@ void Effects_bloom_spreads_past_emissive_edge(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}});
@@ -35,7 +35,8 @@ void Effects_bloom_spreads_past_emissive_edge(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "bloom.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "bloom.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -79,9 +80,10 @@ void Effects_bloom_threshold_keeps_dim_edges(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
-    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1});
+    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1, .high_pass_frequency = 1,
+        .max_mip_dimension = 512});
     ecs_entity_t view = ecs_new(world);
     View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
@@ -94,7 +96,8 @@ void Effects_bloom_threshold_keeps_dim_edges(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 0.8f, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "dim.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "dim.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -128,9 +131,10 @@ void Effects_bloom_intensity_change_applies(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
-    ecs_set(world, bloom, Bloom, {.intensity = 0.1f, .threshold = 1});
+    ecs_set(world, bloom, Bloom, {.intensity = 0.1f, .threshold = 1, .high_pass_frequency = 1,
+        .max_mip_dimension = 512});
     ecs_entity_t view = ecs_new(world);
     View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
@@ -143,7 +147,8 @@ void Effects_bloom_intensity_change_applies(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "change.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "change.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -154,7 +159,8 @@ void Effects_bloom_intensity_change_applies(void) {
     unsigned char weak = px[(32 * 64 + 44) * 4];
     stbi_image_free(px);
 
-    ecs_set(world, bloom, Bloom, {.intensity = 0.8f, .threshold = 1});
+    ecs_set(world, bloom, Bloom, {.intensity = 0.8f, .threshold = 1, .high_pass_frequency = 1,
+        .max_mip_dimension = 512});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
     px = stbi_load(path, &w, &h, &n, 4);
@@ -178,7 +184,7 @@ void Effects_tonemap_compresses_hdr(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}});
@@ -193,7 +199,8 @@ void Effects_tonemap_compresses_hdr(void) {
     }
 
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "tonemap.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "tonemap.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -240,7 +247,7 @@ void Effects_tonemap_keeps_hue_of_bright_colors(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t tonemap = ecs_new(world);
     ecs_add(world, tonemap, Tonemap);
     ecs_entity_t view = ecs_new(world);
@@ -255,7 +262,8 @@ void Effects_tonemap_keeps_hue_of_bright_colors(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 4, .color = {255, 120, 40}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "hue.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "hue.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -283,7 +291,7 @@ void Effects_exposure_adapts_over_frames(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t exposure = ecs_new(world);
     ecs_add(world, exposure, AutoExposure);
     ecs_entity_t tonemap = ecs_new(world);
@@ -300,7 +308,8 @@ void Effects_exposure_adapts_over_frames(void) {
     ecs_set(world, wall, Rgb, {0, 0, 0});
     ecs_set(world, wall, Emissive, {.strength = 0.02f, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "adapt.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "adapt.png",
+        .resolution_scale = 1});
     char *path = NULL;
     unsigned char seen[4] = {0};
     int32_t frame, sample = 0;
@@ -344,7 +353,7 @@ void Effects_exposure_deterministic_with_fixed_delta(void) {
 
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 0, 5});
-        ecs_set(world, camera, Camera, {.fov = 60});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
         ecs_entity_t exposure = ecs_new(world);
         ecs_set(world, exposure, AutoExposure, {.min_brightness = 0.2f, .max_brightness = 0.2f,
             .min_log_luma = -8, .max_log_luma = 4, .speed_up = 2, .speed_down = 2,
@@ -361,7 +370,8 @@ void Effects_exposure_deterministic_with_fixed_delta(void) {
         ecs_set(world, wall, Rgb, {0, 0, 0});
         ecs_set(world, wall, Emissive, {.strength = 2, .color = {255, 255, 255}});
         ecs_entity_t s = ecs_new(world);
-        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "fixed.png"});
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "fixed.png",
+            .resolution_scale = 1});
         int32_t frame;
         for (frame = 0; frame < 20; frame ++) {
             ecs_progress(world, 1.0f / 60);
@@ -393,7 +403,7 @@ void Effects_fog_darkens_with_distance(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}});
@@ -408,7 +418,8 @@ void Effects_fog_darkens_with_distance(void) {
     ecs_set(world, far_box, Rgb, {0, 0, 0});
     ecs_set(world, far_box, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "fog.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "fog.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -453,7 +464,7 @@ void Effects_fog_lit_by_scene_sun(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t fog = ecs_new(world);
     ecs_set(world, fog, HeightFog, {.density = 0.2f, .falloff = 0, .max_opacity = 1,
         .color = {255, 255, 255}, .sun_inscatter = 1, .ambient_inscatter = 1});
@@ -470,7 +481,8 @@ void Effects_fog_lit_by_scene_sun(void) {
     ecs_set(world, sun, Rotation, {(float)GLM_PI_2, 0, 0});
     ecs_set(world, sun, DirectionalLight, {.intensity = 0.2f});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "sun.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "sun.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -514,7 +526,7 @@ void Effects_ssao_darkens_crease(void) {
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 1.5f, 3});
     ecs_set(world, camera, Rotation, {-0.35f, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}});
@@ -527,7 +539,8 @@ void Effects_ssao_darkens_crease(void) {
     ecs_set(world, wall, Box, {10, 4, 0.2f});
     ecs_set(world, wall, Rgb, {255, 255, 255});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "ssao.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "ssao.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -581,9 +594,10 @@ void Effects_chain_order_matters(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
-    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1});
+    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1, .high_pass_frequency = 1,
+        .max_mip_dimension = 512});
     ecs_entity_t tonemap = ecs_new(world);
     ecs_add(world, tonemap, Tonemap);
     ecs_entity_t view = ecs_new(world);
@@ -599,7 +613,8 @@ void Effects_chain_order_matters(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "order.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "order.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -637,7 +652,7 @@ void Effects_chain_reconfigured_on_change(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
         .color = {0, 0, 0, 255}}});
@@ -650,7 +665,8 @@ void Effects_chain_reconfigured_on_change(void) {
     ecs_set(world, floor, Box, {8, 0.2f, 8});
     ecs_set(world, floor, Rgb, {120, 140, 160});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "reconf.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "reconf.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -736,7 +752,7 @@ void Effects_view_without_clear_composites_over(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t back = ecs_new(world);
     ecs_set(world, back, View, {.camera = camera, .clear = {.enabled = true,
         .color = {200, 30, 30, 255}}});
@@ -745,7 +761,7 @@ void Effects_view_without_clear_composites_over(void) {
     ecs_entity_t overlay_camera = ecs_new(world);
     ecs_add_pair(world, overlay_camera, EcsChildOf, scene);
     ecs_set(world, overlay_camera, Position, {0, 0, 5});
-    ecs_set(world, overlay_camera, Camera, {.fov = 60});
+    ecs_set(world, overlay_camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
     ecs_add(world, bloom, Bloom);
     ecs_entity_t tonemap = ecs_new(world);
@@ -765,7 +781,8 @@ void Effects_view_without_clear_composites_over(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 0.5f, .color = {40, 220, 40}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "over.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "over.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -786,7 +803,7 @@ void Effects_view_without_clear_composites_over(void) {
     ecs_fini(world);
 }
 
-void Effects_zero_literal_takes_defaults(void) {
+void Effects_zero_literal_applies_as_set(void) {
     // lighting/effects
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -796,7 +813,7 @@ void Effects_zero_literal_takes_defaults(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
     ecs_set(world, bloom, Bloom, {.threshold = 1});
     ecs_entity_t view = ecs_new(world);
@@ -811,7 +828,8 @@ void Effects_zero_literal_takes_defaults(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "zero.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "zero.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
 
@@ -819,7 +837,7 @@ void Effects_zero_literal_takes_defaults(void) {
     int w = 0, h = 0, n = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
-    test_assert(px[(32 * 64 + 44) * 4] > 8);
+    test_assert(px[(32 * 64 + 44) * 4] < 4);
 
     stbi_image_free(px);
     ecs_os_free(path);
@@ -912,10 +930,10 @@ void Effects_bloom_temporal_keeps_last_frame(void) {
 
         ecs_entity_t camera = ecs_new(world);
         ecs_set(world, camera, Position, {0, 0, 5});
-        ecs_set(world, camera, Camera, {.fov = 60});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
         ecs_entity_t bloom = ecs_new(world);
         ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1,
-            .temporal = temporal[run]});
+            .temporal = temporal[run], .high_pass_frequency = 1, .max_mip_dimension = 512});
         ecs_entity_t view = ecs_new(world);
         View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
         ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
@@ -928,7 +946,8 @@ void Effects_bloom_temporal_keeps_last_frame(void) {
         ecs_set(world, cube, Rgb, {0, 0, 0});
         ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
         ecs_entity_t s = ecs_new(world);
-        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "temporal.png"});
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "temporal.png",
+            .resolution_scale = 1});
         int32_t frame;
         for (frame = 0; frame < 30; frame ++) {
             ecs_progress(world, 1.0f / 60);
@@ -962,9 +981,10 @@ void Effects_follow_surface_resize(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 5});
-    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
     ecs_entity_t bloom = ecs_new(world);
-    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1});
+    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1, .high_pass_frequency = 1,
+        .max_mip_dimension = 512});
     ecs_entity_t ssao = ecs_new(world);
     ecs_add(world, ssao, Ssao);
     ecs_entity_t view = ecs_new(world);
@@ -981,7 +1001,8 @@ void Effects_follow_surface_resize(void) {
     ecs_set(world, cube, Rgb, {0, 0, 0});
     ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
     ecs_entity_t s = ecs_new(world);
-    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "resize.png"});
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "resize.png",
+        .resolution_scale = 1});
     ecs_progress(world, 1.0f / 60);
     box_render_sync(world);
     ecs_set(world, s, Surface, {.width = 128, .height = 64, .resolution_scale = 2,

@@ -24,13 +24,13 @@ extern "C" {
 /** Fraction of the target frame interval a frame may deviate before it is an error */
 #define BOX_PERF_TOLERANCE (0.1)
 
-/** Seconds of frames measured by a run that does not set frames */
+/** Seconds of frames a constructed run measures, at its frame rate */
 #define BOX_PERF_SECONDS (5)
 
-/** Seconds per revolution of a run that does not set period */
+/** Seconds per revolution of a constructed run */
 #define BOX_PERF_PERIOD (10.0f)
 
-/** Degrees above the horizon of a run that does not set elevation */
+/** Degrees above the horizon of a constructed run */
 #define BOX_PERF_ELEVATION (30.0f)
 
 /** Fewest warmup frames, the bounds are measured once the first frame placed the shapes */
@@ -51,12 +51,12 @@ ECS_ENUM(PerfState, {
  * since the previous one, so only frames that take too long can miss the target.
  */
 ECS_STRUCT(PerfRun, {
-    float fps;            /**< Target frame rate: 30, 60, 90 or 120 */
-    int32_t frames;       /**< Frames measured, 0 for five seconds of frames */
-    int32_t warmup;       /**< Frames before the measurement, 0 for one second, at least 2 */
+    float fps;            /**< Target frame rate: 30, 60, 90 or 120, default 60 */
+    int32_t frames;       /**< Frames measured, default 300 */
+    int32_t warmup;       /**< Frames before the measurement, default 60, at least 2 */
     ecs_entity_t camera;  /**< Camera that orbits, 0 for the first entity with Camera */
-    float period;         /**< Seconds per revolution of the camera, 0 for 10 */
-    float elevation;      /**< Degrees the camera looks down on the center, 0 for 30 */
+    float period;         /**< Seconds per revolution of the camera, default 10, 0 stands still */
+    float elevation;      /**< Degrees the camera looks down on the center, default 30 */
     float stall;          /**< Milliseconds of busy work added to every frame, to test checks */
     bool quit;            /**< Quit the world when the run completes */
     char *report;         /**< JSON file the result is written to, NULL for none */
@@ -94,7 +94,7 @@ ECS_STRUCT(PerfStatus, {
     vec3 center;          /**< Center of the bounds the camera orbits */
     float radius;         /**< Radius of the sphere around the bounds */
     float distance;       /**< Distance of the camera from the center */
-    float revolutions;    /**< Turns the orbit made during the measured frames */
+    float revolutions;    /**< Turns the orbit made during the measured frames, 0 standing still */
     int32_t views;        /**< Views that render the orbiting camera or a camera under it */
     int32_t cull_samples; /**< Culling results of those views read during the measurement */
     int32_t cull_changes; /**< Samples whose counts differ from the sample before */

@@ -69,7 +69,7 @@ static void bench_effects(
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 8, 30});
     ecs_set(world, camera, Rotation, {-0.3f, 0, 0});
-    ecs_set(world, camera, Camera, {.fov = 50});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
     View value = {.camera = camera, .clear = {.enabled = true, .color = {110, 150, 210, 255}},
         .lighting.enabled = true};
     ecs_vec_init_t(NULL, &value.effects, ViewEffect, 4);
@@ -113,7 +113,7 @@ static void bench_effects(
     }
 
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 1280, .height = 720});
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
     uint32_t word = 0;
     int32_t i;
     for (i = 0; i < 3; i ++) {

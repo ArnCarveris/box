@@ -140,7 +140,7 @@ void RenderPacket_main_thread_consumes(void) {
     box_render_null_t *null = box_render_null_new();
     box_render_backend_t backend = box_render_null_backend(null);
     box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, RenderSettings, { .main_thread = true });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
 
     ecs_progress(world, 0);
     test_int(null->packets, 1);
@@ -301,7 +301,7 @@ void RenderPacket_switch_to_main_thread(void) {
 
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    ecs_singleton_set(world, RenderSettings, { .main_thread = true });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
     ecs_progress(world, 0);
 
     test_int(null->packets, 3);
@@ -327,7 +327,7 @@ void RenderPacket_no_alloc_after_warmup(void) {
     });
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, { .fov = 60 });
+    ecs_set(world, camera, Camera, { .fov = 60, .near_ = 0.1f });
     ecs_set(world, camera, Position, { 1, 2, 3 });
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, { .camera = camera });
@@ -361,7 +361,7 @@ void RenderPacket_no_alloc_after_warmup_main_thread(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_singleton_set(world, RenderSettings, { .main_thread = true });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "ExtractContents" }),
         .phase = RenderExtract,
@@ -369,7 +369,7 @@ void RenderPacket_no_alloc_after_warmup_main_thread(void) {
     });
 
     ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, { .fov = 60 });
+    ecs_set(world, camera, Camera, { .fov = 60, .near_ = 0.1f });
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, { .camera = camera });
 

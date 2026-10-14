@@ -21,12 +21,14 @@ void Draws_transform_and_color(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "xf.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "xf.png",
+        .resolution_scale = 1});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-2, 1, 0});
     ecs_set(world, a, Box, {2, 1, 1});
@@ -77,12 +79,14 @@ void Draws_replaced_shape_renders_new_mesh(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "swap.png"});
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32, .write_to_file = "swap.png",
+        .resolution_scale = 1});
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Box, {2, 2, 2});
     ecs_set(world, e, Rgb, {0, 0, 0});
@@ -128,12 +132,14 @@ void Draws_many_instances_all_drawn(void) {
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Position, {0, 0, 10});
-    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 16});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 16, .near_ = 0.1f,
+        .far_ = 1000});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
         .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t surface = ecs_new(world);
-    ecs_set(world, surface, Surface, {.width = 64, .height = 64, .write_to_file = "many.png"});
+    ecs_set(world, surface, Surface, {.width = 64, .height = 64, .write_to_file = "many.png",
+        .resolution_scale = 1});
     int32_t i;
     for (i = 0; i < 256; i ++) {
         if (i == 64) {

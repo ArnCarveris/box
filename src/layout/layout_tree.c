@@ -269,7 +269,7 @@ static void box_layout_grow(
         for (i = 0; i < n->count; i ++) {
             const box_layout_node_t *c = &nodes[n->first + i];
             float w = box_layout_sizing(c, main)->value;
-            weights += c->frozen ? 0 : (w > 0 ? w : 1);
+            weights += c->frozen ? 0 : fmaxf(w, 0.0f);
         }
 
         if (weights <= 0) {
@@ -279,7 +279,7 @@ static void box_layout_grow(
         for (i = 0; i < n->count; i ++) {
             box_layout_node_t *c = &nodes[n->first + i];
             const Sizing *s = box_layout_sizing(c, main);
-            float raw = free * (s->value > 0 ? s->value : 1) / weights;
+            float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen) {
                 c->size[main] = box_layout_clamp(raw, s);
                 over += c->size[main] - raw;
@@ -294,7 +294,7 @@ static void box_layout_grow(
         for (i = 0; i < n->count; i ++) {
             box_layout_node_t *c = &nodes[n->first + i];
             const Sizing *s = box_layout_sizing(c, main);
-            float raw = free * (s->value > 0 ? s->value : 1) / weights;
+            float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen && ((over > 0 && c->size[main] > raw) ||
                 (over < 0 && c->size[main] < raw)))
             {

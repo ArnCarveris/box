@@ -41,6 +41,38 @@ static void box_controllers_camera_actions(
     }
 }
 
+/** Free the default action scope a controller constructor reads.
+ *
+ * @param ctx The scope
+ */
+static void box_controllers_scope_free(
+    void *ctx)
+{
+    ecs_os_free(ctx);
+}
+
+/** Make the constructor of a controller use a scope as its default actions.
+ *
+ * @param world The world
+ * @param component The controller component
+ * @param ctor The constructor
+ * @param scope The scope of the default actions
+ */
+static void box_controllers_ctor(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    ecs_xtor_t ctor,
+    ecs_entity_t scope)
+{
+    ecs_entity_t *ctx = ecs_os_malloc_t(ecs_entity_t);
+    *ctx = scope;
+    ecs_set_hooks_id(world, component, &(ecs_type_hooks_t){
+        .ctor = ctor,
+        .ctx = ctx,
+        .ctx_free = box_controllers_scope_free
+    });
+}
+
 void BoxControllersImport(
     ecs_world_t *world)
 {
@@ -51,7 +83,6 @@ void BoxControllersImport(
 
     ECS_META_COMPONENT(world, CameraController);
     ECS_COMPONENT_DEFINE(world, CameraActionMap);
-    ecs_set_hooks(world, CameraController, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, CameraActionMap, {
         .ctor = flecs_default_ctor,
         .flags = ECS_TYPE_HOOK_COPY_ILLEGAL | ECS_TYPE_HOOK_MOVE_ILLEGAL
@@ -61,15 +92,18 @@ void BoxControllersImport(
 
     ECS_META_COMPONENT(world, FirstPersonController);
     ECS_COMPONENT_DEFINE(world, FirstPersonActionMap);
-    ecs_set_hooks(world, FirstPersonController, { .ctor = flecs_default_ctor });
     ecs_set_hooks(world, FirstPersonActionMap, { .ctor = flecs_default_ctor });
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Rotation));
 
     CameraActionMap *map = ecs_singleton_ensure(world, CameraActionMap);
     box_controllers_camera_actions(world, map);
+    box_controllers_ctor(world, ecs_id(CameraController), box_camera_controller_ctor, map->scope);
 
-    box_first_person_actions_create(world, ecs_singleton_ensure(world, FirstPersonActionMap));
+    FirstPersonActionMap *fp_map = ecs_singleton_ensure(world, FirstPersonActionMap);
+    box_first_person_actions_create(world, fp_map);
+    box_controllers_ctor(world, ecs_id(FirstPersonController), box_first_person_controller_ctor,
+        fp_map->scope);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "CameraActionsActivate" }),
