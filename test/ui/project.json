@@ -87,6 +87,7 @@
                     "hud_over_3d_scene",
                     "ortho_scale_counts_points",
                     "resolution_scale_keeps_ui_size",
+                    "pixel_ratio_scales_pixels",
                     "views_stack_in_view_order",
                     "unlit_ui_view_draws_base_color",
                     "ui_view_skips_culling",

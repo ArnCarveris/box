@@ -220,7 +220,8 @@ static void box_surface_ctor(
         values[i] = (Surface){
             .width = BOX_SURFACE_WIDTH,
             .height = BOX_SURFACE_HEIGHT,
-            .resolution_scale = 1.0f
+            .resolution_scale = 1.0f,
+            .pixel_ratio = 1.0f
         };
     }
 }
@@ -255,7 +256,7 @@ done:
 }
 
 /** Describe the target of a surface: its size in pixels and points, render size and window
- * layer. Offscreen a point is a pixel; a window reports both, so a retina window has two
+ * layer. Offscreen a point is pixel_ratio pixels; a window reports both, so a retina window has two
  * pixels per point.
  *
  * @param s The surface
@@ -269,9 +270,10 @@ static void box_surface_measure(
 {
     int32_t width = box_surface_points(s->width);
     int32_t height = box_surface_points(s->height);
+    float ratio = s->pixel_ratio > 0 ? s->pixel_ratio : 1.0f;
     ecs_os_memset_t(desc, 0, box_render_target_desc_t);
-    desc->width = width;
-    desc->height = height;
+    desc->width = box_surface_points((int32_t)((float)width * ratio + 0.5f));
+    desc->height = box_surface_points((int32_t)((float)height * ratio + 0.5f));
     desc->point_width = width;
     desc->point_height = height;
     desc->vsync = s->vsync;
@@ -418,6 +420,8 @@ static void box_surface_frame(
         ecs_set(world, e, SurfaceStatus, {
             .width = desc.width,
             .height = desc.height,
+            .point_width = desc.point_width,
+            .point_height = desc.point_height,
             .render_width = desc.render_width,
             .render_height = desc.render_height,
             .window = impl->window != NULL
