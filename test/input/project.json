@@ -43,7 +43,9 @@
                     "script_key_repeat",
                     "script_mouse_move",
                     "script_mouse_click",
-                    "script_mouse_drag"
+                    "script_mouse_drag",
+                    "mouse_release_no_jump",
+                    "reset_no_jump"
                 ]
             },
             {

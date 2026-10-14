@@ -52,7 +52,7 @@ typedef struct InputDevice {
     box_input_platform_t backend;  /**< Backend that feeds real device input */
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
-    bool has_position;             /**< A cursor position arrived since focus was gained */
+    bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 
 extern ECS_COMPONENT_DECLARE(InputDevice);

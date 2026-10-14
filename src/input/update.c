@@ -332,11 +332,13 @@ static void box_input_apply(
         break;
     case InputRelease:
         in->mouse.pinned = false;
+        dev->has_position = false;
         break;
     case InputReset:
         box_input_release_all(dev, in);
         box_input_hold_release_all(dev);
         in->mouse.pinned = false;
+        dev->has_position = false;
         break;
     case InputActionDown:
     case InputActionUp:
