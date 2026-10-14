@@ -68,34 +68,34 @@ ECS_STRUCT(RightTrianglePrism, {
 
 /** Flat regular polygon */
 ECS_STRUCT(NGon, {
-    int32_t sides; /**< Number of sides */
+    int32_t sides; /**< Number of sides, 0 for 6 */
     float radius;  /**< Circumradius */
 });
 
 /** UV sphere */
 ECS_STRUCT(Sphere, {
-    int32_t segments; /**< Subdivisions */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Radius */
 });
 
 /** Upper half of a UV sphere */
 ECS_STRUCT(HemiSphere, {
-    int32_t segments; /**< Subdivisions */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Radius */
 });
 
 /** Subdivided icosahedron */
 ECS_STRUCT(IcoSphere, {
-    int32_t segments; /**< Subdivision level */
+    int32_t segments; /**< Subdivision level from 0 to 6 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Radius */
 });
 
 /** Cone along Y */
 ECS_STRUCT(Cone, {
-    int32_t segments; /**< Subdivisions around the axis */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Base radius */
@@ -103,7 +103,7 @@ ECS_STRUCT(Cone, {
 
 /** Cylinder along Y */
 ECS_STRUCT(Cylinder, {
-    int32_t segments; /**< Subdivisions around the axis */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Radius */
@@ -111,8 +111,8 @@ ECS_STRUCT(Cylinder, {
 
 /** Ring in the XZ plane with major radius and tube radius */
 ECS_STRUCT(Torus, {
-    int32_t segments; /**< Subdivisions around the ring */
-    int32_t rings;    /**< Subdivisions around the tube */
+    int32_t segments; /**< Subdivisions around the ring, 0 for 24 */
+    int32_t rings;    /**< Subdivisions around the tube, 0 for 12 */
     bool smooth;      /**< Smooth shading */
     float radius;     /**< Major radius */
     float tube;       /**< Tube radius */
@@ -120,7 +120,7 @@ ECS_STRUCT(Torus, {
 
 /** Capsule along Y, length is the cylinder part */
 ECS_STRUCT(Capsule, {
-    int32_t segments; /**< Subdivisions */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Cylinder length */
     float radius;     /**< Radius */
@@ -128,7 +128,7 @@ ECS_STRUCT(Capsule, {
 
 /** Hollow cylinder with wall thickness, arc limits the sweep in radians */
 ECS_STRUCT(Tube, {
-    int32_t segments; /**< Subdivisions around the axis */
+    int32_t segments; /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;      /**< Smooth shading */
     float length;     /**< Height */
     float radius;     /**< Outer radius */
@@ -138,7 +138,7 @@ ECS_STRUCT(Tube, {
 
 /** Truncated cone with separate bottom and top radius */
 ECS_STRUCT(Frustum, {
-    int32_t segments;    /**< Subdivisions around the axis */
+    int32_t segments;    /**< Subdivisions around the axis, 0 for 24 */
     bool smooth;         /**< Smooth shading */
     float length;        /**< Height */
     float radius_bottom; /**< Bottom radius */
@@ -151,7 +151,7 @@ ECS_STRUCT(RoundedBox, {
     float y;          /**< Height */
     float z;          /**< Depth */
     float radius;     /**< Corner radius */
-    int32_t segments; /**< Subdivisions per corner */
+    int32_t segments; /**< Subdivisions per corner rounded up to even, 0 for 4 */
 });
 
 /** Flat star polygon in the XY plane, the worked example of the shape registry */
@@ -172,6 +172,118 @@ ECS_STRUCT(Circle, {
     float radius;     /**< Radius */
     int32_t segments; /**< Segments around the rim, 0 to derive them from the radius */
 });
+
+/** Vertex of a shape mesh, laid out to be copied into a vertex buffer as is */
+typedef struct box_vertex_t {
+    vec3 position; /**< Position in unit shape space */
+    vec3 normal;   /**< Unit length normal pointing out of the shape */
+    vec2 uv;       /**< Texture coordinate in 0..1 */
+} box_vertex_t;
+
+/** CPU side triangle mesh of a shape, front faces are counter-clockwise */
+typedef struct box_mesh_t {
+    box_vertex_t *vertices;  /**< Vertex array */
+    uint32_t *indices;       /**< Three indices per triangle */
+    rgba *colors;            /**< One color per vertex, NULL when the mesh has none */
+    int32_t vertex_count;    /**< Number of vertices */
+    int32_t index_count;     /**< Number of indices */
+    int32_t vertex_capacity; /**< Allocated vertices */
+    int32_t index_capacity;  /**< Allocated indices */
+    vec3 min;                /**< Minimum corner of the bounds */
+    vec3 max;                /**< Maximum corner of the bounds */
+} box_mesh_t;
+
+/** Mesh parameters of a shape value, values with equal keys share one mesh */
+typedef struct box_shape_key_t {
+    int32_t i[4]; /**< Topology parameters such as segments and smooth */
+    float f[4];   /**< Proportions that a scale cannot express, quantized */
+} box_shape_key_t;
+
+/** Compute the mesh key of a shape value; the key is zeroed before the call.
+ *
+ * @param value The shape component value
+ * @param key The key to fill
+ */
+typedef void (*box_shape_key_fn)(
+    const void *value,
+    box_shape_key_t *key);
+
+/** Generate the unit mesh of a key with box_mesh_vertex and box_mesh_triangle.
+ *
+ * @param value The first shape value that produced the key
+ * @param key The key
+ * @param mesh The empty mesh to fill
+ */
+typedef void (*box_shape_generate_fn)(
+    const void *value,
+    const box_shape_key_t *key,
+    box_mesh_t *mesh);
+
+/** Compute the instance scale that turns the unit mesh into the shape value.
+ *
+ * @param value The shape component value
+ * @param scale The scale to fill
+ */
+typedef void (*box_shape_scale_fn)(
+    const void *value,
+    vec3 scale);
+
+/** Registration of a shape component */
+typedef struct box_shape_desc_t {
+    ecs_entity_t component;         /**< The shape component */
+    box_shape_key_fn key;           /**< Key function */
+    box_shape_generate_fn generate; /**< Mesh generator */
+    box_shape_scale_fn scale;       /**< Scale function, NULL for a scale of one */
+} box_shape_desc_t;
+
+/** Register a shape so that setting its component selects a cached mesh.
+ *
+ * Register a shape before its component is used, as adding the shape also adds ShapeMesh.
+ *
+ * @param world The world, which must have imported box.geometry
+ * @param desc The shape registration
+ * @return Zero on success, nonzero when the registration is invalid, a duplicate or too late
+ */
+int box_shape_register(
+    ecs_world_t *world,
+    const box_shape_desc_t *desc);
+
+/** Append a vertex to a mesh.
+ *
+ * @param mesh The mesh
+ * @param position The position
+ * @param normal The unit length normal
+ * @param u The U texture coordinate
+ * @param v The V texture coordinate
+ * @return The index of the vertex
+ */
+int32_t box_mesh_vertex(
+    box_mesh_t *mesh,
+    const vec3 position,
+    const vec3 normal,
+    float u,
+    float v);
+
+/** Append a triangle, wound counter-clockwise around the normals of its vertices.
+ *
+ * @param mesh The mesh
+ * @param a First vertex index
+ * @param b Second vertex index
+ * @param c Third vertex index
+ */
+void box_mesh_triangle(
+    box_mesh_t *mesh,
+    int32_t a,
+    int32_t b,
+    int32_t c);
+
+/** Round a proportion so that values that look the same share a mesh key.
+ *
+ * @param value The proportion
+ * @return The value rounded to a multiple of 1/4096
+ */
+float box_shape_quantize(
+    float value);
 
 /** Register the box.geometry module.
  *
