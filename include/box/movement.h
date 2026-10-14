@@ -1,6 +1,14 @@
 /**
  * @file box/movement.h
  * @brief Velocity components integrated into Position and Rotation every frame.
+ *
+ * Systems in EcsOnUpdate add Velocity times the world delta time to the local Position and
+ * AngularVelocity times the delta time to the local Rotation of the same entity, before the
+ * transform systems of EcsPreStore run. Children follow through their parent's transform.
+ *
+ * Systems write without notifying observers, so only DynamicTransform entities get their
+ * WorldTransform updated. Add DynamicTransform to every moving entity: it is not added
+ * automatically, as static entities are re-uploaded on change, every frame if they move.
  */
 
 #ifndef BOX_MOVEMENT_H
