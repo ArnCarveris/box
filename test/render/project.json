@@ -275,7 +275,11 @@
                     "zero_budget_never_converges",
                     "dynamic_shape_lit_not_captured",
                     "no_bake_removes_contribution",
-                    "perf_run_waits_for_convergence"
+                    "perf_run_waits_for_convergence",
+                    "budget_spreads_over_frames",
+                    "invalid_capture_size_bakes_nothing",
+                    "perf_run_measures_zero_budget",
+                    "perf_run_ignores_unviewed_scene"
                 ]
             },
             {

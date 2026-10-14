@@ -330,3 +330,173 @@ void ProbeCapture_perf_run_waits_for_convergence(void) {
 
     ecs_fini(world);
 }
+
+void ProbeCapture_budget_spreads_over_frames(void) {
+    // baked_lighting/probe_capture
+    int32_t frames[2] = {0, 0};
+    float budgets[2] = {0.001f, 50};
+    int32_t i;
+
+    for (i = 0; i < 2; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+            .capture_size = 8, .budget_ms = budgets[i], .bounces = 1});
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 1, 5});
+        ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+            .lighting.baked = true});
+        ecs_entity_t floor = ecs_new(world);
+        ecs_set(world, floor, Position, {0, -0.1f, 0});
+        ecs_set(world, floor, Box, {5, 0.2f, 5});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+
+        int32_t frame, last = 0, partial = 0;
+        const LightBakeStatus *status = NULL;
+        for (frame = 0; frame < 1000; frame ++) {
+            ecs_progress(world, 0);
+            status = ecs_get(world, ecs_id(LightBake), LightBakeStatus);
+            test_assert(status->baked >= last);
+            last = status->baked;
+            partial += status->baked > 0 && status->baked < status->probes &&
+                !status->converged;
+            if (status->converged) {
+                break;
+            }
+        }
+
+        test_assert(status->converged);
+        test_assert(status->probes > 40);
+        if (i == 0) {
+            test_assert(partial > 20);
+        }
+
+        frames[i] = frame;
+        ecs_fini(world);
+    }
+
+    test_assert(frames[1] < frames[0]);
+}
+
+void ProbeCapture_invalid_capture_size_bakes_nothing(void) {
+    // baked_lighting/probe_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 0, .budget_ms = 2, .bounces = 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {3, 0.2f, 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+
+    int32_t frame;
+    for (frame = 0; frame < 30; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    const LightBakeStatus *status = ecs_get(world, ecs_id(LightBake), LightBakeStatus);
+    test_assert(status->probes > 0);
+    test_int(status->baked, 0);
+    test_bool(status->converged, false);
+    test_assert(status->error != NULL);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 257, .budget_ms = 2, .bounces = 1});
+    ecs_progress(world, 0);
+    test_assert(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->error != NULL);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 20, .bounces = 1});
+    for (frame = 0; frame < 400; frame ++) {
+        ecs_progress(world, 0);
+        if (ecs_get(world, ecs_id(LightBake), LightBakeStatus)->converged) {
+            break;
+        }
+    }
+
+    status = ecs_get(world, ecs_id(LightBake), LightBakeStatus);
+    test_bool(status->converged, true);
+    test_assert(status->error == NULL);
+
+    ecs_fini(world);
+}
+
+void ProbeCapture_perf_run_measures_zero_budget(void) {
+    // baked_lighting/probe_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 0, .bounces = 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {3, 0.2f, 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+    ecs_singleton_set(world, PerfRun, {.fps = 120, .frames = 4, .warmup = 2});
+
+    int32_t frame;
+    for (frame = 0; frame < 4; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_assert(ecs_singleton_get(world, PerfStatus)->state >= PerfMeasure);
+    test_bool(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->converged, false);
+
+    ecs_fini(world);
+}
+
+void ProbeCapture_perf_run_ignores_unviewed_scene(void) {
+    // baked_lighting/probe_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t level = ecs_new(world);
+    ecs_add(world, level, Scene);
+    ecs_set(world, level, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 2, .bounces = 1});
+    ecs_entity_t block = ecs_new_w_pair(world, EcsChildOf, level);
+    ecs_set(world, block, Position, {0, 0, 0});
+    ecs_set(world, block, Box, {3, 0.2f, 3});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {3, 0.2f, 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+    ecs_singleton_set(world, PerfRun, {.fps = 120, .frames = 4, .warmup = 2});
+
+    int32_t frame;
+    for (frame = 0; frame < 4; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    const LightBakeStatus *status = ecs_get(world, level, LightBakeStatus);
+    test_assert(status->probes > 0);
+    test_int(status->baked, 0);
+    test_assert(ecs_singleton_get(world, PerfStatus)->state >= PerfMeasure);
+
+    ecs_fini(world);
+}
