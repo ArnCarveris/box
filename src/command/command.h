@@ -151,4 +151,11 @@ void box_logs_init(
 void box_history_init(
     ecs_world_t *world);
 
+/** Register the search commands: query, iter, next, done, has, grep and grep_recur.
+ *
+ * @param world The world
+ */
+void box_search_init(
+    ecs_world_t *world);
+
 #endif
