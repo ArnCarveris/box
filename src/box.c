@@ -28,5 +28,5 @@ void BoxImport(
     ECS_IMPORT(world, BoxShader);
     ECS_IMPORT(world, BoxCommand);
     ECS_IMPORT(world, BoxPerf);
-    ECS_IMPORT(world, BoxPerf);
+    ECS_IMPORT(world, BoxSpatial);
 }

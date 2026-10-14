@@ -1,0 +1,554 @@
+/**
+ * @file spatial/spatial.c
+ * @brief Registers box.spatial and keeps the index of every scene up to date.
+ *
+ * Observers collect changed shapes and the roots of changed subtrees, so an update only
+ * places what changed; the shapes with DynamicTransform are placed every frame.
+ */
+
+#include "index.h"
+#include "../render/render.h"
+#include "../geometry/mesh_cache.h"
+
+ECS_COMPONENT_DECLARE(SpatialProxy);
+ECS_COMPONENT_DECLARE(SpatialIndex);
+
+/** Construct SpatialProxy values that are not indexed.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spatial_proxy_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    SpatialProxy *proxies = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        proxies[i] = (SpatialProxy){ .item = -1 };
+    }
+}
+
+/** Copy SpatialProxy values: a copy is a new entity that is not indexed yet.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spatial_proxy_copy(
+    void *dst,
+    const void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    (void)src;
+    box_spatial_proxy_ctor(dst, count, ti);
+}
+
+/** Move SpatialProxy values with the entity they belong to.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_spatial_proxy_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ecs_os_memcpy(dst, src, ti->size * count);
+}
+
+box_spatial_t* box_spatial_of(
+    const ecs_world_t *world)
+{
+    const SpatialIndex *s = ecs_singleton_get(world, SpatialIndex);
+
+    return s ? s->index : NULL;
+}
+
+/** Drop a reference to the index, freeing it with the last one.
+ *
+ * @param ctx The index
+ */
+static void box_spatial_release(
+    void *ctx)
+{
+    box_spatial_t *index = ctx;
+    if (!-- index->refs) {
+        box_spatial_free(index);
+    }
+}
+
+/** Add an entity with a proxy to the changed entities unless it is in the list.
+ *
+ * @param world The world
+ * @param index The index
+ * @param e The entity
+ */
+static void box_spatial_mark(
+    ecs_world_t *world,
+    box_spatial_t *index,
+    ecs_entity_t e)
+{
+    SpatialProxy *p = ecs_get_mut(world, e, SpatialProxy);
+    if (p && !p->dirty) {
+        p->dirty = true;
+        *ecs_vec_append_t(NULL, &index->dirty, ecs_entity_t) = e;
+    }
+}
+
+/** Take an entity out of the index.
+ *
+ * @param index The index
+ * @param p The proxy of the entity
+ */
+static void box_spatial_unindex(
+    box_spatial_t *index,
+    SpatialProxy *p)
+{
+    box_spatial_scene_t *s = p->item >= 0 ? box_spatial_scene(index, p->scene) : NULL;
+    if (s) {
+        box_spatial_item_remove(index, s, p->item);
+    }
+
+    p->item = -1;
+    p->scene = 0;
+}
+
+/** Mark the entities of an observer event as changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnChange(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    if (!ecs_is_fini(it->world)) {
+        for (i = 0; i < it->count; i ++) {
+            box_spatial_mark(it->world, it->ctx, it->entities[i]);
+        }
+    }
+}
+
+/** Remember the entities of an observer event as roots of changed subtrees.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnMove(
+    ecs_iter_t *it)
+{
+    box_spatial_t *index = it->ctx;
+    int32_t i;
+    if (!ecs_is_fini(it->world)) {
+        for (i = 0; i < it->count; i ++) {
+            *ecs_vec_append_t(NULL, &index->moved, ecs_entity_t) = it->entities[i];
+        }
+    }
+}
+
+/** Take entities that lose their shape out of the index.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnRemove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    if (!ecs_is_fini(it->world)) {
+        for (i = 0; i < it->count; i ++) {
+            SpatialProxy *p = ecs_get_mut(it->world, it->entities[i], SpatialProxy);
+            if (p) {
+                box_spatial_unindex(it->ctx, p);
+            }
+        }
+    }
+}
+
+/** Compute the world bounds of a shape from its unit mesh, instance scale and transform.
+ *
+ * @param cache The mesh cache
+ * @param shape The shape
+ * @param t World transform of the entity, NULL for the identity
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ * @return false when the shape has no mesh
+ */
+static bool box_spatial_world_bounds(
+    const box_mesh_cache_t *cache,
+    const ShapeMesh *shape,
+    const WorldTransform *t,
+    vec3 min,
+    vec3 max)
+{
+    const box_mesh_t *mesh = cache && shape && shape->mesh ?
+        box_mesh_cache_get(cache, shape->mesh) : NULL;
+    bool result = mesh && mesh->vertex_count;
+    vec3 c, e, wc, we;
+    int32_t i, j;
+    if (!result) {
+        goto done;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        c[i] = (mesh->min[i] + mesh->max[i]) * 0.5f * shape->scale[i];
+        e[i] = (mesh->max[i] - mesh->min[i]) * 0.5f * fabsf(shape->scale[i]);
+    }
+
+    for (i = 0; i < 3; i ++) {
+        wc[i] = t ? t->m[3][i] : c[i];
+        we[i] = t ? 0 : e[i];
+        for (j = 0; t && j < 3; j ++) {
+            wc[i] += t->m[j][i] * c[j];
+            we[i] += fabsf(t->m[j][i]) * e[j];
+        }
+
+        min[i] = wc[i] - we[i];
+        max[i] = wc[i] + we[i];
+    }
+
+done:
+    return result;
+}
+
+/** Place a changed entity in the index of its scene, or take it out.
+ *
+ * @param world The world
+ * @param index The index
+ * @param cache The mesh cache
+ * @param e The entity
+ */
+static void box_spatial_refresh(
+    ecs_world_t *world,
+    box_spatial_t *index,
+    const box_mesh_cache_t *cache,
+    ecs_entity_t e)
+{
+    vec3 min, max;
+    ecs_entity_t scene = 0;
+    int32_t tree = BOX_SPATIAL_STATIC;
+    SpatialProxy *p = ecs_is_alive(world, e) ? ecs_get_mut(world, e, SpatialProxy) : NULL;
+    if (!p) {
+        goto done;
+    }
+
+    p->dirty = false;
+    bool indexed = !ecs_has_id(world, e, EcsPrefab) && box_spatial_world_bounds(cache,
+        ecs_get(world, e, ShapeMesh), ecs_get(world, e, WorldTransform), min, max);
+    if (indexed) {
+        scene = box_render_scene_of(world, e);
+        tree = ecs_has_id(world, e, DynamicTransform) ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
+    }
+
+    if (p->item >= 0 && (!indexed || scene != p->scene)) {
+        box_spatial_unindex(index, p);
+    }
+
+    if (!indexed) {
+        goto done;
+    }
+
+    index->stats.updated ++;
+    if (p->item < 0) {
+        box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
+        p->scene = scene;
+        p->item = box_spatial_item_add(s, e, tree, min, max);
+    } else {
+        box_spatial_item_set(box_spatial_scene(index, scene), p->item, tree, min, max);
+    }
+
+done:
+    return;
+}
+
+/** Mark every entity of the changed subtrees, the roots included.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_walk(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&index->moved); i ++) {
+        ecs_entity_t root = *ecs_vec_get_t(&index->moved, ecs_entity_t, i);
+        if (!ecs_is_alive(world, root)) {
+            continue;
+        }
+
+        *ecs_vec_append_t(NULL, &index->walk, ecs_entity_t) = root;
+        while (ecs_vec_count(&index->walk)) {
+            ecs_entity_t e = *ecs_vec_last_t(&index->walk, ecs_entity_t);
+            ecs_vec_remove_last(&index->walk);
+            box_spatial_mark(world, index, e);
+            ecs_iter_t it = ecs_children(world, e);
+            while (ecs_children_next(&it)) {
+                int32_t c;
+                for (c = 0; c < it.count; c ++) {
+                    *ecs_vec_append_t(NULL, &index->walk, ecs_entity_t) = it.entities[c];
+                }
+            }
+        }
+    }
+
+    ecs_vec_clear(&index->moved);
+}
+
+/** Give the dynamic entities the bounds of this frame.
+ *
+ * @param world The world
+ * @param index The index
+ * @param cache The mesh cache
+ */
+static void box_spatial_dynamic(
+    ecs_world_t *world,
+    box_spatial_t *index,
+    const box_mesh_cache_t *cache)
+{
+    ecs_iter_t it = ecs_query_iter(world, index->dynamic);
+    box_spatial_scene_t *s = NULL;
+    ecs_entity_t scene = 0;
+    while (ecs_query_next(&it)) {
+        const SpatialProxy *p = ecs_field(&it, SpatialProxy, 0);
+        const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 1);
+        const WorldTransform *t = ecs_field(&it, WorldTransform, 2);
+        int32_t i;
+        for (i = 0; i < it.count; i ++) {
+            vec3 min, max;
+            if (p[i].item < 0 || p[i].dirty) {
+                continue;
+            }
+
+            if (!s || scene != p[i].scene) {
+                scene = p[i].scene;
+                s = box_spatial_scene(index, scene);
+            }
+
+            if (!s || box_spatial_item(s, p[i].item)->tree != BOX_SPATIAL_DYNAMIC ||
+                !box_spatial_world_bounds(cache, &shape[i], t ? &t[i] : NULL, min, max))
+            {
+                continue;
+            }
+
+            index->stats.moved += box_spatial_item_set(
+                s, p[i].item, BOX_SPATIAL_DYNAMIC, min, max);
+        }
+    }
+}
+
+/** Bring the index up to date: changed entities, dynamic entities, then the commit.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_process(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    const box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    int32_t i;
+    index->stats.updated = 0;
+    index->stats.moved = 0;
+    box_spatial_walk(world, index);
+    for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
+        box_spatial_refresh(world, index, cache, *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));
+    }
+
+    ecs_vec_clear(&index->dirty);
+    box_spatial_dynamic(world, index, cache);
+    box_spatial_commit(index);
+}
+
+/** Update the index once the transforms of the frame are known.
+ *
+ * @param it The iterator of the system
+ */
+static void BoxSpatialUpdate(
+    ecs_iter_t *it)
+{
+    box_spatial_process(it->world, it->ctx);
+}
+
+void box_spatial_update(
+    ecs_world_t *world)
+{
+    box_spatial_t *index = box_spatial_of(world);
+    if (index) {
+        box_spatial_process(world, index);
+    }
+}
+
+void box_spatial_rebuild(
+    ecs_world_t *world)
+{
+    box_spatial_t *index = box_spatial_of(world);
+    if (!index) {
+        goto done;
+    }
+
+    box_spatial_process(world, index);
+    box_spatial_scene_rebuild(index, index->root);
+    ecs_map_iter_t it = ecs_map_iter(&index->scenes);
+    while (ecs_map_next(&it)) {
+        box_spatial_scene_rebuild(index, ecs_map_ptr(&it));
+    }
+
+done:
+    return;
+}
+
+void box_spatial_stats(
+    const ecs_world_t *world,
+    box_spatial_stats_t *stats)
+{
+    const box_spatial_t *index = box_spatial_of(world);
+    ecs_os_memset_t(stats, 0, box_spatial_stats_t);
+    if (!index) {
+        goto done;
+    }
+
+    *stats = index->stats;
+    stats->scenes = index->root->count ? 1 : 0;
+    stats->entities = index->root->count;
+    ecs_map_iter_t it = ecs_map_iter(&index->scenes);
+    while (ecs_map_next(&it)) {
+        const box_spatial_scene_t *s = ecs_map_ptr(&it);
+        stats->scenes += s->count ? 1 : 0;
+        stats->entities += s->count;
+    }
+
+done:
+    return;
+}
+
+/** Register an observer of the index.
+ *
+ * @param world The world
+ * @param index The index
+ * @param name Name of the observer
+ * @param desc Terms and events of the observer
+ * @param callback What the observer does
+ */
+static void box_spatial_observer(
+    ecs_world_t *world,
+    box_spatial_t *index,
+    const char *name,
+    ecs_observer_desc_t desc,
+    ecs_iter_action_t callback)
+{
+    desc.entity = ecs_entity(world, { .name = name });
+    desc.callback = callback;
+    desc.ctx = index;
+    desc.ctx_free = box_spatial_release;
+    index->refs ++;
+    ecs_observer_init(world, &desc);
+}
+
+/** Register the observers of the components a static transform is computed from.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_transform_observers(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    ecs_entity_t components[3] = { ecs_id(Position), ecs_id(Rotation), ecs_id(Scale) };
+    const char *names[3] = { "SpatialOnPosition", "SpatialOnRotation", "SpatialOnScale" };
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        box_spatial_observer(world, index, names[i], (ecs_observer_desc_t){
+            .query.terms = {
+                { .id = components[i] },
+                { .id = DynamicTransform, .oper = EcsNot },
+                { .id = ManualTransform, .oper = EcsNot }
+            },
+            .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnMove);
+    }
+
+    box_spatial_observer(world, index, "SpatialOnWorldTransform", (ecs_observer_desc_t){
+        .query.terms = {
+            { .id = ecs_id(WorldTransform) },
+            { .id = DynamicTransform, .oper = EcsNot }
+        },
+        .events = { EcsOnSet } }, BoxSpatialOnMove);
+}
+
+/** Register the observers that collect changed entities and changed subtrees.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_observers(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    box_spatial_observer(world, index, "SpatialOnShape", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(ShapeMesh) }},
+        .events = { EcsOnSet } }, BoxSpatialOnChange);
+    box_spatial_observer(world, index, "SpatialOnShapeRemove", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(ShapeMesh) }},
+        .events = { EcsOnRemove } }, BoxSpatialOnRemove);
+    box_spatial_observer(world, index, "SpatialOnProxyRemove", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(SpatialProxy) }},
+        .events = { EcsOnRemove } }, BoxSpatialOnRemove);
+    box_spatial_observer(world, index, "SpatialOnDynamic", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
+    box_spatial_observer(world, index, "SpatialOnScene", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Scene) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnMove);
+    box_spatial_observer(world, index, "SpatialOnChildOf", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnMove);
+    box_spatial_observer(world, index, "SpatialOnParent", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(EcsParent) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnMove);
+    box_spatial_transform_observers(world, index);
+}
+
+void BoxSpatialImport(
+    ecs_world_t *world)
+{
+    ECS_MODULE(world, BoxSpatial);
+    ECS_IMPORT(world, BoxRender);
+
+    box_spatial_t *index = box_spatial_new();
+    ECS_COMPONENT_DEFINE(world, SpatialProxy);
+    ecs_set_hooks(world, SpatialProxy, {
+        .ctor = box_spatial_proxy_ctor,
+        .copy = box_spatial_proxy_copy,
+        .move = box_spatial_proxy_move
+    });
+    ecs_add_pair(world, ecs_id(ShapeMesh), EcsWith, ecs_id(SpatialProxy));
+    ECS_COMPONENT_DEFINE(world, SpatialIndex);
+    ecs_set_hooks(world, SpatialIndex, { .ctor = flecs_default_ctor });
+    ecs_singleton_set(world, SpatialIndex, { .index = index });
+
+    index->refs = 1;
+    index->dynamic = ecs_query(world, {
+        .terms = {
+            { .id = ecs_id(SpatialProxy), .inout = EcsIn },
+            { .id = ecs_id(ShapeMesh), .inout = EcsIn },
+            { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
+            { .id = DynamicTransform, .inout = EcsInOutNone }
+        },
+        .cache_kind = EcsQueryCacheAuto
+    });
+    box_spatial_observers(world, index);
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "SpatialUpdate" }),
+        .phase = EcsOnStore,
+        .run = BoxSpatialUpdate,
+        .ctx = index,
+        .ctx_free = box_spatial_release
+    });
+}
