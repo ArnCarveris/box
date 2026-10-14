@@ -54,7 +54,8 @@
                     "resource_absolute_path",
                     "resource_symlink_outside",
                     "resource_other_session",
-                    "resource_no_session"
+                    "resource_no_session",
+                    "import_without_app"
                 ]
             },
             {

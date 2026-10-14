@@ -813,3 +813,15 @@ void Terminal_resource_no_session(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Terminal_import_without_app(void) {
+    // command/import_app
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxCommand);
+
+    ecs_entity_t s = box_terminal_new(world);
+    test_assert(s != 0);
+    test_assert(ecs_has(world, s, Terminal));
+
+    ecs_fini(world);
+}

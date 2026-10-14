@@ -136,6 +136,7 @@ void BoxCommandImport(
     ecs_world_t *world)
 {
     ECS_MODULE(world, BoxCommand);
+    ECS_IMPORT(world, BoxApp);
 
     ECS_META_COMPONENT(world, Terminal);
     ECS_META_COMPONENT(world, TerminalStatus);
