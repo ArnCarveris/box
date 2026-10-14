@@ -252,6 +252,52 @@
                     "patch_http_post",
                     "commands_are_script_functions"
                 ]
+            },
+            {
+                "id": "Input",
+                "testcases": [
+                    "key_press",
+                    "key_press_dur",
+                    "key_press_unknown",
+                    "key_press_negative_dur",
+                    "key_down_up",
+                    "key_type",
+                    "key_type_dur",
+                    "mouse_move",
+                    "mouse_move_normalized",
+                    "mouse_move_invalid",
+                    "mouse_sweep",
+                    "mouse_sweep_default_steps",
+                    "mouse_release",
+                    "mouse_button",
+                    "mouse_button_unknown",
+                    "mouse_click",
+                    "mouse_click_no_pos",
+                    "mouse_click_dur",
+                    "mouse_drag",
+                    "mouse_drag_invalid",
+                    "mouse_scroll",
+                    "input_reset",
+                    "input_focus",
+                    "input_focus_invalid",
+                    "input_wait_empty",
+                    "input_wait_pending",
+                    "input_wait_sweep",
+                    "action_press",
+                    "action_press_dur",
+                    "action_down_up",
+                    "action_by_name",
+                    "action_relative_to_cwd",
+                    "action_ambiguous",
+                    "action_unknown",
+                    "action_prefab_ignored",
+                    "action_drag",
+                    "action_list",
+                    "action_list_empty",
+                    "not_imported",
+                    "http_exec",
+                    "commands_are_script_functions"
+                ]
             }
         ]
     }

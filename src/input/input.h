@@ -61,6 +61,14 @@ void box_input_actions_import(
 InputDevice* box_input_device(
     ecs_world_t *world);
 
+/** Count the frames until the synthetic queue is drained.
+ *
+ * @param world The world
+ * @return Frames the queue needs to apply every event, 0 when it is empty
+ */
+int32_t box_input_pending_frames(
+    ecs_world_t *world);
+
 /** Get the key value a keyboard event carries for a key, as a browser reports it.
  *
  * @param key The key
