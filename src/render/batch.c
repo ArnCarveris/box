@@ -67,6 +67,8 @@ static uint64_t box_draws_hash(
         h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
     }
 
+    h ^= (uint64_t)key->shadow * 0x94D049BB133111EBull;
+
     return h ^ (h >> 29);
 }
 
@@ -82,7 +84,8 @@ static bool box_draws_key_eq(
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
         a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
-        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures));
+        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures)) &&
+        a->shadow == b->shadow;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -533,6 +536,7 @@ static uint32_t box_draws_send_batch(
     out->pipeline = b->key.pipeline;
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
+    out->shadow = b->key.shadow;
     out->mesh = b->key.mesh;
     box_draws_batch_textures(d, b, out);
     out->instances = b->buffer;
@@ -634,6 +638,7 @@ static void box_draws_send_blended(
             out->pipeline = b->key.pipeline;
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
+            out->shadow = b->key.shadow;
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             out->instances = b->buffer;

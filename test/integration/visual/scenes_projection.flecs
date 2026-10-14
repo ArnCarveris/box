@@ -1,0 +1,79 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.projection
+
+world_camera {
+  Position: {0, 4, 9}
+  Rotation: {-0.4, 0, 0}
+  Camera: {fov: 50}
+}
+
+world_view {
+  View: {camera: world_camera, clear: {enabled: true, color: {30, 40, 70, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {120, 128, 110}
+}
+
+hero {
+  Position: {-2, 1, 0}
+  Capsule: {segments: 24, smooth: true, length: 1, radius: 0.5}
+  Rgb: {220, 90, 60}
+}
+
+crate {
+  Position: {2.5, 0.5, -1.5}
+  Rotation: {0, 0.5, 0}
+  Box: {1, 1, 1}
+  Rgb: {200, 170, 90}
+}
+
+ghost {
+  Position: {0, 1, 14}
+  Box: {1, 1, 1}
+  Rgb: {255, 255, 255}
+}
+
+ui {
+  Scene: {}
+
+  camera {
+    Position: {0, 0, 100}
+    Camera: {ortho: true, ortho_scale: 1}
+  }
+
+  hero_plate {
+    ProjectedAnchor: {target: hero, view: world_view, offset: {0, 1.3, 0}}
+    Quad: {96, 20}
+    Rgb: {20, 20, 24}
+
+    bar {
+      Position: {0, 0, 1}
+      Quad: {88, 12}
+      Rgb: {80, 220, 90}
+    }
+  }
+
+  crate_marker {
+    ProjectedAnchor: {target: crate, view: world_view, offset: {0, 1, 0}}
+    Rotation: {0, 0, 0.7854}
+    Quad: {16, 16}
+    Rgb: {250, 210, 40}
+  }
+
+  ghost_plate {
+    ProjectedAnchor: {target: ghost, view: world_view, offset: {0, 1, 0}}
+    Quad: {96, 20}
+    Rgb: {255, 0, 255}
+  }
+}
+
+ui_view {
+  View: {camera: ui.camera, lighting: {enabled: false}}
+}

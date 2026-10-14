@@ -272,18 +272,20 @@ WGPUBindGroup box_gpu_light_group(
 {
     uint64_t size = 0;
     WGPUBuffer lights = box_gpu_light_binding(gpu, v, &size);
-    WGPUBindGroupEntry entries[3] = {
+    WGPUBindGroupEntry entries[5] = {
         { .binding = 0, .buffer = gpu->view_buffer, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = lights, .size = size },
         {
             .binding = 2,
             .buffer = box_gpu_cluster_buffer(gpu, slot),
             .size = BOX_GPU_CLUSTER_SIZE
-        }
+        },
+        { .binding = 3, .textureView = box_gpu_shadow_binding(gpu, v) },
+        { .binding = 4, .sampler = gpu->shadow_sampler }
     };
     WGPUBindGroupDescriptor desc = {
         .layout = gpu->view_layout,
-        .entryCount = 3,
+        .entryCount = 5,
         .entries = entries
     };
 

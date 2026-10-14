@@ -1,0 +1,41 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 6, 10}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {
+    camera: camera
+    clear: {enabled: true, color: {150, 180, 220, 255}}
+    shadows: {enabled: true, cascades: 2, max_distance: 40, fade: 0.5}
+  }
+}
+
+sun {
+  Rotation: {-0.7, 2.6, 0}
+  DirectionalLight: {intensity: 1.5}
+}
+
+ground {
+  Position: {0, -0.1, -40}
+  Box: {60, 0.2, 110}
+  Rgb: {190, 190, 180}
+}
+
+for z in 0..12 {
+  for x in 0..5 {
+    {
+      Position: {x * 4 - 8, 1, 4 - z * 6}
+      Box: {0.8, 2, 0.8}
+      Rgb: {200, 200, 200}
+    }
+  }
+}

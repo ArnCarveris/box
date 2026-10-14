@@ -53,8 +53,8 @@ ECS_STRUCT(AmbientLight, {
 
 /** Register the box.light module.
  *
- * The module gives View a constructor that enables lighting, so a view is lit unless it
- * sets lighting.enabled to false.
+ * The first directional light of a scene casts the shadows of the views that enable them;
+ * NoShadow shapes and blended shapes cast none.
  *
  * @param world The world
  */
