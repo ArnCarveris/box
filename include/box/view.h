@@ -76,6 +76,9 @@ ECS_STRUCT(Scene, {
 
 /** Register the box.view module.
  *
+ * View gets a constructor that enables lighting and sets the documented ShadowSettings
+ * defaults, with shadows disabled.
+ *
  * @param world The world
  */
 void BoxViewImport(

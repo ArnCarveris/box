@@ -1,0 +1,57 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 5, 9}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {40, 44, 52, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {-0.8, 2.4, 0}
+  DirectionalLight: {intensity: 1.5}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {180, 180, 185}
+}
+
+caster {
+  Position: {-3, 1, 0}
+  Box: {1, 2, 1}
+  Rgb: {220, 90, 70}
+}
+
+ghost {
+  Position: {0, 1, 0}
+  Box: {1, 2, 1}
+  Rgb: {90, 160, 220}
+  NoShadow
+}
+
+group {
+  Position: {3, 0, 0}
+  NoShadow
+
+  pillar {
+    Position: {0, 1, 0}
+    Box: {1, 2, 1}
+    Rgb: {120, 200, 120}
+  }
+
+  ball {
+    Position: {0, 2.5, 0}
+    Sphere: {segments: 24, smooth: true, radius: 0.5}
+    Rgb: {230, 210, 90}
+  }
+}
