@@ -77,6 +77,8 @@ box_spatial_t* box_spatial_new(void)
     ecs_vec_init_t(NULL, &index->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->rescoped, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &index->transformed, box_spatial_transformed_t, 0);
+    ecs_vec_init_t(NULL, &index->late, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->walk, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &index->leaves, box_bvh_leaf_t, 0);
     ecs_vec_init_t(NULL, &index->nodes, int32_t, 0);
@@ -98,6 +100,8 @@ void box_spatial_free(
     ecs_vec_fini_t(NULL, &index->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->rescoped, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &index->transformed, box_spatial_transformed_t);
+    ecs_vec_fini_t(NULL, &index->late, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->walk, ecs_entity_t);
     ecs_vec_fini_t(NULL, &index->leaves, box_bvh_leaf_t);
     ecs_vec_fini_t(NULL, &index->nodes, int32_t);

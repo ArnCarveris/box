@@ -149,6 +149,26 @@ static void BoxSpatialOnChange(
     }
 }
 
+/** Remember the entities of an observer event with the static transform version they have
+ * now, to find the ones whose transform is not computed yet when the index is updated.
+ *
+ * @param it The iterator of the observer
+ */
+static void box_spatial_transformed(
+    ecs_iter_t *it)
+{
+    box_spatial_t *index = it->ctx;
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        const WorldTransformVersion *v = ecs_get(
+            it->world, it->entities[i], WorldTransformVersion);
+        *ecs_vec_append_t(NULL, &index->transformed, box_spatial_transformed_t) =
+            (box_spatial_transformed_t){
+                .entity = it->entities[i], .version = v ? v->version : 0
+            };
+    }
+}
+
 /** Remember the entities of an observer event as roots of changed subtrees.
  *
  * @param it The iterator of the observer
@@ -162,6 +182,8 @@ static void BoxSpatialOnMove(
         for (i = 0; i < it->count; i ++) {
             *ecs_vec_append_t(NULL, &index->moved, ecs_entity_t) = it->entities[i];
         }
+
+        box_spatial_transformed(it);
     }
 }
 
@@ -246,6 +268,8 @@ static void BoxSpatialOnRescope(
         for (i = 0; i < it->count; i ++) {
             *ecs_vec_append_t(NULL, &index->rescoped, ecs_entity_t) = it->entities[i];
         }
+
+        box_spatial_transformed(it);
     }
 }
 
@@ -490,6 +514,42 @@ box_spatial_t* box_spatial_of(
     return index;
 }
 
+/** Walk the roots again whose static transform was not computed yet at the last update, and
+ * keep the roots whose static transform changed after it was computed this frame.
+ *
+ * A static transform is computed in EcsPreStore and written without an event, so a change made
+ * after it is only computed in the next frame, and its subtree is placed again then.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_late(
+    ecs_world_t *world,
+    box_spatial_t *index)
+{
+    int32_t i, count = ecs_vec_count(&index->transformed);
+    box_spatial_transformed_t *changes = ecs_vec_first(&index->transformed);
+    for (i = 0; i < ecs_vec_count(&index->late); i ++) {
+        *ecs_vec_append_t(NULL, &index->moved, ecs_entity_t) =
+            *ecs_vec_get_t(&index->late, ecs_entity_t, i);
+    }
+
+    ecs_vec_clear(&index->late);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = changes[i].entity;
+        ecs_table_t *table = ecs_is_alive(world, e) ? ecs_get_table(world, e) : NULL;
+        const WorldTransformVersion *v = table ? ecs_get(world, e, WorldTransformVersion) : NULL;
+        bool pending = v && v->version == changes[i].version &&
+            !ecs_table_has_id(world, table, DynamicTransform) &&
+            !ecs_table_has_id(world, table, ManualTransform);
+        if (pending) {
+            *ecs_vec_append_t(NULL, &index->late, ecs_entity_t) = e;
+        }
+    }
+
+    ecs_vec_clear(&index->transformed);
+}
+
 /** Compute the bounds of the changed entities, commit the new static ones and mark the
  * leaves stale.
  *
@@ -504,6 +564,7 @@ static void box_spatial_process(
     int32_t i;
     index->stats.updated = 0;
     index->stats.moved = 0;
+    box_spatial_late(world, index);
     box_spatial_walk(world, index, &index->rescoped, true);
     box_spatial_walk(world, index, &index->moved, false);
     for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
