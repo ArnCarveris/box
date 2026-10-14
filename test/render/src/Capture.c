@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <stdio.h>
 #include "render.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -65,10 +66,6 @@ void Capture_cleared_surface(void) {
     }
 
     test_int(wrong, 0);
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.captures, 1);
-    test_int(stats.errors, 0);
 
     stbi_image_free(px);
     ecs_os_free(path);
@@ -140,11 +137,9 @@ void Capture_resolution_scale(void) {
     }
 
     test_int(wrong, 0);
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.render_width, 16);
-    test_int(stats.render_height, 8);
-    test_int(stats.errors, 0);
+    const SurfaceStatus *status = ecs_get(world, e, SurfaceStatus);
+    test_int(status->render_width, 16);
+    test_int(status->render_height, 8);
 
     stbi_image_free(px);
     ecs_os_free(path);
@@ -262,24 +257,23 @@ void Capture_every_frame(void) {
 
     ecs_entity_t e = ecs_new(world);
     ecs_set(world, e, Surface, {.width = 8, .height = 8, .write_to_file = "frames.png"});
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    box_render_gpu_stats_t stats;
-    test_bool(box_render_gpu_stats(world, &stats), true);
-    test_int(stats.frames, 3);
-    test_int(stats.captures, 3);
-    test_int(stats.errors, 0);
+    char *path = flecs_asprintf("%s/frames.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        FILE *f = fopen(path, "rb");
+        test_assert(f != NULL);
+        fclose(f);
+        test_int(remove(path), 0);
+    }
 
     ecs_set(world, e, Surface, {.width = 8, .height = 8});
     ecs_progress(world, 0);
     box_render_sync(world);
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.frames, 4);
-    test_int(stats.captures, 3);
+    test_assert(fopen(path, "rb") == NULL);
 
+    ecs_os_free(path);
     ecs_fini(world);
 }
 

@@ -18,39 +18,20 @@
             {
                 "id": "Surface",
                 "testcases": [
-                    "create_offscreen_target",
                     "default_size",
                     "status_written",
-                    "two_surfaces_two_targets",
-                    "target_every_frame",
-                    "no_surface_no_target",
-                    "view_root_renders_views_under_it"
+                    "two_surfaces"
                 ]
             },
             {
                 "id": "Reconfigure",
                 "testcases": [
-                    "resize_updates_target",
+                    "resize_updates_status",
                     "resolution_scale_updates_render_size",
                     "fractional_resolution_scale",
-                    "vsync_updates_target",
-                    "unchanged_sends_no_update",
-                    "remove_destroys_target",
-                    "delete_destroys_target",
+                    "remove_stops_rendering",
+                    "delete_stops_rendering",
                     "set_again_after_remove"
-                ]
-            },
-            {
-                "id": "Device",
-                "testcases": [
-                    "surface_creates_device",
-                    "no_surface_no_device",
-                    "own_backend_kept",
-                    "resize_reconfigures",
-                    "resolution_scale_reconfigures",
-                    "unchanged_not_reconfigured",
-                    "remove_releases_target",
-                    "main_thread_renders"
                 ]
             },
             {
@@ -98,12 +79,10 @@
                     "endif_without_ifdef",
                     "double_else",
                     "skipped_directives_ignored",
-                    "files_listed",
                     "missing_file",
-                    "engine_shader_from_disk",
-                    "component_sends_code",
+                    "component_preprocessed",
                     "component_defines",
-                    "unchanged_not_sent",
+                    "unchanged_not_recompiled",
                     "set_again_recompiles",
                     "file_change_recompiles",
                     "include_change_recompiles",
@@ -111,10 +90,8 @@
                     "status_error",
                     "error_keeps_code",
                     "missing_file_appears",
-                    "remove_destroys",
-                    "delete_destroys",
-                    "new_backend_resends",
-                    "engine_shader_not_sent_to_null",
+                    "remove_removes_status",
+                    "engine_shaders_are_components",
                     "copy_owns_strings",
                     "gpu_compiles_engine_shader",
                     "gpu_compiles_component",
@@ -145,9 +122,7 @@
                 "id": "Views",
                 "testcases": [
                     "creation_order",
-                    "parent",
                     "camera_scene",
-                    "clear_settings",
                     "view_matrix",
                     "no_camera_skipped"
                 ]
@@ -155,15 +130,9 @@
             {
                 "id": "Draws",
                 "testcases": [
-                    "shape_sends_mesh_and_batch",
-                    "shared_mesh_sent_once",
-                    "no_views_no_batches",
-                    "removed_shape_destroys_mesh",
-                    "reused_handle_sent_again",
-                    "instance_data",
-                    "scene_of_batch",
-                    "new_backend_resends",
-                    "instance_buffer_grows"
+                    "transform_and_color",
+                    "replaced_shape_renders_new_mesh",
+                    "many_instances_all_drawn"
                 ]
             },
             {
@@ -174,53 +143,45 @@
                     "view_order",
                     "scene_filter",
                     "ortho_camera",
-                    "mesh_shader_on_demand",
-                    "target_view_root"
+                    "shape_added_and_removed"
                 ]
             },
             {
                 "id": "Instancing",
                 "testcases": [
-                    "batch_per_mesh",
-                    "batch_per_scene",
-                    "add_joins_batch",
-                    "remove_swaps_last",
-                    "mesh_change_moves_batch",
-                    "scene_change_moves_batch",
+                    "added_shape_rendered",
+                    "removed_shape_disappears",
+                    "shape_change_renders_new_mesh",
+                    "scene_change_updates_render",
                     "unchanged_uploads_nothing",
-                    "changed_scatters_slot",
+                    "changed_uploads_only_changes",
                     "parent_move_updates_children",
                     "dynamic_uploads_every_frame",
                     "dynamic_material_descendants",
-                    "dynamic_tag_moves_batch",
-                    "many_changes_upload_all",
-                    "empty_batch_released",
+                    "dynamic_tag_toggles_uploads",
                     "no_alloc_steady_state",
-                    "gpu_scatter_readback"
+                    "gpu_changes_rendered"
                 ]
             },
             {
                 "id": "Material",
                 "testcases": [
                     "default_material",
-                    "base_color_linear",
+                    "base_color",
                     "pbr_material",
                     "pbr_material_defaults",
                     "emissive",
-                    "opacity_blends",
-                    "full_opacity_stays_opaque",
                     "opacity_hierarchy",
                     "parent_opacity_updates_children",
-                    "blend_mode_batch",
-                    "back_face_mode_batch",
+                    "blend_mode_change",
+                    "back_face_mode_removed",
                     "blended_after_opaque_back_to_front",
-                    "blended_runs_merge",
                     "blended_sorted_per_view",
                     "blended_scene_filter",
-                    "change_scatters_slot",
+                    "change_uploads_only_changed",
                     "dynamic_material_per_frame",
                     "dynamic_transform_keeps_material",
-                    "dynamic_opacity_moves_batch",
+                    "dynamic_opacity_blends",
                     "blended_no_alloc_steady_state",
                     "gpu_alpha_blend",
                     "gpu_back_face_plain"

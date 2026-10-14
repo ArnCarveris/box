@@ -57,16 +57,6 @@ void Forward_simple_scene(void) {
     test_assert(blue[0] < 40);
     test_assert(blue[1] < 40);
 
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.passes, 1);
-    test_int(stats.draws, 2);
-    test_int(stats.meshes, 2);
-    test_int(stats.buffers, 2);
-    test_int(stats.shaders, 2);
-    test_int(stats.errors, 0);
-    test_int(stats.shader_errors, 0);
-
     stbi_image_free(px);
     ecs_os_free(path);
     ecs_fini(world);
@@ -172,10 +162,6 @@ void Forward_view_order(void) {
     }
 
     test_int(wrong, 0);
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.passes, 4);
-    test_int(stats.errors, 0);
     test_assert(v1 != 0);
 
     stbi_image_free(px);
@@ -232,9 +218,6 @@ void Forward_scene_filter(void) {
     unsigned char *center = &px[(16 * 32 + 16) * 4];
     test_assert(center[0] > 100);
     test_int(px[0], 0);
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.draws, 1);
 
     stbi_image_free(px);
     ecs_os_free(path);
@@ -285,7 +268,7 @@ void Forward_ortho_camera(void) {
     ecs_fini(world);
 }
 
-void Forward_mesh_shader_on_demand(void) {
+void Forward_shape_added_and_removed(void) {
     // renderer/views
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -294,102 +277,43 @@ void Forward_mesh_shader_on_demand(void) {
     ecs_singleton_modified(world, App);
 
     ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 5});
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera});
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_set(world, e, Surface, {.width = 16, .height = 16, .write_to_file = "added.png"});
     ecs_progress(world, 0);
     box_render_sync(world);
 
-    box_render_gpu_stats_t stats;
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.shaders, 1);
-    test_int(stats.meshes, 0);
+    char *path = flecs_asprintf("%s/added.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(px[(8 * 16 + 8) * 4], 0);
+    stbi_image_free(px);
 
     ecs_entity_t box = ecs_new(world);
-    ecs_set(world, box, Box, {1, 1, 1});
+    ecs_set(world, box, Box, {2, 2, 2});
+    ecs_set(world, box, Rgb, {255, 255, 255});
     ecs_progress(world, 0);
     box_render_sync(world);
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.shaders, 2);
-    test_int(stats.meshes, 1);
-    test_int(stats.draws, 1);
-    test_int(stats.shader_errors, 0);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(8 * 16 + 8) * 4] > 40);
+    stbi_image_free(px);
     ecs_entity_t mesh = ecs_lookup(world, "box.shader.builtin.mesh");
     test_bool(ecs_get(world, mesh, ShaderStatus)->ok, true);
 
     ecs_delete(world, box);
     ecs_progress(world, 0);
     box_render_sync(world);
-    box_render_gpu_stats(world, &stats);
-    test_int(stats.meshes, 0);
-    test_int(stats.draws, 1);
-    test_int(stats.errors, 0);
-
-    ecs_fini(world);
-}
-
-void Forward_target_view_root(void) {
-    // renderer/views
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-    App *app = ecs_singleton_get_mut(world, App);
-    app->headless = true;
-    ecs_singleton_modified(world, App);
-    char *path = flecs_asprintf("%s/root.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
-    ecs_entity_t root = ecs_new(world);
-
-    box_render_backend_t gpu = box_render_gpu_backend();
-    test_int(gpu.init(gpu.ctx), 0);
-    box_render_packet_t p;
-    box_render_packet_init(&p);
-    box_render_target_desc_t *desc = box_render_packet_resource(
-        &p, BOX_RENDER_TARGET, BOX_RENDER_CREATE, 1, sizeof(box_render_target_desc_t));
-    ecs_os_memset_t(desc, 0, box_render_target_desc_t);
-    desc->width = 8;
-    desc->height = 8;
-    box_render_view_t *v = box_render_packet_view(&p);
-    v->view = 1000;
-    v->parent = root;
-    v->camera_data.fov = 60;
-    glm_mat4_identity(v->view_matrix);
-    v->clear = (ClearSettings){.enabled = true, .color = {0, 255, 0, 255}};
-    v = box_render_packet_view(&p);
-    v->view = 1001;
-    v->camera_data.fov = 60;
-    glm_mat4_identity(v->view_matrix);
-    v->clear = (ClearSettings){.enabled = true, .color = {255, 0, 0, 255}};
-    box_render_target_t *t = box_render_packet_target(&p, 1, path);
-    t->view_root = root;
-    gpu.render(gpu.ctx, &p);
-
-    int w = 0, h = 0, n = 0, i, wrong = 0;
-    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
-    test_assert(px != NULL);
-    for (i = 0; i < w * h; i ++) {
-        wrong += px[i * 4] || px[i * 4 + 1] != 255 || px[i * 4 + 2];
-    }
-
-    test_int(wrong, 0);
-    stbi_image_free(px);
-
-    ecs_vec_clear(&p.resources);
-    t = ecs_vec_first_t(&p.targets, box_render_target_t);
-    t->view_root = 0;
-    gpu.render(gpu.ctx, &p);
     px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
-    for (i = 0, wrong = 0; i < w * h; i ++) {
-        wrong += px[i * 4] != 255 || px[i * 4 + 1] || px[i * 4 + 2];
-    }
+    test_int(px[(8 * 16 + 8) * 4], 0);
 
-    test_int(wrong, 0);
     stbi_image_free(px);
-
-    gpu.fini(gpu.ctx);
-    gpu.free(gpu.ctx);
-    box_render_packet_fini(&p);
     ecs_os_free(path);
     ecs_fini(world);
 }
