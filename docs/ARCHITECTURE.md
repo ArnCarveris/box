@@ -146,6 +146,24 @@ renaming it over. `box_render_gpu_stats` returns the counters of the backend for
 Colors are display encoded `rgba`; the targets are sRGB, so a clear color comes back
 unchanged in a capture.
 
+A one-off capture (`box_render_capture`, `src/render/captures.c`) renders a camera entity, or
+explicit camera settings, transform and scene, into a PNG without a surface. The request is
+queued on the main thread; `RenderExtractCaptures` turns it into an offscreen target created
+by the packet of the frame, a view assigned to that target (`box_render_view_t.target`) and a
+target entry with the path, and destroys the target in the next packet. A target marked
+`exclusive` renders only its assigned views and other targets skip assigned views, so a
+capture never shows up on a surface. The PNG is written on the render thread when that
+packet renders; `box_render_sync` waits for it.
+
+The `capture` and `render` commands of `box.command` (`src/command/cmd_render.c`) use it and
+reply at once with the image name in the session `resources` folder and a `(pending)` marker,
+because a reply cannot wait for a frame. `capture` renders the camera of the first view of the
+first surface, or each named camera, at the surface size. `render` puts the subject in a
+private `Scene` under the session: a prefab is instantiated, a template added, an entity
+copied with its reflected components and children. In `EcsOnStore` of the same frame the
+camera is fitted to the world bounds of the subject meshes, and the scene is deleted the
+next frame.
+
 ## Cameras, views and the forward pass
 
 `box_camera_projection` builds the projection of a `Camera` for a surface size: reversed Z,
