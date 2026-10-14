@@ -95,6 +95,30 @@
                     "command_key",
                     "command_action"
                 ]
+            },
+            {
+                "id": "Collision",
+                "testcases": [
+                    "wall_stops",
+                    "slide_along_wall",
+                    "slide_along_rotated_wall",
+                    "land_on_box",
+                    "walk_off_box",
+                    "step_up",
+                    "step_too_high",
+                    "step_setting",
+                    "crouch_under_ceiling",
+                    "ceiling_blocks_standing",
+                    "jump_hits_ceiling",
+                    "round_shapes",
+                    "round_shapes_slide_around",
+                    "scene_scoping",
+                    "own_shape_ignored",
+                    "ground_below_plane",
+                    "camera_collide",
+                    "camera_radius",
+                    "script_settings"
+                ]
             }
         ]
     }

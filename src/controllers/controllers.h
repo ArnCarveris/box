@@ -75,24 +75,133 @@ typedef struct FirstPersonActionMap {
 
 extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 
-/** Move a controlled entity by its velocity over a frame.
+/** Shape a collider has in its own frame */
+typedef enum box_collider_kind_t {
+    BoxColliderBox,      /**< Box with the half extents, also the fallback of other meshes */
+    BoxColliderSphere,   /**< Ball with the radius half[0] */
+    BoxColliderCylinder, /**< Cylinder along the second axis, radius half[0], half height half[1] */
+    BoxColliderCapsule   /**< Capsule along the second axis, radius half[0], half height half[1] */
+} box_collider_kind_t;
+
+/** A shape of the scene as the narrow phase sees it: an oriented box, ball, cylinder or capsule */
+typedef struct box_collider_t {
+    ecs_entity_t entity;      /**< The entity of the shape */
+    box_collider_kind_t kind; /**< Shape in its own frame */
+    vec3 center;              /**< Center in world space */
+    vec3 axis[3];             /**< Unit axes of its frame in world space */
+    vec3 half;                /**< Half extents along the axes in world units */
+} box_collider_t;
+
+/** The capsule a controller moves as, from its feet up */
+typedef struct box_controller_body_t {
+    ecs_entity_t entity; /**< The controlled entity, its shapes and its children's are ignored */
+    ecs_entity_t scene;  /**< Scene whose shapes block the body, 0 for the default scene */
+    float radius;        /**< Radius of the capsule, 0 moves without collision */
+    float height;        /**< Height of the capsule, a ball when at most twice the radius */
+    float step;          /**< Height of the ledges the body steps onto, 0 for none */
+    float probe;         /**< Distance below the feet the ground is searched for, 0 for none */
+} box_controller_body_t;
+
+/** What a move of a body ran into */
+typedef struct box_controller_hit_t {
+    bool grounded; /**< The body ended on a surface flat enough to stand on */
+    bool blocked;  /**< A shape pushed the body back */
+} box_controller_hit_t;
+
+/** Resolve the collider of an indexed shape.
  *
- * This is where a controller meets the scene: collision slides the move along what it hits
- * and writes the velocity of a blocked direction. Without collision the move is unobstructed.
+ * Boxes are exact, Sphere and IcoSphere become balls, Cylinder a cylinder and Capsule a
+ * capsule while their scale keeps them round; every other mesh is its oriented bounding box.
  *
  * @param world The world
- * @param entity The controlled entity
- * @param p The position, written in place
+ * @param e The shape
+ * @param out The collider, written
+ * @return false when the entity has no mesh
+ */
+bool box_collider_resolve(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    box_collider_t *out);
+
+/** Find how far a capsule reaches into a collider.
+ *
+ * @param c The collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param normal Receives the direction that moves the capsule out
+ * @param depth Receives the distance the capsule must move along the normal
+ * @return true when the capsule overlaps the collider
+ */
+bool box_collider_push(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal,
+    float *depth);
+
+/** Intersect a ray with the oriented box of a collider, or the ball of a sphere.
+ *
+ * @param c The collider
+ * @param origin Origin of the ray
+ * @param dir Direction of the ray, need not be normalized
+ * @param max Longest distance along dir that counts
+ * @param t Receives the distance of the hit in lengths of dir
+ * @return true when the ray hits
+ */
+bool box_collider_ray(
+    const box_collider_t *c,
+    const vec3 origin,
+    const vec3 dir,
+    float max,
+    float *t);
+
+/** Move a body by its velocity over a frame, sliding along the shapes of its scene.
+ *
+ * Only the shapes the spatial index finds around the swept capsule are tested. A body that
+ * walks into a ledge up to its step height steps onto it, and a body with a probe sticks to
+ * ground below it. The velocity loses what pushes into what the body touched.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule, written in place
  * @param velocity Velocity in units per second, written when the move is blocked
  * @param dt Seconds the frame took
+ * @param hit Receives what the move ran into, may be NULL
  * @return Whether the position changed
  */
 bool box_controller_move(
     ecs_world_t *world,
-    ecs_entity_t entity,
-    Position *p,
+    const box_controller_body_t *body,
+    Position *feet,
     vec3 velocity,
-    float dt);
+    float dt,
+    box_controller_hit_t *hit);
+
+/** Test whether a body fits at a position without overlapping a shape of its scene.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @return true when the body overlaps no shape
+ */
+bool box_controller_fits(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet);
+
+/** Test whether a shape of the scene of a body lies anywhere below its feet.
+ *
+ * @param world The world
+ * @param body The body
+ * @param feet The bottom of the capsule
+ * @return true when a ray down from the lower cap hits a shape
+ */
+bool box_controller_ground_below(
+    ecs_world_t *world,
+    const box_controller_body_t *body,
+    const Position *feet);
 
 /** Enable the default camera actions while a controller uses them, else disable them.
  *

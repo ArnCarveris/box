@@ -23,8 +23,9 @@ extern "C" {
 
 /** Fly controller of a camera that writes the Position and Rotation of its entity.
  *
- * Forward, Back, Left and Right move in the XZ plane along the yaw, Up and Down move along Y
- * and Fast multiplies the speed. A member that is zero takes its default.
+ * Forward, Back, Left and Right move in the XZ plane along the yaw, Up and Down along Y and
+ * Fast multiplies the speed. With collide set the camera is a sphere that slides along the
+ * shapes of its scene. A member that is zero takes its default.
  *
  * While Look is held the cursor turns the camera: Rotation.y is the yaw, Rotation.x the pitch,
  * which stops short of straight up and down. The camera looks along -Z of its rotation, so a
@@ -38,13 +39,19 @@ ECS_STRUCT(CameraController, {
     bool invert_y;         /**< Moving the cursor down looks up */
     ecs_entity_t actions;  /**< Scope of the actions, box.controllers.camera when 0 */
     vec3 velocity;         /**< Velocity in units per second, written by the controller */
+    bool collide;          /**< Slide along the shapes of the scene instead of flying through */
+    float radius;          /**< Radius of the sphere that collides, 0.25 by default */
 });
 
 /** First person controller that walks its entity and writes its Position and Rotation.
  *
  * The Position is the eye, above the feet. WASD walk along the yaw, Look turns, Jump leaves the
- * ground, gravity pulls the feet onto the ground plane and Crouch lowers the eye and slows down.
+ * ground, gravity pulls the feet onto the ground and Crouch lowers the eye and slows down.
  * Fly toggles free flight that moves like a camera controller. A zero setting takes its default.
+ *
+ * The body is a capsule from the feet to just above the eye that slides along the shapes of
+ * its scene, stands on them, steps onto ledges and only stands up when there is room. The
+ * ground plane holds the feet only where no shape is below them.
  */
 ECS_STRUCT(FirstPersonController, {
     float speed;           /**< Walking units per second, 4 by default */
@@ -55,7 +62,9 @@ ECS_STRUCT(FirstPersonController, {
     float gravity;         /**< Downward acceleration in units per second squared, 18 by default */
     float eye;             /**< Height of the eye above the feet, 1.7 by default */
     float crouch_eye;      /**< Height of the eye above the feet while crouching, 0.9 by default */
-    float ground;          /**< Height of the ground plane, 0 by default */
+    float ground;          /**< Height of the ground plane where no shape is below, 0 by default */
+    float radius;          /**< Radius of the body, 0.3 by default */
+    float step;            /**< Height of the ledges the feet step onto, 0.3 by default */
     float sensitivity;     /**< Radians turned per point of cursor movement, 0.003 by default */
     float acceleration;    /**< How fast the walk or flight follows the input per second, 0 snaps */
     bool invert_y;         /**< Moving the cursor down looks up */
@@ -63,7 +72,7 @@ ECS_STRUCT(FirstPersonController, {
     vec3 velocity;         /**< Velocity in units per second, written by the controller */
     float height;          /**< Height of the eye above the feet, written by the controller */
     bool grounded;         /**< The feet stand on the ground, written by the controller */
-    bool crouched;         /**< Crouch is held while walking, written by the controller */
+    bool crouched;         /**< Crouch is held or there is no room to stand, written */
     bool flying;           /**< Free flight, toggled by the Fly action */
 });
 

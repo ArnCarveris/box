@@ -4,6 +4,7 @@
  */
 
 #include "controllers.h"
+#include "../render/render.h"
 #include <math.h>
 
 /** Pitch the camera stops at, short of looking straight up or down */
@@ -17,6 +18,9 @@
 
 /** Radians per point of cursor movement when the controller does not say */
 #define BOX_CAMERA_SENSITIVITY (0.003f)
+
+/** Radius of the colliding sphere when the controller does not say */
+#define BOX_CAMERA_RADIUS (0.25f)
 
 /** What the actions of one scope ask a camera for this frame */
 typedef struct box_camera_input_t {
@@ -141,6 +145,38 @@ static void box_camera_accelerate(
     }
 }
 
+/** Move a camera by its velocity, as a sphere around the eye when it collides.
+ *
+ * @param world The world
+ * @param e The camera
+ * @param cc The controller, its velocity is written when the move is blocked
+ * @param p The position, written in place
+ * @param dt Seconds the frame took
+ * @return Whether the position changed
+ */
+static bool box_camera_move(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    CameraController *cc,
+    Position *p,
+    float dt)
+{
+    float radius = cc->collide ? box_camera_value(cc->radius, BOX_CAMERA_RADIUS) : 0;
+    box_controller_body_t body = {
+        .entity = e,
+        .scene = cc->collide ? box_render_scene_of(world, e) : 0,
+        .radius = radius,
+        .height = radius * 2
+    };
+    Position feet = { p->x, p->y - radius, p->z };
+    bool result = box_controller_move(world, &body, &feet, cc->velocity, dt, NULL);
+    p->x = feet.x;
+    p->y = feet.y + radius;
+    p->z = feet.z;
+
+    return result;
+}
+
 void BoxCameraActionsActivate(
     ecs_iter_t *it)
 {
@@ -192,7 +228,7 @@ void BoxCameraControllerUpdate(
         }
 
         box_camera_accelerate(&cc[i], &in, r[i].y, dt);
-        if (box_controller_move(it->world, e, &p[i], cc[i].velocity, dt)) {
+        if (box_camera_move(it->world, e, &cc[i], &p[i], dt)) {
             ecs_modified(it->world, e, Position);
         }
     }
