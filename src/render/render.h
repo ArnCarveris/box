@@ -62,6 +62,24 @@ typedef struct box_render_view_t {
     ClearSettings clear;        /**< Clear settings of the view */
 } box_render_view_t;
 
+/** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
+typedef struct box_render_target_desc_t {
+    void *layer;            /**< CAMetalLayer of a window, NULL for an offscreen texture */
+    int32_t width;          /**< Width of the presented image in pixels */
+    int32_t height;         /**< Height of the presented image in pixels */
+    int32_t render_width;   /**< Width the views render at, after the resolution scale */
+    int32_t render_height;  /**< Height the views render at, after the resolution scale */
+    bool vsync;             /**< A window presents with vertical sync */
+} box_render_target_desc_t;
+
+/** A target the frame renders into and presents, optionally captured to a PNG file */
+typedef struct box_render_target_t {
+    uint32_t handle;        /**< Handle of the BOX_RENDER_TARGET resource */
+    float clear[4];         /**< Linear color the target is cleared to before the views */
+    uint32_t capture;       /**< Offset of the PNG path in the packet data */
+    uint32_t capture_size;  /**< Bytes of the path with its terminator, 0 when not captured */
+} box_render_target_t;
+
 /** Instanced draw of one mesh with one pipeline */
 typedef struct box_render_batch_t {
     int32_t view;               /**< Index of the view that draws it, -1 for every view */
@@ -75,8 +93,8 @@ typedef struct box_render_batch_t {
 /** Everything the renderer needs of one frame, filled on the main thread.
  *
  * The vectors keep their storage when the packet is reused, so a frame that needs no more
- * than an earlier one does not allocate. Resources apply first, then uploads, then the views
- * draw their batches.
+ * than an earlier one does not allocate. Resources apply first, then uploads, then every
+ * target is cleared, drawn by its views and presented.
  */
 typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
@@ -86,6 +104,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t views;        /**< box_render_view_t in render order */
     ecs_vec_t batches;      /**< box_render_batch_t */
+    ecs_vec_t targets;      /**< box_render_target_t in the order they render */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
 } box_render_packet_t;
 
@@ -118,8 +137,26 @@ typedef struct box_render_null_t {
     int64_t uploads;            /**< Uploads received in total */
     int64_t resources;          /**< Resource changes received in total */
     int64_t bytes;              /**< Upload bytes received in total */
+    int64_t targets;            /**< Targets received in total */
     box_render_packet_t last;   /**< Copy of the last packet */
 } box_render_null_t;
+
+/** Counters of the GPU backend, written on the render thread */
+typedef struct box_render_gpu_stats_t {
+    bool ready;                 /**< The device exists */
+    bool failed;                /**< Creating the device failed */
+    int32_t targets;            /**< Targets alive */
+    int32_t created;            /**< Targets created */
+    int32_t configured;         /**< Times a target was configured, creation included */
+    int32_t destroyed;          /**< Targets released */
+    int32_t frames;             /**< Target frames rendered */
+    int32_t captures;           /**< PNG files written */
+    int32_t errors;             /**< Device errors and failed captures */
+    int32_t width;              /**< Width of the last configured target */
+    int32_t height;             /**< Height of the last configured target */
+    int32_t render_width;       /**< Render width of the last configured target */
+    int32_t render_height;      /**< Render height of the last configured target */
+} box_render_gpu_stats_t;
 
 /** Packet ring between the main thread and the consumer of the packets */
 typedef struct box_render_ring_t box_render_ring_t;
@@ -144,6 +181,42 @@ void box_render_null_free(
  */
 box_render_backend_t box_render_null_backend(
     box_render_null_t *null);
+
+/** Create the backend that renders with webgpu, available when built with BOX_RENDER_WGPU.
+ *
+ * The device is created by init on the thread that renders and released by fini.
+ *
+ * @return The backend, which frees its state with its free callback
+ */
+box_render_backend_t box_render_gpu_backend(void);
+
+/** Read the counters of the GPU backend of a world.
+ *
+ * @param world The world
+ * @param stats The counters
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_stats(
+    ecs_world_t *world,
+    box_render_gpu_stats_t *stats);
+
+/** Get the backend of a world.
+ *
+ * @param world The world
+ * @return The backend, valid until the backend is replaced
+ */
+const box_render_backend_t* box_render_get_backend(
+    const ecs_world_t *world);
+
+/** Render with the GPU backend unless the world was given a backend of its own.
+ *
+ * The box.surface module calls this when a surface is set, so a world without surfaces never
+ * creates a device. Without BOX_RENDER_WGPU the null backend stays.
+ *
+ * @param world The world
+ */
+void box_render_use_gpu(
+    ecs_world_t *world);
 
 /** Initialize the vectors of a packet.
  *
@@ -201,6 +274,18 @@ box_render_view_t* box_render_packet_view(
  */
 box_render_batch_t* box_render_packet_batch(
     box_render_packet_t *p);
+
+/** Append a target to a packet.
+ *
+ * @param p The packet
+ * @param handle Handle of the target
+ * @param capture PNG file the frame of the target is written to, NULL for none
+ * @return The target, with a zero clear color
+ */
+box_render_target_t* box_render_packet_target(
+    box_render_packet_t *p,
+    uint32_t handle,
+    const char *capture);
 
 /** Append an upload to a packet.
  *
@@ -327,6 +412,22 @@ void box_render_ring_submit(
 void box_render_ring_set_backend(
     box_render_ring_t *ring,
     const box_render_backend_t *backend);
+
+/** Get the backend of a ring.
+ *
+ * @param ring The ring
+ * @return The backend
+ */
+const box_render_backend_t* box_render_ring_backend(
+    const box_render_ring_t *ring);
+
+/** Check whether a ring still has the null backend it was created with.
+ *
+ * @param ring The ring
+ * @return Whether no backend was set
+ */
+bool box_render_ring_is_default(
+    const box_render_ring_t *ring);
 
 /** Hold or release the packets of a ring.
  *

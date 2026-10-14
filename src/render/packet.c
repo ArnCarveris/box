@@ -14,6 +14,7 @@ void box_render_packet_init(
     ecs_vec_init_t(NULL, &p->uploads, box_render_upload_t, 0);
     ecs_vec_init_t(NULL, &p->views, box_render_view_t, 0);
     ecs_vec_init_t(NULL, &p->batches, box_render_batch_t, 0);
+    ecs_vec_init_t(NULL, &p->targets, box_render_target_t, 0);
     ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
 }
 
@@ -24,6 +25,7 @@ void box_render_packet_fini(
     ecs_vec_fini_t(NULL, &p->uploads, box_render_upload_t);
     ecs_vec_fini_t(NULL, &p->views, box_render_view_t);
     ecs_vec_fini_t(NULL, &p->batches, box_render_batch_t);
+    ecs_vec_fini_t(NULL, &p->targets, box_render_target_t);
     ecs_vec_fini_t(NULL, &p->data, uint8_t);
 }
 
@@ -37,6 +39,7 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->uploads);
     ecs_vec_clear(&p->views);
     ecs_vec_clear(&p->batches);
+    ecs_vec_clear(&p->targets);
     ecs_vec_clear(&p->data);
 }
 
@@ -69,6 +72,7 @@ void box_render_packet_copy(
     box_render_vec_copy(&dst->uploads, &src->uploads, ECS_SIZEOF(box_render_upload_t));
     box_render_vec_copy(&dst->views, &src->views, ECS_SIZEOF(box_render_view_t));
     box_render_vec_copy(&dst->batches, &src->batches, ECS_SIZEOF(box_render_batch_t));
+    box_render_vec_copy(&dst->targets, &src->targets, ECS_SIZEOF(box_render_target_t));
     box_render_vec_copy(&dst->data, &src->data, ECS_SIZEOF(uint8_t));
 }
 
@@ -129,6 +133,26 @@ void* box_render_packet_upload(
     upload->size = size;
 
     return box_render_packet_alloc(p, size, &upload->data);
+}
+
+box_render_target_t* box_render_packet_target(
+    box_render_packet_t *p,
+    uint32_t handle,
+    const char *capture)
+{
+    uint32_t size = capture ? (uint32_t)ecs_os_strlen(capture) + 1 : 0;
+    uint32_t offset = 0;
+    char *path = box_render_packet_alloc(p, size, &offset);
+    box_render_target_t *result = ecs_vec_append_t(NULL, &p->targets, box_render_target_t);
+    ecs_os_memset_t(result, 0, box_render_target_t);
+    result->handle = handle;
+    result->capture = offset;
+    result->capture_size = size;
+    if (path) {
+        ecs_os_memcpy(path, capture, (ecs_size_t)size);
+    }
+
+    return result;
 }
 
 void* box_render_packet_resource(
