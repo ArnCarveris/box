@@ -22,6 +22,7 @@
                     "offset",
                     "orthographic",
                     "surface_size",
+                    "surface_points",
                     "anchor_in_ui_scene",
                     "follows_target_same_frame",
                     "follows_camera",
