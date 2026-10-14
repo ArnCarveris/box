@@ -246,7 +246,7 @@ static void box_surface_open(
 
     impl->window_width = box_surface_points(s->width);
     impl->window_height = box_surface_points(s->height);
-    impl->window = box_window_new(impl->window_width, impl->window_height, "box");
+    impl->window = box_window_new(world, impl->window_width, impl->window_height, "box");
     if (!impl->window) {
         ecs_warn("cannot open a window, the surface renders offscreen");
     }
