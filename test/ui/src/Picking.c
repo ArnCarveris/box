@@ -1050,3 +1050,573 @@ void Picking_unhandled_goes_to_screen(void) {
 
     ecs_fini(world);
 }
+
+void Picking_capture_drag_leaves_element(void) {
+    // ui/pointer_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut presses: i32 = 0\n"
+        "  mut drags: i32 = 0\n"
+        "  mut releases: i32 = 0\n"
+        "  mut enters: i32 = 0\n"
+        "  mut leaves: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.press(this)\n"
+        "      presses = presses + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = dx + e.delta_x\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.release(this)\n"
+        "      releases = releases + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.enter(this)\n"
+        "      enters = enters + 1\n"
+        "      await on.leave(this)\n"
+        "      leaves = leaves + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slider {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {200, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  other {\n"
+        "    Position: {300, 0, 0}\n"
+        "    Rect: {40, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n"
+        "" }) != 0);
+    typedef struct { int32_t presses, drags, releases, enters, leaves; float dx; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t slider = ecs_lookup(world, "hud.slider");
+    ecs_entity_t other = ecs_lookup(world, "hud.other");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->captured, slider);
+    test_uint(status->pressed, slider);
+    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [600, 360] [960, 360] 6 6", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, slider, mut);
+    const Mut *o = ecs_get_id(world, other, mut);
+    status = ecs_singleton_get(world, PickStatus);
+    test_assert(m->drags >= 6);
+    test_flt(m->dx, 360);
+    test_int(m->leaves, 0);
+    test_int(m->releases, 0);
+    test_bool(ecs_has(world, slider, Pressed), true);
+    test_bool(ecs_has(world, slider, Hovered), true);
+    test_bool(ecs_has(world, other, Hovered), false);
+    test_uint(status->captured, slider);
+    test_uint(status->target, slider);
+    test_uint(status->hit, other);
+    test_flt(status->drag[0], 360);
+    test_flt(status->drag[1], 0);
+    test_int(o->enters, 0);
+    test_int(o->drags, 0);
+    test_int(o->presses, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, slider, mut);
+    test_int(m->releases, 1);
+
+    ecs_fini(world);
+}
+
+void Picking_capture_drag_across_second_view(void) {
+    // ui/pointer_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut presses: i32 = 0\n"
+        "  mut drags: i32 = 0\n"
+        "  mut releases: i32 = 0\n"
+        "  mut enters: i32 = 0\n"
+        "  mut leaves: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.press(this)\n"
+        "      presses = presses + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = dx + e.delta_x\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.release(this)\n"
+        "      releases = releases + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.enter(this)\n"
+        "      enters = enters + 1\n"
+        "      await on.leave(this)\n"
+        "      leaves = leaves + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slider {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {200, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  other {\n"
+        "    Position: {300, 0, 0}\n"
+        "    Rect: {40, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n"
+        "front {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  cover {\n"
+        "    Position: {200, 0, 0}\n"
+        "    Rect: {300, 200}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "front_view {\n"
+        "  View: {camera: front.camera}\n"
+        "}\n"
+        "" }) != 0);
+    typedef struct { int32_t presses, drags, releases, enters, leaves; float dx; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t slider = ecs_lookup(world, "hud.slider");
+    ecs_entity_t other = ecs_lookup(world, "hud.other");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    ecs_entity_t cover = ecs_lookup(world, "front.cover");
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
+    ecs_os_free(box_terminal_run(world, s, "mouse.sweep [600, 360] [800, 360] 4 4", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, slider, mut);
+    const Mut *c = ecs_get_id(world, cover, mut);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_flt(m->dx, 200);
+    test_int(m->leaves, 0);
+    test_uint(status->target, slider);
+    test_uint(status->view, ecs_lookup(world, "hud_view"));
+    test_uint(status->hit, cover);
+    test_uint(status->hit_view, ecs_lookup(world, "front_view"));
+    test_bool(ecs_has(world, cover, Hovered), false);
+    test_int(c->enters, 0);
+    test_int(c->drags, 0);
+    test_int(c->presses, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, slider, mut);
+    c = ecs_get_id(world, cover, mut);
+    test_int(m->releases, 1);
+    test_int(c->releases, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [801, 360]", NULL));
+    ecs_progress(world, 0);
+    status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->captured, 0);
+    test_uint(status->target, cover);
+    test_bool(ecs_has(world, cover, Hovered), true);
+
+    ecs_fini(world);
+}
+
+void Picking_capture_release_outside(void) {
+    // ui/pointer_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut presses: i32 = 0\n"
+        "  mut drags: i32 = 0\n"
+        "  mut releases: i32 = 0\n"
+        "  mut enters: i32 = 0\n"
+        "  mut leaves: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.press(this)\n"
+        "      presses = presses + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = dx + e.delta_x\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.release(this)\n"
+        "      releases = releases + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.enter(this)\n"
+        "      enters = enters + 1\n"
+        "      await on.leave(this)\n"
+        "      leaves = leaves + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slider {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {200, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  other {\n"
+        "    Position: {300, 0, 0}\n"
+        "    Rect: {40, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n"
+        "" }) != 0);
+    typedef struct { int32_t presses, drags, releases, enters, leaves; float dx; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t slider = ecs_lookup(world, "hud.slider");
+    ecs_entity_t other = ecs_lookup(world, "hud.other");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [2000, 1500]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const Mut *m = ecs_get_id(world, slider, mut);
+    test_assert(m->drags >= 1);
+    test_flt(m->dx, 1400);
+    test_bool(ecs_has(world, slider, Pressed), true);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+    m = ecs_get_id(world, slider, mut);
+    test_int(m->releases, 1);
+    test_bool(ecs_has(world, slider, Pressed), false);
+    test_uint(ecs_singleton_get(world, PickStatus)->pressed, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, 0);
+
+    ecs_fini(world);
+}
+
+void Picking_capture_cleared_after_release(void) {
+    // ui/pointer_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut presses: i32 = 0\n"
+        "  mut drags: i32 = 0\n"
+        "  mut releases: i32 = 0\n"
+        "  mut enters: i32 = 0\n"
+        "  mut leaves: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.press(this)\n"
+        "      presses = presses + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = dx + e.delta_x\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.release(this)\n"
+        "      releases = releases + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.enter(this)\n"
+        "      enters = enters + 1\n"
+        "      await on.leave(this)\n"
+        "      leaves = leaves + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slider {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {200, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  other {\n"
+        "    Position: {300, 0, 0}\n"
+        "    Rect: {40, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n"
+        "" }) != 0);
+    typedef struct { int32_t presses, drags, releases, enters, leaves; float dx; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t slider = ecs_lookup(world, "hud.slider");
+    ecs_entity_t other = ecs_lookup(world, "hud.other");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [940, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, 0);
+    test_int(((const Mut*)ecs_get_id(world, slider, mut))->releases, 1);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [942, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->target, other);
+    test_bool(ecs_has(world, other, Hovered), true);
+    test_bool(ecs_has(world, slider, Hovered), false);
+    test_int(((const Mut*)ecs_get_id(world, other, mut))->enters, 1);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [940, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, other);
+    test_int(((const Mut*)ecs_get_id(world, other, mut))->presses, 1);
+    test_int(((const Mut*)ecs_get_id(world, slider, mut))->presses, 1);
+    int32_t drags = ((const Mut*)ecs_get_id(world, slider, mut))->drags;
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, other);
+    test_int(((const Mut*)ecs_get_id(world, slider, mut))->drags, drags);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+
+    ecs_fini(world);
+}
+
+void Picking_capture_cleared_when_deleted(void) {
+    // ui/pointer_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    test_assert(ecs_script(world, { .code =
+        "using flecs.script\n"
+        "using box.transform\n"
+        "using box.geometry\n"
+        "using box.camera\n"
+        "using box.view\n"
+        "using box.picking\n"
+        "template Probe {\n"
+        "  mut presses: i32 = 0\n"
+        "  mut drags: i32 = 0\n"
+        "  mut releases: i32 = 0\n"
+        "  mut enters: i32 = 0\n"
+        "  mut leaves: i32 = 0\n"
+        "  mut dx: f32 = 0\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.press(this)\n"
+        "      presses = presses + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      const e = await on.drag(this)\n"
+        "      drags = drags + 1\n"
+        "      dx = dx + e.delta_x\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.release(this)\n"
+        "      releases = releases + 1\n"
+        "    }\n"
+        "  }\n"
+        "  async {\n"
+        "    while true {\n"
+        "      await on.enter(this)\n"
+        "      enters = enters + 1\n"
+        "      await on.leave(this)\n"
+        "      leaves = leaves + 1\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "hud {\n"
+        "  Scene: {}\n"
+        "  camera {\n"
+        "    Position: {0, 0, 100}\n"
+        "    Camera: {ortho: true, ortho_scale: 1}\n"
+        "  }\n"
+        "  slider {\n"
+        "    Position: {0, 0, 0}\n"
+        "    Rect: {200, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "  other {\n"
+        "    Position: {300, 0, 0}\n"
+        "    Rect: {40, 40}\n"
+        "    Interactive\n"
+        "    Probe: {}\n"
+        "  }\n"
+        "}\n"
+        "hud_view {\n"
+        "  View: {camera: hud.camera}\n"
+        "}\n"
+        "" }) != 0);
+    typedef struct { int32_t presses, drags, releases, enters, leaves; float dx; } Mut;
+    ecs_entity_t mut = ecs_lookup(world, "Probe.mut");
+    ecs_entity_t slider = ecs_lookup(world, "hud.slider");
+    ecs_entity_t other = ecs_lookup(world, "hud.other");
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [600, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left true", NULL));
+    ecs_progress(world, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [650, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, slider);
+    ecs_delete(world, slider);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [700, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    const PickStatus *status = ecs_singleton_get(world, PickStatus);
+    test_uint(status->captured, 0);
+    test_uint(status->pressed, 0);
+    test_uint(status->target, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.move [942, 360]", NULL));
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->target, other);
+    test_int(((const Mut*)ecs_get_id(world, other, mut))->drags, 0);
+    ecs_os_free(box_terminal_run(world, s, "mouse.button left false", NULL));
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, PickStatus)->captured, 0);
+
+    ecs_fini(world);
+}

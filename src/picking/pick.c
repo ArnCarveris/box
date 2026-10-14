@@ -24,13 +24,6 @@ typedef struct box_pick_ray_t {
     float max_distance;  /**< Distance to the far plane, 0 for none */
 } box_pick_ray_t;
 
-/** A surface a pick goes through */
-typedef struct box_pick_surface_t {
-    ecs_entity_t view_root; /**< Parent of its views, 0 for the views no surface claims */
-    float width;            /**< Width in points */
-    float height;           /**< Height in points */
-} box_pick_surface_t;
-
 /** Context of the narrow phase of a ray cast */
 typedef struct box_pick_cast_t {
     const ecs_world_t *world;  /**< The world */
@@ -856,6 +849,9 @@ static bool box_pick_view(
         out->target = hit.entity;
         out->handler = handler;
         out->view = view;
+        out->surface = *s;
+        out->surface_cursor[0] = cursor[0];
+        out->surface_cursor[1] = cursor[1];
         out->distance = hit.distance;
         glm_vec3_copy(point, out->point);
         result = true;
@@ -948,6 +944,73 @@ void box_pick_at(
     ecs_os_zeromem(out);
     box_pick_input_surface(world, st, &s);
     box_pick_surface(world, st, &s, cursor, 0, out);
+}
+
+/** Find where the ray of a cursor meets the plane of an entity.
+ *
+ * @param world The world
+ * @param e The entity, whose local z = 0 plane is used
+ * @param ray The ray
+ * @param point Receives the position in the scene
+ * @param distance Receives the distance along the ray
+ * @return Whether the ray meets the plane
+ */
+static bool box_pick_capture_plane(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    const box_pick_ray_t *ray,
+    vec3 point,
+    float *distance)
+{
+    mat4 m, inv;
+    vec3 o, d;
+    bool result = false;
+    box_pick_transform(world, e, m);
+    glm_mat4_inv(m, inv);
+    glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, ray->origin), 1.0f, o);
+    glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, ray->dir), 0.0f, d);
+    if (fabsf(d[2]) > 1e-8f) {
+        *distance = -o[2] / d[2];
+        glm_vec3_scale(ECS_CONST_CAST(float*, ray->dir), *distance, point);
+        glm_vec3_add(point, ECS_CONST_CAST(float*, ray->origin), point);
+        result = true;
+    }
+
+    return result;
+}
+
+void box_pick_resolve(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const vec2 cursor,
+    box_pick_t *out)
+{
+    box_pick_capture_t *cap = &st->capture;
+    box_pick_ray_t ray;
+    vec2 surface_cursor;
+    box_pick_at(world, st, cursor, out);
+    if (!cap->target) {
+        goto done;
+    }
+
+    if (!ecs_is_alive(world, cap->target) || !ecs_is_alive(world, cap->view)) {
+        ecs_os_zeromem(cap);
+        goto done;
+    }
+
+    out->target = cap->target;
+    out->handler = cap->handler;
+    out->view = cap->view;
+    out->surface = cap->surface;
+    glm_vec3_copy(cap->point, out->point);
+    surface_cursor[0] = cursor[0] + cap->offset[0];
+    surface_cursor[1] = cursor[1] + cap->offset[1];
+    if (box_pick_view_ray(world, cap->view, &cap->surface, surface_cursor, &ray)) {
+        box_pick_capture_plane(world, cap->target, &ray, out->point, &out->distance);
+    }
+
+done:
+    return;
 }
 
 void box_pick_queries_init(

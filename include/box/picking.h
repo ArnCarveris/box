@@ -25,10 +25,16 @@ extern "C" {
  *
  * An event goes to the entity under the cursor and bubbles up to its first Interactive
  * ancestor (or itself), which handles it. Unhandled, it goes to the views rendered before.
+ *
+ * A press on one captures the pointer until that button is released: move, drag and release
+ * events go to it outside its element, over another view or outside the window, mapped through
+ * the view of the press. Nothing else is entered or left; deleting it ends the capture.
  */
 extern ECS_TAG_DECLARE(Interactive);
 
-/** Added to the entity the pointer events go to while the cursor is over it */
+/** Added to the entity the pointer events go to while the cursor is over it.
+ *
+ * While a button holds a capture it stays on the captured entity, whatever is under the cursor. */
 extern ECS_TAG_DECLARE(Hovered);
 
 /** Added to the entity a press went to while a mouse button is held */
@@ -45,6 +51,8 @@ ECS_STRUCT(PickStatus, {
     vec3 point;           /**< Hit position of hit in its scene */
     float distance;       /**< Distance of point from the near plane of the view */
     vec2 cursor;          /**< Cursor in window points the pick was made at */
+    ecs_entity_t captured; /**< Entity that captured the pointer with a press, 0 for none */
+    vec2 drag;            /**< Cursor movement since the press while captured, else 0 */
 });
 
 /** Register the box.picking module.

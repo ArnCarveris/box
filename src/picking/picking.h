@@ -18,6 +18,13 @@
 /** Most entities an event bubbles through */
 #define BOX_PICK_CHAIN_MAX (256)
 
+/** A surface a pick goes through */
+typedef struct box_pick_surface_t {
+    ecs_entity_t view_root; /**< Parent of its views, 0 for the views no surface claims */
+    float width;            /**< Width in points */
+    float height;           /**< Height in points */
+} box_pick_surface_t;
+
 /** What a pick at a cursor found */
 typedef struct box_pick_t {
     ecs_entity_t target;   /**< Hit of the first view that handles events, 0 when none does */
@@ -29,7 +36,21 @@ typedef struct box_pick_t {
     ecs_entity_t hit_view; /**< View of hit */
     vec3 hit_point;        /**< Hit position of hit in its scene */
     float hit_distance;    /**< Distance of the hit of hit along its ray */
+    box_pick_surface_t surface; /**< Surface of the view of target */
+    vec2 surface_cursor;   /**< Cursor of the pick in points of surface */
 } box_pick_t;
+
+/** The entity a held button captured, whose events it keeps until the button is released */
+typedef struct box_pick_capture_t {
+    ecs_entity_t target;        /**< Entity the press went to, 0 when nothing is captured */
+    ecs_entity_t handler;       /**< Interactive entity that handles its events */
+    ecs_entity_t view;          /**< View the press happened in */
+    box_pick_surface_t surface; /**< Surface of that view */
+    vec2 offset;                /**< Cursor in surface points minus cursor in window points */
+    vec2 start;                 /**< Window cursor of the press */
+    vec3 point;                 /**< Position of the press in the scene of the view */
+    uint32_t buttons;           /**< Button bits whose release ends the capture */
+} box_pick_capture_t;
 
 /** A hit the narrow phase of a ray cast accepted */
 typedef struct box_pick_candidate_t {
@@ -55,6 +76,7 @@ typedef struct box_pick_state_t {
     ecs_entity_t screen;    /**< Target of the events no view handles */
     ecs_entity_t hovered;   /**< Entity that carries Hovered */
     ecs_entity_t pressed;   /**< Entity that carries Pressed */
+    box_pick_capture_t capture; /**< The capture of the held button */
     ecs_entity_t last;      /**< Target the last pointer event went to, 0 for the screen */
     vec2 cursor;            /**< Cursor of the last pointer event */
     uint32_t buttons;       /**< Buttons held at the last pointer event */
@@ -76,6 +98,20 @@ extern ECS_COMPONENT_DECLARE(PickingState);
  * @param out Receives what the pick found
  */
 void box_pick_at(
+    ecs_world_t *world,
+    box_pick_state_t *st,
+    const vec2 cursor,
+    box_pick_t *out);
+
+/** Pick the entities under a cursor like box_pick_at, except that while a button holds a
+ * capture the target, handler and view are the captured ones wherever the cursor is.
+ *
+ * @param world The world
+ * @param st The module state
+ * @param cursor Cursor in points of the window, origin at the top left
+ * @param out Receives what the pick found
+ */
+void box_pick_resolve(
     ecs_world_t *world,
     box_pick_state_t *st,
     const vec2 cursor,

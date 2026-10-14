@@ -154,6 +154,7 @@ static void box_pick_publish(
     bool press)
 {
     ecs_entity_t pressed = press ? pick->target : (st->buttons ? st->pressed : 0);
+    pressed = pressed && ecs_is_alive(world, pressed) ? pressed : 0;
     const PickStatus *cur = ecs_singleton_get(world, PickStatus);
     PickStatus status;
     ecs_os_zeromem(&status);
@@ -161,6 +162,12 @@ static void box_pick_publish(
     status.handler = pick->handler;
     status.view = pick->view;
     status.pressed = pressed;
+    status.captured = st->capture.target;
+    if (st->capture.target) {
+        status.drag[0] = cursor[0] - st->capture.start[0];
+        status.drag[1] = cursor[1] - st->capture.start[1];
+    }
+
     status.hit = pick->hit;
     status.hit_view = pick->hit_view;
     status.distance = pick->hit_distance;
@@ -173,6 +180,41 @@ static void box_pick_publish(
     st->pressed = pressed;
     if (!cur || ecs_os_memcmp_t(cur, &status, PickStatus)) {
         ecs_singleton_set_ptr(world, PickStatus, &status);
+    }
+}
+
+/** Start or end the capture of a button after an event was delivered.
+ *
+ * A press that lands on an Interactive entity while nothing is captured makes it capture the
+ * pointer. The capture ends when the button that started it is released.
+ *
+ * @param st The module state
+ * @param src The event
+ * @param pick The pick the event was delivered by
+ * @param pressed The buttons that went down with the event
+ */
+static void box_pick_capture(
+    box_pick_state_t *st,
+    const EcsScriptMouseEvent *src,
+    const box_pick_t *pick,
+    uint32_t pressed)
+{
+    box_pick_capture_t *cap = &st->capture;
+    if (cap->target && !(src->buttons & cap->buttons)) {
+        ecs_os_zeromem(cap);
+    }
+
+    if (!cap->target && pressed && pick->target && pick->handler) {
+        cap->target = pick->target;
+        cap->handler = pick->handler;
+        cap->view = pick->view;
+        cap->surface = pick->surface;
+        cap->offset[0] = pick->surface_cursor[0] - src->screen_x;
+        cap->offset[1] = pick->surface_cursor[1] - src->screen_y;
+        cap->start[0] = src->screen_x;
+        cap->start[1] = src->screen_y;
+        cap->buttons = pressed;
+        glm_vec3_copy(ECS_CONST_CAST(float*, pick->point), cap->point);
     }
 }
 
@@ -192,10 +234,13 @@ static void box_pick_send(
     ecs_entity_t chain[BOX_PICK_CHAIN_MAX];
     int32_t i, count = box_pick_chain(world, st, pick, chain);
     EcsScriptMouseEvent evt = *src;
-    bool press = (src->buttons & ~st->buttons) != 0;
-    if (st->has_cursor) {
+    uint32_t pressed = src->buttons & ~st->buttons;
+    bool press = pressed != 0;
+    if (st->has_cursor && !press) {
         evt.delta_x = src->screen_x - st->cursor[0];
         evt.delta_y = src->screen_y - st->cursor[1];
+    } else {
+        evt.delta_x = evt.delta_y = 0;
     }
 
     for (i = 0; i < count && ecs_is_alive(world, chain[i]); i ++) {
@@ -209,6 +254,7 @@ static void box_pick_send(
     st->buttons = src->buttons;
     st->has_cursor = true;
     st->last = pick->target;
+    box_pick_capture(st, src, pick, pressed);
     box_pick_publish(world, st, pick, st->cursor, press);
 }
 
@@ -277,7 +323,7 @@ static void box_pick_refresh(
 {
     const Input *in = ecs_singleton_get(world, Input);
     box_pick_t pick;
-    box_pick_at(world, st, st->cursor, &pick);
+    box_pick_resolve(world, st, st->cursor, &pick);
     if (pick.target == st->last) {
         box_pick_publish(world, st, &pick, st->cursor, false);
     } else {
@@ -310,10 +356,12 @@ void BoxPickingUpdate(
         }
 
         pointer = true;
-        box_pick_at(world, st, (vec2){ emit.mouse.screen_x, emit.mouse.screen_y }, &pick);
         if (emit.is_scroll) {
+            box_pick_at(world, st, (vec2){ emit.mouse.screen_x, emit.mouse.screen_y }, &pick);
             box_pick_scroll(world, st, &emit.mouse, &pick);
         } else {
+            box_pick_resolve(
+                world, st, (vec2){ emit.mouse.screen_x, emit.mouse.screen_y }, &pick);
             box_pick_send(world, st, &emit.mouse, &pick);
         }
     }
