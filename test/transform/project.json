@@ -1,29 +1,16 @@
 {
-    "id": "transform_test",
+    "id": "transform",
     "type": "application",
     "value": {
         "public": false,
         "use": [
-            "flecs"
+            "box"
         ]
     },
     "lang.c": {
         "include": [
-            "../include",
-            "../src/transform"
+            "../../src/transform"
         ]
-    },
-    "bundle": {
-        "cglm": {
-            "repository": "https://github.com/recp/cglm.git",
-            "tag": "v0.9.2",
-            "library": "cglm",
-            "cmake-args": [
-                "-DCGLM_SHARED=OFF",
-                "-DCGLM_STATIC=ON",
-                "-DCGLM_USE_TEST=OFF"
-            ]
-        }
     },
     "test": {
         "testsuites": [

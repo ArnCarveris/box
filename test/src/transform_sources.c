@@ -1,5 +1,0 @@
-#include "../../src/transform/transform.c"
-#include "../../src/transform/transform_dynamic.c"
-#include "../../src/transform/transform_dynamic_childof.c"
-#include "../../src/transform/transform_dynamic_parent.c"
-#include "../../src/transform/transform_static.c"
