@@ -31,6 +31,7 @@ component ids are registered in the same order in every world.
 | `box.jobs`      | `src/jobs/jobs.h` (private) | `src/jobs`     | Worker pool for IO and asset work |
 | `box.render`    | `include/box/render.h`    | `src/render`     | `RenderSettings`, `RenderStatus`, packet ring, render thread, backends, views, forward pass |
 | `box.shader`    | `include/box/shader.h`    | `src/render`     | `Shader`, `ShaderStatus`, `ShaderSettings`, WGSL preprocessor, engine shaders in `etc/shaders` |
+| `box.perf`      | `include/box/perf.h`      | `src/perf`       | `PerfRun`, `PerfStatus`, paced frames, orbit camera fitted to the shape bounds, frame time checks |
 
 A module keeps private declarations in a header next to its sources
 (`src/transform/transform.h`, `src/app/app.h`); test projects that need them add the
