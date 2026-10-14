@@ -51,7 +51,7 @@ static void bench_cull(
             .max_distance = 200, .split_lambda = 0.7f, .depth_bias = 2,
             .normal_offset = 1.5f, .filter_size = 3, .fade = 0.2f}});
     ecs_entity_t sun = ecs_new(world);
-    ecs_set(world, sun, Rotation, {-0.7f, 2.5f, 0});
+    ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
     ecs_entity_t floor = ecs_new(world);
     ecs_set(world, floor, Position, {0, -0.1f, 0});
@@ -117,7 +117,7 @@ static void bench_city(
         .color = {150, 180, 220, 255}}, .lighting.enabled = true,
         .culling = {.enabled = true, .occlusion = !frustum_only, .min_dimension_px = 1}});
     ecs_entity_t sun = ecs_new(world);
-    ecs_set(world, sun, Rotation, {-0.7f, 2.5f, 0});
+    ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
     ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
     ecs_entity_t ground = ecs_new(world);
     ecs_set(world, ground, Position, {0, -0.1f, 0});
