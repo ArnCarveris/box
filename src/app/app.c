@@ -132,6 +132,24 @@ static float box_app_delta(
     return result;
 }
 
+/** Serve the terminal and REST endpoints on a port, only REST without box.command.
+ *
+ * @param world The world
+ * @param port The port
+ */
+static void box_app_serve(
+    ecs_world_t *world,
+    int32_t port)
+{
+    ecs_entity_t server = ecs_lookup(world, "box.command.TerminalServer");
+    if (server) {
+        TerminalServer value = { .port = port };
+        ecs_set_id(world, server, server, sizeof(TerminalServer), &value);
+    } else {
+        ecs_singleton_set(world, EcsRest, { .port = (uint16_t)port });
+    }
+}
+
 /** Check the settings of a run and load its scene.
  *
  * @param world The world
@@ -163,7 +181,7 @@ static int box_app_start(
 
     app = ecs_singleton_get(world, App);
     if (app->port > 0) {
-        ecs_singleton_set(world, EcsRest, { .port = (uint16_t)app->port });
+        box_app_serve(world, app->port);
     }
 
     ecs_set_target_fps(world, app->fps);

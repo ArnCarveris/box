@@ -19,4 +19,5 @@ void BoxImport(
     ECS_IMPORT(world, BoxMovement);
     ECS_IMPORT(world, BoxLayout);
     ECS_IMPORT(world, BoxApp);
+    ECS_IMPORT(world, BoxCommand);
 }

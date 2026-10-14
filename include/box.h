@@ -20,6 +20,7 @@
 #include "box/movement.h"
 #include "box/layout.h"
 #include "box/app.h"
+#include "box/command.h"
 
 #ifdef __cplusplus
 extern "C" {
