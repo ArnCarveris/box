@@ -1,0 +1,49 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.controllers
+
+// A city of tall blocks with a ball in every street. The camera flies 50 units a frame (fixed
+// headless delta, a CameraController with a velocity that barely decays), so every frame shows
+// streets and balls the previous frame hid behind blocks or did not see at all: occlusion
+// culling must draw them in the frame they appear.
+camera {
+  Position: {0, 34, 120}
+  Rotation: {-0.5, 0.3, 0}
+  CameraController: {acceleration: 0.000001, velocity: {-600, 0, -3000}}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.9, 0.6, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {200, 0.2, 200}
+  Rgb: {120, 124, 120}
+}
+
+for x in 0..16 {
+  for z in 0..16 {
+    {
+      Position: {x * 10 - 75, 4 + ((x * 7 + z * 3) % 5) * 2, z * 10 - 75}
+      Box: {7, 8 + ((x * 7 + z * 3) % 5) * 4, 7}
+      Rgb: {90 + x * 9, 100 + z * 8, 170 - x * 5}
+    }
+    {
+      Position: {x * 10 - 70, 0.8, z * 10 - 70}
+      Sphere: {radius: 0.8}
+      Rgb: {250, 80 + x * 10, 40 + z * 12}
+    }
+  }
+}

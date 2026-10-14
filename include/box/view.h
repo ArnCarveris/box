@@ -42,10 +42,15 @@ ECS_STRUCT(ShadowSettings, {
     float fade;          /**< Fraction of the last cascade that fades out, default 0.2 */
 });
 
-/** Culling settings of a view, all zero culls with occlusion and the defaults */
+/** Culling settings of a view, all zero culls with occlusion and the defaults.
+ *
+ * Occlusion tests against what the view drew first in the same frame, so an instance that comes
+ * into view is drawn at once however fast the camera moves. Cascades cull by frustum only.
+ */
 ECS_STRUCT(CullSettings, {
-    bool enabled;           /**< Cull the instances of the view */
-    float min_dimension_px; /**< Projected size in pixels below which an instance is culled */
+    bool disabled;          /**< Draw every instance of the scene of the view */
+    bool frustum_only;      /**< Cull by frustum and size only, not by occlusion */
+    float min_dimension_px; /**< Smallest projected size in pixels, 0 for 1, negative for none */
 });
 
 /** Element in view effects array. */
@@ -77,7 +82,8 @@ ECS_STRUCT(Scene, {
 /** Register the box.view module.
  *
  * View gets a constructor that enables lighting and sets the documented ShadowSettings
- * defaults, with shadows disabled.
+ * defaults, with shadows disabled. Its CullSettings stay zero, so a view culls with occlusion
+ * and a smallest size of one pixel, from script and C alike.
  *
  * @param world The world
  */

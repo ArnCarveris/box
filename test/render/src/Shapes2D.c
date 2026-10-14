@@ -1064,7 +1064,7 @@ void Shapes2D_culled_by_view(void) {
     ecs_set(world, camera, Position, {0, 0, 10});
     ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
     ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+    ecs_set(world, view, View, {.camera = camera,
         .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
     ecs_entity_t rect = ecs_new(world);
     ecs_set(world, rect, Position, {0, 10, 0});

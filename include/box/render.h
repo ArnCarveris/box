@@ -43,6 +43,19 @@ ECS_STRUCT(RenderStatus, {
     int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged */
 });
 
+/** How a view culled its instances in the last frame the GPU finished, set on the View entity.
+ *
+ * Written by the engine a frame or two late, read only for applications. Every instance of the
+ * scene counts once: drawn, frustum (or size) culled, or hidden behind closer geometry.
+ */
+ECS_STRUCT(CullStatus, {
+    int64_t frame;          /**< Frame the counts are from */
+    int32_t instances;      /**< Instances the view tested */
+    int32_t visible;        /**< Instances the view drew */
+    int32_t frustum_culled; /**< Instances outside the frustum or below the smallest size */
+    int32_t occlusion_culled; /**< Instances in the frustum hidden behind closer geometry */
+});
+
 /** Register the box.render module.
  *
  * @param world The world

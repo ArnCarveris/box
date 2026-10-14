@@ -125,6 +125,42 @@ typedef struct box_gpu_buffer_t {
     WGPUBindGroup instances;        /**< Binds it as the instances of a batch, made on use */
 } box_gpu_buffer_t;
 
+/** Levels of a depth pyramid at most, enough for a 16384 pixel axis */
+#define BOX_GPU_HIZ_LEVELS (15)
+
+/** Depth pyramid of a render size: power of two levels, each texel the farthest depth below it.
+ *
+ * The views of every target of that render size share it; a view builds it from its own depth
+ * right before its late cull phase reads it.
+ */
+typedef struct box_gpu_hiz_t {
+    uint32_t width;                 /**< Width of the first level, a power of two */
+    uint32_t height;                /**< Height of the first level, a power of two */
+    uint32_t levels;                /**< Levels down to one texel */
+    uint32_t id;                    /**< Number of the pyramid, never reused */
+    int64_t stamp;                  /**< Cull pass the pyramid was last used in */
+    WGPUTexture texture;            /**< R32Float texture with every level */
+    WGPUTextureView view;           /**< View of every level, read by the cull pass */
+    WGPUTextureView mips[BOX_GPU_HIZ_LEVELS]; /**< View of each level */
+    WGPUBindGroup reduce[BOX_GPU_HIZ_LEVELS]; /**< Reduces the level below into each level */
+} box_gpu_hiz_t;
+
+/** Which instances a view drew in its previous frame, one word per instance slot.
+ *
+ * Each instance buffer the view draws from has a range of words, 0 for an instance that was
+ * drawn. A range is only a guess for the early phase: after a slot moved or a buffer was
+ * replaced the late phase still tests and draws every instance the early phase missed.
+ */
+typedef struct box_gpu_cull_history_t {
+    WGPUBuffer buffer;              /**< The words, zero when created */
+    uint32_t capacity;              /**< Words of the buffer */
+    uint32_t used;                  /**< Words handed out to ranges */
+    ecs_map_t ranges;               /**< Instance buffer handle to offset << 32 | words */
+    WGPUBindGroup group;            /**< Binds the words and the pyramid for the cull pass */
+    uint32_t group_hiz;             /**< Id of the pyramid the group binds */
+    int64_t stamp;                  /**< Cull pass the view was last culled in */
+} box_gpu_cull_history_t;
+
 /** A frustum the cull pass tests instances against: a view, or a cascade of its shadows */
 typedef struct box_gpu_cull_view_t {
     ecs_entity_t view;              /**< Entity of the view */
@@ -134,12 +170,17 @@ typedef struct box_gpu_cull_view_t {
     int32_t draw_count;             /**< Batches it draws */
     int32_t first_dispatch;         /**< First of its dispatches */
     int32_t dispatch_count;         /**< Dispatches that cull its batches */
+    uint32_t counter;               /**< Index of its counters */
+    box_gpu_hiz_t *hiz;             /**< Pyramid of a view that culls by occlusion, else NULL */
+    WGPUBindGroup group;            /**< History and pyramid, or the empty ones */
+    bool report;                    /**< Its counts become the CullStatus, false for captures */
 } box_gpu_cull_view_t;
 
 /** A batch a cull view draws: where its visible instances and its draw arguments are */
 typedef struct box_gpu_cull_draw_t {
     int32_t batch;                  /**< Index of the batch in the packet */
     uint32_t args;                  /**< Index of its indexed indirect draw arguments */
+    uint32_t late;                  /**< Arguments of its late phase, UINT32_MAX for none */
     uint32_t base;                  /**< First of its entries in the visible buffer */
     uint32_t count;                 /**< Instances it tests */
 } box_gpu_cull_draw_t;
@@ -149,6 +190,7 @@ typedef struct box_gpu_cull_dispatch_t {
     uint32_t buffer;                /**< Handle of the instance buffer */
     uint32_t groups;                /**< Workgroups to dispatch */
     bool ordered;                   /**< One invocation per job keeps the order of its slots */
+    bool late;                      /**< Runs after the early draw, against the pyramid */
 } box_gpu_cull_dispatch_t;
 
 /** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
@@ -158,9 +200,9 @@ typedef struct box_gpu_cull_job_t {
     uint32_t args;                  /**< Index of the draw arguments it counts into */
     uint32_t base;                  /**< First entry it writes in the visible buffer */
     float center[3];                /**< Center of the mesh bounds */
-    uint32_t pad0;                  /**< Alignment of extent */
+    uint32_t history;               /**< First history word of its buffer, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
-    uint32_t pad1;                  /**< Size of the struct in WGSL */
+    uint32_t late;                  /**< Draw arguments of its late phase, UINT32_MAX for none */
 } box_gpu_cull_job_t;
 
 /** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
@@ -168,25 +210,67 @@ typedef struct box_gpu_cull_uniforms_t {
     vec4 planes[6];                 /**< World space planes, inside where non negative */
     vec4 clip_w;                    /**< Row of the view projection that gives clip w */
     vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
-    uint32_t jobs[4];               /**< First job, jobs, two unused */
+    uint32_t jobs[4];               /**< First job, jobs, phase, counters of the cull view */
+    mat4 view_proj;                 /**< World to clip space of the view */
+    uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
 } box_gpu_cull_uniforms_t;
+
+/** What a view culled in a target, kept until its counters are read back */
+typedef struct box_gpu_cull_record_t {
+    ecs_entity_t view;              /**< Entity of the view */
+    int32_t tested;                 /**< Instances it tested */
+    uint32_t counter;               /**< Index of its counters */
+} box_gpu_cull_record_t;
+
+/** A copy of the cull counters of a target on its way back to the main thread */
+typedef struct box_gpu_cull_readback_t {
+    WGPUBuffer buffer;              /**< Mappable copy of the counters */
+    uint64_t size;                  /**< Bytes of the buffer */
+    uint64_t used;                  /**< Bytes copied into it */
+    int32_t state;                  /**< Free, copied, mapping, mapped or failed */
+    int64_t frame;                  /**< Frame of the packet */
+    ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
+} box_gpu_cull_readback_t;
+
+/** Copies of the cull counters in flight at most */
+#define BOX_GPU_CULL_READBACKS (4)
 
 /** Cull pass state: the frustums, draws and buffers of the target being rendered */
 typedef struct box_gpu_cull_t {
     WGPUBindGroupLayout layout;     /**< Bind group layout of the cull pass */
+    WGPUBindGroupLayout history_layout; /**< Binds the history and pyramid of a cull view */
     WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the cull pass */
     WGPUComputePipeline parallel;   /**< Tests one instance per invocation, NULL without shader */
     WGPUComputePipeline ordered;    /**< Tests one job per invocation, keeping slot order */
+    WGPUBindGroupLayout hiz_first_layout; /**< Binds the depth and the first level */
+    WGPUBindGroupLayout hiz_reduce_layout; /**< Binds a level and the level above it */
+    WGPUPipelineLayout hiz_first_pipeline_layout; /**< Pipeline layout of the first level */
+    WGPUPipelineLayout hiz_reduce_pipeline_layout; /**< Pipeline layout of the other levels */
+    WGPUComputePipeline hiz_first;  /**< Reduces the depth into the first level */
+    WGPUComputePipeline hiz_reduce; /**< Reduces a level into the next */
     int32_t revision;               /**< Revision of the shader the pipelines were made with */
     WGPUBuffer uniforms;            /**< box_gpu_cull_uniforms_t per dispatch */
     WGPUBuffer jobs;                /**< box_gpu_cull_job_t */
     WGPUBuffer visible;             /**< Slots of the visible instances, per draw */
     WGPUBuffer args;                /**< Indexed indirect draw arguments, per draw */
+    WGPUBuffer counters;            /**< Drawn and frustum culled instances per cull view */
     uint64_t uniforms_size;         /**< Bytes of the uniform buffer */
     uint64_t jobs_size;             /**< Bytes of the job buffer */
     uint64_t visible_size;          /**< Bytes of the visible buffer */
     uint64_t args_size;             /**< Bytes of the argument buffer */
+    uint64_t counters_size;         /**< Bytes of the counter buffer */
     WGPUBindGroup group;            /**< Binds the buffers for the target being rendered */
+    WGPUBuffer empty_history;       /**< History of the cull views without occlusion */
+    WGPUTexture empty_hiz;          /**< Pyramid of the cull views without occlusion */
+    WGPUTextureView empty_hiz_view; /**< View of the empty pyramid */
+    WGPUBindGroup empty_group;      /**< Binds the empty history and pyramid */
+    ecs_map_t histories;            /**< View and target key to box_gpu_cull_history_t */
+    ecs_map_t pyramids;             /**< Render size to box_gpu_hiz_t */
+    uint32_t next_hiz;              /**< Id of the next pyramid */
+    int64_t stamp;                  /**< Cull passes begun, ages histories and pyramids */
+    box_gpu_cull_readback_t readbacks[BOX_GPU_CULL_READBACKS]; /**< Counter copies */
+    ecs_vec_t status;               /**< box_render_cull_status_t, under the lock of the gpu */
+    int64_t frame;                  /**< Frame of the packet of the target being rendered */
     ecs_vec_t views;                /**< box_gpu_cull_view_t of the target */
     ecs_vec_t draws;                /**< box_gpu_cull_draw_t of the target */
     ecs_vec_t dispatches;           /**< box_gpu_cull_dispatch_t of the target */
@@ -801,10 +885,15 @@ WGPUBindGroup box_gpu_instance_group(
 
 /** Forget the cull views of the previous target, before the views of a target are written.
  *
+ * Also maps the counter copies of earlier targets, which have been submitted by now, publishes
+ * the ones that arrived and releases the histories and pyramids nothing used for a while.
+ *
  * @param gpu The backend
+ * @param packet The packet the target belongs to
  */
 void box_gpu_cull_begin(
-    box_gpu_t *gpu);
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Add the frustums of a view: the view itself and every cascade of its shadows.
  *
@@ -832,7 +921,7 @@ void box_gpu_cull_add(
 void box_gpu_cull_upload(
     box_gpu_t *gpu);
 
-/** Record the cull dispatches of a view and its cascades.
+/** Record the cull dispatches of a view and its cascades that run before the view draws.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -842,6 +931,144 @@ void box_gpu_cull_record(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     int32_t slot);
+
+/** Check whether a view culls by occlusion and draws in two phases.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @return Whether the view has a late phase
+ */
+bool box_gpu_cull_occludes(
+    box_gpu_t *gpu,
+    int32_t slot);
+
+/** Record the late phase of a view: its pyramid built from the depth of the early draw, then
+ * the dispatches that test what the early draw left out against it.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param depth The depth the early draw wrote
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_cull_record_late(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView depth,
+    int32_t slot);
+
+/** Copy the counters of the views of a target for the status of their culling.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the target, after its views
+ */
+void box_gpu_cull_finish(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder);
+
+/** Create the layouts, pipelines layouts and empty bindings of the depth pyramid.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_hiz_init(
+    box_gpu_t *gpu);
+
+/** Release the pyramids, histories, pipelines and layouts of the occlusion culling.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_hiz_fini(
+    box_gpu_t *gpu);
+
+/** Create the pyramid pipelines from the module of the cull shader.
+ *
+ * @param gpu The backend
+ * @param module The cull shader
+ */
+void box_gpu_hiz_pipelines(
+    box_gpu_t *gpu,
+    WGPUShaderModule module);
+
+/** Get the pyramid of a render size, created on first use.
+ *
+ * @param gpu The backend
+ * @param width Render width in pixels
+ * @param height Render height in pixels
+ * @return The pyramid
+ */
+box_gpu_hiz_t* box_gpu_hiz_get(
+    box_gpu_t *gpu,
+    int32_t width,
+    int32_t height);
+
+/** Get the history of a view in a target, created on first use.
+ *
+ * @param gpu The backend
+ * @param view Entity of the view
+ * @param target Handle of the target
+ * @return The history
+ */
+box_gpu_cull_history_t* box_gpu_hiz_history(
+    box_gpu_t *gpu,
+    ecs_entity_t view,
+    uint32_t target);
+
+/** Give every instance buffer a view draws opaque batches from a range of its history.
+ *
+ * When the ranges do not fit, the history starts over in a larger buffer, as if the view drew
+ * every instance the previous frame.
+ *
+ * @param gpu The backend
+ * @param h The history
+ * @param packet The packet
+ * @param index Index of the view in the packet
+ */
+void box_gpu_hiz_ranges(
+    box_gpu_t *gpu,
+    box_gpu_cull_history_t *h,
+    const box_render_packet_t *packet,
+    int32_t index);
+
+/** Get the first history word of an instance buffer.
+ *
+ * @param h The history
+ * @param buffer Handle of the instance buffer
+ * @return The offset, UINT32_MAX when the buffer has no range
+ */
+uint32_t box_gpu_hiz_offset(
+    const box_gpu_cull_history_t *h,
+    uint32_t buffer);
+
+/** Get the bind group of a history and a pyramid, created again when either changed.
+ *
+ * @param gpu The backend
+ * @param h The history
+ * @param hiz The pyramid
+ * @return The bind group
+ */
+WGPUBindGroup box_gpu_hiz_group(
+    box_gpu_t *gpu,
+    box_gpu_cull_history_t *h,
+    box_gpu_hiz_t *hiz);
+
+/** Record the reduction of a depth texture into every level of a pyramid.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param hiz The pyramid
+ * @param depth The depth texture
+ */
+void box_gpu_hiz_build(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    box_gpu_hiz_t *hiz,
+    WGPUTextureView depth);
+
+/** Release the histories and pyramids that no cull pass used for a while.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_hiz_purge(
+    box_gpu_t *gpu);
 
 /** Get the cull view of a view or of one of its cascades.
  *
@@ -865,6 +1092,7 @@ const box_gpu_cull_view_t* box_gpu_cull_view(
  * @param packet The packet
  * @param draw The draw
  * @param group Bind group index the instance buffer is bound at
+ * @param late Draw what the late phase kept instead of the early or only phase
  * @return Whether the draw was recorded
  */
 bool box_gpu_cull_draw(
@@ -872,7 +1100,8 @@ bool box_gpu_cull_draw(
     WGPURenderPassEncoder pass,
     const box_render_packet_t *packet,
     const box_gpu_cull_draw_t *draw,
-    uint32_t group);
+    uint32_t group,
+    bool late);
 
 /** Record a copy of a presented image into the readback buffer of its target.
  *
