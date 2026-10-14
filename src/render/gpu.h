@@ -89,6 +89,8 @@ typedef struct box_gpu_mesh_t {
     WGPUBuffer vertices;            /**< box_vertex_t */
     WGPUBuffer indices;             /**< uint32_t, three per triangle */
     uint32_t index_count;           /**< Indices to draw */
+    float center[3];                /**< Center of the box around the vertex positions */
+    float extent[3];                /**< Half size of the box around the vertex positions */
 } box_gpu_mesh_t;
 
 /** A sampled texture with its mip chain and the two views the layers bind */
@@ -113,7 +115,81 @@ typedef struct box_gpu_material_t {
 typedef struct box_gpu_buffer_t {
     WGPUBuffer buffer;              /**< The buffer */
     uint32_t size;                  /**< Bytes of the buffer */
+    uint32_t usage;                 /**< box_render_buffer_usage_t flags */
+    WGPUBindGroup instances;        /**< Binds it as the instances of a batch, made on use */
 } box_gpu_buffer_t;
+
+/** A frustum the cull pass tests instances against: a view, or a cascade of its shadows */
+typedef struct box_gpu_cull_view_t {
+    ecs_entity_t view;              /**< Entity of the view */
+    int32_t slot;                   /**< Slot of the view in the view buffer */
+    int32_t cascade;                /**< Cascade of its shadow map, -1 for the view itself */
+    int32_t first_draw;             /**< First of its draws */
+    int32_t draw_count;             /**< Batches it draws */
+    int32_t first_dispatch;         /**< First of its dispatches */
+    int32_t dispatch_count;         /**< Dispatches that cull its batches */
+} box_gpu_cull_view_t;
+
+/** A batch a cull view draws: where its visible instances and its draw arguments are */
+typedef struct box_gpu_cull_draw_t {
+    int32_t batch;                  /**< Index of the batch in the packet */
+    uint32_t args;                  /**< Index of its indexed indirect draw arguments */
+    uint32_t base;                  /**< First of its entries in the visible buffer */
+    uint32_t count;                 /**< Instances it tests */
+} box_gpu_cull_draw_t;
+
+/** A dispatch of the cull pass over the jobs of one instance buffer */
+typedef struct box_gpu_cull_dispatch_t {
+    uint32_t buffer;                /**< Handle of the instance buffer */
+    uint32_t groups;                /**< Workgroups to dispatch */
+    bool ordered;                   /**< One invocation per job keeps the order of its slots */
+} box_gpu_cull_dispatch_t;
+
+/** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
+typedef struct box_gpu_cull_job_t {
+    uint32_t first;                 /**< First slot in the instance buffer */
+    uint32_t count;                 /**< Slots to test */
+    uint32_t args;                  /**< Index of the draw arguments it counts into */
+    uint32_t base;                  /**< First entry it writes in the visible buffer */
+    float center[3];                /**< Center of the mesh bounds */
+    uint32_t pad0;                  /**< Alignment of extent */
+    float extent[3];                /**< Half size of the mesh bounds */
+    uint32_t pad1;                  /**< Size of the struct in WGSL */
+} box_gpu_cull_job_t;
+
+/** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
+typedef struct box_gpu_cull_uniforms_t {
+    vec4 planes[6];                 /**< World space planes, inside where non negative */
+    vec4 clip_w;                    /**< Row of the view projection that gives clip w */
+    vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
+    uint32_t jobs[4];               /**< First job, jobs, two unused */
+} box_gpu_cull_uniforms_t;
+
+/** Cull pass state: the frustums, draws and buffers of the target being rendered */
+typedef struct box_gpu_cull_t {
+    WGPUBindGroupLayout layout;     /**< Bind group layout of the cull pass */
+    WGPUPipelineLayout pipeline_layout; /**< Pipeline layout of the cull pass */
+    WGPUComputePipeline parallel;   /**< Tests one instance per invocation, NULL without shader */
+    WGPUComputePipeline ordered;    /**< Tests one job per invocation, keeping slot order */
+    int32_t revision;               /**< Revision of the shader the pipelines were made with */
+    WGPUBuffer uniforms;            /**< box_gpu_cull_uniforms_t per dispatch */
+    WGPUBuffer jobs;                /**< box_gpu_cull_job_t */
+    WGPUBuffer visible;             /**< Slots of the visible instances, per draw */
+    WGPUBuffer args;                /**< Indexed indirect draw arguments, per draw */
+    uint64_t uniforms_size;         /**< Bytes of the uniform buffer */
+    uint64_t jobs_size;             /**< Bytes of the job buffer */
+    uint64_t visible_size;          /**< Bytes of the visible buffer */
+    uint64_t args_size;             /**< Bytes of the argument buffer */
+    WGPUBindGroup group;            /**< Binds the buffers for the target being rendered */
+    ecs_vec_t views;                /**< box_gpu_cull_view_t of the target */
+    ecs_vec_t draws;                /**< box_gpu_cull_draw_t of the target */
+    ecs_vec_t dispatches;           /**< box_gpu_cull_dispatch_t of the target */
+    ecs_vec_t uniform_data;         /**< Bytes of the uniforms of the dispatches */
+    ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
+    ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
+    ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
+    uint32_t visible_count;         /**< Entries of the visible buffer the target uses */
+} box_gpu_cull_t;
 
 /** Uniforms of a view, written per target because the projection follows its size.
  *
@@ -198,6 +274,8 @@ typedef struct box_gpu_t {
     WGPUBuffer shadow_buffer;       /**< Cascade matrices of the views of a target */
     int32_t shadow_capacity;        /**< Views the cascade buffer holds */
     ecs_vec_t shadow_data;          /**< Bytes of the cascade matrices of a target */
+    WGPUBindGroupLayout instance_layout; /**< Binds the instance buffer of a batch */
+    box_gpu_cull_t cull;            /**< Cull pass state */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
     WGPUComputePipeline scatter;    /**< Scatter pipeline, NULL until the shader exists */
@@ -619,6 +697,121 @@ void box_gpu_scatter_fini(
 void box_gpu_scatter(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
+
+/** Copy a range of a buffer into memory, waiting for the copy.
+ *
+ * @param gpu The backend
+ * @param buffer The buffer, with CopySrc usage
+ * @param offset Byte offset in the buffer, a multiple of 4
+ * @param size Bytes to copy, a multiple of 4
+ * @param out Receives the bytes
+ * @return Whether the bytes were copied
+ */
+bool box_gpu_read(
+    box_gpu_t *gpu,
+    WGPUBuffer buffer,
+    uint32_t offset,
+    uint32_t size,
+    void *out);
+
+/** Create the layouts of the cull pass and the layout that binds instance buffers.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_cull_init(
+    box_gpu_t *gpu);
+
+/** Release the pipelines, layouts and buffers of the cull pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_cull_fini(
+    box_gpu_t *gpu);
+
+/** Get the bind group of an instance buffer, made on first use.
+ *
+ * @param gpu The backend
+ * @param b The buffer
+ * @return The bind group, NULL when the buffer is not a storage buffer
+ */
+WGPUBindGroup box_gpu_instance_group(
+    box_gpu_t *gpu,
+    box_gpu_buffer_t *b);
+
+/** Forget the cull views of the previous target, before the views of a target are written.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_cull_begin(
+    box_gpu_t *gpu);
+
+/** Add the frustums of a view: the view itself and every cascade of its shadows.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param index Index of the view in the packet
+ * @param slot Slot of the view in the view buffer
+ * @param proj Projection of the view for the target
+ * @param u Uniforms of the view, with its view projection and cascade matrices
+ */
+void box_gpu_cull_add(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    int32_t index,
+    int32_t slot,
+    mat4 proj,
+    const box_gpu_view_uniforms_t *u);
+
+/** Write the uniforms, jobs and draw arguments of the cull views of a target.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_cull_upload(
+    box_gpu_t *gpu);
+
+/** Record the cull dispatches of a view and its cascades.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_cull_record(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    int32_t slot);
+
+/** Get the cull view of a view or of one of its cascades.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @param cascade Cascade, -1 for the view itself
+ * @return The cull view, NULL when the view does not draw
+ */
+const box_gpu_cull_view_t* box_gpu_cull_view(
+    box_gpu_t *gpu,
+    int32_t slot,
+    int32_t cascade);
+
+/** Record the indirect draw of a batch of a cull view.
+ *
+ * Binds the mesh, the instance buffer at group, the visible slots of the draw and draws with
+ * the arguments the cull pass wrote.
+ *
+ * @param gpu The backend
+ * @param pass The render pass
+ * @param packet The packet
+ * @param draw The draw
+ * @param group Bind group index the instance buffer is bound at
+ * @return Whether the draw was recorded
+ */
+bool box_gpu_cull_draw(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    const box_gpu_cull_draw_t *draw,
+    uint32_t group);
 
 /** Record a copy of a presented image into the readback buffer of its target.
  *

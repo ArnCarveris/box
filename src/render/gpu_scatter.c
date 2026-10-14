@@ -203,18 +203,9 @@ static void box_gpu_on_read(
     read->done = true;
 }
 
-/** Copy a range of a buffer into a mappable buffer and wait until it is mapped.
- *
- * @param gpu The backend
- * @param b The buffer
- * @param offset Byte offset in the buffer
- * @param size Bytes to copy
- * @param out Receives the bytes
- * @return Whether the bytes were copied
- */
-static bool box_gpu_read(
+bool box_gpu_read(
     box_gpu_t *gpu,
-    box_gpu_buffer_t *b,
+    WGPUBuffer buffer,
     uint32_t offset,
     uint32_t size,
     void *out)
@@ -226,7 +217,7 @@ static bool box_gpu_read(
     };
     WGPUBuffer staging = wgpuDeviceCreateBuffer(gpu->device, &desc);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-    wgpuCommandEncoderCopyBufferToBuffer(encoder, b->buffer, offset, staging, 0, size);
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, buffer, offset, staging, 0, size);
     WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
@@ -269,7 +260,7 @@ bool box_render_gpu_read_buffer(
         goto done;
     }
 
-    result = box_gpu_read(gpu, b, offset, size, out);
+    result = box_gpu_read(gpu, b->buffer, offset, size, out);
 done:
     return result;
 }

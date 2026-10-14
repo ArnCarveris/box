@@ -217,6 +217,8 @@ static void box_render_extract_view(
     v->scene = box_render_scene_of(world, camera);
     v->camera_data = *data;
     v->clear = view->clear;
+    v->cull.enabled = view->culling.enabled;
+    v->cull.min_dimension = glm_max(view->culling.min_dimension_px, 0.0f);
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {

@@ -1050,3 +1050,56 @@ void Shapes2D_tint_applies(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Shapes2D_culled_by_view(void) {
+    // ui/shapes_2d
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .culling.enabled = true,
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {0, 10, 0});
+    ecs_set(world, rect, Rect, {10, 4});
+    ecs_set(world, rect, Rgb, {255, 255, 255});
+    ecs_entity_t line = ecs_new(world);
+    ecs_set(world, line, Position, {100, 0, 0});
+    ecs_set(world, line, Line, {.x1 = -110, .y1 = -10, .x2 = -90, .y2 = -10, .width = 2});
+    ecs_set(world, line, Rgb, {255, 255, 255});
+    ecs_entity_t away = ecs_new(world);
+    ecs_set(world, away, Position, {80, 0, 0});
+    ecs_set(world, away, Circle, {5});
+    ecs_entity_t far_line = ecs_new(world);
+    ecs_set(world, far_line, Position, {60, 60, 0});
+    ecs_set(world, far_line, Line, {.x1 = -2, .y1 = -2, .x2 = 2, .y2 = 2});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "culled.png"});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    box_render_cull_stats_t stats;
+    test_bool(box_render_gpu_cull_stats(world, view, &stats), true);
+    test_int(stats.tested, 4);
+    test_int(stats.visible, 2);
+
+    char *path = flecs_asprintf("%s/culled.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(21 * 64 + 32) * 4] > 245);
+    test_assert(px[(41 * 64 + 25) * 4] > 245);
+    test_assert(px[(42 * 64 + 39) * 4] > 245);
+    test_assert(px[(41 * 64 + 45) * 4] < 10);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

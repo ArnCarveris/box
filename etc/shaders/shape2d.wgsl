@@ -10,7 +10,8 @@
 // units of half its smaller side, shape.zw the linear border color as four half floats, and
 // emissive.w its width over its height. A line: shape.xy is the start, shape.zw the end and
 // emissive.w the negated width; its quad is scaled to bounds centered on the origin that hold
-// both ends, twice the largest coordinate plus the width on each axis.
+// both ends, twice the largest coordinate plus the width on each axis. Instances are read by
+// the slot the cull pass wrote, from the instance buffer of the batch (group 2).
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -21,16 +22,20 @@ override blend_mode: u32 = 0u;
 @group(1) @binding(0) var albedo_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
+// The instance layout of the forward pass with the material words read as integers.
+struct Shape2DInstance {
+    model: mat4x4f,
+    color: vec4f,
+    emissive: vec4f,
+    shape: vec4u,
+    uv: vec4f,
+};
+
+@group(2) @binding(0) var<storage, read> instances: array<Shape2DInstance>;
+
 struct VertexIn {
     @location(0) position: vec3f,
-    @location(3) model_0: vec4f,
-    @location(4) model_1: vec4f,
-    @location(5) model_2: vec4f,
-    @location(6) model_3: vec4f,
-    @location(7) color: vec4f,
-    @location(8) emissive: vec4f,
-    @location(9) shape: vec4u,
-    @location(10) uv_transform: vec4f,
+    @location(3) slot: u32,
 };
 
 struct VertexOut {
@@ -58,7 +63,9 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
 }
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let model = mat4x4f(v.model_0, v.model_1, v.model_2, v.model_3);
+    let inst = instances[v.slot];
+    let model = mat4x4f(vec4f(inst.model[0].xyz, 0.0), vec4f(inst.model[1].xyz, 0.0),
+        vec4f(inst.model[2].xyz, 0.0), vec4f(inst.model[3].xyz, 1.0));
     let mvp = view.view_proj * model;
     var origin = vec2f(0.0);
     var axis = vec2f(1.0, 0.0);
@@ -67,20 +74,20 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     var o: VertexOut;
     o.params = vec2f(0.0);
     o.border = vec4f(0.0);
-    if (v.emissive.w < 0.0) {
-        let a = bitcast<vec2f>(v.shape.xy);
-        let b = bitcast<vec2f>(v.shape.zw);
+    if (inst.emissive.w < 0.0) {
+        let a = bitcast<vec2f>(inst.shape.xy);
+        let b = bitcast<vec2f>(inst.shape.zw);
         let len = length(b - a);
         axis = select(vec2f(1.0, 0.0), (b - a) / len, len > 0.0);
-        to_model = 1.0 / (2.0 * max(abs(a), abs(b)) + vec2f(-v.emissive.w));
+        to_model = 1.0 / (2.0 * max(abs(a), abs(b)) + vec2f(-inst.emissive.w));
         origin = (a + b) * 0.5 * to_model;
-        extent = vec2f(len, -v.emissive.w) * 0.5;
+        extent = vec2f(len, -inst.emissive.w) * 0.5;
     } else {
-        let aspect = max(v.emissive.w, 1e-6);
+        let aspect = max(inst.emissive.w, 1e-6);
         extent = select(vec2f(1.0, 1.0 / aspect), vec2f(aspect, 1.0), aspect >= 1.0);
         to_model = 0.5 / extent;
-        o.params = vec2f(bitcast<f32>(v.shape.x), bitcast<f32>(v.shape.y));
-        o.border = vec4f(unpack2x16float(v.shape.z), unpack2x16float(v.shape.w));
+        o.params = vec2f(bitcast<f32>(inst.shape.x), bitcast<f32>(inst.shape.y));
+        o.border = vec4f(unpack2x16float(inst.shape.z), unpack2x16float(inst.shape.w));
     }
 
     let dir_x = axis * to_model;
@@ -96,9 +103,9 @@ fn pixels_per_unit(mvp: mat4x4f, clip: vec4f, dir: vec2f) -> f32 {
     o.local = q;
     o.uv = vec2f(q.x / (2.0 * extent.x) + 0.5, 0.5 - q.y / (2.0 * extent.y));
     o.extent = extent;
-    o.color = v.color;
-    o.emissive = v.emissive.rgb;
-    o.uv_transform = v.uv_transform;
+    o.color = inst.color;
+    o.emissive = inst.emissive.rgb;
+    o.uv_transform = inst.uv;
     return o;
 }
 
