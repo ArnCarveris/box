@@ -1,0 +1,55 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+// 100,467 2D shapes on the ground: a third bordered rounded rectangles, a third bordered circles
+// and a third lines, all in the one instanced, GPU culled batch of the shape shader.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+board {
+  Position: {0, -0.1, 0}
+  Box: {184, 0.2, 184}
+  Rgb: {48, 54, 70}
+}
+
+shapes {
+  Position: {0, 0.01, 0}
+  Rotation: {-1.5708, 0, 0}
+
+  for x in 0..183 {
+    for y in 0..183 {
+      "r_{x}_{y}" {
+        Position: {x - 91, y - 91.3, 0}
+        Rect: {0.5, 0.3}
+        Rgb: {90, 160, 250}
+        Border: {width: 0.04, radius: 0.1, color: {255, 255, 255, 255}}
+      }
+
+      "c_{x}_{y}" {
+        Position: {x - 90.7, y - 90.8, 0}
+        Circle: {0.15}
+        Rgb: {250, 190, 60}
+        Border: {width: 0.03, color: {230, 80, 70, 255}}
+      }
+
+      "l_{x}_{y}" {
+        Position: {x - 91.2, y - 90.7, 0}
+        Line: {x1: -0.2, y1: -0.1, x2: 0.2, y2: 0.1, width: 0.04}
+        Rgb: {120, 220, 140}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}

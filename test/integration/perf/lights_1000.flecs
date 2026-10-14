@@ -7,8 +7,6 @@ using box.light
 using box.perf
 
 camera {
-  Position: {0, 40, 80}
-  Rotation: {-0.45, 0, 0}
   Camera: {fov: 50}
 }
 
@@ -42,5 +40,5 @@ for x in 0..40 {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }

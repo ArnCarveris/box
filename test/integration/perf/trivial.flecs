@@ -6,8 +6,6 @@ using box.view
 using box.perf
 
 camera {
-  Position: {0, 4, 10}
-  Rotation: {-0.3, 0, 0}
   Camera: {fov: 50}
 }
 
@@ -34,5 +32,5 @@ ball {
 }
 
 $ {
-  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }

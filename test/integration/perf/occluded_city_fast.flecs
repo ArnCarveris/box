@@ -1,0 +1,60 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+// The city of occluded_city with a fast, low orbit: a revolution per second at 15 degrees, so the
+// camera moves 6 degrees around the city every frame and the blocks in front of the street boxes
+// change all the time. Most of what the view drew last frame is no longer what is visible, so the
+// Hi-Z history the early phase draws from is out of date every frame.
+camera {
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}}
+}
+
+ground {
+  Position: {0, -0.1, 0}
+  Box: {250, 0.2, 250}
+  Rgb: {110, 112, 110}
+}
+
+for x in 0..50 {
+  for z in 0..50 {
+    {
+      Position: {x * 5 - 122.5, 6 + ((x * 7 + z * 3) % 5) * 1.5, z * 5 - 122.5}
+      Box: {3.6, 12 + ((x * 7 + z * 3) % 5) * 3, 3.6}
+      Rgb: {90 + x * 3, 100 + z * 3, 170 - x * 2}
+    }
+    for i in 0..10 {
+      {
+        Position: {x * 5 - 124.6 + i * 0.42, 0.15, z * 5 - 124.6}
+        Box: {0.3, 0.3, 0.3}
+        Rgb: {250, 120 + i * 10, 60}
+      }
+      {
+        Position: {x * 5 - 124.6 + i * 0.42, 0.15, z * 5 - 124.2}
+        Box: {0.3, 0.3, 0.3}
+        Rgb: {240, 200, 60 + i * 15}
+      }
+      {
+        Position: {x * 5 - 124.6, 0.15, z * 5 - 123.8 + i * 0.42}
+        Box: {0.3, 0.3, 0.3}
+        Rgb: {60, 200, 120 + i * 10}
+      }
+      {
+        Position: {x * 5 - 124.2, 0.15, z * 5 - 123.8 + i * 0.42}
+        Box: {0.3, 0.3, 0.3}
+        Rgb: {80, 120 + i * 10, 240}
+      }
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 1, elevation: 15, camera: camera}
+}

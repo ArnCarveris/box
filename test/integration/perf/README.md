@@ -19,15 +19,33 @@ with the `box.perf.PerfRun` singleton:
 
 ```
 $ {
-  box.perf.PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+  box.perf.PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
 }
 ```
+
+Every scene spells out every setting, so a changed default never changes what a scene measures.
+
+## Rules every scene follows
+
+The runner fails a scene that breaks one of these, whatever its frame times:
+
+- A view renders the orbiting camera or a camera under it (a narrower lens on the orbit, like
+  `offscreen_100k`'s `eye`). A scene with a special camera (a controller walk, a fixed pose)
+  keeps it only as a second view next to the orbit view, never instead of it.
+- The measurement covers at least one full revolution: `frames >= fps * period`, so every angle
+  is measured and objects enter and leave the view during the measurement.
+- The warmup, the only frames that are not measured, is at most one second (`warmup <= fps`). It
+  lets the first frames load the scene, build the batches and the spatial index and compile the
+  pipelines; nothing after it is excused.
+- Every measured frame counts: a frame interval outside 10% of the target is an error and one
+  error fails the scene. There is no retry of a run that started; only a run the load guard
+  refused to start is retried.
 
 | Member | Meaning |
 | --- | --- |
 | `fps` | Target: 30, 60, 90 or 120. Anything else makes the run `PerfInvalid`. Also written to `App.fps`. |
-| `frames` | Frames measured, 0 for five seconds of frames. |
-| `warmup` | Paced, orbiting frames before the measurement, 0 for one second, at least 2. |
+| `frames` | Frames measured, 0 for five seconds of frames. At least `fps * period` for the runner. |
+| `warmup` | Paced, orbiting frames before the measurement, 0 for one second, at least 2. At most `fps`. |
 | `camera` | Camera to orbit, 0 for the first entity with `Camera`. |
 | `period`, `elevation` | Seconds per revolution (10) and degrees the camera looks down (30). |
 | `stall` | Busy milliseconds added to every frame, only to prove that the checks catch a slow scene. |
@@ -35,7 +53,8 @@ $ {
 
 Setting `PerfRun` again, from a script, C or the REST API, restarts the run. The engine writes the
 result into the `box.perf.PerfStatus` singleton (state, errors, slow, fast, frame interval and work
-statistics, bounds), which the command port and REST read like any other component.
+statistics, bounds, revolutions, orbit views and culling ranges), which the command port and REST
+read like any other component.
 
 ## How a run measures
 
@@ -54,6 +73,12 @@ statistics, bounds), which the command port and REST read like any other compone
 - Error rule: a measured interval `i` is an error when `i > 1.1 T` (slow) or `i < 0.9 T` (fast).
   Warmup frames are not measured. A run passes only when all `frames` intervals were measured and
   none is an error.
+- Culling: every measured frame reads the `CullStatus` of the views that render the orbiting
+  camera (or a camera under it) and, when the GPU published a new result, adds a sample: the
+  visible, frustum culled (outside the frustum or below the smallest size) and occlusion culled
+  instances, summed over those views. `PerfStatus.visible`, `frustum_culled` and
+  `occlusion_culled` hold the minimum, maximum and mean, `cull_changes` how many samples differ
+  from the sample before: the proof that the orbit makes culling decide again every frame.
 - Work: the time from the previous frame end to the start of the wait, every system, the render
   submit and any wait for a free render packet included. `work_mean_ms` and `work_p99_ms` show the
   headroom a passing scene has left; frame interval statistics of a passing scene sit at `T`.
@@ -78,18 +103,40 @@ a result:
 ## Report
 
 `test/integration/out/perf.json` holds one result per scene in the format the pm page charts as a
-scene (`mean_ms`, `p50_ms`, `p99_ms`, `max_ms`, `fps`, `entities`) plus `target_fps`, `errors`,
-`slow`, `fast`, the work statistics, `slept_ms`, `stalls`, the load averages and every interval in
-`intervals_ms`. `test/integration/out/perf/` keeps the report boxrun wrote, the log and the script
+scene (`mean_ms`, `p50_ms`, `p99_ms`, `max_ms`, `fps`, `entities`, `drawn` = mean visible,
+`culled` = mean frustum plus occlusion culled) plus `target_fps`, `errors`, `slow`, `fast`, the
+work statistics, `slept_ms`, `stalls`, the load averages, `warmup`, `period`, `revolutions`,
+`deg_per_frame`, `views`, the culling ranges (`visible_min`, `visible_max`, `frustum_culled_min`,
+... and `cull_changes` of `cull_samples`), the `problems` that broke a rule and every interval in
+`intervals_ms`. The epic pipeline (`tools/epic.py`, step `perf`) runs every scene once the load
+average is at most half the cores and fails on any error of any scene. `test/integration/out/perf/` keeps the report boxrun wrote, the log and the script
 of every scene. `--out` moves both.
 
 ## Scenes
 
-| Scene | Target | Content |
-| --- | --- | --- |
-| `trivial` | 60 | A floor, a box and a sphere. |
-| `instanced_100k` | 60 | 100,000 static boxes in one instanced batch on a floor. |
-| `lights_1000` | 60 | 1,000 colored point lights over a floor, one above each of 1,000 boxes, culled per cluster. |
-| `offscreen_100k` | 60 | The 100,000 boxes of `instanced_100k` seen through a 12 degree camera on the orbit, so most of them are culled. |
-| `walk_1m` | 60 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index. The orbit moves an unused `orbit` entity. |
-| `occluded_city` | 60 | 2,500 tall blocks with 100,000 small boxes in the streets between them; from the orbit most street boxes are hidden and occlusion culled. |
+Targets are what minime (Apple silicon, 12 cores, debug build, 1280x720 offscreen) holds with every
+frame inside 10% while other agents build: every scene held 120 FPS in three full passes at load
+averages of up to 4, except `instanced_dynamic`, whose 10,000 dynamic transforms cost 5 to 10 ms
+of work per frame (the spread follows which core the main thread lands on), so 120 FPS (8.3 ms)
+is not honest for it. Counts are the ranges over the orbit of one pass.
+
+| Scene | Feature | Target | Content | Visible | Frustum culled | Occlusion culled |
+| --- | --- | --- | --- | --- | --- | --- |
+| `trivial` | baseline | 120 | A floor, a box and a sphere. | 3 | 0 | 0 |
+| `instanced_100k` | static instancing | 120 | 100,000 static boxes in one instanced batch on a floor. | 95k..100k | 0 | 0..4.6k |
+| `instanced_dynamic` | dynamic instancing | 60 | The 100,000 static boxes plus 10,000 `DynamicTransform`/`DynamicMaterial` boxes on a turntable that turns every frame (a camera controller whose Look action holds a fixed delta). | 97k..110k | 0 | 0.1k..12.6k |
+| `offscreen_100k` | frustum culling | 120 | The 100,000 boxes seen through a 12 degree lens on the orbit, turned off the center, so it sweeps a ring and boxes enter and leave the frustum every frame. | 8.9k..28k | 72k..90k | 0..4.2k |
+| `occluded_city` | Hi-Z occlusion | 120 | 2,500 tall blocks with 100,000 small boxes in the streets between them. | 2.9k..8.2k | 60k..65k | 33k..37k |
+| `occluded_city_fast` | Hi-Z history | 120 | The city with a revolution per second at 15 degrees: 3 degrees per frame, so the history the early phase draws is out of date every frame. | 2.7k..8k | 58k..62k | 36k..40k |
+| `shadows_40k` | cascaded shadows | 120 | 40,000 pillars casting into four 2048 texel cascades of a low sun; the cascades are fitted to the moving frustum every frame. | 39k..40k | 0 | 0..1k |
+| `lights_1000` | clustered lights | 120 | 1,000 colored point lights over a floor, one above each of 1,000 boxes; the clusters are culled again for the moving view every frame. | 1,001 | 0 | 0 |
+| `effects_chain` | post effects | 120 | Auto exposure, SSAO, height fog, bloom and tonemapping over 10,000 lit blocks and 2,500 glowing spheres. | 11k..12.3k | 0 | 0.1k..1.6k |
+| `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
+| `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
+| `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
+| `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
+
+Frustum culled includes the size cull: shapes below one pixel (the far street boxes of the city,
+far glyphs, the 1M field outside the lens) count there. `trivial` and `lights_1000` see their
+whole scene from every angle, so their counts do not change; every other scene changes its counts
+in nearly every sample.

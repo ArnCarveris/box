@@ -1,0 +1,91 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.input
+using box.controllers
+using box.perf
+
+// walk_1m with a second view, the first person camera of the walking controller, rendered after
+// the orbit view: the 1,000,000 shapes are culled and drawn for both cameras every frame. The
+// walk holds Forward and turns by a fixed Look delta every frame: actions that are disabled keep
+// the ActionState the scene gives them, as no binding resolves them.
+walk {
+  Forward {
+    ActionState: {down: true}
+    flecs.core.Disabled
+  }
+
+  Look {
+    ActionState: {down: true, delta: {2, 0}}
+    flecs.core.Disabled
+  }
+}
+
+player {
+  Position: {0.75, 1.7, 0.75}
+  Camera: {fov: 70}
+  FirstPersonController: {actions: walk}
+}
+
+// The orbit fits the whole field, 2,500 units away, where a shape is far below a pixel and
+// size culled. The view looks through a 5 degree lens turned 3 degrees off the center instead,
+// so it sweeps a ring of the field at a few pixels per shape and shapes enter and leave it
+// every frame.
+camera {
+  Camera: {fov: 50}
+
+  lens {
+    Position: {0, 0, 0}
+    Rotation: {0, 0.05, 0}
+    Camera: {fov: 5}
+  }
+}
+
+main_view {
+  View: {camera: camera.lens, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+walk_view {
+  View: {camera: player, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {1504, 0.2, 1504}
+  Rgb: {90, 96, 104}
+}
+
+// Named entities: anonymous ones in a for loop are tracked in a list flecs searches linearly.
+for x in 0..500 {
+  for z in 0..500 {
+    "b_{x}_{z}" {
+      Position: {x * 3 - 750, 0.125 + (x % 8) * 0.125, z * 3 - 750}
+      Box: {0.3 + (z % 5) * 0.08, 0.25 + (x % 8) * 0.25, 0.3 + (z % 5) * 0.08}
+      Rgb: {200, 90 + (x % 40) * 4, 60}
+    }
+
+    "s_{x}_{z}" {
+      Position: {x * 3 - 748.5, 0.15 + (z % 5) * 0.04, z * 3 - 750}
+      IcoSphere: {segments: 0, radius: 0.15 + (z % 5) * 0.04}
+      Rgb: {70, 150, 210 - (z % 40) * 3}
+    }
+
+    "c_{x}_{z}" {
+      Position: {x * 3 - 750, 0.25 + (z % 8) * 0.125, z * 3 - 748.5}
+      Cylinder: {segments: 6, radius: 0.15 + (x % 5) * 0.04, length: 0.5 + (z % 8) * 0.25}
+      Rgb: {110, 190, 90 + (x % 40) * 3}
+    }
+
+    "k_{x}_{z}" {
+      Position: {x * 3 - 748.5, 0.3 + (x % 6) * 0.1, z * 3 - 748.5}
+      Cone: {segments: 6, radius: 0.15 + (x % 5) * 0.04, length: 0.6 + (x % 6) * 0.2}
+      Rgb: {220, 200, 80 + (z % 40) * 3}
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 600, warmup: 120, period: 5, elevation: 30, camera: camera}
+}
