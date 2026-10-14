@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract of the instanced batches and lights and the shadow pass of box.render",
+        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass, the cull pass and the effect passes of box.render",
         "public": false,
         "use": [
             "box"
@@ -26,13 +26,21 @@
                 "id": "Material",
                 "benchcases": [
                     "dynamic_material",
-                    "blended_sort"
+                    "blended_sort",
+                    "tint_subtree"
                 ]
             },
             {
                 "id": "Texture",
                 "benchcases": [
                     "textured_batches"
+                ]
+            },
+            {
+                "id": "Shapes2D",
+                "benchcases": [
+                    "dynamic_material",
+                    "changed_1pct"
                 ]
             },
             {
@@ -48,6 +56,27 @@
                 "benchcases": [
                     "off_100k",
                     "on_100k"
+                ]
+            },
+            {
+                "id": "Cull",
+                "benchcases": [
+                    "offscreen_100k",
+                    "offscreen_100k_unculled",
+                    "shadows_100k"
+                ]
+            },
+            {
+                "id": "Effects",
+                "benchcases": [
+                    "none",
+                    "disabled",
+                    "tonemap",
+                    "auto_exposure",
+                    "bloom",
+                    "ssao",
+                    "fog",
+                    "all"
                 ]
             }
         ]

@@ -449,19 +449,28 @@ done:
  * @param p The packet
  * @param handle Handle of the shader
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
- * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader
+ * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader,
+ * or it culls and a batch draws with the mesh or the 2D shape shader, or an effect pass of a
+ * view runs it
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
     uint32_t handle)
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
-    uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER || handle == BOX_RENDER_SHADER_SHADOW
+    uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER ||
+        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_CULL
         ? BOX_RENDER_SHADER_MESH
         : handle;
+    uint32_t also = handle == BOX_RENDER_SHADER_CULL ? BOX_RENDER_SHADER_SHAPE2D : pipeline;
     int32_t i;
+    if (box_render_effects_use(p, handle)) {
+        result = true;
+    }
+
     for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
-        if (ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline == pipeline) {
+        uint32_t used = ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline;
+        if (used == pipeline || used == also) {
             result = true;
             break;
         }
@@ -716,4 +725,18 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_CLUSTER, true);
     box_shader_builtin(world, state, builtin, "shadow", "etc/shaders/shadow.wgsl",
         BOX_RENDER_SHADER_SHADOW, true);
+    box_shader_builtin(world, state, builtin, "cull", "etc/shaders/cull.wgsl",
+        BOX_RENDER_SHADER_CULL, true);
+    box_shader_builtin(world, state, builtin, "shape2d", "etc/shaders/shape2d.wgsl",
+        BOX_RENDER_SHADER_SHAPE2D, true);
+    box_shader_builtin(world, state, builtin, "tonemap", "etc/shaders/tonemap.wgsl",
+        BOX_RENDER_SHADER_TONEMAP, true);
+    box_shader_builtin(world, state, builtin, "exposure", "etc/shaders/exposure.wgsl",
+        BOX_RENDER_SHADER_EXPOSURE, true);
+    box_shader_builtin(world, state, builtin, "bloom", "etc/shaders/bloom.wgsl",
+        BOX_RENDER_SHADER_BLOOM, true);
+    box_shader_builtin(world, state, builtin, "ssao", "etc/shaders/ssao.wgsl",
+        BOX_RENDER_SHADER_SSAO, true);
+    box_shader_builtin(world, state, builtin, "fog", "etc/shaders/fog.wgsl",
+        BOX_RENDER_SHADER_FOG, true);
 }

@@ -3,7 +3,8 @@
  * @brief Registers box.spatial and keeps the index of every scene up to date.
  *
  * Observers collect changed shapes and the roots of changed subtrees, so an update only
- * places what changed; the shapes with DynamicTransform are placed every frame.
+ * places what changed. The shapes with DynamicTransform are placed by the first query after
+ * a frame, so a frame without queries does no work for them.
  */
 
 #include "index.h"
@@ -65,7 +66,12 @@ static void box_spatial_proxy_move(
     ecs_os_memcpy(dst, src, ti->size * count);
 }
 
-box_spatial_t* box_spatial_of(
+/** Get the index of a world without placing the dynamic entities.
+ *
+ * @param world The world
+ * @return The index, NULL when box.spatial was not imported
+ */
+static box_spatial_t* box_spatial_get(
     const ecs_world_t *world)
 {
     const SpatialIndex *s = ecs_singleton_get(world, SpatialIndex);
@@ -193,50 +199,53 @@ static void BoxSpatialOnRemove(
     }
 }
 
-/** Compute the world bounds of a shape from its unit mesh, instance scale and transform.
+/** Get the unit mesh of a shape.
  *
  * @param cache The mesh cache
+ * @param shape The shape
+ * @return The mesh, NULL when the shape has no mesh with vertices
+ */
+static const box_mesh_t* box_spatial_mesh(
+    const box_mesh_cache_t *cache,
+    const ShapeMesh *shape)
+{
+    const box_mesh_t *result = cache && shape && shape->mesh ?
+        box_mesh_cache_get(cache, shape->mesh) : NULL;
+
+    return result && result->vertex_count ? result : NULL;
+}
+
+/** Compute the world bounds of a shape from its unit mesh, instance scale and transform.
+ *
+ * @param mesh The unit mesh of the shape
  * @param shape The shape
  * @param t World transform of the entity, NULL for the identity
  * @param min Receives the minimum corner
  * @param max Receives the maximum corner
- * @return false when the shape has no mesh
  */
-static bool box_spatial_world_bounds(
-    const box_mesh_cache_t *cache,
+static void box_spatial_world_bounds(
+    const box_mesh_t *mesh,
     const ShapeMesh *shape,
     const WorldTransform *t,
     vec3 min,
     vec3 max)
 {
-    const box_mesh_t *mesh = cache && shape && shape->mesh ?
-        box_mesh_cache_get(cache, shape->mesh) : NULL;
-    bool result = mesh && mesh->vertex_count;
-    vec3 c, e, wc, we;
-    int32_t i, j;
-    if (!result) {
-        goto done;
-    }
-
+    static const WorldTransform identity = { .m = GLM_MAT4_IDENTITY_INIT };
+    const WorldTransform *m = t ? t : &identity;
+    vec3 c, e;
+    int32_t i;
     for (i = 0; i < 3; i ++) {
         c[i] = (mesh->min[i] + mesh->max[i]) * 0.5f * shape->scale[i];
         e[i] = (mesh->max[i] - mesh->min[i]) * 0.5f * fabsf(shape->scale[i]);
     }
 
     for (i = 0; i < 3; i ++) {
-        wc[i] = t ? t->m[3][i] : c[i];
-        we[i] = t ? 0 : e[i];
-        for (j = 0; t && j < 3; j ++) {
-            wc[i] += t->m[j][i] * c[j];
-            we[i] += fabsf(t->m[j][i]) * e[j];
-        }
-
-        min[i] = wc[i] - we[i];
-        max[i] = wc[i] + we[i];
+        float wc = m->m[3][i] + m->m[0][i] * c[0] + m->m[1][i] * c[1] + m->m[2][i] * c[2];
+        float we = fabsf(m->m[0][i]) * e[0] + fabsf(m->m[1][i]) * e[1] +
+            fabsf(m->m[2][i]) * e[2];
+        min[i] = wc - we;
+        max[i] = wc + we;
     }
-
-done:
-    return result;
 }
 
 /** Place a changed entity in the index of its scene, or take it out.
@@ -263,9 +272,11 @@ static void box_spatial_refresh(
     bool rescope = p->rescope || p->item < 0;
     p->dirty = false;
     p->rescope = false;
-    bool indexed = !ecs_has_id(world, e, EcsPrefab) && box_spatial_world_bounds(cache,
-        ecs_get(world, e, ShapeMesh), ecs_get(world, e, WorldTransform), min, max);
+    const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
+    const box_mesh_t *mesh = box_spatial_mesh(cache, shape);
+    bool indexed = mesh && !ecs_has_id(world, e, EcsPrefab);
     if (indexed) {
+        box_spatial_world_bounds(mesh, shape, ecs_get(world, e, WorldTransform), min, max);
         scene = rescope ? box_render_scene_of(world, e) : p->scene;
         tree = ecs_has_id(world, e, DynamicTransform) ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
     }
@@ -336,13 +347,15 @@ static void box_spatial_walk(
  * @param cache The mesh cache
  */
 static void box_spatial_dynamic(
-    ecs_world_t *world,
+    const ecs_world_t *world,
     box_spatial_t *index,
     const box_mesh_cache_t *cache)
 {
     ecs_iter_t it = ecs_query_iter(world, index->dynamic);
     box_spatial_scene_t *s = NULL;
+    const box_mesh_t *mesh = NULL;
     ecs_entity_t scene = 0;
+    uint32_t handle = 0;
     while (ecs_query_next(&it)) {
         const SpatialProxy *p = ecs_field(&it, SpatialProxy, 0);
         const ShapeMesh *shape = ecs_field(&it, ShapeMesh, 1);
@@ -359,8 +372,19 @@ static void box_spatial_dynamic(
                 s = box_spatial_scene(index, scene);
             }
 
-            if (!s || box_spatial_item(s, p[i].item)->tree != BOX_SPATIAL_DYNAMIC ||
-                !box_spatial_world_bounds(cache, &shape[i], t ? &t[i] : NULL, min, max))
+            if (!mesh || handle != shape[i].mesh) {
+                handle = shape[i].mesh;
+                mesh = box_spatial_mesh(cache, &shape[i]);
+            }
+
+            const box_spatial_item_t *item = s ? box_spatial_item(s, p[i].item) : NULL;
+            if (!mesh || !item || item->tree != BOX_SPATIAL_DYNAMIC) {
+                continue;
+            }
+
+            box_spatial_world_bounds(mesh, &shape[i], t ? &t[i] : NULL, min, max);
+            if (glm_vec3_eqv(min, ECS_CONST_CAST(float*, item->min)) &&
+                glm_vec3_eqv(max, ECS_CONST_CAST(float*, item->max)))
             {
                 continue;
             }
@@ -371,7 +395,33 @@ static void box_spatial_dynamic(
     }
 }
 
-/** Bring the index up to date: changed entities, dynamic entities, then the commit.
+/** Place the dynamic entities when they may have moved since they were last placed.
+ *
+ * @param world The world
+ * @param index The index
+ */
+static void box_spatial_sync(
+    const ecs_world_t *world,
+    box_spatial_t *index)
+{
+    if (index->stale) {
+        index->stale = false;
+        box_spatial_dynamic(world, index, box_mesh_cache_of(world));
+    }
+}
+
+box_spatial_t* box_spatial_of(
+    const ecs_world_t *world)
+{
+    box_spatial_t *index = box_spatial_get(world);
+    if (index) {
+        box_spatial_sync(world, index);
+    }
+
+    return index;
+}
+
+/** Place the changed entities, commit the static trees and mark the dynamic entities stale.
  *
  * @param world The world
  * @param index The index
@@ -391,7 +441,7 @@ static void box_spatial_process(
     }
 
     ecs_vec_clear(&index->dirty);
-    box_spatial_dynamic(world, index, cache);
+    index->stale = true;
     box_spatial_commit(index);
 }
 
@@ -408,21 +458,23 @@ static void BoxSpatialUpdate(
 void box_spatial_update(
     ecs_world_t *world)
 {
-    box_spatial_t *index = box_spatial_of(world);
+    box_spatial_t *index = box_spatial_get(world);
     if (index) {
         box_spatial_process(world, index);
+        box_spatial_sync(world, index);
     }
 }
 
 void box_spatial_rebuild(
     ecs_world_t *world)
 {
-    box_spatial_t *index = box_spatial_of(world);
+    box_spatial_t *index = box_spatial_get(world);
     if (!index) {
         goto done;
     }
 
     box_spatial_process(world, index);
+    box_spatial_sync(world, index);
     box_spatial_scene_rebuild(index, index->root);
     ecs_map_iter_t it = ecs_map_iter(&index->scenes);
     while (ecs_map_next(&it)) {
@@ -437,7 +489,7 @@ void box_spatial_stats(
     const ecs_world_t *world,
     box_spatial_stats_t *stats)
 {
-    const box_spatial_t *index = box_spatial_of(world);
+    const box_spatial_t *index = box_spatial_get(world);
     ecs_os_memset_t(stats, 0, box_spatial_stats_t);
     if (!index) {
         goto done;

@@ -1,0 +1,77 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 5, 14}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {0.9, 0.6, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, -20}
+  Box: {120, 0.2, 90}
+  Rgb: {190, 190, 180}
+}
+
+for x in 0..48 {
+  for z in 0..14 {
+    {
+      Position: {x * 1.6 - 37.6, 0.5 + (x % 3) * 0.3, 8 - z * 3}
+      Box: {0.9, 1 + (x % 3) * 0.6, 0.9}
+      Rgb: {60 + x * 4, 90 + z * 10, 210 - x * 3}
+    }
+  }
+}
+
+for i in 0..10 {
+  {
+    Position: {i * 2.2 - 10, 9.5, -6}
+    Box: {1.2, 6, 1.2}
+    Rgb: {230, 200, 90}
+  }
+}
+
+bar {
+  Position: {26, 3, -4}
+  Rotation: {0, 0.5, 0}
+  Scale: {12, 1, 1}
+  Box: {5, 0.4, 0.4}
+  Rgb: {220, 60, 60}
+}
+
+overhead {
+  Position: {-2, 22, 4}
+  Box: {6, 0.5, 6}
+  Rgb: {80, 80, 80}
+}
+
+for i in 0..6 {
+  {
+    Position: {i * 4 - 10, 3.5, 6}
+    Box: {2.5, 2, 0.2}
+    Rgb: {255, 150, 30}
+    Opacity: {0.6}
+  }
+}
+
+for i in 0..40 {
+  {
+    Position: {i * 0.8 - 16, 1, -60}
+    Box: {0.02, 0.02, 0.02}
+    Rgb: {255, 255, 255}
+  }
+}

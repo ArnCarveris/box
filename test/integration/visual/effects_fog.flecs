@@ -1,0 +1,52 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.effects
+
+fog {
+  HeightFog: {density: 0.06, falloff: 0.25, base_height: 0}
+}
+
+camera {
+  Position: {0, 2.5, 8}
+  Rotation: {-0.08, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {110, 150, 210, 255}}, effects: [{effect: fog}]}
+}
+
+sun {
+  Rotation: {-0.35, 2.8, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 235, 210}
+}
+
+ground {
+  Position: {0, -0.1, -140}
+  Box: {60, 0.2, 300}
+  Rgb: {120, 140, 100}
+}
+
+for i in 0..10 {
+  {
+    Position: {-3, 1.5, 3 - i * i * 1.5}
+    Box: {0.8, 3, 0.8}
+    Rgb: {200, 80, 60}
+  }
+  {
+    Position: {3, 1.5, 3 - i * i * 1.5}
+    Box: {0.8, 3, 0.8}
+    Rgb: {80, 120, 210}
+  }
+}
+
+hill {
+  Position: {12, 0, -60}
+  Sphere: {segments: 32, smooth: true, radius: 14}
+  Rgb: {90, 110, 80}
+}

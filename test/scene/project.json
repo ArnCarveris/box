@@ -64,7 +64,8 @@
                     "overlap_box_and_sphere",
                     "random_vs_brute_force",
                     "random_moves_vs_brute_force",
-                    "rebuild_keeps_results"
+                    "rebuild_keeps_results",
+                    "dynamic_unnotified_move_after_idle"
                 ]
             }
         ]

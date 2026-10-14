@@ -25,7 +25,9 @@ static void box_draw_slot_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        slots[i] = (DrawSlot){ .batch = -1, .slot = -1, .fade = 1.0f };
+        slots[i] = (DrawSlot){
+            .batch = -1, .slot = -1, .fade = 1.0f, .tint = { .keep = 1.0f }
+        };
     }
 }
 
@@ -203,14 +205,26 @@ static void box_draws_walk(
 
 float box_draws_fade(
     const ecs_world_t *world,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    box_draw_tint_t *tint)
 {
     float result = 1.0f;
     ecs_entity_t cur = ecs_get_parent(world, e);
+    *tint = (box_draw_tint_t){ .keep = 1.0f };
     while (cur) {
         const Opacity *opacity = ecs_get(world, cur, Opacity);
+        const Tint *t = ecs_get(world, cur, Tint);
         if (opacity) {
             result *= glm_clamp(opacity->value, 0.0f, 1.0f);
+        }
+
+        if (t) {
+            float a = (float)t->a / 255.0f;
+            float weight = a * tint->keep / 255.0f;
+            tint->add[0] += (float)t->r * weight;
+            tint->add[1] += (float)t->g * weight;
+            tint->add[2] += (float)t->b * weight;
+            tint->keep *= 1.0f - a;
         }
 
         cur = ecs_get_parent(world, cur);
@@ -237,6 +251,7 @@ static void box_draws_key(
     const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
     const PbrTextures *textures = ecs_get(world, e, PbrTextures);
     const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
+    const Shape2D *shape2d = ecs_get(world, e, Shape2D);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
@@ -250,11 +265,15 @@ static void box_draws_key(
 
     key->scene = box_render_scene_of(world, e);
     key->mesh = shape->mesh;
-    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
+    if (shape2d && shape2d->texture) {
+        key->textures[0] = shape2d->texture;
+    }
+
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
         ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
-    key->shadow = !ecs_has_id(world, e, NoShadow) &&
+    key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
 }
 
@@ -282,13 +301,17 @@ static void box_draws_update(
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
-        s->fade = box_draws_fade(world, e);
+        s->fade = box_draws_fade(world, e, &s->tint);
+        s->tinted = s->tint.keep < 1.0f;
         material = (box_draw_material_t){
             .color = ecs_get(world, e, Rgb),
             .opacity = ecs_get(world, e, Opacity),
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
+            .shape2d = ecs_get(world, e, Shape2D),
+            .tint = ecs_get(world, e, Tint),
+            .inherited = s->tinted ? &s->tint : NULL,
             .fade = s->fade
         };
         box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
@@ -432,6 +455,9 @@ static void box_draws_material_observers(
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Opacity) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnTint", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Tint) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
 }
 
 /** Register the observers that collect changed entities and changed subtrees.
@@ -449,6 +475,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnShapeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
+    box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Shape2D) }},
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
@@ -529,7 +558,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone,
                 .oper = EcsOptional
-            }
+            },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -551,7 +581,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
+            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });

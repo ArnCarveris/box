@@ -4,7 +4,7 @@
  */
 
 #define BOX_GEOMETRY_IMPL
-#include "mesh_cache.h"
+#include "shape2d.h"
 
 ECS_COMPONENT_DECLARE(ShapeMesh);
 
@@ -227,6 +227,9 @@ void BoxGeometryImport(
     ECS_META_COMPONENT(world, Star);
     ECS_META_COMPONENT(world, Rect);
     ECS_META_COMPONENT(world, Circle);
+    ECS_META_COMPONENT(world, Line);
+    ECS_META_COMPONENT(world, Border);
+    ECS_META_COMPONENT(world, Image);
 
     ECS_COMPONENT_DEFINE(world, ShapeMesh);
     ecs_set_hooks(world, ShapeMesh, {
@@ -240,4 +243,5 @@ void BoxGeometryImport(
 
     box_geometry_shapes_init(world);
     box_geometry_star_init(world);
+    box_geometry_shapes2d_init(world);
 }

@@ -36,6 +36,12 @@ typedef struct box_perf_stats_t {
     double max;   /**< Longest duration */
 } box_perf_stats_t;
 
+/** Replacement for the wall clock, NULL for the real one, lets tests drive time. */
+extern double (*box_perf_clock)(void);
+
+/** Replacement for sleeping, NULL for the real sleep. Receives the seconds to sleep. */
+extern void (*box_perf_sleep)(double seconds);
+
 /** Measure the world space bounds of every shape with a world transform.
  *
  * @param world The world

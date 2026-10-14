@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../src/render",
-            "../../src/geometry"
+            "../../src/geometry",
+            "../../src/spatial"
         ]
     },
     "test": {
@@ -188,6 +189,24 @@
                 ]
             },
             {
+                "id": "Tint",
+                "testcases": [
+                    "mix_by_strength",
+                    "compose_childof",
+                    "compose_parent",
+                    "compose_mixed",
+                    "own_tint_after_ancestors",
+                    "change_updates_descendants",
+                    "remove_tint",
+                    "reparent_childof",
+                    "reparent_parent",
+                    "leave_hierarchy",
+                    "dynamic_material",
+                    "dynamic_material_inherited",
+                    "keeps_opacity"
+                ]
+            },
+            {
                 "id": "Texture",
                 "testcases": [
                     "load_png",
@@ -266,6 +285,70 @@
                     "beyond_max_distance_unshadowed",
                     "fade_softens_last_cascade",
                     "default_settings"
+                ]
+            },
+            {
+                "id": "Culling",
+                "testcases": [
+                    "offscreen_not_drawn",
+                    "edge_objects_drawn",
+                    "bounds_follow_scale_and_rotation",
+                    "disabled_draws_all",
+                    "min_dimension",
+                    "offscreen_caster_shadows_view",
+                    "blended_order_kept",
+                    "views_cull_separately",
+                    "dynamic_moves_out",
+                    "default_settings"
+                ]
+            },
+            {
+                "id": "Shapes2D",
+                "testcases": [
+                    "rect_size",
+                    "circle_shape",
+                    "border_radius_rounds_corners",
+                    "border_width_and_color",
+                    "circle_border_ring",
+                    "line_segment",
+                    "image_texture_area",
+                    "opacity_blends",
+                    "depth_with_3d_shapes",
+                    "coplanar_draw_in_order",
+                    "edges_crisp_at_any_scale",
+                    "edges_crisp_in_perspective",
+                    "edges_antialiased_when_rotated",
+                    "changes_update_render",
+                    "dynamic_shapes",
+                    "prefab_instance",
+                    "one_batch_for_all_kinds",
+                    "empty_shapes_not_drawn",
+                    "bounds_hold_shape",
+                    "tint_applies",
+                    "culled_by_view"
+                ]
+            },
+            {
+                "id": "Effects",
+                "testcases": [
+                    "bloom_spreads_past_emissive_edge",
+                    "bloom_threshold_keeps_dim_edges",
+                    "bloom_intensity_change_applies",
+                    "tonemap_compresses_hdr",
+                    "tonemap_keeps_hue_of_bright_colors",
+                    "exposure_adapts_over_frames",
+                    "exposure_deterministic_with_fixed_delta",
+                    "fog_darkens_with_distance",
+                    "fog_lit_by_scene_sun",
+                    "ssao_darkens_crease",
+                    "chain_order_matters",
+                    "chain_reconfigured_on_change",
+                    "view_without_clear_composites_over",
+                    "zero_literal_takes_defaults",
+                    "default_settings",
+                    "script_entry_enabled_by_default",
+                    "bloom_temporal_keeps_last_frame",
+                    "follow_surface_resize"
                 ]
             }
         ]

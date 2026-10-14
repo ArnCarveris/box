@@ -3,6 +3,9 @@
 // Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
+// The cull pass writes the slots of the visible instances, which step per instance; the
+// instance data is read from the instance buffer of the batch (group 2).
+#include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
 
@@ -22,18 +25,13 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(3) var normal_map: texture_2d<f32>;
 @group(1) @binding(4) var material_sampler: sampler;
 
+@group(2) @binding(0) var<storage, read> instances: array<Instance>;
+
 struct VertexIn {
     @location(0) position: vec3f,
     @location(1) normal: vec3f,
     @location(2) uv: vec2f,
-    @location(3) model_0: vec4f,
-    @location(4) model_1: vec4f,
-    @location(5) model_2: vec4f,
-    @location(6) model_3: vec4f,
-    @location(7) color: vec4f,
-    @location(8) emissive: vec4f,
-    @location(9) material: vec4f,
-    @location(10) uv_transform: vec4f,
+    @location(3) slot: u32,
 };
 
 struct VertexOut {
@@ -47,10 +45,11 @@ struct VertexOut {
 };
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let model = mat4x4f(v.model_0, v.model_1, v.model_2, v.model_3);
-    let c0 = v.model_0.xyz;
-    let c1 = v.model_1.xyz;
-    let c2 = v.model_2.xyz;
+    let inst = instances[v.slot];
+    let model = inst.model;
+    let c0 = model[0].xyz;
+    let c1 = model[1].xyz;
+    let c2 = model[2].xyz;
     let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
     let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     let world = model * vec4f(v.position, 1.0);
@@ -58,10 +57,10 @@ struct VertexOut {
     o.pos = view.view_proj * world;
     o.world = world.xyz;
     o.normal = cofactor * v.normal * flip;
-    o.color = v.color;
-    o.emissive = v.emissive.rgb;
-    o.material = v.material.xy;
-    o.uv = v.uv * v.uv_transform.xy + v.uv_transform.zw;
+    o.color = inst.color;
+    o.emissive = inst.emissive.rgb;
+    o.material = inst.material.xy;
+    o.uv = v.uv * inst.uv.xy + inst.uv.zw;
     return o;
 }
 

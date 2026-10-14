@@ -11,8 +11,14 @@
 #define BOX_RENDER_DRAW_H
 
 #include "render.h"
-#include "../geometry/mesh_cache.h"
+#include "../geometry/shape2d.h"
 #include "../texture/texture.h"
+
+/** Tints composed into one mix: a display encoded color becomes color * keep + add */
+typedef struct box_draw_tint_t {
+    float add[3];   /**< Sum of the tint colors weighted by what the later tints keep, 0..1 */
+    float keep;     /**< Product of one minus the strength of every tint */
+} box_draw_tint_t;
 
 /** Batch and slot of a shape, added with every ShapeMesh */
 typedef struct DrawSlot {
@@ -20,6 +26,8 @@ typedef struct DrawSlot {
     int32_t slot;   /**< Slot of the entity in the batch */
     float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
     bool dirty;     /**< The entity is in the list of changed entities */
+    bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
+    box_draw_tint_t tint; /**< Tints of the ancestors, composed from the root down */
 } DrawSlot;
 
 /** Component id of DrawSlot */
@@ -45,6 +53,9 @@ typedef struct box_draw_material_t {
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
     const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
+    const Tint *tint;           /**< Tint of the shape itself, applied after the inherited */
+    const box_draw_tint_t *inherited; /**< Composed tints of the ancestors, NULL for none */
+    const Shape2D *shape2d;     /**< Resolved 2D shape, NULL for a 3D shape */
     float fade;                 /**< Product of the Opacity of the ancestors */
 } box_draw_material_t;
 
@@ -177,8 +188,9 @@ void box_draws_transform(
 
 /** Write the material of a shape into its instance data.
  *
- * The base color and emission are converted to linear light, the alpha is the opacity of
- * the shape times the opacity of its ancestors. Tint and textures resolve here as well.
+ * The base color is mixed toward the tints of the ancestors from the root down and then toward
+ * the tint of the shape, in display encoding, before it and the emission are converted to
+ * linear light. The alpha is the opacity of the shape times the opacity of its ancestors.
  *
  * @param out The instance
  * @param material Material components of the entity
@@ -186,6 +198,20 @@ void box_draws_transform(
 void box_draws_material(
     box_render_instance_t *out,
     const box_draw_material_t *material);
+
+/** Write the shape of a 2D shape into its instance data, over the 3D surface constants.
+ *
+ * Material holds the corner radius, border width and border color of a rectangle or the end
+ * points of a line, emissive w the aspect of a rectangle or the negated width of a line.
+ *
+ * @param out The instance
+ * @param material Material components of the entity, with its Shape2D
+ * @param border Linear border color mixed toward the tints, NULL for the color of the Border
+ */
+void box_draws_shape2d(
+    box_render_instance_t *out,
+    const box_draw_material_t *material,
+    const float *border);
 
 /** Resolve the blend mode a shape draws with: Opaque turns into AlphaBlend below alpha 1.
  *
@@ -216,15 +242,17 @@ void box_draws_mark(
     box_render_draws_t *d,
     ecs_entity_t e);
 
-/** Multiply the Opacity of the ancestors of an entity, through ChildOf and Parent.
+/** Multiply the Opacity and compose the Tint of the ancestors, through ChildOf and Parent.
  *
  * @param world The world
  * @param e The entity
- * @return The product, 1 when no ancestor has an Opacity
+ * @param tint Receives the composed tints of the ancestors, keep 1 and add 0 without any
+ * @return The product of the opacities, 1 when no ancestor has an Opacity
  */
 float box_draws_fade(
     const ecs_world_t *world,
-    ecs_entity_t e);
+    ecs_entity_t e,
+    box_draw_tint_t *tint);
 
 /** Send the batches of the frame: meshes, instance buffers, uploads and scatters.
  *

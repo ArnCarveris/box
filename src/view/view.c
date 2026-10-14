@@ -6,7 +6,9 @@
 #define BOX_VIEW_IMPL
 #include <box.h>
 
-/** Construct View values that are lit, with the documented shadow defaults.
+/** Construct View values that are lit and culled, with the documented shadow defaults.
+ *
+ * Culling is on and drops instances whose projected size is below one pixel.
  *
  * @param ptr The components
  * @param count Number of components
@@ -32,6 +34,30 @@ static void box_view_ctor(
             .filter_size = 3,
             .fade = 0.2f
         };
+        values[i].culling = (CullSettings){
+            .enabled = true,
+            .min_dimension_px = 1.0f
+        };
+    }
+}
+
+/** Construct ViewEffect values that are enabled, so a script entry that names only its effect
+ * runs it.
+ *
+ * @param ptr The elements
+ * @param count Number of elements
+ * @param ti Type info
+ */
+static void box_view_effect_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ViewEffect *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ViewEffect){ .enabled = true };
     }
 }
 
@@ -46,6 +72,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, ShadowSettings);
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, ViewEffect);
+    ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });
     ECS_META_COMPONENT(world, View);
     box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });

@@ -11,6 +11,9 @@
 /** Color of a shape without Rgb, display encoded */
 static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 
+/** Color of a 2D shape with an Image and without Rgb, which shows the texture as is */
+static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
+
 /** Instances the smallest instance buffer holds */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
@@ -47,6 +50,57 @@ static float box_draws_linear(
     uint8_t value)
 {
     return box_draws_srgb[value];
+}
+
+/** Convert a display encoded channel from 0 to 1 to linear light.
+ *
+ * Interpolates the table of the byte values, which stays within 1e-5 of the exact curve.
+ *
+ * @param value The channel
+ * @return The linear value
+ */
+static float box_draws_linear_f(
+    float value)
+{
+    float x = glm_clamp(value, 0.0f, 1.0f) * 255.0f;
+    int32_t i = (int32_t)x;
+    if (i > 254) {
+        i = 254;
+    }
+
+    float f = x - (float)i;
+
+    return box_draws_srgb[i] + (box_draws_srgb[i + 1] - box_draws_srgb[i]) * f;
+}
+
+/** Write the base color of a shape, mixed toward its tints, as linear light.
+ *
+ * @param out Three floats receiving the color
+ * @param color The base color, display encoded
+ * @param material Material components of the entity
+ */
+static void box_draws_tinted(
+    float *out,
+    const uint8_t *color,
+    const box_draw_material_t *material)
+{
+    const box_draw_tint_t *inherited = material->inherited;
+    const Tint *tint = material->tint;
+    const uint8_t *own = tint ? &tint->r : NULL;
+    float a = tint ? (float)tint->a / 255.0f : 0.0f;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float c = (float)color[i] / 255.0f;
+        if (inherited) {
+            c = c * inherited->keep + inherited->add[i];
+        }
+
+        if (own) {
+            c += ((float)own[i] / 255.0f - c) * a;
+        }
+
+        out[i] = box_draws_linear_f(c);
+    }
 }
 
 /** Hash a batch key.
@@ -265,9 +319,14 @@ void box_draws_material(
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
     const TextureTransform *uv = material->uv;
-    out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
-    out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
-    out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
+    const uint8_t *base = color ? &color->r : box_draws_default_color;
+    if (!color && material->shape2d && material->shape2d->texture) {
+        base = box_draws_image_color;
+    }
+
+    out->color[0] = box_draws_linear(base[0]);
+    out->color[1] = box_draws_linear(base[1]);
+    out->color[2] = box_draws_linear(base[2]);
     out->color[3] = box_draws_alpha(material);
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
     out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
@@ -282,6 +341,19 @@ void box_draws_material(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->inherited || material->tint) {
+        box_draws_tinted(out->color, base, material);
+    }
+
+    if (material->shape2d) {
+        float border[3];
+        bool tinted = material->inherited || material->tint;
+        if (tinted) {
+            box_draws_tinted(border, &material->shape2d->border_color.r, material);
+        }
+
+        box_draws_shape2d(out, material, tinted ? border : NULL);
+    }
 }
 
 void box_draws_transform(
@@ -436,10 +508,7 @@ static void box_draws_reserve(
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
     desc->size = capacity * (uint32_t)sizeof(box_render_instance_t);
-    desc->usage = BOX_RENDER_BUFFER_INSTANCE;
-    if (!b->key.dynamic) {
-        desc->usage |= BOX_RENDER_BUFFER_STORAGE;
-    }
+    desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
 
     b->capacity = capacity;
     b->full = true;
@@ -773,7 +842,7 @@ static const void* box_draws_at(
  *
  * @param it The query result
  * @param d The state
- * @param walk Whether the opacity of ancestors is read every frame
+ * @param walk Whether the opacity and tint of ancestors are read every frame
  */
 static void box_draws_fill_material(
     ecs_iter_t *it,
@@ -787,12 +856,15 @@ static void box_draws_fill_material(
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
+    const Shape2D *shapes2d = ecs_field(it, Shape2D, 11);
+    const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
     ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
     ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
     ecs_size_t uv_step = box_draws_stride(it, uvs, ECS_SIZEOF(TextureTransform), 8);
+    box_draw_tint_t inherited;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (slots[i].batch < 0) {
@@ -810,8 +882,16 @@ static void box_draws_fill_material(
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
-            .fade = walk ? box_draws_fade(it->world, it->entities[i]) : slots[i].fade
+            .shape2d = shapes2d ? &shapes2d[i] : NULL,
+            .tint = tints ? &tints[i] : NULL,
+            .inherited = slots[i].tinted ? &slots[i].tint : NULL,
+            .fade = slots[i].fade
         };
+        if (walk) {
+            material.fade = box_draws_fade(it->world, it->entities[i], &inherited);
+            material.inherited = &inherited;
+        }
+
         box_render_instance_t *inst = ecs_vec_get_t(
             &b->instances, box_render_instance_t, slots[i].slot);
         box_draws_material(inst, &material);

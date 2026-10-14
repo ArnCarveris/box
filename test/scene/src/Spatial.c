@@ -1009,3 +1009,46 @@ void Spatial_rebuild_keeps_results(void) {
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);
 }
+
+void Spatial_dynamic_unnotified_move_after_idle(void) {
+    // scenes/spatial_idle_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, DynamicTransform);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_set(world, parent, Box, {1, 1, 1});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {0, 5, 0});
+    ecs_set(world, child, Box, {1, 1, 1});
+    int32_t i;
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 5, 0}, 0.1f, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), child);
+    for (i = 0; i < 5; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_get_mut(world, parent, Position)->x = 10;
+    ecs_progress(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 0, 0}, 0.1f, &out), 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 5, 0}, 0.1f, &out), 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){10, 0, 0}, 0.1f, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), parent);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){10, 5, 0}, 0.1f, &out), 1);
+    test_uint(*ecs_vec_get_t(&out, ecs_entity_t, 0), child);
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, child, NULL, min, max));
+    test_flt(min[0], 9.5f);
+    test_flt(max[1], 5.5f);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
