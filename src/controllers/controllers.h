@@ -100,6 +100,9 @@ typedef struct FirstPersonActionMap {
 
 extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 
+/** Longest frame a controller simulates: a longer frame, such as a stall, counts as this long */
+#define BOX_CONTROLLER_DT_MAX (0.5f)
+
 /** Shape a collider has in its own frame */
 typedef enum box_collider_kind_t {
     BoxColliderBox,      /**< Box with the half extents, also the fallback of other meshes */
@@ -125,6 +128,7 @@ typedef struct box_controller_body_t {
     float height;        /**< Height of the capsule, a ball when at most twice the radius */
     float step;          /**< Height of the ledges the body steps onto, 0 for none */
     float probe;         /**< Distance below the feet the ground is searched for, 0 for none */
+    bool upright;        /**< Surfaces too steep to stand on block like walls, never lift it */
 } box_controller_body_t;
 
 /** What a move of a body ran into */
@@ -148,14 +152,36 @@ bool box_collider_resolve(
     ecs_entity_t e,
     box_collider_t *out);
 
+/** Where a capsule touches a collider */
+typedef struct box_collider_contact_t {
+    vec3 normal;  /**< Direction from the collider towards the capsule, that moves it out */
+    vec3 surface; /**< Normal of the face touched, the most upward one at an edge or corner */
+    float depth;  /**< Overlap of the capsule and the collider along the normal, positive */
+} box_collider_contact_t;
+
+/** Find the signed distance between a capsule and a collider.
+ *
+ * @param c The collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param normal Receives the direction from the collider towards the capsule
+ * @return The gap between their surfaces, negative by the depth when they overlap
+ */
+float box_collider_separation(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal);
+
 /** Find how far a capsule reaches into a collider.
  *
  * @param c The collider
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
- * @param normal Receives the direction that moves the capsule out
- * @param depth Receives the distance the capsule must move along the normal
+ * @param out The contact, written when the capsule overlaps the collider
  * @return true when the capsule overlaps the collider
  */
 bool box_collider_push(
@@ -163,8 +189,7 @@ bool box_collider_push(
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 normal,
-    float *depth);
+    box_collider_contact_t *out);
 
 /** Intersect a ray with the oriented box of a collider, or the ball of a sphere.
  *
@@ -191,7 +216,8 @@ bool box_collider_ray(
  * @param world The world
  * @param body The body
  * @param feet The bottom of the capsule, written in place
- * @param velocity Velocity in units per second, written when the move is blocked
+ * @param velocity Velocity in units per second, written when the move is blocked; a velocity
+ * that is not finite does not move the body
  * @param dt Seconds the frame took
  * @param hit Receives what the move ran into, may be NULL
  * @return Whether the position changed
@@ -266,8 +292,9 @@ void box_controller_actions_enable(
  * The angular velocity eases towards the turn actions at the acceleration rate while one is
  * held and towards a stop at the deceleration rate when none is.
  *
- * While Look is held the cursor movement sets it so the frame turns by exactly the movement.
- * The pitch stops short of straight up and down, dropping the angular velocity towards it.
+ * While Look is held the cursor movement turns the rotation by exactly the movement on top of
+ * that. Mouse look never feeds the angular velocity, so the turn stops the frame the cursor
+ * does. The pitch stops short of straight up and down, dropping the angular velocity towards it.
  *
  * @param turn What the frame asks for
  * @param angular_velocity Pitch (x) and yaw (y) rate in radians per second, written in place

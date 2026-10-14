@@ -244,7 +244,7 @@ void BoxCameraControllerUpdate(
     Rotation *r = ecs_field(it, Rotation, 2);
     const CameraActionMap *map = ecs_singleton_get(it->world, CameraActionMap);
     box_camera_input_t in = { 0 };
-    float dt = it->delta_time;
+    float dt = fminf(it->delta_time, BOX_CONTROLLER_DT_MAX);
     bool read = false;
     int32_t i;
     for (i = 0; dt > 0 && i < it->count; i ++) {

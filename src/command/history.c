@@ -5,7 +5,7 @@
 
 #include "command.h"
 
-/** The commands command: list the last count lines of the session, all when omitted.
+/** The commands command: list the last count lines of the history ring, all when omitted.
  *
  * @param ctx The call context
  * @param argc Number of arguments
@@ -29,10 +29,10 @@ static void box_history_commands(
         goto done;
     }
 
-    total = ecs_vec_count(&s->entries);
+    total = box_terminal_history_count(s);
     i = count > 0 && count < total ? total - count : 0;
     for (; i < total; i ++) {
-        const box_command_entry_t *e = ecs_vec_get_t(&s->entries, box_command_entry_t, i);
+        const box_command_entry_t *e = box_terminal_history_get(s, i);
         if (ecs_strbuf_written(&buf)) {
             ecs_strbuf_appendch(&buf, '\n');
         }
