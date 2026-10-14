@@ -39,7 +39,11 @@
                     "only_slow_frames_counted",
                     "tolerance_edges",
                     "statistics",
-                    "late_wakeups_absorbed"
+                    "late_wakeups_absorbed",
+                    "realtime_during_run",
+                    "no_realtime_without_run",
+                    "realtime_reset_on_remove",
+                    "realtime_reset_on_fini"
                 ]
             },
             {
