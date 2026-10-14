@@ -11,6 +11,30 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+/** Errors logged since the counter was installed */
+static int capture_errors = 0;
+
+/** Count logged errors.
+ *
+ * @param level Level of the message
+ * @param file File that logged it
+ * @param line Line that logged it
+ * @param msg The message
+ */
+static void capture_count_errors(
+    int32_t level,
+    const char *file,
+    int32_t line,
+    const char *msg)
+{
+    (void)file;
+    (void)line;
+    (void)msg;
+    if (level == -3) {
+        capture_errors ++;
+    }
+}
+
 void Capture_cleared_surface(void) {
     // renderer/device
     ecs_world_t *world = ecs_init();
@@ -293,4 +317,31 @@ void Capture_main_thread(void) {
     stbi_image_free(px);
     ecs_os_free(path);
     ecs_fini(world);
+}
+
+void Capture_relative_path_written_before_exit(void) {
+    // renderer/capture_path
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {255, 255, 255, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 256, .height = 256, .write_to_file = "exit.png"});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_os_api_log_t log = ecs_os_api.log_;
+    capture_errors = 0;
+    ecs_os_api.log_ = capture_count_errors;
+    ecs_fini(world);
+    ecs_os_api.log_ = log;
+    test_int(capture_errors, 0);
 }

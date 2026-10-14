@@ -63,7 +63,8 @@
                     "absolute_path",
                     "view_root_selects_clear",
                     "every_frame",
-                    "main_thread"
+                    "main_thread",
+                    "relative_path_written_before_exit"
                 ]
             },
             {

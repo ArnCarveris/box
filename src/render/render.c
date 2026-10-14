@@ -146,6 +146,21 @@ void box_render_sync(
     }
 }
 
+/** Wait for the packets in flight before the world is deleted, so that the captures they
+ * write land before the fini actions registered later, such as the removal of
+ * AppStatus.tmp_dir, run.
+ *
+ * @param world The world
+ * @param ctx Unused
+ */
+static void box_render_fini(
+    ecs_world_t *world,
+    void *ctx)
+{
+    (void)ctx;
+    box_render_ring_sync(box_render_get_ring(world));
+}
+
 /** Apply new render settings before the next frame acquires its packet.
  *
  * @param it The iterator of the observer
@@ -285,6 +300,7 @@ void BoxRenderImport(
 
     ecs_singleton_set(world, RenderRing, { .ring = box_render_ring_new() });
     ecs_singleton_set(world, RenderStatus, {0});
+    ecs_atfini(world, box_render_fini, NULL);
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "RenderSettingsOnSet" }),
