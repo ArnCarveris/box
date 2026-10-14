@@ -318,12 +318,12 @@ void Sphere_lantern_ribs(void) {
         const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
         test_assert(mesh != NULL);
         int32_t outside = 0;
-        for (int32_t rib = -1; rib <= 1; rib += 2) {
+        for (int32_t rib = -1; rib <= 1; rib ++) {
             for (int32_t a = 0; a < 64; a ++) {
                 for (int32_t b = 0; b < 8; b ++) {
                     float around = 2.0f * GLM_PIf * (float)a / 64.0f;
                     float tube = 2.0f * GLM_PIf * (float)b / 8.0f;
-                    float r = 0.185f + 0.014f * cosf(tube);
+                    float r = 0.2f - 0.015f * fabsf((float)rib) + 0.014f * cosf(tube);
                     vec3 p = {
                         r * cosf(around) / 0.25f,
                         (0.12f * (float)rib + 0.014f * sinf(tube)) / 0.25f,
