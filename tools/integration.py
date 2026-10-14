@@ -24,21 +24,28 @@ when no channel moved more than 16, over a dimmed grey copy of the baseline wher
 identical. --json writes the results in the bake3 test report format.
 
   integration.py perf [--dir dir] [--app project] [--env name] [--cfg mode] [--out dir]
-                      [--size WxH] [--cpu-budget pct] [--stall ms] [--max-load n]
+                      [--size WxH] [--seconds s] [--cpu-budget pct] [--stall ms] [--max-load n]
                       [--json file] [scene ...]
 
 perf runs every <dir>/<scene>.flecs (test/integration/perf by default) headless with boxrun on an
-offscreen surface. The scene sets the box.perf.PerfRun singleton (30, 60, 90 or 120 FPS); the
-engine paces every frame to the target, orbits the camera around the bounds of the shapes and
-counts every frame interval outside [0.9, 1.1] target intervals as an error. A scene passes only
-with zero errors, when a view renders the orbiting camera (or a camera under it), when the
-measured frames cover at least one revolution (frames >= fps * period) and when the warmup, the
-only frames not measured, is at most one second. A run is retried only when the load guard refused
-to start it; a run that started is never retried. Each result also holds the range of the visible,
-frustum culled and occlusion culled instances of the orbiting views over the measurement. The results go to <out>/perf.json (test/integration/out by default), which the
-pm page charts, with the 1 minute load average before and after every scene. --stall adds busy
-milliseconds to every frame to prove that the checks fail a slow scene. --max-load waits, up to
---load-wait seconds, until the load average is at most n before every scene.
+offscreen surface of --size, unless the scene declares its own Surface. The scene sets the
+box.perf.PerfRun singleton (30, 60, 90 or 120 FPS) and runs in a release build (--cfg overrides
+it); the engine paces every frame to the target (or presents to a simulated vsync display of
+PerfRun.refresh Hz that paces it), orbits the camera
+around the bounds of the shapes (or lets its controller fly it) and counts as errors every frame
+interval outside [0.9, 1.1] target intervals, every delta_time that differs more than 1 ms from the
+wall time since the previous frame or from the time the display showed the frame before, and every
+uneven present. A scene passes only with zero errors, when a view renders the orbiting (or flying)
+camera, when an orbit covers at least one revolution (frames >= fps * period) or a flying camera
+moved, and when the warmup, the only frames not measured, is at most one second. A run is retried
+only when the load guard refused to start it; a run that started is never retried. Each result
+also holds the range of the visible, frustum culled and occlusion culled instances of the measured
+views and the process CPU use per frame. The results go to <out>/perf.json (test/integration/out
+by default), which the pm page charts, with the 1 minute load average before and after every
+scene. --seconds measures that many seconds at every scene's target instead of its frames.
+--stall adds busy milliseconds to every frame to prove that the checks fail a slow scene.
+--max-load waits, up to --load-wait seconds, until the load average is at most n before every
+scene.
 """
 import argparse
 import glob
@@ -722,7 +729,8 @@ def main():
     perf.add_argument("--dir", help="folder of the scenes, test/integration/perf by default")
     perf.add_argument("--app", default=DEFAULT_APP, help="bake project that runs the scenes")
     perf.add_argument("--env", help="bake3 local environment, the default one when absent")
-    perf.add_argument("--cfg", help="bake3 build mode, the bake3 default when absent")
+    perf.add_argument("--cfg", default="release",
+                      help="bake3 build mode the scenes run in, release by default")
     perf.add_argument("--out", help="folder of perf.json, the runs go to its perf/ folder")
     perf.add_argument("--size", default="1280x720",
                       help="surface size in pixels of the scenes that declare no Surface")

@@ -1,8 +1,10 @@
 # Performance scenes
 
 Every `<scene>.flecs` in this folder is a performance test: it must hold its requested frame rate
-with a camera that orbits the whole scene. `tools/integration.py perf` runs each scene headless
-with `boxrun` and fails a scene on any frame outside 10% of its target.
+with a camera that orbits the whole scene (or that its controller flies), and every frame's
+`delta_time` must match the wall time that passed. `tools/integration.py perf` runs each scene
+headless with `boxrun` and fails a scene on any frame outside 10% of its target, any delta off by
+more than 1 ms and any uneven present of a simulated vsync display.
 
 ```sh
 python3 tools/integration.py perf --env <name>                  # every scene
@@ -10,12 +12,19 @@ python3 tools/integration.py perf --env <name> trivial          # some scenes
 python3 tools/integration.py perf --env <name> --max-load 4     # wait for a quiet machine
 python3 tools/integration.py perf --env <name> --stall 20 --out test/integration/out/slow trivial
 python3 tools/integration.py perf --env <name> --json tests.json  # bake3 test report
+python3 tools/integration.py perf --env <name> --seconds 10 town_fly_60  # a shorter run
 ```
+
+The runner builds and runs `boxrun` in release (`--cfg release`, the default since
+testing/town_stutter; `--cfg debug` overrides it). Earlier baselines, the scene targets and the
+`perf.json` of testing/perf_orbit and of the ui epic, were measured in debug builds.
 
 ## A scene
 
-A scene declares its content, camera and views like a visual scene, never a `Surface`, and opts in
-with the `box.perf.PerfRun` singleton:
+A scene declares its content, camera and views like a visual scene and opts in with the
+`box.perf.PerfRun` singleton. The runner adds an offscreen `Surface` of `--size` (1280x720) unless
+the scene declares its own, like the town scenes, which measure the retina window of the town
+(1280x720 points at `pixel_ratio: 2`, 2560x1440 pixels):
 
 ```
 $ {
@@ -37,18 +46,21 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 
 - A view renders the orbiting camera or a camera under it (a narrower lens on the orbit, like
   `offscreen_100k`'s `eye`). A scene with a special camera (a controller walk, a fixed pose)
-  keeps it only as a second view next to the orbit view, never instead of it.
+  keeps it only as a second view next to the orbit view, never instead of it. A fly run
+  (`fly: true`) has no orbit: its controller flies the camera and the camera must move.
 - The orbiting views draw something. The orbit fits the bounds at `radius / sin(fov / 2)`, which
   for a scene wider than a few hundred units lies beyond the default far plane (1000) of a
   `Camera`: such a scene gives its cameras `far_: 0` (no far plane), like `walk_1m`.
 - The measurement covers at least one full revolution: `frames >= fps * period`, so every angle
-  is measured and objects enter and leave the view during the measurement.
+  is measured and objects enter and leave the view during the measurement (orbit runs only).
 - The warmup, the only frames that are not measured, is at most one second (`warmup <= fps`). It
   lets the first frames load the scene, build the batches and the spatial index and compile the
   pipelines; nothing after it is excused.
-- Every measured frame counts: a frame interval outside 10% of the target is an error and one
-  error fails the scene. There is no retry of a run that started; only a run the load guard
-  refused to start is retried.
+- Every measured frame counts: a frame interval outside 10% of the target, a delta that differs
+  more than 1 ms from the wall time since the previous frame (or, on a simulated display, from
+  the time between the presents of the two frames) and a present interval outside 10% of the
+  target are errors, and one error fails the scene. There is no retry of a run that started; only
+  a run the load guard refused to start is retried.
 
 | Member | Meaning |
 | --- | --- |
@@ -56,14 +68,17 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 | `frames` | Frames measured (300). At least `fps * period` for the runner. |
 | `warmup` | Paced, orbiting frames before the measurement (60), at least 2. At most `fps` for the runner. |
 | `camera` | Camera to orbit, 0 for the first entity with `Camera`. |
+| `refresh` | Refresh rate in Hz of a simulated vsync display (`RenderSettings.display_rate`), 0 for none: the frames are then paced like a window, by the presentation. |
+| `fly` | The camera's `CameraController` flies it with synthetic input (W and the left arrow held, Shift toggled every 2 s) instead of the orbit. |
 | `period`, `elevation` | Seconds per revolution (10) and degrees the camera looks down (30). A period of 0 stands still, which the runner fails. |
 | `stall` | Busy milliseconds added to every frame, only to prove that the checks catch a slow scene. |
 | `quit`, `report` | Quit when the run completes; JSON file the result is written to. |
 
 Setting `PerfRun` again, from a script, C or the REST API, restarts the run. The engine writes the
 result into the `box.perf.PerfStatus` singleton (state, errors, slow, fast, frame interval and work
-statistics, bounds, revolutions, orbit views and culling ranges), which the command port and REST
-read like any other component.
+statistics, bounds, revolutions, orbit views, culling ranges and, in `checks`, the delta, present
+and CPU checks and the distance a fly run travelled), which the command port and REST read like
+any other component.
 
 ## How a run measures
 
@@ -76,12 +91,16 @@ read like any other component.
 - Frame interval: the wall time between the ends of two consecutive frames, taken in the last
   `EcsPostFrame` system after the CPU budget sleep. A frame that finishes early waits until one
   target interval `T = 1 / fps` has passed since the previous end, so an early frame is never
-  counted as fast. The wait sleeps 60% of the time left before the last millisecond at a time (a
-  process without a window gets up to 50% timer leeway on macOS: a 10 ms sleep returns after up to
-  15 ms) and spins the last millisecond, which lands within microseconds of `T`. Every sleep ends
-  at least a millisecond early even with the full leeway, so a thread that wakes up late on a busy
-  machine (seen up to 2 ms with 0.2 ms of spin) does not turn a 1 ms frame into an error; the spin
-  costs about a quarter of a core at 120 FPS.
+  counted as fast. The wait never spins: it sleeps 60% of the time left at a time (a process
+  without a window gets up to 50% timer leeway on macOS: a 10 ms sleep returns after up to 15 ms)
+  until 0.1 ms is left, then the rest, and lands within tens of microseconds of `T` because the
+  pacing thread has a time-constraint policy during the run (testing/pacer_priority).
+- Simulated display: with `refresh` the perf pacer does not wait. Every frame presents to a
+  simulated FIFO swap chain of three images on the render thread: it is shown at the first free
+  refresh after the render thread submitted it, for the swap interval `refresh / fps` refreshes;
+  the render thread waits for the GPU fence of the frame two frames back (the GPU may take two
+  refreshes per frame, as with three images, and a GPU that cannot keep up blocks the renderer)
+  and blocks while a present is still queued, which paces the main thread like a window.
 - Error rule: a measured interval `i` is an error when `i > 1.1 T` (slow) or `i < 0.9 T` (fast).
   Warmup frames are not measured. A run passes only when all `frames` intervals were measured and
   none is an error.
@@ -91,12 +110,23 @@ read like any other component.
   instances, summed over those views. `PerfStatus.visible`, `frustum_culled` and
   `occlusion_culled` hold the minimum, maximum and mean, `cull_changes` how many samples differ
   from the sample before: the proof that the orbit makes culling decide again every frame.
-- Work: the time from the previous frame end to the start of the wait, every system, the render
-  submit and any wait for a free render packet included. `work_mean_ms` and `work_p99_ms` show the
+- Work: the time from the start of the frame (`EcsPreFrame`) to the start of the wait, every
+  system, the render submit and any wait for a free render packet included; on a simulated
+  display that wait is the presentation pacing the frame, so work is close to the interval. `work_mean_ms` and `work_p99_ms` show the
   headroom a passing scene has left; frame interval statistics of a passing scene sit at `T`.
-- Timing: a headless run still steps the simulation with a fixed delta of `1 / fps`, while the
-  pacing, the orbit and the measurement use the wall clock. `App.fps` equals the target, so the
-  flecs frame limiter agrees with the pacer.
+- Delta: a run sets `App.realtime`, so `delta_time` is measured like in a window (and snapped to
+  whole refreshes once the delta smoothing knows the refresh rate). Every measured frame compares
+  the unscaled `delta_time` with the wall time since the start of the previous frame on the same
+  OS clock; a difference over `BOX_FRAME_TOLERANCE_MS` (1 ms) is a delta error. The tolerance is
+  absolute because the error of a measured delta is wake up jitter, which does not grow with the
+  frame interval; 1 ms is 12% of a 120 FPS frame, so a delta that passes moves the scene by at
+  most one eighth of a frame's motion. On a simulated display every shown frame also compares its
+  delta with the time since the frame before was shown (display delta errors): the motion of a
+  frame must match how long the display showed the frame before it.
+- CPU: the process CPU time (all threads) over the wall time of the measurement is reported as
+  `cpu_percent` and per frame as `cpu_ms`. A pacer or present that busy waits shows up as CPU time
+  that grows with the idle time of a frame; on minime the town costs about 3.8 ms of CPU per frame
+  at every target.
 
 ## CPU budget and load guard
 
@@ -148,6 +178,8 @@ whose work was under 2 ms: the pacer's sleep woke late on a busy machine, not th
 | `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
 | `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
+| `town_orbit_30` .. `town_orbit_120` | windowed town | 30, 60, 90, 120 | The town at the retina size of its window for a minute, orbiting, presenting to a simulated 120 Hz display (90 Hz for 90 FPS, which does not divide 120). | 2.5k..3.6k | 0.1k | 1.1k..2.2k |
+| `town_fly_30` .. `town_fly_120` | moving through the town | 30, 60, 90, 120 | The same, flown through the streets by the scene's `CameraController` with synthetic input for a minute. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
 | `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` (content shared through `town.sources`) with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 
