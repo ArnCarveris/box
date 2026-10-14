@@ -1,0 +1,47 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 3, 8}
+  Rotation: {-0.15, 0, 0}
+  Camera: {fov: 60}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 180, 220, 255}}, shadows: {enabled: true}}
+}
+
+sun {
+  Rotation: {-0.6, 2.5, 0}
+  DirectionalLight: {intensity: 1.5}
+  Rgb: {255, 240, 220}
+}
+
+ground {
+  Position: {0, -0.1, -140}
+  Box: {40, 0.2, 300}
+  Rgb: {190, 190, 180}
+}
+
+for i in 0..12 {
+  {
+    Position: {-3, 1, 4 - i * i * 1.2}
+    Box: {0.6, 2, 0.6}
+    Rgb: {200, 80, 60}
+  }
+  {
+    Position: {3, 0.8, 3 - i * i * 1.2}
+    Sphere: {segments: 24, smooth: true, radius: 0.8}
+    Rgb: {80, 140, 210}
+  }
+}
+
+arch {
+  Position: {0, 2.5, -20}
+  Box: {8, 0.4, 0.8}
+  Rgb: {120, 200, 120}
+}
