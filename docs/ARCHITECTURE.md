@@ -18,11 +18,11 @@ component ids are registered in the same order in every world.
 | `box.geometry`  | `include/box/geometry.h`  | `src/geometry`   | Scalable 3D and 2D shapes |
 | `box.camera`    | `include/box/camera.h`    | `src/camera`     | `Camera`, reversed Z projections |
 | `box.surface`   | `include/box/surface.h`   | `src/surface`    | `Surface`, `SurfaceStatus`, glfw windows, render targets |
-| `box.view`      | `include/box/view.h`      | `src/view`       | `View`, `Scene` |
+| `box.view`      | `include/box/view.h`      | `src/view`       | `View` (lit by default), `Scene` |
 | `box.effects`   | `include/box/effects.h`   | `src/effects`    | Post process effect settings |
 | `box.material`  | `include/box/material.h`  | `src/material`   | PBR material components, `Tint` |
 | `box.texture`   | `include/box/texture.h`   | `src/texture`    | `Texture`, `TexturePath` (not yet imported by `BoxImport`) |
-| `box.light`     | `include/box/light.h`     | `src/light`      | Directional, point and spot lights |
+| `box.light`     | `include/box/light.h`     | `src/light`      | Directional, point, spot and ambient lights |
 | `box.movement`  | `include/box/movement.h`  | `src/movement`   | `Velocity`, `AngularVelocity` |
 | `box.layout`    | `include/box/layout.h`    | `src/layout`     | UI layout components |
 | `box.input`     | `include/box/input.h`     | `src/input`      | `Input`, `Key`, synthetic input queue, `Action`, `ActionState`, `Binding` |
@@ -106,8 +106,8 @@ Two phases run after `EcsOnStore`: in `RenderExtract` modules call
 free packet and waits when all are in flight, counted in `RenderStatus.stalls`), and
 `RenderSubmit` hands it to the consumer. `RenderExtractViews` adds every `View` whose
 camera has a `Camera`, in creation order (entity id), with the parent of the view, the
-camera transform, its inverse and the scene root of the camera (the nearest ancestor with
-`Scene`, 0 for the default scene). `RenderExtractDraws` sends the instanced batches of the
+camera transform, its inverse and the scene of the camera (see Scenes, 0 for the default
+scene). `RenderExtractDraws` sends the instanced batches of the
 shapes, see below. `box_render_sync` waits until every submitted packet rendered; deleting
 the world does the same before the fini actions registered after `box.render`, such as the
 removal of `AppStatus.tmp_dir`, run, so the captures of the last frames land.
@@ -197,10 +197,53 @@ The webgpu backend (`src/render/gpu_draw.c`) renders, after clearing a target, e
 of the target in packet order into its color texture and a `Depth32Float` texture at the
 render size. A view that clears replaces the color with its clear color, any other view
 draws over what is there; depth is cleared to 0 for every view and tested with greater. A
-view draws the batches of its own scene with the engine shader `etc/shaders/mesh.wgsl` (a
-sun and sky ambient), which is sent once a batch uses it. A target renders the views whose
+view draws the batches of its own scene with the engine shader `etc/shaders/mesh.wgsl`,
+lit by the lights of that scene (see Lights), which is sent once a batch uses it. A target renders the views whose
 parent is its `view_root`, or every view when that is 0; `box.surface` does not set
 `box_render_target_t.view_root` yet, so for now every surface renders every view.
+
+## Scenes
+
+A `Scene` is an isolated space in the world. An entity belongs to itself when it has `Scene`,
+else to its nearest ancestor with `Scene` (through `ChildOf` or `Parent` storage), else to the
+default scene (0). Nested scenes are separate: an entity of an inner scene is not part of the
+outer one. Scene membership comes from queries with a `Scene(self|up)` term, never from a
+walk up the hierarchy: `src/render/scene.c` keeps one cached membership query that
+`box_render_scene_of` asks for a single entity (the camera of a view or capture, a changed
+shape), and the light queries carry the same term, so the scene of a light is the source of
+its field.
+
+The renderer partitions by scene: batches are keyed by scene and a view draws only the
+batches of the scene of its camera; lights, ambient light and the cluster pass of a view are
+per scene, so a light never reaches another scene and entities of different scenes never
+interact, even when they overlap. Adding or removing `Scene`, or reparenting an entity,
+queues its subtree in the draw observers, which moves the shapes into the batches of their
+new scene in the next extract; the light queries follow the change by themselves. Picking,
+collision and spatial indices do not exist yet.
+
+## Lights
+
+`box.light` defines `DirectionalLight`, `PointLight`, `SpotLight` and `AmbientLight`; their
+constructors give intensity 1, range 10 and a 20/30 degree cone, so a script that leaves a
+member out keeps the default (a C literal writes 0, see CLAUDE.md). A light takes its color
+from `Rgb`, its position from `WorldTransform` and its direction from the local +Z axis.
+
+`RenderExtractLights` (`src/render/lights.c`) collects the lights of every scene each frame
+from cached queries into a storage light buffer per scene, directional lights first. A
+buffer grows by doubling and is uploaded only when its bytes changed, so a static scene
+uploads nothing. Every view of the packet gets the buffer, the light counts and the ambient
+light of the scene of its camera. `AmbientLight` (sky, ground, intensity) on a scene root,
+on any entity of the scene or as a singleton for the default scene is summed per scene. A
+scene without any light entity is lit by a default sun from a shared buffer, a scene without
+`AmbientLight` by the default sky and ground, so a scene that adds a light entity with
+intensity 0 is dark. `View.lighting.enabled` false draws base color and emission only; the
+`View` constructor (`src/view/view.c`) enables lighting.
+
+The webgpu backend (`src/render/gpu_light.c`) runs, for every view with point or spot
+lights, the compute shader `etc/shaders/cluster.wgsl` before the view draws: it splits the
+view frustum into 16x9x24 clusters (the last depth slice reaching to infinity) and lists,
+per cluster, up to 128 lights whose range reaches it. `mesh.wgsl` shades every directional
+light of the scene plus the lights of the cluster of the fragment.
 
 ## From a component change to a reconfiguration
 
