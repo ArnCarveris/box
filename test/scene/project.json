@@ -65,7 +65,10 @@
                     "random_vs_brute_force",
                     "random_moves_vs_brute_force",
                     "rebuild_keeps_results",
-                    "dynamic_unnotified_move_after_idle"
+                    "dynamic_unnotified_move_after_idle",
+                    "static_moved_over_frames_then_queried",
+                    "static_moved_then_removed_then_queried",
+                    "static_moved_back_then_queried"
                 ]
             }
         ]

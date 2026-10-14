@@ -121,6 +121,8 @@ typedef struct box_render_draws_t {
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     box_render_draws_stats_t stats; /**< Counters of the last extract */
+    const ecs_table_t *scene_table; /**< Table whose entities share scene_of while processing */
+    ecs_entity_t scene_of;      /**< Scene of the entities of scene_table */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
 
