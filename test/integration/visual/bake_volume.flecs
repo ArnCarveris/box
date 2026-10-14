@@ -1,0 +1,80 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+room {
+  Scene: {}
+  LightBake: {probe_spacing: 1.5, bounds_padding: 1}
+  AmbientLight: {sky: {150, 185, 255}, ground: {190, 110, 60}, intensity: 1.5}
+
+  camera {
+    Position: {0, 3.5, 9}
+    Rotation: {-0.32, 0, 0}
+    Camera: {fov: 50}
+  }
+
+  sun {
+    Rotation: {0.9, 2.4, 0}
+    DirectionalLight: {intensity: 0.3}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {14, 0.2, 8}
+    Rgb: {200, 200, 200}
+  }
+
+  wall {
+    Position: {0, 2, -3.5}
+    Box: {14, 4, 0.5}
+    Rgb: {210, 205, 200}
+  }
+
+  pillar {
+    Position: {-4.5, 1.5, -1.5}
+    Box: {1.6, 3, 1.6}
+    Rgb: {90, 140, 220}
+  }
+
+  ball {
+    Position: {-1.8, 1, 0.5}
+    Sphere: {segments: 32, smooth: true, radius: 1}
+    Rgb: {235, 235, 235}
+  }
+
+  block {
+    Position: {1.2, 0.7, -0.5}
+    Rotation: {0, 0.6, 0}
+    Box: {1.4, 1.4, 1.4}
+    Rgb: {220, 90, 70}
+  }
+
+  ring {
+    Position: {4, 1.1, 0.5}
+    Rotation: {0.4, 0, 0.3}
+    Torus: {segments: 32, rings: 16, smooth: true, radius: 0.8, tube: 0.3}
+    Rgb: {80, 180, 120}
+    PbrMaterial: {metallic: 1, roughness: 0.3}
+  }
+
+  hidden {
+    NoBake
+    Position: {2.6, 0.4, 2}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {240, 200, 60}
+  }
+
+  mover {
+    DynamicTransform
+    Position: {-0.2, 2.6, 1.5}
+    Sphere: {segments: 24, smooth: true, radius: 0.5}
+    Rgb: {230, 120, 200}
+  }
+}
+
+main_view {
+  View: {camera: room.camera, clear: {enabled: true, color: {20, 22, 28, 255}}}
+}

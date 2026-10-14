@@ -107,7 +107,8 @@ typedef enum box_render_resource_kind_t {
     BOX_RENDER_MESH,     /**< Vertex and index data */
     BOX_RENDER_TEXTURE,  /**< Sampled texture */
     BOX_RENDER_TARGET,   /**< Surface or offscreen target that views render into */
-    BOX_RENDER_SHADER    /**< Shader module or pipeline */
+    BOX_RENDER_SHADER,   /**< Shader module or pipeline */
+    BOX_RENDER_VOLUME    /**< Irradiance probe volume of a scene with LightBake */
 } box_render_resource_kind_t;
 
 /** What a resource change does to its object */
@@ -207,6 +208,7 @@ typedef struct box_render_view_t {
     box_render_view_cull_t cull; /**< Culling of the view and of its shadow casters */
     int32_t effect_first;       /**< Index of the first effect pass of the view in the packet */
     int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
+    uint32_t volume;            /**< Probe volume the view samples, 0 for the hemisphere ambient */
 } box_render_view_t;
 
 /** Kind of an effect pass of a view */
@@ -261,6 +263,26 @@ typedef struct box_render_texture_desc_t {
     uint32_t width;         /**< Width in pixels */
     uint32_t height;        /**< Height in pixels */
 } box_render_texture_desc_t;
+
+/** Coefficients of an L2 spherical harmonic: one for band 0, three for 1 and five for 2 */
+#define BOX_RENDER_SH_COEFFICIENTS (9)
+
+/** Description of a BOX_RENDER_VOLUME create or update, followed by the validity mask.
+ *
+ * Probe (x, y, z) is at origin + (x, y, z) * spacing, stored x fastest, then y, then z. A
+ * probe is L2 SH irradiance E_lm = A_l * L_lm (Ramamoorthi and Hanrahan) in Sloan's real basis,
+ * evaluated as E(n) / pi in place of the hemisphere ambient.
+ *
+ * The mask has one bit per probe, (probes + 31) / 32 words, set outside static geometry. A
+ * create fills every probe with sh; an update of the same grid refills them and the mask.
+ */
+typedef struct box_render_volume_desc_t {
+    float origin[3];        /**< World position of the first probe */
+    float spacing;          /**< World units between neighbouring probes */
+    uint32_t size[3];       /**< Probes per axis, at least 1 */
+    uint32_t probes;        /**< Probes of the grid, the product of size */
+    float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Linear rgb irradiance coefficients, w unused */
+} box_render_volume_desc_t;
 
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
@@ -759,6 +781,39 @@ void box_render_shadow_cascade(
     int32_t resolution,
     float distance,
     box_render_cascade_t *out);
+
+/** Register the system that keeps the irradiance probe volume of every scene with LightBake.
+ *
+ * Runs after the light extract, because the probes start out as the ambient light of the views
+ * of their scene. Views with lighting.baked sample the volume of their scene.
+ *
+ * A volume is a grid over the static bounds of its scene plus bounds_padding, probe_spacing
+ * apart; it is sent again when the grid changes and refilled when the ambient changes.
+ *
+ * @param world The world
+ */
+void box_render_bake_init(
+    ecs_world_t *world);
+
+/** A probe of the volume of a scene */
+typedef struct box_render_probe_t {
+    vec3 position;          /**< World position of the probe */
+    bool valid;             /**< The probe is outside static geometry, so views sample it */
+} box_render_probe_t;
+
+/** Find the probe of the volume of a scene nearest to a position.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param position The position
+ * @param out Receives the probe
+ * @return false when the scene has no probes
+ */
+bool box_render_bake_probe(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    const vec3 position,
+    box_render_probe_t *out);
 
 /** Register the system that adds the effect passes of every view to the packet.
  *
