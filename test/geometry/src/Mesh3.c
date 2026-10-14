@@ -310,3 +310,24 @@ void Mesh3_scale(void) {
 
     ecs_fini(world);
 }
+
+void Mesh3_ensure_modified_leak(void) {
+    // renderer/mesh3_leak
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+
+    ecs_entity_t e = ecs_new(world);
+    Mesh3 *m = ecs_ensure(world, e, Mesh3);
+    test_assert(m != NULL);
+    ecs_vec_init_t(NULL, &m->vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m->vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m->vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_modified(world, e, Mesh3);
+    test_assert(ecs_get(world, e, ShapeMesh) != NULL);
+
+    ecs_fini(world);
+}
