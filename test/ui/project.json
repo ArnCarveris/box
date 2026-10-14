@@ -128,7 +128,12 @@
                     "press_drag_release",
                     "scroll",
                     "layout_bounds",
-                    "unhandled_goes_to_screen"
+                    "unhandled_goes_to_screen",
+                    "capture_drag_leaves_element",
+                    "capture_drag_across_second_view",
+                    "capture_release_outside",
+                    "capture_cleared_after_release",
+                    "capture_cleared_when_deleted"
                 ]
             },
             {
