@@ -858,6 +858,19 @@
                     "static_100k_add_velocity",
                     "static_100k_shapes_add_dynamic_velocity"
                 ]
+            },
+            {
+                "id": "DynamicInherit",
+                "testcases": [
+                    "childof_velocity_child_keeps_moving",
+                    "parent_velocity_child_keeps_moving",
+                    "childof_angular_velocity_child_keeps_rotating",
+                    "childof_tagged_child_stays_dynamic",
+                    "parent_tagged_child_stays_dynamic",
+                    "childof_inherited_child_becomes_static",
+                    "childof_velocity_grandchild_under_inherited_child",
+                    "childof_child_regains_tag_from_new_dynamic_parent"
+                ]
             }
         ]
     }
