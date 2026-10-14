@@ -87,6 +87,24 @@ static void box_input_emit_mouse(
     };
 }
 
+/** Append a wheel movement at the cursor to the events of the frame.
+ *
+ * @param dev The device state
+ * @param in The Input singleton
+ * @param ev The scroll event, its value is the wheel offset
+ */
+static void box_input_emit_scroll(
+    InputDevice *dev,
+    const Input *in,
+    const InputEvent *ev)
+{
+    box_input_emit_mouse(dev, in, 0);
+    box_input_emit_t *emit = ecs_vec_last_t(&dev->emits, box_input_emit_t);
+    emit->is_scroll = true;
+    emit->mouse.delta_x = ev->value[0];
+    emit->mouse.delta_y = ev->value[1];
+}
+
 /** Append the event of a key or button change to the events of the frame.
  *
  * @param dev The device state
@@ -303,6 +321,7 @@ static void box_input_apply(
     case InputScroll:
         in->mouse.scroll[0] += ev->value[0];
         in->mouse.scroll[1] += ev->value[1];
+        box_input_emit_scroll(dev, in, ev);
         break;
     case InputFocus:
         box_input_set_focus(dev, in, ev->code != 0);
@@ -387,7 +406,7 @@ static void box_input_derive(
     }
 }
 
-/** Emit the script events of the frame through flecs.script.event.
+/** Emit the script events of the frame through the router or flecs.script.event.
  *
  * @param world The world
  * @param dev The device state
@@ -399,10 +418,12 @@ static void box_input_emit(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&dev->emits); i ++) {
         box_input_emit_t emit = *ecs_vec_get_t(&dev->emits, box_input_emit_t, i);
-        if (emit.is_mouse) {
-            ecs_script_mouse_event(world, &emit.mouse);
-        } else {
+        if (dev->router.route) {
+            dev->router.route(world, &emit, dev->router.ctx);
+        } else if (!emit.is_mouse) {
             ecs_script_keyboard_event(world, &emit.keyboard);
+        } else if (!emit.is_scroll) {
+            ecs_script_mouse_event(world, &emit.mouse);
         }
     }
 
