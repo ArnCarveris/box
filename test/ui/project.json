@@ -1,0 +1,57 @@
+{
+    "id": "ui",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Layout",
+                "testcases": [
+                    "row_places_children",
+                    "column_places_children",
+                    "ordered_children",
+                    "row_spacing",
+                    "column_spacing",
+                    "padding",
+                    "fit_content",
+                    "fit_rect",
+                    "fit_circle",
+                    "fit_text",
+                    "fit_without_item",
+                    "fixed_size",
+                    "min_max",
+                    "grow_weighted",
+                    "grow_zero_weight",
+                    "grow_min_max",
+                    "grow_column",
+                    "grow_cross_axis",
+                    "grow_direction_none",
+                    "row_align",
+                    "column_align",
+                    "row_ignores_item_placement",
+                    "none_anchors",
+                    "none_keeps_position",
+                    "none_fit_content",
+                    "position_keeps_z",
+                    "position_owned",
+                    "rect_written",
+                    "rect_input_change",
+                    "nested",
+                    "transform_same_frame",
+                    "same_in_every_scene",
+                    "parent_component",
+                    "add_remove_child",
+                    "reparent",
+                    "unchanged_tree_not_laid_out",
+                    "root_item",
+                    "script"
+                ]
+            }
+        ]
+    }
+}
