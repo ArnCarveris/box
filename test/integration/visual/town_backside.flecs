@@ -1,0 +1,28 @@
+// The town of etc/scenes/town.flecs (town_content.flecs, copied next to the run through
+// town.sources) from the viewpoint of box_old's town_backside scene, which looked from
+// {-14, 7, 18} at {0, 1, 0}, with the view of etc/scenes/town.flecs.
+
+include town_content
+
+using box.transform
+using box.camera
+using box.view
+using box.effects
+
+ssao {
+  Ssao: {radius: 2.5, bias: 0.025, intensity: 1}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Position: {-14, 7, 18}
+  Rotation: {-0.2573, -0.6610, 0}
+  Camera: {fov: 55, near_: 0.1}
+}
+
+view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 1.5, filter_size: 3, fade: 0.2}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: ssao}, {enabled: true, effect: tonemap}]}
+}

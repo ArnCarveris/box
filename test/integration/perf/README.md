@@ -25,6 +25,12 @@ $ {
 
 Every scene spells out every setting, so a changed default never changes what a scene measures.
 
+A scene may share content with another scene through `include <name>` (flecs script resolves it
+next to the script). The runner writes the script it runs into the output folder, so the scene
+lists the files it includes in `<scene>.sources`, one path relative to the scene per line, and
+the runner copies them next to it: `town.flecs` includes `town_content`, listed in `town.sources`
+as `../../../etc/scenes/town_content.flecs`, the content of `etc/scenes/town.flecs`.
+
 ## Rules every scene follows
 
 The runner fails a scene that breaks one of these, whatever its frame times:
@@ -43,11 +49,11 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 
 | Member | Meaning |
 | --- | --- |
-| `fps` | Target: 30, 60, 90 or 120. Anything else makes the run `PerfInvalid`. Also written to `App.fps`. |
-| `frames` | Frames measured, 0 for five seconds of frames. At least `fps * period` for the runner. |
-| `warmup` | Paced, orbiting frames before the measurement, 0 for one second, at least 2. At most `fps`. |
+| `fps` | Target: 30, 60, 90 or 120 (60 when added without a value). Anything else makes the run `PerfInvalid`. Also written to `App.fps`. |
+| `frames` | Frames measured (300). At least `fps * period` for the runner. |
+| `warmup` | Paced, orbiting frames before the measurement (60), at least 2. At most `fps` for the runner. |
 | `camera` | Camera to orbit, 0 for the first entity with `Camera`. |
-| `period`, `elevation` | Seconds per revolution (10) and degrees the camera looks down (30). |
+| `period`, `elevation` | Seconds per revolution (10) and degrees the camera looks down (30). A period of 0 stands still, which the runner fails. |
 | `stall` | Busy milliseconds added to every frame, only to prove that the checks catch a slow scene. |
 | `quit`, `report` | Quit when the run completes; JSON file the result is written to. |
 
@@ -134,6 +140,7 @@ is not honest for it. Counts are the ranges over the orbit of one pass.
 | `text_10k` | text | 120 | 10,000 labels, about 50,000 glyphs, lying on a board. | 20k..22k | 26k..28k | 0..0.1k |
 | `shapes2d_100k` | 2D shapes | 120 | 100,467 bordered rectangles, bordered circles and lines on the ground, one batch. | 87k..88k | 12.5k..13.4k | 0..1k |
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
+| `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` (content shared through `town.sources`) with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 
 Frustum culled includes the size cull: shapes below one pixel (the far street boxes of the city,

@@ -50,6 +50,10 @@ that ran. The output folder ignores itself in git.
   from the repository root (`test/integration/visual/assets/checker.png`); a `TexturePath`
   finds them from the working directory of `boxrun` upwards. `assets/gen_assets.py` writes
   the PNGs.
+- Shared content: a scene may `include` a script that lives elsewhere, such as a scene of
+  `etc/scenes`, when it lists the file in `<scene>.sources` (a path relative to the scene per
+  line); the runner copies it next to the script it runs. `town_backside` includes the content of
+  `etc/scenes/town.flecs` this way.
 - Static: the camera does not move, and nothing that depends on wall time or history across
   many frames is guarded by a baseline; cover that with a C test.
 - Small: a scene renders in well under a second.
@@ -92,3 +96,4 @@ that ran. The output folder ignores itself in git.
 | `effects_fog` | Height fog | Two rows of pillars running into the distance that fade into a warm fog lit by the sun, a hill behind them half lost in it and a horizon where ground and sky blend. |
 | `ui_layout` | Layout: fit, grow, align, anchors | A 600 px wide window that fits its height: a title bar (yellow dot, title, two dots pushed right by a grow spacer), three buttons growing 1:2:1, five bars centered and bottom aligned, a list of bars aligned right and a dark stage that stretches to the list height with a red dot top left, a green rect top right, a blue bar bottom left offset by 10, 4, a yellow dot bottom right, a purple pill in the middle and a white dot kept at its own position. |
 | `culling_occlusion` | Hi-Z occlusion under a fast camera | A city of tall blocks seen from above while the camera flies 50 units a frame (a `CameraController` velocity), so the captured frame shows streets the previous frame hid; every block and every orange ball in the visible streets is drawn, exactly as with frustum culling alone (`occlusion: false`). |
+| `town_backside` | The town of `etc/scenes/town.flecs` | The 4 by 4 block town (its `town_content`) from box_old's `town_backside` viewpoint with the view of the etc scene (cascaded shadows, occlusion culling, SSAO, tonemap): a flat roof with laundry and a water tank bottom left, a purple house with a balcony and two cherry trees behind it, a tall timber house on the right with air conditioners and shutters, power lines with sagging wires across the frame and glowing red lanterns in the streets. box_old drew the same layout mirrored left to right and with a black sky. |
