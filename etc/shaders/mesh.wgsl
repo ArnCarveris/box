@@ -4,7 +4,9 @@
 // a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
 // with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
 // The cull pass writes the slots of the visible instances, which step per instance; the
-// instance data is read from the instance buffer of the batch (group 2).
+// instance data is read from the instance buffer of the batch (group 2). Indirect light comes
+// from the hemisphere ambient, or for a view that samples baked lighting from the irradiance
+// probe volume of its scene (group 3).
 #include "include/instance.wgsl"
 #include "include/lights.wgsl"
 #include "include/shadow.wgsl"
@@ -26,6 +28,22 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(1) @binding(4) var material_sampler: sampler;
 
 @group(2) @binding(0) var<storage, read> instances: array<Instance>;
+
+// Grid of the probe volume: probe (x, y, z) sits at origin.xyz + (x, y, z) * origin.w, x
+// fastest in the probe buffer. size.w is 0 for the 1x1x1 volume of views that keep the
+// hemisphere ambient, 1 when the view samples the probes.
+struct Volume {
+    origin: vec4f,
+    size: vec4u,
+};
+
+// Every probe is SH_COEFFICIENTS rgb irradiance coefficients E_lm (Ramamoorthi and Hanrahan),
+// in Sloan's real SH basis; probe_valid has one bit per probe, clear inside static geometry.
+@group(3) @binding(0) var<uniform> volume: Volume;
+@group(3) @binding(1) var<storage, read> probes: array<vec4f>;
+@group(3) @binding(2) var<storage, read> probe_valid: array<u32>;
+
+const SH_COEFFICIENTS: u32 = 9u;
 
 struct VertexIn {
     @location(0) position: vec3f,
@@ -67,6 +85,75 @@ struct VertexOut {
 // Hemisphere ambient light of the scene in a direction.
 fn ambient(dir: vec3f) -> vec3f {
     return mix(view.ambient_ground.rgb, view.ambient_sky.rgb, dir.y * 0.5 + 0.5);
+}
+
+// L2 SH irradiance coefficients of a probe, or of a blend of probes.
+struct Irradiance {
+    sh: array<vec3f, 9>,
+};
+
+// Irradiance of the hemisphere ambient: mix(ground, sky, y / 2 + 1 / 2) is a + b * y, which
+// projects exactly onto the constant and the y coefficient.
+fn hemisphere_irradiance() -> Irradiance {
+    var e: Irradiance;
+    let a = (view.ambient_sky.rgb + view.ambient_ground.rgb) * 0.5;
+    let b = (view.ambient_sky.rgb - view.ambient_ground.rgb) * 0.5;
+    e.sh[0] = a * (PI * 3.5449077018);
+    e.sh[1] = b * (PI * 2.0466534158);
+    return e;
+}
+
+// Irradiance at a position with a normal, blended from the 8 probes around it: trilinear
+// weights, times the wrap of the direction toward the probe around the normal as in DDGI, so
+// probes behind the surface count less. Invalid probes are skipped; outside the grid the
+// position clamps to the border probes. Without a valid probe it is the hemisphere ambient.
+fn volume_irradiance(world: vec3f, n: vec3f) -> Irradiance {
+    let size = volume.size.xyz;
+    let g = clamp((world - volume.origin.xyz) / volume.origin.w, vec3f(0.0), vec3f(size - 1u));
+    let base = min(vec3u(floor(g)), max(size, vec3u(2u)) - 2u);
+    let t = clamp(g - vec3f(base), vec3f(0.0), vec3f(1.0));
+    var e: Irradiance;
+    var total = 0.0;
+    for (var i = 0u; i < 8u; i++) {
+        let o = vec3u(i & 1u, (i >> 1u) & 1u, (i >> 2u) & 1u);
+        let p = min(base + o, size - 1u);
+        let index = p.x + (p.y + p.z * size.y) * size.x;
+        let valid = (probe_valid[index >> 5u] >> (index & 31u)) & 1u;
+        let trilinear = select(1.0 - t, t, o == vec3u(1u));
+        let to_probe = volume.origin.xyz + vec3f(p) * volume.origin.w - world;
+        let dist = length(to_probe);
+        let dir = select(n, to_probe / max(dist, 1e-4), dist > 1e-4);
+        let wrap = (dot(dir, n) + 1.0) * 0.5;
+        let w = trilinear.x * trilinear.y * trilinear.z * (wrap * wrap + 0.2) * f32(valid);
+        if (w > 0.0) {
+            for (var k = 0u; k < SH_COEFFICIENTS; k++) {
+                e.sh[k] += probes[index * SH_COEFFICIENTS + k].rgb * w;
+            }
+
+            total += w;
+        }
+    }
+
+    if (total <= 0.0) {
+        return hemisphere_irradiance();
+    }
+
+    for (var k = 0u; k < SH_COEFFICIENTS; k++) {
+        e.sh[k] /= total;
+    }
+
+    return e;
+}
+
+// Irradiance over pi in a direction, the term the hemisphere ambient stands in for. The
+// direction is used as given, like the hemisphere, which reads its y without normalizing.
+fn irradiance(e: Irradiance, d: vec3f) -> vec3f {
+    let band0 = e.sh[0] * 0.2820947918;
+    let band1 = (e.sh[1] * d.y + e.sh[2] * d.z + e.sh[3] * d.x) * 0.4886025119;
+    let band2 = (e.sh[4] * (d.x * d.y) + e.sh[5] * (d.y * d.z) + e.sh[7] * (d.x * d.z))
+        * 1.0925484306 + e.sh[6] * (0.3153915653 * (3.0 * d.z * d.z - 1.0))
+        + e.sh[8] * (0.5462742153 * (d.x * d.x - d.y * d.y));
+    return max((band0 + band1 + band2) / PI, vec3f(0.0));
 }
 
 // Surface of a fragment from the material constants of its instance. Texture layers apply
@@ -215,8 +302,19 @@ fn shade(s: Surface, v: vec3f, world: vec3f) -> vec3f {
     let ndv = max(dot(n, v), 1e-4);
     let ab = env_brdf(s.roughness, ndv);
     let r = reflect(-v, n);
-    let indirect_specular = (f0 * ab.x + ab.y) * ambient(mix(r, n, a));
-    let indirect_diffuse = diffuse_color * ambient(n);
+    var specular_light: vec3f;
+    var diffuse_light: vec3f;
+    if (volume.size.w == 0u) {
+        specular_light = ambient(mix(r, n, a));
+        diffuse_light = ambient(n);
+    } else {
+        let e = volume_irradiance(world, n);
+        specular_light = irradiance(e, mix(r, n, a));
+        diffuse_light = irradiance(e, n);
+    }
+
+    let indirect_specular = (f0 * ab.x + ab.y) * specular_light;
+    let indirect_diffuse = diffuse_color * diffuse_light;
     return lights_direct(s, v, world) + indirect_diffuse + indirect_specular + s.emissive;
 }
 
