@@ -845,18 +845,20 @@ void Terminal_root_private(void) {
     ecs_os_free(root);
 }
 
-void Terminal_root_existing_refused(void) {
+void Terminal_root_symlink_refused(void) {
     // hardening/tmp_dir
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
     char *root = flecs_asprintf("/tmp/box/%d", (int)getpid());
-    char *marker = flecs_asprintf("%s/marker", root);
-    mkdir("/tmp/box", 01777);
-    test_int(mkdir(root, 0700), 0);
+    char *target = flecs_asprintf("/tmp/box_command_target_%d", (int)getpid());
+    char *marker = flecs_asprintf("%s/marker", target);
+    mkdir("/tmp/box", 0700);
+    test_int(mkdir(target, 0700), 0);
     FILE *f = fopen(marker, "w");
     test_assert(f != NULL);
     fclose(f);
+    test_int(symlink(target, root), 0);
 
     ecs_log_set_level(-4);
     test_assert(box_terminal_new(world) == 0);
@@ -864,11 +866,15 @@ void Terminal_root_existing_refused(void) {
     ecs_fini(world);
 
     struct stat st;
+    test_int(lstat(root, &st), 0);
+    test_assert(S_ISLNK(st.st_mode));
     test_int(stat(marker, &st), 0);
 
+    unlink(root);
     unlink(marker);
-    rmdir(root);
+    rmdir(target);
     ecs_os_free(marker);
+    ecs_os_free(target);
     ecs_os_free(root);
 }
 
@@ -892,5 +898,54 @@ void Terminal_name_not_a_path(void) {
 
     struct stat st;
     test_int(stat("/tmp/box", &st), 0);
+    ecs_os_free(root);
+}
+
+void Terminal_name_with_slash(void) {
+    // hardening/tmp_dir
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char *root = flecs_asprintf("/tmp/box/%d", (int)getpid());
+    ecs_entity_t e = ecs_new(world);
+    ecs_set_name(world, e, "a/b");
+    ecs_add(world, e, Terminal);
+
+    const TerminalStatus *status = ecs_get(world, e, TerminalStatus);
+    test_assert(status != NULL);
+    test_assert(strncmp(status->dir, root, strlen(root)) == 0);
+    test_assert(status->dir[strlen(root)] == '/');
+    test_assert(strchr(status->dir + strlen(root) + 1, '/') == NULL);
+
+    struct stat st;
+    test_int(lstat(status->dir, &st), 0);
+    test_assert(S_ISDIR(st.st_mode));
+
+    ecs_fini(world);
+    ecs_os_free(root);
+}
+
+void Terminal_headless_root_shared(void) {
+    // hardening/tmp_dir
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = box_terminal_new(world);
+    test_assert(s != 0);
+    char *root = flecs_asprintf("/tmp/box/%d", (int)getpid());
+
+    ecs_singleton_set(world, App, { .headless = true, .frames = 1, .cpu_budget = 100 });
+    test_str(ecs_singleton_get(world, AppStatus)->tmp_dir, root);
+
+    ecs_entity_t t = box_terminal_new(world);
+    test_assert(t != 0);
+    const TerminalStatus *status = ecs_get(world, t, TerminalStatus);
+    test_assert(status != NULL);
+    test_assert(strncmp(status->dir, root, strlen(root)) == 0);
+
+    ecs_fini(world);
+
+    struct stat st;
+    test_assert(lstat(root, &st) != 0);
     ecs_os_free(root);
 }

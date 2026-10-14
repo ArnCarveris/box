@@ -125,30 +125,47 @@ void box_app_rmtree(
     box_app_rmtree_id(path, 0, 0);
 }
 
-/** Create the shared root of the temporary folders unless it exists, and check that it is a
- * real folder in which other users cannot rename or delete the folder of this process.
+const char* box_app_tmp_root_problem(
+    mode_t mode,
+    uid_t owner,
+    uid_t user)
+{
+    const char *result = NULL;
+    if (!S_ISDIR(mode)) {
+        result = "it is not a folder";
+    } else if (owner != user && owner != 0) {
+        result = "another user owns it and could replace the folder of this process";
+    } else if ((mode & (S_IWGRP | S_IWOTH)) && !(mode & S_ISVTX)) {
+        result = "other users can write it and it has no sticky bit";
+    }
+
+    return result;
+}
+
+/** Create the root of the temporary folders unless it exists, and check that no other user
+ * can rename, replace or delete the folder of this process in it.
  *
  * @return 0 when the root may hold the folder, -1 when it may not
  */
 static int box_app_tmp_root(void)
 {
     struct stat st;
+    const char *problem;
     int result = -1;
-    if (!mkdir(BOX_TMP_ROOT, 0700)) {
-        chmod(BOX_TMP_ROOT, 01777);
-    } else if (errno != EEXIST) {
+    if (mkdir(BOX_TMP_ROOT, 0700) && errno != EEXIST) {
         ecs_err("cannot create %s: %s", BOX_TMP_ROOT, strerror(errno));
         goto done;
     }
 
-    if (lstat(BOX_TMP_ROOT, &st) || !S_ISDIR(st.st_mode)) {
-        ecs_err("cannot use %s: it is not a folder", BOX_TMP_ROOT);
+    if (lstat(BOX_TMP_ROOT, &st)) {
+        ecs_err("cannot use %s: %s", BOX_TMP_ROOT, strerror(errno));
         goto done;
     }
 
-    if ((st.st_mode & (S_IWGRP | S_IWOTH)) && !(st.st_mode & S_ISVTX)) {
-        ecs_err("cannot use %s: other users can write it and it has no sticky bit",
-            BOX_TMP_ROOT);
+    problem = box_app_tmp_root_problem(st.st_mode, st.st_uid, geteuid());
+    if (problem) {
+        ecs_err("cannot use %s: %s; remove it or let root own it with mode 1777",
+            BOX_TMP_ROOT, problem);
         goto done;
     }
 
@@ -157,7 +174,30 @@ done:
     return result;
 }
 
-/** Create the folder of the process, which must not exist yet.
+/** Remove the folder that an earlier process with the same pid left behind when it crashed.
+ * The pid now belongs to this process, so that process has exited: a real folder of the
+ * current user at the path is stale. Anything else at the path is kept.
+ *
+ * @param path The folder
+ * @return 0 when a stale folder was removed, -1 when the path holds something else
+ */
+static int box_app_tmp_reclaim(
+    const char *path)
+{
+    struct stat st;
+    int result = -1;
+    if (lstat(path, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) {
+        goto done;
+    }
+
+    ecs_trace("removing %s, left behind by an earlier process with this pid", path);
+    box_app_rmtree_id(path, st.st_dev, st.st_ino);
+    result = 0;
+done:
+    return result;
+}
+
+/** Create the folder of the process, after removing a stale folder of the current user.
  *
  * @param path The folder
  * @return 0 when the folder was created and is private to the current user, -1 otherwise
@@ -167,9 +207,12 @@ static int box_app_tmp_mkdir(
 {
     struct stat st;
     int fd = -1, result = -1;
-    if (mkdir(path, 0700)) {
-        ecs_err("cannot create %s: %s", path,
-            errno == EEXIST ? "it already exists" : strerror(errno));
+    if (mkdir(path, 0700) && (errno != EEXIST || box_app_tmp_reclaim(path) ||
+        mkdir(path, 0700)))
+    {
+        ecs_err("cannot create %s: %s", path, errno == EEXIST ?
+            "it exists and is not a stale folder of the current user" :
+            strerror(errno));
         goto done;
     }
 
