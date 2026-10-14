@@ -1007,8 +1007,11 @@ void box_gpu_bake_fini(
 
     ecs_map_fini(&gpu->volumes);
     if (gpu->bake) {
-        box_gpu_bake_state_free(gpu->bake);
+        box_gpu_bake_t *b = gpu->bake;
+        ecs_os_mutex_lock(gpu->lock);
         gpu->bake = NULL;
+        ecs_os_mutex_unlock(gpu->lock);
+        box_gpu_bake_state_free(b);
     }
 
     if (gpu->no_volume) {
@@ -1111,7 +1114,10 @@ void box_gpu_bake_capture(
     }
 
     if (!gpu->bake) {
-        gpu->bake = box_gpu_bake_state_new(gpu);
+        box_gpu_bake_t *created = box_gpu_bake_state_new(gpu);
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->bake = created;
+        ecs_os_mutex_unlock(gpu->lock);
     }
 
     box_gpu_bake_t *b = gpu->bake;
