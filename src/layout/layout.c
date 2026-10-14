@@ -199,9 +199,18 @@ static void LayoutFillUpdate(
     const LayoutFill *fill = ecs_field(it, LayoutFill, 0);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
-        const Surface *s = ecs_is_alive(world, fill[i].surface) ?
-            ecs_get(world, fill[i].surface, Surface) : NULL;
-        float w = s ? (float)s->width : 0, h = s ? (float)s->height : 0;
+        bool alive = ecs_is_alive(world, fill[i].surface);
+        const SurfaceStatus *st = alive ? ecs_get(world, fill[i].surface, SurfaceStatus) : NULL;
+        const Surface *s = alive ? ecs_get(world, fill[i].surface, Surface) : NULL;
+        float w = 0, h = 0;
+        if (st && st->point_width > 0 && st->point_height > 0) {
+            w = (float)st->point_width;
+            h = (float)st->point_height;
+        } else if (s) {
+            w = (float)s->width;
+            h = (float)s->height;
+        }
+
         LayoutItem *item = ecs_get_mut(world, it->entities[i], LayoutItem);
         if (item->width.mode != SizeModeFixed || item->height.mode != SizeModeFixed ||
             item->width.value != w || item->height.value != h)

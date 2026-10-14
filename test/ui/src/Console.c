@@ -869,6 +869,7 @@ void Console_follows_resize(void) {
 
     ecs_set(world, s, Surface, {.width = 1000, .height = 500, .resolution_scale = 1});
     ecs_progress(world, 0);
+    ecs_progress(world, 0);
     test_flt(ecs_get(world, panel, Rect)->width, 500);
     test_flt(ecs_get(world, panel, Rect)->height, 500);
     test_flt(ecs_get(world, stack, Position)->x + ecs_get(world, panel, Position)->x, -250);
@@ -881,6 +882,7 @@ void Console_follows_resize(void) {
     test_flt(ecs_get(world, panel, Rect)->height, 500);
 
     ecs_set(world, s, Surface, {.width = 300, .height = 600, .resolution_scale = 1});
+    ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_flt(ecs_get(world, panel, Rect)->width, 150);
     test_flt(ecs_get(world, panel, Rect)->height, 600);
