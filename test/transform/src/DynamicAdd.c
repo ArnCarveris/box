@@ -266,3 +266,36 @@ void DynamicAdd_static_100k_add_manual(void) {
     ecs_os_free(ents);
     ecs_fini(world);
 }
+
+void DynamicAdd_static_100k_add_velocity(void) {
+    // engine_core/dynamic_add_crash
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxMovement);
+
+    int count = 100000;
+    ecs_entity_t *ents = ecs_os_malloc_n(ecs_entity_t, count);
+    for (int i = 0; i < count; i ++) {
+        ents[i] = ecs_new(world);
+        ecs_set(world, ents[i], Position, {(float)i, 0, 0});
+        ecs_set(world, ents[i], Rotation, {0, 0, 0});
+    }
+
+    ecs_progress(world, 1.0f);
+
+    for (int i = 0; i < count; i ++) {
+        ecs_set(world, ents[i], Velocity, {0, 1, 0});
+    }
+
+    ecs_progress(world, 1.0f);
+
+    for (int i = 0; i < count; i ++) {
+        test_assert(ecs_has(world, ents[i], DynamicTransform));
+        const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
+        test_assert(t != NULL);
+        test_flt(t->m[3][0], (float)i);
+        test_flt(t->m[3][1], 1);
+    }
+
+    ecs_os_free(ents);
+    ecs_fini(world);
+}

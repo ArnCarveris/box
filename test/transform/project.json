@@ -854,7 +854,8 @@
                     "childof_100k_children_add_dynamic_to_root",
                     "parent_100k_children_add_dynamic_to_root",
                     "dynamic_100k_remove_dynamic",
-                    "static_100k_add_manual"
+                    "static_100k_add_manual",
+                    "static_100k_add_velocity"
                 ]
             }
         ]
