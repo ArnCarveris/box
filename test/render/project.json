@@ -195,6 +195,33 @@
                     "no_alloc_steady_state",
                     "gpu_scatter_readback"
                 ]
+            },
+            {
+                "id": "Material",
+                "testcases": [
+                    "default_material",
+                    "base_color_linear",
+                    "pbr_material",
+                    "pbr_material_defaults",
+                    "emissive",
+                    "opacity_blends",
+                    "full_opacity_stays_opaque",
+                    "opacity_hierarchy",
+                    "parent_opacity_updates_children",
+                    "blend_mode_batch",
+                    "back_face_mode_batch",
+                    "blended_after_opaque_back_to_front",
+                    "blended_runs_merge",
+                    "blended_sorted_per_view",
+                    "blended_scene_filter",
+                    "change_scatters_slot",
+                    "dynamic_material_per_frame",
+                    "dynamic_transform_keeps_material",
+                    "dynamic_opacity_moves_batch",
+                    "blended_no_alloc_steady_state",
+                    "gpu_alpha_blend",
+                    "gpu_back_face_plain"
+                ]
             }
         ]
     }
