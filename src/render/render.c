@@ -214,7 +214,7 @@ static void box_render_extract_view(
     v->view = e;
     v->camera = camera;
     v->parent = ecs_get_parent(world, e);
-    v->scene = ecs_get_target_for_id(world, camera, EcsChildOf, ecs_id(Scene));
+    v->scene = box_render_scene_of(world, camera);
     v->camera_data = *data;
     v->clear = view->clear;
     if (transform) {
@@ -317,6 +317,7 @@ void BoxRenderImport(
         .run = BoxRenderExtractViews
     });
 
+    box_render_scenes_init(world);
     box_render_captures_init(world);
     box_render_draws_init(world);
     box_render_lights_init(world);

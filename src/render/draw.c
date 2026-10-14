@@ -238,9 +238,7 @@ static void box_draws_key(
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
-    key->scene = ecs_has(world, e, Scene)
-        ? e
-        : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
+    key->scene = box_render_scene_of(world, e);
     key->mesh = shape->mesh;
     key->pipeline = BOX_RENDER_SHADER_MESH;
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
