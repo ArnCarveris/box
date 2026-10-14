@@ -537,11 +537,12 @@ static void box_spatial_late(
     ecs_vec_clear(&index->late);
     for (i = 0; i < count; i ++) {
         ecs_entity_t e = changes[i].entity;
-        ecs_table_t *table = ecs_is_alive(world, e) ? ecs_get_table(world, e) : NULL;
-        const WorldTransformVersion *v = table ? ecs_get(world, e, WorldTransformVersion) : NULL;
+        ecs_record_t *r = ecs_is_alive(world, e) ? ecs_record_find(world, e) : NULL;
+        const WorldTransformVersion *v = r && r->table ?
+            ecs_record_get(world, r, WorldTransformVersion) : NULL;
         bool pending = v && v->version == changes[i].version &&
-            !ecs_table_has_id(world, table, DynamicTransform) &&
-            !ecs_table_has_id(world, table, ManualTransform);
+            !ecs_table_has_id(world, r->table, DynamicTransform) &&
+            !ecs_table_has_id(world, r->table, ManualTransform);
         if (pending) {
             *ecs_vec_append_t(NULL, &index->late, ecs_entity_t) = e;
         }
