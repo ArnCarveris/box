@@ -19,6 +19,7 @@
 #include "box/effects.h"
 #include "box/movement.h"
 #include "box/layout.h"
+#include "box/text.h"
 #include "box/app.h"
 #include "box/render.h"
 #include "box/shader.h"
