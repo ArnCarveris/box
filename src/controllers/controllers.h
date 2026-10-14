@@ -128,6 +128,7 @@ typedef struct box_controller_body_t {
     float height;        /**< Height of the capsule, a ball when at most twice the radius */
     float step;          /**< Height of the ledges the body steps onto, 0 for none */
     float probe;         /**< Distance below the feet the ground is searched for, 0 for none */
+    bool upright;        /**< Surfaces too steep to stand on block like walls, never lift it */
 } box_controller_body_t;
 
 /** What a move of a body ran into */
@@ -151,6 +152,13 @@ bool box_collider_resolve(
     ecs_entity_t e,
     box_collider_t *out);
 
+/** Where a capsule touches a collider */
+typedef struct box_collider_contact_t {
+    vec3 normal;  /**< Direction from the collider towards the capsule, that moves it out */
+    vec3 surface; /**< Normal of the face touched, the most upward one at an edge or corner */
+    float depth;  /**< Distance the capsule must move along the normal, negative for a gap */
+} box_collider_contact_t;
+
 /** Find the signed distance between a capsule and a collider.
  *
  * @param c The collider
@@ -173,8 +181,7 @@ float box_collider_separation(
  * @param a Center of the lower cap of the capsule
  * @param b Center of the upper cap of the capsule
  * @param radius Radius of the capsule
- * @param normal Receives the direction that moves the capsule out
- * @param depth Receives the distance the capsule must move along the normal
+ * @param out The contact, written when the capsule overlaps the collider
  * @return true when the capsule overlaps the collider
  */
 bool box_collider_push(
@@ -182,8 +189,7 @@ bool box_collider_push(
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 normal,
-    float *depth);
+    box_collider_contact_t *out);
 
 /** Intersect a ray with the oriented box of a collider, or the ball of a sphere.
  *

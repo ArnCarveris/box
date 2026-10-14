@@ -142,7 +142,11 @@
                     "script_settings",
                     "camera_thin_wall_boost",
                     "first_person_thin_wall_boost",
-                    "first_person_thin_wall_walk"
+                    "first_person_thin_wall_walk",
+                    "steep_slope_blocks_walk",
+                    "steep_slope_blocks_jump",
+                    "walkable_slope_climbs",
+                    "stairs_climb"
                 ]
             }
         ]

@@ -258,14 +258,93 @@ static float box_collide_inside(
     return result;
 }
 
-float box_collider_separation(
+/** Move a direction in the frame of a collider into world space.
+ *
+ * @param c The collider
+ * @param d The direction in the frame of the collider
+ * @param out The direction in world space
+ */
+static void box_collide_world_dir(
+    const box_collider_t *c,
+    const vec3 d,
+    vec3 out)
+{
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        out[i] = c->axis[0][i] * d[0] + c->axis[1][i] * d[1] + c->axis[2][i] * d[2];
+    }
+}
+
+/** Find the normal of the face of a collider at a point of its surface.
+ *
+ * A point on an edge or corner of a box or a cylinder lies on several faces; it gets the most
+ * upward one, so a body resting on the edge of a flat top stands on that top. Balls and capsules
+ * are smooth and answer with the normal of the contact.
+ *
+ * @param c The collider
+ * @param q The point of the surface in the frame of the collider
+ * @param contact Normal of the contact in the frame of the collider
+ * @param out The normal of the face in world space
+ */
+static void box_collide_surface(
+    const box_collider_t *c,
+    const vec3 q,
+    const vec3 contact,
+    vec3 out)
+{
+    const float *h = c->half;
+    vec3 face[3];
+    int32_t i, count = 0;
+    if (c->kind == BoxColliderBox) {
+        for (i = 0; i < 3; i ++) {
+            if (fabsf(q[i]) >= h[i] * (1.0f - BOX_COLLIDE_TOUCH)) {
+                glm_vec3_zero(face[count]);
+                face[count ++][i] = q[i] < 0 ? -1.0f : 1.0f;
+            }
+        }
+    } else if (c->kind == BoxColliderCylinder) {
+        float r = sqrtf(q[0] * q[0] + q[2] * q[2]);
+        if (fabsf(q[1]) >= h[1] * (1.0f - BOX_COLLIDE_TOUCH)) {
+            glm_vec3_zero(face[count]);
+            face[count ++][1] = q[1] < 0 ? -1.0f : 1.0f;
+        }
+
+        if (r > 1e-6f && r >= h[0] * (1.0f - BOX_COLLIDE_TOUCH)) {
+            face[count][0] = q[0] / r;
+            face[count][1] = 0;
+            face[count ++][2] = q[2] / r;
+        }
+    }
+
+    box_collide_world_dir(c, contact, out);
+    for (i = 0; i < count; i ++) {
+        vec3 w;
+        box_collide_world_dir(c, face[i], w);
+        if (i == 0 || w[1] > out[1]) {
+            glm_vec3_copy(w, out);
+        }
+    }
+}
+
+/** Find the nearest points of a capsule and a collider and the normal between them.
+ *
+ * @param c The collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param n Receives the direction from the collider towards the capsule, in its frame
+ * @param q Receives the nearest point of the collider or its core, in its frame
+ * @return The gap between their surfaces, negative by the depth when they overlap
+ */
+static float box_collide_nearest(
     const box_collider_t *c,
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 normal)
+    vec3 n,
+    vec3 q)
 {
-    vec3 p0, p1, p, q, d, n;
+    vec3 p0, p1, p, d;
     vec3 zero = { 0, 0, 0 };
     float reach = radius, dist, gap = 0;
     int32_t i;
@@ -295,11 +374,21 @@ float box_collider_separation(
         gap = box_collide_inside(c, p, n);
     }
 
-    for (i = 0; i < 3; i ++) {
-        normal[i] = c->axis[0][i] * n[0] + c->axis[1][i] * n[1] + c->axis[2][i] * n[2];
-    }
-
     return dist - reach - gap;
+}
+
+float box_collider_separation(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal)
+{
+    vec3 n, q;
+    float result = box_collide_nearest(c, a, b, radius, n, q);
+    box_collide_world_dir(c, n, normal);
+
+    return result;
 }
 
 bool box_collider_push(
@@ -307,15 +396,15 @@ bool box_collider_push(
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 normal,
-    float *depth)
+    box_collider_contact_t *out)
 {
-    vec3 n;
-    float separation = box_collider_separation(c, a, b, radius, n);
+    vec3 n, q;
+    float separation = box_collide_nearest(c, a, b, radius, n, q);
     bool result = separation < 0;
     if (result) {
-        glm_vec3_copy(n, normal);
-        *depth = -separation;
+        box_collide_world_dir(c, n, out->normal);
+        box_collide_surface(c, q, n, out->surface);
+        out->depth = -separation;
     }
 
     return result;

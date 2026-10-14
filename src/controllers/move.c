@@ -158,20 +158,41 @@ static void box_move_init(
     box_move_gather(world, m, min, max);
 }
 
+/** Test whether the body can stand on a contact.
+ *
+ * The drop of a step also rests on an edge, but only of a surface the body can stand on.
+ *
+ * @param m The move
+ * @param contact The contact
+ * @return true when the contact holds the body up
+ */
+static bool box_move_ground(
+    const box_move_t *m,
+    const box_collider_contact_t *contact)
+{
+    bool result = contact->normal[1] >= BOX_MOVE_WALKABLE;
+    if (m->support) {
+        result = contact->normal[1] >= BOX_MOVE_SUPPORT &&
+            contact->surface[1] >= BOX_MOVE_WALKABLE;
+    }
+
+    return result;
+}
+
 /** Remember a contact normal and whether the body can stand on it.
  *
  * @param m The move
- * @param n The normal
+ * @param contact The contact
  */
 static void box_move_touch(
     box_move_t *m,
-    const vec3 n)
+    const box_collider_contact_t *contact)
 {
-    bool ground = n[1] >= (m->support ? BOX_MOVE_SUPPORT : BOX_MOVE_WALKABLE);
+    bool ground = box_move_ground(m, contact);
     m->ground |= ground;
     m->wall |= !ground;
     if (m->normal_count < BOX_MOVE_NORMALS) {
-        glm_vec3_copy(ECS_CONST_CAST(float*, n), m->normals[m->normal_count ++]);
+        glm_vec3_copy(ECS_CONST_CAST(float*, contact->normal), m->normals[m->normal_count ++]);
     }
 }
 
@@ -179,24 +200,26 @@ static void box_move_touch(
  *
  * @param m The move
  * @param pos The feet
- * @param normal Receives the normal of the deepest contact
+ * @param out Receives the deepest contact
  * @return The depth of the deepest contact, 0 when there is none
  */
 static float box_move_deepest(
     const box_move_t *m,
     const vec3 pos,
-    vec3 normal)
+    box_collider_contact_t *out)
 {
     const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
     int32_t i, count = ecs_vec_count(&m->colliders);
     float result = 0;
-    vec3 a, b, n;
+    vec3 a, b;
     box_move_segment(m->body, pos, a, b);
     for (i = 0; i < count; i ++) {
-        float depth = 0;
-        if (box_collider_push(&c[i], a, b, m->body->radius, n, &depth) && depth > result) {
-            result = depth;
-            glm_vec3_copy(n, normal);
+        box_collider_contact_t contact;
+        if (box_collider_push(&c[i], a, b, m->body->radius, &contact) &&
+            contact.depth > result)
+        {
+            result = contact.depth;
+            *out = contact;
         }
     }
 
@@ -206,6 +229,8 @@ static float box_move_deepest(
 /** Push the capsule out of the shapes it reaches into, the deepest contact first.
  *
  * A contact the body can stand on lifts it straight up, so standing on a slope does not slide.
+ * An upright body is pushed off a surface too steep to stand on horizontally, like off a wall,
+ * so walking or jumping into a steep slope does not climb it.
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -217,20 +242,26 @@ static void box_move_push(
     bool again = true;
     int32_t i;
     for (i = 0; i < BOX_MOVE_PUSHES && again; i ++) {
-        vec3 n;
-        float depth = box_move_deepest(m, pos, n);
+        box_collider_contact_t contact;
+        float *n = contact.normal;
+        float depth = box_move_deepest(m, pos, &contact);
+        float flat = 0;
         again = depth > BOX_MOVE_EPS;
         if (!again) {
             continue;
         }
 
+        flat = sqrtf(n[0] * n[0] + n[2] * n[2]);
         if (n[1] >= (m->support ? BOX_MOVE_SUPPORT : BOX_MOVE_WALKABLE)) {
             pos[1] += depth / n[1];
+        } else if (m->body->upright && n[1] > 0 && flat > 0) {
+            pos[0] += n[0] / flat * depth / flat;
+            pos[2] += n[2] / flat * depth / flat;
         } else {
             glm_vec3_muladds(n, depth, pos);
         }
 
-        box_move_touch(m, n);
+        box_move_touch(m, &contact);
     }
 }
 
@@ -386,7 +417,8 @@ static void box_move_probe(
 /** Take out of a velocity what pushes into the surfaces a move touched.
  *
  * Clipping never speeds the body up along Y, so walking into a slope or an edge does not
- * launch it, and a surface the body stands on only stops the fall.
+ * launch it, and a surface the body stands on only stops the fall. An upright body clips
+ * against a surface too steep to stand on as against a wall, so it does not stop the fall.
  *
  * @param m The move
  * @param velocity The velocity, written in place
@@ -398,12 +430,21 @@ static void box_move_clip(
     float rise = velocity[1] > 0 ? velocity[1] : 0;
     int32_t i;
     for (i = 0; i < m->normal_count; i ++) {
-        const float *n = m->normals[i];
-        float d = glm_vec3_dot(velocity, ECS_CONST_CAST(float*, n));
+        vec3 n;
+        float d, flat;
+        glm_vec3_copy(ECS_CONST_CAST(float*, m->normals[i]), n);
+        flat = sqrtf(n[0] * n[0] + n[2] * n[2]);
+        if (m->body->upright && n[1] > 0 && n[1] < BOX_MOVE_WALKABLE && flat > 0) {
+            n[0] /= flat;
+            n[1] = 0;
+            n[2] /= flat;
+        }
+
+        d = glm_vec3_dot(velocity, n);
         if (n[1] >= BOX_MOVE_WALKABLE) {
             velocity[1] = velocity[1] < 0 ? 0 : velocity[1];
         } else if (d < 0) {
-            glm_vec3_muladds(ECS_CONST_CAST(float*, n), -d, velocity);
+            glm_vec3_muladds(n, -d, velocity);
         }
     }
 
@@ -469,12 +510,12 @@ bool box_controller_fits(
 {
     vec3 pos = { feet->x, feet->y, feet->z };
     vec3 still = { 0, 0, 0 };
-    vec3 n;
+    box_collider_contact_t contact;
     box_move_t m;
     bool result = true;
     if (body->radius > 0) {
         box_move_init(world, &m, body, pos, still);
-        result = box_move_deepest(&m, pos, n) <= BOX_MOVE_FIT;
+        result = box_move_deepest(&m, pos, &contact) <= BOX_MOVE_FIT;
         ecs_vec_fini_t(NULL, &m.colliders, box_collider_t);
     }
 

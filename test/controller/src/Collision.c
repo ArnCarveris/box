@@ -670,3 +670,131 @@ void Collision_first_person_thin_wall_walk(void) {
 
     ecs_fini(world);
 }
+
+void Collision_steep_slope_blocks_walk(void) {
+    // controller_fixes/steep_slopes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float a = 60 * (float)GLM_PI / 180, s = sinf(a), c = cosf(a);
+    ecs_entity_t slope = ecs_new(world);
+    ecs_set(world, slope, Position, { 0, -0.5f * c + 5 * s, -2 - 0.5f * s - 5 * c });
+    ecs_set(world, slope, Rotation, { a, 0, 0 });
+    ecs_set(world, slope, Box, { 10, 1, 10 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 0.1f);
+
+    const WorldTransform *t = ecs_get(world, slope, WorldTransform);
+    test_assert(fabsf(t->m[1][1] - c) < 0.001f);
+    test_assert(fabsf(t->m[1][2] - s) < 0.001f);
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 180; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        test_assert(ecs_get(world, fp, Position)->y < 1.75f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(p->z > -2.1f);
+    test_assert(p->z < -1.5f);
+
+    ecs_fini(world);
+}
+
+void Collision_steep_slope_blocks_jump(void) {
+    // controller_fixes/steep_slopes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float a = 60 * (float)GLM_PI / 180, s = sinf(a), c = cosf(a);
+    ecs_entity_t slope = ecs_new(world);
+    ecs_set(world, slope, Position, { 0, -0.5f * c + 5 * s, -2 - 0.5f * s - 5 * c });
+    ecs_set(world, slope, Rotation, { a, 0, 0 });
+    ecs_set(world, slope, Box, { 10, 1, 10 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 0.1f);
+
+    box_input_key(world, KeyW, true);
+    float top = 0;
+    for (int32_t i = 0; i < 300; i ++) {
+        box_input_key(world, KeySpace, (i % 2) == 0);
+        ecs_progress(world, 1.0f / 60.0f);
+        float y = ecs_get(world, fp, Position)->y;
+        top = y > top ? y : top;
+    }
+
+    test_assert(top > 2.0f);
+    test_assert(top < 1.7f + 0.75f);
+    box_input_key(world, KeyW, false);
+    box_input_key(world, KeySpace, false);
+    for (int32_t i = 0; i < 120; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(fabsf(p->y - 1.7f) < 0.001f);
+    test_assert(p->z > -2.1f);
+    test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}
+
+void Collision_walkable_slope_climbs(void) {
+    // controller_fixes/steep_slopes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float a = 40 * (float)GLM_PI / 180, s = sinf(a), c = cosf(a);
+    ecs_entity_t slope = ecs_new(world);
+    ecs_set(world, slope, Position, { 0, -0.5f * c + 5 * s, -2 - 0.5f * s - 5 * c });
+    ecs_set(world, slope, Rotation, { a, 0, 0 });
+    ecs_set(world, slope, Box, { 10, 1, 10 });
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 0.1f);
+
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 120; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    float feet = p->y - 1.7f;
+    float surface = (-2 - p->z) * s / c;
+    test_assert(p->z < -6);
+    test_assert(feet > 3);
+    test_assert(fabsf(feet - surface) < 0.3f / c);
+    test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}
+
+void Collision_stairs_climb(void) {
+    // controller_fixes/steep_slopes
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    for (int32_t i = 0; i < 4; i ++) {
+        float h = 0.25f * (float)(i + 1);
+        ecs_entity_t stair = ecs_new(world);
+        ecs_set(world, stair, Position, { 0, h * 0.5f, -2 - 0.5f * (float)i - 5 });
+        ecs_set(world, stair, Box, { 2, h, 10 });
+    }
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_progress(world, 0.1f);
+
+    box_input_key(world, KeyW, true);
+    for (int32_t i = 0; i < 90; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    const Position *p = ecs_get(world, fp, Position);
+    test_assert(p->z < -5);
+    test_assert(fabsf(p->y - 2.7f) < 0.001f);
+    test_bool(ecs_get(world, fp, FirstPersonController)->grounded, true);
+
+    ecs_fini(world);
+}

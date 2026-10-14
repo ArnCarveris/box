@@ -288,7 +288,8 @@ static void box_first_person_body(
         .radius = fp->radius,
         .height = height + BOX_FIRST_PERSON_HEAD,
         .step = walking ? step : 0,
-        .probe = walking && fp->velocity[1] <= 0 ? step : 0
+        .probe = walking && fp->velocity[1] <= 0 ? step : 0,
+        .upright = !fp->flying
     };
 }
 
