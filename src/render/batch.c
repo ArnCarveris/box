@@ -346,7 +346,13 @@ void box_draws_material(
     }
 
     if (material->shape2d) {
-        box_draws_shape2d(out, material);
+        float border[3];
+        bool tinted = material->inherited || material->tint;
+        if (tinted) {
+            box_draws_tinted(border, &material->shape2d->border_color.r, material);
+        }
+
+        box_draws_shape2d(out, material, tinted ? border : NULL);
     }
 }
 

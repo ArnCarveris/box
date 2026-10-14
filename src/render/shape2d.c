@@ -77,10 +77,12 @@ static void box_shape2d_pack(
  *
  * @param out The instance
  * @param s The shape
+ * @param border Linear border color, NULL for the color of the shape
  */
 static void box_shape2d_rect(
     box_render_instance_t *out,
-    const Shape2D *s)
+    const Shape2D *s,
+    const float *border)
 {
     float w = s->size[0] > 0.0f ? s->size[0] : 1.0f;
     float h = s->size[1] > 0.0f ? s->size[1] : 1.0f;
@@ -88,9 +90,11 @@ static void box_shape2d_rect(
     const rgba *c = &s->border_color;
     out->material[0] = glm_clamp(s->radius / half, 0.0f, 1.0f);
     out->material[1] = s->border / half;
-    box_shape2d_pack(&out->material[2], box_shape2d_linear(c->r), box_shape2d_linear(c->g));
-    box_shape2d_pack(&out->material[3], box_shape2d_linear(c->b),
-        box_shape2d_half((float)c->a / 255.0f));
+    uint32_t r = border ? box_shape2d_half(border[0]) : box_shape2d_linear(c->r);
+    uint32_t g = border ? box_shape2d_half(border[1]) : box_shape2d_linear(c->g);
+    uint32_t b = border ? box_shape2d_half(border[2]) : box_shape2d_linear(c->b);
+    box_shape2d_pack(&out->material[2], r, g);
+    box_shape2d_pack(&out->material[3], b, box_shape2d_half((float)c->a / 255.0f));
     out->emissive[3] = w / h;
 }
 
@@ -112,13 +116,14 @@ static void box_shape2d_line(
 
 void box_draws_shape2d(
     box_render_instance_t *out,
-    const box_draw_material_t *material)
+    const box_draw_material_t *material,
+    const float *border)
 {
     const Shape2D *s = material->shape2d;
     if (s->kind == BOX_SHAPE2D_LINE) {
         box_shape2d_line(out, s);
     } else {
-        box_shape2d_rect(out, s);
+        box_shape2d_rect(out, s, border);
     }
 
     out->uv[2] = s->uv[2] * out->uv[0] + out->uv[2];

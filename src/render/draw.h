@@ -206,10 +206,12 @@ void box_draws_material(
  *
  * @param out The instance
  * @param material Material components of the entity, with its Shape2D
+ * @param border Linear border color mixed toward the tints, NULL for the color of the Border
  */
 void box_draws_shape2d(
     box_render_instance_t *out,
-    const box_draw_material_t *material);
+    const box_draw_material_t *material,
+    const float *border);
 
 /** Resolve the blend mode a shape draws with: Opaque turns into AlphaBlend below alpha 1.
  *
