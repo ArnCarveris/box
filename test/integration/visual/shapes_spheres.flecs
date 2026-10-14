@@ -1,5 +1,5 @@
 // The round shapes of the town (etc/scenes/town_content.flecs) up close with the view of
-// etc/scenes/town.flecs: a cherry tree crown, a planter with blossoms, a lantern whose outer ribs sit
+// etc/scenes/town.flecs: a cherry tree crown, a planter with blossoms, a lantern whose ribs sit
 // inside its 8 segment sphere, and a flat shaded 8 segment sphere.
 
 using flecs.script
@@ -16,7 +16,7 @@ $ {
 }
 
 sun {
-  Rotation: {0.9, -0.6, 0}
+  Rotation: {0.703, -0.8332, 0}
   DirectionalLight: {intensity: 1.1}
   Rgb: {255, 255, 255}
 }
@@ -31,7 +31,7 @@ tonemap {
 
 camera {
   Position: {0.6, 1.7, -3.2}
-  Rotation: {0.3, 3.1416, 0}
+  Rotation: {-0.3, 3.1416, 0}
   Camera: {fov: 55, near_: 0.1}
 }
 
@@ -103,7 +103,7 @@ lantern {
   for i in 0..3 {
     {
       Position: {0, (i - 1) * 0.12, 0}
-      Torus: {radius: 0.22 - math.abs(i - 1) * 0.035, tube: 0.014, segments: 16, rings: 4}
+      Torus: {radius: 0.2 - math.abs(i - 1) * 0.015, tube: 0.014, segments: 16, rings: 4}
       Rgb: {182, 67, 58}
     }
   }
