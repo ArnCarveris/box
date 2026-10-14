@@ -151,4 +151,11 @@ void box_logs_init(
 void box_history_init(
     ecs_world_t *world);
 
+/** Register the script_read, script_write, script_grep and script_patch commands.
+ *
+ * @param world The world
+ */
+void box_cmd_script_init(
+    ecs_world_t *world);
+
 #endif

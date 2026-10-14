@@ -166,4 +166,5 @@ void BoxCommandImport(
     box_endpoint_init(world, host);
     box_history_init(world);
     box_logs_init(world);
+    box_cmd_script_init(world);
 }
