@@ -503,6 +503,7 @@ void BoxSurfaceImport(
     ECS_META_COMPONENT(world, Anisotropy);
     ECS_META_COMPONENT(world, TextureQuality);
     ECS_META_COMPONENT(world, Surface);
+    box_owned_hooks(world, Surface, BOX_OWNED_STR(Surface, write_to_file));
     ECS_META_COMPONENT(world, SurfaceStatus);
     ECS_COMPONENT_DEFINE(world, SurfaceImpl);
 

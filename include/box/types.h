@@ -41,6 +41,42 @@ ECS_STRUCT(rgba, {
     uint8_t a; /**< Alpha */
 });
 
+/** Member of a component that owns heap memory. */
+typedef struct box_owned_t {
+    ecs_size_t offset;      /**< Offset of the member in the component */
+    ecs_size_t elem_size;   /**< Element size of an ecs_vec_t member, 0 for a char* member */
+} box_owned_t;
+
+/** Owned char* member of component T */
+#define BOX_OWNED_STR(T, member) { (ecs_size_t)offsetof(T, member), 0 }
+
+/** Owned ecs_vec_t member of component T with trivially copyable elements of type E */
+#define BOX_OWNED_VEC(T, member, E) { (ecs_size_t)offsetof(T, member), ECS_SIZEOF(E) }
+
+/** Install the lifecycle hooks of reflected component T from its owned members.
+ *
+ * Flecs generates no dtor, copy or move for C structs registered with ECS_META_COMPONENT,
+ * so components with BOX_OWNED_STR or BOX_OWNED_VEC members call this right after it.
+ */
+#define box_owned_hooks(world, T, ...)\
+    box_types_owned_hooks(world, ecs_id(T), (const box_owned_t[]){ __VA_ARGS__ },\
+        (int32_t)(sizeof((const box_owned_t[]){ __VA_ARGS__ }) / sizeof(box_owned_t)))
+
+/** Install ctor, dtor, copy and move hooks that free, deep copy and hand over owned members.
+ *
+ * Must be called before the component is used.
+ *
+ * @param world The world
+ * @param component The component
+ * @param members The members that own heap memory
+ * @param count Number of members
+ */
+void box_types_owned_hooks(
+    ecs_world_t *world,
+    ecs_entity_t component,
+    const box_owned_t *members,
+    int32_t count);
+
 /** Register the box.types module.
  *
  * @param world The world

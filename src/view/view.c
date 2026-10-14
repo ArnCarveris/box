@@ -18,5 +18,6 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, ViewEffect);
     ECS_META_COMPONENT(world, View);
+    box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));
     ECS_META_COMPONENT(world, Scene);
 }
