@@ -178,6 +178,9 @@ static void transformTree(
 
 /** Transform a dirty entity and its children if not yet done this frame.
  *
+ * A ManualTransform entity keeps the world transform the application wrote; only its
+ * children are recomputed from it.
+ *
  * @param world The world
  * @param e The dirty entity
  * @param version The transform version of the current frame
@@ -188,8 +191,16 @@ static void transformRoot(
     uint64_t version)
 {
     WorldTransformVersion *v = NULL;
-    bool skip = !ecs_is_alive(world, e) || ecs_has(world, e, ManualTransform) ||
-        ecs_has(world, e, DynamicTransform);
+    bool skip = !ecs_is_alive(world, e) || ecs_has(world, e, DynamicTransform);
+
+    if (!skip && ecs_has(world, e, ManualTransform)) {
+        const WorldTransform *t = ecs_get(world, e, WorldTransform);
+        if (t) {
+            transformTree(world, e, t, version);
+        }
+
+        skip = true;
+    }
 
     if (!skip) {
         v = ecs_get_mut(world, e, WorldTransformVersion);
@@ -281,6 +292,17 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
+        .callback = TransformStatic_OnChange
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnManual" }),
+        .query.terms = {
+            { .id = ecs_id(WorldTransform), .src.id = EcsSelf },
+            { .id = ManualTransform, .inout = EcsInOutFilter },
+            { .id = DynamicTransform, .oper = EcsNot }
+        },
+        .events = { EcsOnSet },
         .callback = TransformStatic_OnChange
     });
 
