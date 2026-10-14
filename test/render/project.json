@@ -346,7 +346,9 @@
                     "view_without_clear_composites_over",
                     "zero_literal_takes_defaults",
                     "default_settings",
-                    "script_entry_enabled_by_default"
+                    "script_entry_enabled_by_default",
+                    "bloom_temporal_keeps_last_frame",
+                    "follow_surface_resize"
                 ]
             }
         ]

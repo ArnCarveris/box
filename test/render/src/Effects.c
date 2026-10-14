@@ -897,3 +897,109 @@ void Effects_script_entry_enabled_by_default(void) {
 
     ecs_fini(world);
 }
+
+void Effects_bloom_temporal_keeps_last_frame(void) {
+    // lighting/effects
+    unsigned char glow[2] = {0};
+    float temporal[2] = {0, 0.9f};
+    int32_t run;
+    for (run = 0; run < 2; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 5});
+        ecs_set(world, camera, Camera, {.fov = 60});
+        ecs_entity_t bloom = ecs_new(world);
+        ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1,
+            .temporal = temporal[run]});
+        ecs_entity_t view = ecs_new(world);
+        View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+        ecs_vec_init_t(NULL, &value.effects, ViewEffect, 1);
+        *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+            .enabled = true, .effect = bloom };
+        ecs_set_ptr(world, view, View, &value);
+        ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+        ecs_entity_t cube = ecs_new(world);
+        ecs_set(world, cube, Box, {1, 1, 1});
+        ecs_set(world, cube, Rgb, {0, 0, 0});
+        ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "temporal.png"});
+        int32_t frame;
+        for (frame = 0; frame < 30; frame ++) {
+            ecs_progress(world, 1.0f / 60);
+        }
+
+        ecs_set(world, cube, Position, {0, 100, 0});
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        char *path = flecs_asprintf("%s/temporal.png",
+            ecs_singleton_get(world, AppStatus)->tmp_dir);
+        int w = 0, h = 0, n = 0;
+        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        glow[run] = px[(32 * 64 + 40) * 4];
+        stbi_image_free(px);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(glow[0] < 4);
+    test_assert(glow[1] > glow[0] + 8);
+}
+
+void Effects_follow_surface_resize(void) {
+    // lighting/effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t bloom = ecs_new(world);
+    ecs_set(world, bloom, Bloom, {.intensity = 0.5f, .threshold = 1});
+    ecs_entity_t ssao = ecs_new(world);
+    ecs_add(world, ssao, Ssao);
+    ecs_entity_t view = ecs_new(world);
+    View value = {.camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 2);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = ssao };
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = bloom };
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_set(world, cube, Rgb, {0, 0, 0});
+    ecs_set(world, cube, Emissive, {.strength = 8, .color = {255, 255, 255}});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 64, .height = 64, .write_to_file = "resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+    ecs_set(world, s, Surface, {.width = 128, .height = 64, .resolution_scale = 2,
+        .write_to_file = "resize.png"});
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/resize.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 128);
+    test_int(h, 64);
+    test_assert(px[(32 * 128 + 64) * 4] > 250);
+    test_assert(px[(32 * 128 + 80) * 4] > 8);
+    test_assert(px[(2 * 128 + 2) * 4] < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
