@@ -51,6 +51,31 @@ ECS_STRUCT(AmbientLight, {
     float intensity; /**< Scale of both colors, default 1 */
 });
 
+/** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
+ * scene. Adding it adds LightBakeStatus. Values apply as specified: bounces 0 bakes direct
+ * emission and light only, budget_ms 0 bakes nothing.
+ */
+ECS_STRUCT(LightBake, {
+    float probe_spacing; /**< World units between probes, default 2 */
+    int32_t bounces;     /**< Light bounces to bake, default 2 */
+    int32_t capture_size; /**< Cubemap face edge of a probe capture in texels, default 16 */
+    float budget_ms;     /**< Render time per frame spent baking in milliseconds, default 2 */
+    float bounds_padding; /**< World units added around the static bounds, default 1 */
+    char *cache;         /**< Cache folder path, default ".box/bake", empty for none */
+});
+
+/** Progress of the bake of a scene, written by the engine next to LightBake */
+ECS_STRUCT(LightBakeStatus, {
+    int32_t probes;      /**< Probes of the volume */
+    int32_t baked;       /**< Probes baked in the current pass */
+    int32_t pass;        /**< Pass being baked, one more than the bounces baked so far */
+    bool converged;      /**< All passes are baked */
+    bool cache_hit;      /**< The volume was loaded from the cache */
+});
+
+/** Keeps a static shape out of the bake captures */
+extern ECS_TAG_DECLARE(NoBake);
+
 /** Register the box.light module.
  *
  * The first directional light of a scene casts the shadows of the views that enable them;

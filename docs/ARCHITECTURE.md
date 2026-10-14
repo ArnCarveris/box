@@ -264,6 +264,13 @@ light has intensity 0 is dark. `View.lighting.enabled` false draws base color an
 `cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
 lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
 
+**Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
+the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
+`bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
+constructor and taken literally otherwise. Adding it makes the engine add `LightBakeStatus`
+(`probes`, `baked`, `pass`, `converged`, `cache_hit`), removed with it. `NoBake` keeps a static
+shape out of the captures. These are data only for now: nothing samples a volume yet.
+
 ## Spatial index
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
@@ -300,7 +307,8 @@ drawn over the 3D view of the same surface. `ProjectedAnchor` places UI over 3D 
 far). A perspective camera without a far plane is infinite; orthographic shows `ortho_height`
 units or the surface height divided by `ortho_scale`. The aspect follows the surface unless set.
 A `View` renders the camera's scene into the targets that include it; its constructor enables
-lighting, culling with occlusion, 1 px minimum size and the shadow defaults.
+lighting, `lighting.baked` (use the bake of the scene when there is one; a C literal opts out),
+culling with occlusion, 1 px minimum size and the shadow defaults.
 
 ## Input and controllers
 

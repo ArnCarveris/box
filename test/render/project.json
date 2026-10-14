@@ -255,6 +255,20 @@
                 ]
             },
             {
+                "id": "LightBake",
+                "testcases": [
+                    "script_defaults",
+                    "c_defaults",
+                    "zero_is_literal",
+                    "status_follows_bake",
+                    "singleton_bake_has_status",
+                    "no_bake_tag",
+                    "cache_is_owned",
+                    "view_baked_defaults",
+                    "scene_renders_identically"
+                ]
+            },
+            {
                 "id": "Scene",
                 "testcases": [
                     "view_renders_scene_of_camera",

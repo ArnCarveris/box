@@ -86,6 +86,60 @@ static void box_ambient_light_ctor(
     }
 }
 
+ECS_TAG_DECLARE(NoBake);
+
+/** Construct LightBake values with the default probe grid and cache folder.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_light_bake_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    LightBake *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (LightBake){
+            .probe_spacing = 2.0f,
+            .bounces = 2,
+            .capture_size = 16,
+            .budget_ms = 2.0f,
+            .bounds_padding = 1.0f,
+            .cache = ecs_os_strdup(".box/bake")
+        };
+    }
+}
+
+/** Add LightBakeStatus to an entity that got LightBake.
+ *
+ * @param it The observer iterator
+ */
+static void box_light_bake_add(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_set(it->stage, it->entities[i], LightBakeStatus, {0});
+    }
+}
+
+/** Remove LightBakeStatus from an entity that lost LightBake.
+ *
+ * @param it The observer iterator
+ */
+static void box_light_bake_remove(
+    ecs_iter_t *it)
+{
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_remove(it->stage, it->entities[i], LightBakeStatus);
+    }
+}
+
 void BoxLightImport(
     ecs_world_t *world)
 {
@@ -100,4 +154,20 @@ void BoxLightImport(
     ecs_set_hooks(world, PointLight, { .ctor = box_point_light_ctor });
     ecs_set_hooks(world, SpotLight, { .ctor = box_spot_light_ctor });
     ecs_set_hooks(world, AmbientLight, { .ctor = box_ambient_light_ctor });
+    ECS_META_COMPONENT(world, LightBake);
+    box_owned_hooks(world, LightBake, BOX_OWNED_STR(LightBake, cache));
+    ecs_set_hooks(world, LightBake, { .ctor = box_light_bake_ctor });
+    ECS_META_COMPONENT(world, LightBakeStatus);
+    ECS_TAG_DEFINE(world, NoBake);
+
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(LightBake) }},
+        .events = { EcsOnAdd },
+        .callback = box_light_bake_add
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(LightBake) }},
+        .events = { EcsOnRemove },
+        .callback = box_light_bake_remove
+    });
 }

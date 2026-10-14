@@ -27,6 +27,7 @@ ECS_STRUCT(ClearSettings, {
 /** Light settings for a view */
 ECS_STRUCT(LightSettings, {
     bool enabled;           /**< Enable lighting for the view */
+    bool baked;             /**< Sample the baked lighting of the scene, View ctor sets true */
 });
 
 /** Shadow settings of a view */
@@ -81,9 +82,9 @@ ECS_STRUCT(Scene, {
 
 /** Register the box.view module.
  *
- * View gets a constructor that enables lighting, sets the documented ShadowSettings defaults
- * with shadows disabled and enables culling with occlusion and a smallest size of one pixel.
- * A C literal View starts from zero instead, which renders unlit and draws every instance.
+ * View gets a constructor that enables lighting and baked lighting, sets the ShadowSettings
+ * defaults with shadows disabled and enables culling with occlusion and a smallest size of one
+ * pixel. A C literal View starts from zero instead: unlit, drawing every instance.
  *
  * @param world The world
  */
