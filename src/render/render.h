@@ -17,6 +17,12 @@
 /** Shader handle of the engine shader that scales a scene texture to the presented image */
 #define BOX_RENDER_SHADER_BLIT (1)
 
+/** Shader handle of the engine shader of the forward pass that draws meshes */
+#define BOX_RENDER_SHADER_MESH (2)
+
+/** Buffer handle of the instance buffer of the forward pass */
+#define BOX_RENDER_BUFFER_DRAWS (1)
+
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
 
@@ -59,11 +65,18 @@ typedef struct box_render_upload_t {
     uint32_t data;      /**< Offset of the bytes in the packet data */
 } box_render_upload_t;
 
-/** A view of the frame: the camera it renders and how it clears */
+/** A view of the frame: the camera it renders, the scene it draws and how it clears.
+ *
+ * The projection is built by the renderer per target, because its aspect follows the
+ * surface; views are in render order, the order in which they were created.
+ */
 typedef struct box_render_view_t {
     ecs_entity_t view;          /**< Entity with the View component */
     ecs_entity_t camera;        /**< Entity with the Camera component */
+    ecs_entity_t parent;        /**< Parent of the view, matched against Surface.view_root */
+    ecs_entity_t scene;         /**< Scene root of the camera, 0 for the default scene */
     mat4 camera_transform;      /**< World transform of the camera */
+    mat4 view_matrix;           /**< Inverse of the camera transform */
     Camera camera_data;         /**< Settings of the camera */
     ClearSettings clear;        /**< Clear settings of the view */
 } box_render_view_t;
@@ -78,6 +91,35 @@ typedef struct box_render_target_desc_t {
     bool vsync;             /**< A window presents with vertical sync */
 } box_render_target_desc_t;
 
+/** Description of a BOX_RENDER_MESH create, followed by its vertices and its indices.
+ *
+ * The vertices are box_vertex_t, the indices uint32_t with three per counter-clockwise
+ * triangle. A mesh does not change under its handle; it is destroyed and created again.
+ */
+typedef struct box_render_mesh_desc_t {
+    uint32_t vertex_count;  /**< Vertices after the description */
+    uint32_t index_count;   /**< Indices after the vertices */
+} box_render_mesh_desc_t;
+
+/** How a buffer is used, flags of box_render_buffer_desc_t */
+typedef enum box_render_buffer_usage_t {
+    BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
+    BOX_RENDER_BUFFER_STORAGE = 1 << 1   /**< Read and written by compute shaders */
+} box_render_buffer_usage_t;
+
+/** Description of a BOX_RENDER_BUFFER create; creating an existing handle replaces it */
+typedef struct box_render_buffer_desc_t {
+    uint32_t size;          /**< Bytes of the buffer */
+    uint32_t usage;         /**< box_render_buffer_usage_t flags */
+} box_render_buffer_desc_t;
+
+/** Instance data of the forward pass, one per drawn instance in an instance buffer */
+typedef struct box_render_instance_t {
+    mat4 model;             /**< World transform with the instance scale of the mesh */
+    vec4 normal[3];         /**< Columns of the inverse transpose of the model rotation */
+    vec4 color;             /**< Linear base color */
+} box_render_instance_t;
+
 /** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
  *
  * The preprocessed WGSL code and the label each end with a terminator that their size counts.
@@ -90,14 +132,16 @@ typedef struct box_render_shader_desc_t {
 /** A target the frame renders into and presents, optionally captured to a PNG file */
 typedef struct box_render_target_t {
     uint32_t handle;        /**< Handle of the BOX_RENDER_TARGET resource */
+    ecs_entity_t view_root; /**< Parent of the views the target renders, 0 for every view */
     float clear[4];         /**< Linear color the target is cleared to before the views */
     uint32_t capture;       /**< Offset of the PNG path in the packet data */
     uint32_t capture_size;  /**< Bytes of the path with its terminator, 0 when not captured */
 } box_render_target_t;
 
-/** Instanced draw of one mesh with one pipeline */
+/** Instanced draw of one mesh with one pipeline, drawn by the views of its scene */
 typedef struct box_render_batch_t {
     int32_t view;               /**< Index of the view that draws it, -1 for every view */
+    ecs_entity_t scene;         /**< Scene root of the instances, 0 for the default scene */
     uint32_t pipeline;          /**< Shader handle of the pipeline */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t instances;         /**< Buffer handle holding the instance data */
@@ -174,6 +218,10 @@ typedef struct box_render_gpu_stats_t {
     int32_t shaders;            /**< Shader modules alive */
     int32_t compiles;           /**< Shader modules compiled */
     int32_t shader_errors;      /**< Shader modules that failed to compile */
+    int32_t meshes;             /**< Meshes alive */
+    int32_t buffers;            /**< Buffers alive */
+    int32_t passes;             /**< View passes rendered */
+    int32_t draws;              /**< Draw calls recorded */
 } box_render_gpu_stats_t;
 
 /** Packet ring between the main thread and the consumer of the packets */
@@ -234,6 +282,16 @@ const box_render_backend_t* box_render_get_backend(
  * @param world The world
  */
 void box_render_use_gpu(
+    ecs_world_t *world);
+
+/** Register the system that extracts the shapes of the world for the forward pass.
+ *
+ * Every entity with a ShapeMesh becomes one instance in the instance buffer and one batch,
+ * drawn by the views whose camera is in the same scene.
+ *
+ * @param world The world
+ */
+void box_render_draws_init(
     ecs_world_t *world);
 
 /** Initialize the vectors of a packet.

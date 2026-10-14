@@ -5,6 +5,7 @@
 
 #define BOX_RENDER_IMPL
 #include "render.h"
+#include <stdlib.h>
 
 /** Whether the main thread renders by default: in the browser there is no render thread */
 #ifdef __EMSCRIPTEN__
@@ -156,36 +157,83 @@ static void BoxRenderSettingsOnSet(
     box_render_ring_configure(box_render_get_ring(it->world), settings);
 }
 
-/** Add a view to the packet for every View whose camera is alive and has a Camera.
+/** Order two views by creation, which is the order of their entity ids.
+ *
+ * @param a The first view
+ * @param b The second view
+ * @return Negative when a renders first, positive when b does
+ */
+static int box_render_view_compare(
+    const void *a,
+    const void *b)
+{
+    ecs_entity_t x = ((const box_render_view_t*)a)->view;
+    ecs_entity_t y = ((const box_render_view_t*)b)->view;
+
+    return (x > y) - (x < y);
+}
+
+/** Describe a view whose camera has a Camera in the packet.
+ *
+ * @param world The world
+ * @param p The packet
+ * @param e The view entity
+ * @param view The view
+ */
+static void box_render_extract_view(
+    ecs_world_t *world,
+    box_render_packet_t *p,
+    ecs_entity_t e,
+    const View *view)
+{
+    ecs_entity_t camera = view->camera;
+    const Camera *data = camera && ecs_is_alive(world, camera)
+        ? ecs_get(world, camera, Camera)
+        : NULL;
+    if (!data) {
+        goto done;
+    }
+
+    const WorldTransform *transform = ecs_get(world, camera, WorldTransform);
+    box_render_view_t *v = box_render_packet_view(p);
+    v->view = e;
+    v->camera = camera;
+    v->parent = ecs_get_parent(world, e);
+    v->scene = ecs_get_target_for_id(world, camera, EcsChildOf, ecs_id(Scene));
+    v->camera_data = *data;
+    v->clear = view->clear;
+    if (transform) {
+        ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
+    } else {
+        glm_mat4_identity(v->camera_transform);
+    }
+
+    glm_mat4_inv(v->camera_transform, v->view_matrix);
+done:
+    return;
+}
+
+/** Add a view to the packet for every View whose camera is alive and has a Camera, in
+ * creation order.
  *
  * @param it The iterator of the system
  */
 static void BoxRenderExtractViews(
     ecs_iter_t *it)
 {
-    const View *views = ecs_field(it, View, 0);
     box_render_packet_t *p = box_render_packet(it->world);
-    int32_t i;
-    for (i = 0; i < it->count; i ++) {
-        ecs_entity_t camera = views[i].camera;
-        const Camera *data = camera && ecs_is_alive(it->world, camera)
-            ? ecs_get(it->world, camera, Camera)
-            : NULL;
-        if (!data) {
-            continue;
+    int32_t i, count;
+    while (ecs_iter_next(it)) {
+        const View *views = ecs_field(it, View, 0);
+        for (i = 0; i < it->count; i ++) {
+            box_render_extract_view(it->world, p, it->entities[i], &views[i]);
         }
+    }
 
-        const WorldTransform *transform = ecs_get(it->world, camera, WorldTransform);
-        box_render_view_t *view = box_render_packet_view(p);
-        view->view = it->entities[i];
-        view->camera = camera;
-        view->camera_data = *data;
-        view->clear = views[i].clear;
-        if (transform) {
-            ecs_os_memcpy_t(view->camera_transform, transform->m, mat4);
-        } else {
-            glm_mat4_identity(view->camera_transform);
-        }
+    count = ecs_vec_count(&p->views);
+    if (count > 1) {
+        qsort(ecs_vec_first(&p->views), (size_t)count, sizeof(box_render_view_t),
+            box_render_view_compare);
     }
 }
 
@@ -210,8 +258,10 @@ void BoxRenderImport(
 {
     ECS_MODULE(world, BoxRender);
     ECS_IMPORT(world, BoxTransform);
+    ECS_IMPORT(world, BoxGeometry);
     ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxView);
+    ECS_IMPORT(world, BoxMaterial);
 
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
@@ -247,8 +297,10 @@ void BoxRenderImport(
         .entity = ecs_entity(world, { .name = "RenderExtractViews" }),
         .phase = RenderExtract,
         .query.terms = {{ .id = ecs_id(View), .inout = EcsIn }},
-        .callback = BoxRenderExtractViews
+        .run = BoxRenderExtractViews
     });
+
+    box_render_draws_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),

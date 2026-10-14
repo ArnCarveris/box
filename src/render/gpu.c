@@ -240,6 +240,7 @@ static int box_gpu_init(
     }
 
     box_gpu_blit_init(gpu);
+    box_gpu_draw_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
     result = 0;
@@ -267,11 +268,18 @@ static void box_gpu_render(
         const box_render_resource_t *r = ecs_vec_get_t(
             &packet->resources, box_render_resource_t, i);
         const box_render_target_desc_t *desc = NULL;
+        const void *data = r->op != BOX_RENDER_DESTROY && r->size
+            ? box_render_packet_data(packet, r->data)
+            : NULL;
         if (r->kind == BOX_RENDER_SHADER) {
             box_gpu_shader_apply(gpu, r->op, r->handle,
-                r->op != BOX_RENDER_DESTROY && r->size >= sizeof(box_render_shader_desc_t)
-                    ? box_render_packet_data(packet, r->data)
-                    : NULL);
+                r->size >= sizeof(box_render_shader_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_MESH) {
+            box_gpu_mesh_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_mesh_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_BUFFER) {
+            box_gpu_buffer_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_buffer_desc_t) ? data : NULL);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -287,6 +295,7 @@ static void box_gpu_render(
         }
     }
 
+    box_gpu_upload(gpu, packet);
     count = ecs_vec_count(&packet->targets);
     for (i = 0; i < count; i ++) {
         box_gpu_target_render(gpu, packet,
@@ -318,6 +327,7 @@ static void box_gpu_fini(
         ecs_map_fini(&gpu->targets);
         box_gpu_shader_fini(gpu);
         ecs_map_fini(&gpu->shaders);
+        box_gpu_draw_fini(gpu);
     }
 
     box_gpu_blit_reset(gpu);
@@ -382,6 +392,24 @@ void box_gpu_count(
         break;
     case BOX_GPU_STAT_SHADER_ERROR:
         gpu->stats.shader_errors ++;
+        break;
+    case BOX_GPU_STAT_MESH_CREATED:
+        gpu->stats.meshes ++;
+        break;
+    case BOX_GPU_STAT_MESH_DESTROYED:
+        gpu->stats.meshes --;
+        break;
+    case BOX_GPU_STAT_BUFFER_CREATED:
+        gpu->stats.buffers ++;
+        break;
+    case BOX_GPU_STAT_BUFFER_DESTROYED:
+        gpu->stats.buffers --;
+        break;
+    case BOX_GPU_STAT_PASS:
+        gpu->stats.passes ++;
+        break;
+    case BOX_GPU_STAT_DRAW:
+        gpu->stats.draws ++;
         break;
     }
 

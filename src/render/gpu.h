@@ -24,6 +24,12 @@
 /** Bytes a row of a texture to buffer copy is aligned to */
 #define BOX_GPU_ROW_ALIGN (256)
 
+/** Depth format of the views, cleared to 0 and compared with greater for reversed Z */
+#define BOX_GPU_DEPTH_FORMAT (WGPUTextureFormat_Depth32Float)
+
+/** Bytes between the uniforms of two views, the dynamic offset alignment of webgpu */
+#define BOX_GPU_VIEW_STRIDE (256)
+
 /** A surface on the GPU: the image it presents and the image views render into */
 typedef struct box_gpu_target_t {
     uint32_t handle;                /**< Handle the main thread assigned */
@@ -35,6 +41,8 @@ typedef struct box_gpu_target_t {
     WGPUTexture scene;              /**< Render size texture, NULL when it equals the output */
     WGPUTextureView scene_view;     /**< View of the scene texture */
     WGPUBindGroup blit_group;       /**< Binds the scene texture to the blit pipeline */
+    WGPUTexture depth;              /**< Depth texture of the views at the render size */
+    WGPUTextureView depth_view;     /**< View of the depth texture */
     bool immediate;                 /**< The window can present without vertical sync */
     WGPUBuffer readback;            /**< Buffer a capture copies the image into */
     uint64_t readback_size;         /**< Bytes of the readback buffer */
@@ -51,7 +59,27 @@ typedef struct box_gpu_shader_t {
     int32_t revision;               /**< Times the module was compiled under its handle */
 } box_gpu_shader_t;
 
-/** Blit pipeline for one color format */
+/** Vertex and index buffers of a mesh */
+typedef struct box_gpu_mesh_t {
+    WGPUBuffer vertices;            /**< box_vertex_t */
+    WGPUBuffer indices;             /**< uint32_t, three per triangle */
+    uint32_t index_count;           /**< Indices to draw */
+} box_gpu_mesh_t;
+
+/** A buffer the main thread created by handle */
+typedef struct box_gpu_buffer_t {
+    WGPUBuffer buffer;              /**< The buffer */
+    uint32_t size;                  /**< Bytes of the buffer */
+} box_gpu_buffer_t;
+
+/** Uniforms of a view, written per target because the projection follows its size */
+typedef struct box_gpu_view_uniforms_t {
+    mat4 view_proj;                 /**< Projection times view matrix */
+    vec4 camera;                    /**< World position of the camera */
+    vec4 light;                     /**< Direction toward the light of the forward pass */
+} box_gpu_view_uniforms_t;
+
+/** Pipeline of the blit or the forward pass for one color format */
 typedef struct box_gpu_blit_t {
     WGPUTextureFormat format;       /**< Format of the color target */
     WGPURenderPipeline pipeline;    /**< The pipeline */
@@ -68,6 +96,16 @@ typedef struct box_gpu_t {
     WGPUSampler sampler;            /**< Linear sampler of the blit */
     box_gpu_blit_t blits[BOX_GPU_BLIT_FORMATS]; /**< Blit pipelines by format */
     int32_t blit_count;             /**< Blit pipelines created */
+    WGPUBindGroupLayout view_layout; /**< Bind group layout of the view uniforms */
+    WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
+    box_gpu_blit_t forward[BOX_GPU_BLIT_FORMATS]; /**< Forward pipelines by format */
+    int32_t forward_count;          /**< Forward pipelines created */
+    WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
+    WGPUBindGroup view_group;       /**< Binds the view buffer with a dynamic offset */
+    int32_t view_capacity;          /**< Views the view buffer holds */
+    ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
+    ecs_map_t meshes;               /**< Handle to box_gpu_mesh_t */
+    ecs_map_t buffers;              /**< Handle to box_gpu_buffer_t */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
     ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
     ecs_os_mutex_t lock;            /**< Protects the counters */
@@ -85,7 +123,13 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_SHADER_CREATED,    /**< A shader module got its handle */
     BOX_GPU_STAT_SHADER_DESTROYED,  /**< A shader module was released */
     BOX_GPU_STAT_COMPILED,          /**< A shader module compiled */
-    BOX_GPU_STAT_SHADER_ERROR       /**< A shader module failed to compile */
+    BOX_GPU_STAT_SHADER_ERROR,      /**< A shader module failed to compile */
+    BOX_GPU_STAT_MESH_CREATED,      /**< A mesh was created */
+    BOX_GPU_STAT_MESH_DESTROYED,    /**< A mesh was released */
+    BOX_GPU_STAT_BUFFER_CREATED,    /**< A buffer was created */
+    BOX_GPU_STAT_BUFFER_DESTROYED,  /**< A buffer was released */
+    BOX_GPU_STAT_PASS,              /**< A view pass was rendered */
+    BOX_GPU_STAT_DRAW               /**< A draw call was recorded */
 } box_gpu_stat_t;
 
 /** Count an event of the backend.
@@ -166,6 +210,79 @@ void box_gpu_shader_fini(
  */
 void box_gpu_blit_reset(
     box_gpu_t *gpu);
+
+/** Create the layouts the forward pass shares.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_draw_init(
+    box_gpu_t *gpu);
+
+/** Release the meshes, buffers, pipelines and layouts of the forward pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_draw_fini(
+    box_gpu_t *gpu);
+
+/** Release the forward pipelines, which are created again with the current mesh shader.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_forward_reset(
+    box_gpu_t *gpu);
+
+/** Create or release a mesh from a BOX_RENDER_MESH resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the mesh
+ * @param handle Handle of the mesh
+ * @param desc Description followed by the vertices and indices, NULL for a release
+ */
+void box_gpu_mesh_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_mesh_desc_t *desc);
+
+/** Create or release a buffer from a BOX_RENDER_BUFFER resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the buffer
+ * @param handle Handle of the buffer
+ * @param desc Size and usage, NULL for a release
+ */
+void box_gpu_buffer_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_buffer_desc_t *desc);
+
+/** Write the uploads of a packet into their buffers.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ */
+void box_gpu_upload(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
+
+/** Render the views of a target in order with the forward pass.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet with the views and batches
+ * @param frame The target of the packet
+ * @param encoder The encoder of the frame
+ * @param color The texture view the views render into
+ */
+void box_gpu_draw_views(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_target_t *frame,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView color);
 
 /** Record a copy of a presented image into the readback buffer of its target.
  *

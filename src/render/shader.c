@@ -15,6 +15,7 @@ typedef struct box_shader_t {
     ecs_entity_t entity;    /**< Entity with the Shader component */
     uint32_t handle;        /**< Handle of the shader in the backend */
     bool builtin;           /**< Engine shader, only sent to the webgpu backend */
+    bool on_demand;         /**< Engine shader sent once a batch of the packet uses it */
     bool dirty;             /**< Preprocess before the next send */
     bool sent;              /**< The backend received code under the handle */
     bool pending;           /**< The code changed since the backend received it */
@@ -403,6 +404,28 @@ done:
     return;
 }
 
+/** Check whether a batch of a packet draws with a shader.
+ *
+ * @param p The packet
+ * @param handle Handle of the shader
+ * @return Whether a batch uses the shader as its pipeline
+ */
+static bool box_shader_used(
+    const box_render_packet_t *p,
+    uint32_t handle)
+{
+    bool result = false;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&p->batches); i ++) {
+        if (ecs_vec_get_t(&p->batches, box_render_batch_t, i)->pipeline == handle) {
+            result = true;
+            break;
+        }
+    }
+
+    return result;
+}
+
 /** Preprocess changed shaders and send new code and removed shaders to the renderer.
  *
  * @param it The iterator of the system
@@ -427,6 +450,10 @@ static void BoxShaderExtract(
     while (ecs_map_next(&mit)) {
         box_shader_t *s = ecs_map_ptr(&mit);
         if (s->builtin && !gpu) {
+            continue;
+        }
+
+        if (s->on_demand && !s->sent && !box_shader_used(box_render_packet(world), s->handle)) {
             continue;
         }
 
@@ -489,6 +516,7 @@ static void BoxShaderOnRemove(
  * @param name Name of the shader entity
  * @param path WGSL file
  * @param handle Handle the backend knows the shader by
+ * @param on_demand Send the shader once a batch draws with it instead of right away
  */
 static void box_shader_builtin(
     ecs_world_t *world,
@@ -496,10 +524,13 @@ static void box_shader_builtin(
     ecs_entity_t parent,
     const char *name,
     const char *path,
-    uint32_t handle)
+    uint32_t handle,
+    bool on_demand)
 {
     ecs_entity_t e = ecs_entity(world, { .name = name, .parent = parent });
-    box_shader_ensure(state, e, handle)->builtin = true;
+    box_shader_t *s = box_shader_ensure(state, e, handle);
+    s->builtin = true;
+    s->on_demand = on_demand;
     ecs_set(world, e, Shader, { .path = ECS_CONST_CAST(char*, path) });
 }
 
@@ -563,5 +594,7 @@ void BoxShaderImport(
 
     ecs_entity_t builtin = ecs_entity(world, { .name = "builtin" });
     box_shader_builtin(world, state, builtin, "blit", "etc/shaders/blit.wgsl",
-        BOX_RENDER_SHADER_BLIT);
+        BOX_RENDER_SHADER_BLIT, false);
+    box_shader_builtin(world, state, builtin, "mesh", "etc/shaders/mesh.wgsl",
+        BOX_RENDER_SHADER_MESH, true);
 }

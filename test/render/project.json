@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../src/render"
+            "../../src/render",
+            "../../src/geometry"
         ]
     },
     "test": {
@@ -117,6 +118,59 @@
                     "gpu_compiles_component",
                     "gpu_invalid_code",
                     "gpu_recompiles_on_change"
+                ]
+            },
+            {
+                "id": "Camera",
+                "testcases": [
+                    "perspective_near_is_one",
+                    "perspective_infinite_far",
+                    "perspective_finite_far",
+                    "perspective_defaults",
+                    "perspective_aspect_follows_surface",
+                    "aspect_ratio_overrides_surface",
+                    "ortho_near_far",
+                    "ortho_default_far",
+                    "ortho_height",
+                    "ortho_default_height",
+                    "ortho_scale"
+                ]
+            },
+            {
+                "id": "Views",
+                "testcases": [
+                    "creation_order",
+                    "parent",
+                    "camera_scene",
+                    "clear_settings",
+                    "view_matrix",
+                    "no_camera_skipped"
+                ]
+            },
+            {
+                "id": "Draws",
+                "testcases": [
+                    "shape_sends_mesh_and_batch",
+                    "shared_mesh_sent_once",
+                    "no_views_no_batches",
+                    "removed_shape_destroys_mesh",
+                    "reused_handle_sent_again",
+                    "instance_data",
+                    "scene_of_batch",
+                    "new_backend_resends",
+                    "instance_buffer_grows"
+                ]
+            },
+            {
+                "id": "Forward",
+                "testcases": [
+                    "simple_scene",
+                    "depth_nearer_wins",
+                    "view_order",
+                    "scene_filter",
+                    "ortho_camera",
+                    "mesh_shader_on_demand",
+                    "target_view_root"
                 ]
             }
         ]

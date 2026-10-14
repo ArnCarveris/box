@@ -1,0 +1,555 @@
+/**
+ * @file render/gpu_draw.c
+ * @brief Meshes, buffers and the forward pass of the webgpu backend.
+ *
+ * Every view of a target renders in order into its color texture with a depth buffer that is
+ * cleared to 0 and compared with greater, and draws the batches of the scene of its camera.
+ */
+
+#include "gpu.h"
+#include <math.h>
+
+#ifdef BOX_RENDER_WGPU
+
+/** Direction toward the light of the forward pass, in world space */
+static const float box_gpu_light[3] = { 0.35f, 0.8f, 0.5f };
+
+/** Convert a display encoded channel to linear light.
+ *
+ * @param value The channel
+ * @return The linear value
+ */
+static double box_gpu_linear(
+    uint8_t value)
+{
+    double c = (double)value / 255.0;
+
+    return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
+}
+
+/** Create a buffer.
+ *
+ * @param gpu The backend
+ * @param size Bytes of the buffer
+ * @param usage Usage of the buffer
+ * @return The buffer
+ */
+static WGPUBuffer box_gpu_buffer_new(
+    box_gpu_t *gpu,
+    uint64_t size,
+    WGPUBufferUsage usage)
+{
+    WGPUBufferDescriptor desc = {
+        .usage = usage | WGPUBufferUsage_CopyDst,
+        .size = (size + 3) & ~(uint64_t)3
+    };
+
+    return wgpuDeviceCreateBuffer(gpu->device, &desc);
+}
+
+void box_gpu_draw_init(
+    box_gpu_t *gpu)
+{
+    WGPUBindGroupLayoutEntry entry = {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+        .buffer = {
+            .type = WGPUBufferBindingType_Uniform,
+            .hasDynamicOffset = true,
+            .minBindingSize = sizeof(box_gpu_view_uniforms_t)
+        }
+    };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 1, .entries = &entry };
+    gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+    gpu->mesh_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
+        &(WGPUPipelineLayoutDescriptor){
+            .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &gpu->view_layout
+        });
+    ecs_map_init(&gpu->meshes, NULL);
+    ecs_map_init(&gpu->buffers, NULL);
+    ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
+}
+
+/** Release the buffers of a mesh and the mesh.
+ *
+ * @param gpu The backend
+ * @param m The mesh
+ */
+static void box_gpu_mesh_free(
+    box_gpu_t *gpu,
+    box_gpu_mesh_t *m)
+{
+    wgpuBufferRelease(m->vertices);
+    wgpuBufferRelease(m->indices);
+    ecs_os_free(m);
+    box_gpu_count(gpu, BOX_GPU_STAT_MESH_DESTROYED);
+}
+
+/** Release a buffer and its handle.
+ *
+ * @param gpu The backend
+ * @param b The buffer
+ */
+static void box_gpu_buffer_free(
+    box_gpu_t *gpu,
+    box_gpu_buffer_t *b)
+{
+    wgpuBufferRelease(b->buffer);
+    ecs_os_free(b);
+    box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_DESTROYED);
+}
+
+void box_gpu_forward_reset(
+    box_gpu_t *gpu)
+{
+    int32_t i;
+    for (i = 0; i < gpu->forward_count; i ++) {
+        if (gpu->forward[i].pipeline) {
+            wgpuRenderPipelineRelease(gpu->forward[i].pipeline);
+        }
+
+        gpu->forward[i].pipeline = NULL;
+    }
+
+    gpu->forward_count = 0;
+}
+
+void box_gpu_draw_fini(
+    box_gpu_t *gpu)
+{
+    ecs_map_iter_t it = ecs_map_iter(&gpu->meshes);
+    while (ecs_map_next(&it)) {
+        box_gpu_mesh_free(gpu, ecs_map_ptr(&it));
+    }
+
+    it = ecs_map_iter(&gpu->buffers);
+    while (ecs_map_next(&it)) {
+        box_gpu_buffer_free(gpu, ecs_map_ptr(&it));
+    }
+
+    ecs_map_fini(&gpu->meshes);
+    ecs_map_fini(&gpu->buffers);
+    ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
+    box_gpu_forward_reset(gpu);
+    if (gpu->view_group) {
+        wgpuBindGroupRelease(gpu->view_group);
+        gpu->view_group = NULL;
+    }
+
+    if (gpu->view_buffer) {
+        wgpuBufferRelease(gpu->view_buffer);
+        gpu->view_buffer = NULL;
+    }
+
+    if (gpu->mesh_layout) {
+        wgpuPipelineLayoutRelease(gpu->mesh_layout);
+        gpu->mesh_layout = NULL;
+    }
+
+    if (gpu->view_layout) {
+        wgpuBindGroupLayoutRelease(gpu->view_layout);
+        gpu->view_layout = NULL;
+    }
+}
+
+void box_gpu_mesh_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_mesh_desc_t *desc)
+{
+    box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, handle);
+    if (m) {
+        ecs_map_remove(&gpu->meshes, handle);
+        box_gpu_mesh_free(gpu, m);
+    }
+
+    if (op == BOX_RENDER_DESTROY || !desc || !desc->vertex_count || !desc->index_count) {
+        goto done;
+    }
+
+    uint64_t vertex_size = (uint64_t)desc->vertex_count * sizeof(box_vertex_t);
+    uint64_t index_size = (uint64_t)desc->index_count * sizeof(uint32_t);
+    const uint8_t *vertices = (const uint8_t*)(desc + 1);
+    m = ecs_os_calloc_t(box_gpu_mesh_t);
+    m->vertices = box_gpu_buffer_new(gpu, vertex_size, WGPUBufferUsage_Vertex);
+    m->indices = box_gpu_buffer_new(gpu, index_size, WGPUBufferUsage_Index);
+    m->index_count = desc->index_count;
+    wgpuQueueWriteBuffer(gpu->queue, m->vertices, 0, vertices, (size_t)vertex_size);
+    wgpuQueueWriteBuffer(gpu->queue, m->indices, 0, vertices + vertex_size, (size_t)index_size);
+    ecs_map_insert_ptr(&gpu->meshes, handle, m);
+    box_gpu_count(gpu, BOX_GPU_STAT_MESH_CREATED);
+done:
+    return;
+}
+
+void box_gpu_buffer_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_buffer_desc_t *desc)
+{
+    box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, handle);
+    WGPUBufferUsage usage = 0;
+    if (b) {
+        ecs_map_remove(&gpu->buffers, handle);
+        box_gpu_buffer_free(gpu, b);
+    }
+
+    if (op == BOX_RENDER_DESTROY || !desc || !desc->size) {
+        goto done;
+    }
+
+    if (desc->usage & BOX_RENDER_BUFFER_INSTANCE) {
+        usage |= WGPUBufferUsage_Vertex;
+    }
+
+    if (desc->usage & BOX_RENDER_BUFFER_STORAGE) {
+        usage |= WGPUBufferUsage_Storage;
+    }
+
+    b = ecs_os_calloc_t(box_gpu_buffer_t);
+    b->buffer = box_gpu_buffer_new(gpu, desc->size, usage);
+    b->size = desc->size;
+    ecs_map_insert_ptr(&gpu->buffers, handle, b);
+    box_gpu_count(gpu, BOX_GPU_STAT_BUFFER_CREATED);
+done:
+    return;
+}
+
+void box_gpu_upload(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, count = ecs_vec_count(&packet->uploads);
+    for (i = 0; i < count; i ++) {
+        const box_render_upload_t *u = ecs_vec_get_t(
+            &packet->uploads, box_render_upload_t, i);
+        box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, u->buffer);
+        if (!b || (uint64_t)u->offset + u->size > b->size || (u->offset | u->size) & 3) {
+            ecs_err("upload of %u bytes at %u does not fit buffer %u",
+                u->size, u->offset, u->buffer);
+            box_gpu_count(gpu, BOX_GPU_STAT_ERRORS);
+            continue;
+        }
+
+        wgpuQueueWriteBuffer(gpu->queue, b->buffer, u->offset,
+            box_render_packet_data(packet, u->data), u->size);
+    }
+}
+
+/** Create the forward pipeline of a color format.
+ *
+ * @param gpu The backend
+ * @param shader The mesh shader
+ * @param format The format of the color target
+ * @return The pipeline
+ */
+static WGPURenderPipeline box_gpu_forward_create(
+    box_gpu_t *gpu,
+    WGPUShaderModule shader,
+    WGPUTextureFormat format)
+{
+    WGPUVertexAttribute vertex_attrs[3] = {
+        { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
+        { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
+        { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
+    };
+    WGPUVertexAttribute instance_attrs[8];
+    int32_t i;
+    for (i = 0; i < 8; i ++) {
+        instance_attrs[i] = (WGPUVertexAttribute){
+            .format = WGPUVertexFormat_Float32x4,
+            .offset = (uint64_t)i * 16,
+            .shaderLocation = (uint32_t)(3 + i)
+        };
+    }
+
+    WGPUVertexBufferLayout buffers[2] = {
+        {
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .arrayStride = sizeof(box_vertex_t),
+            .attributeCount = 3,
+            .attributes = vertex_attrs
+        },
+        {
+            .stepMode = WGPUVertexStepMode_Instance,
+            .arrayStride = sizeof(box_render_instance_t),
+            .attributeCount = 8,
+            .attributes = instance_attrs
+        }
+    };
+    WGPUColorTargetState target = { .format = format, .writeMask = WGPUColorWriteMask_All };
+    WGPUFragmentState fragment = {
+        .module = shader,
+        .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
+        .targetCount = 1,
+        .targets = &target
+    };
+    WGPUDepthStencilState depth = {
+        .format = BOX_GPU_DEPTH_FORMAT,
+        .depthWriteEnabled = WGPUOptionalBool_True,
+        .depthCompare = WGPUCompareFunction_Greater,
+        .stencilFront = { .compare = WGPUCompareFunction_Always },
+        .stencilBack = { .compare = WGPUCompareFunction_Always }
+    };
+    WGPURenderPipelineDescriptor desc = {
+        .layout = gpu->mesh_layout,
+        .vertex = {
+            .module = shader,
+            .entryPoint = { .data = "vs", .length = WGPU_STRLEN },
+            .bufferCount = 2,
+            .buffers = buffers
+        },
+        .primitive = {
+            .topology = WGPUPrimitiveTopology_TriangleList,
+            .frontFace = WGPUFrontFace_CCW,
+            .cullMode = WGPUCullMode_Back
+        },
+        .depthStencil = &depth,
+        .multisample = { .count = 1, .mask = 0xFFFFFFFF },
+        .fragment = &fragment
+    };
+
+    return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
+}
+
+/** Get the forward pipeline of a color format, creating it on first use.
+ *
+ * @param gpu The backend
+ * @param format The format of the color target
+ * @return The pipeline, NULL without a mesh shader or when too many formats are in use
+ */
+static WGPURenderPipeline box_gpu_forward_pipeline(
+    box_gpu_t *gpu,
+    WGPUTextureFormat format)
+{
+    WGPURenderPipeline result = NULL;
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    int32_t i;
+    for (i = 0; i < gpu->forward_count; i ++) {
+        if (gpu->forward[i].format == format) {
+            result = gpu->forward[i].pipeline;
+            goto done;
+        }
+    }
+
+    if (!shader || gpu->forward_count == BOX_GPU_BLIT_FORMATS) {
+        goto done;
+    }
+
+    result = box_gpu_forward_create(gpu, shader, format);
+    gpu->forward[gpu->forward_count].format = format;
+    gpu->forward[gpu->forward_count].pipeline = result;
+    gpu->forward_count ++;
+done:
+    return result;
+}
+
+/** Make the view buffer hold the uniforms of a number of views.
+ *
+ * @param gpu The backend
+ * @param count Views of the target
+ */
+static void box_gpu_view_reserve(
+    box_gpu_t *gpu,
+    int32_t count)
+{
+    int32_t capacity = gpu->view_capacity ? gpu->view_capacity : 4;
+    if (gpu->view_buffer && count <= gpu->view_capacity) {
+        goto done;
+    }
+
+    while (capacity < count) {
+        capacity *= 2;
+    }
+
+    if (gpu->view_group) {
+        wgpuBindGroupRelease(gpu->view_group);
+    }
+
+    if (gpu->view_buffer) {
+        wgpuBufferRelease(gpu->view_buffer);
+    }
+
+    gpu->view_capacity = capacity;
+    gpu->view_buffer = box_gpu_buffer_new(gpu,
+        (uint64_t)capacity * BOX_GPU_VIEW_STRIDE, WGPUBufferUsage_Uniform);
+    WGPUBindGroupEntry entry = {
+        .binding = 0,
+        .buffer = gpu->view_buffer,
+        .size = sizeof(box_gpu_view_uniforms_t)
+    };
+    WGPUBindGroupDescriptor desc = {
+        .layout = gpu->view_layout,
+        .entryCount = 1,
+        .entries = &entry
+    };
+    gpu->view_group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
+done:
+    return;
+}
+
+/** Check whether a target renders a view.
+ *
+ * @param frame The target of the packet
+ * @param v The view
+ * @return Whether the view is under the view root of the target, or it has none
+ */
+static bool box_gpu_target_has_view(
+    const box_render_target_t *frame,
+    const box_render_view_t *v)
+{
+    return !frame->view_root || v->parent == frame->view_root;
+}
+
+/** Write the uniforms of the views a target renders into the view buffer.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param packet The packet
+ * @param frame The target of the packet
+ * @return The number of views the target renders
+ */
+static int32_t box_gpu_view_write(
+    box_gpu_t *gpu,
+    const box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_target_t *frame)
+{
+    int32_t i, result = 0, count = ecs_vec_count(&packet->views);
+    ecs_vec_set_count_t(NULL, &gpu->view_data, uint8_t, count * BOX_GPU_VIEW_STRIDE);
+    for (i = 0; i < count; i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
+        if (!box_gpu_target_has_view(frame, v)) {
+            continue;
+        }
+
+        box_gpu_view_uniforms_t *u = (box_gpu_view_uniforms_t*)ecs_vec_get_t(
+            &gpu->view_data, uint8_t, result * BOX_GPU_VIEW_STRIDE);
+        mat4 proj;
+        ecs_os_memset_t(u, 0, box_gpu_view_uniforms_t);
+        box_camera_projection(&v->camera_data,
+            (float)t->desc.width, (float)t->desc.height, proj);
+        glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
+        glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
+        u->camera[3] = 1;
+        glm_vec3_normalize_to(ECS_CONST_CAST(float*, box_gpu_light), u->light);
+        result ++;
+    }
+
+    if (result) {
+        box_gpu_view_reserve(gpu, result);
+        wgpuQueueWriteBuffer(gpu->queue, gpu->view_buffer, 0,
+            ecs_vec_first(&gpu->view_data), (size_t)result * BOX_GPU_VIEW_STRIDE);
+    }
+
+    return result;
+}
+
+/** Record the draws of the batches a view renders.
+ *
+ * @param gpu The backend
+ * @param pass The render pass of the view
+ * @param pipeline The forward pipeline
+ * @param packet The packet
+ * @param index Index of the view in the packet
+ */
+static void box_gpu_draw_batches(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    WGPURenderPipeline pipeline,
+    const box_render_packet_t *packet,
+    int32_t index)
+{
+    const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
+    int32_t i, count = ecs_vec_count(&packet->batches);
+    for (i = 0; i < count; i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        if ((b->view != -1 && b->view != index) || b->scene != v->scene ||
+            b->pipeline != BOX_RENDER_SHADER_MESH || !b->instance_count)
+        {
+            continue;
+        }
+
+        box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
+        box_gpu_buffer_t *inst = ecs_map_get_deref(
+            &gpu->buffers, box_gpu_buffer_t, b->instances);
+        if (!m || !inst) {
+            continue;
+        }
+
+        wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderSetVertexBuffer(pass, 1, inst->buffer, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderSetIndexBuffer(
+            pass, m->indices, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
+        wgpuRenderPassEncoderDrawIndexed(
+            pass, m->index_count, b->instance_count, 0, 0, b->first_instance);
+        box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
+    }
+}
+
+void box_gpu_draw_views(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    const box_render_packet_t *packet,
+    const box_render_target_t *frame,
+    WGPUCommandEncoder encoder,
+    WGPUTextureView color)
+{
+    int32_t i, slot = 0, count = ecs_vec_count(&packet->views);
+    WGPURenderPipeline pipeline = NULL;
+    if (!box_gpu_view_write(gpu, t, packet, frame)) {
+        goto done;
+    }
+
+    pipeline = box_gpu_forward_pipeline(gpu, t->format);
+    for (i = 0; i < count; i ++) {
+        const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
+        if (!box_gpu_target_has_view(frame, v)) {
+            continue;
+        }
+
+        WGPURenderPassColorAttachment attachment = {
+            .view = color,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .loadOp = v->clear.enabled ? WGPULoadOp_Clear : WGPULoadOp_Load,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = {
+                box_gpu_linear(v->clear.color.r),
+                box_gpu_linear(v->clear.color.g),
+                box_gpu_linear(v->clear.color.b),
+                (double)v->clear.color.a / 255.0
+            }
+        };
+        WGPURenderPassDepthStencilAttachment depth = {
+            .view = t->depth_view,
+            .depthLoadOp = WGPULoadOp_Clear,
+            .depthStoreOp = WGPUStoreOp_Discard,
+            .depthClearValue = 0.0f
+        };
+        WGPURenderPassDescriptor desc = {
+            .colorAttachmentCount = 1,
+            .colorAttachments = &attachment,
+            .depthStencilAttachment = &depth
+        };
+        uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+        WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->view_group, 1, &offset);
+        if (pipeline) {
+            box_gpu_draw_batches(gpu, pass, pipeline, packet, i);
+        }
+
+        wgpuRenderPassEncoderEnd(pass);
+        wgpuRenderPassEncoderRelease(pass);
+        box_gpu_count(gpu, BOX_GPU_STAT_PASS);
+        slot ++;
+    }
+
+done:
+    return;
+}
+
+#endif

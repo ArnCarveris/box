@@ -1,6 +1,6 @@
 /**
  * @file render/target.c
- * @brief Window and offscreen targets of the webgpu backend: configuration, clear and present.
+ * @brief Window and offscreen targets of the webgpu backend: configuration, views and present.
  *
  * Views render into the scene texture at the render size, which the blit scales to the
  * presented image; at a resolution scale of one the views render into the image directly.
@@ -111,6 +111,14 @@ static void box_gpu_target_release(
         wgpuTextureRelease(t->scene);
     }
 
+    if (t->depth_view) {
+        wgpuTextureViewRelease(t->depth_view);
+    }
+
+    if (t->depth) {
+        wgpuTextureRelease(t->depth);
+    }
+
     if (t->output) {
         wgpuTextureRelease(t->output);
     }
@@ -119,6 +127,8 @@ static void box_gpu_target_release(
     t->scene_view = NULL;
     t->scene = NULL;
     t->output = NULL;
+    t->depth_view = NULL;
+    t->depth = NULL;
 }
 
 /** Create the scene texture of a target whose render size differs from its image.
@@ -182,6 +192,10 @@ static void box_gpu_target_configure(
     if (d->render_width != d->width || d->render_height != d->height) {
         box_gpu_target_scene(gpu, t);
     }
+
+    t->depth = box_gpu_texture(gpu, d->render_width, d->render_height,
+        BOX_GPU_DEPTH_FORMAT, WGPUTextureUsage_RenderAttachment);
+    t->depth_view = wgpuTextureCreateView(t->depth, NULL);
 
     box_gpu_count(gpu, BOX_GPU_STAT_CONFIGURED);
     ecs_os_mutex_lock(gpu->lock);
@@ -426,6 +440,7 @@ void box_gpu_target_render(
     WGPUTextureView view = wgpuTextureCreateView(texture, NULL);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     box_gpu_clear(encoder, t->scene_view ? t->scene_view : view, frame->clear);
+    box_gpu_draw_views(gpu, t, packet, frame, encoder, t->scene_view ? t->scene_view : view);
     if (t->scene_view) {
         box_gpu_blit(gpu, t, encoder, view);
     }
