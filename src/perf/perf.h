@@ -46,6 +46,8 @@ typedef struct box_perf_t {
     int32_t cull_last[3]; /**< Visible, frustum and occlusion culled counts of the last sample */
     double cull_sum[3];   /**< Sums of the visible, frustum and occlusion culled samples */
     box_perf_priority_t priority; /**< Schedule of the pacing thread during the run */
+    int32_t bake_left;    /**< Probes the bakes had left when they last progressed */
+    int32_t bake_stalled; /**< Warmup frames since the bakes last progressed */
 } box_perf_t;
 
 /** Distribution of a series of durations */

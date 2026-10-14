@@ -1,0 +1,39 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+yard {
+  Scene: {}
+  LightBake: {probe_spacing: 0.5, bounds_padding: 0.25}
+  AmbientLight: {sky: {90, 110, 150}, ground: {40, 38, 36}, intensity: 0.5}
+
+  camera {
+    Position: {3.2, 2.6, 4.2}
+    Rotation: {-0.42, 0.62, 0}
+    Camera: {fov: 55}
+  }
+
+  sun {
+    Rotation: {0.35, -1.4, 0}
+    DirectionalLight: {intensity: 1.2}
+  }
+
+  floor {
+    Position: {0, -0.5, 0}
+    Box: {6, 1, 6}
+    Rgb: {235, 235, 235}
+  }
+
+  red_wall {
+    Position: {-1.25, 1.25, 0}
+    Box: {0.3, 2.5, 4}
+    Rgb: {230, 30, 25}
+  }
+}
+
+main_view {
+  View: {camera: yard.camera, clear: {enabled: true, color: {120, 150, 200, 255}}, shadows: {enabled: true}}
+}

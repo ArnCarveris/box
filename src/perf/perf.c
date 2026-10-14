@@ -5,6 +5,7 @@
 
 #define BOX_PERF_IMPL
 #include "perf.h"
+#include "../render/render.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,9 @@
  * time left would overshoot by up to half of it.
  */
 #define BOX_PERF_SLEEP (0.6)
+
+/** Warmup frames a light bake may go without progress before a run measures without it */
+#define BOX_PERF_BAKE_STALL (300)
 
 /** Factor on the median work of the warmup frames that the real-time schedule asks for */
 #define BOX_PERF_WORK_MARGIN (1.5)
@@ -152,6 +156,8 @@ static void BoxPerfOnSet(
     status.period = run->period;
     perf->run = 0;
     perf->mark = 0;
+    perf->bake_left = 0;
+    perf->bake_stalled = 0;
     perf->priority.refused = false;
     box_perf_priority_reset(&perf->priority);
     perf->bounds = false;
@@ -525,6 +531,39 @@ static void box_perf_end(
     }
 }
 
+/** Check whether a light bake that can progress is still baking, which a run waits for.
+ *
+ * A bake that leaves the same probes for BOX_PERF_BAKE_STALL frames is given up on, with an
+ * error, and the run measures without it.
+ *
+ * @param world The world
+ * @param perf The state of the module
+ * @return Whether the warmup starts again
+ */
+static bool box_perf_baking(
+    ecs_world_t *world,
+    box_perf_t *perf)
+{
+    int32_t left = box_render_bake_pending(world);
+    bool result = false;
+    if (!left || perf->bake_stalled >= BOX_PERF_BAKE_STALL) {
+        goto done;
+    }
+
+    if (left != perf->bake_left) {
+        perf->bake_left = left;
+        perf->bake_stalled = 0;
+    } else if (++ perf->bake_stalled == BOX_PERF_BAKE_STALL) {
+        ecs_err("PerfRun: the light bake left %d probes for %d frames, measuring without it",
+            left, BOX_PERF_BAKE_STALL);
+        goto done;
+    }
+
+    result = true;
+done:
+    return result;
+}
+
 /** Pace the frame to the target interval, measure it and advance the run.
  *
  * @param it The iterator of the system
@@ -559,6 +598,11 @@ static void BoxPerfFrame(
 
     perf->mark = now;
     perf->run ++;
+    if (perf->state == PerfWarmup && box_perf_baking(it->world, perf)) {
+        perf->run = 0;
+        ecs_vec_clear(&perf->work);
+    }
+
     if (perf->state == PerfWarmup && perf->run >= perf->warmup) {
         box_perf_begin(it->world, perf);
         status->state = PerfMeasure;
