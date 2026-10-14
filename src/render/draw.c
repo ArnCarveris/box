@@ -84,6 +84,8 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &d->transformed, box_draw_transformed_t);
+    ecs_vec_fini_t(NULL, &d->late, ecs_entity_t);
     box_draws_order_fini(d);
     ecs_os_free(d);
 done:
@@ -144,6 +146,34 @@ done:
     return;
 }
 
+/** Remember the entities of an observer event as roots of changed subtrees whose static
+ * transform changed, with the transform version they have now.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnTransform(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    if (ecs_is_fini(it->world)) {
+        goto done;
+    }
+
+    BoxDrawsOnMove(it);
+    for (i = 0; i < it->count; i ++) {
+        const WorldTransformVersion *v = ecs_get(
+            it->world, it->entities[i], WorldTransformVersion);
+        *ecs_vec_append_t(NULL, &d->transformed, box_draw_transformed_t) =
+            (box_draw_transformed_t){
+                .entity = it->entities[i], .version = v ? v->version : 0
+            };
+    }
+
+done:
+    return;
+}
+
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
  * draw order again.
  *
@@ -154,7 +184,7 @@ static void BoxDrawsOnHierarchy(
 {
     box_render_draws_t *d = it->ctx;
     d->order_dirty = true;
-    BoxDrawsOnMove(it);
+    BoxDrawsOnTransform(it);
 }
 
 /** Make the 2D draw order again when the z it was made from changed.
@@ -227,6 +257,41 @@ static void BoxDrawsOnTextRemove(
 
 done:
     return;
+}
+
+/** Walk the roots again whose static transform was not computed yet at the last extract, and
+ * keep the roots whose static transform changed after it was computed this frame.
+ *
+ * A static transform is computed in EcsPreStore and written without an event, so a change made
+ * after it is only computed in the next frame, and its subtree is walked again then.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_late(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    int32_t i, count = ecs_vec_count(&d->transformed);
+    box_draw_transformed_t *changes = ecs_vec_first(&d->transformed);
+    for (i = 0; i < ecs_vec_count(&d->late); i ++) {
+        *ecs_vec_append_t(NULL, &d->moved, ecs_entity_t) =
+            *ecs_vec_get_t(&d->late, ecs_entity_t, i);
+    }
+
+    ecs_vec_clear(&d->late);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = changes[i].entity;
+        const WorldTransformVersion *v = ecs_is_alive(world, e) ?
+            ecs_get(world, e, WorldTransformVersion) : NULL;
+        bool pending = v && v->version == changes[i].version &&
+            !ecs_has_id(world, e, DynamicTransform) && !ecs_has_id(world, e, ManualTransform);
+        if (pending) {
+            *ecs_vec_append_t(NULL, &d->late, ecs_entity_t) = e;
+        }
+    }
+
+    ecs_vec_clear(&d->transformed);
 }
 
 /** Mark every entity of the changed subtrees, the roots included.
@@ -489,6 +554,7 @@ static void box_draws_process(
 {
     int32_t i;
     box_draws_text_dynamic(world, d);
+    box_draws_late(world, d);
     box_draws_walk(world, d);
     d->scene_table = NULL;
     for (i = 0; i < ecs_vec_count(&d->dirty); i ++) {
@@ -675,7 +741,7 @@ static void box_draws_transform_observers(
                 { .id = DynamicTransform, .oper = EcsNot },
                 { .id = ManualTransform, .oper = EcsNot }
             },
-            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnTransform);
     }
 
     box_draws_observer(world, d, "DrawsOnPositionZ", (ecs_observer_desc_t){
@@ -759,6 +825,8 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &d->transformed, box_draw_transformed_t, 0);
+    ecs_vec_init_t(NULL, &d->late, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);

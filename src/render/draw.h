@@ -105,6 +105,12 @@ typedef struct box_draw_parent_t {
     int32_t count;          /**< Children it had */
 } box_draw_parent_t;
 
+/** An entity whose static transform changed, with the version its transform had then */
+typedef struct box_draw_transformed_t {
+    ecs_entity_t entity;    /**< The entity */
+    uint64_t version;       /**< Its WorldTransformVersion when the change was observed */
+} box_draw_transformed_t;
+
 /** A batch: the entities of its slots, their instance data and what the GPU still needs */
 typedef struct box_draw_batch_t {
     box_draw_key_t key;     /**< Key of the batch */
@@ -133,6 +139,8 @@ typedef struct box_render_draws_t {
     ecs_vec_t dirty;            /**< ecs_entity_t, entities whose instance may have changed */
     ecs_vec_t moved;            /**< ecs_entity_t, roots of subtrees that changed */
     ecs_vec_t walk;             /**< ecs_entity_t, stack of a subtree walk */
+    ecs_vec_t transformed;      /**< box_draw_transformed_t, static transform changes */
+    ecs_vec_t late;             /**< ecs_entity_t, roots to walk again once transformed */
     ecs_map_t meshes;           /**< Mesh handles the backend received */
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
     ecs_vec_t blended;          /**< int32_t, blended batches the frame draws */
