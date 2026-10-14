@@ -65,11 +65,10 @@ ECS_STRUCT(View, {
 });
 
 /** Component added to scene root.
- * Allows for having different scenes in the same world. A view will only render
- * the entities that are in the same scene as the configured camera.
+ * A view renders only the scene of its camera, lit by the lights of that scene.
  *
- * Entities in a subtree without a Scene component will be rendered by the
- * default scene.
+ * An entity belongs to its nearest ancestor with Scene (itself included), so
+ * scenes nest; entities outside any Scene belong to the default scene.
  */
 ECS_STRUCT(Scene, {
     int32_t dummy_; /**< Unused, gives the component a size */

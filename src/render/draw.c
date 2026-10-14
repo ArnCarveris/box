@@ -248,9 +248,7 @@ static void box_draws_key(
         key->textures[3] = textures->normal;
     }
 
-    key->scene = ecs_has(world, e, Scene)
-        ? e
-        : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
+    key->scene = box_render_scene_of(world, e);
     key->mesh = shape->mesh;
     key->pipeline = BOX_RENDER_SHADER_MESH;
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
