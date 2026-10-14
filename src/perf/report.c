@@ -118,6 +118,7 @@ static void box_perf_report_stats(
     ecs_strbuf_t *buf,
     const PerfStatus *status)
 {
+    const PerfChecks *checks = &status->checks;
     double fps = status->mean_ms > 0 ? 1000.0 / status->mean_ms : 0;
     ecs_strbuf_append(buf,
         "  \"passed\": %s,\n  \"frames\": %d,\n  \"errors\": %d,\n  \"slow\": %d,\n"
@@ -132,6 +133,16 @@ static void box_perf_report_stats(
     ecs_strbuf_append(buf,
         "  \"work_mean_ms\": %.4f,\n  \"work_p99_ms\": %.4f,\n  \"work_max_ms\": %.4f,\n",
         status->work_mean_ms, status->work_p99_ms, status->work_max_ms);
+    ecs_strbuf_append(buf,
+        "  \"delta_errors\": %d,\n  \"delta_tolerance_ms\": %.3f,\n  \"delta_max_ms\": %.4f,\n"
+        "  \"display_delta_errors\": %d,\n"
+        "  \"present_errors\": %d,\n  \"refresh\": %.2f,\n  \"present_mean_ms\": %.4f,\n"
+        "  \"cpu_percent\": %.2f,\n  \"cpu_ms\": %.4f,\n  \"fly\": %s,\n"
+        "  \"travelled\": %.3f,\n",
+        checks->delta_errors, checks->delta_tolerance_ms, checks->delta_max_ms,
+        checks->display_delta_errors, checks->present_errors, (double)checks->refresh,
+        checks->present_mean_ms, checks->cpu_percent, checks->cpu_ms,
+        checks->fly ? "true" : "false", (double)checks->travelled);
     ecs_strbuf_append(buf,
         "  \"center\": [%.4f, %.4f, %.4f],\n  \"radius\": %.4f,\n  \"distance\": %.4f,\n",
         (double)status->center[0], (double)status->center[1], (double)status->center[2],

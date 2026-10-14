@@ -45,6 +45,7 @@ import glob
 import html
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -63,10 +64,13 @@ MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
 GUARD_RETRIES = 6
 GUARD_WAIT = 10
-PERF_TIMEOUT = 120
+PERF_TIMEOUT = 240
 PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
                "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
-               "slept_ms", "stalls", "stall_ms", "warmup", "period", "revolutions", "views")
+               "slept_ms", "stalls", "stall_ms", "warmup", "period", "revolutions", "views",
+               "delta_errors", "delta_tolerance_ms", "delta_max_ms", "display_delta_errors",
+               "present_errors", "refresh",
+               "present_mean_ms", "cpu_percent", "cpu_ms", "fly", "travelled")
 CULL_FIELDS = ("visible", "frustum_culled", "occlusion_culled")
 PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "cull_changes",
                            "load_before", "load_after") + tuple(
@@ -508,10 +512,18 @@ def perf_script(scene, report, args):
     width, height = (int(v) for v in args.size.lower().split("x"))
     with open(scene) as f:
         source = f.read()
-    stall = ", stall: %g" % args.stall if args.stall else ""
-    return ("%s\n\nperf_surface {\n  box.surface.Surface: {width: %d, height: %d}\n}\n\n"
-            "$ {\n  box.perf.PerfRun: {quit: true, report: \"%s\"%s}\n}\n" % (
-                source.rstrip(), width, height, report, stall))
+    extra = ""
+    if args.stall:
+        extra += ", stall: %g" % args.stall
+    fps = re.search(r"PerfRun:\s*\{[^}]*\bfps:\s*(\d+)", source)
+    if args.seconds and fps:
+        extra += ", frames: %d" % round(int(fps.group(1)) * args.seconds)
+    surface = ""
+    if not re.search(r"\bSurface:", source):
+        surface = "perf_surface {\n  box.surface.Surface: {width: %d, height: %d}\n}\n\n" % (
+            width, height)
+    return "%s\n\n%s$ {\n  box.perf.PerfRun: {quit: true, report: \"%s\"%s}\n}\n" % (
+        source.rstrip(), surface, report, extra)
 
 
 def perf_command(harness, args):
@@ -564,14 +576,17 @@ def perf_problems(data):
     problems = []
     fps = data.get("target_fps") or 0
     period = data.get("period") or 0
+    fly = data.get("fly")
     if not data.get("views"):
-        problems.append("no view renders the orbiting camera")
+        problems.append("no view renders the %s camera" % ("flying" if fly else "orbiting"))
     cull = data.get("cull") or {}
     if cull.get("samples") and not (cull.get("visible") or {}).get("max"):
-        problems.append("the orbiting views draw nothing (beyond the far plane?)")
-    if period <= 0:
+        problems.append("the measured views draw nothing (beyond the far plane?)")
+    if fly and not data.get("travelled"):
+        problems.append("the flying camera did not move")
+    if not fly and period <= 0:
         problems.append("the camera does not orbit (period %g)" % period)
-    if fps and period and data.get("frames", 0) < fps * period:
+    if not fly and fps and period and data.get("frames", 0) < fps * period:
         problems.append("the measurement covers %.2f of a revolution, frames must be at least "
                         "fps * period (%d)" % (data.get("frames", 0) / (fps * period),
                                                round(fps * period)))
@@ -582,12 +597,21 @@ def perf_problems(data):
 
 
 def perf_detail(data):
-    return ("%d errors (%d slow, %d fast) in %d frames at %d fps, frame mean %.2f ms, p99 %.2f "
-            "ms, max %.2f ms, work mean %.2f ms, p99 %.2f ms, budget slept %.1f ms" % (
+    refresh = data.get("refresh") or 0
+    display = (", %g Hz display, present mean %.2f ms" % (refresh, data.get("present_mean_ms", 0))
+               if refresh else "")
+    return ("%d errors (%d slow, %d fast, %d delta, %d display delta, %d present) in %d frames at "
+            "%d fps%s, frame "
+            "mean %.2f ms, p99 %.2f ms, max %.2f ms, delta max %.3f ms, work mean %.2f ms, p99 "
+            "%.2f ms, cpu %.1f%% (%.2f ms/frame), budget slept %.1f ms" % (
                 data.get("errors", 0), data.get("slow", 0), data.get("fast", 0),
-                data.get("frames", 0), data.get("target_fps", 0), data.get("mean_ms", 0),
-                data.get("p99_ms", 0), data.get("max_ms", 0), data.get("work_mean_ms", 0),
-                data.get("work_p99_ms", 0), data.get("slept_ms", 0)))
+                data.get("delta_errors", 0), data.get("display_delta_errors", 0),
+                data.get("present_errors", 0),
+                data.get("frames", 0), data.get("target_fps", 0), display,
+                data.get("mean_ms", 0), data.get("p99_ms", 0), data.get("max_ms", 0),
+                data.get("delta_max_ms", 0), data.get("work_mean_ms", 0),
+                data.get("work_p99_ms", 0), data.get("cpu_percent", 0), data.get("cpu_ms", 0),
+                data.get("slept_ms", 0)))
 
 
 def cull_detail(result):
@@ -700,7 +724,10 @@ def main():
     perf.add_argument("--env", help="bake3 local environment, the default one when absent")
     perf.add_argument("--cfg", help="bake3 build mode, the bake3 default when absent")
     perf.add_argument("--out", help="folder of perf.json, the runs go to its perf/ folder")
-    perf.add_argument("--size", default="1280x720", help="surface size in pixels")
+    perf.add_argument("--size", default="1280x720",
+                      help="surface size in pixels of the scenes that declare no Surface")
+    perf.add_argument("--seconds", type=float,
+                      help="measure this many seconds at the target of every scene (frames)")
     perf.add_argument("--cpu-budget", type=float, help="App.cpu_budget of the runs in percent")
     perf.add_argument("--stall", type=float, default=0,
                       help="busy milliseconds added to every frame, to check that slow fails")

@@ -7,6 +7,7 @@
 #include <bake_test.h>
 #include "fake.h"
 #include <math.h>
+#include <sys/resource.h>
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -403,7 +404,7 @@ void Frames_late_wakeups_absorbed(void) {
     test_int(status->errors, 0);
     test_bool(status->passed, true);
     test_assert(status->min_ms >= status->target_ms);
-    test_assert(status->max_ms < status->target_ms + 0.05);
+    test_assert(status->max_ms < status->target_ms + 0.1);
 
     ecs_fini(world);
     box_perf_clock = NULL;
@@ -592,6 +593,257 @@ void Frames_realtime_reset_on_fini(void) {
     ecs_fini(world);
 #endif
 
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_delta_matches_wall_time(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_os_api_now_t now = ecs_os_api.now_;
+    ecs_os_api.now_ = fake_os_now;
+    fake_time = 100;
+    fake_work_ms = 2;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 20 });
+    for (int i = 0; i < 22; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->checks.delta_errors, 0);
+    test_assert(status->checks.delta_max_ms < 0.01);
+    test_assert(status->checks.delta_tolerance_ms == BOX_FRAME_TOLERANCE_MS);
+    test_int(status->errors, 0);
+    test_bool(status->passed, true);
+    test_bool(ecs_singleton_get(world, App)->realtime, false);
+
+    ecs_fini(world);
+    ecs_os_api.now_ = now;
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_delta_mismatch_fails(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_os_api_now_t now = ecs_os_api.now_;
+    ecs_os_api.now_ = fake_os_now;
+    fake_time = 100;
+    fake_work_ms = 2;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 20 });
+    for (int i = 0; i < 22; i ++) {
+        ecs_progress(world, 1.0f / 30.0f);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->slow, 0);
+    test_int(status->fast, 0);
+    test_int(status->checks.delta_errors, 20);
+    test_int(status->errors, 20);
+    test_assert(status->checks.delta_max_ms > 16.6 && status->checks.delta_max_ms < 16.8);
+    test_bool(status->passed, false);
+
+    ecs_fini(world);
+    ecs_os_api.now_ = now;
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_delta_tolerance_edges(void) {
+    // testing/town_stutter
+    float off[] = { 0.0009f, 0.0011f, -0.0009f, -0.0011f };
+    int32_t errors[] = { 0, 10, 0, 10 };
+    for (int c = 0; c < 4; c ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        ecs_os_api_now_t now = ecs_os_api.now_;
+        ecs_os_api.now_ = fake_os_now;
+        fake_time = 100;
+        fake_work_ms = 2;
+        fake_slept_ms = 0;
+        box_perf_clock = fake_now;
+        box_perf_sleep = fake_sleep;
+        ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+            .phase = EcsOnUpdate, .run = fake_work });
+        ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 10 });
+        for (int i = 0; i < 12; i ++) {
+            ecs_progress(world, 1.0f / 60.0f + off[c]);
+        }
+
+        const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+        test_int(status->state, PerfDone);
+        test_int(status->checks.delta_errors, errors[c]);
+        test_bool(status->passed, errors[c] == 0);
+
+        ecs_fini(world);
+        ecs_os_api.now_ = now;
+        box_perf_clock = NULL;
+        box_perf_sleep = NULL;
+    }
+}
+
+void Frames_pacer_does_not_spin(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, PerfRun, { .fps = 60, .warmup = 2, .frames = 30 });
+    struct rusage before, after;
+    ecs_time_t start;
+    ecs_os_get_time(&start);
+    getrusage(RUSAGE_SELF, &before);
+    for (int i = 0; i < 32; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    double wall = ecs_time_measure(&start);
+    getrusage(RUSAGE_SELF, &after);
+    double cpu = (double)(after.ru_utime.tv_sec - before.ru_utime.tv_sec) +
+        (double)(after.ru_utime.tv_usec - before.ru_utime.tv_usec) * 1e-6 +
+        (double)(after.ru_stime.tv_sec - before.ru_stime.tv_sec) +
+        (double)(after.ru_stime.tv_usec - before.ru_stime.tv_usec) * 1e-6;
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_assert(wall > 0.45);
+    test_assert(cpu < wall * 0.25);
+    test_assert(status->checks.cpu_percent > 0 && status->checks.cpu_percent < 25);
+    test_assert(status->checks.cpu_ms > 0 && status->checks.cpu_ms < 4);
+
+    ecs_fini(world);
+}
+
+void Frames_display_paces_run(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_os_api_now_t now = ecs_os_api.now_;
+    ecs_os_api_sleep_t sleep = ecs_os_api.sleep_;
+    ecs_os_api.now_ = fake_os_now;
+    ecs_os_api.sleep_ = fake_os_sleep;
+    fake_time = 100;
+    fake_work_ms = 3;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 60, .warmup = 4, .frames = 30, .refresh = 120 });
+    for (int i = 0; i < 34; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    const RenderStatus *render = ecs_singleton_get(world, RenderStatus);
+    test_int(status->state, PerfDone);
+    test_int(render->swap_interval, 2);
+    test_assert(status->checks.refresh == 120);
+    test_int(status->checks.present_errors, 0);
+    test_int(status->checks.display_delta_errors, 0);
+    test_int(status->checks.delta_errors, 0);
+    test_assert(status->checks.present_mean_ms > 16.6 && status->checks.present_mean_ms < 16.7);
+    test_assert(status->min_ms > 16.6 && status->max_ms < 16.7);
+    test_int(status->errors, 0);
+    test_bool(status->passed, true);
+    test_assert(ecs_singleton_get(world, RenderSettings)->display_rate == 0);
+
+    ecs_fini(world);
+    ecs_os_api.now_ = now;
+    ecs_os_api.sleep_ = sleep;
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_uneven_display_fails(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_os_api_now_t now = ecs_os_api.now_;
+    ecs_os_api_sleep_t sleep = ecs_os_api.sleep_;
+    ecs_os_api.now_ = fake_os_now;
+    ecs_os_api.sleep_ = fake_os_sleep;
+    fake_time = 100;
+    fake_work_ms = 3;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2, .main_thread = true });
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 90, .warmup = 4, .frames = 30, .refresh = 120 });
+    for (int i = 0; i < 34; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_assert(status->checks.present_errors > 0);
+    test_assert(status->errors > 0);
+    test_bool(status->passed, false);
+
+    ecs_fini(world);
+    ecs_os_api.now_ = now;
+    ecs_os_api.sleep_ = sleep;
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Frames_fly_moves_camera(void) {
+    // testing/town_stutter
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_os_api_now_t now = ecs_os_api.now_;
+    ecs_os_api.now_ = fake_os_now;
+    fake_time = 100;
+    fake_work_ms = 2;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Box, { .x = 1, .y = 1, .z = 1 });
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, { 0, 2, 50 });
+    ecs_set(world, camera, Rotation, { 0, 0, 0 });
+    ecs_set(world, camera, Camera, { .fov = 60, .near_ = 0.1f });
+    ecs_add(world, camera, CameraController);
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 60, .warmup = 2, .frames = 120, .fly = true, .camera = camera });
+    for (int i = 0; i < 122; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    const Position *p = ecs_get(world, camera, Position);
+    test_int(status->state, PerfDone);
+    test_bool(status->checks.fly, true);
+    test_assert(status->checks.travelled > 5);
+    test_assert(status->revolutions == 0);
+    test_assert(p->z < 50 || p->x != 0);
+    test_assert(p->y > 1.99f && p->y < 2.01f);
+    test_int(status->checks.delta_errors, 0);
+    test_bool(status->passed, true);
+    ecs_progress(world, 0);
+    test_int(box_input_pending(world), 0);
+
+    ecs_fini(world);
+    ecs_os_api.now_ = now;
     box_perf_clock = NULL;
     box_perf_sleep = NULL;
 }

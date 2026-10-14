@@ -25,7 +25,19 @@ void fake_sleep(
 void fake_sleep_late(
     double seconds)
 {
-    fake_time += seconds * 1.5 + 0.001;
+    fake_time += seconds * 1.5 + 0.00002;
+}
+
+uint64_t fake_os_now(void)
+{
+    return (uint64_t)(fake_time * 1e9);
+}
+
+void fake_os_sleep(
+    int32_t sec,
+    int32_t nanosec)
+{
+    fake_time += (double)sec + (double)nanosec * 1e-9;
 }
 
 void fake_work(

@@ -46,6 +46,17 @@ typedef struct box_perf_t {
     int32_t cull_last[3]; /**< Visible, frustum and occlusion culled counts of the last sample */
     double cull_sum[3];   /**< Sums of the visible, frustum and occlusion culled samples */
     box_perf_priority_t priority; /**< Schedule of the pacing thread during the run */
+    double begin;         /**< Perf clock at the start of the current frame, 0 for none */
+    double os_begin;      /**< OS clock at the start of the previous frame, 0 for none */
+    double cpu;           /**< Process CPU seconds when the measurement started */
+    double wall;          /**< OS clock when the measurement started */
+    int32_t presented;    /**< RenderStatus.presented when the measurement started */
+    int32_t presents_bad; /**< Uneven presents of RenderStatus when the measurement started */
+    int32_t mismatches;   /**< RenderStatus.delta_mismatches when the measurement started */
+    bool boost;           /**< A fly run holds the boost key */
+    double boost_time;    /**< Perf clock of the last boost toggle of a fly run */
+    vec3 last;            /**< Position of the camera in the previous measured frame */
+    bool has_last;        /**< last holds a position */
 } box_perf_t;
 
 /** Distribution of a series of durations */
