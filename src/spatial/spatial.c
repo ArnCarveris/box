@@ -91,13 +91,19 @@ static void box_spatial_release(
  * @param world The world
  * @param index The index
  * @param e The entity
+ * @param rescope The scene of the entity may have changed
  */
 static void box_spatial_mark(
     ecs_world_t *world,
     box_spatial_t *index,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    bool rescope)
 {
     SpatialProxy *p = ecs_get_mut(world, e, SpatialProxy);
+    if (p) {
+        p->rescope |= rescope;
+    }
+
     if (p && !p->dirty) {
         p->dirty = true;
         *ecs_vec_append_t(NULL, &index->dirty, ecs_entity_t) = e;
@@ -132,7 +138,7 @@ static void BoxSpatialOnChange(
     int32_t i;
     if (!ecs_is_fini(it->world)) {
         for (i = 0; i < it->count; i ++) {
-            box_spatial_mark(it->world, it->ctx, it->entities[i]);
+            box_spatial_mark(it->world, it->ctx, it->entities[i], false);
         }
     }
 }
@@ -149,6 +155,22 @@ static void BoxSpatialOnMove(
     if (!ecs_is_fini(it->world)) {
         for (i = 0; i < it->count; i ++) {
             *ecs_vec_append_t(NULL, &index->moved, ecs_entity_t) = it->entities[i];
+        }
+    }
+}
+
+/** Remember the entities of an observer event as roots of subtrees that may change scene.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxSpatialOnRescope(
+    ecs_iter_t *it)
+{
+    box_spatial_t *index = it->ctx;
+    int32_t i;
+    if (!ecs_is_fini(it->world)) {
+        for (i = 0; i < it->count; i ++) {
+            *ecs_vec_append_t(NULL, &index->rescoped, ecs_entity_t) = it->entities[i];
         }
     }
 }
@@ -238,11 +260,13 @@ static void box_spatial_refresh(
         goto done;
     }
 
+    bool rescope = p->rescope || p->item < 0;
     p->dirty = false;
+    p->rescope = false;
     bool indexed = !ecs_has_id(world, e, EcsPrefab) && box_spatial_world_bounds(cache,
         ecs_get(world, e, ShapeMesh), ecs_get(world, e, WorldTransform), min, max);
     if (indexed) {
-        scene = box_render_scene_of(world, e);
+        scene = rescope ? box_render_scene_of(world, e) : p->scene;
         tree = ecs_has_id(world, e, DynamicTransform) ? BOX_SPATIAL_DYNAMIC : BOX_SPATIAL_STATIC;
     }
 
@@ -267,18 +291,22 @@ done:
     return;
 }
 
-/** Mark every entity of the changed subtrees, the roots included.
+/** Mark every entity of changed subtrees, the roots included.
  *
  * @param world The world
  * @param index The index
+ * @param roots The roots of the subtrees
+ * @param rescope The scene of the subtrees may have changed
  */
 static void box_spatial_walk(
     ecs_world_t *world,
-    box_spatial_t *index)
+    box_spatial_t *index,
+    ecs_vec_t *roots,
+    bool rescope)
 {
     int32_t i;
-    for (i = 0; i < ecs_vec_count(&index->moved); i ++) {
-        ecs_entity_t root = *ecs_vec_get_t(&index->moved, ecs_entity_t, i);
+    for (i = 0; i < ecs_vec_count(roots); i ++) {
+        ecs_entity_t root = *ecs_vec_get_t(roots, ecs_entity_t, i);
         if (!ecs_is_alive(world, root)) {
             continue;
         }
@@ -287,7 +315,7 @@ static void box_spatial_walk(
         while (ecs_vec_count(&index->walk)) {
             ecs_entity_t e = *ecs_vec_last_t(&index->walk, ecs_entity_t);
             ecs_vec_remove_last(&index->walk);
-            box_spatial_mark(world, index, e);
+            box_spatial_mark(world, index, e, rescope);
             ecs_iter_t it = ecs_children(world, e);
             while (ecs_children_next(&it)) {
                 int32_t c;
@@ -298,7 +326,7 @@ static void box_spatial_walk(
         }
     }
 
-    ecs_vec_clear(&index->moved);
+    ecs_vec_clear(roots);
 }
 
 /** Give the dynamic entities the bounds of this frame.
@@ -356,7 +384,8 @@ static void box_spatial_process(
     int32_t i;
     index->stats.updated = 0;
     index->stats.moved = 0;
-    box_spatial_walk(world, index);
+    box_spatial_walk(world, index, &index->rescoped, true);
+    box_spatial_walk(world, index, &index->moved, false);
     for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
         box_spatial_refresh(world, index, cache, *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));
     }
@@ -504,13 +533,13 @@ static void box_spatial_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnChange);
     box_spatial_observer(world, index, "SpatialOnScene", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Scene) }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnMove);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_observer(world, index, "SpatialOnChildOf", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnMove);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_observer(world, index, "SpatialOnParent", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(EcsParent) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnMove);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxSpatialOnRescope);
     box_spatial_transform_observers(world, index);
 }
 

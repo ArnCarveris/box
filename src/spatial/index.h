@@ -23,6 +23,7 @@ typedef struct SpatialProxy {
     ecs_entity_t scene; /**< Scene the entity is indexed in */
     int32_t item;       /**< Item of the entity in its scene, -1 when it is not indexed */
     bool dirty;         /**< The entity is in the list of changed entities */
+    bool rescope;       /**< The scene of the entity may have changed */
 } SpatialProxy;
 
 /** Component id of SpatialProxy */
@@ -52,7 +53,8 @@ typedef struct box_spatial_t {
     box_spatial_scene_t *root; /**< Index of the default scene */
     ecs_map_t scenes;          /**< Scene entity to its box_spatial_scene_t */
     ecs_vec_t dirty;           /**< ecs_entity_t, entities whose place may have changed */
-    ecs_vec_t moved;           /**< ecs_entity_t, roots of subtrees that changed */
+    ecs_vec_t moved;           /**< ecs_entity_t, roots of subtrees that moved */
+    ecs_vec_t rescoped;        /**< ecs_entity_t, roots of subtrees that may change scene */
     ecs_vec_t walk;            /**< ecs_entity_t, stack of a subtree walk */
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
     ecs_vec_t nodes;           /**< int32_t, scratch of a build */
