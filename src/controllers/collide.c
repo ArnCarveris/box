@@ -258,18 +258,16 @@ static float box_collide_inside(
     return result;
 }
 
-bool box_collider_push(
+float box_collider_separation(
     const box_collider_t *c,
     const vec3 a,
     const vec3 b,
     float radius,
-    vec3 normal,
-    float *depth)
+    vec3 normal)
 {
     vec3 p0, p1, p, q, d, n;
     vec3 zero = { 0, 0, 0 };
     float reach = radius, dist, gap = 0;
-    bool result = false;
     int32_t i;
     box_collide_local(c, a, p0);
     box_collide_local(c, b, p1);
@@ -289,10 +287,6 @@ bool box_collider_push(
     }
 
     dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-    if (dist >= reach) {
-        goto done;
-    }
-
     if (dist > BOX_COLLIDE_TOUCH) {
         for (i = 0; i < 3; i ++) {
             n[i] = d[i] / dist;
@@ -305,10 +299,25 @@ bool box_collider_push(
         normal[i] = c->axis[0][i] * n[0] + c->axis[1][i] * n[1] + c->axis[2][i] * n[2];
     }
 
-    *depth = reach - dist + gap;
-    result = true;
+    return dist - reach - gap;
+}
 
-done:
+bool box_collider_push(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal,
+    float *depth)
+{
+    vec3 n;
+    float separation = box_collider_separation(c, a, b, radius, n);
+    bool result = separation < 0;
+    if (result) {
+        glm_vec3_copy(n, normal);
+        *depth = -separation;
+    }
+
     return result;
 }
 

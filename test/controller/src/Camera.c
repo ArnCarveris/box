@@ -1666,3 +1666,24 @@ void Camera_look_level_horizon(void) {
 
     ecs_fini(world);
 }
+
+void Camera_stall_clamped(void) {
+    // controller_fixes/tunneling
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+
+    box_input_key(world, KeyW, true);
+    ecs_progress(world, 5.0f);
+    test_flt(ecs_get(world, cam, Position)->z, -5);
+    ecs_progress(world, 0.25f);
+    test_flt(ecs_get(world, cam, Position)->z, -7.5f);
+
+    ecs_fini(world);
+}

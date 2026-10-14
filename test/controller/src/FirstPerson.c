@@ -1108,3 +1108,22 @@ void FirstPerson_look_level_horizon(void) {
 
     ecs_fini(world);
 }
+
+void FirstPerson_stall_clamped(void) {
+    // controller_fixes/tunneling
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_set(world, fp, Position, { 0, 11.7f, 0 });
+    ecs_add(world, fp, FirstPersonController);
+
+    box_input_key(world, KeyW, true);
+    ecs_progress(world, 5.0f);
+    const Position *p = ecs_get(world, fp, Position);
+    test_flt(p->z, -2);
+    test_assert(fabsf(p->y - (11.7f - 18 * 0.25f)) < 0.001f);
+    test_assert(fabsf(ecs_get(world, fp, FirstPersonController)->velocity[1] + 9) < 0.001f);
+
+    ecs_fini(world);
+}

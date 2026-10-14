@@ -100,6 +100,9 @@ typedef struct FirstPersonActionMap {
 
 extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 
+/** Longest frame a controller simulates: a longer frame, such as a stall, counts as this long */
+#define BOX_CONTROLLER_DT_MAX (0.5f)
+
 /** Shape a collider has in its own frame */
 typedef enum box_collider_kind_t {
     BoxColliderBox,      /**< Box with the half extents, also the fallback of other meshes */
@@ -147,6 +150,22 @@ bool box_collider_resolve(
     const ecs_world_t *world,
     ecs_entity_t e,
     box_collider_t *out);
+
+/** Find the signed distance between a capsule and a collider.
+ *
+ * @param c The collider
+ * @param a Center of the lower cap of the capsule
+ * @param b Center of the upper cap of the capsule
+ * @param radius Radius of the capsule
+ * @param normal Receives the direction from the collider towards the capsule
+ * @return The gap between their surfaces, negative by the depth when they overlap
+ */
+float box_collider_separation(
+    const box_collider_t *c,
+    const vec3 a,
+    const vec3 b,
+    float radius,
+    vec3 normal);
 
 /** Find how far a capsule reaches into a collider.
  *

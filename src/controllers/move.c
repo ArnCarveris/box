@@ -3,7 +3,8 @@
  * @brief Moves a controller capsule through its scene: slide, step up and ground probe.
  *
  * A move reads the shapes around the swept capsule from the spatial index once, then walks the
- * motion in steps of at most half the radius and pushes the capsule out after each step.
+ * motion in steps as long as the capsule is clear of every shape (conservative advancement),
+ * at least half the radius, and pushes the capsule out after each step.
  */
 
 #include "controllers.h"
@@ -15,9 +16,6 @@
 
 /** Longest step of a move as a fraction of the radius */
 #define BOX_MOVE_FRACTION (0.5f)
-
-/** Steps a move is split into at the most */
-#define BOX_MOVE_STEPS (64)
 
 /** Overlap a contact needs before it counts */
 #define BOX_MOVE_EPS (1e-5f)
@@ -233,7 +231,44 @@ static void box_move_push(
     }
 }
 
+/** Find how far the capsule can move along a direction before it can touch a shape.
+ *
+ * Conservative advancement: the capsule and each shape are convex, so the capsule cannot reach
+ * a shape before it crosses the plane that separates them, which it approaches at the speed of
+ * the direction along the normal of that plane.
+ *
+ * @param m The move
+ * @param pos The feet
+ * @param dir The unit direction of the motion
+ * @return Distance along dir that touches no shape, 0 when the capsule already touches one
+ */
+static float box_move_clearance(
+    const box_move_t *m,
+    const vec3 pos,
+    const vec3 dir)
+{
+    const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
+    int32_t i, count = ecs_vec_count(&m->colliders);
+    float result = FLT_MAX;
+    vec3 a, b, n;
+    box_move_segment(m->body, pos, a, b);
+    for (i = 0; i < count && result > 0; i ++) {
+        float gap = box_collider_separation(&c[i], a, b, m->body->radius, n);
+        float approach = -glm_vec3_dot(ECS_CONST_CAST(float*, dir), n);
+        if (gap <= 0) {
+            result = 0;
+        } else if (approach > 0 && gap < result * approach) {
+            result = gap / approach;
+        }
+    }
+
+    return result;
+}
+
 /** Move the capsule by a motion, pushing it out after every step.
+ *
+ * A step goes as far as the capsule is clear of every shape, and at least half the radius,
+ * which the push can always undo. No length of motion skips over a shape.
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -244,19 +279,23 @@ static void box_move_slide(
     vec3 pos,
     const vec3 motion)
 {
-    float len = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
+    float remaining = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
     float limit = m->body->radius * BOX_MOVE_FRACTION;
-    int32_t i, steps = 1;
-    vec3 delta;
-    if (limit > 0 && len > limit) {
-        steps = (int32_t)ceilf(len / limit);
-        steps = steps > BOX_MOVE_STEPS ? BOX_MOVE_STEPS : steps;
+    vec3 dir = { 0, 0, 0 };
+    if (remaining > 0) {
+        glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / remaining, dir);
     }
 
-    glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, delta);
-    for (i = 0; i < steps; i ++) {
-        glm_vec3_add(pos, delta, pos);
+    while (remaining > 0) {
+        float step = remaining;
+        if (remaining > limit) {
+            step = fmaxf(limit, box_move_clearance(m, pos, dir));
+            step = fminf(step, remaining);
+        }
+
+        glm_vec3_muladds(dir, step, pos);
         box_move_push(m, pos);
+        remaining -= step;
     }
 }
 

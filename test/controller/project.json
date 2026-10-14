@@ -67,7 +67,8 @@
                     "boost_yaw",
                     "wheel_zoom",
                     "zoom_zero",
-                    "script_turn_settings"
+                    "script_turn_settings",
+                    "stall_clamped"
                 ]
             },
             {
@@ -113,7 +114,8 @@
                     "script_controller",
                     "command_key",
                     "command_action",
-                    "arrows_turn"
+                    "arrows_turn",
+                    "stall_clamped"
                 ]
             },
             {
@@ -137,7 +139,10 @@
                     "ground_below_plane",
                     "camera_collide",
                     "camera_radius",
-                    "script_settings"
+                    "script_settings",
+                    "camera_thin_wall_boost",
+                    "first_person_thin_wall_boost",
+                    "first_person_thin_wall_walk"
                 ]
             }
         ]
