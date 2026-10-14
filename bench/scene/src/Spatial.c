@@ -4,6 +4,7 @@
  *
  * Shapes of random size stand on a 1000 x 1000 grid with a spacing of 1.5 units. Query cases
  * cast rays down onto the grid and test small boxes and spheres around random grid points.
+ * Idle cases time the per frame update of 100k shapes that do not move, a tenth dynamic.
  */
 
 #include <box.h>
@@ -325,5 +326,74 @@ void Spatial_update_dynamic_10k(
     bench_counter(b, "moved_in_tree", stats.moved);
     ecs_os_free(movers);
     bench_counter(b, "first_frame_ms", bench_first_frame_ms);
+    ecs_fini(world);
+}
+
+/** Create a world with static and dynamic shapes that do not move and run its first frames.
+ *
+ * @param count Shapes of the world, a tenth of them dynamic
+ * @return The world
+ */
+static ecs_world_t* bench_spatial_idle_world(
+    int32_t count)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        if (!(i % 10)) {
+            ecs_add(world, e, DynamicTransform);
+        }
+
+        ecs_set(world, e, Position, {(float)(i % BENCH_ROW) * BENCH_SPACING, 0,
+            (float)(i / BENCH_ROW) * BENCH_SPACING});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    return world;
+}
+
+void Spatial_idle_100k(
+    bench_t *b)
+{
+    // scenes/spatial_idle_cost
+    ecs_world_t *world = bench_spatial_idle_world(100000);
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialUpdate");
+    box_spatial_stats_t stats = {0};
+    bench_set_items(b, 100000);
+    while (bench_iter(b)) {
+        ecs_run(world, system, 0, NULL);
+    }
+
+    box_spatial_stats(world, &stats);
+    bench_counter(b, "indexed", stats.entities);
+    bench_counter(b, "updated", stats.updated);
+    ecs_fini(world);
+}
+
+void Spatial_idle_ray_100k(
+    bench_t *b)
+{
+    // scenes/spatial_idle_cost
+    ecs_world_t *world = bench_spatial_idle_world(100000);
+    ecs_entity_t system = ecs_lookup(world, "box.spatial.SpatialUpdate");
+    box_spatial_ray_t ray = { .origin = {10, 20, 10}, .dir = {0, -1, 0} };
+    box_spatial_stats_t stats = {0};
+    int32_t hits = 0;
+    bench_set_items(b, 100000);
+    while (bench_iter(b)) {
+        box_spatial_hit_t hit;
+        ecs_run(world, system, 0, NULL);
+        hits += box_spatial_ray(world, &ray, &hit);
+    }
+
+    box_spatial_stats(world, &stats);
+    bench_keep(hits);
+    bench_counter(b, "indexed", stats.entities);
+    bench_counter(b, "moved_in_tree", stats.moved);
     ecs_fini(world);
 }
