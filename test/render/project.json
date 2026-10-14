@@ -188,6 +188,32 @@
                 ]
             },
             {
+                "id": "Texture",
+                "testcases": [
+                    "load_png",
+                    "requested_size",
+                    "load_svg",
+                    "missing_file_fails",
+                    "invalid_image_fails",
+                    "reload_on_path_change",
+                    "failed_reload_keeps_image",
+                    "remove_path",
+                    "texture_quality_caps_size",
+                    "gpu_emissive_layer",
+                    "gpu_albedo_layer",
+                    "gpu_wrap_repeat",
+                    "gpu_wrap_clamp",
+                    "gpu_wrap_mirror",
+                    "gpu_transform_change",
+                    "gpu_anisotropy",
+                    "gpu_normal_layer",
+                    "gpu_reload_changes_image",
+                    "gpu_deleted_texture_unbinds",
+                    "gpu_inherited_from_prefab",
+                    "gpu_svg_colors"
+                ]
+            },
+            {
                 "id": "Light",
                 "testcases": [
                     "point_light_reaches_its_range",

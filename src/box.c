@@ -23,6 +23,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxControllers);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
+    ECS_IMPORT(world, BoxTexture);
     ECS_IMPORT(world, BoxRender);
     ECS_IMPORT(world, BoxShader);
     ECS_IMPORT(world, BoxCommand);

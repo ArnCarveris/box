@@ -10,13 +10,7 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Get the blit pipeline of a color format, creating it on first use.
- *
- * @param gpu The backend
- * @param format The format of the color target
- * @return The pipeline, NULL without a blit shader or when too many formats are in use
- */
-static WGPURenderPipeline box_gpu_blit_pipeline(
+WGPURenderPipeline box_gpu_blit_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format)
 {

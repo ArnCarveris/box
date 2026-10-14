@@ -235,9 +235,19 @@ static void box_draws_key(
     box_draw_key_t *key)
 {
     const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
+    const PbrTextures *textures = ecs_get(world, e, PbrTextures);
+    const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
+    key->wrap = wrap ? (uint8_t)*wrap : (uint8_t)WrapRepeat;
+    if (textures) {
+        key->textures[0] = textures->albedo;
+        key->textures[1] = textures->emissive;
+        key->textures[2] = textures->roughness;
+        key->textures[3] = textures->normal;
+    }
+
     key->scene = ecs_has(world, e, Scene)
         ? e
         : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
@@ -280,6 +290,7 @@ static void box_draws_update(
             .opacity = ecs_get(world, e, Opacity),
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
+            .uv = ecs_get(world, e, TextureTransform),
             .fade = s->fade
         };
         box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
@@ -397,18 +408,28 @@ static void box_draws_material_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[4] = {
-        ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(BlendMode), ecs_id(BackFaceMode)
+    ecs_entity_t components[6] = {
+        ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(BlendMode), ecs_id(BackFaceMode),
+        ecs_id(TextureWrap), ecs_id(TextureTransform)
     };
-    const char *names[4] = {
-        "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnBlendMode", "DrawsOnBackFaceMode"
+    const char *names[6] = {
+        "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnBlendMode", "DrawsOnBackFaceMode",
+        "DrawsOnTextureWrap", "DrawsOnTextureTransform"
     };
     int32_t i;
-    for (i = 0; i < 4; i ++) {
+    for (i = 0; i < 6; i ++) {
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
             .query.terms = {{ .id = components[i] }},
             .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
     }
+
+    box_draws_observer(world, d, "DrawsOnPbrTextures", (ecs_observer_desc_t){
+        .query.terms = {{
+            .id = ecs_id(PbrTextures),
+            .src.id = EcsSelf | EcsUp,
+            .trav = EcsIsA
+        }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
 
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Opacity) }},
@@ -502,6 +523,7 @@ static void box_draws_queries(
             { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Emissive), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(BlendMode), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(TextureTransform), .inout = EcsIn, .oper = EcsOptional },
             { .id = DynamicTransform, .inout = EcsInOutNone },
             {
                 .id = DynamicMaterial,
@@ -524,6 +546,7 @@ static void box_draws_queries(
             { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Emissive), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(BlendMode), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(TextureTransform), .inout = EcsIn, .oper = EcsOptional },
             {
                 .id = DynamicMaterial,
                 .src.id = EcsSelf | EcsUp,

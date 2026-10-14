@@ -56,6 +56,18 @@
 /** First shader handle of application shaders, the handles below are engine shaders */
 #define BOX_RENDER_SHADER_FIRST (64)
 
+/** Texture layers of a batch: albedo, emissive, roughness and normal, as in PbrTextures */
+#define BOX_RENDER_TEXTURE_SLOTS (4)
+
+/** Anisotropic samples of the texture samplers when no surface sets them */
+#define BOX_RENDER_ANISOTROPY_DEFAULT (4)
+
+/** Bytes of texture images a packet carries before the rest waits for the next frame */
+#define BOX_RENDER_TEXTURE_BUDGET (32 * 1024 * 1024)
+
+/** Bytes of packet data a reused packet keeps, a larger block is freed when it is reset */
+#define BOX_RENDER_DATA_KEEP (16 * 1024 * 1024)
+
 /** Phase after EcsOnStore in which modules append what a frame renders to its packet */
 extern ECS_DECLARE(RenderExtract);
 
@@ -177,6 +189,16 @@ typedef struct box_render_mesh_desc_t {
     uint32_t index_count;   /**< Indices after the vertices */
 } box_render_mesh_desc_t;
 
+/** Description of a BOX_RENDER_TEXTURE create, followed by its RGBA8 pixels row by row.
+ *
+ * The first row is the top of the image, at v 0. Creating an existing handle replaces the
+ * image; the backend generates the mip levels.
+ */
+typedef struct box_render_texture_desc_t {
+    uint32_t width;         /**< Width in pixels */
+    uint32_t height;        /**< Height in pixels */
+} box_render_texture_desc_t;
+
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
@@ -191,15 +213,15 @@ typedef struct box_render_buffer_desc_t {
 
 /** Instance data of the forward pass, one per drawn instance in an instance buffer.
  *
- * The model matrix is affine, so the w of its first columns carries the material: metallic
- * in model[0][3], roughness in model[1][3], model[2][3] unused; the shader reads them as 0.
- *
- * The w of the normal columns carries the linear emitted color times its strength.
+ * The shader derives the normal matrix from the model matrix, so an instance holds the
+ * transform and the material constants only.
  */
 typedef struct box_render_instance_t {
-    mat4 model;             /**< World transform with the instance scale, packed material */
-    vec4 normal[3];         /**< Inverse transpose of the model rotation, w is the emission */
+    mat4 model;             /**< World transform with the instance scale, affine */
     vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
+    vec4 emissive;          /**< Linear emitted color times its strength, w unused */
+    vec4 material;          /**< Metallic, roughness, z and w unused */
+    vec4 uv;                /**< TextureTransform: u scale, v scale, u offset, v offset */
 } box_render_instance_t;
 
 /** Compute pass that copies changed instances from the change buffer into their slots.
@@ -255,6 +277,8 @@ typedef struct box_render_batch_t {
     uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
     uint32_t mesh;              /**< Mesh handle */
+    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
+    uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Buffer handle holding the instance data */
     uint32_t first_instance;    /**< First instance in the instance buffer */
     uint32_t instance_count;    /**< Instances to draw */
@@ -270,6 +294,7 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
+    uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
     ecs_vec_t scatters;     /**< box_render_scatter_t, run after the uploads */
@@ -457,6 +482,16 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** Register the system that sends loaded texture images to the backend.
+ *
+ * It also writes the anisotropy of the samplers into the packet, the largest one any surface
+ * asks for, and loads every texture again when the backend changes.
+ *
+ * @param world The world
+ */
+void box_render_textures_init(
+    ecs_world_t *world);
 
 /** Counters of the light extract of a world */
 typedef struct box_render_lights_stats_t {

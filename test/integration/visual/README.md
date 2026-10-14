@@ -46,7 +46,10 @@ that ran. The output folder ignores itself in git.
 ## Rules for a scene
 
 - Self contained: the scene declares its camera, views and content, never a `Surface`, and
-  refers to no file by a relative path.
+  refers to no file by a relative path other than the images in `assets/`, which it names
+  from the repository root (`test/integration/visual/assets/checker.png`); a `TexturePath`
+  finds them from the working directory of `boxrun` upwards. `assets/gen_assets.py` writes
+  the PNGs.
 - Static: the camera does not move, and nothing that depends on wall time or history across
   many frames is guarded by a baseline; cover that with a C test.
 - Small: a scene renders in well under a second.
@@ -69,6 +72,10 @@ that ran. The output folder ignores itself in git.
 | `lights_point` | Point lights | A red, a green and a blue point light (small glowing spheres) between two columns, a ball and a back wall: colored pools on the floor and wall that fade out at their range. |
 | `lights_spot` | Spot lights | A narrow white cone on a pillar, a wide orange cone around a ball and a slanted cyan cone on a cone, each a soft edged ellipse on the dark floor. |
 | `lights_many` | 400 point lights, clustering | A 20 by 20 grid of small colored point lights just above a floor with 25 pillars: an even pattern of overlapping colored pools to the far edge, none missing. |
+| `textures_tiling` | `TextureWrap`, tiling | A floor tiled 8 by 5 with a red and cream checker, crisp near and smooth far (mip levels). Three quads show the `F` texture at UV -0.5 to 1.5: repeat (four partial tiles), clamp (one `F`, the red top and green left edges stretched out), mirror (the tiles mirrored around the center). |
+| `textures_transform` | `TextureTransform` | Emissive quads with the `F` (red bar on top, green on the left): plain, scaled 2 by 1 (two narrow `F`s), offset by a quarter (shifted up left, wrapping), scale -1 (mirrored, green on the right). Below a lit cube, a sphere and a cube tiled 3 by 3 with the texture as albedo. |
+| `textures_normal` | Normal, roughness and emissive maps | A flat orange panel next to the same panel with a bump normal map (round bumps lit from the top right), a blue sphere covered in bumps, a metal panel with rough and smooth bands, a dark box with glowing orange rings and a floor of bumps. |
+| `textures_svg` | SVG at a requested size | One badge SVG (blue disc, yellow star) loaded at 16 px (blurry), its own 64 px, 512 px and 256 by 128 (squashed), and as the albedo of a lit cube. |
 | `shadows_cascades` | Cascaded shadows near and far | A ground plane running to the horizon with a row of red pillars and a row of blue balls further and further away, all casting sharp shadows to the right from the nearest pillar to the far ones, without seams between cascades. |
 | `shadows_bias` | Depth bias and normal offset | A tilted ramp with a red cube resting on it, a blue block, a thin yellow slab and a ball on a floor, lit at a low angle: the ramp and floor are clean (no acne stripes) and every shadow starts right at the base of its caster (no peter panning). |
 | `shadows_fade` | Shadow fade, two cascades | A field of white pillars on a ground plane with shadows that are dark in front and fade out with distance until the far pillars cast none at 40 units. |

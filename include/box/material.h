@@ -80,14 +80,18 @@ ECS_ENUM(BackFaceMode, {
     BackFacePlain = 1     /**< The material constants without any texture */
 });
 
-/** What a sampler does with UVs outside the 0..1 range */
+/** What the samplers of a shape's PbrTextures do with UVs outside the 0..1 range */
 ECS_ENUM(TextureWrap, {
     WrapRepeat = 0, /**< The texture tiles */
     WrapClamp = 1,  /**< The edge texel is held */
     WrapMirror = 2  /**< Every other tile is mirrored */
 });
 
-/** Scale and offset applied to the UVs of a material, defaults to 1, 1, 0, 0 */
+/** Scale and offset applied to the UVs of a material, defaults to 1, 1, 0, 0.
+ *
+ * A scale of 4 tiles the texture four times across the shape (with WrapRepeat); the offset
+ * shifts the texture after the scale, in texture widths. UV 0, 0 is the top left of an image.
+ */
 ECS_STRUCT(TextureTransform, {
     float scale_x;  /**< U multiplier */
     float scale_y;  /**< V multiplier */
@@ -95,12 +99,16 @@ ECS_STRUCT(TextureTransform, {
     float offset_y; /**< V addend, applied after the scale */
 });
 
-/** Texture entities for each PBR layer, 0 for none, inherited by instances */
+/** Texture entities for each PBR layer, 0 for none, inherited by instances.
+ *
+ * A texture entity has a TexturePath (box/texture.h); until it loaded, or when it is missing,
+ * the layer has no effect. Back faces drawn with BackFacePlain do not sample the textures.
+ */
 ECS_STRUCT(PbrTextures, {
-    ecs_entity_t albedo;    /**< Multiplied with the base color, display encoded */
-    ecs_entity_t emissive;  /**< Added, scaled by the emission strength */
+    ecs_entity_t albedo;    /**< Multiplied with the base color and opacity, display encoded */
+    ecs_entity_t emissive;  /**< Multiplied with the Emissive color times its strength */
     ecs_entity_t roughness; /**< Multiplied with the roughness, green channel */
-    ecs_entity_t normal;    /**< Tangent space normal perturbation */
+    ecs_entity_t normal;    /**< Tangent space normal map, green points up the image */
 });
 
 /** Material properties change every frame, applies to descendants */

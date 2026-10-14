@@ -12,6 +12,7 @@
 
 #include "render.h"
 #include "../geometry/mesh_cache.h"
+#include "../texture/texture.h"
 
 /** Batch and slot of a shape, added with every ShapeMesh */
 typedef struct DrawSlot {
@@ -31,8 +32,10 @@ typedef struct box_draw_key_t {
     uint32_t pipeline;      /**< Shader handle of the pipeline */
     uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
     uint8_t back_face;      /**< BackFaceMode */
+    uint8_t wrap;           /**< TextureWrap of the texture samplers */
     bool dynamic;           /**< Instances are uploaded every frame */
     bool shadow;            /**< Instances cast shadows, false under NoShadow */
+    ecs_entity_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture entities of PbrTextures */
 } box_draw_key_t;
 
 /** The material components of a shape, NULL for the ones it does not have */
@@ -41,6 +44,7 @@ typedef struct box_draw_material_t {
     const Opacity *opacity;     /**< Opacity of the shape itself */
     const PbrMaterial *pbr;     /**< Metallic and roughness */
     const Emissive *emissive;   /**< Emitted light */
+    const TextureTransform *uv; /**< Scale and offset of the texture coordinates */
     float fade;                 /**< Product of the Opacity of the ancestors */
 } box_draw_material_t;
 
@@ -82,6 +86,7 @@ typedef struct box_render_draws_t {
     ecs_vec_t free_buffers;     /**< uint32_t, instance buffer handles to reuse */
     uint32_t next_buffer;       /**< Next instance buffer handle */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
+    const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     box_render_draws_stats_t stats; /**< Counters of the last extract */
@@ -146,7 +151,7 @@ void box_draws_slot_changed(
     box_draw_batch_t *b,
     int32_t slot);
 
-/** Write the instance data of a shape: its model matrix, normal matrix and material.
+/** Write the instance data of a shape: its model matrix and material.
  *
  * @param out The instance
  * @param transform World transform of the entity, NULL for the identity
@@ -159,7 +164,7 @@ void box_draws_instance(
     const ShapeMesh *shape,
     const box_draw_material_t *material);
 
-/** Write the model and normal matrix of a shape, keeping the material packed with them.
+/** Write the model matrix of a shape into its instance data.
  *
  * @param out The instance
  * @param transform World transform of the entity, NULL for the identity
@@ -222,6 +227,8 @@ float box_draws_fade(
     ecs_entity_t e);
 
 /** Send the batches of the frame: meshes, instance buffers, uploads and scatters.
+ *
+ * The texture entities of a batch resolve to the handles of the images the backend has.
  *
  * @param world The world
  * @param d The state

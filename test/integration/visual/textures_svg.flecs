@@ -1,0 +1,72 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 0, 8}
+  Camera: {fov: 45}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {36, 38, 46, 255}}}
+}
+
+badge_16 {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 16, height: 16}
+}
+
+badge_64 {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg"}
+}
+
+badge_512 {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 512}
+}
+
+badge_wide {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 256, height: 128}
+}
+
+small {
+  Position: {-4.2, 1.2, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: badge_16}
+}
+
+native {
+  Position: {-1.4, 1.2, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: badge_64}
+}
+
+large {
+  Position: {1.4, 1.2, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: badge_512}
+}
+
+wide {
+  Position: {4.2, 1.2, 0}
+  Quad: {2.4, 1.2}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: badge_wide}
+}
+
+lit_box {
+  Position: {0, -1.6, 0}
+  Rotation: {0.5, 0.7, 0}
+  Box: {2, 2, 2}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.7}
+  PbrTextures: {albedo: badge_512}
+}

@@ -47,6 +47,25 @@ static void box_pbr_material_ctor(
     }
 }
 
+/** Construct TextureTransform values that leave the texture coordinates unchanged.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_texture_transform_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TextureTransform *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TextureTransform){ .scale_x = 1.0f, .scale_y = 1.0f };
+    }
+}
+
 void BoxMaterialImport(
     ecs_world_t *world)
 {
@@ -65,6 +84,8 @@ void BoxMaterialImport(
     ECS_META_COMPONENT(world, PbrTextures);
     ecs_set_hooks(world, Opacity, { .ctor = box_opacity_ctor });
     ecs_set_hooks(world, PbrMaterial, { .ctor = box_pbr_material_ctor });
+    ecs_set_hooks(world, TextureTransform, { .ctor = box_texture_transform_ctor });
+    ecs_add_pair(world, ecs_id(PbrTextures), EcsOnInstantiate, EcsInherit);
 
     ECS_TAG_DEFINE(world, DynamicMaterial);
     ECS_TAG_DEFINE(world, NoShadow);
