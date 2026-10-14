@@ -26,6 +26,18 @@ static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
 
+/** Linear light of every display encoded channel value */
+static float box_draws_srgb[256];
+
+void box_draws_tables_init(void)
+{
+    int32_t i;
+    for (i = 0; i < 256; i ++) {
+        float c = (float)i / 255.0f;
+        box_draws_srgb[i] = c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+    }
+}
+
 /** Convert a display encoded channel to linear light.
  *
  * @param value The channel
@@ -34,9 +46,7 @@ static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 static float box_draws_linear(
     uint8_t value)
 {
-    float c = (float)value / 255.0f;
-
-    return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+    return box_draws_srgb[value];
 }
 
 /** Hash a batch key.
@@ -50,6 +60,7 @@ static uint64_t box_draws_hash(
     uint64_t h = key->scene * 0x9E3779B97F4A7C15ull;
     h ^= ((uint64_t)key->mesh + 0x632BE59BD9B4E019ull) * 0xC2B2AE3D27D4EB4Full;
     h ^= ((uint64_t)key->pipeline * 2 + key->dynamic) * 0x165667B19E3779F9ull;
+    h ^= ((uint64_t)key->blend * 2 + key->back_face + 1) * 0x27D4EB2F165667C5ull;
 
     return h ^ (h >> 29);
 }
@@ -65,7 +76,7 @@ static bool box_draws_key_eq(
     const box_draw_key_t *b)
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
-        a->dynamic == b->dynamic;
+        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic;
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -217,14 +228,57 @@ void box_draws_slot_remove(
     ecs_vec_remove_last(&b->instances);
 }
 
-void box_draws_instance(
+float box_draws_alpha(
+    const box_draw_material_t *material)
+{
+    float alpha = material->opacity ? material->opacity->value : 1.0f;
+
+    return glm_clamp(alpha, 0.0f, 1.0f) * material->fade;
+}
+
+uint8_t box_draws_blend(
+    const BlendMode *mode,
+    float alpha)
+{
+    uint8_t result = mode ? (uint8_t)*mode : (uint8_t)Opaque;
+    if (result == Opaque && alpha < 1.0f) {
+        result = AlphaBlend;
+    }
+
+    return result;
+}
+
+void box_draws_material(
+    box_render_instance_t *out,
+    const box_draw_material_t *material)
+{
+    const Rgb *color = material->color;
+    const Emissive *emissive = material->emissive;
+    const PbrMaterial *pbr = material->pbr;
+    out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
+    out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
+    out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
+    out->color[3] = box_draws_alpha(material);
+    float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
+    out->normal[0][3] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
+    out->normal[1][3] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
+    out->normal[2][3] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
+    out->model[0][3] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : 0.0f;
+    out->model[1][3] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : 0.5f;
+    out->model[2][3] = 0.0f;
+}
+
+void box_draws_transform(
     box_render_instance_t *out,
     const WorldTransform *transform,
-    const ShapeMesh *shape,
-    const Rgb *color)
+    const ShapeMesh *shape)
 {
     mat3 m, inv;
     int32_t i;
+    float packed[6] = {
+        out->model[0][3], out->model[1][3], out->model[2][3],
+        out->normal[0][3], out->normal[1][3], out->normal[2][3]
+    };
     if (transform) {
         glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), out->model);
     } else {
@@ -238,13 +292,19 @@ void box_draws_instance(
     glm_mat3_inv(m, inv);
     glm_mat3_transpose(inv);
     for (i = 0; i < 3; i ++) {
-        glm_vec4(inv[i], 0, out->normal[i]);
+        glm_vec4(inv[i], packed[3 + i], out->normal[i]);
+        out->model[i][3] = packed[i];
     }
+}
 
-    out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
-    out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
-    out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
-    out->color[3] = 1.0f;
+void box_draws_instance(
+    box_render_instance_t *out,
+    const WorldTransform *transform,
+    const ShapeMesh *shape,
+    const box_draw_material_t *material)
+{
+    box_draws_transform(out, transform, shape);
+    box_draws_material(out, material);
 }
 
 /** Send a mesh to the backend unless it has it, taking a cache reference to it.
@@ -443,15 +503,122 @@ static uint32_t box_draws_send_batch(
         }
     }
 
+    b->ready = true;
+    if (b->key.blend != Opaque) {
+        goto done;
+    }
+
     box_render_batch_t *out = box_render_packet_batch(p);
     out->scene = b->key.scene;
     out->pipeline = b->key.pipeline;
+    out->blend = b->key.blend;
+    out->back_face = b->key.back_face;
     out->mesh = b->key.mesh;
     out->instances = b->buffer;
     out->first_instance = 0;
     out->instance_count = count;
+done:
+    return result;
+}
+
+/** Order blended instances back to front, then by batch and slot for equal depths.
+ *
+ * @param a The first instance
+ * @param b The second instance
+ * @return Negative when a draws first
+ */
+static int box_draws_sorted_cmp(
+    const void *a,
+    const void *b)
+{
+    const box_draw_sorted_t *sa = a, *sb = b;
+    int result = (sa->depth > sb->depth) - (sa->depth < sb->depth);
+    if (!result) {
+        result = (sa->batch > sb->batch) - (sa->batch < sb->batch);
+    }
+
+    if (!result) {
+        result = (sa->slot > sb->slot) - (sa->slot < sb->slot);
+    }
 
     return result;
+}
+
+/** Collect the blended instances a view draws with their view depth.
+ *
+ * @param d The state
+ * @param v The view
+ */
+static void box_draws_collect(
+    box_render_draws_t *d,
+    const box_render_view_t *v)
+{
+    int32_t i, s;
+    const vec4 *m = v->view_matrix;
+    ecs_vec_clear(&d->sorted);
+    for (i = 0; i < ecs_vec_count(&d->blended); i ++) {
+        int32_t index = *ecs_vec_get_t(&d->blended, int32_t, i);
+        box_draw_batch_t *b = box_draws_batch(d, index);
+        int32_t count = ecs_vec_count(&b->instances);
+        const box_render_instance_t *inst = ecs_vec_first(&b->instances);
+        if (b->key.scene != v->scene) {
+            continue;
+        }
+
+        box_draw_sorted_t *out = ecs_vec_grow_t(NULL, &d->sorted, box_draw_sorted_t, count);
+        for (s = 0; s < count; s ++) {
+            const float *pos = inst[s].model[3];
+            out[s].depth = m[0][2] * pos[0] + m[1][2] * pos[1] + m[2][2] * pos[2] + m[3][2];
+            out[s].batch = index;
+            out[s].slot = s;
+        }
+    }
+}
+
+/** Add the blended instances of every view, sorted back to front, after the opaque batches.
+ *
+ * Consecutive slots of one batch become one draw. The sort reuses the storage of earlier
+ * frames, so a frame that sorts no more instances than before does not allocate.
+ *
+ * @param p The packet
+ * @param d The state
+ */
+static void box_draws_send_blended(
+    box_render_packet_t *p,
+    box_render_draws_t *d)
+{
+    int32_t v, i;
+    for (v = 0; v < ecs_vec_count(&p->views); v ++) {
+        box_render_view_t *view = ecs_vec_get_t(&p->views, box_render_view_t, v);
+        box_render_batch_t *out = NULL;
+        box_draws_collect(d, view);
+        int32_t count = ecs_vec_count(&d->sorted);
+        box_draw_sorted_t *sorted = ecs_vec_first(&d->sorted);
+        if (count > 1) {
+            qsort(sorted, (size_t)count, sizeof(box_draw_sorted_t), box_draws_sorted_cmp);
+        }
+
+        for (i = 0; i < count; i ++) {
+            box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
+            if (out && out->instances == b->buffer &&
+                out->first_instance + out->instance_count == (uint32_t)sorted[i].slot)
+            {
+                out->instance_count ++;
+                continue;
+            }
+
+            out = box_render_packet_batch(p);
+            out->view = v;
+            out->scene = b->key.scene;
+            out->pipeline = b->key.pipeline;
+            out->blend = b->key.blend;
+            out->back_face = b->key.back_face;
+            out->mesh = b->key.mesh;
+            out->instances = b->buffer;
+            out->first_instance = (uint32_t)sorted[i].slot;
+            out->instance_count = 1;
+        }
+    }
 }
 
 /** Write the scatter segment of a batch and add its scatter.
@@ -541,20 +708,62 @@ static void box_draws_send_changes(
     }
 }
 
-/** Write the instances of the dynamic shapes of a query result into their slots.
+/** Get the step between the rows of an optional field, 0 when its value is inherited.
+ *
+ * @param it The query result
+ * @param ptr The field
+ * @param size Size of an element
+ * @param index The field index
+ * @return The step in bytes
+ */
+static ecs_size_t box_draws_stride(
+    const ecs_iter_t *it,
+    const void *ptr,
+    ecs_size_t size,
+    int8_t index)
+{
+    return ptr && ecs_field_is_self(it, index) ? size : 0;
+}
+
+/** Get the value of an optional field for a row.
+ *
+ * @param ptr The field
+ * @param stride Step between rows
+ * @param row The row
+ * @return The value, NULL when the field is not set
+ */
+static const void* box_draws_at(
+    const void *ptr,
+    ecs_size_t stride,
+    int32_t row)
+{
+    return ptr ? ECS_OFFSET(ptr, stride * row) : NULL;
+}
+
+/** Write the material of the dynamic shapes of a query result into their instances.
+ *
+ * A shape whose resolved blend mode no longer matches its batch is queued to move.
  *
  * @param it The query result
  * @param d The state
+ * @param walk Whether the opacity of ancestors is read every frame
  */
-static void box_draws_fill_dynamic(
+static void box_draws_fill_material(
     ecs_iter_t *it,
-    box_render_draws_t *d)
+    box_render_draws_t *d,
+    bool walk)
 {
-    const ShapeMesh *shapes = ecs_field(it, ShapeMesh, 0);
     const DrawSlot *slots = ecs_field(it, DrawSlot, 1);
-    const WorldTransform *transforms = ecs_field(it, WorldTransform, 2);
-    const Rgb *colors = ecs_field(it, Rgb, 3);
-    bool color_self = ecs_field_is_self(it, 3);
+    const void *colors = ecs_field(it, Rgb, 3);
+    const void *opacities = ecs_field(it, Opacity, 4);
+    const void *pbrs = ecs_field(it, PbrMaterial, 5);
+    const void *emissives = ecs_field(it, Emissive, 6);
+    const void *modes = ecs_field(it, BlendMode, 7);
+    ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
+    ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
+    ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
+    ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
+    ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (slots[i].batch < 0) {
@@ -566,10 +775,47 @@ static void box_draws_fill_dynamic(
             continue;
         }
 
-        box_draws_instance(
-            ecs_vec_get_t(&b->instances, box_render_instance_t, slots[i].slot),
-            transforms ? &transforms[i] : NULL, &shapes[i],
-            colors ? &colors[color_self ? i : 0] : NULL);
+        box_draw_material_t material = {
+            .color = box_draws_at(colors, color_step, i),
+            .opacity = box_draws_at(opacities, opacity_step, i),
+            .pbr = box_draws_at(pbrs, pbr_step, i),
+            .emissive = box_draws_at(emissives, emissive_step, i),
+            .fade = walk ? box_draws_fade(it->world, it->entities[i]) : slots[i].fade
+        };
+        box_render_instance_t *inst = ecs_vec_get_t(
+            &b->instances, box_render_instance_t, slots[i].slot);
+        box_draws_material(inst, &material);
+        if (box_draws_blend(box_draws_at(modes, mode_step, i), inst->color[3]) != b->key.blend) {
+            box_draws_mark(it->world, d, it->entities[i]);
+        }
+    }
+}
+
+/** Write the transforms of the dynamic shapes of a query result into their instances.
+ *
+ * @param it The query result
+ * @param d The state
+ */
+static void box_draws_fill_transform(
+    ecs_iter_t *it,
+    box_render_draws_t *d)
+{
+    const ShapeMesh *shapes = ecs_field(it, ShapeMesh, 0);
+    const DrawSlot *slots = ecs_field(it, DrawSlot, 1);
+    const WorldTransform *transforms = ecs_field(it, WorldTransform, 2);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (slots[i].batch < 0) {
+            continue;
+        }
+
+        box_draw_batch_t *b = box_draws_batch(d, slots[i].batch);
+        if (!b->key.dynamic || slots[i].slot >= ecs_vec_count(&b->instances)) {
+            continue;
+        }
+
+        box_draws_transform(ecs_vec_get_t(&b->instances, box_render_instance_t, slots[i].slot),
+            transforms ? &transforms[i] : NULL, &shapes[i]);
     }
 }
 
@@ -584,12 +830,16 @@ static void box_draws_dynamic(
 {
     ecs_iter_t it = ecs_query_iter(world, d->dynamic_transform);
     while (ecs_query_next(&it)) {
-        box_draws_fill_dynamic(&it, d);
+        box_draws_fill_transform(&it, d);
+        if (ecs_field_is_set(&it, 9)) {
+            box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
+        }
     }
 
     it = ecs_query_iter(world, d->dynamic_material);
     while (ecs_query_next(&it)) {
-        box_draws_fill_dynamic(&it, d);
+        box_draws_fill_transform(&it, d);
+        box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 8));
     }
 }
 
@@ -629,11 +879,21 @@ void box_draws_send(
     }
 
     box_draws_dynamic(world, d);
+    ecs_vec_clear(&d->blended);
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
+        b->ready = false;
         if (b->alive && box_draws_mesh(p, d, cache, b->key.mesh)) {
             changes += box_draws_send_batch(p, d, b);
         }
+
+        if (b->ready && b->key.blend != Opaque) {
+            *ecs_vec_append_t(NULL, &d->blended, int32_t) = i;
+        }
+    }
+
+    if (ecs_vec_count(&d->blended)) {
+        box_draws_send_blended(p, d);
     }
 
     if (changes) {

@@ -25,7 +25,7 @@ static void box_draw_slot_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        slots[i] = (DrawSlot){ .batch = -1, .slot = -1 };
+        slots[i] = (DrawSlot){ .batch = -1, .slot = -1, .fade = 1.0f };
     }
 }
 
@@ -77,6 +77,8 @@ static void box_draws_free(
     box_draws_batches_fini(d);
     ecs_map_fini(&d->meshes);
     ecs_vec_fini_t(NULL, &d->released, uint32_t);
+    ecs_vec_fini_t(NULL, &d->blended, int32_t);
+    ecs_vec_fini_t(NULL, &d->sorted, box_draw_sorted_t);
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
@@ -85,13 +87,7 @@ done:
     return;
 }
 
-/** Add an entity to the changed entities unless it is in the list.
- *
- * @param world The world
- * @param d The state
- * @param e The entity
- */
-static void box_draws_mark(
+void box_draws_mark(
     ecs_world_t *world,
     box_render_draws_t *d,
     ecs_entity_t e)
@@ -205,20 +201,43 @@ static void box_draws_walk(
     ecs_vec_clear(&d->moved);
 }
 
+float box_draws_fade(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    float result = 1.0f;
+    ecs_entity_t cur = ecs_get_parent(world, e);
+    while (cur) {
+        const Opacity *opacity = ecs_get(world, cur, Opacity);
+        if (opacity) {
+            result *= glm_clamp(opacity->value, 0.0f, 1.0f);
+        }
+
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
 /** Compute the batch key of a shape.
  *
  * @param world The world
  * @param e The entity
  * @param shape Its mesh
+ * @param alpha Resolved alpha of the shape
  * @param key Receives the key
  */
 static void box_draws_key(
     ecs_world_t *world,
     ecs_entity_t e,
     const ShapeMesh *shape,
+    float alpha,
     box_draw_key_t *key)
 {
+    const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
     ecs_os_memset_t(key, 0, box_draw_key_t);
+    key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
+    key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
     key->scene = ecs_has(world, e, Scene)
         ? e
         : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
@@ -242,6 +261,7 @@ static void box_draws_update(
 {
     box_draw_key_t key;
     box_draw_batch_t *b;
+    box_draw_material_t material;
     DrawSlot *s = ecs_is_alive(world, e) ? ecs_get_mut(world, e, DrawSlot) : NULL;
     if (!s) {
         goto done;
@@ -252,7 +272,15 @@ static void box_draws_update(
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
-        box_draws_key(world, e, shape, &key);
+        s->fade = box_draws_fade(world, e);
+        material = (box_draw_material_t){
+            .color = ecs_get(world, e, Rgb),
+            .opacity = ecs_get(world, e, Opacity),
+            .pbr = ecs_get(world, e, PbrMaterial),
+            .emissive = ecs_get(world, e, Emissive),
+            .fade = s->fade
+        };
+        box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
     }
 
     if (s->batch >= 0) {
@@ -275,7 +303,7 @@ static void box_draws_update(
     b = box_draws_batch(d, s->batch);
 write:
     box_draws_instance(ecs_vec_get_t(&b->instances, box_render_instance_t, s->slot),
-        ecs_get(world, e, WorldTransform), shape, ecs_get(world, e, Rgb));
+        ecs_get(world, e, WorldTransform), shape, &material);
     box_draws_slot_changed(b, s->slot);
 done:
     return;
@@ -353,6 +381,33 @@ static void box_draws_observer(
     ecs_observer_init(world, &desc);
 }
 
+/** Register the observers of the material components.
+ *
+ * @param world The world
+ * @param d The state
+ */
+static void box_draws_material_observers(
+    ecs_world_t *world,
+    box_render_draws_t *d)
+{
+    ecs_entity_t components[4] = {
+        ecs_id(PbrMaterial), ecs_id(Emissive), ecs_id(BlendMode), ecs_id(BackFaceMode)
+    };
+    const char *names[4] = {
+        "DrawsOnPbrMaterial", "DrawsOnEmissive", "DrawsOnBlendMode", "DrawsOnBackFaceMode"
+    };
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
+            .query.terms = {{ .id = components[i] }},
+            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+    }
+
+    box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Opacity) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+}
+
 /** Register the observers that collect changed entities and changed subtrees.
  *
  * @param world The world
@@ -371,6 +426,7 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
+    box_draws_material_observers(world, d);
     box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicTransform }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
@@ -432,7 +488,18 @@ static void box_draws_queries(
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
-            { .id = DynamicTransform, .inout = EcsInOutNone }
+            { .id = ecs_id(Opacity), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(Emissive), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(BlendMode), .inout = EcsIn, .oper = EcsOptional },
+            { .id = DynamicTransform, .inout = EcsInOutNone },
+            {
+                .id = DynamicMaterial,
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsOptional
+            }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -443,6 +510,10 @@ static void box_draws_queries(
             { .id = ecs_id(DrawSlot), .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(Opacity), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(PbrMaterial), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(Emissive), .inout = EcsIn, .oper = EcsOptional },
+            { .id = ecs_id(BlendMode), .inout = EcsIn, .oper = EcsOptional },
             {
                 .id = DynamicMaterial,
                 .src.id = EcsSelf | EcsUp,
@@ -459,6 +530,7 @@ void box_render_draws_init(
     ecs_world_t *world)
 {
     box_render_draws_t *d = ecs_os_calloc_t(box_render_draws_t);
+    box_draws_tables_init();
     ECS_COMPONENT_DEFINE(world, DrawSlot);
     ecs_set_hooks(world, DrawSlot, {
         .ctor = box_draw_slot_ctor,
@@ -474,6 +546,8 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
+    ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
+    ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;

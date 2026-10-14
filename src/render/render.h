@@ -129,11 +129,17 @@ typedef struct box_render_buffer_desc_t {
     uint32_t usage;         /**< box_render_buffer_usage_t flags */
 } box_render_buffer_desc_t;
 
-/** Instance data of the forward pass, one per drawn instance in an instance buffer */
+/** Instance data of the forward pass, one per drawn instance in an instance buffer.
+ *
+ * The model matrix is affine, so the w of its first columns carries the material: metallic
+ * in model[0][3], roughness in model[1][3], model[2][3] unused; the shader reads them as 0.
+ *
+ * The w of the normal columns carries the linear emitted color times its strength.
+ */
 typedef struct box_render_instance_t {
-    mat4 model;             /**< World transform with the instance scale of the mesh */
-    vec4 normal[3];         /**< Columns of the inverse transpose of the model rotation */
-    vec4 color;             /**< Linear base color */
+    mat4 model;             /**< World transform with the instance scale, packed material */
+    vec4 normal[3];         /**< Inverse transpose of the model rotation, w is the emission */
+    vec4 color;             /**< Linear base color, alpha is the opacity with its ancestors */
 } box_render_instance_t;
 
 /** Compute pass that copies changed instances from the change buffer into their slots.
@@ -176,11 +182,17 @@ typedef struct box_render_target_t {
     bool exclusive;         /**< Renders only the views whose target is this handle */
 } box_render_target_t;
 
-/** Instanced draw of one mesh with one pipeline, drawn by the views of its scene */
+/** Instanced draw of one mesh with one pipeline, drawn by the views of its scene.
+ *
+ * Opaque batches come first in a packet; the blended instances follow as draws of one view,
+ * sorted back to front, so they draw after the opaque ones in the order of the packet.
+ */
 typedef struct box_render_batch_t {
     int32_t view;               /**< Index of the view that draws it, -1 for every view */
     ecs_entity_t scene;         /**< Scene root of the instances, 0 for the default scene */
     uint32_t pipeline;          /**< Shader handle of the pipeline */
+    uint32_t blend;             /**< BlendMode of the pipeline, Opaque writes depth */
+    uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t instances;         /**< Buffer handle holding the instance data */
     uint32_t first_instance;    /**< First instance in the instance buffer */

@@ -21,6 +21,13 @@
                     "unchanged",
                     "changed_1pct"
                 ]
+            },
+            {
+                "id": "Material",
+                "benchcases": [
+                    "dynamic_material",
+                    "blended_sort"
+                ]
             }
         ]
     }

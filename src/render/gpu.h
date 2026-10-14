@@ -34,6 +34,9 @@
 /** Bytes between the uniforms of two views, the dynamic offset alignment of webgpu */
 #define BOX_GPU_VIEW_STRIDE (256)
 
+/** Forward pipelines by color format, blend mode and back face mode, at most */
+#define BOX_GPU_FORWARD_PIPELINES (64)
+
 /** A surface on the GPU: the image it presents and the image views render into */
 typedef struct box_gpu_target_t {
     uint32_t handle;                /**< Handle the main thread assigned */
@@ -76,11 +79,17 @@ typedef struct box_gpu_buffer_t {
     uint32_t size;                  /**< Bytes of the buffer */
 } box_gpu_buffer_t;
 
-/** Uniforms of a view, written per target because the projection follows its size */
+/** Uniforms of a view, written per target because the projection follows its size.
+ *
+ * The light members are the only light inputs of the forward pass.
+ */
 typedef struct box_gpu_view_uniforms_t {
     mat4 view_proj;                 /**< Projection times view matrix */
     vec4 camera;                    /**< World position of the camera */
-    vec4 light;                     /**< Direction toward the light of the forward pass */
+    vec4 light;                     /**< Direction toward the directional light */
+    vec4 light_color;               /**< Linear illuminance of the directional light */
+    vec4 ambient_sky;               /**< Linear ambient light from above */
+    vec4 ambient_ground;            /**< Linear ambient light from below */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -88,6 +97,14 @@ typedef struct box_gpu_blit_t {
     WGPUTextureFormat format;       /**< Format of the color target */
     WGPURenderPipeline pipeline;    /**< The pipeline */
 } box_gpu_blit_t;
+
+/** Pipeline of the forward pass for one color format, blend mode and back face mode */
+typedef struct box_gpu_forward_t {
+    WGPUTextureFormat format;       /**< Format of the color target */
+    uint32_t blend;                 /**< BlendMode */
+    uint32_t back_face;             /**< BackFaceMode */
+    WGPURenderPipeline pipeline;    /**< The pipeline */
+} box_gpu_forward_t;
 
 /** The webgpu backend: device, shared objects and targets */
 typedef struct box_gpu_t {
@@ -102,7 +119,7 @@ typedef struct box_gpu_t {
     int32_t blit_count;             /**< Blit pipelines created */
     WGPUBindGroupLayout view_layout; /**< Bind group layout of the view uniforms */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
-    box_gpu_blit_t forward[BOX_GPU_BLIT_FORMATS]; /**< Forward pipelines by format */
+    box_gpu_forward_t forward[BOX_GPU_FORWARD_PIPELINES]; /**< Forward pipelines */
     int32_t forward_count;          /**< Forward pipelines created */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
     WGPUBindGroup view_group;       /**< Binds the view buffer with a dynamic offset */

@@ -16,6 +16,7 @@
 typedef struct DrawSlot {
     int32_t batch;  /**< Index of the batch, -1 when the entity is not drawn */
     int32_t slot;   /**< Slot of the entity in the batch */
+    float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
     bool dirty;     /**< The entity is in the list of changed entities */
 } DrawSlot;
 
@@ -27,8 +28,26 @@ typedef struct box_draw_key_t {
     ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
     uint32_t mesh;          /**< Mesh handle */
     uint32_t pipeline;      /**< Shader handle of the pipeline */
+    uint8_t blend;          /**< Resolved BlendMode, Opaque unless the shape blends */
+    uint8_t back_face;      /**< BackFaceMode */
     bool dynamic;           /**< Instances are uploaded every frame */
 } box_draw_key_t;
+
+/** The material components of a shape, NULL for the ones it does not have */
+typedef struct box_draw_material_t {
+    const Rgb *color;           /**< Base color, display encoded */
+    const Opacity *opacity;     /**< Opacity of the shape itself */
+    const PbrMaterial *pbr;     /**< Metallic and roughness */
+    const Emissive *emissive;   /**< Emitted light */
+    float fade;                 /**< Product of the Opacity of the ancestors */
+} box_draw_material_t;
+
+/** A blended instance of a view, ordered back to front by its view depth */
+typedef struct box_draw_sorted_t {
+    float depth;            /**< View space z of the instance origin, smaller is farther */
+    int32_t batch;          /**< Index of the batch */
+    int32_t slot;           /**< Slot of the instance in the batch */
+} box_draw_sorted_t;
 
 /** A batch: the entities of its slots, their instance data and what the GPU still needs */
 typedef struct box_draw_batch_t {
@@ -38,6 +57,7 @@ typedef struct box_draw_batch_t {
     uint32_t buffer;        /**< Handle of the instance buffer, 0 before it is created */
     uint32_t capacity;      /**< Instances the instance buffer holds */
     bool full;              /**< Upload every instance instead of the changed slots */
+    bool ready;             /**< The backend has the mesh and the instances this frame */
     ecs_vec_t entities;     /**< ecs_entity_t per slot */
     ecs_vec_t instances;    /**< box_render_instance_t per slot */
     ecs_vec_t changed;      /**< int32_t, slots of a static batch the GPU does not have */
@@ -55,6 +75,8 @@ typedef struct box_render_draws_t {
     ecs_vec_t walk;             /**< ecs_entity_t, stack of a subtree walk */
     ecs_map_t meshes;           /**< Mesh handles the backend received */
     ecs_vec_t released;         /**< uint32_t, meshes to release this frame */
+    ecs_vec_t blended;          /**< int32_t, blended batches the frame draws */
+    ecs_vec_t sorted;           /**< box_draw_sorted_t, blended instances of one view */
     ecs_vec_t free_buffers;     /**< uint32_t, instance buffer handles to reuse */
     uint32_t next_buffer;       /**< Next instance buffer handle */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
@@ -63,6 +85,10 @@ typedef struct box_render_draws_t {
     box_render_draws_stats_t stats; /**< Counters of the last extract */
     int32_t refs;               /**< Observers and systems that use the state */
 } box_render_draws_t;
+
+/** Fill the conversion tables of the instance data, once per process.
+ */
+void box_draws_tables_init(void);
 
 /** Get a batch by index.
  *
@@ -118,18 +144,80 @@ void box_draws_slot_changed(
     box_draw_batch_t *b,
     int32_t slot);
 
-/** Write the instance data of a shape: its model matrix, normal matrix and color.
+/** Write the instance data of a shape: its model matrix, normal matrix and material.
  *
  * @param out The instance
  * @param transform World transform of the entity, NULL for the identity
  * @param shape Mesh and instance scale of the entity
- * @param color Base color of the entity, NULL for the default color
+ * @param material Material components of the entity
  */
 void box_draws_instance(
     box_render_instance_t *out,
     const WorldTransform *transform,
     const ShapeMesh *shape,
-    const Rgb *color);
+    const box_draw_material_t *material);
+
+/** Write the model and normal matrix of a shape, keeping the material packed with them.
+ *
+ * @param out The instance
+ * @param transform World transform of the entity, NULL for the identity
+ * @param shape Mesh and instance scale of the entity
+ */
+void box_draws_transform(
+    box_render_instance_t *out,
+    const WorldTransform *transform,
+    const ShapeMesh *shape);
+
+/** Write the material of a shape into its instance data.
+ *
+ * The base color and emission are converted to linear light, the alpha is the opacity of
+ * the shape times the opacity of its ancestors. Tint and textures resolve here as well.
+ *
+ * @param out The instance
+ * @param material Material components of the entity
+ */
+void box_draws_material(
+    box_render_instance_t *out,
+    const box_draw_material_t *material);
+
+/** Resolve the blend mode a shape draws with: Opaque turns into AlphaBlend below alpha 1.
+ *
+ * @param mode The BlendMode of the shape, NULL for Opaque
+ * @param alpha The resolved alpha of the shape
+ * @return The blend mode
+ */
+uint8_t box_draws_blend(
+    const BlendMode *mode,
+    float alpha);
+
+/** Get the resolved alpha of a shape.
+ *
+ * @param material Material components of the entity
+ * @return The opacity of the shape times the opacity of its ancestors, clamped to 0..1
+ */
+float box_draws_alpha(
+    const box_draw_material_t *material);
+
+/** Add a shape to the changed entities unless it is in the list.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity
+ */
+void box_draws_mark(
+    ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Multiply the Opacity of the ancestors of an entity, through ChildOf and Parent.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The product, 1 when no ancestor has an Opacity
+ */
+float box_draws_fade(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Send the batches of the frame: meshes, instance buffers, uploads and scatters.
  *

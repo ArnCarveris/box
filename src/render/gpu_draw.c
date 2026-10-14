@@ -11,8 +11,20 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Direction toward the light of the forward pass, in world space */
+/** Direction toward the default directional light, in world space */
 static const float box_gpu_light[3] = { 0.35f, 0.8f, 0.5f };
+
+/** Linear color of the default directional light, scaled by pi into illuminance */
+static const float box_gpu_light_color[3] = { 1.0f, 0.96f, 0.9f };
+
+/** Linear default ambient light from above */
+static const float box_gpu_ambient_sky[3] = { 0.18f, 0.22f, 0.3f };
+
+/** Linear default ambient light from below */
+static const float box_gpu_ambient_ground[3] = { 0.08f, 0.07f, 0.06f };
+
+/** Instance attributes of the forward pass, vec4 each */
+#define BOX_GPU_INSTANCE_ATTRS ((int32_t)(sizeof(box_render_instance_t) / sizeof(vec4)))
 
 /** Convert a display encoded channel to linear light.
  *
@@ -239,26 +251,90 @@ void box_gpu_upload(
     }
 }
 
-/** Create the forward pipeline of a color format.
+/** Get the blend state of a blend mode.
+ *
+ * The fragment shader shapes its output for the equation: multiply and min mix toward
+ * white by the alpha, screen and max scale by it.
+ *
+ * @param blend The BlendMode
+ * @param out Receives the blend state
+ */
+static void box_gpu_blend_state(
+    uint32_t blend,
+    WGPUBlendState *out)
+{
+    WGPUBlendComponent color = {
+        .operation = WGPUBlendOperation_Add,
+        .srcFactor = WGPUBlendFactor_SrcAlpha,
+        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+    };
+    WGPUBlendComponent alpha = {
+        .operation = WGPUBlendOperation_Add,
+        .srcFactor = WGPUBlendFactor_One,
+        .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+    };
+    switch (blend) {
+    case PremultipliedAlpha:
+        color.srcFactor = WGPUBlendFactor_One;
+        break;
+    case Additive:
+        color.dstFactor = WGPUBlendFactor_One;
+        alpha.dstFactor = WGPUBlendFactor_One;
+        alpha.srcFactor = WGPUBlendFactor_Zero;
+        break;
+    case Multiply:
+        color.srcFactor = WGPUBlendFactor_Dst;
+        color.dstFactor = WGPUBlendFactor_Zero;
+        break;
+    case Screen:
+        color.srcFactor = WGPUBlendFactor_One;
+        color.dstFactor = WGPUBlendFactor_OneMinusSrc;
+        break;
+    case Subtractive:
+        color.operation = WGPUBlendOperation_ReverseSubtract;
+        color.dstFactor = WGPUBlendFactor_One;
+        alpha.srcFactor = WGPUBlendFactor_Zero;
+        alpha.dstFactor = WGPUBlendFactor_One;
+        break;
+    case Min:
+    case Max:
+        color.operation = blend == Min ? WGPUBlendOperation_Min : WGPUBlendOperation_Max;
+        color.srcFactor = WGPUBlendFactor_One;
+        color.dstFactor = WGPUBlendFactor_One;
+        break;
+    default:
+        break;
+    }
+
+    out->color = color;
+    out->alpha = alpha;
+}
+
+/** Create the forward pipeline of a color format, blend mode and back face mode.
  *
  * @param gpu The backend
  * @param shader The mesh shader
  * @param format The format of the color target
+ * @param blend The BlendMode, Opaque writes depth and does not blend
+ * @param back_face The BackFaceMode, BackFaceCull culls the back faces
  * @return The pipeline
  */
 static WGPURenderPipeline box_gpu_forward_create(
     box_gpu_t *gpu,
     WGPUShaderModule shader,
-    WGPUTextureFormat format)
+    WGPUTextureFormat format,
+    uint32_t blend,
+    uint32_t back_face)
 {
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
         { .format = WGPUVertexFormat_Float32x2, .offset = 24, .shaderLocation = 2 }
     };
-    WGPUVertexAttribute instance_attrs[8];
+    WGPUVertexAttribute instance_attrs[BOX_GPU_INSTANCE_ATTRS];
+    WGPUBlendState blend_state;
     int32_t i;
-    for (i = 0; i < 8; i ++) {
+    for (i = 0; i < BOX_GPU_INSTANCE_ATTRS; i ++) {
         instance_attrs[i] = (WGPUVertexAttribute){
             .format = WGPUVertexFormat_Float32x4,
             .offset = (uint64_t)i * 16,
@@ -276,20 +352,31 @@ static WGPURenderPipeline box_gpu_forward_create(
         {
             .stepMode = WGPUVertexStepMode_Instance,
             .arrayStride = sizeof(box_render_instance_t),
-            .attributeCount = 8,
+            .attributeCount = BOX_GPU_INSTANCE_ATTRS,
             .attributes = instance_attrs
         }
     };
-    WGPUColorTargetState target = { .format = format, .writeMask = WGPUColorWriteMask_All };
+    box_gpu_blend_state(blend, &blend_state);
+    WGPUColorTargetState target = {
+        .format = format,
+        .blend = blend == Opaque ? NULL : &blend_state,
+        .writeMask = WGPUColorWriteMask_All
+    };
+    WGPUConstantEntry constant = {
+        .key = { .data = "blend_mode", .length = WGPU_STRLEN },
+        .value = (double)blend
+    };
     WGPUFragmentState fragment = {
         .module = shader,
         .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
+        .constantCount = 1,
+        .constants = &constant,
         .targetCount = 1,
         .targets = &target
     };
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_DEPTH_FORMAT,
-        .depthWriteEnabled = WGPUOptionalBool_True,
+        .depthWriteEnabled = blend == Opaque ? WGPUOptionalBool_True : WGPUOptionalBool_False,
         .depthCompare = WGPUCompareFunction_Greater,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
@@ -305,7 +392,7 @@ static WGPURenderPipeline box_gpu_forward_create(
         .primitive = {
             .topology = WGPUPrimitiveTopology_TriangleList,
             .frontFace = WGPUFrontFace_CCW,
-            .cullMode = WGPUCullMode_Back
+            .cullMode = back_face == BackFaceCull ? WGPUCullMode_Back : WGPUCullMode_None
         },
         .depthStencil = &depth,
         .multisample = { .count = 1, .mask = 0xFFFFFFFF },
@@ -315,34 +402,40 @@ static WGPURenderPipeline box_gpu_forward_create(
     return wgpuDeviceCreateRenderPipeline(gpu->device, &desc);
 }
 
-/** Get the forward pipeline of a color format, creating it on first use.
+/** Get the forward pipeline of a color format and the state of a batch, created on first use.
  *
  * @param gpu The backend
  * @param format The format of the color target
- * @return The pipeline, NULL without a mesh shader or when too many formats are in use
+ * @param b The batch
+ * @return The pipeline, NULL without a mesh shader or when too many pipelines are in use
  */
 static WGPURenderPipeline box_gpu_forward_pipeline(
     box_gpu_t *gpu,
-    WGPUTextureFormat format)
+    WGPUTextureFormat format,
+    const box_render_batch_t *b)
 {
     WGPURenderPipeline result = NULL;
     WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    box_gpu_forward_t *f;
     int32_t i;
     for (i = 0; i < gpu->forward_count; i ++) {
-        if (gpu->forward[i].format == format) {
-            result = gpu->forward[i].pipeline;
+        f = &gpu->forward[i];
+        if (f->format == format && f->blend == b->blend && f->back_face == b->back_face) {
+            result = f->pipeline;
             goto done;
         }
     }
 
-    if (!shader || gpu->forward_count == BOX_GPU_BLIT_FORMATS) {
+    if (!shader || gpu->forward_count == BOX_GPU_FORWARD_PIPELINES || b->blend > Max) {
         goto done;
     }
 
-    result = box_gpu_forward_create(gpu, shader, format);
-    gpu->forward[gpu->forward_count].format = format;
-    gpu->forward[gpu->forward_count].pipeline = result;
-    gpu->forward_count ++;
+    result = box_gpu_forward_create(gpu, shader, format, b->blend, b->back_face);
+    f = &gpu->forward[gpu->forward_count ++];
+    f->format = format;
+    f->blend = b->blend;
+    f->back_face = b->back_face;
+    f->pipeline = result;
 done:
     return result;
 }
@@ -441,6 +534,9 @@ static int32_t box_gpu_view_write(
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
         glm_vec3_normalize_to(ECS_CONST_CAST(float*, box_gpu_light), u->light);
+        glm_vec3_scale(ECS_CONST_CAST(float*, box_gpu_light_color), GLM_PIf, u->light_color);
+        glm_vec3_copy(ECS_CONST_CAST(float*, box_gpu_ambient_sky), u->ambient_sky);
+        glm_vec3_copy(ECS_CONST_CAST(float*, box_gpu_ambient_ground), u->ambient_ground);
         result ++;
     }
 
@@ -453,22 +549,23 @@ static int32_t box_gpu_view_write(
     return result;
 }
 
-/** Record the draws of the batches a view renders.
+/** Record the draws of the batches a view renders, in packet order.
  *
  * @param gpu The backend
  * @param pass The render pass of the view
- * @param pipeline The forward pipeline
+ * @param format The format of the color target
  * @param packet The packet
  * @param index Index of the view in the packet
  */
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
     WGPURenderPassEncoder pass,
-    WGPURenderPipeline pipeline,
+    WGPUTextureFormat format,
     const box_render_packet_t *packet,
     int32_t index)
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
+    WGPURenderPipeline bound = NULL;
     int32_t i, count = ecs_vec_count(&packet->batches);
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
@@ -481,11 +578,16 @@ static void box_gpu_draw_batches(
         box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
         box_gpu_buffer_t *inst = ecs_map_get_deref(
             &gpu->buffers, box_gpu_buffer_t, b->instances);
-        if (!m || !inst) {
+        WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b);
+        if (!m || !inst || !pipeline) {
             continue;
         }
 
-        wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+        if (pipeline != bound) {
+            wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+            bound = pipeline;
+        }
+
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetVertexBuffer(pass, 1, inst->buffer, 0, WGPU_WHOLE_SIZE);
         wgpuRenderPassEncoderSetIndexBuffer(
@@ -505,12 +607,10 @@ void box_gpu_draw_views(
     WGPUTextureView color)
 {
     int32_t i, slot = 0, count = ecs_vec_count(&packet->views);
-    WGPURenderPipeline pipeline = NULL;
     if (!box_gpu_view_write(gpu, t, packet, frame)) {
         goto done;
     }
 
-    pipeline = box_gpu_forward_pipeline(gpu, t->format);
     for (i = 0; i < count; i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, i);
         if (!box_gpu_target_has_view(frame, v)) {
@@ -543,9 +643,7 @@ void box_gpu_draw_views(
         uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
         wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->view_group, 1, &offset);
-        if (pipeline) {
-            box_gpu_draw_batches(gpu, pass, pipeline, packet, i);
-        }
+        box_gpu_draw_batches(gpu, pass, t->format, packet, i);
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
