@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "render.h"
+#include "spatial.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -947,4 +948,44 @@ void Shapes2D_empty_shapes_not_drawn(void) {
 
     ecs_fini(world);
     box_render_null_free(null);
+}
+
+void Shapes2D_bounds_hold_shape(void) {
+    // ui/shapes_2d
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t rect = ecs_new(world);
+    ecs_set(world, rect, Position, {10, 0, 0});
+    ecs_set(world, rect, Rect, {4, 2});
+    ecs_entity_t circle = ecs_new(world);
+    ecs_set(world, circle, Position, {0, 10, 0});
+    ecs_set(world, circle, Circle, {3});
+    ecs_entity_t line = ecs_new(world);
+    ecs_set(world, line, Position, {0, 0, 5});
+    ecs_set(world, line, Line, {.x1 = 20, .y1 = 4, .x2 = 30, .y2 = -6, .width = 2});
+    ecs_progress(world, 0);
+
+    vec3 min, max;
+    test_assert(box_spatial_bounds(world, rect, NULL, min, max));
+    test_flt(min[0], 8);
+    test_flt(max[0], 12);
+    test_flt(min[1], -1);
+    test_flt(max[1], 1);
+    test_assert(box_spatial_bounds(world, circle, NULL, min, max));
+    test_flt(min[0], -3);
+    test_flt(max[0], 3);
+    test_flt(min[1], 7);
+    test_flt(max[1], 13);
+    test_assert(box_spatial_bounds(world, line, NULL, min, max));
+    test_assert(min[0] <= 19 && max[0] >= 31);
+    test_assert(min[1] <= -7 && max[1] >= 5);
+    test_assert(min[2] <= 5 && max[2] >= 5);
+
+    ecs_set(world, line, Line, {.x1 = -50, .y1 = 0, .x2 = -40, .y2 = 0, .width = 2});
+    ecs_progress(world, 0);
+    test_assert(box_spatial_bounds(world, line, NULL, min, max));
+    test_assert(min[0] <= -51 && max[0] >= -39);
+    test_assert(min[1] <= -1 && max[1] >= 1);
+
+    ecs_fini(world);
 }

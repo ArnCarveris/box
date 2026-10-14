@@ -10,7 +10,8 @@
     "lang.c": {
         "include": [
             "../../src/render",
-            "../../src/geometry"
+            "../../src/geometry",
+            "../../src/spatial"
         ]
     },
     "test": {
@@ -288,7 +289,8 @@
                     "dynamic_shapes",
                     "prefab_instance",
                     "one_batch_for_all_kinds",
-                    "empty_shapes_not_drawn"
+                    "empty_shapes_not_drawn",
+                    "bounds_hold_shape"
                 ]
             }
         ]
