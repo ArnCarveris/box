@@ -85,22 +85,24 @@ python3 tools/epic.py <epic> --env <name> [--baseline <previous epic>]
 ```
 
 Its steps, each writing into `project/db/<epic>/deliverable`, are `build_debug`
-and `build_release`, which build `boxrun` in debug and release and keep the
-bake3 `--build-json` reports as `build_debug.json` and `build_native.json`;
-`tests`, one `bake3 run test/<project> --json` per project under `test/` into
-`tests_<project>.json`, merged into `tests.json` the way `pm deliver` does;
-`visual`, `bench_scenes` and `command`, which run `tools/integration.py` into
-`integration/`; `bench`, which runs `tools/bench.py` into `bench/` against the
+and `build_release`, which build `apps/boxrun` (and with it the library) in debug and
+release and keep the bake3 `--build-json` reports as `build_debug.json` and
+`build_native.json`; `tests`, one `BOX_TEST=1 bake3 run test/<project> --json` per
+project under `test/` with a `project.json` into `tests_<project>.json`, merged into
+`tests.json` the way `pm deliver` does; `visual` and `perf`, which run
+`tools/integration.py` into `integration/` (`index.html` and `visual.json`, `perf.json`);
+`bench`, which runs `tools/bench.py` over every bench project into `bench/` against the
 `bench/` folder of the baseline epic, by default the last completed one;
-`shaders`, which checks every shader the renderer compiles with Tint's WGSL rules through
+`shaders`, which checks every shader in `etc/shaders` with Tint's WGSL rules through
 `tools/wgsl_check.mjs` into `shaders.json` (native wgpu does not enforce uniformity, the browser
-does); and `wasm`, which builds the web image with its `build_wasm.json` report and copies
-`boxrun.html`, `boxrun.js` and `boxrun.wasm` into `wasm/`. `--steps a,b` and
+does); and `wasm`, which builds the web image in release with its `build_wasm.json` report and
+copies `boxrun.html`, `boxrun.js` and `boxrun.wasm` into `wasm/`. `--steps a,b` and
 `--skip a,b` rerun part of a pipeline after a failure.
 
-The run prints one line per step and exits non zero when a build, a test or a
-scene fails, then lists what `pm done` still wants. Write the README yourself and
-close with `python3 project/pm.py done <epic>`. The wasm image is what gives the
+The run prints one line per step, keeps the output of every step in
+`.bake/epic/<epic>/<step>.log` and exits non zero when a build, a test or a scene
+fails, then lists what `pm done` still wants. Write the README yourself and close
+with `python3 project/pm.py done <epic>`. The wasm image is what gives the
 epic its **Inspect** link on the status page: the page serves
 `apps/box_inspector/index.html` at `/inspector` and opens it on that build, which
 is how an old epic stays explorable after the code has moved on. The three build

@@ -107,14 +107,15 @@ python3 tools/epic.py <epic> --env <name> [--baseline <previous epic>]
 It builds `boxrun` in debug, release and wasm and keeps the bake3 `--build-json`
 reports as `build_debug.json`, `build_native.json` and `build_wasm.json`, runs
 every project under `test/` into `tests_<project>.json` plus the merged
-`tests.json`, runs the visual, bench and command scenes into `integration/`, runs
+`tests.json`, runs the visual and perf scenes into `integration/`, runs
 one benchmark report per project into `bench/` against the `bench/` folder of the
-previous epic, checks every shader the renderer compiles with the browser's WGSL rules
+previous epic, checks every shader in `etc/shaders` with the browser's WGSL rules
 (`shaders.json`, Tint through node; native wgpu does not enforce uniformity) and copies the web
 image into `wasm/`, all under
-`project/db/<epic>/deliverable`. It prints a line per step, exits non zero when a
-build, a test or a scene fails and ends with what `pm done <epic>` still wants;
-`--steps` and `--skip` rerun part of it. Write `deliverable/README.md` by hand.
+`project/db/<epic>/deliverable`. It prints a line per step (the output of each step goes to
+`.bake/epic/<epic>/<step>.log`), exits non zero when a build, a test or a scene fails and ends
+with what `pm done <epic>` still wants; `--steps` and `--skip` rerun part of it. Write
+`deliverable/README.md` by hand.
 
 ## Visual scenes
 
