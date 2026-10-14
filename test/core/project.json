@@ -137,6 +137,21 @@
                     "batch_upload_resource_contents",
                     "headless_fixed_delta"
                 ]
+            },
+            {
+                "id": "Hooks",
+                "testcases": [
+                    "app",
+                    "app_status",
+                    "action",
+                    "mesh3",
+                    "terminal",
+                    "terminal_status",
+                    "texture_path",
+                    "surface",
+                    "view",
+                    "owning_components_have_hooks"
+                ]
             }
         ]
     }
