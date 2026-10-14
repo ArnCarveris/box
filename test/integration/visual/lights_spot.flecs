@@ -1,0 +1,65 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 6, 10}
+  Rotation: {-0.5, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.1}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 200, 200}
+}
+
+pillar {
+  Position: {-4, 0.75, 0}
+  Box: {0.8, 1.5, 0.8}
+  Rgb: {230, 230, 230}
+}
+
+ball {
+  Position: {0, 0.6, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {230, 230, 230}
+}
+
+cone {
+  Position: {4, 0.7, 0}
+  Cone: {segments: 32, smooth: true, length: 1.4, radius: 0.6}
+  Rgb: {230, 230, 230}
+}
+
+narrow {
+  Position: {-4, 5, 0}
+  Rotation: {1.5708, 0, 0}
+  SpotLight: {intensity: 30, range: 9, inner_angle: 10, outer_angle: 16}
+  Rgb: {255, 255, 255}
+}
+
+wide {
+  Position: {0, 5, 0}
+  Rotation: {1.5708, 0, 0}
+  SpotLight: {intensity: 30, range: 9, inner_angle: 15, outer_angle: 30}
+  Rgb: {255, 170, 80}
+}
+
+slanted {
+  Position: {6, 4, 2}
+  Rotation: {2.1, -0.49, 0}
+  SpotLight: {intensity: 30, range: 10, inner_angle: 5, outer_angle: 25}
+  Rgb: {80, 220, 255}
+}

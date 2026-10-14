@@ -1,0 +1,75 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 5, 10}
+  Rotation: {-0.45, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.15}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {200, 200, 200}
+}
+
+wall {
+  Position: {0, 2, -3}
+  Box: {16, 4, 0.2}
+  Rgb: {200, 200, 200}
+}
+
+ball {
+  Position: {0, 0.8, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.8}
+  Rgb: {240, 240, 240}
+  PbrMaterial: {roughness: 0.3}
+}
+
+column_left {
+  Position: {-3.5, 1, 0.5}
+  Cylinder: {segments: 24, smooth: true, length: 2, radius: 0.4}
+  Rgb: {240, 240, 240}
+}
+
+column_right {
+  Position: {3.5, 1, 0.5}
+  Cylinder: {segments: 24, smooth: true, length: 2, radius: 0.4}
+  Rgb: {240, 240, 240}
+}
+
+red {
+  Position: {-2, 1.5, 1}
+  PointLight: {intensity: 4, range: 6}
+  Rgb: {255, 60, 40}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {255, 60, 40}}
+}
+
+green {
+  Position: {0, 2.5, -1.5}
+  PointLight: {intensity: 4, range: 6}
+  Rgb: {60, 255, 80}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {60, 255, 80}}
+}
+
+blue {
+  Position: {2, 1.5, 1}
+  PointLight: {intensity: 4, range: 6}
+  Rgb: {60, 120, 255}
+  Sphere: {segments: 12, smooth: true, radius: 0.1}
+  Emissive: {strength: 1, color: {60, 120, 255}}
+}
