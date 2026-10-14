@@ -151,4 +151,46 @@ void box_logs_init(
 void box_history_init(
     ecs_world_t *world);
 
+/** Access a shell command needs to the entity of a path */
+typedef enum box_shell_access_t {
+    BoxShellScope,      /**< Any entity or the root */
+    BoxShellRead,       /**< Any entity but the root */
+    BoxShellWrite,      /**< An entity outside the flecs scope */
+    BoxShellDelete      /**< A writable entity outside modules and sessions */
+} box_shell_access_t;
+
+/** Resolve a path against the current entity of a session, failing the command when it can't.
+ *
+ * A leading / starts at the root, ../ goes up one level, the rest is a dotted flecs path.
+ *
+ * @param ctx The call context of the command
+ * @param result The result of the command, which gets the error
+ * @param session The session entity
+ * @param path The path, NULL for the current entity
+ * @param access The access the command needs
+ * @param out Receives the entity, 0 for the root
+ * @return 0 on success, -1 when the command failed
+ */
+int box_shell_resolve(
+    const ecs_function_ctx_t *ctx,
+    ecs_value_t *result,
+    ecs_entity_t session,
+    const char *path,
+    box_shell_access_t access,
+    ecs_entity_t *out);
+
+/** Register the shell commands cd, ls, touch, rm, mv, man and the component commands.
+ *
+ * @param world The world
+ */
+void box_shell_init(
+    ecs_world_t *world);
+
+/** Register the component commands add, remove, set, get and clear.
+ *
+ * @param world The world
+ */
+void box_component_init(
+    ecs_world_t *world);
+
 #endif
