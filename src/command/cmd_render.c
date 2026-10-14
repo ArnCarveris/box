@@ -4,6 +4,10 @@
  *
  * Both commands write PNG files into the resources folder of the session and return their
  * names right away; the renderer writes the files once the frame that holds them rendered.
+ *
+ * A capture shows a camera as its view renders it, effects included. A render shows its
+ * subject alone in a private scene, plain lit without shadows or effects, so the image does
+ * not depend on the views of the world.
  */
 
 #include "command.h"

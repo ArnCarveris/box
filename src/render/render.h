@@ -760,6 +760,10 @@ bool box_render_effects_use(
  *
  * The camera is an entity read when the frame is extracted, or, when camera is 0, the
  * settings, transform and scene in the description.
+ *
+ * A camera that a view renders is captured as its first view renders it, effects included
+ * (exposure and temporal bloom start fresh). Other cameras render lit, without shadows or
+ * effects, with the default culling.
  */
 typedef struct box_render_capture_desc_t {
     ecs_entity_t camera;        /**< Entity with Camera, 0 to use the fields below */
