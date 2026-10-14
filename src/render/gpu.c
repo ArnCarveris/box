@@ -389,6 +389,8 @@ static void box_gpu_render(
         box_gpu_target_render(gpu, packet,
             ecs_vec_get_t(&packet->targets, box_render_target_t, i));
     }
+
+    box_gpu_effects_sweep(gpu, packet);
 }
 
 /** Release a webgpu object when it exists.

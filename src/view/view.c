@@ -41,6 +41,26 @@ static void box_view_ctor(
     }
 }
 
+/** Construct ViewEffect values that are enabled, so a script entry that names only its effect
+ * runs it.
+ *
+ * @param ptr The elements
+ * @param count Number of elements
+ * @param ti Type info
+ */
+static void box_view_effect_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ViewEffect *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (ViewEffect){ .enabled = true };
+    }
+}
+
 void BoxViewImport(
     ecs_world_t *world)
 {
@@ -52,6 +72,7 @@ void BoxViewImport(
     ECS_META_COMPONENT(world, ShadowSettings);
     ECS_META_COMPONENT(world, CullSettings);
     ECS_META_COMPONENT(world, ViewEffect);
+    ecs_set_hooks(world, ViewEffect, { .ctor = box_view_effect_ctor });
     ECS_META_COMPONENT(world, View);
     box_owned_hooks(world, View, BOX_OWNED_VEC(View, effects, ViewEffect));
     ecs_set_hooks(world, View, { .ctor = box_view_ctor });
