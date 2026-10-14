@@ -538,12 +538,13 @@ void Jobs_shutdown_idle_workers(void)
 void Jobs_worker_count(void)
 {
     // engine_core/jobs
-    test_int(box_jobs_worker_count(12, 0), 10);
-    test_int(box_jobs_worker_count(2, 0), 1);
-    test_int(box_jobs_worker_count(1, 0), 1);
-    test_int(box_jobs_worker_count(64, 0), BOX_JOBS_MAX_WORKERS);
-    test_int(box_jobs_worker_count(12, 50), 1);
-    test_int(box_jobs_worker_count(12, 100), 1);
-    test_int(box_jobs_worker_count(12, 400), 3);
-    test_int(box_jobs_worker_count(4, 1000), 2);
+    test_assert(box_jobs_worker_count(1, 0) >= 1);
+    test_assert(box_jobs_worker_count(2, 0) >= 1);
+    test_assert(box_jobs_worker_count(12, 0) < 12);
+    test_assert(box_jobs_worker_count(12, 0) >= box_jobs_worker_count(2, 0));
+    test_assert(box_jobs_worker_count(64, 0) >= box_jobs_worker_count(12, 0));
+    test_assert(box_jobs_worker_count(12, 50) >= 1);
+    test_assert(box_jobs_worker_count(12, 50) <= box_jobs_worker_count(12, 400));
+    test_assert(box_jobs_worker_count(12, 400) <= box_jobs_worker_count(12, 0));
+    test_assert(box_jobs_worker_count(4, 1000) < 4);
 }

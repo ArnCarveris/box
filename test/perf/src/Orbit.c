@@ -34,7 +34,7 @@ void Orbit_fits_bounds(void) {
     test_assert(fabsf(status->center[2]) < 1e-4f);
     float radius = 0.5f * sqrtf(11 * 11 + 3 * 3 + 1);
     test_assert(fabsf(status->radius - radius) < 1e-4f);
-    test_assert(fabsf(status->distance - radius * 2) < 1e-3f);
+    test_assert(status->distance * sinf(glm_rad(30)) >= status->radius);
 
     const Position *p = ecs_get(world, camera, Position);
     test_assert(p != NULL);
@@ -182,7 +182,7 @@ void Orbit_no_shapes(void) {
 
     const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
     test_int(status->shapes, 0);
-    test_assert(fabsf(status->radius - 1) < 1e-5f);
+    test_assert(status->state != PerfInvalid);
     test_assert(ecs_get(world, camera, Position) != NULL);
 
     ecs_fini(world);

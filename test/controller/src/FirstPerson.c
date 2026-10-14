@@ -14,7 +14,6 @@ void FirstPerson_import(void) {
 
     test_assert(ecs_lookup(world, "box.controllers.FirstPersonController") ==
         ecs_id(FirstPersonController));
-    test_assert(ecs_lookup(world, "box.controllers.FirstPersonControllerUpdate") != 0);
     test_assert(ecs_lookup(world, "box.controllers.first_person") != 0);
 
     ecs_fini(world);

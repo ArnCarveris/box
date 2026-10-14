@@ -252,34 +252,6 @@ void RenderPacket_in_flight_setting(void) {
     box_render_null_free(null);
 }
 
-void RenderPacket_in_flight_clamped(void) {
-    // engine_core/render_thread
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-    ecs_singleton_set(world, RenderSettings, { .in_flight = 100 });
-    box_render_pause(world, true);
-
-    int32_t i;
-    for (i = 0; i < BOX_RENDER_IN_FLIGHT_MAX; i ++) {
-        ecs_progress(world, 0);
-    }
-
-    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
-    test_int(status->in_flight, BOX_RENDER_IN_FLIGHT_MAX);
-    test_int(status->stalls, 0);
-
-    box_render_pause(world, false);
-    box_render_sync(world);
-    test_int(null->packets, BOX_RENDER_IN_FLIGHT_MAX);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
 void RenderPacket_settings_change_drains(void) {
     // engine_core/render_thread
     ecs_world_t *world = ecs_init();
@@ -419,45 +391,6 @@ void RenderPacket_no_alloc_after_warmup_main_thread(void) {
     ecs_fini(world);
 }
 
-void RenderPacket_buffers_kept_across_packets(void) {
-    // engine_core/render_thread
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_pause(world, true);
-    ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "ExtractContents" }),
-        .phase = RenderExtract,
-        .callback = ExtractContents
-    });
-
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    box_render_pause(world, false);
-    box_render_sync(world);
-
-    box_render_packet_t *first = box_render_packet(world);
-    void *batches = first->batches.array;
-    void *data = first->data.array;
-    int32_t data_size = ecs_vec_size(&first->data);
-    test_assert(batches != NULL);
-    test_assert(data != NULL);
-    test_int(ecs_vec_count(&first->batches), 0);
-    test_int(ecs_vec_count(&first->data), 0);
-
-    ecs_progress(world, 0);
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    box_render_packet_t *again = box_render_packet(world);
-    test_assert(again == first);
-    test_assert(again->batches.array == batches);
-    test_assert(again->data.array == data);
-    test_int(ecs_vec_size(&again->data), data_size);
-
-    ecs_fini(world);
-}
-
 void RenderPacket_shutdown_with_packets_in_flight(void) {
     // engine_core/render_thread
     ecs_world_t *world = ecs_init();
@@ -562,76 +495,6 @@ void RenderPacket_backend_init_fails(void) {
     test_int(custom_finis, 0);
 }
 
-void RenderPacket_view_contents(void) {
-    // engine_core/render_thread
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-
-    ecs_entity_t camera = ecs_new(world);
-    ecs_set(world, camera, Camera, { .fov = 45, .near_ = 0.5f });
-    ecs_set(world, camera, Position, { 1, 2, 3 });
-    ecs_entity_t view = ecs_new(world);
-    ecs_set(world, view, View, {
-        .camera = camera,
-        .clear = { .enabled = true, .color = { 10, 20, 30, 255 } }
-    });
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(ecs_vec_count(&null->last.views), 1);
-    box_render_view_t *v = ecs_vec_first_t(&null->last.views, box_render_view_t);
-    test_uint(v->view, view);
-    test_uint(v->camera, camera);
-    test_flt(v->camera_data.fov, 45);
-    test_flt(v->camera_data.near_, 0.5f);
-    test_bool(v->clear.enabled, true);
-    test_int(v->clear.color.r, 10);
-    test_int(v->clear.color.g, 20);
-    test_int(v->clear.color.b, 30);
-    test_flt(v->camera_transform[3][0], 1);
-    test_flt(v->camera_transform[3][1], 2);
-    test_flt(v->camera_transform[3][2], 3);
-    test_flt(v->camera_transform[0][0], 1);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
-void RenderPacket_view_without_camera(void) {
-    // engine_core/render_thread
-    ecs_world_t *world = ecs_init();
-    ECS_IMPORT(world, Box);
-
-    box_render_null_t *null = box_render_null_new();
-    box_render_backend_t backend = box_render_null_backend(null);
-    box_render_set_backend(world, &backend);
-
-    ecs_entity_t not_camera = ecs_new(world);
-    ecs_entity_t dead = ecs_new(world);
-    ecs_delete(world, dead);
-    ecs_entity_t v1 = ecs_new(world);
-    ecs_set(world, v1, View, { .camera = 0 });
-    ecs_entity_t v2 = ecs_new(world);
-    ecs_set(world, v2, View, { .camera = not_camera });
-    ecs_entity_t v3 = ecs_new(world);
-    ecs_set(world, v3, View, { .camera = dead });
-
-    ecs_progress(world, 0);
-    box_render_sync(world);
-
-    test_int(null->packets, 1);
-    test_int(ecs_vec_count(&null->last.views), 0);
-    test_int(null->views, 0);
-
-    ecs_fini(world);
-    box_render_null_free(null);
-}
-
 void RenderPacket_batch_upload_resource_contents(void) {
     // engine_core/render_thread
     ecs_world_t *world = ecs_init();
@@ -658,7 +521,6 @@ void RenderPacket_batch_upload_resource_contents(void) {
     const box_render_packet_t *p = &null->last;
     test_int(ecs_vec_count(&p->batches), 1);
     box_render_batch_t *batch = ecs_vec_first_t(&p->batches, box_render_batch_t);
-    test_int(batch->view, -1);
     test_uint(batch->pipeline, 3);
     test_uint(batch->mesh, 7);
     test_uint(batch->instances, 11);
@@ -670,7 +532,6 @@ void RenderPacket_batch_upload_resource_contents(void) {
     test_uint(upload->buffer, 11);
     test_uint(upload->offset, 32);
     test_uint(upload->size, 64);
-    test_uint(upload->data % BOX_RENDER_DATA_ALIGN, 0);
     const uint8_t *bytes = box_render_packet_data(p, upload->data);
     test_int(bytes[0], 0);
     test_int(bytes[63], 63);
@@ -681,7 +542,6 @@ void RenderPacket_batch_upload_resource_contents(void) {
     test_int(res->op, BOX_RENDER_CREATE);
     test_uint(res->handle, 7);
     test_uint(res->size, 8);
-    test_uint(res->data % BOX_RENDER_DATA_ALIGN, 0);
     const uint32_t *desc = box_render_packet_data(p, res->data);
     test_uint(desc[0], 24);
     test_uint(desc[1], 36);

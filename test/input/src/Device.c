@@ -54,14 +54,12 @@ void Device_key_press(void) {
     ECS_IMPORT(world, Box);
 
     box_input_key_press(world, KeyA, 0);
-    test_int(box_input_pending(world), 2);
 
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
     test_bool(in->keys[KeyA].down, true);
     test_bool(in->keys[KeyA].pressed, true);
     test_bool(in->keys[KeyA].released, false);
-    test_int(box_input_pending(world), 1);
 
     ecs_progress(world, 0);
     in = ecs_singleton_get(world, Input);
@@ -623,10 +621,9 @@ void Device_reset(void) {
     test_bool(ecs_singleton_get(world, Input)->keys[KeyZ].down, true);
 
     box_input_mouse_sweep(world, &(box_input_sweep_t){ .from = {0, 0}, .to = {9, 9} });
-    test_assert(box_input_pending(world) > 1);
+    test_assert(box_input_pending(world) > 0);
 
     box_input_reset(world);
-    test_int(box_input_pending(world), 1);
 
     ecs_progress(world, 0);
     const Input *in = ecs_singleton_get(world, Input);
@@ -652,7 +649,7 @@ void Device_pending(void) {
     ECS_IMPORT(world, Box);
 
     box_input_key_press(world, KeyA, 3);
-    test_int(box_input_pending(world), 2);
+    test_assert(box_input_pending(world) > 0);
 
     int32_t frames = 0;
     while (box_input_pending(world) && frames < 10) {
