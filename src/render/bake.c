@@ -1,15 +1,19 @@
 /**
  * @file render/bake.c
- * @brief Irradiance probe volume of every scene with LightBake, sent to the backend on change.
+ * @brief Irradiance probe volume of every scene with LightBake and the captures that bake it.
  *
  * The grid covers the static bounds the spatial index holds, padded and spaced as LightBake
  * says; probes inside a static shape are invalid. Probes start as the SH of the hemisphere
  * ambient of the scene, so a view that samples them looks as it did with the hemisphere.
+ *
+ * Every frame the unbaked probes nearest to the cameras go into the packet as captures, as many
+ * as budget_ms allows at the measured GPU time per probe; a headless run captures them all.
  */
 
-#include "render.h"
-#include "../spatial/index.h"
+#include "draw.h"
+#include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
+#include <float.h>
 #include <math.h>
 
 /** Probes of a volume at most; a larger grid is spaced wider until it fits */
@@ -17,6 +21,24 @@
 
 /** Fraction of the spacing an extent may exceed a whole number of spacings by, float noise */
 #define BOX_BAKE_EPSILON (1e-4)
+
+/** GPU milliseconds per probe assumed until the backend measured one, or when it cannot */
+#define BOX_BAKE_PROBE_MS (1.0f)
+
+/** Probes captured per scene and frame at most outside a headless run */
+#define BOX_BAKE_FRAME_MAX (256)
+
+/** Face edge of a capture in texels at most */
+#define BOX_BAKE_SIZE_MAX (256)
+
+/** Weight of a new measurement in the GPU time per probe */
+#define BOX_BAKE_SMOOTHING (0.5f)
+
+/** A probe waiting for its capture and its squared distance to the nearest camera */
+typedef struct box_bake_pick_t {
+    float distance;         /**< Squared distance to the nearest camera of the scene */
+    uint32_t probe;         /**< Index of the probe */
+} box_bake_pick_t;
 
 /** Grid of probes of a volume */
 typedef struct box_bake_grid_t {
@@ -38,9 +60,19 @@ typedef struct box_bake_volume_t {
     bool seen;              /**< A LightBake of the scene exists in this frame */
     bool sent;              /**< The backend has the volume with this grid */
     bool viewed;            /**< A view of the scene is in the packet of this frame */
+    bool converged;         /**< Every probe of the pass is captured and rendered */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance the probes are filled with */
     float ambient[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Irradiance of the views of this frame */
     ecs_vec_t valid;        /**< uint32_t, one bit per probe outside static geometry */
+    ecs_vec_t queue;        /**< uint32_t, valid probes of the pass not captured yet */
+    ecs_vec_t cameras;      /**< vec3, cameras of the views of the scene in this frame */
+    box_render_view_lights_t lights; /**< Lights of the first view of the scene in this frame */
+    vec3 min;               /**< Minimum corner of the static bounds of the grid */
+    vec3 max;               /**< Maximum corner of the static bounds of the grid */
+    int32_t capture_size;   /**< LightBake.capture_size of this frame */
+    float budget_ms;        /**< LightBake.budget_ms of this frame */
+    int32_t issued;         /**< Packet number of the last captures, as RenderStatus.submitted */
+    int32_t valid_count;    /**< Probes outside static geometry, the probes a pass captures */
 } box_bake_volume_t;
 
 /** Main thread state of the bake extract */
@@ -51,6 +83,10 @@ typedef struct box_render_bake_t {
     uint32_t next_handle;   /**< Next volume handle */
     ecs_vec_t hits;         /**< ecs_entity_t, scratch of the overlap queries */
     int32_t indexed;        /**< Entities of the spatial index at the last extract */
+    ecs_vec_t picks;        /**< box_bake_pick_t, scratch of the choice of the next probes */
+    float probe_ms;         /**< GPU milliseconds per probe capture */
+    bool measured;          /**< probe_ms comes from a measurement */
+    box_render_draws_t *draws; /**< State of the draw extract, marked on NoBake changes */
     const void *backend;    /**< Context of the backend the volumes were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
 } box_render_bake_t;
@@ -94,45 +130,8 @@ static box_bake_volume_t* box_bake_ensure(
         ecs_os_memset_t(result, 0, box_bake_volume_t);
         result->scene = scene;
         ecs_vec_init_t(NULL, &result->valid, uint32_t, 0);
-    }
-
-    return result;
-}
-
-/** Compute the static bounds of a scene from the static items of the spatial index.
- *
- * @param world The world
- * @param scene The scene root
- * @param min Receives the minimum corner
- * @param max Receives the maximum corner
- * @return false when the scene has no static shapes
- */
-static bool box_bake_bounds(
-    const ecs_world_t *world,
-    ecs_entity_t scene,
-    vec3 min,
-    vec3 max)
-{
-    const SpatialIndex *si = ecs_id(SpatialIndex) ?
-        ecs_singleton_get(world, SpatialIndex) : NULL;
-    const box_spatial_scene_t *s = si && si->index ? box_spatial_scene(si->index, scene) : NULL;
-    bool result = false;
-    int32_t i, count = s ? ecs_vec_count(&s->items) : 0;
-    const box_spatial_item_t *items = s ? ecs_vec_first(&s->items) : NULL;
-    for (i = 0; i < count; i ++) {
-        const box_spatial_item_t *it = &items[i];
-        if (!it->entity || it->tree != BOX_SPATIAL_STATIC) {
-            continue;
-        }
-
-        if (!result) {
-            glm_vec3_copy(ECS_CONST_CAST(float*, it->min), min);
-            glm_vec3_copy(ECS_CONST_CAST(float*, it->max), max);
-            result = true;
-        } else {
-            glm_vec3_minv(min, ECS_CONST_CAST(float*, it->min), min);
-            glm_vec3_maxv(max, ECS_CONST_CAST(float*, it->max), max);
-        }
+        ecs_vec_init_t(NULL, &result->queue, uint32_t, 0);
+        ecs_vec_init_t(NULL, &result->cameras, vec3, 0);
     }
 
     return result;
@@ -301,7 +300,7 @@ static void box_bake_validate(
     }
 }
 
-/** Write the probe count of a volume into the LightBakeStatus of its entity.
+/** Write the progress of a volume into the LightBakeStatus of its entity when it changed.
  *
  * @param it The iterator of the system
  * @param v The volume
@@ -310,12 +309,44 @@ static void box_bake_status(
     ecs_iter_t *it,
     const box_bake_volume_t *v)
 {
-    const LightBakeStatus *status = ecs_get(it->world, v->entity, LightBakeStatus);
-    if (status && status->probes != v->probes) {
-        LightBakeStatus value = *status;
-        value.probes = v->probes;
+    const LightBakeStatus *status = v->entity && ecs_is_alive(it->world, v->entity)
+        ? ecs_get(it->world, v->entity, LightBakeStatus)
+        : NULL;
+    if (!status) {
+        goto done;
+    }
+
+    LightBakeStatus value = *status;
+    value.probes = v->probes;
+    value.baked = v->sent ? v->valid_count - ecs_vec_count(&v->queue) : 0;
+    value.pass = v->probes ? 1 : 0;
+    value.converged = v->converged;
+    if (memcmp(&value, status, sizeof(value))) {
         ecs_set_ptr(it->stage, v->entity, LightBakeStatus, &value);
     }
+
+done:
+    return;
+}
+
+/** Start the pass of a volume again: every valid probe waits for its capture.
+ *
+ * @param v The volume
+ */
+static void box_bake_restart(
+    box_bake_volume_t *v)
+{
+    const uint32_t *valid = ecs_vec_first(&v->valid);
+    int32_t i;
+    ecs_vec_clear(&v->queue);
+    for (i = 0; valid && i < v->probes; i ++) {
+        if ((valid[i >> 5] >> (i & 31)) & 1u) {
+            *ecs_vec_append_t(NULL, &v->queue, uint32_t) = (uint32_t)i;
+        }
+    }
+
+    v->valid_count = ecs_vec_count(&v->queue);
+    v->converged = false;
 }
 
 /** Get a volume handle.
@@ -375,8 +406,10 @@ static void box_bake_update(
     box_bake_grid_t grid = {0};
     vec3 min, max;
     int32_t probes = 0;
-    if (box_bake_bounds(it->world, v->scene, min, max)) {
+    if (box_spatial_static_bounds(it->world, v->scene, min, max)) {
         probes = box_bake_place(min, max, bake->probe_spacing, bake->bounds_padding, &grid);
+        glm_vec3_copy(min, v->min);
+        glm_vec3_copy(max, v->max);
     }
 
     v->placed = true;
@@ -397,6 +430,8 @@ static void box_bake_update(
     } else {
         box_bake_handle_free(b, p, v);
         ecs_vec_clear(&v->valid);
+        ecs_vec_clear(&v->queue);
+        v->converged = false;
     }
 
 done:
@@ -429,8 +464,8 @@ static void box_bake_ambient(
     }
 }
 
-/** Point the views of the packet at the volume of their scene and take the ambient light of
- * the first view of every scene.
+/** Point the views of the packet at the volume of their scene, take the ambient light and the
+ * lights of the first view of every scene and collect the cameras of its views.
  *
  * @param world The world
  * @param b The state
@@ -454,8 +489,11 @@ static void box_bake_views(
             : NULL;
         if (!v->viewed) {
             box_bake_ambient(&rv->lights, v->ambient);
+            v->lights = rv->lights;
             v->viewed = true;
         }
+
+        glm_vec3_copy(rv->camera_transform[3], *ecs_vec_append_t(NULL, &v->cameras, vec3));
 
         if (rv->lights.enabled && (view ? view->lighting.baked : true)) {
             rv->volume = v->handle;
@@ -498,6 +536,7 @@ static void box_bake_send(
     }
 
     v->sent = true;
+    box_bake_restart(v);
 done:
     return;
 }
@@ -517,6 +556,8 @@ static void box_bake_remove(
     int32_t last = ecs_vec_count(&b->volumes) - 1;
     box_bake_handle_free(b, p, v);
     ecs_vec_fini_t(NULL, &v->valid, uint32_t);
+    ecs_vec_fini_t(NULL, &v->queue, uint32_t);
+    ecs_vec_fini_t(NULL, &v->cameras, vec3);
     if (index != last) {
         *v = *ecs_vec_get_t(&b->volumes, box_bake_volume_t, last);
     }
@@ -540,6 +581,227 @@ static bool box_bake_spatial_changed(
     b->indexed = stats.entities;
 
     return result;
+}
+
+/** Move the probes nearest to the cameras to the front of the picks.
+ *
+ * Quickselect: afterwards the first count picks are the nearest ones, in no order.
+ *
+ * @param picks The picks
+ * @param n Number of picks
+ * @param count Number of picks to bring to the front
+ */
+static void box_bake_select(
+    box_bake_pick_t *picks,
+    int32_t n,
+    int32_t count)
+{
+    int32_t lo = 0, hi = n - 1;
+    while (lo < hi) {
+        float pivot = picks[(lo + hi) / 2].distance;
+        int32_t i = lo, j = hi;
+        while (i <= j) {
+            while (picks[i].distance < pivot) {
+                i ++;
+            }
+
+            while (picks[j].distance > pivot) {
+                j --;
+            }
+
+            if (i <= j) {
+                box_bake_pick_t tmp = picks[i];
+                picks[i] = picks[j];
+                picks[j] = tmp;
+                i ++;
+                j --;
+            }
+        }
+
+        if (count - 1 <= j) {
+            hi = j;
+        } else if (count - 1 >= i) {
+            lo = i;
+        } else {
+            break;
+        }
+    }
+}
+
+/** Take the probes of the next captures out of the queue of a volume, nearest to the cameras of
+ * the views of its scene first.
+ *
+ * @param b The state
+ * @param v The volume
+ * @param count Probes to take, at most the queue
+ * @param p The packet the captures are added to
+ */
+static void box_bake_pick(
+    box_render_bake_t *b,
+    box_bake_volume_t *v,
+    int32_t count,
+    box_render_packet_t *p)
+{
+    const box_bake_grid_t *g = &v->grid;
+    const vec3 *cameras = ecs_vec_first(&v->cameras);
+    int32_t i, c, n = ecs_vec_count(&v->queue), cams = ecs_vec_count(&v->cameras);
+    uint32_t *queue = ecs_vec_first(&v->queue);
+    ecs_vec_set_count_t(NULL, &b->picks, box_bake_pick_t, n);
+    box_bake_pick_t *picks = ecs_vec_first(&b->picks);
+    for (i = 0; i < n; i ++) {
+        uint32_t index = queue[i];
+        uint32_t x = index % (uint32_t)g->size[0];
+        uint32_t y = (index / (uint32_t)g->size[0]) % (uint32_t)g->size[1];
+        uint32_t z = index / ((uint32_t)g->size[0] * (uint32_t)g->size[1]);
+        vec3 pos = {
+            g->origin[0] + (float)x * g->spacing,
+            g->origin[1] + (float)y * g->spacing,
+            g->origin[2] + (float)z * g->spacing
+        };
+        picks[i].probe = index;
+        picks[i].distance = FLT_MAX;
+        for (c = 0; c < cams; c ++) {
+            float d = glm_vec3_distance2(pos, ECS_CONST_CAST(float*, cameras[c]));
+            picks[i].distance = glm_min(picks[i].distance, d);
+        }
+    }
+
+    if (count < n) {
+        box_bake_select(picks, n, count);
+    }
+
+    for (i = 0; i < count; i ++) {
+        uint32_t index = picks[i].probe;
+        box_render_probe_capture_t *out = ecs_vec_append_t(
+            NULL, &p->probes, box_render_probe_capture_t);
+        out->index = index;
+        out->position[0] = g->origin[0] + (float)(index % (uint32_t)g->size[0]) * g->spacing;
+        out->position[1] = g->origin[1] +
+            (float)((index / (uint32_t)g->size[0]) % (uint32_t)g->size[1]) * g->spacing;
+        out->position[2] = g->origin[2] +
+            (float)(index / ((uint32_t)g->size[0] * (uint32_t)g->size[1])) * g->spacing;
+    }
+
+    for (i = count; i < n; i ++) {
+        queue[i - count] = picks[i].probe;
+    }
+
+    ecs_vec_set_count_t(NULL, &v->queue, uint32_t, n - count);
+}
+
+/** Get the probes a scene captures in a frame of its budget.
+ *
+ * @param b The state
+ * @param v The volume
+ * @return Probes of the budget at the GPU time per probe, at least one
+ */
+static int32_t box_bake_budget(
+    const box_render_bake_t *b,
+    const box_bake_volume_t *v)
+{
+    float probes = floorf(v->budget_ms / b->probe_ms);
+    int32_t result = BOX_BAKE_FRAME_MAX;
+    if (probes < (float)BOX_BAKE_FRAME_MAX) {
+        result = probes < 1.0f ? 1 : (int32_t)probes;
+    }
+
+    return result;
+}
+
+/** Add the next captures of a volume to the packet.
+ *
+ * Nothing is captured without a budget, without probes left, without a view of the scene in
+ * the packet or without the GPU backend. A headless run captures every probe left.
+ *
+ * @param b The state
+ * @param p The packet
+ * @param v The volume
+ * @param headless Whether the run is headless
+ * @param submitted Packets submitted before this one
+ */
+static void box_bake_schedule(
+    box_render_bake_t *b,
+    box_render_packet_t *p,
+    box_bake_volume_t *v,
+    bool headless,
+    int32_t submitted)
+{
+    int32_t left = ecs_vec_count(&v->queue);
+    if (!v->handle || !v->sent || !v->viewed || !left || !(v->budget_ms > 0)) {
+        goto done;
+    }
+
+    int32_t count = headless ? left : box_bake_budget(b, v);
+    count = count < left ? count : left;
+    box_render_bake_batch_t *batch = ecs_vec_append_t(NULL, &p->bakes, box_render_bake_batch_t);
+    ecs_os_memset_t(batch, 0, box_render_bake_batch_t);
+    batch->volume = v->handle;
+    batch->scene = v->scene;
+    batch->size = (int32_t)glm_clamp((float)v->capture_size, 1.0f, (float)BOX_BAKE_SIZE_MAX);
+    batch->lights = v->lights;
+    batch->lights.enabled = true;
+    glm_vec3_copy(v->min, batch->bounds_min);
+    glm_vec3_copy(v->max, batch->bounds_max);
+    batch->first = ecs_vec_count(&p->probes);
+    batch->count = count;
+    box_bake_pick(b, v, count, p);
+    v->issued = submitted + 1;
+done:
+    return;
+}
+
+/** Take the GPU time of the captures the backend measured into the time per probe.
+ *
+ * @param world The world
+ * @param b The state
+ */
+static void box_bake_timing(
+    ecs_world_t *world,
+    box_render_bake_t *b)
+{
+    box_render_bake_timing_t timing;
+    if (!box_render_gpu_bake_timing(world, &timing) || timing.probes <= 0) {
+        goto done;
+    }
+
+    float per = (float)(timing.ms / (double)timing.probes);
+    b->probe_ms = b->measured
+        ? b->probe_ms + (per - b->probe_ms) * BOX_BAKE_SMOOTHING
+        : per;
+    b->probe_ms = glm_max(b->probe_ms, 1e-3f);
+    b->measured = true;
+done:
+    return;
+}
+
+/** Capture the next probes of every volume and update the progress of the volumes.
+ *
+ * @param it The iterator of the system
+ * @param b The state
+ * @param p The packet
+ */
+static void box_bake_progress(
+    ecs_iter_t *it,
+    box_render_bake_t *b,
+    box_render_packet_t *p)
+{
+    box_render_gpu_stats_t stats;
+    const App *app = ecs_singleton_get(it->world, App);
+    const RenderStatus *status = ecs_singleton_get(it->world, RenderStatus);
+    bool gpu = box_render_gpu_stats(it->world, &stats) && !stats.failed;
+    int32_t i, submitted = status ? status->submitted : 0;
+    int32_t rendered = status ? status->rendered : 0;
+    box_bake_timing(it->world, b);
+    for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        if (gpu) {
+            box_bake_schedule(b, p, v, app && app->headless, submitted);
+        }
+
+        v->converged = v->sent && v->probes && !ecs_vec_count(&v->queue) &&
+            rendered >= v->issued;
+        box_bake_status(it, v);
+    }
 }
 
 /** Keep a volume per scene with LightBake and point the views at the volume of their scene.
@@ -566,6 +828,7 @@ static void BoxRenderExtractBake(
         box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
         v->seen = false;
         v->viewed = false;
+        ecs_vec_clear(&v->cameras);
     }
 
     ecs_iter_t qit = ecs_query_iter(world, b->bakes);
@@ -584,13 +847,13 @@ static void BoxRenderExtractBake(
 
             v->seen = true;
             v->entity = qit.entities[row];
+            v->capture_size = bakes[row].capture_size;
+            v->budget_ms = bakes[row].budget_ms;
             if (!v->placed || changed || v->probe_spacing != bakes[row].probe_spacing ||
                 v->bounds_padding != bakes[row].bounds_padding)
             {
                 box_bake_update(it, b, p, v, &bakes[row]);
             }
-
-            box_bake_status(it, v);
         }
     }
 
@@ -604,6 +867,8 @@ static void BoxRenderExtractBake(
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
         box_bake_send(p, ecs_vec_get_t(&b->volumes, box_bake_volume_t, i));
     }
+
+    box_bake_progress(it, b, p);
 }
 
 /** Free the state of the bake extract.
@@ -616,19 +881,42 @@ static void box_bake_free(
     box_render_bake_t *b = ctx;
     int32_t i;
     for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
-        ecs_vec_fini_t(NULL, &ecs_vec_get_t(&b->volumes, box_bake_volume_t, i)->valid, uint32_t);
+        box_bake_volume_t *v = ecs_vec_get_t(&b->volumes, box_bake_volume_t, i);
+        ecs_vec_fini_t(NULL, &v->valid, uint32_t);
+        ecs_vec_fini_t(NULL, &v->queue, uint32_t);
+        ecs_vec_fini_t(NULL, &v->cameras, vec3);
     }
 
     ecs_vec_fini_t(NULL, &b->volumes, box_bake_volume_t);
+    ecs_vec_fini_t(NULL, &b->picks, box_bake_pick_t);
     ecs_vec_fini_t(NULL, &b->free_handles, uint32_t);
     ecs_vec_fini_t(NULL, &b->hits, ecs_entity_t);
     ecs_os_free(b);
+}
+
+/** Bring the shapes that got or lost NoBake or ManualTransform into the batch of their key.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxBakeOnCaptured(
+    ecs_iter_t *it)
+{
+    box_render_bake_t *b = it->ctx;
+    int32_t i;
+    for (i = 0; !ecs_is_fini(it->world) && b->draws && i < it->count; i ++) {
+        box_draws_mark(it->world, b->draws, it->entities[i]);
+    }
 }
 
 void box_render_bake_init(
     ecs_world_t *world)
 {
     box_render_bake_t *b = ecs_os_calloc_t(box_render_bake_t);
+    ecs_entity_t draws = ecs_lookup(world, "box.render.RenderExtractDraws");
+    const ecs_system_t *system = draws ? ecs_system_get(world, draws) : NULL;
+    b->draws = system ? system->ctx : NULL;
+    b->probe_ms = BOX_BAKE_PROBE_MS;
+    ecs_vec_init_t(NULL, &b->picks, box_bake_pick_t, 0);
     ecs_vec_init_t(NULL, &b->volumes, box_bake_volume_t, 0);
     ecs_vec_init_t(NULL, &b->free_handles, uint32_t, 0);
     ecs_vec_init_t(NULL, &b->hits, ecs_entity_t, 0);
@@ -645,6 +933,22 @@ void box_render_bake_init(
             }
         },
         .cache_kind = EcsQueryCacheAuto
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "BakeOnNoBake" }),
+        .query.terms = {{ .id = NoBake }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxBakeOnCaptured,
+        .ctx = b
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "BakeOnManualTransform" }),
+        .query.terms = {{ .id = ManualTransform }},
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = BoxBakeOnCaptured,
+        .ctx = b
     });
 
     ecs_system(world, {

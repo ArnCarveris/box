@@ -645,6 +645,15 @@ static void box_gpu_draw_batches(
     }
 }
 
+void box_gpu_draw_capture(
+    box_gpu_t *gpu,
+    WGPURenderPassEncoder pass,
+    const box_render_packet_t *packet,
+    int32_t slot)
+{
+    box_gpu_draw_batches(gpu, pass, BOX_GPU_HDR_FORMAT, packet, slot, 0);
+}
+
 /** Record a render pass of a view and its draws of one phase.
  *
  * @param gpu The backend

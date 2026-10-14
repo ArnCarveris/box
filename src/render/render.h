@@ -59,6 +59,9 @@
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (7)
 
+/** Shader handle of the engine compute shader that projects probe captures onto SH */
+#define BOX_RENDER_SHADER_BAKE (8)
+
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
 
@@ -284,6 +287,30 @@ typedef struct box_render_volume_desc_t {
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Linear rgb irradiance coefficients, w unused */
 } box_render_volume_desc_t;
 
+/** A probe the backend captures: six faces around its position, projected onto its SH */
+typedef struct box_render_probe_capture_t {
+    float position[3];      /**< World position of the probe */
+    uint32_t index;         /**< Index of the probe in its volume */
+} box_render_probe_capture_t;
+
+/** The probe captures of the volume of one scene in a packet.
+ *
+ * Each probe renders six faces of the batches of the scene with bake set, lit by the lights
+ * of the scene with a black ambient term, the sun shadowed by one cascade over the bounds.
+ *
+ * Texels no shape covers see the hemisphere ambient. Captures run before the targets.
+ */
+typedef struct box_render_bake_batch_t {
+    uint32_t volume;        /**< Handle of the volume the probes are written into */
+    ecs_entity_t scene;     /**< Scene root of the batches the faces draw */
+    int32_t size;           /**< Edge of a face in texels */
+    box_render_view_lights_t lights; /**< Lights of the scene, enabled */
+    float bounds_min[3];    /**< Minimum corner of the static bounds of the scene */
+    float bounds_max[3];    /**< Maximum corner of the static bounds of the scene */
+    int32_t first;          /**< First probe of the batch in the probes of the packet */
+    int32_t count;          /**< Probes of the batch */
+} box_render_bake_batch_t;
+
 /** How a buffer is used, flags of box_render_buffer_desc_t */
 typedef enum box_render_buffer_usage_t {
     BOX_RENDER_BUFFER_INSTANCE = 1 << 0, /**< Per instance vertex data of batches */
@@ -361,6 +388,7 @@ typedef struct box_render_batch_t {
     uint32_t blend;             /**< BlendMode of the pipeline, Opaque writes depth */
     uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
     bool shadow;                /**< The instances cast shadows, false for NoShadow */
+    bool bake;                  /**< Static 3D instances without NoBake, drawn by probe captures */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
@@ -387,6 +415,8 @@ typedef struct box_render_packet_t {
     ecs_vec_t batches;      /**< box_render_batch_t */
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
     ecs_vec_t effects;      /**< box_render_effect_t, the effect passes of the views */
+    ecs_vec_t bakes;        /**< box_render_bake_batch_t, the probe captures of the frame */
+    ecs_vec_t probes;       /**< box_render_probe_capture_t of the bake batches */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
 } box_render_packet_t;
 
@@ -448,7 +478,28 @@ typedef struct box_render_gpu_stats_t {
     int32_t draws;              /**< Draw calls recorded */
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
+    int32_t probes;             /**< Probes captured */
 } box_render_gpu_stats_t;
+
+/** GPU time of the probe captures the GPU backend measured since the last time it was taken */
+typedef struct box_render_bake_timing_t {
+    int32_t probes;             /**< Probes the measured capture batches held */
+    double ms;                  /**< Milliseconds the GPU spent on them */
+    bool measured;              /**< The device measures with timestamp queries */
+} box_render_bake_timing_t;
+
+/** Take the GPU time of the probe captures the GPU backend of a world measured.
+ *
+ * Timestamps are read back without waiting, so a measurement arrives a few frames after its
+ * captures. Without timestamp queries nothing is measured.
+ *
+ * @param world The world
+ * @param out Receives the time, zero when nothing arrived
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_bake_timing(
+    ecs_world_t *world,
+    box_render_bake_timing_t *out);
 
 /** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
 typedef struct box_render_cull_stats_t {

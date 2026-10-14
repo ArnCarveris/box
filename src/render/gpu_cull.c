@@ -780,6 +780,89 @@ void box_gpu_cull_add(
     }
 }
 
+void box_gpu_cull_reset(
+    box_gpu_t *gpu)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    ecs_vec_clear(&c->views);
+    ecs_vec_clear(&c->draws);
+    ecs_vec_clear(&c->dispatches);
+    ecs_vec_clear(&c->uniform_data);
+    ecs_vec_clear(&c->job_data);
+    ecs_vec_clear(&c->arg_data);
+    c->visible_count = 0;
+}
+
+/** Check whether a probe capture draws a batch.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @param scene Scene of the captures
+ * @param cascade Cascade of the cull view, -1 for a face
+ * @return Whether the batch has opaque static meshes of the scene the captures draw, and for
+ * the cascade casts shadows, and the backend has its mesh and storage instance buffer
+ */
+static bool box_gpu_cull_capture_draws(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    ecs_entity_t scene,
+    int32_t cascade)
+{
+    bool result = b->scene == scene && b->bake && b->view == -1 && b->blend == Opaque &&
+        b->pipeline == BOX_RENDER_SHADER_MESH && b->instance_count &&
+        (cascade < 0 || b->shadow);
+    if (result) {
+        box_gpu_buffer_t *inst = ecs_map_get_deref(
+            &gpu->buffers, box_gpu_buffer_t, b->instances);
+        result = inst && (inst->usage & BOX_RENDER_BUFFER_STORAGE) &&
+            ecs_map_get(&gpu->meshes, b->mesh) != NULL;
+    }
+
+    return result;
+}
+
+void box_gpu_cull_capture_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    int32_t cascade,
+    mat4 view_proj,
+    float pixels)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    box_gpu_cull_uniforms_t base;
+    int32_t i, count = ecs_vec_count(&packet->batches);
+    ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    box_gpu_cull_planes(view_proj, base.planes);
+    for (i = 0; i < 4; i ++) {
+        base.clip_w[i] = view_proj[i][3];
+    }
+
+    base.size[0] = pixels;
+    base.size[1] = pixels > 0 ? BOX_RENDER_CULL_MIN_DIMENSION : 0.0f;
+    base.size[2] = 1.0f;
+    base.jobs[3] = (uint32_t)ecs_vec_count(&c->views);
+    box_gpu_cull_view_t *cv = ecs_vec_append_t(NULL, &c->views, box_gpu_cull_view_t);
+    ecs_os_memset_t(cv, 0, box_gpu_cull_view_t);
+    cv->slot = slot;
+    cv->cascade = cascade;
+    cv->first_draw = ecs_vec_count(&c->draws);
+    cv->first_dispatch = ecs_vec_count(&c->dispatches);
+    cv->counter = base.jobs[3];
+    cv->group = c->empty_group;
+    for (i = 0; i < count; i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        if (box_gpu_cull_capture_draws(gpu, b, scene, cascade)) {
+            box_gpu_cull_draw_add(gpu, packet, i, &base, NULL);
+        }
+    }
+
+    cv = ecs_vec_last_t(&c->views, box_gpu_cull_view_t);
+    cv->draw_count = ecs_vec_count(&c->draws) - cv->first_draw;
+    cv->dispatch_count = ecs_vec_count(&c->dispatches) - cv->first_dispatch;
+}
+
 /** Make a cull buffer hold a number of bytes, growing it by doubling.
  *
  * @param gpu The backend
@@ -884,14 +967,16 @@ done:
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
- * @param slot Slot of the view in the view buffer
+ * @param slot Slot of the view in the view buffer, -1 for every cull view
  * @param late Record the late dispatches instead of the others
+ * @param writes Timestamps the compute pass writes, NULL for none
  */
 static void box_gpu_cull_dispatches(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     int32_t slot,
-    bool late)
+    bool late,
+    const WGPUPassTimestampWrites *writes)
 {
     box_gpu_cull_t *c = &gpu->cull;
     WGPUComputePassEncoder pass = NULL;
@@ -903,7 +988,7 @@ static void box_gpu_cull_dispatches(
 
     for (i = 0; i < count; i ++) {
         const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
-        if (cv->slot != slot) {
+        if (slot != -1 && cv->slot != slot) {
             continue;
         }
 
@@ -919,7 +1004,8 @@ static void box_gpu_cull_dispatches(
             }
 
             if (!pass) {
-                pass = wgpuCommandEncoderBeginComputePass(encoder, NULL);
+                pass = wgpuCommandEncoderBeginComputePass(encoder,
+                    &(WGPUComputePassDescriptor){ .timestampWrites = writes });
             }
 
             if (pipeline != bound) {
@@ -948,7 +1034,17 @@ void box_gpu_cull_record(
     WGPUCommandEncoder encoder,
     int32_t slot)
 {
-    box_gpu_cull_dispatches(gpu, encoder, slot, false);
+    box_gpu_cull_dispatches(gpu, encoder, slot, false, NULL);
+}
+
+bool box_gpu_cull_record_all(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const WGPUPassTimestampWrites *writes)
+{
+    box_gpu_cull_dispatches(gpu, encoder, -1, false, writes);
+
+    return ecs_vec_count(&gpu->cull.dispatches) && gpu->cull.group && gpu->cull.parallel;
 }
 
 const box_gpu_cull_view_t* box_gpu_cull_view(
@@ -997,7 +1093,7 @@ void box_gpu_cull_record_late(
     }
 
     box_gpu_hiz_build(gpu, encoder, cv->hiz, depth);
-    box_gpu_cull_dispatches(gpu, encoder, slot, true);
+    box_gpu_cull_dispatches(gpu, encoder, slot, true, NULL);
 done:
     return;
 }

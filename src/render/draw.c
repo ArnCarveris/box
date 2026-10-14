@@ -445,6 +445,8 @@ static void box_draws_key(
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
     key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
+    key->bake = !shape2d && !ecs_has_id(world, e, DynamicTransform) &&
+        !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake);
 }
 
 /** Bring the shape of a changed entity into the batch of its key and write its instance.

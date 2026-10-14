@@ -6,10 +6,12 @@
  * render with etc/shaders/shadow.wgsl into that cascade of the shared shadow map, depth only
  * and with reversed Z.
  *
- * The forward pass then samples the map through a comparison sampler.
+ * The forward pass then samples the map through a comparison sampler. Probe captures use a
+ * map of their own with one cascade around the static bounds of the scene.
  */
 
 #include "gpu.h"
+#include <math.h>
 
 #ifdef BOX_RENDER_WGPU
 
@@ -95,10 +97,44 @@ static void box_gpu_shadow_map_free(
     gpu->shadow_cascades = 0;
 }
 
+/** Release the shadow map of the probe captures and its uniform buffer.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_shadow_capture_free(
+    box_gpu_t *gpu)
+{
+    if (gpu->capture_shadow_group) {
+        wgpuBindGroupRelease(gpu->capture_shadow_group);
+        gpu->capture_shadow_group = NULL;
+    }
+
+    if (gpu->capture_shadow_buffer) {
+        wgpuBufferRelease(gpu->capture_shadow_buffer);
+        gpu->capture_shadow_buffer = NULL;
+    }
+
+    if (gpu->capture_shadow_layer) {
+        wgpuTextureViewRelease(gpu->capture_shadow_layer);
+        gpu->capture_shadow_layer = NULL;
+    }
+
+    if (gpu->capture_shadow_view) {
+        wgpuTextureViewRelease(gpu->capture_shadow_view);
+        gpu->capture_shadow_view = NULL;
+    }
+
+    if (gpu->capture_shadow) {
+        wgpuTextureRelease(gpu->capture_shadow);
+        gpu->capture_shadow = NULL;
+    }
+}
+
 void box_gpu_shadow_fini(
     box_gpu_t *gpu)
 {
     box_gpu_shadow_map_free(gpu);
+    box_gpu_shadow_capture_free(gpu);
     ecs_vec_fini_t(NULL, &gpu->shadow_data, uint8_t);
     if (gpu->shadow) {
         wgpuRenderPipelineRelease(gpu->shadow);
@@ -406,6 +442,147 @@ void box_gpu_shadow_render(
     wgpuBindGroupRelease(group);
 done:
     return;
+}
+
+void box_gpu_shadow_capture_fit(
+    const float *min,
+    const float *max,
+    const float *direction,
+    box_render_cascade_t *out)
+{
+    vec3 center, forward, right, up, pole = {0, 1, 0};
+    float res = (float)BOX_GPU_CAPTURE_SHADOW_RESOLUTION;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        center[i] = (min[i] + max[i]) * 0.5f;
+        forward[i] = -direction[i];
+    }
+
+    float radius = glm_max(glm_vec3_distance(ECS_CONST_CAST(float*, min),
+        ECS_CONST_CAST(float*, max)) * 0.5f, 1e-3f);
+    float extent = radius * res / (res - 2.0f);
+    if (glm_vec3_norm(forward) < 1e-6f) {
+        glm_vec3_copy((vec3){0, -1, 0}, forward);
+    }
+
+    glm_vec3_normalize(forward);
+    if (fabsf(forward[1]) > 0.99f) {
+        glm_vec3_copy((vec3){0, 0, 1}, pole);
+    }
+
+    glm_vec3_crossn(forward, pole, right);
+    glm_vec3_cross(right, forward, up);
+    float cx = glm_vec3_dot(right, center);
+    float cy = glm_vec3_dot(up, center);
+    float cz = glm_vec3_dot(forward, center);
+    float d_near = cz - extent;
+    float d_far = cz + extent;
+    float range = d_far - d_near;
+    glm_mat4_zero(out->matrix);
+    for (i = 0; i < 3; i ++) {
+        out->matrix[i][0] = right[i] / extent;
+        out->matrix[i][1] = up[i] / extent;
+        out->matrix[i][2] = -forward[i] / range;
+    }
+
+    out->matrix[3][0] = -cx / extent;
+    out->matrix[3][1] = -cy / extent;
+    out->matrix[3][2] = d_far / range;
+    out->matrix[3][3] = 1.0f;
+    out->texel = 2.0f * extent / res;
+    out->depth_range = range;
+}
+
+/** Create the shadow map of the probe captures, its uniform buffer and bind group.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_shadow_capture_ensure(
+    box_gpu_t *gpu)
+{
+    uint32_t res = BOX_GPU_CAPTURE_SHADOW_RESOLUTION;
+    if (gpu->capture_shadow) {
+        goto done;
+    }
+
+    gpu->capture_shadow = wgpuDeviceCreateTexture(gpu->device, &(WGPUTextureDescriptor){
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { res, res, 1 },
+        .format = BOX_GPU_SHADOW_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1
+    });
+    gpu->capture_shadow_view = wgpuTextureCreateView(gpu->capture_shadow,
+        &(WGPUTextureViewDescriptor){
+            .format = BOX_GPU_SHADOW_FORMAT,
+            .dimension = WGPUTextureViewDimension_2DArray,
+            .mipLevelCount = 1,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_DepthOnly
+        });
+    gpu->capture_shadow_layer = wgpuTextureCreateView(gpu->capture_shadow,
+        &(WGPUTextureViewDescriptor){
+            .format = BOX_GPU_SHADOW_FORMAT,
+            .dimension = WGPUTextureViewDimension_2D,
+            .mipLevelCount = 1,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_DepthOnly
+        });
+    gpu->capture_shadow_buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+        .usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
+        .size = BOX_GPU_CASCADE_STRIDE
+    });
+    WGPUBindGroupEntry entry = {
+        .binding = 0, .buffer = gpu->capture_shadow_buffer, .size = sizeof(mat4)
+    };
+    gpu->capture_shadow_group = wgpuDeviceCreateBindGroup(gpu->device,
+        &(WGPUBindGroupDescriptor){
+            .layout = gpu->shadow_layout,
+            .entryCount = 1,
+            .entries = &entry
+        });
+done:
+    return;
+}
+
+WGPUTextureView box_gpu_shadow_capture(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_packet_t *packet,
+    int32_t slot,
+    const box_render_cascade_t *cascade)
+{
+    WGPURenderPipeline pipeline = box_gpu_shadow_pipeline(gpu);
+    const box_gpu_cull_view_t *cv = box_gpu_cull_view(gpu, slot, 0);
+    WGPUTextureView result = gpu->shadow_empty_view;
+    uint32_t offset = 0;
+    if (!pipeline) {
+        goto done;
+    }
+
+    box_gpu_shadow_capture_ensure(gpu);
+    wgpuQueueWriteBuffer(gpu->queue, gpu->capture_shadow_buffer, 0, cascade->matrix,
+        sizeof(mat4));
+    WGPURenderPassDepthStencilAttachment depth = {
+        .view = gpu->capture_shadow_layer,
+        .depthLoadOp = WGPULoadOp_Clear,
+        .depthStoreOp = WGPUStoreOp_Store,
+        .depthClearValue = 0.0f
+    };
+    WGPURenderPassDescriptor desc = { .depthStencilAttachment = &depth };
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->capture_shadow_group, 1, &offset);
+    if (cv) {
+        box_gpu_shadow_draw(gpu, pass, packet, cv);
+    }
+
+    wgpuRenderPassEncoderEnd(pass);
+    wgpuRenderPassEncoderRelease(pass);
+    result = gpu->capture_shadow_view;
+done:
+    return result;
 }
 
 WGPUTextureView box_gpu_shadow_binding(
