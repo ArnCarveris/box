@@ -139,6 +139,8 @@ void BoxCommandImport(
 
     ECS_META_COMPONENT(world, Terminal);
     ECS_META_COMPONENT(world, TerminalStatus);
+    box_owned_hooks(world, Terminal, BOX_OWNED_STR(Terminal, cwd));
+    box_owned_hooks(world, TerminalStatus, BOX_OWNED_STR(TerminalStatus, dir));
     ECS_META_COMPONENT(world, TerminalServer);
     ECS_COMPONENT_DEFINE(world, TerminalSession);
     ECS_COMPONENT_DEFINE(world, CommandInfo);

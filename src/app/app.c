@@ -221,6 +221,8 @@ void BoxAppImport(
 
     ECS_META_COMPONENT(world, App);
     ECS_META_COMPONENT(world, AppStatus);
+    box_owned_hooks(world, App, BOX_OWNED_STR(App, scene));
+    box_owned_hooks(world, AppStatus, BOX_OWNED_STR(AppStatus, tmp_dir));
 
     ecs_singleton_set(world, AppStatus, {0});
 

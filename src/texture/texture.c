@@ -13,4 +13,5 @@ void BoxTextureImport(
 
     ECS_META_COMPONENT(world, Texture);
     ECS_META_COMPONENT(world, TexturePath);
+    box_owned_hooks(world, TexturePath, BOX_OWNED_STR(TexturePath, path));
 }

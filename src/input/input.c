@@ -86,6 +86,7 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, Mouse);
     ECS_META_COMPONENT(world, Input);
     ECS_META_COMPONENT(world, Action);
+    box_owned_hooks(world, Action, BOX_OWNED_STR(Action, description));
     ECS_META_COMPONENT(world, ActionState);
     ECS_META_COMPONENT(world, Binding);
     ECS_META_COMPONENT(world, ActionEvent);
