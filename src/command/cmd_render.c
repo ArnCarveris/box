@@ -421,7 +421,7 @@ static ecs_entity_t box_cmd_render_copy(
         const ecs_type_info_t *ti = ecs_get_type_info(world, id);
         if (ECS_IS_PAIR(id) && ECS_PAIR_FIRST(id) == EcsIsA) {
             ecs_add_id(world, result, id);
-            generated = true;
+            generated |= id != ecs_pair(EcsIsA, DynamicTransformSpread);
         } else if (box_cmd_render_copies(world, id) && ti && ti->size) {
             ecs_value_t value = ecs_value_init(world, id, ecs_get_id(world, src, id));
             ecs_set_id(world, result, id, (size_t)ti->size, value.ptr);

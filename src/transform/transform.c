@@ -8,6 +8,7 @@
 
 ECS_TAG_DECLARE(DynamicTransform);
 ECS_TAG_DECLARE(ManualTransform);
+ECS_DECLARE(DynamicTransformSpread);
 
 ECS_CTOR(Scale, ptr, {
     ptr->x = 1;
@@ -67,6 +68,14 @@ const WorldTransform* transformGetParentWorldTransform(
     return t;
 }
 
+bool box_transform_dynamic(
+    const ecs_world_t *world,
+    const ecs_table_t *table)
+{
+    return table && ecs_search_relation(world, table, 0, DynamicTransform, EcsIsA,
+        EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+}
+
 bool transformDeleting(
     const ecs_iter_t *it)
 {
@@ -89,6 +98,10 @@ void BoxTransformImport(
 
     ECS_TAG_DEFINE(world, DynamicTransform);
     ECS_TAG_DEFINE(world, ManualTransform);
+    ecs_add_pair(world, DynamicTransform, EcsOnInstantiate, EcsInherit);
+    DynamicTransformSpread = ecs_entity(world, { .name = "DynamicTransformSpread" });
+    ecs_add_id(world, DynamicTransformSpread, EcsPrefab);
+    ecs_add(world, DynamicTransformSpread, DynamicTransform);
 
     ecs_add_pair(world, ecs_id(WorldTransform), EcsWith, ecs_id(WorldTransformVersion));
     ecs_add_pair(world, ecs_id(Position), EcsWith, ecs_id(WorldTransform));

@@ -42,20 +42,47 @@ ECS_DTOR(TransformStaticDirtyEntities, ptr, {
 
 ECS_COMPONENT_DECLARE(TransformStaticDirtyEntities);
 
-/** Add entities with a changed transform input to the dirty list.
+/** Add the entities of an observer event to the dirty list.
+ *
+ * @param it The observer iterator
+ * @param add Whether to add the entities
+ */
+static void transformStaticDirty(
+    ecs_iter_t *it,
+    bool add)
+{
+    TransformStaticDirtyEntities *dirty = add ?
+        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities) : NULL;
+    if (dirty) {
+        for (int i = 0; i < it->count; i ++) {
+            ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
+        }
+    }
+}
+
+/** Add entities with a changed transform input to the dirty list, unless they are dynamic.
+ *
+ * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
+ * allocates for every event.
  *
  * @param it The observer iterator
  */
 static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
-    TransformStaticDirtyEntities *dirty = transformDeleting(it) ? NULL :
-        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities);
-    if (dirty) {
-        for (int i = 0; i < it->count; i ++) {
-            ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
-        }
-    }
+    transformStaticDirty(it,
+        !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
+}
+
+/** Add entities that stop being dynamic to the dirty list.
+ *
+ * @param it The observer iterator
+ */
+static void TransformStatic_OnStatic(
+    ecs_iter_t *it)
+{
+    transformStaticDirty(it,
+        !transformDeleting(it) && !box_transform_dynamic(it->world, it->other_table));
 }
 
 /** Remove the world transform of entities that lose their position.
@@ -268,7 +295,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
         .query.terms = {
             { .id = ecs_id(Position), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
@@ -279,7 +305,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnRotation" }),
         .query.terms = {
             { .id = ecs_id(Rotation), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
@@ -290,7 +315,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnScale" }),
         .query.terms = {
             { .id = ecs_id(Scale), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
@@ -301,11 +325,17 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnManual" }),
         .query.terms = {
             { .id = ecs_id(WorldTransform), .src.id = EcsSelf },
-            { .id = ManualTransform, .inout = EcsInOutFilter },
-            { .id = DynamicTransform, .oper = EcsNot }
+            { .id = ManualTransform, .inout = EcsInOutFilter }
         },
         .events = { EcsOnSet },
         .callback = TransformStatic_OnChange
+    });
+
+    ecs_observer(world, {
+        .entity = ecs_entity(world, { .name = "TransformStatic_OnStatic" }),
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnRemove },
+        .callback = TransformStatic_OnStatic
     });
 
     ecs_observer(world, {
@@ -322,7 +352,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnChildOf" }),
         .query.terms = {
             { .id = ecs_pair(EcsChildOf, EcsWildcard), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnAdd, EcsOnRemove },
@@ -333,7 +362,6 @@ void TransformStaticImport(
         .entity = ecs_entity(world, { .name = "TransformStatic_OnParent" }),
         .query.terms = {
             { .id = ecs_id(EcsParent), .src.id = EcsSelf },
-            { .id = DynamicTransform, .oper = EcsNot },
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },

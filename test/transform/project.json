@@ -872,7 +872,11 @@
                     "parent_tagged_child_stays_dynamic",
                     "childof_inherited_child_becomes_static",
                     "childof_velocity_grandchild_under_inherited_child",
-                    "childof_child_regains_tag_from_new_dynamic_parent"
+                    "childof_child_regains_tag_from_new_dynamic_parent",
+                    "childof_child_tagged_after_parenting_stays_dynamic",
+                    "parent_child_tagged_after_parenting_stays_dynamic",
+                    "childof_child_tagged_after_progress_stays_dynamic",
+                    "script_tagged_child_stays_dynamic"
                 ]
             }
         ]

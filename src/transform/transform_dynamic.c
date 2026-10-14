@@ -5,9 +5,6 @@
 
 #include "transform.h"
 
-/** DynamicTransform was added by a dynamic parent, not by the application */
-static ECS_TAG_DECLARE(DynamicTransformInherited);
-
 /** Queries used by the TransformDynamic system */
 typedef struct {
     ecs_query_t *q_childof; /**< Dynamic entities with a ChildOf parent */
@@ -102,6 +99,9 @@ static void transform_dynamic_ctx_free(
 
 /** Mark children of dynamic entities as dynamic.
  *
+ * A child inherits DynamicTransform from a prefab instead of owning it, so the tag the
+ * application adds itself, before or after parenting, stays distinguishable.
+ *
  * @param it The observer iterator
  */
 static void TransformDynamic_Spread(
@@ -112,8 +112,7 @@ static void TransformDynamic_Spread(
     for (int i = 0; i < it->count; i ++) {
         ecs_entity_t e = it->entities[i];
         if (!ecs_has(world, e, DynamicTransform)) {
-            ecs_add(world, e, DynamicTransform);
-            ecs_add(world, e, DynamicTransformInherited);
+            ecs_add_pair(world, e, EcsIsA, DynamicTransformSpread);
         }
     }
 }
@@ -126,9 +125,7 @@ static void TransformDynamic_SpreadToParented(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->stage;
-    if (it->table && !ecs_table_has_id(
-        ecs_get_world(world), it->table, DynamicTransform))
-    {
+    if (it->table && !box_transform_dynamic(ecs_get_world(world), it->table)) {
         const EcsParent *parents = ecs_field(it, EcsParent, 0);
 
         for (int i = 0; i < it->count; i ++) {
@@ -138,38 +135,16 @@ static void TransformDynamic_SpreadToParented(
             }
 
             if (ecs_has(world, parent, DynamicTransform)) {
-                ecs_add(world, it->entities[i], DynamicTransform);
-                ecs_add(world, it->entities[i], DynamicTransformInherited);
+                ecs_add_pair(world, it->entities[i], EcsIsA, DynamicTransformSpread);
             }
         }
     }
 }
 
-/** Test whether an entity has a component that implies DynamicTransform through With.
+/** Stop spreading DynamicTransform to the children of entities that are no longer dynamic.
  *
- * @param world The world
- * @param e The entity
- * @return true when a component of the entity adds DynamicTransform by itself
- */
-static bool transformDynamicImplied(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    bool result = false;
-    const ecs_type_t *type = ecs_get_type(world, e);
-
-    for (int32_t i = 0; type && i < type->count && !result; i ++) {
-        ecs_id_t id = type->array[i];
-        result = !(id & ECS_ID_FLAGS_MASK) && ecs_has_pair(world, id, EcsWith, DynamicTransform);
-    }
-
-    return result;
-}
-
-/** Remove the inherited dynamic tag from the children of entities that are no longer dynamic.
- *
- * Children that are dynamic on their own (tagged by the application, or with a component
- * such as Velocity that implies DynamicTransform) keep the tag.
+ * Children that own the tag (added by the application, or by a component such as Velocity
+ * that implies DynamicTransform) stay dynamic.
  *
  * @param it The observer iterator
  */
@@ -177,25 +152,21 @@ static void TransformDynamic_Unspread(
     ecs_iter_t *it)
 {
     ecs_world_t *world = it->stage;
-    bool inherited = ecs_table_has_id(it->world, it->table, DynamicTransformInherited);
-    int count = transformDeleting(it) ? 0 : it->count;
+    ecs_id_t spread = ecs_pair(EcsIsA, DynamicTransformSpread);
+    bool keep = transformDeleting(it) || box_transform_dynamic(it->world, it->other_table);
+    int count = keep ? 0 : it->count;
 
     for (int i = 0; i < count; i ++) {
-        if (inherited) {
-            ecs_remove(world, it->entities[i], DynamicTransformInherited);
-        }
-
         ecs_iter_t child_it = ecs_children(world, it->entities[i]);
         while (ecs_children_next(&child_it)) {
+            if (child_it.table && !ecs_table_has_id(it->world, child_it.table, spread)) {
+                continue;
+            }
+
             for (int c = 0; c < child_it.count; c ++) {
                 ecs_entity_t child = child_it.entities[c];
-                if (!ecs_has(world, child, DynamicTransformInherited)) {
-                    continue;
-                }
-
-                ecs_remove(world, child, DynamicTransformInherited);
-                if (!transformDynamicImplied(it->world, child)) {
-                    ecs_remove(world, child, DynamicTransform);
+                if (child_it.table || ecs_has_id(it->world, child, spread)) {
+                    ecs_remove_id(world, child, spread);
                 }
             }
         }
@@ -243,8 +214,6 @@ static void TransformDynamic(
 void TransformDynamicImport(
     ecs_world_t *world)
 {
-    ECS_TAG_DEFINE(world, DynamicTransformInherited);
-
     ecs_system(world, {
         .entity = ecs_entity(world, {
             .name = "TransformDynamic",

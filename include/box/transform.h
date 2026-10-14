@@ -5,9 +5,9 @@
  * WorldTransform is kept equal to parent * T * R * S: by observers for static
  * entities, every frame in EcsPreStore for DynamicTransform entities.
  *
- * DynamicTransform spreads to every descendant. A descendant that only inherited it loses
- * it with the root; one tagged by the application or with a component that implies it
- * (`(With, DynamicTransform)`, such as Velocity) stays dynamic.
+ * Descendants inherit DynamicTransform through `(IsA, DynamicTransformSpread)` and lose it
+ * with the root. One that owns the tag stays dynamic: tagged by the application at any time,
+ * in C or in a script, or by a component that implies it, such as Velocity.
  */
 
 #ifndef BOX_TRANSFORM_H
@@ -64,8 +64,21 @@ ECS_STRUCT(WorldTransformVersion, {
 /** Transform is recomputed every frame instead of on change, kept on every descendant */
 extern ECS_TAG_DECLARE(DynamicTransform);
 
+/** Prefab with DynamicTransform that the descendants of dynamic entities inherit it from */
+extern ECS_DECLARE(DynamicTransformSpread);
+
 /** The engine does not write WorldTransform, the application does */
 extern ECS_TAG_DECLARE(ManualTransform);
+
+/** Test whether the entities of a table are dynamic.
+ *
+ * @param world The world
+ * @param table The table, NULL for none
+ * @return true when the table owns DynamicTransform or inherits it, as spread descendants do
+ */
+bool box_transform_dynamic(
+    const ecs_world_t *world,
+    const ecs_table_t *table);
 
 /** Register the box.transform module.
  *

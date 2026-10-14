@@ -210,7 +210,7 @@ static bool box_spatial_has_local(
 static void BoxSpatialOnLocal(
     ecs_iter_t *it)
 {
-    if (!ecs_table_has_id(it->world, it->table, DynamicTransform) &&
+    if (!box_transform_dynamic(it->world, it->table) &&
         !ecs_table_has_id(it->world, it->table, ManualTransform))
     {
         BoxSpatialOnMove(it);
@@ -225,7 +225,7 @@ static void BoxSpatialOnLocal(
 static void BoxSpatialOnWorld(
     ecs_iter_t *it)
 {
-    if (!ecs_table_has_id(it->world, it->table, DynamicTransform)) {
+    if (!box_transform_dynamic(it->world, it->table)) {
         BoxSpatialOnMove(it);
     }
 }
@@ -247,7 +247,7 @@ static void BoxSpatialOnKind(
             !ecs_table_has_id(it->world, other, ManualTransform));
     } else if (other) {
         result = box_spatial_has_local(it->world, other) &&
-            !ecs_table_has_id(it->world, other, DynamicTransform);
+            !box_transform_dynamic(it->world, other);
     }
 
     if (result) {
@@ -541,7 +541,7 @@ static void box_spatial_late(
         const WorldTransformVersion *v = r && r->table ?
             ecs_record_get(world, r, WorldTransformVersion) : NULL;
         bool pending = v && v->version == changes[i].version &&
-            !ecs_table_has_id(world, r->table, DynamicTransform) &&
+            !box_transform_dynamic(world, r->table) &&
             !ecs_table_has_id(world, r->table, ManualTransform);
         if (pending) {
             *ecs_vec_append_t(NULL, &index->late, ecs_entity_t) = e;
