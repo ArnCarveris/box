@@ -10,22 +10,6 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Shader that draws one triangle over the target and samples the scene texture */
-static const char *box_gpu_blit_wgsl =
-    "@group(0) @binding(0) var scene: texture_2d<f32>;\n"
-    "@group(0) @binding(1) var scene_sampler: sampler;\n"
-    "struct Out { @builtin(position) pos: vec4f, @location(0) uv: vec2f };\n"
-    "@vertex fn vs(@builtin(vertex_index) i: u32) -> Out {\n"
-    "    let p = vec2f(f32((i << 1u) & 2u), f32(i & 2u));\n"
-    "    var o: Out;\n"
-    "    o.pos = vec4f(p * 2.0 - 1.0, 0.0, 1.0);\n"
-    "    o.uv = vec2f(p.x, 1.0 - p.y);\n"
-    "    return o;\n"
-    "}\n"
-    "@fragment fn fs(v: Out) -> @location(0) vec4f {\n"
-    "    return textureSample(scene, scene_sampler, v.uv);\n"
-    "}\n";
-
 /** Log a webgpu message.
  *
  * @param prefix What the message is about
@@ -155,18 +139,13 @@ static void box_gpu_on_lost(
     }
 }
 
-/** Create the shader, layouts and sampler the blit pipelines share.
+/** Create the layouts and sampler the blit pipelines share.
  *
  * @param gpu The backend
  */
 static void box_gpu_blit_init(
     box_gpu_t *gpu)
 {
-    WGPUShaderSourceWGSL wgsl = {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = { .data = box_gpu_blit_wgsl, .length = WGPU_STRLEN }
-    };
-    WGPUShaderModuleDescriptor shader = { .nextInChain = &wgsl.chain };
     WGPUBindGroupLayoutEntry entries[2] = {
         {
             .binding = 0,
@@ -193,7 +172,6 @@ static void box_gpu_blit_init(
         .lodMaxClamp = 32,
         .maxAnisotropy = 1
     };
-    gpu->blit_shader = wgpuDeviceCreateShaderModule(gpu->device, &shader);
     gpu->blit_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     gpu->blit_pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
@@ -263,6 +241,7 @@ static int box_gpu_init(
 
     box_gpu_blit_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
+    ecs_map_init(&gpu->shaders, NULL);
     result = 0;
 done:
     ecs_os_mutex_lock(gpu->lock);
@@ -273,7 +252,7 @@ done:
     return result;
 }
 
-/** Apply the target resources of a packet and render its targets.
+/** Apply the target and shader resources of a packet and render its targets.
  *
  * @param ctx The backend
  * @param packet The packet
@@ -288,6 +267,13 @@ static void box_gpu_render(
         const box_render_resource_t *r = ecs_vec_get_t(
             &packet->resources, box_render_resource_t, i);
         const box_render_target_desc_t *desc = NULL;
+        if (r->kind == BOX_RENDER_SHADER) {
+            box_gpu_shader_apply(gpu, r->op, r->handle,
+                r->op != BOX_RENDER_DESTROY && r->size >= sizeof(box_render_shader_desc_t)
+                    ? box_render_packet_data(packet, r->data)
+                    : NULL);
+        }
+
         if (r->kind != BOX_RENDER_TARGET) {
             continue;
         }
@@ -327,21 +313,17 @@ static void box_gpu_fini(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
-    int32_t i;
     if (gpu->device) {
         box_gpu_target_fini(gpu);
         ecs_map_fini(&gpu->targets);
+        box_gpu_shader_fini(gpu);
+        ecs_map_fini(&gpu->shaders);
     }
 
-    for (i = 0; i < gpu->blit_count; i ++) {
-        BOX_GPU_RELEASE(gpu->blits[i].pipeline, wgpuRenderPipelineRelease);
-    }
-
-    gpu->blit_count = 0;
+    box_gpu_blit_reset(gpu);
     BOX_GPU_RELEASE(gpu->sampler, wgpuSamplerRelease);
     BOX_GPU_RELEASE(gpu->blit_pipeline_layout, wgpuPipelineLayoutRelease);
     BOX_GPU_RELEASE(gpu->blit_layout, wgpuBindGroupLayoutRelease);
-    BOX_GPU_RELEASE(gpu->blit_shader, wgpuShaderModuleRelease);
     BOX_GPU_RELEASE(gpu->queue, wgpuQueueRelease);
     BOX_GPU_RELEASE(gpu->device, wgpuDeviceRelease);
     BOX_GPU_RELEASE(gpu->adapter, wgpuAdapterRelease);
@@ -388,6 +370,18 @@ void box_gpu_count(
         break;
     case BOX_GPU_STAT_ERRORS:
         gpu->stats.errors ++;
+        break;
+    case BOX_GPU_STAT_SHADER_CREATED:
+        gpu->stats.shaders ++;
+        break;
+    case BOX_GPU_STAT_SHADER_DESTROYED:
+        gpu->stats.shaders --;
+        break;
+    case BOX_GPU_STAT_COMPILED:
+        gpu->stats.compiles ++;
+        break;
+    case BOX_GPU_STAT_SHADER_ERROR:
+        gpu->stats.shader_errors ++;
         break;
     }
 

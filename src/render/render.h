@@ -14,6 +14,12 @@
 /** Byte alignment of every block in the data of a packet */
 #define BOX_RENDER_DATA_ALIGN (16)
 
+/** Shader handle of the engine shader that scales a scene texture to the presented image */
+#define BOX_RENDER_SHADER_BLIT (1)
+
+/** First shader handle of application shaders, the handles below are engine shaders */
+#define BOX_RENDER_SHADER_FIRST (64)
+
 /** Phase after EcsOnStore in which modules append what a frame renders to its packet */
 extern ECS_DECLARE(RenderExtract);
 
@@ -71,6 +77,15 @@ typedef struct box_render_target_desc_t {
     int32_t render_height;  /**< Height the views render at, after the resolution scale */
     bool vsync;             /**< A window presents with vertical sync */
 } box_render_target_desc_t;
+
+/** Description of a BOX_RENDER_SHADER create or update, followed by its code and its label.
+ *
+ * The preprocessed WGSL code and the label each end with a terminator that their size counts.
+ */
+typedef struct box_render_shader_desc_t {
+    uint32_t code_size;     /**< Bytes of the code after the description */
+    uint32_t label_size;    /**< Bytes of the label after the code */
+} box_render_shader_desc_t;
 
 /** A target the frame renders into and presents, optionally captured to a PNG file */
 typedef struct box_render_target_t {
@@ -156,6 +171,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t height;             /**< Height of the last configured target */
     int32_t render_width;       /**< Render width of the last configured target */
     int32_t render_height;      /**< Render height of the last configured target */
+    int32_t shaders;            /**< Shader modules alive */
+    int32_t compiles;           /**< Shader modules compiled */
+    int32_t shader_errors;      /**< Shader modules that failed to compile */
 } box_render_gpu_stats_t;
 
 /** Packet ring between the main thread and the consumer of the packets */

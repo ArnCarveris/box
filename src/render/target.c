@@ -14,19 +14,24 @@
  *
  * @param gpu The backend
  * @param format The format of the color target
- * @return The pipeline, NULL when too many formats are in use
+ * @return The pipeline, NULL without a blit shader or when too many formats are in use
  */
 static WGPURenderPipeline box_gpu_blit_pipeline(
     box_gpu_t *gpu,
     WGPUTextureFormat format)
 {
     WGPURenderPipeline result = NULL;
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_BLIT);
     int32_t i;
     for (i = 0; i < gpu->blit_count; i ++) {
         if (gpu->blits[i].format == format) {
             result = gpu->blits[i].pipeline;
             goto done;
         }
+    }
+
+    if (!shader) {
+        goto done;
     }
 
     if (gpu->blit_count == BOX_GPU_BLIT_FORMATS) {
@@ -36,7 +41,7 @@ static WGPURenderPipeline box_gpu_blit_pipeline(
 
     WGPUColorTargetState target = { .format = format, .writeMask = WGPUColorWriteMask_All };
     WGPUFragmentState fragment = {
-        .module = gpu->blit_shader,
+        .module = shader,
         .entryPoint = { .data = "fs", .length = WGPU_STRLEN },
         .targetCount = 1,
         .targets = &target
@@ -44,7 +49,7 @@ static WGPURenderPipeline box_gpu_blit_pipeline(
     WGPURenderPipelineDescriptor desc = {
         .layout = gpu->blit_pipeline_layout,
         .vertex = {
-            .module = gpu->blit_shader,
+            .module = shader,
             .entryPoint = { .data = "vs", .length = WGPU_STRLEN }
         },
         .primitive = { .topology = WGPUPrimitiveTopology_TriangleList },

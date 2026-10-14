@@ -21,6 +21,7 @@
 #include "box/layout.h"
 #include "box/app.h"
 #include "box/render.h"
+#include "box/shader.h"
 #include "box/command.h"
 #include "box/input.h"
 #include "box/controllers.h"
