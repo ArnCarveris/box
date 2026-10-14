@@ -28,7 +28,7 @@ ECS_STRUCT(Camera, {
     float aspect_ratio;  /**< Width over height, 0 follows the surface */
     bool ortho;          /**< Use an orthographic projection */
     float ortho_height;  /**< Visible height in world units when orthographic, default 10 */
-    float ortho_scale;   /**< Surface points per world unit, visible height follows the surface, 0 uses ortho_height */
+    float ortho_scale;   /**< Surface points per world unit, 0 uses ortho_height */
 });
 
 /** Register the box.camera module.

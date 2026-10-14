@@ -50,7 +50,7 @@ ECS_STRUCT(WorldTransform, {
 
 /** WorldTransform version, used to deduplicate static transforms. */
 ECS_STRUCT(WorldTransformVersion, {
-    uint64_t version;
+    uint64_t version; /**< Frame the static transform was last computed in */
 });
 
 /** Transform is recomputed every frame instead of on change, kept on every descendant */

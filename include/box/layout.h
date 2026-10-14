@@ -39,12 +39,12 @@ ECS_ENUM(Direction, {
     DirectionColumn = 2  /**< The children follow each other downward */
 });
 
-/** Padding */
+/** Space between the edges of an element and its content, in logical pixels */
 ECS_STRUCT(Padding, {
-    float top;
-    float bottom;
-    float left;
-    float right;
+    float top;    /**< Space below the top edge */
+    float bottom; /**< Space above the bottom edge */
+    float left;   /**< Space right of the left edge */
+    float right;  /**< Space left of the right edge */
 });
 
 /** Arranges the children of an element in a row or a column. */
@@ -56,33 +56,41 @@ ECS_STRUCT(Layout, {
     VAlign v;             /**< Alignment on the y axis */
 });
 
+/** How an element sizes itself on one axis */
 ECS_ENUM(SizeMode, {
-    SizeModeFit = 0,
-    SizeModeFixed = 1,
-    SizeModeGrow = 2
+    SizeModeFit = 0,   /**< Fit the content plus padding, or the shape */
+    SizeModeFixed = 1, /**< Take the size in value */
+    SizeModeGrow = 2   /**< Take a share of the free space of the parent, weighted by value */
 });
 
+/** Size of an element on one axis */
 ECS_STRUCT(Sizing, {
-    SizeMode mode;
-    float value;
-    float min;
-    float max;
+    SizeMode mode; /**< How the size is computed */
+    float value;   /**< Size for SizeModeFixed, weight for SizeModeGrow */
+    float min;     /**< Smallest size, 0 for no limit */
+    float max;     /**< Largest size, 0 for no limit */
 });
 
+/** Sizing and placement of an element inside the layout of its parent */
 ECS_STRUCT(LayoutItem, {
-    Sizing width;
-    Sizing height;
-    Align h;
-    VAlign v;
-    float x;
-    float y;
+    Sizing width;  /**< Sizing on the x axis */
+    Sizing height; /**< Sizing on the y axis */
+    Align h;       /**< Anchor on the x axis in a DirectionNone parent */
+    VAlign v;      /**< Anchor on the y axis in a DirectionNone parent */
+    float x;       /**< Offset from the anchor on the x axis */
+    float y;       /**< Offset from the anchor on the y axis */
 });
 
+/** Size the layout computed for an element, in logical pixels */
 ECS_STRUCT(LayoutBounds, {
-    float width;
-    float height;
+    float width;  /**< Computed width */
+    float height; /**< Computed height */
 });
 
+/** Register the box.layout module.
+ *
+ * @param world The world
+ */
 void BoxLayoutImport(
     ecs_world_t *world);
 

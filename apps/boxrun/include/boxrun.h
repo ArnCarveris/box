@@ -1,3 +1,8 @@
+/**
+ * @file boxrun.h
+ * @brief Includes the dependencies of the boxrun application.
+ */
+
 #ifndef BOXRUN_H
 #define BOXRUN_H
 
@@ -13,4 +18,3 @@ extern "C" {
 #endif
 
 #endif
-

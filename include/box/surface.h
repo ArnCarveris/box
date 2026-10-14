@@ -48,7 +48,7 @@ ECS_STRUCT(Surface, {
     Anisotropy anisotropy;           /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;  /**< Largest dimension a texture is scaled to */
     ecs_entity_t texture;            /**< For offscreen rendering to texture (window if 0) */
-    ecs_entity_t view_root;          /**< Parent entity of views to render (leave 0 for surface to discover all views). Views rendered in order of occurrance. */
+    ecs_entity_t view_root;          /**< Parent of the views to render in order, 0 for all views */
 });
 
 /** Register the box.surface module.

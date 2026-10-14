@@ -66,15 +66,19 @@ ECS_STRUCT(View, {
 
 /** Component added to scene root.
  * Allows for having different scenes in the same world. A view will only render
- * the entities that are in the same scene as the configured camera. 
+ * the entities that are in the same scene as the configured camera.
  *
- * Entities in a subtree without a Scene component will be rendered by the 
+ * Entities in a subtree without a Scene component will be rendered by the
  * default scene.
  */
 ECS_STRUCT(Scene, {
-    int32_t dummy_;
+    int32_t dummy_; /**< Unused, gives the component a size */
 });
 
+/** Register the box.view module.
+ *
+ * @param world The world
+ */
 void BoxViewImport(
     ecs_world_t *world);
 
