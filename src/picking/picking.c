@@ -3,7 +3,7 @@
  * @brief Registers box.picking and sends the pointer events of a frame to what the cursor picks.
  *
  * box.input hands every event of a frame to the router of this module, which sends them in
- * order once the frame's transforms, layout and spatial index are up to date (OnStore).
+ * order in PreUpdate, picking what the last frame placed, so handlers act before the layout.
  */
 
 #define BOX_PICKING_IMPL
@@ -409,7 +409,7 @@ void BoxPickingImport(
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "PickingUpdate" }),
-        .phase = EcsOnStore,
+        .phase = EcsPreUpdate,
         .run = BoxPickingUpdate,
         .ctx = st,
         .immediate = true

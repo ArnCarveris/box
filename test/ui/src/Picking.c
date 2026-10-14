@@ -719,10 +719,12 @@ void Picking_hover_follows_moving_element(void) {
 
     ecs_set(world, button, Position, {300, 200, 0});
     ecs_progress(world, 0);
+    ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->enters, 1);
     test_bool(ecs_has(world, button, Hovered), true);
 
     ecs_set(world, button, Position, {0, 0, 0});
+    ecs_progress(world, 0);
     ecs_progress(world, 0);
     test_int(((const Mut*)ecs_get_id(world, button, mut))->leaves, 1);
     test_bool(ecs_has(world, button, Hovered), false);
