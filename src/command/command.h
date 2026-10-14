@@ -29,11 +29,18 @@ typedef struct box_command_entry_t {
     bool error;         /**< The command failed */
 } box_command_entry_t;
 
-/** Private state of a terminal session */
+/** Private state of a terminal session; its limits are read from TerminalLimits on open */
 typedef struct TerminalSession {
     char *dir;          /**< The session folder, removed with the session */
     FILE *log;          /**< Open commands.log in the session folder */
-    ecs_vec_t entries;  /**< box_command_entry_t of every line the session ran */
+    ecs_vec_t entries;  /**< Ring of box_command_entry_t of the last lines the session ran */
+    ecs_vec_t images;   /**< Ring of char* paths of the last images of the render commands */
+    int64_t total;      /**< Lines the session ran since it opened */
+    int64_t images_total; /**< Images the session named since it opened */
+    int32_t history;    /**< Size of the entries ring */
+    int32_t images_max; /**< Size of the images ring */
+    int32_t log_size;   /**< Bytes of commands.log before it moves to commands.log.1 */
+    double active;      /**< Wall clock seconds of the last command, or of the open */
 } TerminalSession;
 
 /** Parameter rules of a registered command */
@@ -95,6 +102,47 @@ void box_terminal_log(
     const char *line,
     const char *result,
     bool error);
+
+/** Get the number of lines in the history ring of a session.
+ *
+ * @param s The session
+ * @return Lines the ring holds, at most TerminalLimits.history of the session
+ */
+int32_t box_terminal_history_count(
+    const TerminalSession *s);
+
+/** Get a line of the history ring of a session.
+ *
+ * @param s The session
+ * @param i Index from the oldest line in the ring
+ * @return The line
+ */
+const box_command_entry_t* box_terminal_history_get(
+    const TerminalSession *s,
+    int32_t i);
+
+/** Keep an image a render command names in the resources folder of a session, deleting the
+ * oldest image when the session keeps more than its TerminalLimits.images.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param path The image file
+ * @return 0 when the image is kept, -1 when the session keeps no images
+ */
+int box_terminal_image(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
+/** Test whether box_terminal_new may not open another session.
+ *
+ * @param world The world
+ * @param open Receives the number of open sessions, NULL to ignore
+ * @return Whether TerminalLimits.sessions sessions are open
+ */
+bool box_terminal_full(
+    ecs_world_t *world,
+    int32_t *open);
 
 /** Get the scope that entity arguments of a session resolve against.
  *

@@ -130,7 +130,35 @@ static int box_cmd_input_pos(
     return ret;
 }
 
-/** Fail the command when a frame count is negative.
+/** Fail the command when a frame or step count is negative or above its maximum.
+ *
+ * @param ctx The call context
+ * @param result The result, which gets the error
+ * @param name Name of the parameter
+ * @param frames The count
+ * @param max The largest valid count
+ * @return 0 when the count is valid, -1 when the command failed
+ */
+static int box_cmd_input_count(
+    const ecs_function_ctx_t *ctx,
+    ecs_value_t *result,
+    const char *name,
+    int32_t frames,
+    int32_t max)
+{
+    int ret = 0;
+    if (frames < 0) {
+        box_command_error(ctx, result, "%s: negative frame count %d", name, frames);
+        ret = -1;
+    } else if (frames > max) {
+        box_command_error(ctx, result, "%s: %d is out of range, 0 to %d", name, frames, max);
+        ret = -1;
+    }
+
+    return ret;
+}
+
+/** Fail the command when a frame count is negative or above BOX_COMMAND_FRAMES_MAX.
  *
  * @param ctx The call context
  * @param result The result, which gets the error
@@ -144,13 +172,7 @@ static int box_cmd_input_frames(
     const char *name,
     int32_t frames)
 {
-    int ret = 0;
-    if (frames < 0) {
-        box_command_error(ctx, result, "%s: negative frame count %d", name, frames);
-        ret = -1;
-    }
-
-    return ret;
+    return box_cmd_input_count(ctx, result, name, frames, BOX_COMMAND_FRAMES_MAX);
 }
 
 /** Convert a key argument, failing the command when no key has that name.
@@ -327,7 +349,7 @@ static int box_cmd_input_walk(
     walk->frames = box_cmd_input_i32(argv, first + 3);
     if (box_cmd_input_pos(ctx, result, "from", box_cmd_input_str(argv, first), walk->from) ||
         box_cmd_input_pos(ctx, result, "to", box_cmd_input_str(argv, first + 1), walk->to) ||
-        box_cmd_input_frames(ctx, result, "steps", walk->steps) ||
+        box_cmd_input_count(ctx, result, "steps", walk->steps, BOX_COMMAND_STEPS_MAX) ||
         box_cmd_input_frames(ctx, result, "dur", walk->frames))
     {
         goto done;

@@ -72,7 +72,7 @@ static void box_cmd_render_free(
  * @param prefix Start of the file name
  * @param counter Counter of the images with this prefix
  * @param name Receives the file name, which the caller frees
- * @return The path, NULL when the session has no folder; the caller frees it
+ * @return The path, NULL when the session has no folder or keeps no images; the caller frees it
  */
 static char* box_cmd_render_file(
     const ecs_function_ctx_t *ctx,
@@ -92,6 +92,13 @@ static char* box_cmd_render_file(
 
     name[0] = flecs_asprintf("%s_%d.png", prefix, counter[0] ++);
     path = flecs_asprintf("%s/%s/%s", s->dir, BOX_TERMINAL_RESOURCES, name[0]);
+    if (box_terminal_image(ctx->world, session, path)) {
+        box_command_error(ctx, result, "the session keeps no images, TerminalLimits.images is 0");
+        ecs_os_free(path);
+        ecs_os_free(name[0]);
+        path = name[0] = NULL;
+    }
+
 done:
     return path;
 }

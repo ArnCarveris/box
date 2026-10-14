@@ -42,7 +42,38 @@ static void box_terminal_session_dtor(
         }
 
         ecs_vec_fini_t(NULL, &s[i].entries, box_command_entry_t);
+        char **images = ecs_vec_first(&s[i].images);
+        for (j = 0; j < ecs_vec_count(&s[i].images); j ++) {
+            ecs_os_free(images[j]);
+        }
+
+        ecs_vec_fini_t(NULL, &s[i].images, char*);
         ecs_os_memset_t(&s[i], 0, TerminalSession);
+    }
+}
+
+/** Construct TerminalLimits values with the documented defaults.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_terminal_limits_ctor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    TerminalLimits *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        values[i] = (TerminalLimits){
+            .sessions = BOX_TERMINAL_SESSIONS,
+            .idle_timeout = BOX_TERMINAL_IDLE_TIMEOUT,
+            .history = BOX_TERMINAL_HISTORY,
+            .log_size = BOX_TERMINAL_LOG_SIZE,
+            .images = BOX_TERMINAL_IMAGES
+        };
     }
 }
 
@@ -140,6 +171,8 @@ void BoxCommandImport(
     box_owned_hooks(world, Terminal, BOX_OWNED_STR(Terminal, cwd));
     box_owned_hooks(world, TerminalStatus, BOX_OWNED_STR(TerminalStatus, dir));
     ECS_META_COMPONENT(world, TerminalServer);
+    ECS_META_COMPONENT(world, TerminalLimits);
+    ecs_set_hooks(world, TerminalLimits, { .ctor = box_terminal_limits_ctor });
     ECS_COMPONENT_DEFINE(world, TerminalSession);
     ECS_COMPONENT_DEFINE(world, CommandInfo);
     ECS_COMPONENT_DEFINE(world, TerminalHost);
@@ -160,6 +193,7 @@ void BoxCommandImport(
     box_terminal_host_t *host = ecs_os_calloc_t(box_terminal_host_t);
     host->world = world;
     ecs_singleton_set(world, TerminalHost, { .host = host });
+    ecs_singleton_add(world, TerminalLimits);
     ecs_atfini(world, box_terminal_host_fini, host);
 
     box_terminal_init(world, host);

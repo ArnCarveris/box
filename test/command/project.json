@@ -305,6 +305,25 @@
                 ]
             },
             {
+                "id": "Limits",
+                "testcases": [
+                    "i32_out_of_range",
+                    "f64_not_finite",
+                    "sweep_steps_out_of_range",
+                    "drag_steps_out_of_range",
+                    "action_drag_steps_out_of_range",
+                    "dur_out_of_range",
+                    "next_count_out_of_range",
+                    "session_cap",
+                    "session_cap_set",
+                    "idle_session_closed",
+                    "history_bounded",
+                    "history_default_bounded",
+                    "log_rotated",
+                    "images_bounded"
+                ]
+            },
+            {
                 "id": "Render",
                 "testcases": [
                     "capture_active_camera",
