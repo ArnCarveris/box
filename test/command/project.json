@@ -60,6 +60,7 @@
                     "root_private",
                     "root_symlink_refused",
                     "name_not_a_path",
+                    "host_removed",
                     "name_with_slash",
                     "headless_root_shared"
                 ]
@@ -220,7 +221,14 @@
                     "get_unknown_component",
                     "clear",
                     "clear_in_use",
-                    "clear_module"
+                    "clear_module",
+                    "remove_other_session_terminal",
+                    "set_other_session_terminal",
+                    "add_other_session",
+                    "clear_other_session",
+                    "remove_terminal_host",
+                    "add_module_singleton",
+                    "set_module_singleton"
                 ]
             },
             {

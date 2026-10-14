@@ -54,6 +54,8 @@ static void box_endpoint_reply(
         reply->status = "Forbidden";
     } else if (code == 404) {
         reply->status = "Not Found";
+    } else if (code == 503) {
+        reply->status = "Service Unavailable";
     }
 
     if (body) {
@@ -449,7 +451,11 @@ int box_command_request(
     ecs_http_reply_t *reply)
 {
     box_terminal_host_t *host = box_terminal_host(world);
-    ecs_http_server_request(host->server, method, path, body, reply);
+    if (host) {
+        ecs_http_server_request(host->server, method, path, body, reply);
+    } else {
+        box_endpoint_reply(reply, 503, BOX_COMMAND_ERROR BOX_COMMAND_NOT_IMPORTED);
+    }
 
     return reply->code;
 }

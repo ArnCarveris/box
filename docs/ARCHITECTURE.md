@@ -348,7 +348,12 @@ A `Terminal` session has a cwd; every line goes to the session log and `commands
 are script functions registered with `box_command_register` (`src/command`):
 
 - Shell and components: `cd`, `ls`, `touch`, `rm`, `mv`, `man`, `add`, `remove`, `set`, `get`,
-  `clear`, guarded against flecs aborts. flecs entities are read only.
+  `clear`, guarded against flecs aborts. flecs entities are read only. `rm`, `mv`, `add`,
+  `remove`, `set` and `clear` refuse modules, sessions (any `Terminal` entity) and everything in
+  their scope ("belongs to a module or session"), so one session cannot close, rewire or retune
+  another session or the module state (`TerminalHost`, `TerminalServer`, `TerminalLimits`);
+  the host changes those from C or script. Without a `TerminalHost` commands fail with
+  "box.command is not imported", `box_terminal_new` returns 0 and requests get HTTP 503.
 - Search: `query`, `iter`, `next`, `done`, `has`, `grep`, `grep_recur`. Iteration re-runs the
   query from an offset, so no iterator stays open.
 - Scripts: `script_read`, `script_write`, `script_patch`, `script_grep`, limited to the working
