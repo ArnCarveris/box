@@ -16,7 +16,7 @@ component ids are registered in the same order in every world.
 | `box.types`     | `include/box/types.h`     | `src/types`      | Reflected math types (`vec3`, `mat4`, `rgba`) |
 | `box.transform` | `include/box/transform.h` | `src/transform`  | `Position`, `Rotation`, `Scale`, `WorldTransform`, static and dynamic propagation |
 | `box.geometry`  | `include/box/geometry.h`  | `src/geometry`   | Scalable 3D and 2D shapes |
-| `box.camera`    | `include/box/camera.h`    | `src/camera`     | `Camera` |
+| `box.camera`    | `include/box/camera.h`    | `src/camera`     | `Camera`, reversed Z projections |
 | `box.surface`   | `include/box/surface.h`   | `src/surface`    | `Surface`, `SurfaceStatus`, glfw windows, render targets |
 | `box.view`      | `include/box/view.h`      | `src/view`       | `View`, `Scene` |
 | `box.effects`   | `include/box/effects.h`   | `src/effects`    | Post process effect settings |
@@ -29,7 +29,8 @@ component ids are registered in the same order in every world.
 | `box.controllers` | `include/box/controllers.h` | `src/controllers` | `CameraController`, `FirstPersonController` and their default actions |
 | `box.app`       | `include/box/app.h`       | `src/app`        | `App`, `AppStatus`, argument parsing, the run loop |
 | `box.jobs`      | `src/jobs/jobs.h` (private) | `src/jobs`     | Worker pool for IO and asset work |
-| `box.render`    | `include/box/render.h`    | `src/render`     | `RenderSettings`, `RenderStatus`, packet ring, render thread, backends |
+| `box.render`    | `include/box/render.h`    | `src/render`     | `RenderSettings`, `RenderStatus`, packet ring, render thread, backends, views, forward pass |
+| `box.shader`    | `include/box/shader.h`    | `src/render`     | `Shader`, `ShaderStatus`, `ShaderSettings`, WGSL preprocessor, engine shaders in `etc/shaders` |
 
 A module keeps private declarations in a header next to its sources
 (`src/transform/transform.h`, `src/app/app.h`); test projects that need them add the
@@ -103,7 +104,11 @@ Two phases run after `EcsOnStore`: in `RenderExtract` modules call
 `box_render_packet` to append to the packet of the frame (the first call acquires a
 free packet and waits when all are in flight, counted in `RenderStatus.stalls`), and
 `RenderSubmit` hands it to the consumer. `RenderExtractViews` adds every `View` whose
-camera has a `Camera`. `box_render_sync` waits until every submitted packet rendered.
+camera has a `Camera`, in creation order (entity id), with the parent of the view, the
+camera transform, its inverse and the scene root of the camera (the nearest ancestor with
+`Scene`, 0 for the default scene). `RenderExtractDraws` turns every entity with a
+`ShapeMesh` into an instance and a batch, see below. `box_render_sync` waits until every
+submitted packet rendered.
 
 A backend (`box_render_backend_t`) is four callbacks: `init`, `render` and `fini` run on
 the consuming thread only, `free` on the main thread. A new ring has the null backend,
@@ -139,6 +144,33 @@ readback buffer, waits for it and writes the PNG next to the target path before
 renaming it over. `box_render_gpu_stats` returns the counters of the backend for tests.
 Colors are display encoded `rgba`; the targets are sRGB, so a clear color comes back
 unchanged in a capture.
+
+## Cameras, views and the forward pass
+
+`box_camera_projection` builds the projection of a `Camera` for a surface size: reversed Z,
+depth 1 at the near plane and 0 at the far plane. A perspective camera without `far_` has
+an infinite far plane; an orthographic camera shows `ortho_height` units, or the surface
+height in points divided by `ortho_scale`. The aspect ratio follows the surface unless
+`aspect_ratio` is set. The renderer builds the projection per target, so one view drawn
+into surfaces of different sizes keeps its proportions.
+
+`RenderExtractDraws` (`src/render/draw.c`) runs only when the packet has views. A mesh of
+the mesh cache (`src/geometry/mesh_cache.h`) is sent once per backend as a `BOX_RENDER_MESH`
+create with its vertices and indices; the renderer keeps a cache reference to it, so its
+handle is not reused while the backend has it, and destroys it once only the renderer
+references it. Every shape writes a `box_render_instance_t` (model matrix with the instance
+scale, inverse transpose normal matrix, linear `Rgb` color) into the instance buffer
+`BOX_RENDER_BUFFER_DRAWS`, uploaded every frame, and one batch with one instance and the
+scene root of the entity, found by the cached `Scene(self|up ChildOf)` term of the query.
+
+The webgpu backend (`src/render/gpu_draw.c`) renders, after clearing a target, every view
+of the target in packet order into its color texture and a `Depth32Float` texture at the
+render size. A view that clears replaces the color with its clear color, any other view
+draws over what is there; depth is cleared to 0 for every view and tested with greater. A
+view draws the batches of its own scene with the engine shader `etc/shaders/mesh.wgsl` (a
+sun and sky ambient), which is sent once a batch uses it. A target renders the views whose
+parent is its `view_root`, or every view when that is 0; `box.surface` does not set
+`box_render_target_t.view_root` yet, so for now every surface renders every view.
 
 ## From a component change to a reconfiguration
 
