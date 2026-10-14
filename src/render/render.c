@@ -316,6 +316,7 @@ void BoxRenderImport(
         .run = BoxRenderExtractViews
     });
 
+    box_render_captures_init(world);
     box_render_draws_init(world);
 
     ecs_system(world, {

@@ -314,7 +314,8 @@ static float box_surface_linear(
     return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
 }
 
-/** Find the clear color of a surface: the color of its first view that clears.
+/** Find the clear color of a surface: the color of its first view that clears, skipping the
+ * views of captures.
  *
  * @param world The world
  * @param s The surface
@@ -331,6 +332,10 @@ static void box_surface_clear(
     int32_t i;
     for (i = 0; i < ecs_vec_count(&p->views); i ++) {
         const box_render_view_t *v = ecs_vec_get_t(&p->views, box_render_view_t, i);
+        if (v->target) {
+            continue;
+        }
+
         if (s->view_root && !ecs_has_pair(world, v->view, EcsChildOf, s->view_root)) {
             continue;
         }
