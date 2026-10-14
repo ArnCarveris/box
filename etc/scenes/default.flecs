@@ -1,5 +1,6 @@
 // Default box scene: a lit cube on a ground plane with shadows and post effects.
-// Fly with WASD (QE for down/up), hold the right mouse button to look around.
+// Fly with WASD (QE for down/up, Shift to go faster), turn with the arrow keys or hold the right
+// mouse button to look around, and scroll to push the camera along the view.
 
 using box.transform
 using box.geometry

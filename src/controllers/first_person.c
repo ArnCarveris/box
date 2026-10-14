@@ -7,9 +7,6 @@
 #include "../render/render.h"
 #include <math.h>
 
-/** Pitch the eye stops at, short of looking straight up or down */
-#define BOX_FIRST_PERSON_PITCH_MAX (1.55f)
-
 /** Walking units per second of a constructed controller */
 #define BOX_FIRST_PERSON_SPEED (4.0f)
 
@@ -37,6 +34,15 @@
 /** Radians per point of cursor movement of a constructed controller */
 #define BOX_FIRST_PERSON_SENSITIVITY (0.003f)
 
+/** Radians per second of the turn actions of a constructed controller */
+#define BOX_FIRST_PERSON_TURN_SPEED (1.5f)
+
+/** Rate the turn follows a held turn action of a constructed controller */
+#define BOX_FIRST_PERSON_TURN_ACCELERATION (5.0f)
+
+/** Rate the turn follows a stop of a constructed controller */
+#define BOX_FIRST_PERSON_TURN_DECELERATION (15.0f)
+
 /** Radius of the body of a constructed controller */
 #define BOX_FIRST_PERSON_RADIUS (0.3f)
 
@@ -50,17 +56,22 @@
 #define BOX_FIRST_PERSON_SNAP (0.001f)
 
 const box_controller_action_t box_first_person_actions[BoxFirstPersonActionCount] = {
-    [BoxFirstPersonForward] = { "Forward", "Walk forward", KeyW },
-    [BoxFirstPersonBack] = { "Back", "Walk back", KeyS },
-    [BoxFirstPersonLeft] = { "Left", "Walk left", KeyA },
-    [BoxFirstPersonRight] = { "Right", "Walk right", KeyD },
-    [BoxFirstPersonUp] = { "Up", "Move up in free flight", KeyE },
-    [BoxFirstPersonDown] = { "Down", "Move down in free flight", KeyQ },
-    [BoxFirstPersonFast] = { "Fast", "Fly faster while held", KeyShiftLeft },
-    [BoxFirstPersonLook] = { "Look", "Turn with the cursor while held", KeyMouseRight },
-    [BoxFirstPersonJump] = { "Jump", "Jump from the ground", KeySpace },
-    [BoxFirstPersonCrouch] = { "Crouch", "Lower the eye and walk slower while held", KeyCtrlLeft },
-    [BoxFirstPersonFly] = { "Fly", "Toggle free flight", KeyF }
+    [BoxFirstPersonForward] = { "Forward", "Walk forward", KeyW, KeyNone },
+    [BoxFirstPersonBack] = { "Back", "Walk back", KeyS, KeyNone },
+    [BoxFirstPersonLeft] = { "Left", "Walk left", KeyA, KeyNone },
+    [BoxFirstPersonRight] = { "Right", "Walk right", KeyD, KeyNone },
+    [BoxFirstPersonUp] = { "Up", "Move up in free flight", KeyE, KeyNone },
+    [BoxFirstPersonDown] = { "Down", "Move down in free flight", KeyQ, KeyNone },
+    [BoxFirstPersonFast] = { "Fast", "Fly faster while held", KeyShiftLeft, KeyShiftRight },
+    [BoxFirstPersonLook] = { "Look", "Turn with the cursor while held", KeyMouseRight, KeyNone },
+    [BoxFirstPersonJump] = { "Jump", "Jump from the ground", KeySpace, KeyNone },
+    [BoxFirstPersonCrouch] = { "Crouch", "Lower the eye and walk slower while held", KeyCtrlLeft,
+        KeyNone },
+    [BoxFirstPersonFly] = { "Fly", "Toggle free flight", KeyF, KeyNone },
+    [BoxFirstPersonTurnLeft] = { "TurnLeft", "Turn left while held", KeyLeft, KeyNone },
+    [BoxFirstPersonTurnRight] = { "TurnRight", "Turn right while held", KeyRight, KeyNone },
+    [BoxFirstPersonTurnUp] = { "TurnUp", "Look up while held", KeyUp, KeyNone },
+    [BoxFirstPersonTurnDown] = { "TurnDown", "Look down while held", KeyDown, KeyNone }
 };
 
 /** What the actions of one scope ask a first person controller for this frame */
@@ -92,6 +103,9 @@ void box_first_person_controller_ctor(
             .radius = BOX_FIRST_PERSON_RADIUS,
             .step = BOX_FIRST_PERSON_STEP,
             .sensitivity = BOX_FIRST_PERSON_SENSITIVITY,
+            .turn_speed = BOX_FIRST_PERSON_TURN_SPEED,
+            .turn_acceleration = BOX_FIRST_PERSON_TURN_ACCELERATION,
+            .turn_deceleration = BOX_FIRST_PERSON_TURN_DECELERATION,
             .actions = *scope
         };
     }
@@ -133,36 +147,35 @@ static void box_first_person_read(
     }
 }
 
-/** Turn a controlled entity by the cursor movement of the Look action.
+/** Turn a controlled entity with the turn actions and the cursor movement of the Look action.
  *
- * @param fp The controller
+ * @param fp The controller, its angular velocity is written
  * @param in The input of the frame
  * @param r The rotation, written in place
+ * @param dt Seconds the frame took
  * @return Whether the rotation changed
  */
 static bool box_first_person_turn(
-    const FirstPersonController *fp,
+    FirstPersonController *fp,
     const box_first_person_input_t *in,
-    Rotation *r)
+    Rotation *r,
+    float dt)
 {
-    float sensitivity = fp->sensitivity;
-    float dy = fp->invert_y ? -in->look[1] : in->look[1];
-    float yaw = r->y - in->look[0] * sensitivity;
-    float pitch = r->x - dy * sensitivity;
-    bool result = false;
-    if (pitch > BOX_FIRST_PERSON_PITCH_MAX) {
-        pitch = BOX_FIRST_PERSON_PITCH_MAX;
-    }
+    const bool *held = in->held;
+    box_controller_turn_t turn = {
+        .speed = fp->turn_speed,
+        .acceleration = fp->turn_acceleration,
+        .deceleration = fp->turn_deceleration,
+        .sensitivity = fp->sensitivity,
+        .yaw_scale = 1.0f,
+        .invert_y = fp->invert_y,
+        .yaw = (float)(held[BoxFirstPersonTurnLeft] - held[BoxFirstPersonTurnRight]),
+        .pitch = (float)(held[BoxFirstPersonTurnUp] - held[BoxFirstPersonTurnDown]),
+        .look = held[BoxFirstPersonLook],
+        .delta = { in->look[0], in->look[1] }
+    };
 
-    if (pitch < -BOX_FIRST_PERSON_PITCH_MAX) {
-        pitch = -BOX_FIRST_PERSON_PITCH_MAX;
-    }
-
-    result = yaw != r->y || pitch != r->x;
-    r->y = yaw;
-    r->x = pitch;
-
-    return result;
+    return box_controller_turn(&turn, fp->angular_velocity, r, dt);
 }
 
 /** Speed the controller walks or flies at this frame.
@@ -354,22 +367,6 @@ static bool box_first_person_step(
     return result;
 }
 
-void box_first_person_actions_create(
-    ecs_world_t *world,
-    FirstPersonActionMap *map)
-{
-    int32_t i;
-    map->scope = ecs_entity(world, { .name = "first_person" });
-    for (i = 0; i < BoxFirstPersonActionCount; i ++) {
-        const box_controller_action_t *a = &box_first_person_actions[i];
-        ecs_entity_t action = ecs_entity(world, { .name = a->name, .parent = map->scope });
-        ecs_set(world, action, Action, { .description = ECS_CONST_CAST(char*, a->description) });
-        ecs_set(world, action, Binding, { .key = a->key });
-        ecs_enable(world, action, false);
-        map->actions[i] = action;
-    }
-}
-
 void BoxFirstPersonActionsActivate(
     ecs_iter_t *it)
 {
@@ -384,15 +381,9 @@ void BoxFirstPersonActionsActivate(
         }
     }
 
-    for (i = 0; used != map->active && i < BoxFirstPersonActionCount; i ++) {
-        ecs_entity_t action = map->actions[i];
-        ActionState *state = ecs_is_alive(world, action)
-            ? ecs_get_mut(world, action, ActionState)
-            : NULL;
-        if (state) {
-            ecs_os_zeromem(state);
-            ecs_enable(world, action, used);
-        }
+    if (used != map->active) {
+        box_controller_actions_enable(world, map->actions, map->alts, BoxFirstPersonActionCount,
+            used);
     }
 
     map->active = used;
@@ -416,7 +407,7 @@ void BoxFirstPersonControllerUpdate(
             read = true;
         }
 
-        if (box_first_person_turn(&fp[i], &in, &r[i])) {
+        if (box_first_person_turn(&fp[i], &in, &r[i], dt)) {
             ecs_modified(it->world, e, Rotation);
         }
 

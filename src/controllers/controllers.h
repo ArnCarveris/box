@@ -18,15 +18,34 @@ typedef enum box_camera_action_t {
     BoxCameraDown,       /**< Move down along Y */
     BoxCameraFast,       /**< Multiply the speed by the boost while held */
     BoxCameraLook,       /**< Turn with the cursor while held */
+    BoxCameraTurnLeft,   /**< Turn left while held */
+    BoxCameraTurnRight,  /**< Turn right while held */
+    BoxCameraTurnUp,     /**< Look up while held */
+    BoxCameraTurnDown,   /**< Look down while held */
     BoxCameraActionCount /**< Number of camera actions */
 } box_camera_action_t;
 
-/** Name, description and default key of one controller action */
+/** Name, description and default keys of one controller action */
 typedef struct box_controller_action_t {
     const char *name;        /**< Name of the action entity under its scope */
     const char *description; /**< What the action does */
-    Key key;                 /**< Key of the default binding */
+    Key key;                 /**< Key of the default binding on the action */
+    Key alt;                 /**< Key of a child binding named after it, KeyNone for none */
 } box_controller_action_t;
+
+/** The turn of a controller over one frame, as its settings and actions ask for it */
+typedef struct box_controller_turn_t {
+    float speed;        /**< Radians per second the turn actions reach */
+    float acceleration; /**< Rate the turn follows held turn actions, per second */
+    float deceleration; /**< Rate the turn follows a stop, per second */
+    float sensitivity;  /**< Radians per point of cursor movement */
+    float yaw_scale;    /**< Multiplier of the yaw rate */
+    bool invert_y;      /**< Moving the cursor down looks up */
+    float yaw;          /**< Turn actions: 1 turns left, -1 right */
+    float pitch;        /**< Turn actions: 1 looks up, -1 down */
+    bool look;          /**< Look is held, the cursor turns */
+    vec2 delta;         /**< Cursor movement of the frame */
+} box_controller_turn_t;
 
 /** The camera actions, indexed by box_camera_action_t */
 extern const box_controller_action_t box_camera_actions[BoxCameraActionCount];
@@ -39,6 +58,7 @@ extern const box_controller_action_t box_camera_actions[BoxCameraActionCount];
 typedef struct CameraActionMap {
     ecs_entity_t scope;                          /**< box.controllers.camera */
     ecs_entity_t actions[BoxCameraActionCount];  /**< The actions, by box_camera_action_t */
+    ecs_entity_t alts[BoxCameraActionCount];     /**< Their child bindings, 0 for none */
     bool active;                                 /**< The actions are enabled */
 } CameraActionMap;
 
@@ -57,6 +77,10 @@ typedef enum box_first_person_action_t {
     BoxFirstPersonJump,       /**< Leave the ground when pressed */
     BoxFirstPersonCrouch,     /**< Lower the eye and walk slower while held */
     BoxFirstPersonFly,        /**< Toggle free flight when pressed */
+    BoxFirstPersonTurnLeft,   /**< Turn left while held */
+    BoxFirstPersonTurnRight,  /**< Turn right while held */
+    BoxFirstPersonTurnUp,     /**< Look up while held */
+    BoxFirstPersonTurnDown,   /**< Look down while held */
     BoxFirstPersonActionCount /**< Number of first person actions */
 } box_first_person_action_t;
 
@@ -70,6 +94,7 @@ extern const box_controller_action_t box_first_person_actions[BoxFirstPersonActi
 typedef struct FirstPersonActionMap {
     ecs_entity_t scope;                              /**< box.controllers.first_person */
     ecs_entity_t actions[BoxFirstPersonActionCount]; /**< The actions, by index */
+    ecs_entity_t alts[BoxFirstPersonActionCount];    /**< Their child bindings, 0 for none */
     bool active;                                     /**< The actions are enabled */
 } FirstPersonActionMap;
 
@@ -203,6 +228,59 @@ bool box_controller_ground_below(
     const box_controller_body_t *body,
     const Position *feet);
 
+/** Create the default actions of a controller under a scope, disabled and bound to their keys.
+ *
+ * @param world The world
+ * @param name Name of the scope
+ * @param table The actions
+ * @param count Number of actions
+ * @param actions The action entities, written
+ * @param alts The child bindings of the actions, written, 0 for none
+ * @return The scope
+ */
+ecs_entity_t box_controller_actions_create(
+    ecs_world_t *world,
+    const char *name,
+    const box_controller_action_t *table,
+    int32_t count,
+    ecs_entity_t *actions,
+    ecs_entity_t *alts);
+
+/** Enable or disable default actions and their child bindings, releasing their state.
+ *
+ * @param world The world
+ * @param actions The action entities
+ * @param alts The child bindings of the actions, 0 for none
+ * @param count Number of actions
+ * @param enabled Whether the actions bind
+ */
+void box_controller_actions_enable(
+    ecs_world_t *world,
+    const ecs_entity_t *actions,
+    const ecs_entity_t *alts,
+    int32_t count,
+    bool enabled);
+
+/** Turn an entity over one frame like the flecs-engine camera controller.
+ *
+ * The angular velocity eases towards the turn actions at the acceleration rate while one is
+ * held and towards a stop at the deceleration rate when none is.
+ *
+ * While Look is held the cursor movement sets it so the frame turns by exactly the movement.
+ * The pitch stops short of straight up and down, dropping the angular velocity towards it.
+ *
+ * @param turn What the frame asks for
+ * @param angular_velocity Pitch (x) and yaw (y) rate in radians per second, written in place
+ * @param r The rotation, written in place
+ * @param dt Seconds the frame took
+ * @return Whether the rotation changed
+ */
+bool box_controller_turn(
+    const box_controller_turn_t *turn,
+    vec2 angular_velocity,
+    Rotation *r,
+    float dt);
+
 /** Construct CameraController values with the documented defaults and the default actions.
  *
  * @param ptr The components
@@ -227,15 +305,6 @@ void BoxCameraActionsActivate(
  */
 void BoxCameraControllerUpdate(
     ecs_iter_t *it);
-
-/** Create the default first person actions, disabled and each bound to its key.
- *
- * @param world The world
- * @param map The action map, written
- */
-void box_first_person_actions_create(
-    ecs_world_t *world,
-    FirstPersonActionMap *map);
 
 /** Construct FirstPersonController values with the documented defaults and the default actions.
  *

@@ -50,7 +50,23 @@
                     "script_remap",
                     "command_key",
                     "command_drag",
-                    "command_action"
+                    "command_action",
+                    "arrows_turn",
+                    "arrows_pitch",
+                    "arrows_diagonal",
+                    "turn_speed_zero",
+                    "pitch_limit",
+                    "mouse_look_platform",
+                    "mouse_look_coasts",
+                    "mouse_left_no_look",
+                    "ease_in",
+                    "ease_out",
+                    "deceleration_zero_coasts",
+                    "boost_shift_right",
+                    "boost_yaw",
+                    "wheel_zoom",
+                    "zoom_zero",
+                    "script_turn_settings"
                 ]
             },
             {
@@ -94,7 +110,8 @@
                     "world_transform",
                     "script_controller",
                     "command_key",
-                    "command_action"
+                    "command_action",
+                    "arrows_turn"
                 ]
             },
             {

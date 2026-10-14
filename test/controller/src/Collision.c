@@ -503,7 +503,13 @@ void Collision_camera_collide(void) {
     test_assert(p->z < -2.5f);
     test_assert(fabsf(p->y - 1) < 0.001f);
     test_assert(fabsf(ecs_get(world, cam, CameraController)->velocity[2]) < 0.01f);
-    test_flt(ecs_get(world, ghost, Position)->z, -10);
+    float z = 0, v = 0;
+    for (int32_t i = 0; i < 10; i ++) {
+        v += (40 - v) * (1.0f - expf(-0.6f));
+        z -= v * 0.1f;
+    }
+
+    test_assert(fabsf(ecs_get(world, ghost, Position)->z - z) < 0.001f);
 
     ecs_fini(world);
 }

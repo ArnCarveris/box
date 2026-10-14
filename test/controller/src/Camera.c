@@ -24,10 +24,16 @@ void Camera_default_bindings(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    const char *names[] = { "Forward", "Back", "Left", "Right", "Up", "Down", "Fast", "Look" };
-    Key keys[] = { KeyW, KeyS, KeyA, KeyD, KeyE, KeyQ, KeyShiftLeft, KeyMouseRight };
+    const char *names[] = {
+        "Forward", "Back", "Left", "Right", "Up", "Down", "Fast", "Look",
+        "TurnLeft", "TurnRight", "TurnUp", "TurnDown"
+    };
+    Key keys[] = {
+        KeyW, KeyS, KeyA, KeyD, KeyE, KeyQ, KeyShiftLeft, KeyMouseRight,
+        KeyLeft, KeyRight, KeyUp, KeyDown
+    };
     ecs_entity_t scope = ecs_lookup(world, "box.controllers.camera");
-    for (int32_t i = 0; i < 8; i ++) {
+    for (int32_t i = 0; i < 12; i ++) {
         ecs_entity_t action = ecs_lookup_child(world, scope, names[i]);
         test_assert(action != 0);
         const Action *a = ecs_get(world, action, Action);
@@ -39,6 +45,11 @@ void Camera_default_bindings(void) {
         test_int(b->key, keys[i]);
         test_uint(b->action, 0);
     }
+
+    ecs_entity_t shift = ecs_lookup(world, "box.controllers.camera.Fast.ShiftRight");
+    test_assert(shift != 0);
+    test_int(ecs_get(world, shift, Binding)->key, KeyShiftRight);
+    test_uint(ecs_get(world, shift, Binding)->action, 0);
 
     ecs_fini(world);
 }
@@ -58,6 +69,12 @@ void Camera_default_actions_disabled(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_progress(world, 0.5f);
     test_assert(!ecs_has_id(world, forward, EcsDisabled));
     test_bool(ecs_get(world, forward, ActionState)->down, true);
@@ -79,6 +96,12 @@ void Camera_default_actions_custom_only(void) {
     ecs_entity_t scope = ecs_entity(world, { .name = "keys" });
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_get_mut(world, cam, CameraController)->actions = scope;
     ecs_progress(world, 0.5f);
 
@@ -98,7 +121,7 @@ void Camera_default_actions_custom_only(void) {
 }
 
 void Camera_adds_position_rotation(void) {
-    // controllers/camera
+    // controllers/camera_flecs_engine
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
@@ -109,8 +132,21 @@ void Camera_adds_position_rotation(void) {
     test_assert(ecs_has(world, cam, WorldTransform));
 
     const CameraController *cc = ecs_get(world, cam, CameraController);
-    test_flt(cc->speed, 10);
+    test_flt(cc->speed, 40);
+    test_flt(cc->boost, 5);
+    test_flt(cc->acceleration, 6);
+    test_flt(cc->deceleration, 18);
+    test_flt(cc->turn_speed, 1.5f);
+    test_flt(cc->turn_acceleration, 5);
+    test_flt(cc->turn_deceleration, 15);
+    test_flt(cc->boost_yaw, 0.33f);
+    test_flt(cc->sensitivity, 0.003f);
+    test_flt(cc->zoom, 3);
+    test_bool(cc->invert_y, false);
     test_flt(cc->velocity[0], 0);
+    test_flt(cc->angular_velocity[1], 0);
+    test_bool(cc->collide, false);
+    test_flt(cc->radius, 0.25f);
     test_uint(cc->actions, ecs_lookup(world, "box.controllers.camera"));
 
     ecs_fini(world);
@@ -147,6 +183,12 @@ void Camera_forward(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyW, 2);
     ecs_progress(world, 0.5f);
@@ -173,6 +215,12 @@ void Camera_back(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyS, 1);
     ecs_progress(world, 0.5f);
@@ -191,6 +239,12 @@ void Camera_left(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyA, 1);
     ecs_progress(world, 0.5f);
@@ -209,6 +263,12 @@ void Camera_right(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyD, 1);
     ecs_progress(world, 0.5f);
@@ -227,6 +287,12 @@ void Camera_up(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyE, 1);
     ecs_progress(world, 0.5f);
@@ -245,6 +311,12 @@ void Camera_down(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyQ, 1);
     ecs_progress(world, 0.5f);
@@ -263,6 +335,12 @@ void Camera_diagonal(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key(world, KeyW, true);
     box_input_key(world, KeyD, true);
@@ -284,6 +362,12 @@ void Camera_forward_follows_yaw(void) {
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Rotation, { 0, (float)GLM_PI_2, 0 });
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
@@ -309,6 +393,12 @@ void Camera_forward_ignores_pitch(void) {
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Rotation, { 0.5f, 0, 0 });
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
@@ -328,6 +418,12 @@ void Camera_fast(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key(world, KeyShiftLeft, true);
     box_input_key(world, KeyW, true);
@@ -348,7 +444,13 @@ void Camera_speed(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->speed = 2;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->speed = 2;
 
     box_input_key_press(world, KeyE, 1);
     ecs_progress(world, 0.5f);
@@ -380,7 +482,13 @@ void Camera_boost(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->boost = 2;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->boost = 2;
 
     box_input_key(world, KeyShiftLeft, true);
     box_input_key(world, KeyS, true);
@@ -397,6 +505,12 @@ void Camera_release_stops(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key(world, KeyD, true);
     ecs_progress(world, 0.5f);
@@ -412,36 +526,39 @@ void Camera_release_stops(void) {
 }
 
 void Camera_acceleration(void) {
-    // controllers/camera
+    // controllers/camera_flecs_engine
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->acceleration = 2;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->acceleration = 2;
+    cc->deceleration = 4;
 
-    float alpha = 1.0f - expf(-1.0f);
+    float up = 1.0f - expf(-1.0f), down = 1.0f - expf(-2.0f);
     box_input_key(world, KeyD, true);
     ecs_progress(world, 0.5f);
-    float v = 10 * alpha;
-    const CameraController *cc = ecs_get(world, cam, CameraController);
-    test_assert(fabsf(cc->velocity[0] - v) < 0.0001f);
+    float v = 10 * up;
+    const CameraController *c = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
     test_assert(fabsf(ecs_get(world, cam, Position)->x - v * 0.5f) < 0.0001f);
 
     ecs_progress(world, 0.5f);
     float x = v * 0.5f;
-    v += (10 - v) * alpha;
+    v += (10 - v) * up;
     x += v * 0.5f;
-    cc = ecs_get(world, cam, CameraController);
-    test_assert(fabsf(cc->velocity[0] - v) < 0.0001f);
+    c = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
     test_assert(fabsf(ecs_get(world, cam, Position)->x - x) < 0.0001f);
 
     box_input_key(world, KeyD, false);
     ecs_progress(world, 0.5f);
-    v -= v * alpha;
+    v -= v * down;
     x += v * 0.5f;
-    cc = ecs_get(world, cam, CameraController);
-    test_assert(fabsf(cc->velocity[0] - v) < 0.0001f);
+    c = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(c->velocity[0] - v) < 0.0001f);
     test_assert(fabsf(ecs_get(world, cam, Position)->x - x) < 0.0001f);
     test_assert(v > 0);
 
@@ -455,6 +572,12 @@ void Camera_look_drag(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 100, 100 }, .to = { 200, 150 }, .steps = 4, .frames = 4,
@@ -483,6 +606,12 @@ void Camera_look_action_drag(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t look = ecs_lookup(world, "box.controllers.camera.Look");
     test_assert(look != 0);
 
@@ -533,7 +662,13 @@ void Camera_look_sensitivity(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->sensitivity = 0.01f;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->sensitivity = 0.01f;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -556,8 +691,14 @@ void Camera_look_invert_y(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->sensitivity = 0.01f;
-    ecs_get_mut(world, cam, CameraController)->invert_y = true;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->sensitivity = 0.01f;
+    cc->invert_y = true;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -580,7 +721,13 @@ void Camera_pitch_clamped(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->sensitivity = 1;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->sensitivity = 1;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 0, 100 }, .steps = 2, .button = KeyMouseRight
@@ -614,6 +761,12 @@ void Camera_remap_binding(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t forward = ecs_lookup(world, "box.controllers.camera.Forward");
     ecs_set(world, forward, Binding, { .key = KeyUp });
 
@@ -635,6 +788,12 @@ void Camera_extra_binding(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t forward = ecs_lookup(world, "box.controllers.camera.Forward");
     ecs_entity_t arrow = ecs_new_w_pair(world, EcsChildOf, forward);
     ecs_set(world, arrow, Binding, { .key = KeyUp });
@@ -662,6 +821,12 @@ void Camera_action_hold(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t left = ecs_lookup(world, "box.controllers.camera.Left");
     ecs_entity_t down = ecs_lookup(world, "box.controllers.camera.Down");
 
@@ -702,9 +867,21 @@ void Camera_custom_actions(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
-    ecs_get_mut(world, cam, CameraController)->actions = scope;
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
+    cc->actions = scope;
     ecs_entity_t other = ecs_new(world);
     ecs_add(world, other, CameraController);
+    CameraController *cc_other = ecs_get_mut(world, other, CameraController);
+    cc_other->speed = 10;
+    cc_other->boost = 4;
+    cc_other->acceleration = 1e9f;
+    cc_other->deceleration = 1e9f;
+    cc_other->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyW, 1);
     ecs_progress(world, 0.5f);
@@ -760,9 +937,21 @@ void Camera_multiple_cameras(void) {
 
     ecs_entity_t a = ecs_new(world);
     ecs_add(world, a, CameraController);
+    CameraController *cc_a = ecs_get_mut(world, a, CameraController);
+    cc_a->speed = 10;
+    cc_a->boost = 4;
+    cc_a->acceleration = 1e9f;
+    cc_a->deceleration = 1e9f;
+    cc_a->turn_deceleration = 1e9f;
     ecs_entity_t b = ecs_new(world);
     ecs_add(world, b, CameraController);
-    ecs_get_mut(world, b, CameraController)->speed = 2;
+    CameraController *cc_b = ecs_get_mut(world, b, CameraController);
+    cc_b->speed = 10;
+    cc_b->boost = 4;
+    cc_b->acceleration = 1e9f;
+    cc_b->deceleration = 1e9f;
+    cc_b->turn_deceleration = 1e9f;
+    cc_b->speed = 2;
     ecs_set(world, b, Rotation, { 0, (float)GLM_PI, 0 });
 
     box_input_key_press(world, KeyW, 1);
@@ -781,6 +970,12 @@ void Camera_world_transform(void) {
     ecs_entity_t cam = ecs_new(world);
     ecs_set(world, cam, Camera, { .near_ = 0.1f });
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
 
     box_input_key_press(world, KeyE, 1);
     ecs_progress(world, 0.5f);
@@ -831,12 +1026,15 @@ void Camera_script_controller(void) {
     test_flt(cc->sensitivity, 0.01f);
     test_bool(cc->invert_y, true);
 
+    test_flt(cc->acceleration, 6);
+    test_flt(cc->deceleration, 18);
+
     box_input_key(world, KeyShiftLeft, true);
     box_input_key(world, KeyW, true);
     ecs_progress(world, 0.5f);
     const Position *p = ecs_get(world, cam, Position);
     test_flt(p->y, 1);
-    test_flt(p->z, -6);
+    test_assert(fabsf(p->z + 12 * (1.0f - expf(-3.0f)) * 0.5f) < 0.0001f);
 
     ecs_fini(world);
 }
@@ -854,7 +1052,7 @@ void Camera_script_remap(void) {
             "  Binding: {key: Space}\n"
             "} } } }\n"
             "page_up { Binding: {action: box.controllers.camera.Up, key: PageUp} }\n"
-            "cam { CameraController: {} }\n"
+            "cam { CameraController: {speed: 10, acceleration: 1e9, deceleration: 1e9} }\n"
     });
     test_assert(s != 0);
 
@@ -883,6 +1081,12 @@ void Camera_command_key(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = true;
@@ -914,6 +1118,12 @@ void Camera_command_drag(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = true;
@@ -937,6 +1147,12 @@ void Camera_command_action(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->boost = 4;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
+    cc->turn_deceleration = 1e9f;
     ecs_entity_t s = box_terminal_new(world);
 
     bool error = true;
@@ -963,3 +1179,452 @@ void Camera_command_action(void) {
     ecs_fini(world);
 }
 
+
+void Camera_arrows_turn(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    float dt = 1.0f / 60.0f, yaw = 0, av = 0;
+    box_input_glfw_on_key(world, 263, 1);
+    for (int32_t n = 1; n <= 30; n ++) {
+        ecs_progress(world, dt);
+        av += (1.5f - av) * (1.0f - expf(-5.0f * dt));
+        yaw += av * dt;
+        const CameraController *cc = ecs_get(world, cam, CameraController);
+        float expect = 1.5f * (1.0f - expf(-5.0f * n * dt));
+        test_assert(fabsf(cc->angular_velocity[1] - expect) < 0.0001f);
+        test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 0.0001f);
+    }
+
+    test_assert(ecs_get(world, cam, CameraController)->angular_velocity[1] < 1.5f * 0.95f);
+    test_assert(ecs_get(world, cam, Position)->z == 0);
+
+    box_input_glfw_on_key(world, 263, 0);
+    float released = av;
+    for (int32_t n = 1; n <= 10; n ++) {
+        ecs_progress(world, dt);
+        av -= av * (1.0f - expf(-15.0f * dt));
+        yaw += av * dt;
+        const CameraController *cc = ecs_get(world, cam, CameraController);
+        test_assert(fabsf(cc->angular_velocity[1] - released * expf(-15.0f * n * dt)) < 0.0001f);
+        test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 0.0001f);
+    }
+
+    box_input_glfw_on_key(world, 262, 1);
+    for (int32_t n = 0; n < 60; n ++) {
+        ecs_progress(world, dt);
+    }
+
+    test_assert(ecs_get(world, cam, CameraController)->angular_velocity[1] < -1.4f);
+    test_assert(ecs_get(world, cam, Rotation)->y < yaw - 0.5f);
+    test_flt(ecs_get(world, cam, Rotation)->x, 0);
+
+    ecs_fini(world);
+}
+
+void Camera_arrows_pitch(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_glfw_on_key(world, 265, 1);
+    for (int32_t n = 0; n < 20; n ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    float up = ecs_get(world, cam, Rotation)->x;
+    test_assert(up > 0.1f);
+    test_flt(ecs_get(world, cam, Rotation)->y, 0);
+
+    box_input_glfw_on_key(world, 265, 0);
+    box_input_glfw_on_key(world, 264, 1);
+    for (int32_t n = 0; n < 60; n ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    test_assert(ecs_get(world, cam, Rotation)->x < up - 0.5f);
+    test_assert(ecs_get(world, cam, CameraController)->angular_velocity[0] < -1.4f);
+
+    ecs_fini(world);
+}
+
+void Camera_arrows_diagonal(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->turn_acceleration = 1e9f;
+
+    box_input_key(world, KeyLeft, true);
+    box_input_key(world, KeyUp, true);
+    ecs_progress(world, 0.1f);
+
+    const CameraController *cc = ecs_get(world, cam, CameraController);
+    float rate = 1.5f / sqrtf(2.0f);
+    test_assert(fabsf(cc->angular_velocity[0] - rate) < 0.0001f);
+    test_assert(fabsf(cc->angular_velocity[1] - rate) < 0.0001f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x - rate * 0.1f) < 0.0001f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y - rate * 0.1f) < 0.0001f);
+
+    ecs_fini(world);
+}
+
+void Camera_turn_speed_zero(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->turn_speed = 0;
+
+    box_input_key(world, KeyLeft, true);
+    box_input_key(world, KeyDown, true);
+    for (int32_t n = 0; n < 10; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    test_flt(ecs_get(world, cam, Rotation)->x, 0);
+    test_flt(ecs_get(world, cam, Rotation)->y, 0);
+
+    ecs_fini(world);
+}
+
+void Camera_pitch_limit(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_key(world, KeyUp, true);
+    for (int32_t n = 0; n < 40; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    float limit = (float)GLM_PI_2 - 0.05f;
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x - limit) < 0.0001f);
+    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[0], 0);
+
+    box_input_key(world, KeyUp, false);
+    box_input_key(world, KeyDown, true);
+    for (int32_t n = 0; n < 60; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x + limit) < 0.0001f);
+    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[0], 0);
+
+    ecs_fini(world);
+}
+
+void Camera_mouse_look_platform(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, dt);
+    test_flt(ecs_get(world, cam, Rotation)->y, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 150, 100 } });
+    ecs_progress(world, dt);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y + 0.15f) < 0.00001f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x) < 0.00001f);
+
+    ecs_progress(world, dt);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y + 0.15f) < 0.00001f);
+    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[1], 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 130, 120 } });
+    ecs_progress(world, dt);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y + 0.09f) < 0.00001f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x + 0.06f) < 0.00001f);
+    test_flt(ecs_get(world, cam, Position)->z, 0);
+
+    ecs_fini(world);
+}
+
+void Camera_mouse_look_coasts(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, dt);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 80, 100 } });
+    ecs_progress(world, dt);
+    float yaw = ecs_get(world, cam, Rotation)->y;
+    float av = 20 * 0.003f / dt;
+    test_assert(fabsf(yaw - 0.06f) < 0.00001f);
+    test_assert(fabsf(ecs_get(world, cam, CameraController)->angular_velocity[1] - av) < 0.001f);
+
+    box_input_glfw_on_button(world, 1, 0);
+    for (int32_t n = 1; n <= 20; n ++) {
+        ecs_progress(world, dt);
+        av -= av * (1.0f - expf(-15.0f * dt));
+        yaw += av * dt;
+        test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 0.0001f);
+    }
+
+    test_assert(yaw > 0.06f + 0.1f);
+    test_assert(ecs_get(world, cam, CameraController)->angular_velocity[1] < av + 0.001f);
+
+    ecs_fini(world);
+}
+
+void Camera_mouse_left_no_look(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 0, 1);
+    ecs_progress(world, 0.1f);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 200, 160 } });
+    ecs_progress(world, 0.1f);
+
+    test_flt(ecs_get(world, cam, Rotation)->x, 0);
+    test_flt(ecs_get(world, cam, Rotation)->y, 0);
+
+    ecs_fini(world);
+}
+
+void Camera_ease_in(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f, z = 0;
+
+    box_input_glfw_on_key(world, 'W', 1);
+    for (int32_t n = 1; n <= 60; n ++) {
+        ecs_progress(world, dt);
+        float v = 40 * (1.0f - expf(-6.0f * n * dt));
+        z -= v * dt;
+        const CameraController *cc = ecs_get(world, cam, CameraController);
+        test_assert(fabsf(cc->velocity[2] + v) < 0.001f);
+        test_assert(fabsf(ecs_get(world, cam, Position)->z - z) < 0.001f);
+        if (n == 1) {
+            test_assert(-cc->velocity[2] < 40 * 0.1f);
+        }
+    }
+
+    test_assert(-ecs_get(world, cam, CameraController)->velocity[2] > 39);
+    test_flt(ecs_get(world, cam, Position)->x, 0);
+    test_flt(ecs_get(world, cam, Position)->y, 0);
+
+    ecs_fini(world);
+}
+
+void Camera_ease_out(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_glfw_on_key(world, 'D', 1);
+    for (int32_t n = 0; n < 120; n ++) {
+        ecs_progress(world, dt);
+    }
+
+    float v0 = ecs_get(world, cam, CameraController)->velocity[0];
+    float x = ecs_get(world, cam, Position)->x;
+    test_assert(v0 > 39.9f);
+
+    box_input_glfw_on_key(world, 'D', 0);
+    for (int32_t n = 1; n <= 20; n ++) {
+        ecs_progress(world, dt);
+        float v = v0 * expf(-18.0f * n * dt);
+        x += v * dt;
+        test_assert(fabsf(ecs_get(world, cam, CameraController)->velocity[0] - v) < 0.001f);
+        test_assert(fabsf(ecs_get(world, cam, Position)->x - x) < 0.001f);
+        if (n == 1) {
+            test_assert(v > v0 * 0.5f);
+        }
+    }
+
+    test_assert(ecs_get(world, cam, CameraController)->velocity[0] < 1);
+
+    ecs_fini(world);
+}
+
+void Camera_deceleration_zero_coasts(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->deceleration = 0;
+
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0.5f);
+    float v = ecs_get(world, cam, CameraController)->velocity[2];
+    test_assert(v > 30);
+
+    box_input_key(world, KeyS, false);
+    ecs_progress(world, 0.5f);
+    ecs_progress(world, 0.5f);
+    test_flt(ecs_get(world, cam, CameraController)->velocity[2], v);
+
+    ecs_fini(world);
+}
+
+void Camera_boost_shift_right(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_glfw_on_key(world, 344, 1);
+    box_input_glfw_on_key(world, 'W', 1);
+    for (int32_t n = 0; n < 30; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    test_assert(fabsf(ecs_get(world, cam, CameraController)->velocity[2] + 200) < 0.01f);
+
+    ecs_fini(world);
+}
+
+void Camera_boost_yaw(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_key(world, KeyShiftLeft, true);
+    box_input_key(world, KeyLeft, true);
+    for (int32_t n = 0; n < 30; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    const CameraController *cc = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(cc->angular_velocity[1] - 1.5f * 0.33f) < 0.001f);
+
+    box_input_key(world, KeyLeft, false);
+    for (int32_t n = 0; n < 30; n ++) {
+        ecs_progress(world, 0.1f);
+    }
+
+    float yaw = ecs_get(world, cam, Rotation)->y;
+    float pitch = ecs_get(world, cam, Rotation)->x;
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 0, 0 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, 0.1f);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    ecs_progress(world, 0.1f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y - (yaw - 0.3f * 0.33f)) < 0.0001f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->x - (pitch - 0.3f)) < 0.0001f);
+
+    ecs_fini(world);
+}
+
+void Camera_wheel_zoom(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_set(world, cam, Rotation, { 0.5f, 0, 0 });
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputScroll, .value = { 0, 2 } });
+    ecs_progress(world, dt);
+    const CameraController *cc = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(cc->velocity[1] - 6 * sinf(0.5f)) < 0.0001f);
+    test_assert(fabsf(cc->velocity[2] + 6 * cosf(0.5f)) < 0.0001f);
+    test_flt(cc->velocity[0], 0);
+    const Position *p = ecs_get(world, cam, Position);
+    test_assert(fabsf(p->y - 6 * sinf(0.5f) * dt) < 0.0001f);
+    test_assert(fabsf(p->z + 6 * cosf(0.5f) * dt) < 0.0001f);
+
+    ecs_progress(world, dt);
+    cc = ecs_get(world, cam, CameraController);
+    test_assert(fabsf(cc->velocity[2] + 6 * cosf(0.5f) * expf(-18.0f * dt)) < 0.0001f);
+
+    box_input_mouse_scroll(world, 0, -3);
+    ecs_progress(world, dt);
+    cc = ecs_get(world, cam, CameraController);
+    test_assert(cc->velocity[2] > 0);
+
+    ecs_fini(world);
+}
+
+void Camera_zoom_zero(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->zoom = 0;
+
+    box_input_mouse_scroll(world, 0, 3);
+    ecs_progress(world, 0.1f);
+    test_flt(ecs_get(world, cam, Position)->z, 0);
+    test_flt(ecs_get(world, cam, CameraController)->velocity[2], 0);
+
+    ecs_fini(world);
+}
+
+void Camera_script_turn_settings(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = ecs_script(world, {
+        .code =
+            "using box.controllers\n"
+            "cam {\n"
+            "  CameraController: {turn_speed: 2, turn_acceleration: 1e9, boost_yaw: 0.5}\n"
+            "}\n"
+    });
+    test_assert(s != 0);
+
+    ecs_entity_t cam = ecs_lookup(world, "cam");
+    const CameraController *cc = ecs_get(world, cam, CameraController);
+    test_flt(cc->speed, 40);
+    test_flt(cc->turn_deceleration, 15);
+
+    box_input_key(world, KeyShiftRight, true);
+    box_input_key(world, KeyRight, true);
+    ecs_progress(world, 0.5f);
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y + 0.5f) < 0.0001f);
+
+    ecs_fini(world);
+}
