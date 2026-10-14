@@ -293,3 +293,17 @@ int32_t box_input_pending(
 {
     return ecs_vec_count(&box_input_device(world)->queue);
 }
+
+int32_t box_input_pending_frames(
+    ecs_world_t *world)
+{
+    InputDevice *dev = box_input_device(world);
+    const InputEvent *events = ecs_vec_first_t(&dev->queue, InputEvent);
+    int32_t i, count = ecs_vec_count(&dev->queue);
+    int32_t result = count ? 1 : 0;
+    for (i = 0; i < count; i ++) {
+        result += events[i].delay;
+    }
+
+    return result;
+}
