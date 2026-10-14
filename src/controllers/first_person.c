@@ -4,6 +4,7 @@
  */
 
 #include "controllers.h"
+#include "../render/render.h"
 #include <math.h>
 
 /** Pitch the eye stops at, short of looking straight up or down */
@@ -35,6 +36,15 @@
 
 /** Radians per point of cursor movement when the controller does not say */
 #define BOX_FIRST_PERSON_SENSITIVITY (0.003f)
+
+/** Radius of the body when the controller does not say */
+#define BOX_FIRST_PERSON_RADIUS (0.3f)
+
+/** Height of the ledges the feet step onto when the controller does not say */
+#define BOX_FIRST_PERSON_STEP (0.3f)
+
+/** Height of the top of the body above the eye */
+#define BOX_FIRST_PERSON_HEAD (0.15f)
 
 /** Distance above the ground within which falling feet snap onto it */
 #define BOX_FIRST_PERSON_SNAP (0.001f)
@@ -199,7 +209,7 @@ static void box_first_person_accelerate(
     }
 }
 
-/** Apply the flight toggle, the crouch, the jump and the gravity of a frame.
+/** Apply the flight toggle, the jump and the gravity of a frame.
  *
  * @param fp The controller, its velocity and state are written
  * @param in The input of the frame
@@ -219,7 +229,6 @@ static void box_first_person_state(
         fp->grounded = false;
     }
 
-    fp->crouched = !fp->flying && in->held[BoxFirstPersonCrouch];
     if (!fp->flying && fp->grounded && in->pressed[BoxFirstPersonJump]) {
         fp->velocity[1] = box_first_person_value(fp->jump, BOX_FIRST_PERSON_JUMP);
         fp->grounded = false;
@@ -230,7 +239,63 @@ static void box_first_person_state(
     }
 }
 
+/** Get the body of a controller for an eye height.
+ *
+ * @param world The world
+ * @param e The controlled entity
+ * @param fp The controller
+ * @param height Height of the eye above the feet
+ * @param body The body, written
+ */
+static void box_first_person_body(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    const FirstPersonController *fp,
+    float height,
+    box_controller_body_t *body)
+{
+    bool walking = fp->grounded && !fp->flying;
+    float step = box_first_person_value(fp->step, BOX_FIRST_PERSON_STEP);
+    *body = (box_controller_body_t){
+        .entity = e,
+        .scene = box_render_scene_of(world, e),
+        .radius = box_first_person_value(fp->radius, BOX_FIRST_PERSON_RADIUS),
+        .height = height + BOX_FIRST_PERSON_HEAD,
+        .step = walking ? step : 0,
+        .probe = walking && fp->velocity[1] <= 0 ? step : 0
+    };
+}
+
+/** Crouch while Crouch is held, and stay down while there is no room to stand up.
+ *
+ * @param world The world
+ * @param e The controlled entity
+ * @param fp The controller, its crouched flag is written
+ * @param in The input of the frame
+ * @param p The position of the eye
+ */
+static void box_first_person_crouch(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    FirstPersonController *fp,
+    const box_first_person_input_t *in,
+    const Position *p)
+{
+    bool crouch = !fp->flying && in->held[BoxFirstPersonCrouch];
+    float eye = box_first_person_value(fp->eye, BOX_FIRST_PERSON_EYE);
+    if (fp->crouched && !crouch && fp->height > 0 && fp->height < eye) {
+        box_controller_body_t body;
+        Position feet = { p->x, p->y - fp->height, p->z };
+        box_first_person_body(world, e, fp, eye, &body);
+        crouch = !box_controller_fits(world, &body, &feet);
+    }
+
+    fp->crouched = crouch;
+}
+
 /** Move the feet of a controller over the frame and put its eye above them.
+ *
+ * The ground plane only holds the feet when no shape is below them.
  *
  * @param world The world
  * @param e The controlled entity
@@ -253,17 +318,21 @@ static bool box_first_person_step(
     float previous = fp->height > 0 ? fp->height : height;
     Position feet = { p->x, p->y - previous, p->z };
     Position eye_pos = { 0 };
+    box_controller_body_t body;
+    box_controller_hit_t hit;
     bool landed = false;
     bool result = false;
-    box_controller_move(world, e, &feet, fp->velocity, dt);
-    landed = feet.y < fp->ground ||
-        (feet.y <= fp->ground + BOX_FIRST_PERSON_SNAP && fp->velocity[1] <= 0);
+    box_first_person_body(world, e, fp, height, &body);
+    box_controller_move(world, &body, &feet, fp->velocity, dt, &hit);
+    landed = !hit.grounded && (feet.y < fp->ground ||
+        (feet.y <= fp->ground + BOX_FIRST_PERSON_SNAP && fp->velocity[1] <= 0));
+    landed = landed && !box_controller_ground_below(world, &body, &feet);
     if (landed) {
         feet.y = fp->ground;
         fp->velocity[1] = fp->velocity[1] < 0 ? 0 : fp->velocity[1];
     }
 
-    fp->grounded = landed && !fp->flying;
+    fp->grounded = (landed || hit.grounded) && !fp->flying;
     fp->height = height;
     eye_pos.x = feet.x;
     eye_pos.y = feet.y + height;
@@ -341,6 +410,7 @@ void BoxFirstPersonControllerUpdate(
         }
 
         box_first_person_state(&fp[i], &in, dt);
+        box_first_person_crouch(it->world, e, &fp[i], &in, &p[i]);
         box_first_person_accelerate(&fp[i], &in, r[i].y, dt);
         if (box_first_person_step(it->world, e, &fp[i], &p[i], dt)) {
             ecs_modified(it->world, e, Position);
