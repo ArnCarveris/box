@@ -49,6 +49,57 @@ static float box_draws_linear(
     return box_draws_srgb[value];
 }
 
+/** Convert a display encoded channel from 0 to 1 to linear light.
+ *
+ * Interpolates the table of the byte values, which stays within 1e-5 of the exact curve.
+ *
+ * @param value The channel
+ * @return The linear value
+ */
+static float box_draws_linear_f(
+    float value)
+{
+    float x = glm_clamp(value, 0.0f, 1.0f) * 255.0f;
+    int32_t i = (int32_t)x;
+    if (i > 254) {
+        i = 254;
+    }
+
+    float f = x - (float)i;
+
+    return box_draws_srgb[i] + (box_draws_srgb[i + 1] - box_draws_srgb[i]) * f;
+}
+
+/** Write the base color of a shape, mixed toward its tints, as linear light.
+ *
+ * @param out Three floats receiving the color
+ * @param color The base color, display encoded
+ * @param material Material components of the entity
+ */
+static void box_draws_tinted(
+    float *out,
+    const uint8_t *color,
+    const box_draw_material_t *material)
+{
+    const box_draw_tint_t *inherited = material->inherited;
+    const Tint *tint = material->tint;
+    const uint8_t *own = tint ? &tint->r : NULL;
+    float a = tint ? (float)tint->a / 255.0f : 0.0f;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        float c = (float)color[i] / 255.0f;
+        if (inherited) {
+            c = c * inherited->keep + inherited->add[i];
+        }
+
+        if (own) {
+            c += ((float)own[i] / 255.0f - c) * a;
+        }
+
+        out[i] = box_draws_linear_f(c);
+    }
+}
+
 /** Hash a batch key.
  *
  * @param key The key
@@ -282,6 +333,9 @@ void box_draws_material(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
+    if (material->inherited || material->tint) {
+        box_draws_tinted(out->color, color ? &color->r : box_draws_default_color, material);
+    }
 }
 
 void box_draws_transform(
@@ -770,7 +824,7 @@ static const void* box_draws_at(
  *
  * @param it The query result
  * @param d The state
- * @param walk Whether the opacity of ancestors is read every frame
+ * @param walk Whether the opacity and tint of ancestors are read every frame
  */
 static void box_draws_fill_material(
     ecs_iter_t *it,
@@ -784,12 +838,14 @@ static void box_draws_fill_material(
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
+    const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
     ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
     ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
     ecs_size_t uv_step = box_draws_stride(it, uvs, ECS_SIZEOF(TextureTransform), 8);
+    box_draw_tint_t inherited;
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (slots[i].batch < 0) {
@@ -807,8 +863,15 @@ static void box_draws_fill_material(
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
-            .fade = walk ? box_draws_fade(it->world, it->entities[i]) : slots[i].fade
+            .tint = tints ? &tints[i] : NULL,
+            .inherited = slots[i].tinted ? &slots[i].tint : NULL,
+            .fade = slots[i].fade
         };
+        if (walk) {
+            material.fade = box_draws_fade(it->world, it->entities[i], &inherited);
+            material.inherited = &inherited;
+        }
+
         box_render_instance_t *inst = ecs_vec_get_t(
             &b->instances, box_render_instance_t, slots[i].slot);
         box_draws_material(inst, &material);

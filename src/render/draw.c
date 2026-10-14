@@ -25,7 +25,9 @@ static void box_draw_slot_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        slots[i] = (DrawSlot){ .batch = -1, .slot = -1, .fade = 1.0f };
+        slots[i] = (DrawSlot){
+            .batch = -1, .slot = -1, .fade = 1.0f, .tint = { .keep = 1.0f }
+        };
     }
 }
 
@@ -203,14 +205,26 @@ static void box_draws_walk(
 
 float box_draws_fade(
     const ecs_world_t *world,
-    ecs_entity_t e)
+    ecs_entity_t e,
+    box_draw_tint_t *tint)
 {
     float result = 1.0f;
     ecs_entity_t cur = ecs_get_parent(world, e);
+    *tint = (box_draw_tint_t){ .keep = 1.0f };
     while (cur) {
         const Opacity *opacity = ecs_get(world, cur, Opacity);
+        const Tint *t = ecs_get(world, cur, Tint);
         if (opacity) {
             result *= glm_clamp(opacity->value, 0.0f, 1.0f);
+        }
+
+        if (t) {
+            float a = (float)t->a / 255.0f;
+            float weight = a * tint->keep / 255.0f;
+            tint->add[0] += (float)t->r * weight;
+            tint->add[1] += (float)t->g * weight;
+            tint->add[2] += (float)t->b * weight;
+            tint->keep *= 1.0f - a;
         }
 
         cur = ecs_get_parent(world, cur);
@@ -282,13 +296,16 @@ static void box_draws_update(
     s->dirty = false;
     d->stats.processed ++;
     if (drawn) {
-        s->fade = box_draws_fade(world, e);
+        s->fade = box_draws_fade(world, e, &s->tint);
+        s->tinted = s->tint.keep < 1.0f;
         material = (box_draw_material_t){
             .color = ecs_get(world, e, Rgb),
             .opacity = ecs_get(world, e, Opacity),
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
+            .tint = ecs_get(world, e, Tint),
+            .inherited = s->tinted ? &s->tint : NULL,
             .fade = s->fade
         };
         box_draws_key(world, e, shape, box_draws_alpha(&material), &key);
@@ -431,6 +448,9 @@ static void box_draws_material_observers(
 
     box_draws_observer(world, d, "DrawsOnOpacity", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Opacity) }},
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+    box_draws_observer(world, d, "DrawsOnTint", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Tint) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
 }
 
