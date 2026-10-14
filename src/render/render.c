@@ -277,7 +277,6 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxCamera);
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxMaterial);
-    ECS_IMPORT(world, BoxTexture);
 
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
