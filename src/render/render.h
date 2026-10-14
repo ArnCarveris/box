@@ -29,6 +29,12 @@
 /** Shader handle of the engine shader that draws the casters into the cascades of a view */
 #define BOX_RENDER_SHADER_SHADOW (5)
 
+/** Shader handle of the engine compute shader that culls the instances of a view */
+#define BOX_RENDER_SHADER_CULL (6)
+
+/** Projected size in pixels below which a view culls an instance when its View sets none */
+#define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
@@ -150,6 +156,12 @@ typedef struct box_render_view_shadows_t {
     float direction[3];     /**< Direction toward the light that casts the shadows */
 } box_render_view_shadows_t;
 
+/** The culling of a view, resolved from its CullSettings */
+typedef struct box_render_view_cull_t {
+    bool enabled;           /**< Instances outside the frustum or too small are not drawn */
+    float min_dimension;    /**< Projected size in pixels below which an instance is culled */
+} box_render_view_cull_t;
+
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
@@ -167,6 +179,7 @@ typedef struct box_render_view_t {
     uint32_t target;            /**< Handle of the only target that renders the view, 0 for any */
     box_render_view_lights_t lights; /**< Lights of the scene, filled by the light extract */
     box_render_view_shadows_t shadows; /**< Shadows of the view, filled by the shadow extract */
+    box_render_view_cull_t cull; /**< Culling of the view and of its shadow casters */
 } box_render_view_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -364,6 +377,14 @@ typedef struct box_render_gpu_stats_t {
     int32_t scattered;          /**< Instances the scatter dispatches copied */
 } box_render_gpu_stats_t;
 
+/** What the cull pass of a view tested and kept in the last target the GPU backend rendered */
+typedef struct box_render_cull_stats_t {
+    int32_t tested;             /**< Instances the view tested */
+    int32_t visible;            /**< Instances the view draws */
+    int32_t casters_tested;     /**< Shadow casters tested, summed over the cascades */
+    int32_t casters_visible;    /**< Shadow casters drawn, summed over the cascades */
+} box_render_cull_stats_t;
+
 /** Packet ring between the main thread and the consumer of the packets */
 typedef struct box_render_ring_t box_render_ring_t;
 
@@ -452,6 +473,21 @@ bool box_render_gpu_read_buffer(
     uint32_t offset,
     uint32_t size,
     void *out);
+
+/** Read back what the cull pass of a view kept in the last target the GPU backend rendered.
+ *
+ * Only call this when the main thread renders (RenderSettings.main_thread), after
+ * box_render_sync, so the device is used by one thread.
+ *
+ * @param world The world
+ * @param view Entity with the View
+ * @param out Receives the counts
+ * @return Whether the last rendered target culled for the view
+ */
+bool box_render_gpu_cull_stats(
+    ecs_world_t *world,
+    ecs_entity_t view,
+    box_render_cull_stats_t *out);
 
 /** Counters of the instanced batches of a world, written by the draw extract */
 typedef struct box_render_draws_stats_t {

@@ -449,14 +449,16 @@ done:
  * @param p The packet
  * @param handle Handle of the shader
  * @return Whether a batch uses the shader as its pipeline, it scatters and runs a scatter, or
- * it assigns lights to clusters or draws shadow casters and a batch draws with the mesh shader
+ * it assigns lights to clusters, draws shadow casters or culls and a batch draws with the mesh
+ * shader
  */
 static bool box_shader_used(
     const box_render_packet_t *p,
     uint32_t handle)
 {
     bool result = handle == BOX_RENDER_SHADER_SCATTER && ecs_vec_count(&p->scatters);
-    uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER || handle == BOX_RENDER_SHADER_SHADOW
+    uint32_t pipeline = handle == BOX_RENDER_SHADER_CLUSTER ||
+        handle == BOX_RENDER_SHADER_SHADOW || handle == BOX_RENDER_SHADER_CULL
         ? BOX_RENDER_SHADER_MESH
         : handle;
     int32_t i;
@@ -716,4 +718,6 @@ void BoxShaderImport(
         BOX_RENDER_SHADER_CLUSTER, true);
     box_shader_builtin(world, state, builtin, "shadow", "etc/shaders/shadow.wgsl",
         BOX_RENDER_SHADER_SHADOW, true);
+    box_shader_builtin(world, state, builtin, "cull", "etc/shaders/cull.wgsl",
+        BOX_RENDER_SHADER_CULL, true);
 }

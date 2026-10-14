@@ -436,10 +436,7 @@ static void box_draws_reserve(
     box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
         BOX_RENDER_CREATE, b->buffer, sizeof(box_render_buffer_desc_t));
     desc->size = capacity * (uint32_t)sizeof(box_render_instance_t);
-    desc->usage = BOX_RENDER_BUFFER_INSTANCE;
-    if (!b->key.dynamic) {
-        desc->usage |= BOX_RENDER_BUFFER_STORAGE;
-    }
+    desc->usage = BOX_RENDER_BUFFER_INSTANCE | BOX_RENDER_BUFFER_STORAGE;
 
     b->capacity = capacity;
     b->full = true;
