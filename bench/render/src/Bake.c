@@ -2,10 +2,10 @@
  * @file Bake.c
  * @brief Benchmarks for the per frame cost of a scene whose probe volume is baked.
  *
- * A headless world renders 2500 static boxes on a floor into a 1280x720 offscreen surface on
- * the main thread and waits for the GPU after every frame. With LightBake the headless run
- * captures every probe in the first frame, so the measured frames of a converged bake must
- * capture nothing and cost what a volume that is never baked (budget_ms 0) costs.
+ * A headless world renders 2500 static boxes into a 1280x720 offscreen surface on the main
+ * thread and waits for the GPU after every frame; a headless bake converges in the first frame.
+ *
+ * A converged bake must capture nothing and cost what a never baked volume (budget_ms 0) does.
  */
 
 #include <box.h>
