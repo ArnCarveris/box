@@ -10,6 +10,10 @@
 
 #ifdef BOX_RENDER_WGPU
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+
 /** Log a webgpu message.
  *
  * @param prefix What the message is about
@@ -139,6 +143,8 @@ static void box_gpu_on_lost(
     }
 }
 
+#endif
+
 /** Create the layouts and sampler the blit pipelines share.
  *
  * @param gpu The backend
@@ -181,6 +187,63 @@ static void box_gpu_blit_init(
     gpu->sampler = wgpuDeviceCreateSampler(gpu->device, &sampler);
 }
 
+#ifdef __EMSCRIPTEN__
+
+/** Check whether the page handed the module a device, see apps/boxrun/shell.html.
+ *
+ * @return Whether Module.preinitializedWebGPUDevice is set
+ */
+EM_JS(bool, box_gpu_web_has_device, (void), {
+    return !!Module['preinitializedWebGPUDevice'];
+});
+
+/** Take the device the page requested before the module started.
+ *
+ * The browser requests adapters and devices asynchronously and a frame cannot wait for a
+ * promise, so the shell page requests the device and passes it as preinitializedWebGPUDevice.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_device_init(
+    box_gpu_t *gpu)
+{
+    if (!box_gpu_web_has_device()) {
+        ecs_err("no webgpu device: the page did not pass preinitializedWebGPUDevice");
+        goto done;
+    }
+
+    gpu->device = emscripten_webgpu_get_device();
+    gpu->queue = wgpuDeviceGetQueue(gpu->device);
+done:
+    return;
+}
+
+/** Create the instance and take the device the page requested.
+ *
+ * @param gpu The backend
+ * @return 0 when the device exists, nonzero when there is none
+ */
+static int box_gpu_create(
+    box_gpu_t *gpu)
+{
+    int result = -1;
+    gpu->instance = wgpuCreateInstance(NULL);
+    if (!gpu->instance) {
+        ecs_err("cannot create a webgpu instance");
+        goto done;
+    }
+
+    box_gpu_device_init(gpu);
+    if (gpu->device) {
+        result = 0;
+    }
+
+done:
+    return result;
+}
+
+#else
+
 /** Request the device from the adapter and get its queue.
  *
  * @param gpu The backend
@@ -204,15 +267,14 @@ static void box_gpu_device_init(
     }
 }
 
-/** Create the instance, adapter and device on the thread that renders.
+/** Create the instance, adapter and device.
  *
- * @param ctx The backend
+ * @param gpu The backend
  * @return 0 when the device exists, nonzero when it could not be created
  */
-static int box_gpu_init(
-    void *ctx)
+static int box_gpu_create(
+    box_gpu_t *gpu)
 {
-    box_gpu_t *gpu = ctx;
     int result = -1;
     wgpuSetLogCallback(box_gpu_log, NULL);
     wgpuSetLogLevel(WGPULogLevel_Warn);
@@ -235,7 +297,27 @@ static int box_gpu_init(
     }
 
     box_gpu_device_init(gpu);
-    if (!gpu->device) {
+    if (gpu->device) {
+        result = 0;
+    }
+
+done:
+    return result;
+}
+
+#endif
+
+/** Create the device and the objects the targets share on the thread that renders.
+ *
+ * @param ctx The backend
+ * @return 0 when the device exists, nonzero when it could not be created
+ */
+static int box_gpu_init(
+    void *ctx)
+{
+    box_gpu_t *gpu = ctx;
+    int result = box_gpu_create(gpu);
+    if (result) {
         goto done;
     }
 
@@ -244,7 +326,6 @@ static int box_gpu_init(
     box_gpu_scatter_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
-    result = 0;
 done:
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = result == 0;

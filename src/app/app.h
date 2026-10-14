@@ -10,7 +10,7 @@
 
 /** Read the CPU time the process has used on all of its threads.
  *
- * @return User plus system seconds
+ * @return User plus system seconds, 0 in the browser, which has no process CPU time
  */
 double box_app_cpu_time(void);
 

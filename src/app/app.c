@@ -8,6 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 /** Clock of the frame system, which measures the interval between two frames */
 typedef struct box_app_clock_t {
     double start;   /**< Wall seconds when the module was imported */
@@ -138,6 +142,9 @@ static float box_app_delta(
 
 /** Serve the terminal and REST endpoints on a port, only REST without box.command.
  *
+ * The browser cannot listen on a port and has no threads for the server, so the web build
+ * serves nothing.
+ *
  * @param world The world
  * @param port The port
  */
@@ -145,6 +152,10 @@ static void box_app_serve(
     ecs_world_t *world,
     int32_t port)
 {
+#ifdef __EMSCRIPTEN__
+    (void)world;
+    (void)port;
+#else
     ecs_entity_t server = ecs_lookup(world, "box.command.TerminalServer");
     if (server) {
         TerminalServer value = { .port = port };
@@ -152,6 +163,7 @@ static void box_app_serve(
     } else {
         ecs_singleton_set(world, EcsRest, { .port = (uint16_t)port });
     }
+#endif
 }
 
 /** Check the settings of a run and load its scene.
@@ -194,6 +206,27 @@ done:
     return result;
 }
 
+#ifdef __EMSCRIPTEN__
+/** Run a frame from the animation frame callback of the browser and end the loop when the
+ * world quits. The browser paces the frames, so flecs must not sleep to reach a frame rate.
+ *
+ * @param arg The world
+ */
+static void box_app_web_frame(
+    void *arg)
+{
+    ecs_world_t *world = arg;
+    if (ecs_get_world_info(world)->target_fps != 0) {
+        ecs_set_target_fps(world, 0);
+    }
+
+    if (!ecs_progress(world, box_app_delta(ecs_singleton_get(world, App)))) {
+        ecs_singleton_get_mut(world, AppStatus)->running = false;
+        emscripten_cancel_main_loop();
+    }
+}
+#endif
+
 int box_app_run(
     ecs_world_t *world)
 {
@@ -205,8 +238,12 @@ int box_app_run(
 
     status = ecs_singleton_get_mut(world, AppStatus);
     status->running = true;
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop_arg(box_app_web_frame, world, 0, true);
+#else
     while (ecs_progress(world, box_app_delta(ecs_singleton_get(world, App)))) {
     }
+#endif
 
     status = ecs_singleton_get_mut(world, AppStatus);
     status->running = false;

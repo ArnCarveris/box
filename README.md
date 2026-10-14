@@ -19,6 +19,28 @@ bake3 --local-env                                         # build the library an
 bake3 run apps/boxrun --local-env -- --headless --frames 10  # headless run, exits after 10 frames
 ```
 
+## Browser build
+
+```sh
+bake3 --target em --local-env apps/boxrun                 # boxrun.html, .js and .wasm
+bake3 --target em --cfg release --local-env apps/boxrun   # optimized, about 1.7 MB of wasm
+bake3 run apps/boxrun --target em --local-env             # serve the page on localhost:8080
+```
+
+The files land in `.bake/local_env/wasm32-Emscripten/<cfg>/bin/`. The build uses emsdk's
+`emdawnwebgpu` port, so it renders with the browser's own WebGPU, and embeds `etc/` at `/etc`.
+Command line arguments go after `#` in the page URL, e.g. `boxrun.html#etc/scenes/x.flecs`.
+In the browser the main thread renders each packet at the end of its frame, jobs run inline,
+no command port is served and `Surface.write_to_file` captures are skipped.
+
+The browser enforces the WGSL uniformity rules that native wgpu skips. Check every engine
+shader with Tint (the validator is installed once into `~/.cache/box/wgsl`):
+
+```sh
+node tools/wgsl_check.mjs --install
+node tools/wgsl_check.mjs                                 # etc/shaders, or pass files and dirs
+```
+
 ## Tests
 
 ```sh

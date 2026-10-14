@@ -3,5 +3,12 @@
     "type": "application",
     "value": {
         "use": ["box"]
+    },
+    "lang.c": {
+        "${os Emscripten}": {
+            "shell": "shell.html",
+            "embed": ["../../etc"],
+            "ldflags": ["-sEXPORTED_RUNTIME_METHODS=cwrap,FS"]
+        }
     }
 }
