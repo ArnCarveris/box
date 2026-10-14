@@ -489,7 +489,8 @@ void Texture_gpu_albedo_layer(void) {
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
-        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
     ecs_entity_t textured = ecs_new(world);
     ecs_set(world, textured, Position, {-3, 0, 0});
     ecs_set(world, textured, Quad, {5, 5});
@@ -899,7 +900,8 @@ void Texture_gpu_normal_layer(void) {
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
-        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-3.5f, 0, 0});
     ecs_set(world, a, Quad, {6, 6});
