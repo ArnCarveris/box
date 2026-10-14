@@ -128,18 +128,19 @@ static void box_surface_impl_copy(
     }
 }
 
-/** Close the windows that are left once the world, and with it the renderer, is gone.
+/** Close the windows that are left and free the module state.
  *
- * @param world The world
+ * The state is the hook context of SurfaceImpl, which the world frees after it destroyed every
+ * component, so every SurfaceImpl dtor has retired its target by then and the render thread
+ * and backend are gone.
+ *
  * @param ctx The module state
  */
-static void box_surface_fini(
-    ecs_world_t *world,
+static void box_surface_state_free(
     void *ctx)
 {
     box_surface_state_t *state = ctx;
     int32_t i;
-    (void)world;
     for (i = 0; i < ecs_vec_count(&state->retired); i ++) {
         box_surface_retired_t *r = ecs_vec_get_t(&state->retired, box_surface_retired_t, i);
         if (r->window) {
@@ -578,14 +579,14 @@ void BoxSurfaceImport(
 
     box_surface_state_t *state = ecs_os_calloc_t(box_surface_state_t);
     ecs_vec_init_t(NULL, &state->retired, box_surface_retired_t, 0);
-    ecs_atfini(world, box_surface_fini, state);
 
     ecs_set_hooks(world, SurfaceImpl, {
         .ctor = flecs_default_ctor,
         .dtor = box_surface_impl_dtor,
         .move = box_surface_impl_move,
         .copy = box_surface_impl_copy,
-        .ctx = state
+        .ctx = state,
+        .ctx_free = box_surface_state_free
     });
     ecs_add_pair(world, ecs_id(SurfaceImpl), EcsOnInstantiate, EcsDontInherit);
 
