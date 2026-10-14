@@ -72,14 +72,25 @@ parser only writes the `App` singleton:
 | `--port <n>` | `port` | Command and REST port, default 27750, 0 disables |
 | `<file>` | `scene` | Script loaded before the first frame |
 
-`box_app_run` refuses a headless run without `frames` or `timeout`, and a headless run on a
-machine whose load average exceeds its core count unless `App.unguarded` is set. It loads the
+`box_app_run` refuses a headless run without `frames` or `timeout`, a headless run without its
+temporary folder, and a headless run on a machine whose load average exceeds its core count
+unless `App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a
 paced headless run sleeps for as long as the process exceeded its CPU budget. Setting
-`App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`), removed when the world is
-deleted. The browser build (`bake3 --target em apps/boxrun`) renders into `#canvas` with the
+`App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
+
+The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by
+the user. `/tmp/box` is accepted only when it is a real folder (not a link) owned by the user
+or by root and, when others can write it, sticky, so no other user can rename or replace the
+folder of a process; otherwise the run refuses to start (a new `/tmp/box` is made 0700, so on
+a shared machine either each user removes it or root owns it with mode 1777). A folder of the
+user already at `/tmp/box/<pid>` was left by a crashed run with the same pid and is removed
+first; a link, a file or a folder of another user there is refused and left alone. A refused
+folder leaves `tmp_dir` unset and quits the headless world, and `box_app_run` returns nonzero
+before the scene loads. The windowed terminal session root is the same folder. The worlds of
+one process share it, and the last one deleted removes it without following links. The browser build (`bake3 --target em apps/boxrun`) renders into `#canvas` with the
 page's WebGPU device and has no render thread and no workers.
 
 ## Threads
@@ -348,6 +359,21 @@ are script functions registered with `box_command_register` (`src/command`):
 
 The HTTP server has no deferred reply, so commands that wait (`input.wait`, `capture`, `render`)
 answer at once with a pending state and the caller polls.
+
+**Limits.** Numeric arguments are range checked: an i32 outside the i32 range, a non finite
+f64, walk `steps` above 1000, `dur` above 36000 frames and `next` counts above 1000 fail with
+"is out of range, min to max" (a rejected `next` keeps the iteration). The `TerminalLimits`
+singleton holds the session bounds, with defaults from its constructor. `sessions` (16) caps
+the sessions `/terminal/new` keeps open (HTTP 400 "too many sessions") and `idle_timeout`
+(1800 s) closes such a session when it ran no command for that long (`TerminalIdle`, every
+frame); both are read live and do not apply to the `Terminal` entities of a scene. `history`
+(1000 lines, the `commands` output; `TerminalStatus.commands` stays the total), `log_size`
+(1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
+read when a session opens and do not change open sessions. An image of `capture` or `render`
+counts against `images` from the moment it is named until it is deleted: naming one more
+deletes the oldest image the renderer is done with (written, or dropped once
+`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+the command fails, so a burst of captures cannot leave files behind.
 
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`
 creates an offscreen target for one packet, an exclusive view assigned to it and a PNG path, and

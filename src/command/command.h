@@ -8,6 +8,7 @@
 
 #include <box.h>
 #include <stdio.h>
+#include "../app/app.h"
 
 /** Path of the scope that holds the command functions */
 #define BOX_COMMAND_SCOPE "box.command.commands"
@@ -21,6 +22,23 @@
 /** Name of the file in the session folder that every command line is appended to */
 #define BOX_TERMINAL_LOG "commands.log"
 
+/** Packets after the last submitted one by which the renderer has written or dropped an image
+ * that a command names now: a capture goes into the next packet, a render one packet later
+ * at most */
+#define BOX_TERMINAL_IMAGE_PACKETS (2)
+
+/** box_terminal_image result: the session keeps no images */
+#define BOX_TERMINAL_IMAGE_NONE (-1)
+
+/** box_terminal_image result: every image the session keeps is still being written */
+#define BOX_TERMINAL_IMAGE_PENDING (-2)
+
+/** An image a render command named, which the renderer writes in a later frame */
+typedef struct box_terminal_image_t {
+    char *path;         /**< The PNG file */
+    int32_t packet;     /**< RenderStatus.rendered from which the renderer is done with it */
+} box_terminal_image_t;
+
 /** One command line a session ran and its result */
 typedef struct box_command_entry_t {
     char *line;         /**< The command line */
@@ -28,11 +46,17 @@ typedef struct box_command_entry_t {
     bool error;         /**< The command failed */
 } box_command_entry_t;
 
-/** Private state of a terminal session */
+/** Private state of a terminal session; its limits are read from TerminalLimits on open */
 typedef struct TerminalSession {
     char *dir;          /**< The session folder, removed with the session */
     FILE *log;          /**< Open commands.log in the session folder */
-    ecs_vec_t entries;  /**< box_command_entry_t of every line the session ran */
+    ecs_vec_t entries;  /**< Ring of box_command_entry_t of the last lines the session ran */
+    ecs_vec_t images;   /**< box_terminal_image_t of the images the session keeps, oldest first */
+    int64_t total;      /**< Lines the session ran since it opened */
+    int32_t history;    /**< Size of the entries ring */
+    int32_t images_max; /**< Size of the images ring */
+    int32_t log_size;   /**< Bytes of commands.log before it moves to commands.log.1 */
+    double active;      /**< Wall clock seconds of the last command, or of the open */
 } TerminalSession;
 
 /** Parameter rules of a registered command */
@@ -52,7 +76,7 @@ typedef struct box_terminal_host_t {
     int32_t port_wanted;        /**< Port of the TerminalServer singleton */
     int32_t next;               /**< Counter of generated session handles */
     bool failed;                /**< The running command called box_command_error */
-    char *root;                 /**< Folder this module created for the sessions, or NULL */
+    char *root;                 /**< Temporary folder opened for the sessions, or NULL */
 } box_terminal_host_t;
 
 /** Singleton that points to the host of the world */
@@ -80,13 +104,6 @@ box_terminal_host_t* box_terminal_host(
 const char* box_terminal_root(
     ecs_world_t *world);
 
-/** Remove a folder and everything in it.
- *
- * @param path The folder
- */
-void box_terminal_rmtree(
-    const char *path);
-
 /** Append a command line and its result to the log of a session.
  *
  * @param world The world
@@ -101,6 +118,51 @@ void box_terminal_log(
     const char *line,
     const char *result,
     bool error);
+
+/** Get the number of lines in the history ring of a session.
+ *
+ * @param s The session
+ * @return Lines the ring holds, at most TerminalLimits.history of the session
+ */
+int32_t box_terminal_history_count(
+    const TerminalSession *s);
+
+/** Get a line of the history ring of a session.
+ *
+ * @param s The session
+ * @param i Index from the oldest line in the ring
+ * @return The line
+ */
+const box_command_entry_t* box_terminal_history_get(
+    const TerminalSession *s,
+    int32_t i);
+
+/** Keep an image a render command names in the resources folder of a session.
+ *
+ * An image counts against TerminalLimits.images of the session until it is deleted. When the
+ * session keeps that many, the oldest image the renderer is done with is deleted; an image
+ * that is still being written is never evicted, so its file cannot appear untracked later.
+ *
+ * @param world The world
+ * @param session The session entity
+ * @param path The image file
+ * @return 0 when the image is kept, BOX_TERMINAL_IMAGE_NONE when the session keeps no
+ * images, BOX_TERMINAL_IMAGE_PENDING when every image it keeps is still being written
+ */
+int box_terminal_image(
+    ecs_world_t *world,
+    ecs_entity_t session,
+    const char *path);
+
+/** Test whether box_terminal_new may not open another session.
+ *
+ * @param world The world
+ * @param open Receives the number of open sessions, NULL to ignore
+ * @return Whether TerminalLimits.sessions sessions are open
+ */
+bool box_terminal_full(
+    ecs_world_t *world,
+    int32_t *open);
 
 /** Get the scope that entity arguments of a session resolve against.
  *
