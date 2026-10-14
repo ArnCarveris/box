@@ -19,7 +19,8 @@
                 "id": "Extract",
                 "benchcases": [
                     "unchanged",
-                    "changed_1pct"
+                    "changed_1pct",
+                    "baked_idle"
                 ]
             },
             {

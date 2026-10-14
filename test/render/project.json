@@ -269,6 +269,18 @@
                 ]
             },
             {
+                "id": "ProbeVolume",
+                "testcases": [
+                    "probe_count_of_layout",
+                    "no_static_shapes_no_probes",
+                    "invalid_inside_box",
+                    "invalid_inside_rotated_box",
+                    "grid_follows_static_bounds",
+                    "unbaked_view_renders_identically",
+                    "ambient_probes_match_hemisphere"
+                ]
+            },
+            {
                 "id": "Scene",
                 "testcases": [
                     "view_renders_scene_of_camera",
