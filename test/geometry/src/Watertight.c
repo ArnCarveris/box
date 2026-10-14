@@ -1,0 +1,1181 @@
+/**
+ * @file Watertight.c
+ * @brief Every round shape mesh is closed: each edge is shared by two triangles wound oppositely,
+ * no T-junctions, and every face points outward.
+ */
+
+#include <box.h>
+#include <bake_test.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "mesh_cache.h"
+
+/** A vertex position with its index, sorted by x to weld coincident vertices */
+typedef struct watertight_vertex_t {
+    float p[3];    /**< Position */
+    int32_t index; /**< Index of the vertex in the mesh */
+} watertight_vertex_t;
+
+/** Order welded vertices by x.
+ *
+ * @param a First vertex
+ * @param b Second vertex
+ * @return Negative, zero or positive as a sorts before, with or after b
+ */
+static int watertight_compare(
+    const void *a,
+    const void *b)
+{
+    float xa = ((const watertight_vertex_t*)a)->p[0];
+    float xb = ((const watertight_vertex_t*)b)->p[0];
+
+    return (xa > xb) - (xa < xb);
+}
+
+void Watertight_sphere(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            snprintf(name, sizeof(name), "sphere segments %d smooth %d", segments[s], smooth);
+            ecs_entity_t e = ecs_entity(world, { .name = name });
+            ecs_set(world, e, Sphere,
+                { .segments = segments[s], .smooth = smooth, .radius = 0.28f });
+            entities[count ++] = e;
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_hemisphere(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            snprintf(name, sizeof(name), "hemisphere segments %d smooth %d", segments[s], smooth);
+            ecs_entity_t e = ecs_entity(world, { .name = name });
+            ecs_set(world, e, HemiSphere,
+                { .segments = segments[s], .smooth = smooth, .radius = 0.5f });
+            entities[count ++] = e;
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_icosphere(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    for (int32_t level = 0; level < 5; level ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            snprintf(name, sizeof(name), "icosphere level %d smooth %d", level, smooth);
+            ecs_entity_t e = ecs_entity(world, { .name = name });
+            ecs_set(world, e, IcoSphere, { .segments = level, .smooth = smooth, .radius = 1 });
+            entities[count ++] = e;
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_cylinder(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            snprintf(name, sizeof(name), "cylinder segments %d smooth %d", segments[s], smooth);
+            ecs_entity_t e = ecs_entity(world, { .name = name });
+            ecs_set(world, e, Cylinder,
+                { .segments = segments[s], .smooth = smooth, .radius = 0.12f, .length = 2 });
+            entities[count ++] = e;
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_cone(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t smooth = 0; smooth < 2; smooth ++) {
+            snprintf(name, sizeof(name), "cone segments %d smooth %d", segments[s], smooth);
+            ecs_entity_t e = ecs_entity(world, { .name = name });
+            ecs_set(world, e, Cone,
+                { .segments = segments[s], .smooth = smooth, .radius = 0.55f, .length = 1 });
+            entities[count ++] = e;
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_capsule(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    float lengths[3] = { 0.0f, 0.5f, 3.0f };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t l = 0; l < 3; l ++) {
+            for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                snprintf(name, sizeof(name), "capsule segments %d length %d smooth %d",
+                    segments[s], (int)(lengths[l] * 100), smooth);
+                ecs_entity_t e = ecs_entity(world, { .name = name });
+                ecs_set(world, e, Capsule, { .segments = segments[s], .smooth = smooth,
+                    .radius = 0.5f, .length = lengths[l] });
+                entities[count ++] = e;
+            }
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_torus(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[6] = { 3, 8, 12, 16, 20, 32 };
+    int32_t rings[5] = { 3, 4, 6, 12, 24 };
+    for (int32_t s = 0; s < 6; s ++) {
+        for (int32_t r = 0; r < 5; r ++) {
+            for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                snprintf(name, sizeof(name), "torus segments %d rings %d smooth %d",
+                    segments[s], rings[r], smooth);
+                ecs_entity_t e = ecs_entity(world, { .name = name });
+                ecs_set(world, e, Torus, { .segments = segments[s], .rings = rings[r],
+                    .smooth = smooth, .radius = 0.2f, .tube = 0.05f });
+                entities[count ++] = e;
+            }
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        const Torus *torus = ecs_get(world, entities[m], Torus);
+        test_assert(torus != NULL);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            float step = 2.0f * GLM_PIf / (float)torus->segments;
+            float phi = atan2f(mid[2], mid[0]);
+            phi = phi < 0.0f ? phi + 2.0f * GLM_PIf : phi;
+            float chord = cosf(0.5f * step) / cosf(phi - (floorf(phi / step) + 0.5f) * step);
+            vec3 ring = { chord * cosf(phi), 0.0f, chord * sinf(phi) };
+            glm_vec3_sub(mid, ring, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_tube(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    float thickness[3] = { 0.2f, 0.5f, 1.0f };
+    float arcs[3] = { 0.0f, 1.5f, 4.0f };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t w = 0; w < 3; w ++) {
+            for (int32_t a = 0; a < 3; a ++) {
+                for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                    snprintf(name, sizeof(name), "tube segments %d thickness %d arc %d smooth %d",
+                        segments[s], (int)(thickness[w] * 100), (int)(arcs[a] * 100), smooth);
+                    ecs_entity_t e = ecs_entity(world, { .name = name });
+                    ecs_set(world, e, Tube, { .segments = segments[s], .smooth = smooth,
+                        .radius = 1, .length = 1, .thickness = thickness[w], .arc = arcs[a] });
+                    entities[count ++] = e;
+                }
+            }
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            (void)out;
+            (void)center;
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_frustum(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    int32_t segments[14] = { 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 20, 24, 32, 64 };
+    float radii[4][2] = { { 1.0f, 0.5f }, { 0.5f, 1.0f }, { 1.0f, 0.0f }, { 0.0f, 1.0f } };
+    for (int32_t s = 0; s < 14; s ++) {
+        for (int32_t r = 0; r < 4; r ++) {
+            for (int32_t smooth = 0; smooth < 2; smooth ++) {
+                snprintf(name, sizeof(name), "frustum segments %d radii %d %d smooth %d",
+                    segments[s], (int)(radii[r][0] * 100), (int)(radii[r][1] * 100), smooth);
+                ecs_entity_t e = ecs_entity(world, { .name = name });
+                ecs_set(world, e, Frustum, { .segments = segments[s], .smooth = smooth,
+                    .length = 1, .radius_bottom = radii[r][0], .radius_top = radii[r][1] });
+                entities[count ++] = e;
+            }
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}
+
+void Watertight_rounded_box(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t entities[512];
+    int32_t count = 0;
+    char name[96];
+    float sizes[3][3] = { { 1, 1, 1 }, { 2, 1, 0.5f }, { 0.4f, 3, 1 } };
+    float radii[3] = { 0.05f, 0.1f, 0.2f };
+    int32_t segments[6] = { 1, 2, 3, 4, 6, 8 };
+    for (int32_t z = 0; z < 3; z ++) {
+        for (int32_t r = 0; r < 3; r ++) {
+            for (int32_t s = 0; s < 6; s ++) {
+                snprintf(name, sizeof(name), "rounded box size %d radius %d segments %d",
+                    z, (int)(radii[r] * 100), segments[s]);
+                ecs_entity_t e = ecs_entity(world, { .name = name });
+                ecs_set(world, e, RoundedBox, { .x = sizes[z][0], .y = sizes[z][1],
+                    .z = sizes[z][2], .radius = radii[r], .segments = segments[s] });
+                entities[count ++] = e;
+            }
+        }
+    }
+
+    for (int32_t m = 0; m < count; m ++) {
+        const ShapeMesh *sm = ecs_get(world, entities[m], ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        test_assert(mesh->index_count > 0);
+        test_int(mesh->index_count % 3, 0);
+        int32_t n = mesh->vertex_count;
+        watertight_vertex_t *sorted = ecs_os_malloc_n(watertight_vertex_t, n);
+        int32_t *weld = ecs_os_malloc_n(int32_t, n);
+        for (int32_t i = 0; i < n; i ++) {
+            glm_vec3_copy(mesh->vertices[i].position, sorted[i].p);
+            sorted[i].index = i;
+        }
+
+        qsort(sorted, (size_t)n, sizeof(watertight_vertex_t), watertight_compare);
+        for (int32_t i = 0; i < n; i ++) {
+            weld[sorted[i].index] = sorted[i].index;
+            for (int32_t j = i - 1; j >= 0 && sorted[i].p[0] - sorted[j].p[0] < 1e-4f; j --) {
+                if (glm_vec3_distance(sorted[i].p, sorted[j].p) < 1e-4f) {
+                    weld[sorted[i].index] = weld[sorted[j].index];
+                    break;
+                }
+            }
+        }
+
+        ecs_map_t edges;
+        ecs_map_init(&edges, NULL);
+        int32_t degenerate = 0, open = 0, inward = 0;
+        double volume = 0.0;
+        vec3 center;
+        glm_vec3_center((float*)mesh->min, (float*)mesh->max, center);
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            uint64_t v[3];
+            for (int32_t k = 0; k < 3; k ++) {
+                v[k] = (uint64_t)weld[mesh->indices[t + k]];
+            }
+
+            if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+                degenerate ++;
+            }
+
+            for (int32_t k = 0; k < 3; k ++) {
+                ecs_map_val_t *c = ecs_map_ensure(&edges, (v[k] << 32) | v[(k + 1) % 3]);
+                (*c) ++;
+            }
+
+            const float *a = mesh->vertices[mesh->indices[t]].position;
+            const float *b = mesh->vertices[mesh->indices[t + 1]].position;
+            const float *c = mesh->vertices[mesh->indices[t + 2]].position;
+            vec3 ab, ac, face, mid, out;
+            glm_vec3_sub((float*)b, (float*)a, ab);
+            glm_vec3_sub((float*)c, (float*)a, ac);
+            glm_vec3_cross(ab, ac, face);
+            volume += (double)glm_vec3_dot((float*)a, face) / 6.0;
+            glm_vec3_add((float*)a, (float*)b, mid);
+            glm_vec3_add(mid, (float*)c, mid);
+            glm_vec3_scale(mid, 1.0f / 3.0f, mid);
+            glm_vec3_sub(mid, center, out);
+            if (glm_vec3_dot(face, out) <= 0.0f) {
+                inward ++;
+            }
+        }
+
+        for (int32_t t = 0; t < mesh->index_count; t += 3) {
+            for (int32_t k = 0; k < 3; k ++) {
+                uint64_t a = (uint64_t)weld[mesh->indices[t + k]];
+                uint64_t b = (uint64_t)weld[mesh->indices[t + (k + 1) % 3]];
+                ecs_map_val_t *fwd = ecs_map_get(&edges, (a << 32) | b);
+                ecs_map_val_t *back = ecs_map_get(&edges, (b << 32) | a);
+                if (!fwd || *fwd != 1 || !back || *back != 1) {
+                    open ++;
+                }
+            }
+        }
+
+        if (degenerate || open || inward || volume <= 0.0) {
+            printf("%s: degenerate %d, open edges %d, inward faces %d, volume %f\n",
+                ecs_get_name(world, entities[m]), degenerate, open, inward, volume);
+        }
+
+        test_int(degenerate, 0);
+        test_int(open, 0);
+        test_int(inward, 0);
+        test_assert(volume > 0.0);
+        ecs_map_fini(&edges);
+        ecs_os_free(sorted);
+        ecs_os_free(weld);
+    }
+
+    ecs_fini(world);
+}

@@ -303,3 +303,54 @@ void Sphere_default_segments_normals(void) {
 
     ecs_fini(world);
 }
+
+void Sphere_lantern_ribs(void) {
+    // renderer/sphere_gaps
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    for (int32_t smooth = 0; smooth < 2; smooth ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Sphere, { .segments = 8, .smooth = smooth, .radius = 0.25f });
+        const ShapeMesh *sm = ecs_get(world, e, ShapeMesh);
+        test_assert(sm != NULL);
+        const box_mesh_t *mesh = box_mesh_cache_get(cache, sm->mesh);
+        test_assert(mesh != NULL);
+        int32_t outside = 0;
+        for (int32_t rib = -1; rib <= 1; rib += 2) {
+            for (int32_t a = 0; a < 64; a ++) {
+                for (int32_t b = 0; b < 8; b ++) {
+                    float around = 2.0f * GLM_PIf * (float)a / 64.0f;
+                    float tube = 2.0f * GLM_PIf * (float)b / 8.0f;
+                    float r = 0.185f + 0.014f * cosf(tube);
+                    vec3 p = {
+                        r * cosf(around) / 0.25f,
+                        (0.12f * (float)rib + 0.014f * sinf(tube)) / 0.25f,
+                        r * sinf(around) / 0.25f
+                    };
+                    bool inside = true;
+                    for (int32_t t = 0; t < mesh->index_count; t += 3) {
+                        const float *v0 = mesh->vertices[mesh->indices[t]].position;
+                        const float *v1 = mesh->vertices[mesh->indices[t + 1]].position;
+                        const float *v2 = mesh->vertices[mesh->indices[t + 2]].position;
+                        vec3 e1, e2, face, d;
+                        glm_vec3_sub((float*)v1, (float*)v0, e1);
+                        glm_vec3_sub((float*)v2, (float*)v0, e2);
+                        glm_vec3_cross(e1, e2, face);
+                        glm_vec3_sub(p, (float*)v0, d);
+                        if (glm_vec3_norm(face) > 1e-8f && glm_vec3_dot(face, d) >= 0.0f) {
+                            inside = false;
+                        }
+                    }
+
+                    outside += !inside;
+                }
+            }
+        }
+
+        test_int(outside, 0);
+    }
+
+    ecs_fini(world);
+}
