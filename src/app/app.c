@@ -7,6 +7,7 @@
 #include "app.h"
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -166,6 +167,40 @@ static void box_app_serve(
 #endif
 }
 
+/** Find a scene file: the path as given, or a relative path in the working directory or one
+ * of its ancestors, so a run from inside the repository finds `etc/scenes/...`.
+ *
+ * @param path The scene path from the command line
+ * @return The path to load, owned by the caller
+ */
+static char* box_app_scene_path(
+    const char *path)
+{
+    char dir[4096];
+    char *result = NULL;
+    if (path[0] == '/' || !access(path, R_OK) || !getcwd(dir, sizeof(dir))) {
+        goto done;
+    }
+
+    char *slash = NULL;
+    do {
+        result = flecs_asprintf("%s/%s", dir, path);
+        if (!access(result, R_OK)) {
+            goto done;
+        }
+
+        ecs_os_free(result);
+        result = NULL;
+        slash = strrchr(dir, '/');
+        if (slash) {
+            *slash = '\0';
+        }
+    } while (slash && dir[0]);
+
+done:
+    return result ? result : ecs_os_strdup(path);
+}
+
 /** Check the settings of a run and load its scene.
  *
  * @param world The world
@@ -190,9 +225,14 @@ static int box_app_start(
         goto done;
     }
 
-    if (app->scene && app->scene[0] && !ecs_script(world, { .filename = app->scene })) {
-        ecs_err("failed to load scene '%s'", app->scene);
-        goto done;
+    if (app->scene && app->scene[0]) {
+        char *scene = box_app_scene_path(app->scene);
+        bool loaded = ecs_script(world, { .filename = scene }) != 0;
+        ecs_os_free(scene);
+        if (!loaded) {
+            ecs_err("failed to load scene '%s'", app->scene);
+            goto done;
+        }
     }
 
     app = ecs_singleton_get(world, App);
