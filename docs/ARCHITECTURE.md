@@ -106,9 +106,10 @@ free packet and waits when all are in flight, counted in `RenderStatus.stalls`),
 `RenderSubmit` hands it to the consumer. `RenderExtractViews` adds every `View` whose
 camera has a `Camera`, in creation order (entity id), with the parent of the view, the
 camera transform, its inverse and the scene root of the camera (the nearest ancestor with
-`Scene`, 0 for the default scene). `RenderExtractDraws` turns every entity with a
-`ShapeMesh` into an instance and a batch, see below. `box_render_sync` waits until every
-submitted packet rendered.
+`Scene`, 0 for the default scene). `RenderExtractDraws` sends the instanced batches of the
+shapes, see below. `box_render_sync` waits until every submitted packet rendered; deleting
+the world does the same before the fini actions registered after `box.render`, such as the
+removal of `AppStatus.tmp_dir`, run, so the captures of the last frames land.
 
 A backend (`box_render_backend_t`) is four callbacks: `init`, `render` and `fini` run on
 the consuming thread only, `free` on the main thread. A new ring has the null backend,
@@ -158,10 +159,20 @@ into surfaces of different sizes keeps its proportions.
 the mesh cache (`src/geometry/mesh_cache.h`) is sent once per backend as a `BOX_RENDER_MESH`
 create with its vertices and indices; the renderer keeps a cache reference to it, so its
 handle is not reused while the backend has it, and destroys it once only the renderer
-references it. Every shape writes a `box_render_instance_t` (model matrix with the instance
-scale, inverse transpose normal matrix, linear `Rgb` color) into the instance buffer
-`BOX_RENDER_BUFFER_DRAWS`, uploaded every frame, and one batch with one instance and the
-scene root of the entity, found by the cached `Scene(self|up ChildOf)` term of the query.
+references it. Shapes live in persistent batches (`src/render/draw.h`, `batch.c`) keyed by
+scene root, mesh, pipeline and whether they are dynamic; a private `DrawSlot` holds the batch
+and slot of an entity, and a removed slot is filled with the last one so the instances stay
+contiguous. An instance is a `box_render_instance_t` (model matrix with the instance scale,
+inverse transpose normal matrix, linear `Rgb` color). Observers on `ShapeMesh`, `Rgb`,
+`WorldTransform`, `Position`/`Rotation`/`Scale`, `ChildOf`/`Parent`, `Scene` and the dynamic
+tags queue changed entities or subtree roots, so an extract only visits what changed. A
+static batch owns a vertex and storage instance buffer: a new or grown buffer gets one full
+upload, later changes go into a shared change buffer that the engine compute shader
+`etc/shaders/scatter.wgsl` scatters into their slots, and an unchanged frame uploads nothing.
+`DynamicTransform` and `DynamicMaterial` (self or up) shapes go into dynamic batches that are
+filled from cached queries and uploaded every frame. A batch draws all its instances with one
+instanced draw call; a scatter binds the whole instance buffer, which limits a batch to 1M
+instances.
 
 The webgpu backend (`src/render/gpu_draw.c`) renders, after clearing a target, every view
 of the target in packet order into its color texture and a `Depth32Float` texture at the
