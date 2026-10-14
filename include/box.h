@@ -23,6 +23,8 @@
 #include "box/render.h"
 #include "box/command.h"
 #include "box/input.h"
+#include "box/controllers.h"
+#include "box/controllers.h"
 
 #ifdef __cplusplus
 extern "C" {

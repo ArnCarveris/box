@@ -20,6 +20,7 @@ void BoxImport(
     ECS_IMPORT(world, BoxMovement);
     ECS_IMPORT(world, BoxLayout);
     ECS_IMPORT(world, BoxInput);
+    ECS_IMPORT(world, BoxControllers);
     ECS_IMPORT(world, BoxApp);
     ECS_IMPORT(world, BoxJobs);
     ECS_IMPORT(world, BoxRender);
