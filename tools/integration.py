@@ -566,6 +566,9 @@ def perf_problems(data):
     period = data.get("period") or 0
     if not data.get("views"):
         problems.append("no view renders the orbiting camera")
+    cull = data.get("cull") or {}
+    if cull.get("samples") and not (cull.get("visible") or {}).get("max"):
+        problems.append("the orbiting views draw nothing (beyond the far plane?)")
     if period <= 0:
         problems.append("the camera does not orbit (period %g)" % period)
     if fps and period and data.get("frames", 0) < fps * period:

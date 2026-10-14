@@ -32,14 +32,14 @@ player {
 // The orbit fits the whole field, 2,500 units away, where a shape is far below a pixel and
 // size culled. The view looks through a 5 degree lens turned 3 degrees off the center instead,
 // so it sweeps a ring of the field at a few pixels per shape and shapes enter and leave it
-// every frame.
+// every frame. Both cameras have no far plane: the far side of the field is 3,600 units away.
 camera {
-  Camera: {fov: 50}
+  Camera: {fov: 50, far_: 0}
 
   lens {
     Position: {0, 0, 0}
     Rotation: {0, 0.05, 0}
-    Camera: {fov: 5}
+    Camera: {fov: 5, far_: 0}
   }
 }
 

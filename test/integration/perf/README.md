@@ -38,6 +38,9 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 - A view renders the orbiting camera or a camera under it (a narrower lens on the orbit, like
   `offscreen_100k`'s `eye`). A scene with a special camera (a controller walk, a fixed pose)
   keeps it only as a second view next to the orbit view, never instead of it.
+- The orbiting views draw something. The orbit fits the bounds at `radius / sin(fov / 2)`, which
+  for a scene wider than a few hundred units lies beyond the default far plane (1000) of a
+  `Camera`: such a scene gives its cameras `far_: 0` (no far plane), like `walk_1m`.
 - The measurement covers at least one full revolution: `frames >= fps * period`, so every angle
   is measured and objects enter and leave the view during the measurement.
 - The warmup, the only frames that are not measured, is at most one second (`warmup <= fps`). It
