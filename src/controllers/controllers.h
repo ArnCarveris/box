@@ -216,7 +216,8 @@ bool box_collider_ray(
  * @param world The world
  * @param body The body
  * @param feet The bottom of the capsule, written in place
- * @param velocity Velocity in units per second, written when the move is blocked
+ * @param velocity Velocity in units per second, written when the move is blocked; a velocity
+ * that is not finite does not move the body
  * @param dt Seconds the frame took
  * @param hit Receives what the move ran into, may be NULL
  * @return Whether the position changed

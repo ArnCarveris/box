@@ -35,6 +35,9 @@
 /** Margin around the swept capsule within which shapes are read */
 #define BOX_MOVE_MARGIN (0.05f)
 
+/** Steps a long move advances at the most; one that needs more stops short, never skips */
+#define BOX_MOVE_SWEEPS (256)
+
 /** Contact normals a move keeps to clip the velocity with */
 #define BOX_MOVE_NORMALS (8)
 
@@ -234,10 +237,12 @@ static float box_move_deepest(
  *
  * @param m The move
  * @param pos The feet, written in place
+ * @param rest Motion still to go, loses what pushes into the contacts, may be NULL
  */
 static void box_move_push(
     box_move_t *m,
-    vec3 pos)
+    vec3 pos,
+    vec3 rest)
 {
     bool again = true;
     int32_t i;
@@ -245,20 +250,29 @@ static void box_move_push(
         box_collider_contact_t contact;
         float *n = contact.normal;
         float depth = box_move_deepest(m, pos, &contact);
-        float flat = 0;
+        float flat = 0, d = 0;
+        vec3 away;
         again = depth > BOX_MOVE_EPS;
         if (!again) {
             continue;
         }
 
         flat = sqrtf(n[0] * n[0] + n[2] * n[2]);
+        glm_vec3_copy(n, away);
         if (n[1] >= (m->support ? BOX_MOVE_SUPPORT : BOX_MOVE_WALKABLE)) {
             pos[1] += depth / n[1];
         } else if (m->body->upright && n[1] > 0 && flat > 0) {
-            pos[0] += n[0] / flat * depth / flat;
-            pos[2] += n[2] / flat * depth / flat;
+            away[0] = n[0] / flat;
+            away[1] = 0;
+            away[2] = n[2] / flat;
+            glm_vec3_muladds(away, depth / flat, pos);
         } else {
             glm_vec3_muladds(n, depth, pos);
+        }
+
+        d = rest ? glm_vec3_dot(rest, away) : 0;
+        if (d < 0) {
+            glm_vec3_muladds(away, -d, rest);
         }
 
         box_move_touch(m, &contact);
@@ -271,15 +285,20 @@ static void box_move_push(
  * a shape before it crosses the plane that separates them, which it approaches at the speed of
  * the direction along the normal of that plane.
  *
+ * A shape the capsule already touches limits the move only while it moves into it, by as much
+ * as a push can undo.
+ *
  * @param m The move
  * @param pos The feet
  * @param dir The unit direction of the motion
- * @return Distance along dir that touches no shape, 0 when the capsule already touches one
+ * @param limit Depth a push can always undo
+ * @return Distance along dir that reaches into no shape further than a push undoes
  */
 static float box_move_clearance(
     const box_move_t *m,
     const vec3 pos,
-    const vec3 dir)
+    const vec3 dir,
+    float limit)
 {
     const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
     int32_t i, count = ecs_vec_count(&m->colliders);
@@ -289,9 +308,8 @@ static float box_move_clearance(
     for (i = 0; i < count && result > 0; i ++) {
         float gap = box_collider_separation(&c[i], a, b, m->body->radius, n);
         float approach = -glm_vec3_dot(ECS_CONST_CAST(float*, dir), n);
-        if (gap <= 0) {
-            result = 0;
-        } else if (approach > 0 && gap < result * approach) {
+        gap = gap > 0 ? gap : fmaxf(gap + limit, 0);
+        if (approach > 0 && gap < result * approach) {
             result = gap / approach;
         }
     }
@@ -305,37 +323,45 @@ static float box_move_clearance(
  * longer one advances conservatively: a step goes as far as the capsule is clear of every
  * shape and at least half the radius, so no length of motion skips over a shape.
  *
+ * The motion still to go then loses what pushes into the shapes the step touched (collide and
+ * slide), so a blocked motion ends where it is blocked instead of pushing on in small steps.
+ *
  * @param m The move
  * @param pos The feet, written in place
- * @param motion The motion
+ * @param motion The motion, a non-finite one does not move
  */
 static void box_move_slide(
     box_move_t *m,
     vec3 pos,
     const vec3 motion)
 {
-    float remaining = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
+    float len = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
     float limit = m->body->radius * BOX_MOVE_FRACTION;
-    int32_t i, steps = remaining > limit ? (int32_t)ceilf(remaining / limit) : 1;
-    vec3 dir = { 0, 0, 0 };
-    if (steps <= BOX_MOVE_STEPS) {
+    int32_t i, steps = 0;
+    vec3 rest = { 0, 0, 0 }, dir = { 0, 0, 0 };
+    if (!isfinite(len)) {
+        len = 0;
+    } else if (len <= limit * BOX_MOVE_STEPS) {
+        steps = len > limit ? (int32_t)ceilf(len / limit) : 1;
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, dir);
-        remaining = 0;
+        len = 0;
     } else {
-        glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / remaining, dir);
-        steps = 0;
+        glm_vec3_copy(ECS_CONST_CAST(float*, motion), rest);
     }
 
     for (i = 0; i < steps; i ++) {
         glm_vec3_add(pos, dir, pos);
-        box_move_push(m, pos);
+        box_move_push(m, pos, NULL);
     }
 
-    while (remaining > 0) {
-        float step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir)), remaining);
+    for (i = 0; i < BOX_MOVE_SWEEPS && len > BOX_MOVE_EPS; i ++) {
+        float step;
+        glm_vec3_scale(rest, 1.0f / len, dir);
+        step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit)), len);
         glm_vec3_muladds(dir, step, pos);
-        box_move_push(m, pos);
-        remaining -= step;
+        glm_vec3_scale(dir, len - step, rest);
+        box_move_push(m, pos, rest);
+        len = glm_vec3_norm(rest);
     }
 }
 
@@ -467,6 +493,11 @@ bool box_controller_move(
     glm_vec3_add(start, motion, pos);
     if (hit) {
         ecs_os_zeromem(hit);
+    }
+
+    if (!isfinite(motion[0] + motion[1] + motion[2])) {
+        glm_vec3_copy(start, pos);
+        goto done;
     }
 
     if (body->radius <= 0) {

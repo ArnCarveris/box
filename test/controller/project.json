@@ -146,7 +146,12 @@
                     "steep_slope_blocks_walk",
                     "steep_slope_blocks_jump",
                     "walkable_slope_climbs",
-                    "stairs_climb"
+                    "stairs_climb",
+                    "camera_rotated_thin_wall",
+                    "first_person_rotated_thin_wall",
+                    "step_up_long_frame",
+                    "camera_huge_speed",
+                    "camera_infinite_velocity"
                 ]
             }
         ]
