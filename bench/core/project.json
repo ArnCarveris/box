@@ -1,0 +1,34 @@
+{
+    "id": "bench_core",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for box.app and box.jobs",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/jobs"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Jobs",
+                "benchcases": [
+                    "submit_complete_workers",
+                    "submit_complete_inline",
+                    "submit_only"
+                ]
+            },
+            {
+                "id": "Frame",
+                "benchcases": [
+                    "idle"
+                ]
+            }
+        ]
+    }
+}
