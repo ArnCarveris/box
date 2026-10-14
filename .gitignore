@@ -9,3 +9,4 @@ __pycache__/
 include/box/bake_config.h
 test/*/src/main.c
 bench/*/src/main.c
+test/integration/out
