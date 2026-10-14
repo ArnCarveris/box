@@ -267,6 +267,21 @@
                     "fade_softens_last_cascade",
                     "default_settings"
                 ]
+            },
+            {
+                "id": "Culling",
+                "testcases": [
+                    "offscreen_not_drawn",
+                    "edge_objects_drawn",
+                    "bounds_follow_scale_and_rotation",
+                    "disabled_draws_all",
+                    "min_dimension",
+                    "offscreen_caster_shadows_view",
+                    "blended_order_kept",
+                    "views_cull_separately",
+                    "dynamic_moves_out",
+                    "default_settings"
+                ]
             }
         ]
     }
