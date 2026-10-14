@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract and upload of the instanced batches of box.render",
+        "description": "Benchmarks for the extract and upload of the instanced batches and lights of box.render",
         "public": false,
         "use": [
             "box"
@@ -27,6 +27,13 @@
                 "benchcases": [
                     "dynamic_material",
                     "blended_sort"
+                ]
+            },
+            {
+                "id": "Light",
+                "benchcases": [
+                    "static_1000",
+                    "moving_1000"
                 ]
             }
         ]
