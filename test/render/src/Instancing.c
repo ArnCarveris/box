@@ -11,6 +11,39 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+/** Create a red 2x2x2 Box at the origin the first time the system runs.
+ *
+ * @param it The iterator of the system
+ */
+static void LateBoxCreate(
+    ecs_iter_t *it)
+{
+    int32_t *created = it->ctx;
+    if (!*created) {
+        ecs_entity_t e = ecs_new(it->world);
+        ecs_set(it->world, e, Position, {0, 0, 0});
+        ecs_set(it->world, e, Box, {2, 2, 2});
+        ecs_set(it->world, e, Rgb, {0, 0, 0});
+        ecs_set(it->world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+        ecs_set(it->world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
+        *created = 1;
+    }
+}
+
+/** Move the entity in the context to x = 2 the first time the system runs.
+ *
+ * @param it The iterator of the system
+ */
+static void LateBoxMove(
+    ecs_iter_t *it)
+{
+    ecs_entity_t *e = it->ctx;
+    if (*e) {
+        ecs_set(it->world, *e, Position, {2, 0, 0});
+        *e = 0;
+    }
+}
+
 void Instancing_added_shape_rendered(void) {
     // renderer/instancing
     ecs_world_t *world = ecs_init();
@@ -640,6 +673,101 @@ void Instancing_gpu_changes_rendered(void) {
     }
 
     test_int(wrong, 0);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Instancing_box_created_in_on_store(void) {
+    // renderer/late_shape
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32,
+        .write_to_file = "late_box.png", .resolution_scale = 1});
+    int32_t created = 0;
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .callback = LateBoxCreate,
+        .ctx = &created,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(created, 1);
+
+    char *path = flecs_asprintf("%s/late_box.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(16 * 32 + 16) * 4] > 200);
+    test_assert(px[(16 * 32 + 16) * 4 + 1] < 40);
+    test_assert(px[(16 * 32 + 2) * 4] < 40);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Instancing_box_moved_in_on_store(void) {
+    // renderer/late_shape
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32,
+        .write_to_file = "late_move.png", .resolution_scale = 1});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Position, {-2, 0, 0});
+    ecs_set(world, e, Box, {1, 1, 1});
+    ecs_set(world, e, Rgb, {0, 0, 0});
+    ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_progress(world, 0);
+    ecs_entity_t moving = e;
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .callback = LateBoxMove,
+        .ctx = &moving,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_assert(moving == 0);
+
+    char *path = flecs_asprintf("%s/late_move.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(16 * 32 + 24) * 4] > 200);
+    test_assert(px[(16 * 32 + 8) * 4] < 40);
 
     stbi_image_free(px);
     ecs_os_free(path);

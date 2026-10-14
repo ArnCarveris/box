@@ -162,7 +162,9 @@
                     "dynamic_material_descendants",
                     "dynamic_tag_toggles_uploads",
                     "no_alloc_steady_state",
-                    "gpu_changes_rendered"
+                    "gpu_changes_rendered",
+                    "box_created_in_on_store",
+                    "box_moved_in_on_store"
                 ]
             },
             {
@@ -339,7 +341,10 @@
                     "empty_shapes_not_drawn",
                     "bounds_hold_shape",
                     "tint_applies",
-                    "culled_by_view"
+                    "culled_by_view",
+                    "created_in_post_update",
+                    "created_in_pre_store",
+                    "created_in_on_store"
                 ]
             },
             {

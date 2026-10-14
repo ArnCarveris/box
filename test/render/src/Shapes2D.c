@@ -18,6 +18,23 @@
 #define STB_IMAGE_WRITE_STATIC
 #include <stb_image_write.h>
 
+/** Create a white 20x10 Rect at the origin the first time the system runs.
+ *
+ * @param it The iterator of the system
+ */
+static void LateRectCreate(
+    ecs_iter_t *it)
+{
+    int32_t *created = it->ctx;
+    if (!*created) {
+        ecs_entity_t e = ecs_new(it->world);
+        ecs_set(it->world, e, Position, {0, 0, 0});
+        ecs_set(it->world, e, Rect, {20, 10});
+        ecs_set(it->world, e, Rgb, {255, 255, 255});
+        *created = 1;
+    }
+}
+
 void Shapes2D_rect_size(void) {
     // ui/shapes_2d
     ecs_world_t *world = ecs_init();
@@ -1117,6 +1134,138 @@ void Shapes2D_culled_by_view(void) {
     test_assert(px[(41 * 64 + 25) * 4] > 245);
     test_assert(px[(42 * 64 + 39) * 4] > 245);
     test_assert(px[(41 * 64 + 45) * 4] < 10);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Shapes2D_created_in_post_update(void) {
+    // renderer/late_shape
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "late_post_update.png",
+        .resolution_scale = 1});
+    int32_t created = 0;
+    ecs_system(world, {
+        .phase = EcsPostUpdate,
+        .callback = LateRectCreate,
+        .ctx = &created,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(created, 1);
+
+    char *path = flecs_asprintf("%s/late_post_update.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(32 * 64 + 32) * 4] > 245);
+    test_assert(px[(32 * 64 + 41) * 4] > 245);
+    test_assert(px[(32 * 64 + 42) * 4] < 10);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Shapes2D_created_in_pre_store(void) {
+    // renderer/late_shape
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "late_pre_store.png",
+        .resolution_scale = 1});
+    int32_t created = 0;
+    ecs_system(world, {
+        .phase = EcsPreStore,
+        .callback = LateRectCreate,
+        .ctx = &created,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(created, 1);
+
+    char *path = flecs_asprintf("%s/late_pre_store.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(32 * 64 + 32) * 4] > 245);
+    test_assert(px[(32 * 64 + 41) * 4] > 245);
+    test_assert(px[(32 * 64 + 42) * 4] < 10);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Shapes2D_created_in_on_store(void) {
+    // renderer/late_shape
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "late_on_store.png",
+        .resolution_scale = 1});
+    int32_t created = 0;
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .callback = LateRectCreate,
+        .ctx = &created,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_int(created, 1);
+
+    char *path = flecs_asprintf("%s/late_on_store.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_assert(px[(32 * 64 + 32) * 4] > 245);
+    test_assert(px[(32 * 64 + 41) * 4] > 245);
+    test_assert(px[(32 * 64 + 42) * 4] < 10);
 
     stbi_image_free(px);
     ecs_os_free(path);
