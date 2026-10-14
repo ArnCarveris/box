@@ -5,14 +5,20 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include "fake.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
 void Report_writes_json(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     char path[256];
     snprintf(path, sizeof(path), "/tmp/box_perf_report_%d.json", (int)getpid());
@@ -51,12 +57,19 @@ void Report_writes_json(void) {
     remove(path);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Report_failed_run(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     char path[256];
     snprintf(path, sizeof(path), "/tmp/box_perf_failed_%d.json", (int)getpid());
@@ -80,12 +93,19 @@ void Report_failed_run(void) {
     remove(path);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Report_status_reflected(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 2, .frames = 2 });
     for (int i = 0; i < 4; i ++) {
@@ -101,12 +121,19 @@ void Report_status_reflected(void) {
     ecs_os_free(json);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Report_script_run(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     test_assert(ecs_script_run(world, "perf",
         "using box.camera\n"
@@ -133,4 +160,6 @@ void Report_script_run(void) {
     test_int(ecs_singleton_get(world, PerfStatus)->frame, 4);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }

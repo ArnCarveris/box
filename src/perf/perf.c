@@ -19,16 +19,26 @@
  */
 #define BOX_PERF_SLEEP (0.6)
 
-/** Read the wall clock.
+double (*box_perf_clock)(void) = NULL;
+
+void (*box_perf_sleep)(double seconds) = NULL;
+
+/** Read the wall clock, or the clock a test installed.
  *
  * @return Seconds since an arbitrary epoch
  */
 static double box_perf_now(void)
 {
     ecs_time_t t;
-    ecs_os_get_time(&t);
+    double result;
+    if (box_perf_clock) {
+        result = box_perf_clock();
+    } else {
+        ecs_os_get_time(&t);
+        result = (double)t.sec + (double)t.nanosec * 1e-9;
+    }
 
-    return (double)t.sec + (double)t.nanosec * 1e-9;
+    return result;
 }
 
 /** Wait until a deadline with ever shorter sleeps that cannot overshoot it, then spin.
@@ -43,7 +53,11 @@ static double box_perf_wait(
     while (now < deadline) {
         double left = deadline - now;
         if (left > BOX_PERF_SPIN) {
-            ecs_sleepf(left * BOX_PERF_SLEEP);
+            if (box_perf_sleep) {
+                box_perf_sleep(left * BOX_PERF_SLEEP);
+            } else {
+                ecs_sleepf(left * BOX_PERF_SLEEP);
+            }
         }
 
         now = box_perf_now();
