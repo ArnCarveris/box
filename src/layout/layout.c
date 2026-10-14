@@ -188,6 +188,32 @@ static void box_layout_find_text(
     }
 }
 
+/** Size the elements that fill a surface to the size of the surface in points.
+ *
+ * @param it The system iterator
+ */
+static void LayoutFillUpdate(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    const LayoutFill *fill = ecs_field(it, LayoutFill, 0);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        const Surface *s = ecs_is_alive(world, fill[i].surface) ?
+            ecs_get(world, fill[i].surface, Surface) : NULL;
+        float w = s ? (float)s->width : 0, h = s ? (float)s->height : 0;
+        LayoutItem *item = ecs_get_mut(world, it->entities[i], LayoutItem);
+        if (item->width.mode != SizeModeFixed || item->height.mode != SizeModeFixed ||
+            item->width.value != w || item->height.value != h)
+        {
+            item->width.mode = item->height.mode = SizeModeFixed;
+            item->width.value = w;
+            item->height.value = h;
+            ecs_modified(world, it->entities[i], LayoutItem);
+        }
+    }
+}
+
 /** Lay out the trees of the elements marked since the last frame.
  *
  * @param it The system iterator
@@ -308,11 +334,13 @@ void BoxLayoutImport(
     ECS_META_COMPONENT(world, Sizing);
     ECS_META_COMPONENT(world, LayoutItem);
     ECS_META_COMPONENT(world, LayoutBounds);
+    ECS_META_COMPONENT(world, LayoutFill);
     ecs_set_hooks(world, LayoutItem, { .ctor = box_layout_item_ctor });
 
     ecs_add_pair(world, ecs_id(Layout), EcsWith, ecs_id(LayoutBounds));
     ecs_add_pair(world, ecs_id(Layout), EcsWith, EcsOrderedChildren);
     ecs_add_pair(world, ecs_id(LayoutItem), EcsWith, ecs_id(LayoutBounds));
+    ecs_add_pair(world, ecs_id(LayoutFill), EcsWith, ecs_id(LayoutItem));
 
     ECS_COMPONENT_DEFINE(world, LayoutRegistry);
     ecs_set_hooks(world, LayoutRegistry, {
@@ -363,6 +391,16 @@ void BoxLayoutImport(
         .events = { EcsOnSet, EcsOnRemove },
         .callback = box_layout_on_parent,
         .ctx = state
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "LayoutFillUpdate" }),
+        .phase = EcsPostUpdate,
+        .query.terms = {
+            { .id = ecs_id(LayoutFill), .inout = EcsIn },
+            { .id = ecs_id(LayoutItem), .inout = EcsInOutNone }
+        },
+        .callback = LayoutFillUpdate
     });
 
     ecs_system(world, {

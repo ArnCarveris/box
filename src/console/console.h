@@ -37,9 +37,13 @@ typedef struct box_console_line_t {
 typedef struct box_console_ui_t {
     ecs_entity_t root;          /**< Scene root */
     ecs_entity_t camera;        /**< Orthographic camera at one point per unit */
-    ecs_entity_t background;    /**< Panel rectangle */
-    ecs_entity_t edge;          /**< Line along the bottom edge of the panel */
-    ecs_entity_t panel;         /**< Layout column of the scrollback and the input line */
+    ecs_entity_t screen;        /**< Layout root that fills the surface */
+    ecs_entity_t stack;         /**< Layout column that holds the panel and the space below it */
+    ecs_entity_t panel;         /**< Panel rectangle, takes its share of the surface */
+    ecs_entity_t below;         /**< Space under the panel */
+    ecs_entity_t beside;        /**< Space right of the panel */
+    ecs_entity_t edge;          /**< Line along the right edge of the panel */
+    ecs_entity_t content;       /**< Layout column of the scrollback and the input line */
     ecs_entity_t log;           /**< Layout column of the visible scrollback lines */
     ecs_entity_t input;         /**< Layout row of the input line */
     ecs_entity_t prompt;        /**< Text of the prompt */
@@ -73,6 +77,7 @@ typedef struct box_console_t {
     bool enabled;               /**< The toggle action is enabled */
     bool relayout;              /**< Look or surface size changed since the last sync */
     bool refresh;               /**< Text changed since the last sync */
+    ecs_entity_t surface;       /**< Surface the content fills, 0 while the world has none */
     float width;                /**< Surface width in points the content was laid out for */
     float height;               /**< Surface height in points the content was laid out for */
     ecs_query_t *bindings;      /**< Entities with a Binding */

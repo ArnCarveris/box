@@ -38,13 +38,18 @@ extern "C" {
 
 /** The console singleton: whether it is open and how it looks.
  *
+ * The panel is a layout: a root that fills the surface in points holds the panel, which takes
+ * the width and height fractions of the surface from the top left. It follows the surface when
+ * it is resized. A fraction of zero or less is a panel of zero size, one or more fills the axis.
+ *
  * While open, typed text and key presses go to the input line and no action other than the
  * toggle sees the keyboard or the mouse buttons. Enter runs the line, Up and Down walk the
  * lines that ran, Page Up, Page Down and the wheel scroll, Escape or the toggle close it.
  */
 ECS_STRUCT(Console, {
     bool open;           /**< Shown and taking the keyboard, the toggle action flips it */
-    float height;        /**< Part of the surface height covered from the top, default 0.5 */
+    float width;         /**< Part of the surface width covered from the left, default 0.5 */
+    float height;        /**< Part of the surface height covered from the top, default 1 */
     float font_size;     /**< Em size of the text in points, default 16 */
     float line_height;   /**< Points from one line to the next, default 20 */
     float padding;       /**< Points between the edges of the panel and the text, default 10 */

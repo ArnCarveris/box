@@ -19,7 +19,7 @@ ECS_COMPONENT_DECLARE(ConsoleHost);
 /** Most times the view is recreated in one frame to render after every other view */
 #define BOX_CONSOLE_VIEW_TRIES (256)
 
-/** Construct Console values: closed, half the surface high, light text on a dark panel.
+/** Construct Console values: closed, the left half of the surface, light text on a dark panel.
  *
  * @param ptr The components
  * @param count Number of components
@@ -35,7 +35,8 @@ static void box_console_ctor(
     (void)ti;
     for (i = 0; i < count; i ++) {
         values[i] = (Console){
-            .height = 0.5f,
+            .width = 0.5f,
+            .height = 1.0f,
             .font_size = 16,
             .line_height = 20,
             .padding = 10,
@@ -213,6 +214,7 @@ static void box_console_measure(
     box_console_t *con)
 {
     float w = BOX_CONSOLE_DEFAULT_WIDTH, h = BOX_CONSOLE_DEFAULT_HEIGHT;
+    ecs_entity_t surface = 0;
     bool found = false;
     ecs_iter_t it = ecs_query_iter(world, con->surfaces);
     int32_t i;
@@ -222,9 +224,15 @@ static void box_console_measure(
             if (!s[i].texture) {
                 w = (float)s[i].width;
                 h = (float)s[i].height;
+                surface = it.entities[i];
                 found = true;
             }
         }
+    }
+
+    if (surface != con->surface) {
+        con->surface = surface;
+        con->relayout = true;
     }
 
     if (w != con->width || h != con->height) {

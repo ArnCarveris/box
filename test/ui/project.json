@@ -152,7 +152,11 @@
                     "look_from_script",
                     "run_from_script",
                     "scrollback_limit",
-                    "renders_over_scene"
+                    "renders_over_scene",
+                    "covers_left_half",
+                    "width_fraction",
+                    "follows_resize",
+                    "scrollback_follows_height"
                 ]
             }
         ]

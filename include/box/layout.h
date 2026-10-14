@@ -87,6 +87,18 @@ ECS_STRUCT(LayoutBounds, {
     float height; /**< Computed height */
 });
 
+/** Makes an element take the size of a surface in points, the root of a layout that fills the
+ * screen.
+ *
+ * Every frame before the layout runs, the LayoutItem of the element is set to a fixed width and
+ * height of Surface.width and Surface.height, so the tree follows the surface when it is
+ * resized. A surface that is not alive or has no Surface gives a size of zero. Adding it adds a
+ * LayoutItem.
+ */
+ECS_STRUCT(LayoutFill, {
+    ecs_entity_t surface; /**< Surface whose size in points the element takes */
+});
+
 /** Register the box.layout module.
  *
  * @param world The world

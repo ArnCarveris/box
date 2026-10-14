@@ -10,6 +10,9 @@
 #include <string.h>
 #include "render.h"
 
+#define CONSOLE_INPUT "console.ui.screen.stack.panel.content.input"
+#define CONSOLE_LOG "console.ui.screen.stack.panel.content.log"
+
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
@@ -47,7 +50,7 @@ void Console_toggle_opens(void) {
     test_bool(v->shadows.enabled, false);
     test_bool(v->culling.enabled, false);
     test_int(ecs_vec_count(&v->effects), 0);
-    const Text *before = ecs_get(world, ecs_lookup(world, "console.ui.panel.input.before"),
+    const Text *before = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"),
         Text);
     test_str(before->value, "");
 
@@ -79,7 +82,7 @@ void Console_toggle_closes(void) {
 
     test_bool(ecs_singleton_get(world, Console)->open, false);
     test_assert(ecs_lookup(world, "console.view") == 0);
-    const Text *before = ecs_get(world, ecs_lookup(world, "console.ui.panel.input.before"),
+    const Text *before = ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"),
         Text);
     test_str(before->value, "a");
 
@@ -177,8 +180,8 @@ void Console_typing_goes_to_input(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, "console.ui.panel.input.before");
-    ecs_entity_t after = ecs_lookup(world, "console.ui.panel.input.after");
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    ecs_entity_t after = ecs_lookup(world, CONSOLE_INPUT ".after");
     test_str(ecs_get(world, before, Text)->value, "ls things");
     test_str(ecs_get(world, after, Text)->value, "");
     test_str(ecs_singleton_get(world, Input)->text, "");
@@ -220,7 +223,7 @@ void Console_typing_fires_no_actions(void) {
 
     ecs_progress(world, 0);
     test_bool(ecs_get(world, jump, ActionState)->down, false);
-    test_str(ecs_get(world, ecs_lookup(world, "console.ui.panel.input.before"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
         "jj");
 
     ecs_fini(world);
@@ -286,7 +289,7 @@ void Console_enter_runs_line(void) {
     int32_t i, lines = 0;
     while (true) {
         char name[64];
-        ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", lines);
+        ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", lines);
         if (!ecs_lookup(world, name)) {
             break;
         }
@@ -297,7 +300,7 @@ void Console_enter_runs_line(void) {
     test_assert(lines >= 3);
     for (i = 0; i < 3; i ++) {
         char name[64];
-        ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", lines - 3 + i);
+        ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", lines - 3 + i);
         ecs_entity_t e = ecs_lookup(world, name);
         test_str(ecs_get(world, e, Text)->value, expect[i]);
         const Rgb *color = ecs_get(world, e, Rgb);
@@ -307,7 +310,7 @@ void Console_enter_runs_line(void) {
         test_int(color->b, want->b);
     }
 
-    test_str(ecs_get(world, ecs_lookup(world, "console.ui.panel.input.before"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
         "");
 
     ecs_fini(world);
@@ -373,7 +376,7 @@ void Console_error_output(void) {
     int32_t lines = 0;
     while (true) {
         char name[64];
-        ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", lines);
+        ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", lines);
         if (!ecs_lookup(world, name)) {
             break;
         }
@@ -382,7 +385,7 @@ void Console_error_output(void) {
     }
 
     char name[64];
-    ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", lines - 1);
+    ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", lines - 1);
     ecs_entity_t e = ecs_lookup(world, name);
     test_assert(!strncmp(ecs_get(world, e, Text)->value, BOX_COMMAND_ERROR,
         strlen(BOX_COMMAND_ERROR)));
@@ -413,7 +416,7 @@ void Console_history(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, "console.ui.panel.input.before");
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
     const char *expect[] = {"man ls", "ls", "ls", "man ls", "dra"};
     Key keys[] = {KeyUp, KeyUp, KeyUp, KeyDown, KeyDown};
     int32_t i;
@@ -448,8 +451,8 @@ void Console_cursor_editing(void) {
         ecs_progress(world, 0);
     }
 
-    ecs_entity_t before = ecs_lookup(world, "console.ui.panel.input.before");
-    ecs_entity_t after = ecs_lookup(world, "console.ui.panel.input.after");
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    ecs_entity_t after = ecs_lookup(world, CONSOLE_INPUT ".after");
     test_str(ecs_get(world, before, Text)->value, "ab");
     test_str(ecs_get(world, after, Text)->value, "cd");
 
@@ -515,7 +518,7 @@ void Console_scroll(void) {
     int32_t lines = 0;
     while (true) {
         char name[64];
-        ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", lines);
+        ecs_os_snprintf(name, sizeof(name), CONSOLE_LOG ".line_%d", lines);
         if (!ecs_lookup(world, name)) {
             break;
         }
@@ -525,7 +528,7 @@ void Console_scroll(void) {
 
     test_assert(lines > 2);
     test_assert(lines < 40);
-    ecs_entity_t first = ecs_lookup(world, "console.ui.panel.log.line_0");
+    ecs_entity_t first = ecs_lookup(world, CONSOLE_LOG ".line_0");
     char expect[32];
     ecs_os_snprintf(expect, sizeof(expect), "c%02d", 40 - lines);
     test_str(ecs_get(world, first, Text)->value, expect);
@@ -608,7 +611,7 @@ void Console_rebuilt_after_delete(void) {
     ecs_delete(world, ecs_lookup(world, BOX_CONSOLE_SCOPE));
     ecs_progress(world, 0);
     test_assert(ecs_lookup(world, BOX_CONSOLE_VIEW) != 0);
-    ecs_entity_t before = ecs_lookup(world, "console.ui.panel.input.before");
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
     test_assert(before != 0);
     test_str(ecs_get(world, before, Text)->value, "ab");
 
@@ -634,30 +637,29 @@ void Console_look_from_script(void) {
     test_assert(ecs_script_run(world, "look",
         "using box.console\n"
         "$ {\n"
-        "  Console: {open: true, height: 0.25, font_size: 24, line_height: 30, padding: 5,\n"
+        "  Console: {open: true, width: 0.5, height: 0.25, font_size: 24, line_height: 30, padding: 5,\n"
         "    background: {255, 0, 0, 128}, input: {0, 255, 0}}\n"
         "}\n", NULL) == 0);
     ecs_progress(world, 0);
     ecs_progress(world, 0);
 
     test_bool(ecs_singleton_get(world, Console)->open, true);
-    ecs_entity_t bg = ecs_lookup(world, "console.ui.background");
-    test_flt(ecs_get(world, bg, Rect)->width, 640);
+    ecs_entity_t bg = ecs_lookup(world, "console.ui.screen.stack.panel");
+    test_flt(ecs_get(world, bg, Rect)->width, 320);
     test_flt(ecs_get(world, bg, Rect)->height, 90);
-    test_flt(ecs_get(world, bg, Position)->y, 135);
     test_int(ecs_get(world, bg, Rgb)->r, 255);
     test_flt(ecs_get(world, bg, Opacity)->value, 128.0f / 255.0f);
-    ecs_entity_t prompt = ecs_lookup(world, "console.ui.panel.input.prompt");
+    ecs_entity_t prompt = ecs_lookup(world, CONSOLE_INPUT ".prompt");
     test_flt(ecs_get(world, prompt, Text)->size, 24);
     test_flt(ecs_get(world, prompt, Text)->line_height, 30);
     test_int(ecs_get(world, prompt, Rgb)->g, 255);
-    test_assert(ecs_lookup(world, "console.ui.panel.log.line_0") != 0);
-    test_assert(ecs_lookup(world, "console.ui.panel.log.line_1") == 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_0") != 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_1") == 0);
 
-    ecs_singleton_set(world, Console, {.open = true, .height = 0});
+    ecs_singleton_set(world, Console, {.open = true, .width = 1, .height = 0});
     ecs_progress(world, 0);
     test_flt(ecs_get(world, bg, Rect)->height, 0);
-    test_assert(ecs_lookup(world, "console.ui.panel.log.line_0") == 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_0") == 0);
 
     ecs_fini(world);
 }
@@ -683,9 +685,9 @@ void Console_run_from_script(void) {
     ecs_singleton_set(world, Console, {.open = true, .height = 0.5f, .font_size = 16,
         .line_height = 20, .padding = 10, .scrollback = 100});
     ecs_progress(world, 0);
-    test_str(ecs_get(world, ecs_lookup(world, "console.ui.panel.log.line_5"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_5"), Text)->value,
         "> ls things");
-    test_str(ecs_get(world, ecs_lookup(world, "console.ui.panel.log.line_6"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_LOG ".line_6"), Text)->value,
         "alpha");
 
     box_input_key_press(world, KeyUp, 1);
@@ -693,7 +695,7 @@ void Console_run_from_script(void) {
         ecs_progress(world, 0);
     }
 
-    test_str(ecs_get(world, ecs_lookup(world, "console.ui.panel.input.before"), Text)->value,
+    test_str(ecs_get(world, ecs_lookup(world, CONSOLE_INPUT ".before"), Text)->value,
         "ls things");
 
     ecs_fini(world);
@@ -717,12 +719,13 @@ void Console_scrollback_limit(void) {
     ecs_os_free(box_console_run(world, "ls things", NULL));
     ecs_progress(world, 0);
 
-    const char *expect[] = {"", "", "", "", "", "alpha", "beta"};
     int32_t i;
-    for (i = 0; i < 7; i ++) {
-        char name[64];
-        ecs_os_snprintf(name, sizeof(name), "console.ui.panel.log.line_%d", i);
-        test_str(ecs_get(world, ecs_lookup(world, name), Text)->value, expect[i]);
+    for (i = 0; i < 16; i ++) {
+        char name[96];
+        ecs_os_snprintf(name, sizeof(name),
+            CONSOLE_LOG ".line_%d", i);
+        const char *expect = i == 14 ? "alpha" : i == 15 ? "beta" : "";
+        test_str(ecs_get(world, ecs_lookup(world, name), Text)->value, expect);
     }
 
     ecs_fini(world);
@@ -757,19 +760,160 @@ void Console_renders_over_scene(void) {
     int w = 0, h = 0, n = 0, x, lit = 0;
     unsigned char *px = stbi_load(path, &w, &h, &n, 4);
     test_assert(px != NULL);
-    unsigned char *top = &px[(4 * 320 + 300) * 4];
+    unsigned char *top = &px[(4 * 320 + 150) * 4];
     test_assert(abs((int)top[0] - 200) < 3);
     test_assert(top[2] < 3);
-    unsigned char *bottom = &px[(170 * 320 + 160) * 4];
-    test_assert(bottom[0] < 3);
-    test_assert(bottom[2] > 252);
-    for (x = 0; x < 40; x ++) {
-        unsigned char *p = &px[(70 * 320 + x) * 4];
-        lit += p[1] > 128;
+    unsigned char *bottom = &px[(170 * 320 + 80) * 4];
+    test_assert(abs((int)bottom[0] - 200) < 3);
+    test_assert(bottom[2] < 3);
+    unsigned char *right = &px[(90 * 320 + 200) * 4];
+    test_assert(right[0] < 3);
+    test_assert(right[2] > 252);
+    int y;
+    for (y = 140; y < 180; y ++) {
+        for (x = 0; x < 40; x ++) {
+            unsigned char *p = &px[(y * 320 + x) * 4];
+            lit += p[1] > 128;
+        }
     }
 
     test_assert(lit > 0);
     stbi_image_free(px);
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Console_covers_left_half(void) {
+    // ui/console_layout
+    int32_t sizes[2][2] = {{640, 360}, {400, 300}};
+    int32_t i;
+    for (i = 0; i < 2; i ++) {
+        float w = (float)sizes[i][0], h = (float)sizes[i][1];
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = sizes[i][0], .height = sizes[i][1],
+            .resolution_scale = 1});
+        ecs_singleton_get_mut(world, Console)->open = true;
+        ecs_singleton_modified(world, Console);
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+
+        ecs_entity_t stack = ecs_lookup(world, "console.ui.screen.stack");
+        ecs_entity_t panel = ecs_lookup(world, "console.ui.screen.stack.panel");
+        test_assert(panel != 0);
+        test_flt(ecs_get(world, panel, Rect)->width, w / 2);
+        test_flt(ecs_get(world, panel, Rect)->height, h);
+        test_flt(ecs_get(world, stack, Position)->x + ecs_get(world, panel, Position)->x,
+            -w / 4);
+        test_flt(ecs_get(world, stack, Position)->y + ecs_get(world, panel, Position)->y, 0);
+        ecs_fini(world);
+    }
+}
+
+void Console_width_fraction(void) {
+    // ui/console_layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    Console *c = ecs_singleton_get_mut(world, Console);
+    test_flt(c->width, 0.5f);
+    test_flt(c->height, 1);
+    c->open = true;
+    c->width = 0.25f;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t panel = ecs_lookup(world, "console.ui.screen.stack.panel");
+    test_flt(ecs_get(world, panel, Rect)->width, 160);
+    test_flt(ecs_get(world, panel, Rect)->height, 360);
+
+    c = ecs_singleton_get_mut(world, Console);
+    c->width = 0;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, panel, Rect)->width, 0);
+
+    c = ecs_singleton_get_mut(world, Console);
+    c->width = 1;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, panel, Rect)->width, 640);
+    ecs_fini(world);
+}
+
+void Console_follows_resize(void) {
+    // ui/console_layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_entity_t panel = ecs_lookup(world, "console.ui.screen.stack.panel");
+    ecs_entity_t stack = ecs_lookup(world, "console.ui.screen.stack");
+    test_flt(ecs_get(world, panel, Rect)->width, 320);
+
+    ecs_set(world, s, Surface, {.width = 1000, .height = 500, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, panel, Rect)->width, 500);
+    test_flt(ecs_get(world, panel, Rect)->height, 500);
+    test_flt(ecs_get(world, stack, Position)->x + ecs_get(world, panel, Position)->x, -250);
+
+    ecs_set(world, s, Surface, {.width = 1000, .height = 500, .resolution_scale = 2,
+        .pixel_ratio = 2});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, panel, Rect)->width, 500);
+    test_flt(ecs_get(world, panel, Rect)->height, 500);
+
+    ecs_set(world, s, Surface, {.width = 300, .height = 600, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    test_flt(ecs_get(world, panel, Rect)->width, 150);
+    test_flt(ecs_get(world, panel, Rect)->height, 600);
+    ecs_fini(world);
+}
+
+void Console_scrollback_follows_height(void) {
+    // ui/console_layout
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_15") != 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_16") == 0);
+
+    ecs_set(world, s, Surface, {.width = 640, .height = 200, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_7") != 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_8") == 0);
+    ecs_entity_t log = ecs_lookup(world, CONSOLE_LOG "");
+    test_flt(ecs_get(world, log, LayoutBounds)->height, 160);
+
+    ecs_set(world, s, Surface, {.width = 640, .height = 440, .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_19") != 0);
+    test_assert(ecs_lookup(world, CONSOLE_LOG ".line_20") == 0);
     ecs_fini(world);
 }

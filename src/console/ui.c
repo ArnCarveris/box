@@ -148,13 +148,21 @@ void box_console_ui_build(
         .ortho_scale = 1
     });
 
-    ui->background = box_console_element(world, ui->root, "background");
-    ui->edge = box_console_element(world, ui->root, "edge");
-    ui->panel = box_console_element(world, ui->root, "panel");
-    ecs_set(world, ui->panel, Layout, { .direction = DirectionColumn });
-    ui->log = box_console_element(world, ui->panel, "log");
+    ui->screen = box_console_element(world, ui->root, "screen");
+    ecs_set(world, ui->screen, Layout, { .direction = DirectionRow });
+    ui->stack = box_console_element(world, ui->screen, "stack");
+    ecs_set(world, ui->stack, Layout, { .direction = DirectionColumn });
+    ui->panel = box_console_element(world, ui->stack, "panel");
+    ecs_set(world, ui->panel, Layout, { .direction = DirectionNone });
+    ui->below = box_console_element(world, ui->stack, "below");
+    ui->beside = box_console_element(world, ui->screen, "beside");
+    ui->content = box_console_element(world, ui->panel, "content");
+    ecs_set(world, ui->content, Layout, { .direction = DirectionColumn });
+    ui->edge = box_console_element(world, ui->panel, "edge");
+    ecs_set(world, ui->edge, Rect, {0, 0});
+    ui->log = box_console_element(world, ui->content, "log");
     ecs_set(world, ui->log, Layout, { .direction = DirectionColumn, .v = VAlignBottom });
-    ui->input = box_console_element(world, ui->panel, "input");
+    ui->input = box_console_element(world, ui->content, "input");
     ecs_set(world, ui->input, Layout, { .direction = DirectionRow, .v = VAlignMiddle });
     ui->prompt = box_console_text_element(world, ui->input, "prompt");
     ui->before = box_console_text_element(world, ui->input, "before");
@@ -198,7 +206,51 @@ static void box_console_ui_lines(
     }
 }
 
-/** Size and color the panel for the surface and the look of the console.
+/** Make an element take a share of the free space of its parent on one axis.
+ *
+ * A share of one or more takes all of it and a share of zero or less none of it, which the
+ * weight of a growing size cannot express.
+ *
+ * @param item The sizing to set
+ * @param share Part of the axis the element takes
+ */
+static void box_console_share(
+    Sizing *item,
+    float share)
+{
+    if (share <= 0) {
+        *item = (Sizing){ .mode = SizeModeFixed, .value = 0 };
+    } else {
+        *item = (Sizing){ .mode = SizeModeGrow, .value = share };
+    }
+}
+
+/** Set the size of the space next to the panel, which takes what the panel does not.
+ *
+ * @param world The world
+ * @param e The space
+ * @param share Part of the axis the panel takes
+ * @param horizontal Whether the axis is the width
+ */
+static void box_console_space(
+    ecs_world_t *world,
+    ecs_entity_t e,
+    float share,
+    bool horizontal)
+{
+    LayoutItem item = {
+        .width = { .mode = SizeModeFixed, .value = 0 },
+        .height = { .mode = SizeModeFixed, .value = 0 }
+    };
+    Sizing *axis = horizontal ? &item.width : &item.height;
+    if (share < 1) {
+        box_console_share(axis, 1 - (share > 0 ? share : 0));
+    }
+
+    ecs_set_ptr(world, e, LayoutItem, &item);
+}
+
+/** Lay out the panel on the surface and set the look of the console.
  *
  * @param world The world
  * @param con The console state
@@ -210,28 +262,52 @@ static void box_console_ui_layout(
     const Console *console)
 {
     box_console_ui_t *ui = &con->ui;
-    float w = con->width, h = console->height > 0 ? console->height * con->height : 0;
-    float y = con->height / 2 - h / 2, pad = console->padding, lh = console->line_height;
+    float h = console->height > 0 ? console->height * con->height : 0;
+    float pad = console->padding, lh = console->line_height;
     float room = h - 2 * pad - lh;
     int32_t lines = lh > 0 && room > 0 ? (int32_t)floorf(room / lh) : 0;
-    ecs_set(world, ui->background, Position, {0, y, 0});
-    ecs_set(world, ui->background, Rect, {w, h});
-    box_console_color(world, ui->background, (rgb){
+    LayoutItem item = {0};
+    if (con->surface) {
+        ecs_set(world, ui->screen, LayoutFill, { con->surface });
+    } else {
+        ecs_remove(world, ui->screen, LayoutFill);
+        ecs_set(world, ui->screen, LayoutItem, {
+            .width = { .mode = SizeModeFixed, .value = con->width },
+            .height = { .mode = SizeModeFixed, .value = con->height }
+        });
+    }
+
+    ecs_set(world, ui->screen, Layout, { .direction = DirectionRow });
+    box_console_share(&item.width, console->width);
+    item.height = (Sizing){ .mode = SizeModeGrow, .value = 1 };
+    ecs_set_ptr(world, ui->stack, LayoutItem, &item);
+    box_console_space(world, ui->beside, console->width, true);
+    box_console_space(world, ui->below, console->height, false);
+    item.width = (Sizing){ .mode = SizeModeGrow, .value = 1 };
+    box_console_share(&item.height, console->height);
+    ecs_set_ptr(world, ui->panel, LayoutItem, &item);
+    box_console_color(world, ui->panel, (rgb){
         console->background.r, console->background.g, console->background.b });
-    ecs_set(world, ui->background, Opacity, { (float)console->background.a / 255.0f });
-    ecs_set(world, ui->edge, Position, {0, y - h / 2 + BOX_CONSOLE_EDGE / 2, 0});
-    ecs_set(world, ui->edge, Rect, {w, h > 0 ? BOX_CONSOLE_EDGE : 0});
-    box_console_color(world, ui->edge, console->border);
-    ecs_set(world, ui->panel, Position, {0, y, 0});
-    ecs_set(world, ui->panel, Layout, {
+    ecs_set(world, ui->panel, Opacity, { (float)console->background.a / 255.0f });
+    if (!ecs_has(world, ui->panel, Rect)) {
+        ecs_set(world, ui->panel, Rect, {0, 0});
+    }
+
+    ecs_set(world, ui->content, Layout, {
         .direction = DirectionColumn,
         .padding = { pad, pad, pad, pad },
         .h = AlignLeft
     });
-    ecs_set(world, ui->panel, LayoutItem, {
-        .width = { .mode = SizeModeFixed, .value = w },
-        .height = { .mode = SizeModeFixed, .value = h }
+    ecs_set(world, ui->content, LayoutItem, {
+        .width = { .mode = SizeModeGrow, .value = 1 },
+        .height = { .mode = SizeModeGrow, .value = 1 }
     });
+    ecs_set(world, ui->edge, LayoutItem, {
+        .width = { .mode = SizeModeFixed, .value = BOX_CONSOLE_EDGE },
+        .height = { .mode = SizeModeGrow, .value = 1 },
+        .h = AlignRight
+    });
+    box_console_color(world, ui->edge, console->border);
     ecs_set(world, ui->log, LayoutItem, {
         .width = { .mode = SizeModeGrow, .value = 1 },
         .height = { .mode = SizeModeGrow, .value = 1 }
