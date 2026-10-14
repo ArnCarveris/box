@@ -1,0 +1,32 @@
+{
+    "id": "bench_scene",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the spatial index of box.spatial with one million shapes",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/spatial"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Spatial",
+                "benchcases": [
+                    "build_1m",
+                    "ray_1m",
+                    "ray_all_1m",
+                    "overlap_box_1m",
+                    "overlap_sphere_1m",
+                    "update_static_1pct",
+                    "update_dynamic_10k"
+                ]
+            }
+        ]
+    }
+}
