@@ -2,9 +2,9 @@
 // `occlusion` derives the normal of a pixel from the view positions of its neighbors: per
 // axis it takes the neighbor whose depth is closest, which keeps the normal of the surface at
 // a silhouette. 16 hemisphere samples around that normal, turned by a 4x4 pattern of angles,
-// count how many land behind the depth of the view. The occlusion image holds the occlusion and
-// the view depth of every pixel; `composite` averages the occlusion over the 4x4 pattern among
-// pixels of similar depth and darkens the image by it.
+// count how many land behind the depth of the view. The occlusion image is half the size of the
+// view and holds the occlusion and view depth of every other pixel; `composite` averages the
+// occlusion over the 4x4 pattern among pixels of similar depth and darkens the image by it.
 #include "include/effect.wgsl"
 
 struct Ssao {
@@ -68,7 +68,8 @@ fn neighbor(center: vec3f, texel: vec2i, a: vec2i, b: vec2i) -> vec3f {
 }
 
 @fragment fn occlusion(v: FullscreenOut) -> @location(0) vec4f {
-    let texel = vec2i(v.pos.xy);
+    let cell = vec2i(v.pos.xy);
+    let texel = cell * 2;
     let depth = depth_at(texel);
     if (depth <= 0.0) {
         return vec4f(1.0, 0.0, 0.0, 1.0);
@@ -84,7 +85,7 @@ fn neighbor(center: vec3f, texel: vec2i, a: vec2i, b: vec2i) -> vec3f {
     let dx = neighbor(p, texel, vec2i(1, 0), vec2i(-1, 0));
     let dy = neighbor(p, texel, vec2i(0, 1), vec2i(0, -1));
     let n = normalize(cross(dy, dx));
-    let index = u32(texel.x & 3) + u32(texel.y & 3) * 4u;
+    let index = u32(cell.x & 3) + u32(cell.y & 3) * 4u;
     let angle = (PATTERN[index] + 0.5) * (6.283185307 / 16.0);
     let jitter = vec3f(cos(angle), sin(angle), 0.0);
     var t = jitter - n * dot(jitter, n);
@@ -127,13 +128,14 @@ fn neighbor(center: vec3f, texel: vec2i, a: vec2i, b: vec2i) -> vec3f {
     }
 
     let size = vec2i(textureDimensions(ao_texture));
-    let z = textureLoad(ao_texture, texel, 0).g;
+    let z = view_z(depth);
     let tolerance = max(abs(z) * 0.05, ssao.params.x * 0.5);
+    let center = texel / 2;
     var sum = 0.0;
     var weight = 0.0;
     for (var y = -2; y < 2; y++) {
         for (var x = -2; x < 2; x++) {
-            let at = clamp(texel + vec2i(x, y), vec2i(0), size - 1);
+            let at = clamp(center + vec2i(x, y), vec2i(0), size - 1);
             let s = textureLoad(ao_texture, at, 0);
             let w = select(0.0, 1.0, s.g < 0.0 && abs(s.g - z) < tolerance);
             sum += s.r * w;

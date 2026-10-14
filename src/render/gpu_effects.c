@@ -1099,8 +1099,8 @@ static void box_gpu_fx_projection(
         (float)ctx->t->desc.width, (float)ctx->t->desc.height, proj);
 }
 
-/** Record the passes of ambient occlusion: the occlusion of every pixel into the occlusion
- * image, then the image darkened by its smoothed occlusion.
+/** Record the passes of ambient occlusion: the occlusion of every other pixel into the half
+ * size occlusion image, then the image darkened by its smoothed occlusion.
  *
  * @param gpu The backend
  * @param ctx The chain
@@ -1124,8 +1124,8 @@ static bool box_gpu_fx_ssao(
     u.params[2] = e->ssao.intensity;
     box_gpu_fx_uniforms(gpu, s, &u, sizeof(u));
     if (!ft->ao) {
-        ft->ao = box_gpu_fx_texture(gpu, (uint32_t)ft->width, (uint32_t)ft->height,
-            BOX_GPU_AO_FORMAT, 1);
+        ft->ao = box_gpu_fx_texture(gpu, (uint32_t)(ft->width + 1) / 2,
+            (uint32_t)(ft->height + 1) / 2, BOX_GPU_AO_FORMAT, 1);
         ft->ao_view = wgpuTextureCreateView(ft->ao, NULL);
     }
 
