@@ -46,6 +46,8 @@
                     "script_mouse_drag",
                     "mouse_release_no_jump",
                     "reset_no_jump",
+                    "release_unpinned_keeps_delta",
+                    "reset_unpinned_keeps_delta",
                     "text_long_platform",
                     "text_long_synthetic"
                 ]

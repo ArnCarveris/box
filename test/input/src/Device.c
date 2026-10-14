@@ -5,7 +5,6 @@
 
 #include <box.h>
 #include <bake_test.h>
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -962,8 +961,8 @@ void Device_mouse_release_no_jump(void) {
     const Input *in = ecs_singleton_get(world, Input);
     test_flt(in->mouse.position[0], 702);
     test_flt(in->mouse.position[1], 601);
-    test_assert(fabsf(in->mouse.delta[0]) <= 2);
-    test_assert(fabsf(in->mouse.delta[1]) <= 1);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
 
     box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {705, 605} });
     ecs_progress(world, 0);
@@ -991,6 +990,48 @@ void Device_reset_no_jump(void) {
     test_flt(in->mouse.position[0], 800);
     test_flt(in->mouse.delta[0], 0);
     test_flt(in->mouse.delta[1], 0);
+
+    ecs_fini(world);
+}
+
+void Device_release_unpinned_keeps_delta(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {500, 400} });
+    ecs_progress(world, 0);
+
+    box_input_mouse_release(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {510, 405} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 510);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], 5);
+
+    ecs_fini(world);
+}
+
+void Device_reset_unpinned_keeps_delta(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {500, 400} });
+    ecs_progress(world, 0);
+
+    box_input_reset(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {510, 405} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 510);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], 5);
 
     ecs_fini(world);
 }

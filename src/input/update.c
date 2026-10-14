@@ -370,14 +370,14 @@ static void box_input_apply(
         in->size[1] = ev->value[1];
         break;
     case InputRelease:
+        dev->has_position = dev->has_position && !in->mouse.pinned;
         in->mouse.pinned = false;
-        dev->has_position = false;
         break;
     case InputReset:
         box_input_release_all(dev, in);
         box_input_hold_release_all(dev);
+        dev->has_position = dev->has_position && !in->mouse.pinned;
         in->mouse.pinned = false;
-        dev->has_position = false;
         break;
     case InputActionDown:
     case InputActionUp:
