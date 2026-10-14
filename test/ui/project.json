@@ -108,6 +108,24 @@
                     "view_root_views_skipped_by_other_surfaces",
                     "script"
                 ]
+            },
+            {
+                "id": "Picking",
+                "testcases": [
+                    "screen_ui_over_3d",
+                    "stacked_views_fall_through",
+                    "reverse_view_order",
+                    "world_panel_occluded",
+                    "render_to_texture",
+                    "nameplate",
+                    "bubbling",
+                    "hover_enter_leave",
+                    "hover_follows_moving_element",
+                    "press_drag_release",
+                    "scroll",
+                    "layout_bounds",
+                    "unhandled_goes_to_screen"
+                ]
             }
         ]
     }
