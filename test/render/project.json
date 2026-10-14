@@ -274,7 +274,8 @@
                     "converges_in_bounded_frames",
                     "zero_budget_never_converges",
                     "dynamic_shape_lit_not_captured",
-                    "no_bake_removes_contribution"
+                    "no_bake_removes_contribution",
+                    "perf_run_waits_for_convergence"
                 ]
             },
             {

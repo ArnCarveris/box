@@ -282,3 +282,51 @@ void ProbeCapture_no_bake_removes_contribution(void) {
         stbi_image_free(images[i]);
     }
 }
+
+void ProbeCapture_perf_run_waits_for_convergence(void) {
+    // baked_lighting/probe_capture
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 1, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true,
+        .lighting.baked = true});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {0, -0.1f, 0});
+    ecs_set(world, floor, Box, {3, 0.2f, 3});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .resolution_scale = 1});
+    ecs_singleton_set(world, PerfRun, {.fps = 120, .frames = 4, .warmup = 2});
+
+    int32_t frame;
+    for (frame = 0; frame < 12; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_bool(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->converged, false);
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfWarmup);
+
+    bool converged = false;
+    for (frame = 0; frame < 400; frame ++) {
+        ecs_progress(world, 0);
+        const LightBakeStatus *status = ecs_get(world, ecs_id(LightBake), LightBakeStatus);
+        if (!converged && status->converged) {
+            converged = true;
+            test_int(ecs_singleton_get(world, PerfStatus)->state, PerfWarmup);
+        }
+
+        if (ecs_singleton_get(world, PerfStatus)->state == PerfDone) {
+            break;
+        }
+    }
+
+    test_assert(converged);
+    test_int(ecs_singleton_get(world, PerfStatus)->state, PerfDone);
+
+    ecs_fini(world);
+}
