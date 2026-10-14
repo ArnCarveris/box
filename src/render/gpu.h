@@ -45,6 +45,12 @@ typedef struct box_gpu_target_t {
     bool capture_pending;           /**< A copy was recorded and not yet written */
 } box_gpu_target_t;
 
+/** A compiled shader module */
+typedef struct box_gpu_shader_t {
+    WGPUShaderModule module;        /**< The module */
+    int32_t revision;               /**< Times the module was compiled under its handle */
+} box_gpu_shader_t;
+
 /** Blit pipeline for one color format */
 typedef struct box_gpu_blit_t {
     WGPUTextureFormat format;       /**< Format of the color target */
@@ -57,13 +63,13 @@ typedef struct box_gpu_t {
     WGPUAdapter adapter;            /**< The adapter */
     WGPUDevice device;              /**< The device */
     WGPUQueue queue;                /**< Queue of the device */
-    WGPUShaderModule blit_shader;   /**< Shader that scales the scene texture to the output */
     WGPUBindGroupLayout blit_layout; /**< Bind group layout of the blit */
     WGPUPipelineLayout blit_pipeline_layout; /**< Pipeline layout of the blit */
     WGPUSampler sampler;            /**< Linear sampler of the blit */
     box_gpu_blit_t blits[BOX_GPU_BLIT_FORMATS]; /**< Blit pipelines by format */
     int32_t blit_count;             /**< Blit pipelines created */
     ecs_map_t targets;              /**< Handle to box_gpu_target_t */
+    ecs_map_t shaders;              /**< Handle to box_gpu_shader_t */
     ecs_os_mutex_t lock;            /**< Protects the counters */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
 } box_gpu_t;
@@ -75,7 +81,11 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_DESTROYED,         /**< A target was released */
     BOX_GPU_STAT_FRAMES,            /**< A target frame was rendered */
     BOX_GPU_STAT_CAPTURES,          /**< A PNG file was written */
-    BOX_GPU_STAT_ERRORS             /**< An error occurred */
+    BOX_GPU_STAT_ERRORS,            /**< An error occurred */
+    BOX_GPU_STAT_SHADER_CREATED,    /**< A shader module got its handle */
+    BOX_GPU_STAT_SHADER_DESTROYED,  /**< A shader module was released */
+    BOX_GPU_STAT_COMPILED,          /**< A shader module compiled */
+    BOX_GPU_STAT_SHADER_ERROR       /**< A shader module failed to compile */
 } box_gpu_stat_t;
 
 /** Count an event of the backend.
@@ -116,6 +126,45 @@ void box_gpu_target_render(
  * @param gpu The backend
  */
 void box_gpu_target_fini(
+    box_gpu_t *gpu);
+
+/** Compile, recompile or release a shader module.
+ *
+ * A module that fails to compile is reported and leaves the previous module in place.
+ *
+ * @param gpu The backend
+ * @param op What happens to the module
+ * @param handle Handle of the shader
+ * @param desc Description followed by the code and the label, NULL for a release
+ */
+void box_gpu_shader_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_shader_desc_t *desc);
+
+/** Get the module of a shader.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the shader
+ * @return The module, NULL when the shader has none
+ */
+WGPUShaderModule box_gpu_shader_get(
+    box_gpu_t *gpu,
+    uint32_t handle);
+
+/** Release every shader module.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_shader_fini(
+    box_gpu_t *gpu);
+
+/** Release the blit pipelines, which are created again with the current blit shader.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_blit_reset(
     box_gpu_t *gpu);
 
 /** Record a copy of a presented image into the readback buffer of its target.
