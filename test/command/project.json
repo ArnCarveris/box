@@ -1,0 +1,97 @@
+{
+    "id": "command",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/command"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Terminal",
+                "testcases": [
+                    "new_creates_folder",
+                    "new_unique_handles",
+                    "lookup_handle",
+                    "close_removes_folder",
+                    "remove_terminal_removes_folder",
+                    "script_terminal",
+                    "headless_folder_in_tmp_dir",
+                    "root_removed_at_fini",
+                    "sessions_isolated",
+                    "cwd_per_session",
+                    "log_file",
+                    "log_counts_commands",
+                    "empty_line_not_logged",
+                    "commands_all",
+                    "commands_count",
+                    "commands_count_above_total",
+                    "commands_not_nested",
+                    "commands_not_a_session",
+                    "commands_is_script_function",
+                    "http_new",
+                    "http_exec_get",
+                    "http_exec_post",
+                    "http_exec_error",
+                    "http_exec_missing_cmd",
+                    "http_exec_unknown_session",
+                    "http_close",
+                    "http_close_unknown_session",
+                    "http_rest_forward",
+                    "resource_text",
+                    "resource_png",
+                    "resource_subfolder",
+                    "resource_missing",
+                    "resource_folder",
+                    "resource_parent_path",
+                    "resource_absolute_path",
+                    "resource_symlink_outside",
+                    "resource_other_session",
+                    "resource_no_session"
+                ]
+            },
+            {
+                "id": "Dispatch",
+                "testcases": [
+                    "unknown_command",
+                    "string_int_float_bool",
+                    "entity_argument",
+                    "entity_relative_to_cwd",
+                    "unknown_entity",
+                    "optional_omitted",
+                    "too_few_arguments",
+                    "too_many_arguments",
+                    "invalid_int",
+                    "invalid_bool",
+                    "quoted_argument",
+                    "quoted_escape",
+                    "bracket_argument",
+                    "rest_argument",
+                    "rest_single_quoted",
+                    "dotted_command",
+                    "error_result_logged",
+                    "quiet_result_not_logged"
+                ]
+            },
+            {
+                "id": "Logs",
+                "testcases": [
+                    "captures_error",
+                    "level_filter",
+                    "count",
+                    "default_all_levels",
+                    "numeric_level",
+                    "unknown_level",
+                    "no_color_codes"
+                ]
+            }
+        ]
+    }
+}
