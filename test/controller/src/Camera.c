@@ -1360,7 +1360,7 @@ void Camera_mouse_look_platform(void) {
     ecs_fini(world);
 }
 
-void Camera_mouse_look_stops(void) {
+void Camera_key_turn_after_look(void) {
     // controller_fixes/look_release
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1374,14 +1374,9 @@ void Camera_mouse_look_stops(void) {
     ecs_progress(world, dt);
     box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 80, 100 } });
     ecs_progress(world, dt);
-    float yaw = ecs_get(world, cam, Rotation)->y;
-    test_assert(fabsf(yaw - 0.06f) < 0.00001f);
-    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[1], 0);
-
     box_input_glfw_on_button(world, 1, 0);
     ecs_progress(world, dt);
-    test_flt(ecs_get(world, cam, Rotation)->y, yaw);
-    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[1], 0);
+    float yaw = ecs_get(world, cam, Rotation)->y;
 
     box_input_key(world, KeyLeft, true);
     float av = 0;
@@ -1392,6 +1387,33 @@ void Camera_mouse_look_stops(void) {
         test_assert(fabsf(ecs_get(world, cam, CameraController)->angular_velocity[1] - av) < 1e-5f);
         test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 1e-5f);
     }
+
+    ecs_fini(world);
+}
+
+void Camera_look_with_key_turn(void) {
+    // controller_fixes/look_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f, av = 0, yaw = 0;
+
+    box_input_key(world, KeyLeft, true);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, dt);
+    av += (1.5f - av) * (1.0f - expf(-5.0f * dt));
+    yaw += av * dt;
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 1e-5f);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 80, 100 } });
+    ecs_progress(world, dt);
+    av += (1.5f - av) * (1.0f - expf(-5.0f * dt));
+    yaw += av * dt + 20 * 0.003f;
+    test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 1e-5f);
+    test_assert(fabsf(ecs_get(world, cam, CameraController)->angular_velocity[1] - av) < 1e-5f);
 
     ecs_fini(world);
 }
