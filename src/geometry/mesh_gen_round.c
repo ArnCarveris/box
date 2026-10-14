@@ -38,7 +38,7 @@ void box_mesh_gen_sphere(
     int32_t segments,
     bool smooth)
 {
-    int32_t stacks = segments / 2 < 2 ? 2 : segments / 2;
+    int32_t stacks = 2 * segments;
     box_lathe_point_t *profile = ecs_os_malloc_n(box_lathe_point_t, stacks + 1);
     for (int32_t i = 0; i <= stacks; i ++) {
         float phi = BOX_PI * (float)i / (float)stacks;
@@ -59,7 +59,7 @@ void box_mesh_gen_hemisphere(
     int32_t segments,
     bool smooth)
 {
-    int32_t stacks = segments / 4 < 1 ? 1 : segments / 4;
+    int32_t stacks = segments;
     box_lathe_point_t *profile = ecs_os_malloc_n(box_lathe_point_t, stacks + 1);
     for (int32_t i = 0; i <= stacks; i ++) {
         float phi = 0.5f * BOX_PI * (float)i / (float)stacks;
@@ -134,7 +134,7 @@ void box_mesh_gen_capsule(
     bool smooth,
     float length)
 {
-    int32_t half = segments / 4 < 1 ? 1 : segments / 4;
+    int32_t half = segments;
     int32_t count = 0;
     float total = length + 2.0f;
     float h = 0.5f * length;
