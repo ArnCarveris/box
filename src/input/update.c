@@ -466,6 +466,9 @@ static void box_input_apply(
     case InputActionUp:
         box_input_hold(dev, ev->action, ev->kind == InputActionDown);
         break;
+    case InputCapture:
+        in->capture = ev->code != 0;
+        break;
     }
 }
 
@@ -491,7 +494,7 @@ static bool box_input_platform_accept(
         box_input_surface_remember(world, dev, ev);
     }
 
-    if (ev->kind == InputResize) {
+    if (ev->kind == InputResize || ev->kind == InputCapture) {
         result = own;
     } else if (ev->kind == InputFocus) {
         result = own || ev->code != 0;
@@ -555,6 +558,49 @@ static void box_input_apply_queue(
     }
 }
 
+void box_input_capture_release(
+    ecs_world_t *world,
+    InputDevice *dev)
+{
+    if (dev->capture_applied && dev->backend.capture) {
+        dev->backend.capture(world, dev->capture_surface, false, dev->backend.ctx);
+    }
+
+    dev->capture_applied = false;
+}
+
+/** Capture the cursor while Input.capture is set and input is focused, in the window of the
+ * input surface, and release it otherwise. A change starts a fresh delta unless a synthetic
+ * cursor is pinned, because a platform moves the real cursor when it captures or releases it.
+ *
+ * @param world The world
+ * @param dev The device state
+ * @param in The Input singleton
+ */
+static void box_input_capture_sync(
+    ecs_world_t *world,
+    InputDevice *dev,
+    Input *in)
+{
+    bool want = in->capture && in->focused;
+    if (dev->capture_applied && (!want || dev->capture_surface != in->surface)) {
+        box_input_capture_release(world, dev);
+        dev->has_position = dev->has_position && in->mouse.pinned;
+    }
+
+    if (want && !dev->capture_applied) {
+        if (dev->backend.capture) {
+            dev->backend.capture(world, in->surface, true, dev->backend.ctx);
+        }
+
+        dev->capture_applied = true;
+        dev->capture_surface = in->surface;
+        dev->has_position = dev->has_position && in->mouse.pinned;
+    }
+
+    in->mouse.captured = want;
+}
+
 /** Derive the normalized cursor from the window size.
  *
  * @param in The Input singleton
@@ -606,6 +652,7 @@ void BoxInputUpdate(
     box_input_frame_begin(dev, in);
     box_input_apply_platform(world, dev, in);
     box_input_apply_queue(dev, in);
+    box_input_capture_sync(world, dev, in);
     box_input_text_publish(dev, in);
     box_input_derive(in);
     ecs_singleton_modified(world, Input);

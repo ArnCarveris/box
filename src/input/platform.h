@@ -16,7 +16,8 @@ typedef struct box_input_glfw_target_t {
     ecs_entity_t surface; /**< Surface the window presents, stamped on its events */
 } box_input_glfw_target_t;
 
-/** Send the events of a glfw window, stamped with its surface, to the input of a world.
+/** Send the events of a glfw window, stamped with its surface, to the input of a world, and
+ * install the glfw backend, which captures the cursor, unless the world already has a backend.
  *
  * box.surface polls glfw once per frame in SurfacePoll, in the PreFrame phase before the OnLoad
  * InputUpdate, so the events of a frame apply in that frame. Does nothing without box.input.
@@ -26,6 +27,13 @@ typedef struct box_input_glfw_target_t {
  */
 void box_input_glfw_attach(
     box_input_glfw_target_t *target,
+    void *window);
+
+/** Stop sending the events of a glfw window and capturing its cursor, before it is destroyed.
+ *
+ * @param window The GLFWwindow
+ */
+void box_input_glfw_detach(
     void *window);
 
 /** Send the events of the page canvas, stamped with a surface, to the input of a world by

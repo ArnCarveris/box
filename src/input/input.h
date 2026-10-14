@@ -64,6 +64,8 @@ typedef struct InputDevice {
     ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
     ecs_vec_t surfaces;            /**< box_input_surface_t of the surfaces that sent events */
     ecs_entity_t source;           /**< Surface stamped on pushed events that name none */
+    ecs_entity_t capture_surface;  /**< Surface the backend captured the cursor in */
+    bool capture_applied;          /**< The backend was asked to capture the cursor */
     bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 
@@ -105,6 +107,15 @@ InputDevice* box_input_device(
 void box_input_platform_source(
     ecs_world_t *world,
     ecs_entity_t surface);
+
+/** Ask the backend to release a cursor it was asked to capture.
+ *
+ * @param world The world
+ * @param dev The device state
+ */
+void box_input_capture_release(
+    ecs_world_t *world,
+    InputDevice *dev);
 
 /** Install the router that takes the events of every frame, replacing the previous one.
  *

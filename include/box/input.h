@@ -73,7 +73,8 @@ ECS_ENUM(InputEventKind, {
     InputRelease,    /**< The synthetic cursor is unpinned, the real pointer resumes */
     InputReset,      /**< Every held key, button and action is released, the cursor unpinned */
     InputActionDown, /**< A synthetic hold of an action starts */
-    InputActionUp    /**< A synthetic hold of an action ends */
+    InputActionUp,   /**< A synthetic hold of an action ends */
+    InputCapture     /**< Sets Input.capture to code, a platform sends 0 when it ends a capture */
 });
 
 /** One device event, pushed by the platform or queued as synthetic input */
@@ -96,9 +97,14 @@ ECS_STRUCT(Mouse, {
     vec2 normalized; /**< Cursor over the window size, 0..1 from the top left */
     vec2 scroll;     /**< Wheel offset of this frame */
     bool pinned;     /**< A synthetic cursor is pinned, platform movement is ignored */
+    bool captured;   /**< The cursor is captured: hidden, held by the window, unbounded moves */
 });
 
-/** Device state of the current frame, written by the InputUpdate system */
+/** Device state of the current frame, written by the InputUpdate system.
+ *
+ * The application sets capture; the cursor is captured while it is set and input is focused,
+ * through glfw's disabled cursor with raw motion natively and Pointer Lock in the browser.
+ */
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
@@ -106,6 +112,7 @@ ECS_STRUCT(Input, {
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
     ecs_entity_t surface; /**< Surface with the input focus, 0 until one gains it */
+    bool capture;       /**< Capture the cursor while input is focused, for mouse look */
 });
 
 /** A named game action, an entity that bindings and synthetic input drive */
@@ -154,10 +161,24 @@ ECS_STRUCT(ActionEvent, {
     float drag_y;        /**< Vertical cursor movement since the action went down */
 });
 
+/** Capture or release the cursor in the window of a surface.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for every window of the world
+ * @param captured Whether the cursor is captured
+ * @param ctx The ctx of the backend
+ */
+typedef void (*box_input_capture_t)(
+    ecs_world_t *world,
+    ecs_entity_t surface,
+    bool captured,
+    void *ctx);
+
 /** Backend that feeds real device input, such as glfw or the browser */
 typedef struct box_input_platform_t {
     void (*poll)(ecs_world_t *world, void *ctx); /**< Pushes the OS events at frame start */
     void (*free)(void *ctx);                     /**< Releases ctx, NULL when not needed */
+    box_input_capture_t capture;                 /**< Captures the cursor, NULL when it cannot */
     void *ctx;                                   /**< Backend state passed to the callbacks */
 } box_input_platform_t;
 

@@ -51,6 +51,7 @@ void box_input_platform_set(
     const box_input_platform_t *platform)
 {
     InputDevice *dev = box_input_device(world);
+    box_input_capture_release(world, dev);
     if (dev->backend.free) {
         dev->backend.free(dev->backend.ctx);
     }
