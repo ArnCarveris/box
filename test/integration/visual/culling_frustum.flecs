@@ -16,7 +16,7 @@ main_view {
 }
 
 sun {
-  Rotation: {0.9, 0.6, 0}
+  Rotation: {0.703, 0.8332, 0}
   DirectionalLight: {intensity: 1.5}
   Rgb: {255, 240, 220}
 }
