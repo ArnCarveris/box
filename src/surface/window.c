@@ -149,6 +149,32 @@ void* box_window_layer(
     return window->layer;
 }
 
+float box_window_refresh(
+    box_window_t *window)
+{
+    int count = 0, x = 0, y = 0, w = 0, h = 0, i;
+    GLFWmonitor **monitors = glfwGetMonitors(&count);
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode *mode;
+    glfwGetWindowPos(window->window, &x, &y);
+    glfwGetWindowSize(window->window, &w, &h);
+    for (i = 0; i < count; i ++) {
+        int mx = 0, my = 0;
+        const GLFWvidmode *m = glfwGetVideoMode(monitors[i]);
+        glfwGetMonitorPos(monitors[i], &mx, &my);
+        if (m && x + w / 2 >= mx && x + w / 2 < mx + m->width &&
+            y + h / 2 >= my && y + h / 2 < my + m->height)
+        {
+            monitor = monitors[i];
+            break;
+        }
+    }
+
+    mode = monitor ? glfwGetVideoMode(monitor) : NULL;
+
+    return mode ? (float)mode->refreshRate : 0;
+}
+
 bool box_window_closed(
     box_window_t *window)
 {
@@ -217,6 +243,14 @@ void* box_window_layer(
     (void)window;
 
     return NULL;
+}
+
+float box_window_refresh(
+    box_window_t *window)
+{
+    (void)window;
+
+    return 0;
 }
 
 bool box_window_closed(

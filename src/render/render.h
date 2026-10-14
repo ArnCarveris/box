@@ -239,6 +239,7 @@ typedef struct box_render_target_desc_t {
     int32_t point_width;    /**< Width in points cameras are sized by, the width when 0 */
     int32_t point_height;   /**< Height in points cameras are sized by, the height when 0 */
     bool vsync;             /**< A window presents with vertical sync */
+    float refresh;          /**< Refresh rate in Hz of the display of a window, 0 unknown */
     bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
@@ -357,6 +358,9 @@ typedef struct box_render_packet_t {
     int64_t frame;          /**< Frame the packet was extracted in */
     double time;            /**< World time at the end of the frame, in seconds */
     float delta;            /**< Seconds the frame advanced the world */
+    float fps;              /**< Frame rate cap of the frame, App.fps, 0 when uncapped */
+    bool vsync;             /**< A window target of the frame presents with vsync */
+    float refresh;          /**< Refresh rate in Hz of the display of that window, 0 unknown */
     uint32_t anisotropy;    /**< Anisotropic samples of the texture samplers, 1 to 16 */
     ecs_vec_t resources;    /**< box_render_resource_t in the order they were made */
     ecs_vec_t uploads;      /**< box_render_upload_t in the order they were made */
@@ -379,6 +383,8 @@ typedef struct box_render_backend_t {
     void (*render)(void*, const box_render_packet_t*); /**< Render a packet, valid until return */
     void (*fini)(void*);        /**< Release what init created */
     void (*free)(void*);        /**< Free ctx on the main thread, NULL when the caller owns it */
+    uint64_t (*fence)(void*);   /**< Mark the work render submitted so far, 0 when unsupported */
+    void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
@@ -1097,6 +1103,18 @@ void box_render_ring_pause(
  */
 void box_render_ring_sync(
     box_render_ring_t *ring);
+
+/** Compute how many refreshes a frame is shown for so that vsync paces a frame rate cap, the
+ * swap interval of Vulkan, EGL and D3D (Unity's vSyncCount) that webgpu does not expose.
+ *
+ * @param refresh Refresh rate of the display in Hz, 0 when unknown
+ * @param fps Frame rate cap, 0 for none
+ * @return The interval, 1 without a cap or with a cap at or above the refresh rate, 0 when
+ *         the refresh rate is unknown or not a whole multiple of the cap
+ */
+int32_t box_render_swap_interval(
+    float refresh,
+    float fps);
 
 /** Read the counters of a ring.
  *

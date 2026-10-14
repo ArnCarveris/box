@@ -652,12 +652,55 @@ done:
     return result;
 }
 
+/** Present the scene texture of a window again, so the frame stays on screen for another
+ * refresh: the swap interval of the window, which webgpu does not expose, emulated with FIFO
+ * presents that each block until the display takes an image.
+ *
+ * @param gpu The backend
+ * @param t The target
+ */
+static void box_gpu_target_repeat(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t)
+{
+    WGPUTexture texture = box_gpu_target_acquire(gpu, t);
+    WGPUTextureView view;
+    WGPUCommandEncoder encoder;
+    WGPUCommandBuffer commands;
+    if (!texture || !t->surface) {
+        goto done;
+    }
+
+    view = box_gpu_target_view(t, texture);
+    encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+    box_gpu_blit(gpu, t, encoder, view);
+    commands = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(gpu->queue, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    wgpuCommandEncoderRelease(encoder);
+    wgpuTextureViewRelease(view);
+#ifndef __EMSCRIPTEN__
+    wgpuSurfacePresent(t->surface);
+#endif
+    wgpuTextureRelease(texture);
+done:
+    return;
+}
+
 void box_gpu_target_render(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
     const box_render_target_t *frame)
 {
     box_gpu_target_t *t = ecs_map_get_deref(&gpu->targets, box_gpu_target_t, frame->handle);
+    int32_t swap = t && t->surface && t->desc.vsync
+        ? box_render_swap_interval(t->desc.refresh, packet->fps)
+        : 0;
+    int32_t i;
+    if (t && swap > 1 && !t->scene) {
+        box_gpu_target_scene(gpu, t);
+    }
+
     WGPUTexture texture = t ? box_gpu_target_acquire(gpu, t) : NULL;
     if (!texture) {
         goto done;
@@ -691,6 +734,10 @@ void box_gpu_target_render(
 
     if (box_gpu_target_captures(frame)) {
         box_gpu_capture_write(gpu, t, box_render_packet_data(packet, frame->capture));
+    }
+
+    for (i = 1; i < swap && t->scene; i ++) {
+        box_gpu_target_repeat(gpu, t);
     }
 
     box_gpu_count(gpu, BOX_GPU_STAT_FRAMES);

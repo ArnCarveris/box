@@ -159,6 +159,23 @@
                     "child_follows_parent",
                     "moving_child"
                 ]
+            },
+            {
+                "id": "FrameClock",
+                "testcases": [
+                    "timing_measures_delta_and_interval",
+                    "late_delta_counted",
+                    "dropped_frame_counted",
+                    "headless_steps_fixed_delta",
+                    "cap_sleeps_rest_of_frame",
+                    "vsync_paces_without_cap",
+                    "vsync_delta_smoothed",
+                    "swap_interval_follows_cap",
+                    "uneven_cap_presents_uneven",
+                    "cap_does_not_spin",
+                    "wait_does_not_spin",
+                    "fps_command"
+                ]
             }
         ]
     }

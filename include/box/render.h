@@ -27,10 +27,19 @@ extern "C" {
 /** Largest number of packets in flight */
 #define BOX_RENDER_IN_FLIGHT_MAX (8)
 
-/** How frames travel from the main thread to the renderer, applied before the next frame */
+/** Fraction of the frame interval a present interval may deviate before it counts as uneven */
+#define BOX_RENDER_PRESENT_TOLERANCE (0.1)
+
+/** How frames travel from the main thread to the renderer, applied before the next frame.
+ *
+ * display_rate simulates a vsync display for offscreen targets: a frame shows at the first free
+ * refresh after the GPU finished it, for swap_interval refreshes, and the renderer blocks until
+ * one present of the frame before is queued, like a FIFO swap chain of three images.
+ */
 ECS_STRUCT(RenderSettings, {
     int32_t in_flight;  /**< Packets in flight, default 2, from 1 to 8 */
     bool main_thread;   /**< The main thread renders the packet, default on in the browser */
+    float display_rate; /**< Refresh rate in Hz of the simulated vsync display, 0 for none */
 });
 
 /** Packet counters the engine writes after every frame, read only for applications */
@@ -41,6 +50,18 @@ ECS_STRUCT(RenderStatus, {
     int32_t stalls;     /**< Frames the main thread waited for a free packet */
     bool threaded;      /**< A render thread consumes the packets */
     int64_t upload_bytes; /**< Bytes of instance data the last frame uploaded, 0 when unchanged */
+    bool vsync;         /**< Frames present with vsync: a window with vsync or display_rate */
+    float refresh_rate; /**< Refresh rate in Hz of the vsync display, 0 when unknown or none */
+    int32_t swap_interval; /**< Refreshes each frame is shown for, so the display paces the
+                            *   frames: refresh_rate / App.fps when that is a whole number,
+                            *   1 without a cap, 0 when the cap must sleep instead */
+    int32_t presented;  /**< Frames presented: shown on the simulated display or handed over */
+    double present_ms;  /**< Interval between the last two presents */
+    int32_t presents_late;  /**< Present intervals over 1.1 frame intervals (1 / App.fps) */
+    int32_t presents_early; /**< Present intervals under 0.9 frame intervals */
+    int32_t delta_mismatches; /**< Frames on the simulated display whose delta differs over
+                               *   BOX_FRAME_TOLERANCE_MS from the time it was shown after the
+                               *   frame before it, so the motion does not match the display */
 });
 
 /** How a view culled its instances in the last frame the GPU finished, set on the View entity.

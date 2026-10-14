@@ -289,6 +289,7 @@ static void box_surface_measure(
         box_window_size(impl->window, &desc->width, &desc->height);
         box_window_points(impl->window, &desc->point_width, &desc->point_height);
         desc->layer = box_window_layer(impl->window);
+        desc->refresh = s->vsync ? box_window_refresh(impl->window) : 0;
     }
 
     if (desc->width > 0 && desc->height > 0) {
@@ -427,6 +428,11 @@ static void box_surface_frame(
             .render_height = desc.render_height,
             .window = impl->window != NULL
         });
+    }
+
+    if (s->vsync && !box_surface_offscreen(world, s)) {
+        p->vsync = true;
+        p->refresh = p->refresh > 0 ? p->refresh : desc.refresh;
     }
 
     box_surface_clear(world, s, p, clear);
