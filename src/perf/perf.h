@@ -17,6 +17,7 @@ typedef struct box_perf_t {
     int32_t run;          /**< Frames completed since the run started */
     double mark;          /**< Wall seconds at the end of the previous paced frame, 0 for none */
     double start;         /**< Wall seconds when the orbit started */
+    double measure;       /**< Wall seconds when the measurement started */
     double slept;         /**< AppStatus.slept when the measurement started */
     int32_t stalls;       /**< RenderStatus.stalls when the measurement started */
     bool bounds;          /**< The bounds were measured */
@@ -25,6 +26,9 @@ typedef struct box_perf_t {
     float distance;       /**< Distance of the camera from the center */
     ecs_vec_t intervals;  /**< Measured frame intervals in milliseconds, of double */
     ecs_vec_t work;       /**< Milliseconds of every measured frame before the wait, of double */
+    int64_t cull_frame;   /**< Render frame of the last culling sample, -1 for none */
+    int32_t cull_last[3]; /**< Visible, frustum and occlusion culled counts of the last sample */
+    double cull_sum[3];   /**< Sums of the visible, frustum and occlusion culled samples */
 } box_perf_t;
 
 /** Distribution of a series of durations */

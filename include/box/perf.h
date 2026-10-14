@@ -62,6 +62,13 @@ ECS_STRUCT(PerfRun, {
     char *report;         /**< JSON file the result is written to, NULL for none */
 });
 
+/** Range of a count sampled over the measurement of a run */
+ECS_STRUCT(PerfRange, {
+    int32_t min;  /**< Smallest sample */
+    int32_t max;  /**< Largest sample */
+    double mean;  /**< Mean of the samples */
+});
+
 /** Result of a performance run, written by the engine and read only for applications */
 ECS_STRUCT(PerfStatus, {
     PerfState state;      /**< Progress of the run */
@@ -71,6 +78,8 @@ ECS_STRUCT(PerfStatus, {
     int32_t slow;         /**< Frames longer than 1.1 target intervals */
     int32_t fast;         /**< Frames shorter than 0.9 target intervals */
     double target_ms;     /**< Target frame interval in milliseconds */
+    int32_t warmup;       /**< Paced frames before the measurement, the settle period */
+    float period;         /**< Seconds per revolution of the orbit */
     double min_ms;        /**< Shortest frame interval */
     double mean_ms;       /**< Mean frame interval */
     double p50_ms;        /**< Median frame interval */
@@ -85,6 +94,13 @@ ECS_STRUCT(PerfStatus, {
     vec3 center;          /**< Center of the bounds the camera orbits */
     float radius;         /**< Radius of the sphere around the bounds */
     float distance;       /**< Distance of the camera from the center */
+    float revolutions;    /**< Turns the orbit made during the measured frames */
+    int32_t views;        /**< Views that render the orbiting camera or a camera under it */
+    int32_t cull_samples; /**< Culling results of those views read during the measurement */
+    int32_t cull_changes; /**< Samples whose counts differ from the sample before */
+    PerfRange visible;    /**< Instances those views drew, summed per sample */
+    PerfRange frustum_culled;   /**< Instances outside the frustum or too small, per sample */
+    PerfRange occlusion_culled; /**< Instances hidden behind closer geometry, per sample */
 });
 
 /** Register the box.perf module.

@@ -18,7 +18,10 @@
                     "first_camera_when_unset",
                     "elevation",
                     "no_shapes",
-                    "period"
+                    "period",
+                    "cull_ranges",
+                    "views_of_orbit",
+                    "revolutions"
                 ]
             },
             {
@@ -44,7 +47,8 @@
                     "writes_json",
                     "failed_run",
                     "status_reflected",
-                    "script_run"
+                    "script_run",
+                    "orbit_json"
                 ]
             }
         ]
