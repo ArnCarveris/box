@@ -1,0 +1,58 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 2.5, 7}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {34, 38, 48, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {12, 0.2, 6}
+  Rgb: {120, 124, 132}
+}
+
+quad_cull {
+  Position: {-3, 1, 0}
+  Rotation: {0, 3.1416, 0}
+  Quad: {1.6, 1.6}
+  Rgb: {230, 80, 60}
+}
+
+quad_plain {
+  Position: {-1, 1, 0}
+  Rotation: {0, 3.1416, 0}
+  Quad: {1.6, 1.6}
+  Rgb: {230, 80, 60}
+  BackFaceMode: {BackFacePlain}
+}
+
+star_cull {
+  Position: {1, 1, 0}
+  Rotation: {0, 2.6, 0}
+  Star: {points: 5, inner: 0.45, radius: 0.9}
+  Rgb: {80, 180, 230}
+}
+
+star_plain {
+  Position: {3, 1, 0}
+  Rotation: {0, 2.6, 0}
+  Star: {points: 5, inner: 0.45, radius: 0.9}
+  Rgb: {80, 180, 230}
+  BackFaceMode: {BackFacePlain}
+}
+
+quad_front {
+  Position: {0, 1, -1.5}
+  Quad: {8, 0.3}
+  Rgb: {230, 220, 120}
+  BackFaceMode: {BackFacePlain}
+}

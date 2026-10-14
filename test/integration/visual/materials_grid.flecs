@@ -1,0 +1,32 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 0.4, 9.5}
+  Rotation: {-0.04, 0, 0}
+  Camera: {fov: 45}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+}
+
+backdrop {
+  Position: {0, 0, -2}
+  Box: {16, 9, 0.2}
+  Rgb: {70, 74, 84}
+}
+
+for r in 0..7 {
+  for m in 0..3 {
+    {
+      Position: {r * 1.5 - 4.5, 1.5 - m * 1.5, 0}
+      Sphere: {segments: 32, smooth: true, radius: 0.6}
+      Rgb: {225, 170, 80}
+      PbrMaterial: {metallic: m * 0.5, roughness: r * 0.1667}
+    }
+  }
+}

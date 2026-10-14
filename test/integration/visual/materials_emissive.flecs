@@ -1,0 +1,53 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 3, 8}
+  Rotation: {-0.35, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 6}
+  Rgb: {40, 40, 46}
+}
+
+for i in 0..5 {
+  {
+    Position: {i * 1.8 - 3.6, 0.7, -0.8}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {30, 30, 30}
+    Emissive: {strength: i * 0.25, color: {255, 120, 40}}
+  }
+}
+
+cyan_box {
+  Position: {-2.4, 0.5, 1.4}
+  Rotation: {0, 0.6, 0}
+  Box: {1, 1, 1}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {60, 220, 255}}
+}
+
+green_torus {
+  Position: {0, 0.6, 1.4}
+  Rotation: {1.2, 0, 0}
+  Torus: {segments: 32, rings: 16, smooth: true, radius: 0.55, tube: 0.18}
+  Rgb: {20, 60, 20}
+  Emissive: {strength: 0.6, color: {120, 255, 120}}
+}
+
+lit_box {
+  Position: {2.4, 0.5, 1.4}
+  Rotation: {0, 0.6, 0}
+  Box: {1, 1, 1}
+  Rgb: {200, 200, 200}
+}
