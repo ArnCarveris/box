@@ -1,0 +1,28 @@
+{
+    "id": "bench_controller",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for controller collision in a scene with one million shapes",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/controllers"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Collision",
+                "benchcases": [
+                    "move_1m",
+                    "move_blocked_1m",
+                    "frame_1m"
+                ]
+            }
+        ]
+    }
+}

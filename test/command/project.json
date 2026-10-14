@@ -325,6 +325,7 @@
                     "names_unique",
                     "gpu_capture_png",
                     "gpu_capture_first_frame",
+                    "gpu_capture_effects",
                     "gpu_render_isolated",
                     "http_resource"
                 ]
