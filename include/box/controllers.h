@@ -40,11 +40,41 @@ ECS_STRUCT(CameraController, {
     vec3 velocity;         /**< Velocity in units per second, written by the controller */
 });
 
-/** Register the box.controllers module and the default camera actions.
+/** First person controller that walks its entity and writes its Position and Rotation.
+ *
+ * The Position is the eye, above the feet. WASD walk along the yaw, Look turns, Jump leaves the
+ * ground, gravity pulls the feet onto the ground plane and Crouch lowers the eye and slows down.
+ * Fly toggles free flight that moves like a camera controller. A zero setting takes its default.
+ */
+ECS_STRUCT(FirstPersonController, {
+    float speed;           /**< Walking units per second, 4 by default */
+    float crouch_speed;    /**< Units per second while crouching, 2 by default */
+    float fly_speed;       /**< Units per second in free flight, 10 by default */
+    float boost;           /**< Flight speed multiplier while Fast is held, 4 by default */
+    float jump;            /**< Upward speed of a jump, 5 by default */
+    float gravity;         /**< Downward acceleration in units per second squared, 18 by default */
+    float eye;             /**< Height of the eye above the feet, 1.7 by default */
+    float crouch_eye;      /**< Height of the eye above the feet while crouching, 0.9 by default */
+    float ground;          /**< Height of the ground plane, 0 by default */
+    float sensitivity;     /**< Radians turned per point of cursor movement, 0.003 by default */
+    float acceleration;    /**< How fast the walk or flight follows the input per second, 0 snaps */
+    bool invert_y;         /**< Moving the cursor down looks up */
+    ecs_entity_t actions;  /**< Scope of the actions, box.controllers.first_person when 0 */
+    vec3 velocity;         /**< Velocity in units per second, written by the controller */
+    float height;          /**< Height of the eye above the feet, written by the controller */
+    bool grounded;         /**< The feet stand on the ground, written by the controller */
+    bool crouched;         /**< Crouch is held while walking, written by the controller */
+    bool flying;           /**< Free flight, toggled by the Fly action */
+});
+
+/** Register the box.controllers module and the default controller actions.
  *
  * The actions Forward (W), Back (S), Left (A), Right (D), Up (E), Down (Q), Fast (ShiftLeft)
- * and Look (MouseRight) are created under box.controllers.camera, each with its Binding. They
- * stay disabled while no camera controller uses them, so they only bind in worlds that do.
+ * and Look (MouseRight) are created under box.controllers.camera, each with its Binding.
+ *
+ * The same actions plus Jump (Space), Crouch (CtrlLeft) and Fly (F) are created under
+ * box.controllers.first_person. The actions of a scope stay disabled while no controller uses
+ * them, so they only bind in worlds that do.
  *
  * @param world The world
  */

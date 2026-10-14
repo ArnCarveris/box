@@ -51,6 +51,50 @@
                     "command_drag",
                     "command_action"
                 ]
+            },
+            {
+                "id": "FirstPerson",
+                "testcases": [
+                    "import",
+                    "default_bindings",
+                    "default_actions_disabled",
+                    "adds_position_rotation",
+                    "spawn_on_ground",
+                    "idle",
+                    "walk_forward",
+                    "walk_back_left_right",
+                    "walk_diagonal",
+                    "walk_follows_yaw",
+                    "walk_ignores_pitch",
+                    "walk_ignores_up_down",
+                    "speed",
+                    "acceleration",
+                    "look_drag",
+                    "look_sensitivity_invert_y",
+                    "pitch_clamped",
+                    "jump",
+                    "jump_while_walking",
+                    "jump_needs_ground",
+                    "jump_hold_no_repeat",
+                    "fall",
+                    "ground_height",
+                    "eye",
+                    "crouch",
+                    "crouch_speed",
+                    "fly_toggle",
+                    "fly_no_gravity",
+                    "fly_up_down",
+                    "fly_moves_like_camera",
+                    "fly_speed_boost",
+                    "fly_exit_falls",
+                    "remap_binding",
+                    "custom_actions",
+                    "with_camera_controller",
+                    "world_transform",
+                    "script_controller",
+                    "command_key",
+                    "command_action"
+                ]
             }
         ]
     }

@@ -7,6 +7,7 @@
 #include "controllers.h"
 
 ECS_COMPONENT_DECLARE(CameraActionMap);
+ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 
 const box_controller_action_t box_camera_actions[BoxCameraActionCount] = {
     [BoxCameraForward] = { "Forward", "Move the camera forward", KeyW },
@@ -80,6 +81,13 @@ void BoxControllersImport(
     ecs_add_pair(world, ecs_id(CameraController), EcsWith, ecs_id(Position));
     ecs_add_pair(world, ecs_id(CameraController), EcsWith, ecs_id(Rotation));
 
+    ECS_META_COMPONENT(world, FirstPersonController);
+    ECS_COMPONENT_DEFINE(world, FirstPersonActionMap);
+    ecs_set_hooks(world, FirstPersonController, { .ctor = flecs_default_ctor });
+    ecs_set_hooks(world, FirstPersonActionMap, { .ctor = flecs_default_ctor });
+    ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Position));
+    ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Rotation));
+
     CameraActionMap *map = ecs_singleton_ensure(world, CameraActionMap);
     box_controllers_camera_actions(world, map);
     map->controllers = ecs_query(world, {
@@ -87,6 +95,8 @@ void BoxControllersImport(
         .terms = {{ .id = ecs_id(CameraController), .inout = EcsIn }},
         .cache_kind = EcsQueryCacheAuto
     });
+
+    box_first_person_actions_create(world, ecs_singleton_ensure(world, FirstPersonActionMap));
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "CameraActionsActivate" }),
@@ -104,5 +114,24 @@ void BoxControllersImport(
             { .id = ecs_id(Rotation), .inout = EcsInOut }
         },
         .callback = BoxCameraControllerUpdate
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "FirstPersonActionsActivate" }),
+        .phase = EcsPreFrame,
+        .query.terms = {{ .id = ecs_id(FirstPersonController), .inout = EcsIn }},
+        .run = BoxFirstPersonActionsActivate,
+        .immediate = true
+    });
+
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "FirstPersonControllerUpdate" }),
+        .phase = EcsOnUpdate,
+        .query.terms = {
+            { .id = ecs_id(FirstPersonController), .inout = EcsInOut },
+            { .id = ecs_id(Position), .inout = EcsInOut },
+            { .id = ecs_id(Rotation), .inout = EcsInOut }
+        },
+        .callback = BoxFirstPersonControllerUpdate
     });
 }

@@ -45,6 +45,37 @@ typedef struct CameraActionMap {
 
 extern ECS_COMPONENT_DECLARE(CameraActionMap);
 
+/** The actions a first person controller reads, the index of their name in the action table */
+typedef enum box_first_person_action_t {
+    BoxFirstPersonForward,    /**< Walk along the yaw in the XZ plane */
+    BoxFirstPersonBack,       /**< Walk against the yaw in the XZ plane */
+    BoxFirstPersonLeft,       /**< Strafe left in the XZ plane */
+    BoxFirstPersonRight,      /**< Strafe right in the XZ plane */
+    BoxFirstPersonUp,         /**< Move up along Y in free flight */
+    BoxFirstPersonDown,       /**< Move down along Y in free flight */
+    BoxFirstPersonFast,       /**< Multiply the flight speed by the boost while held */
+    BoxFirstPersonLook,       /**< Turn with the cursor while held */
+    BoxFirstPersonJump,       /**< Leave the ground when pressed */
+    BoxFirstPersonCrouch,     /**< Lower the eye and walk slower while held */
+    BoxFirstPersonFly,        /**< Toggle free flight when pressed */
+    BoxFirstPersonActionCount /**< Number of first person actions */
+} box_first_person_action_t;
+
+/** The first person actions, indexed by box_first_person_action_t */
+extern const box_controller_action_t box_first_person_actions[BoxFirstPersonActionCount];
+
+/** The default first person actions, a private singleton.
+ *
+ * The actions are disabled while no first person controller uses them.
+ */
+typedef struct FirstPersonActionMap {
+    ecs_entity_t scope;                              /**< box.controllers.first_person */
+    ecs_entity_t actions[BoxFirstPersonActionCount]; /**< The actions, by index */
+    bool active;                                     /**< The actions are enabled */
+} FirstPersonActionMap;
+
+extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
+
 /** Move a controlled entity by its velocity over a frame.
  *
  * This is where a controller meets the scene: collision slides the move along what it hits
@@ -76,6 +107,29 @@ void BoxCameraActionsActivate(
  * @param it Iterator over CameraController, Position and Rotation
  */
 void BoxCameraControllerUpdate(
+    ecs_iter_t *it);
+
+/** Create the default first person actions, disabled and each bound to its key.
+ *
+ * @param world The world
+ * @param map The action map, written
+ */
+void box_first_person_actions_create(
+    ecs_world_t *world,
+    FirstPersonActionMap *map);
+
+/** Enable the default first person actions while a controller uses them, else disable them.
+ *
+ * @param it Iterator over FirstPersonController
+ */
+void BoxFirstPersonActionsActivate(
+    ecs_iter_t *it);
+
+/** Walk, jump, fly and turn the entities that have a first person controller.
+ *
+ * @param it Iterator over FirstPersonController, Position and Rotation
+ */
+void BoxFirstPersonControllerUpdate(
     ecs_iter_t *it);
 
 #endif
