@@ -267,7 +267,7 @@ static void box_web_poll(
     }
 
     box_web_follow(world, web);
-    s = web->status && ecs_is_alive(world, web->surface) ?
+    s = web->status && web->surface && ecs_is_alive(world, web->surface) ?
         ecs_get_id(world, web->surface, web->status) : NULL;
     if (!s) {
         goto done;
