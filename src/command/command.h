@@ -213,4 +213,11 @@ ecs_id_t box_command_component(
     ecs_world_t *world,
     const char *expr);
 
+/** Register the script_read, script_write, script_grep and script_patch commands.
+ *
+ * @param world The world
+ */
+void box_cmd_script_init(
+    ecs_world_t *world);
+
 #endif

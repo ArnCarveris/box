@@ -168,4 +168,5 @@ void BoxCommandImport(
     box_logs_init(world);
     box_shell_init(world);
     box_search_init(world);
+    box_cmd_script_init(world);
 }

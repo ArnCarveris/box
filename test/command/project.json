@@ -215,6 +215,43 @@
                     "clear_in_use",
                     "clear_module"
                 ]
+            },
+            {
+                "id": "Script",
+                "testcases": [
+                    "read_script",
+                    "read_absolute_path",
+                    "read_lists_scripts",
+                    "read_unknown_script",
+                    "read_outside_working_dir",
+                    "read_parent_path",
+                    "read_symlink_outside",
+                    "write_updates_world",
+                    "write_writes_file",
+                    "write_parse_error",
+                    "write_eval_error",
+                    "write_unknown_script",
+                    "write_missing_code",
+                    "grep_matches",
+                    "grep_multiple_scripts",
+                    "grep_no_match",
+                    "grep_skips_outside",
+                    "grep_limit",
+                    "patch_replace_line",
+                    "patch_add_lines",
+                    "patch_remove_lines",
+                    "patch_multiple_hunks",
+                    "patch_moved_lines",
+                    "patch_no_line_numbers",
+                    "patch_mismatch",
+                    "patch_no_hunks",
+                    "patch_parse_error",
+                    "patch_writes_file",
+                    "patch_keeps_missing_newline",
+                    "patch_unknown_script",
+                    "patch_http_post",
+                    "commands_are_script_functions"
+                ]
             }
         ]
     }
