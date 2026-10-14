@@ -233,6 +233,42 @@
                 ]
             },
             {
+                "id": "Scene",
+                "testcases": [
+                    "view_renders_scene_of_camera",
+                    "two_views_two_scenes",
+                    "nested_scene_nearest_ancestor",
+                    "reparent_moves_subtree",
+                    "reparent_parent_storage",
+                    "scene_added_and_removed",
+                    "camera_reparented_switches_scene",
+                    "lights_isolated_in_overlapping_scenes",
+                    "light_follows_reparent",
+                    "light_moves_with_scene_added"
+                ]
+            },
+            {
+                "id": "Shadow",
+                "testcases": [
+                    "splits_uniform",
+                    "splits_logarithmic",
+                    "splits_mix_by_lambda",
+                    "splits_end_at_max_distance",
+                    "splits_end_at_camera_far",
+                    "cascade_contains_slice",
+                    "cascade_snapped_to_texels",
+                    "cascade_reversed_z",
+                    "box_casts_shadow",
+                    "disabled_casts_no_shadow",
+                    "no_shadow_casts_none",
+                    "no_shadow_parent_casts_none",
+                    "no_shadow_removed_casts_again",
+                    "beyond_max_distance_unshadowed",
+                    "fade_softens_last_cascade",
+                    "default_settings"
+                ]
+            },
+            {
                 "id": "Shapes2D",
                 "testcases": [
                     "rect_size",

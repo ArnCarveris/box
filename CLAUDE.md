@@ -51,6 +51,10 @@ doc comment on every type and member.
 - `PointLight` and `SpotLight` default to intensity 1 through their ctor, but a C literal
   `ecs_set(e, PointLight, {.range = 5})` writes 0 into the intensity, which means off. Set
   the intensity in C; script `PointLight: {range: 5}` keeps the default.
+- `View` constructs with `lighting.enabled = true`, but a C literal
+  `ecs_set(e, View, {.camera = c})` writes 0 into `lighting.enabled`, so the view renders
+  unlit (base color and emission only). Set `.lighting.enabled = true` in C; script
+  `View: {camera: c}` keeps the default.
 
 ## Tests
 

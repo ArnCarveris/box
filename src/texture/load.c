@@ -25,7 +25,6 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize2.h>
 
-#ifdef BOX_TEXTURE_SVG
 #include <resvg.h>
 
 /** Resolution SVG lengths in physical units are converted with */
@@ -36,7 +35,6 @@ static ecs_os_mutex_t box_texture_svg_lock;
 
 /** Options every SVG is parsed with, created by the first SVG decode */
 static resvg_options *box_texture_svg_options;
-#endif
 
 /** Largest file a texture is read from, in bytes */
 #define BOX_TEXTURE_MAX_FILE (256 * 1024 * 1024)
@@ -167,8 +165,6 @@ done:
     return;
 }
 
-#ifdef BOX_TEXTURE_SVG
-
 /** Get the options SVGs are parsed with, creating them on first use.
  *
  * @return The options
@@ -250,33 +246,11 @@ done:
     return;
 }
 
-#else
-
-/** Report that this build cannot render SVG files.
- *
- * @param job The job, receives the error
- * @param data Unused
- * @param size Unused
- */
-static void box_texture_decode_svg(
-    box_texture_job_t *job,
-    const uint8_t *data,
-    int32_t size)
-{
-    (void)data;
-    (void)size;
-    job->error = flecs_asprintf("cannot load svg '%s': this build has no resvg", job->path);
-}
-
-#endif
-
 void box_texture_decode_init(void)
 {
-#ifdef BOX_TEXTURE_SVG
     if (!box_texture_svg_lock) {
         box_texture_svg_lock = ecs_os_mutex_new();
     }
-#endif
 }
 
 void box_texture_decode(

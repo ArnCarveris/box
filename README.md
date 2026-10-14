@@ -10,7 +10,8 @@ engine reacts to component changes. See `DESIGN.md` for the full brief and
 - [bake3](https://github.com/SanderMertens/bake3) on the path
 - The flecs repository checked out at `../../flecs` (built as a bundle)
 - A Rust toolchain (wgpu-native and resvg are built with cargo)
-- For wasm builds: emsdk, with `emsdk_env.sh` sourced
+- For wasm builds: emsdk, with `emsdk_env.sh` sourced, and the Rust target for resvg:
+  `rustup target add wasm32-unknown-emscripten`
 
 ## Build and run
 

@@ -75,21 +75,6 @@ static void box_lights_table_init(void)
     }
 }
 
-/** Get the scene root an entity belongs to.
- *
- * @param world The world
- * @param e The entity
- * @return The entity when it has Scene, else its nearest ancestor with Scene, 0 for none
- */
-static ecs_entity_t box_lights_scene_of(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    return ecs_has(world, e, Scene)
-        ? e
-        : ecs_get_target_for_id(world, e, EcsChildOf, ecs_id(Scene));
-}
-
 /** Find the lights of a scene.
  *
  * @param l The state
@@ -221,11 +206,11 @@ static box_render_light_t* box_lights_add_point(
 
 /** Collect the lights one query matches into the scenes they belong to.
  *
- * Every entity in a table shares its scene unless the table has non fragmenting parents.
+ * The scene of a light comes from the Scene(self|up) field of the query.
  *
  * @param world The world
  * @param l The state
- * @param q The query, with the light component, WorldTransform and Rgb
+ * @param q The query, with the light component, WorldTransform, Rgb and Scene
  * @param kind 0 for directional, 1 for point and 2 for spot lights
  */
 static void box_lights_collect(
@@ -238,14 +223,16 @@ static void box_lights_collect(
     while (ecs_query_next(&it)) {
         const WorldTransform *transforms = ecs_field(&it, WorldTransform, 1);
         const Rgb *colors = ecs_field(&it, Rgb, 2);
-        bool per_entity = ecs_table_has_id(world, it.table, ecs_id(EcsParent));
         box_light_scene_t *s = NULL;
+        ecs_entity_t scene = 0;
         int32_t i;
         for (i = 0; i < it.count; i ++) {
             const WorldTransform *transform = transforms ? &transforms[i] : NULL;
             const Rgb *rgb = colors ? &colors[i] : NULL;
-            if (!s || per_entity) {
-                s = box_lights_ensure(l, box_lights_scene_of(world, it.entities[i]));
+            ecs_entity_t member = box_render_scene_field(&it, 3, i);
+            if (!s || member != scene) {
+                scene = member;
+                s = box_lights_ensure(l, scene);
             }
 
             s->has_lights = true;
@@ -295,8 +282,7 @@ static void box_lights_collect_ambient(
         const AmbientLight *a = ecs_field(&it, AmbientLight, 0);
         int32_t i, c;
         for (i = 0; i < it.count; i ++) {
-            box_light_scene_t *s = box_lights_ensure(
-                l, box_lights_scene_of(world, it.entities[i]));
+            box_light_scene_t *s = box_lights_ensure(l, box_render_scene_field(&it, 1, i));
             const uint8_t sky[3] = { a[i].sky.r, a[i].sky.g, a[i].sky.b };
             const uint8_t ground[3] = { a[i].ground.r, a[i].ground.g, a[i].ground.b };
             float intensity = glm_max(a[i].intensity, 0.0f);
@@ -502,11 +488,16 @@ static void box_lights_views(
             out->buffer = s->buffer;
             out->directional = s->directional;
             out->count = (uint32_t)ecs_vec_count(&s->lights);
+            if (s->directional) {
+                glm_vec3_copy(ecs_vec_first_t(&s->lights, box_render_light_t)->position,
+                    out->sun);
+            }
         } else {
             box_lights_send_default(l, p);
             out->buffer = BOX_LIGHTS_DEFAULT_BUFFER;
             out->directional = 1;
             out->count = 1;
+            glm_vec3_copy(ECS_CONST_CAST(float*, box_lights_sun), out->sun);
         }
 
         if (s && s->has_ambient) {
@@ -591,7 +582,7 @@ static void box_lights_free(
  *
  * @param world The world
  * @param light The light component
- * @return The query, with the light, WorldTransform and Rgb
+ * @return The query, with the light, WorldTransform, Rgb and Scene(self|up)
  */
 static ecs_query_t* box_lights_query(
     ecs_world_t *world,
@@ -601,7 +592,14 @@ static ecs_query_t* box_lights_query(
         .terms = {
             { .id = light, .inout = EcsIn },
             { .id = ecs_id(WorldTransform), .inout = EcsIn, .oper = EcsOptional },
-            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional }
+            { .id = ecs_id(Rgb), .inout = EcsIn, .oper = EcsOptional },
+            {
+                .id = ecs_id(Scene),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsOptional
+            }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -620,7 +618,16 @@ void box_render_lights_init(
     l->point = box_lights_query(world, ecs_id(PointLight));
     l->spot = box_lights_query(world, ecs_id(SpotLight));
     l->ambient = ecs_query(world, {
-        .terms = {{ .id = ecs_id(AmbientLight), .inout = EcsIn }},
+        .terms = {
+            { .id = ecs_id(AmbientLight), .inout = EcsIn },
+            {
+                .id = ecs_id(Scene),
+                .src.id = EcsSelf | EcsUp,
+                .trav = EcsChildOf,
+                .inout = EcsInOutNone,
+                .oper = EcsOptional
+            }
+        },
         .cache_kind = EcsQueryCacheAuto
     });
 

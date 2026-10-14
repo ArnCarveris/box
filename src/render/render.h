@@ -26,6 +26,15 @@
 /** Shader handle of the engine compute shader that assigns the lights of a view to clusters */
 #define BOX_RENDER_SHADER_CLUSTER (4)
 
+/** Shader handle of the engine shader that draws the casters into the cascades of a view */
+#define BOX_RENDER_SHADER_SHADOW (5)
+
+/** Cascades of the shadow map of a view at most */
+#define BOX_RENDER_SHADOW_CASCADES (4)
+
+/** PCF taps per axis of a shadow lookup at most */
+#define BOX_RENDER_SHADOW_FILTER_MAX (7)
+
 /** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
 #define BOX_RENDER_SHADER_SHAPE2D (6)
 
@@ -123,7 +132,26 @@ typedef struct box_render_view_lights_t {
     uint32_t count;          /**< Lights in the buffer, the directional ones included */
     float ambient_sky[4];    /**< Linear ambient light from above */
     float ambient_ground[4]; /**< Linear ambient light from below */
+    float sun[3];            /**< Direction toward the first directional light, if any */
 } box_render_view_lights_t;
+
+/** The shadow settings of a view, resolved, with the view depths its cascades end at.
+ *
+ * The first directional light of the scene casts the shadows; the cascades are fitted to the
+ * target the view renders into, because the frustum follows its aspect.
+ */
+typedef struct box_render_view_shadows_t {
+    bool enabled;           /**< The view renders shadows and its scene has a directional light */
+    int32_t cascades;       /**< Cascades, 1 to BOX_RENDER_SHADOW_CASCADES */
+    int32_t resolution;     /**< Edge of a cascade in texels */
+    int32_t filter_size;    /**< PCF taps per axis, 1 to BOX_RENDER_SHADOW_FILTER_MAX */
+    float depth_bias;       /**< Depth offset of the comparison in texels */
+    float normal_offset;    /**< Offset of the lookup along the normal in texels */
+    float fade;             /**< Fraction of the last cascade that fades out */
+    float near_;            /**< View depth the first cascade starts at */
+    float splits[BOX_RENDER_SHADOW_CASCADES]; /**< View depth each cascade ends at */
+    float direction[3];     /**< Direction toward the light that casts the shadows */
+} box_render_view_shadows_t;
 
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
@@ -141,6 +169,7 @@ typedef struct box_render_view_t {
     ClearSettings clear;        /**< Clear settings of the view */
     uint32_t target;            /**< Handle of the only target that renders the view, 0 for any */
     box_render_view_lights_t lights; /**< Lights of the scene, filled by the light extract */
+    box_render_view_shadows_t shadows; /**< Shadows of the view, filled by the shadow extract */
 } box_render_view_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -249,6 +278,7 @@ typedef struct box_render_batch_t {
     uint32_t pipeline;          /**< Shader handle of the pipeline */
     uint32_t blend;             /**< BlendMode of the pipeline, Opaque writes depth */
     uint32_t back_face;         /**< BackFaceMode of the pipeline, BackFaceCull culls */
+    bool shadow;                /**< The instances cast shadows, false for NoShadow */
     uint32_t mesh;              /**< Mesh handle */
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
@@ -491,6 +521,109 @@ void box_render_lights_init(
 void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
+
+/** Register the cached query that knows the scene of every entity in a scene.
+ *
+ * @param world The world
+ */
+void box_render_scenes_init(
+    ecs_world_t *world);
+
+/** Get the scene an entity belongs to from the cached scene membership query.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return The entity when it has Scene, else its nearest ancestor with Scene, 0 for the
+ * default scene
+ */
+ecs_entity_t box_render_scene_of(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
+/** Get the scene of an entity of a query result with an optional Scene(self|up) term.
+ *
+ * @param it The iterator
+ * @param field Index of the Scene field
+ * @param row Row of the entity in the result
+ * @return The entity when it has Scene, else the source of the field, 0 for the default scene
+ */
+ecs_entity_t box_render_scene_field(
+    const ecs_iter_t *it,
+    int8_t field,
+    int32_t row);
+
+/** Register the system that resolves the shadow settings of every view of the packet.
+ *
+ * Runs after the light extract, because a view only renders shadows when its scene has a
+ * directional light.
+ *
+ * @param world The world
+ */
+void box_render_shadows_init(
+    ecs_world_t *world);
+
+/** Resolve shadow settings: zero cascades, resolution, distance and filter take the default,
+ * everything is clamped to its valid range.
+ *
+ * @param settings The settings of a view
+ * @param out Receives the resolved settings
+ */
+void box_render_shadow_settings(
+    const ShadowSettings *settings,
+    ShadowSettings *out);
+
+/** Split the view depths between near and distance into cascades.
+ *
+ * A split mixes the uniform split near + (distance - near) * i / n with the logarithmic split
+ * near * (distance / near) ^ (i / n) by lambda: 0 is uniform, 1 logarithmic.
+ *
+ * @param near_ View depth the first cascade starts at
+ * @param distance View depth the last cascade ends at
+ * @param lambda Weight of the logarithmic split
+ * @param cascades Number of cascades
+ * @param out Receives the view depth each cascade ends at, the last one is distance
+ */
+void box_render_shadow_splits(
+    float near_,
+    float distance,
+    float lambda,
+    int32_t cascades,
+    float *out);
+
+/** A cascade fitted to a slice of the view frustum */
+typedef struct box_render_cascade_t {
+    mat4 matrix;            /**< World to shadow clip space, reversed Z: 1 nearest the light */
+    float texel;            /**< World size of a texel of the cascade */
+    float depth_range;      /**< World distance the depth of the cascade spans */
+} box_render_cascade_t;
+
+/** Fit a cascade around the bounding sphere of a slice of the view frustum.
+ *
+ * The sphere only depends on the projection and the slice depths, so its size is the same in
+ * every frame; its center is snapped to whole texels in light space, so a moving camera does
+ * not make the shadow edges shimmer.
+ *
+ * The depth range reaches back toward the light by distance, which keeps the casters between
+ * the light and the slice.
+ *
+ * @param camera World transform of the camera
+ * @param proj Projection of the view
+ * @param near_ View depth the slice starts at
+ * @param far_ View depth the slice ends at
+ * @param direction Direction toward the light
+ * @param resolution Edge of the cascade in texels
+ * @param distance Distance the casters may be in front of the slice toward the light
+ * @param out Receives the cascade
+ */
+void box_render_shadow_cascade(
+    mat4 camera,
+    mat4 proj,
+    float near_,
+    float far_,
+    const float *direction,
+    int32_t resolution,
+    float distance,
+    box_render_cascade_t *out);
 
 /** A one-off render of a camera into an offscreen image that is written as a PNG file.
  *
