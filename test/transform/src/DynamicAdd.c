@@ -299,3 +299,48 @@ void DynamicAdd_static_100k_add_velocity(void) {
     ecs_os_free(ents);
     ecs_fini(world);
 }
+
+void DynamicAdd_static_100k_shapes_add_dynamic_velocity(void) {
+    // engine_core/dynamic_add_crash
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+
+    int count = 100000;
+    ecs_entity_t *ents = ecs_os_malloc_n(ecs_entity_t, count);
+    for (int i = 0; i < count; i ++) {
+        ents[i] = ecs_new(world);
+        ecs_set(world, ents[i], Position, {(float)i, 0, 0});
+        ecs_set(world, ents[i], Rotation, {0, 0, 0});
+        ecs_set(world, ents[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 1.0f);
+    ecs_progress(world, 1.0f);
+
+    for (int i = 0; i < count; i ++) {
+        ecs_add(world, ents[i], DynamicTransform);
+    }
+
+    for (int i = 0; i < count; i ++) {
+        ecs_set(world, ents[i], Velocity, {0, 1, 0});
+    }
+
+    ecs_progress(world, 1.0f);
+    ecs_progress(world, 1.0f);
+
+    test_assert(ecs_singleton_get(world, RenderStatus)->upload_bytes > 0);
+    for (int i = 0; i < count; i ++) {
+        const WorldTransform *t = ecs_get(world, ents[i], WorldTransform);
+        test_assert(t != NULL);
+        test_flt(t->m[3][0], (float)i);
+        test_flt(t->m[3][1], 2);
+    }
+
+    ecs_os_free(ents);
+    ecs_fini(world);
+}
