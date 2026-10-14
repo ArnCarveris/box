@@ -308,7 +308,8 @@
                     "prefab_instance",
                     "one_batch_for_all_kinds",
                     "empty_shapes_not_drawn",
-                    "bounds_hold_shape"
+                    "bounds_hold_shape",
+                    "tint_applies"
                 ]
             }
         ]

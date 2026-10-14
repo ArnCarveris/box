@@ -989,3 +989,64 @@ void Shapes2D_bounds_hold_shape(void) {
 
     ecs_fini(world);
 }
+
+void Shapes2D_tint_applies(void) {
+    // ui/shapes_2d
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t parent = ecs_new(world);
+    ecs_set(world, parent, Position, {0, 0, 0});
+    ecs_set(world, parent, Tint, {0, 0, 255, 255});
+    ecs_entity_t rect = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, rect, Position, {-12, 0, 0});
+    ecs_set(world, rect, Rect, {16, 16});
+    ecs_set(world, rect, Rgb, {255, 255, 255});
+    ecs_set(world, rect, Border, {.width = 3, .color = {255, 0, 0, 255}});
+    ecs_entity_t circle = ecs_new(world);
+    ecs_set(world, circle, Position, {12, 0, 0});
+    ecs_set(world, circle, Circle, {8});
+    ecs_set(world, circle, Rgb, {255, 255, 255});
+    ecs_set(world, circle, Tint, {0, 255, 0, 255});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 64, .write_to_file = "tint.png"});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/tint.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *c = &px[(32 * 64 + 20) * 4];
+    test_assert(c[0] < 10 && c[1] < 10 && c[2] > 245);
+    c = &px[(32 * 64 + 44) * 4];
+    test_assert(c[0] < 10 && c[1] > 245 && c[2] < 10);
+    c = &px[(37 * 64 + 44) * 4];
+    test_assert(c[0] < 10 && c[1] > 245 && c[2] < 10);
+    c = &px[(32 * 64 + 13) * 4];
+    test_assert(c[0] < 10 && c[1] < 10 && c[2] > 245);
+    ecs_set(world, parent, Tint, {0, 0, 255, 0});
+    stbi_image_free(px);
+
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    c = &px[(32 * 64 + 20) * 4];
+    test_assert(c[0] > 245 && c[1] > 245 && c[2] > 245);
+    c = &px[(32 * 64 + 13) * 4];
+    test_assert(c[0] > 245 && c[1] < 10 && c[2] < 10);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
