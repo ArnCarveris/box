@@ -358,7 +358,10 @@ void box_command_error(
     ecs_os_free(out[0]);
     out[0] = flecs_asprintf(BOX_COMMAND_ERROR "%s", msg);
     ecs_os_free(msg);
-    box_terminal_host(ctx->world)->failed = true;
+    box_terminal_host_t *host = box_terminal_host(ctx->world);
+    if (host) {
+        host->failed = true;
+    }
 }
 
 char* box_terminal_run(
@@ -370,6 +373,11 @@ char* box_terminal_run(
     box_command_line_t cl = {0};
     box_command_status_t st = { .failed = true };
     char *result = NULL;
+    if (!box_terminal_host(world)) {
+        result = ecs_os_strdup(BOX_COMMAND_ERROR BOX_COMMAND_NOT_IMPORTED);
+        goto done;
+    }
+
     if (!ecs_is_alive(world, session) || !ecs_has(world, session, TerminalSession)) {
         result = ecs_os_strdup(BOX_COMMAND_ERROR "not a terminal session");
         goto done;

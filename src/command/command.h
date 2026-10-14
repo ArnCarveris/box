@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include "../app/app.h"
 
+/** Error of the command functions when the world has no TerminalHost */
+#define BOX_COMMAND_NOT_IMPORTED "box.command is not imported"
+
 /** Path of the scope that holds the command functions */
 #define BOX_COMMAND_SCOPE "box.command.commands"
 
@@ -91,7 +94,7 @@ extern ECS_COMPONENT_DECLARE(TerminalHost);
 /** Get the host of a world.
  *
  * @param world The world
- * @return The host
+ * @return The host, NULL when box.command is not imported or its TerminalHost was removed
  */
 box_terminal_host_t* box_terminal_host(
     const ecs_world_t *world);
@@ -225,8 +228,19 @@ typedef enum box_shell_access_t {
     BoxShellScope,      /**< Any entity or the root */
     BoxShellRead,       /**< Any entity but the root */
     BoxShellWrite,      /**< An entity outside the flecs scope */
+    BoxShellSet,        /**< A writable entity outside sessions */
     BoxShellDelete      /**< A writable entity outside modules and sessions */
 } box_shell_access_t;
+
+/** Test whether an entity is a module, a session or lives in the scope of one.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when changing the type of the entity could break a module or a session
+ */
+bool box_shell_protected(
+    const ecs_world_t *world,
+    ecs_entity_t e);
 
 /** Resolve a path against the current entity of a session, failing the command when it can't.
  *

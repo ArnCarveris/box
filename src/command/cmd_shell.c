@@ -41,13 +41,7 @@ static bool box_shell_builtin(
     return result;
 }
 
-/** Test whether an entity is a module, a session or lives in the scope of one.
- *
- * @param world The world
- * @param e The entity
- * @return true when deleting the entity would break a module or a session
- */
-static bool box_shell_protected(
+bool box_shell_protected(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
@@ -55,6 +49,26 @@ static bool box_shell_protected(
     ecs_entity_t cur = e;
     while (cur && !result) {
         result = ecs_has_id(world, cur, EcsModule) || ecs_has(world, cur, Terminal);
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
+}
+
+/** Test whether an entity is a session or lives in the scope of one.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when the entity belongs to a session
+ */
+static bool box_shell_session(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    bool result = false;
+    ecs_entity_t cur = e;
+    while (cur && !result) {
+        result = ecs_has(world, cur, Terminal);
         cur = ecs_get_parent(world, cur);
     }
 
@@ -183,7 +197,9 @@ int box_shell_resolve(
         box_command_error(ctx, result, "'%s' is the root", p);
     } else if (access >= BoxShellWrite && box_shell_builtin(world, out[0])) {
         box_command_error(ctx, result, "'%s' is builtin", p);
-    } else if (access == BoxShellDelete && box_shell_protected(world, out[0])) {
+    } else if ((access == BoxShellDelete && box_shell_protected(world, out[0])) ||
+        (access == BoxShellSet && box_shell_session(world, out[0])))
+    {
         box_command_error(ctx, result, "'%s' belongs to a module or session", p);
     } else {
         ret = 0;

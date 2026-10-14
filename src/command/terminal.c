@@ -165,6 +165,10 @@ const char* box_terminal_root(
     box_terminal_host_t *host = box_terminal_host(world);
     const char *result = NULL;
     char *root;
+    if (!host) {
+        goto done;
+    }
+
     if (status && status->tmp_dir) {
         result = status->tmp_dir;
         goto done;
@@ -407,6 +411,11 @@ ecs_entity_t box_terminal_new(
     char handle[BOX_TERMINAL_HANDLE_MAX];
     ecs_entity_t result = 0;
     int32_t open = 0;
+    if (!host) {
+        ecs_err("cannot open a terminal session: %s", BOX_COMMAND_NOT_IMPORTED);
+        goto done;
+    }
+
     if (box_terminal_full(world, &open)) {
         ecs_err("cannot open a terminal session: %d are open", open);
         goto done;
