@@ -946,7 +946,8 @@ void Camera_query_entity_deleted(void) {
 
     ecs_entity_t cam = ecs_entity(world, { .name = "Cam" });
     ecs_set(world, cam, CameraController, { 0 });
-    ecs_progress(world, 0.0f);
+    test_assert(ecs_progress(world, 0.0f));
+    test_assert(ecs_is_alive(world, cam));
 
     ecs_fini(world);
 }
