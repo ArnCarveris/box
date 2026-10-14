@@ -1,0 +1,46 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.perf
+
+camera {
+  Position: {0, 40, 80}
+  Rotation: {-0.45, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {8, 8, 12, 255}}}
+}
+
+$ {
+  AmbientLight: {intensity: 0.1}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {82, 0.2, 52}
+  Rgb: {200, 200, 205}
+}
+
+for x in 0..40 {
+  for z in 0..25 {
+    {
+      Position: {x * 2 - 39.5, 0.6, z * 2 - 24.5}
+      Box: {0.5, 1.2, 0.5}
+      Rgb: {220, 220, 220}
+    }
+    {
+      Position: {x * 2 - 39, 1.2, z * 2 - 24}
+      PointLight: {intensity: 2, range: 3}
+      Rgb: {80 + (x % 4) * 55, 240 - (z % 4) * 50, 120 + ((x + z) % 3) * 60}
+    }
+  }
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+}

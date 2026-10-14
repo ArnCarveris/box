@@ -89,3 +89,4 @@ of every scene. `--out` moves both.
 | --- | --- | --- |
 | `trivial` | 60 | A floor, a box and a sphere. |
 | `instanced_100k` | 60 | 100,000 static boxes in one instanced batch on a floor. |
+| `lights_1000` | 60 | 1,000 colored point lights over a floor, one above each of 1,000 boxes, culled per cluster. |

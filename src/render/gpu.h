@@ -111,15 +111,17 @@ typedef struct box_gpu_buffer_t {
 
 /** Uniforms of a view, written per target because the projection follows its size.
  *
- * The light members are the only light inputs of the forward pass.
+ * The layout matches View in etc/shaders/include/lights.wgsl.
  */
 typedef struct box_gpu_view_uniforms_t {
     mat4 view_proj;                 /**< Projection times view matrix */
+    mat4 view;                      /**< View matrix, the inverse of the camera transform */
     vec4 camera;                    /**< World position of the camera */
-    vec4 light;                     /**< Direction toward the directional light */
-    vec4 light_color;               /**< Linear illuminance of the directional light */
     vec4 ambient_sky;               /**< Linear ambient light from above */
     vec4 ambient_ground;            /**< Linear ambient light from below */
+    vec4 cluster;                   /**< Inverse projection scale of x and y, slice near, far */
+    uint32_t lights[4];             /**< Directional lights, lights, lit, orthographic */
+    uint32_t grid[4];               /**< Clusters per axis, lights per cluster at most */
 } box_gpu_view_uniforms_t;
 
 /** Pipeline of the blit or the forward pass for one color format */
@@ -159,8 +161,13 @@ typedef struct box_gpu_t {
     box_gpu_forward_t forward[BOX_GPU_FORWARD_PIPELINES]; /**< Forward pipelines */
     int32_t forward_count;          /**< Forward pipelines created */
     WGPUBuffer view_buffer;         /**< Uniforms of the views of a target */
-    WGPUBindGroup view_group;       /**< Binds the view buffer with a dynamic offset */
     int32_t view_capacity;          /**< Views the view buffer holds */
+    WGPUBindGroupLayout cluster_layout; /**< Bind group layout of the cluster pass */
+    WGPUPipelineLayout cluster_pipeline_layout; /**< Pipeline layout of the cluster pass */
+    WGPUComputePipeline cluster;    /**< Cluster pipeline, NULL until the shader exists */
+    int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
+    ecs_vec_t clusters;             /**< WGPUBuffer, the cluster buffer of each view slot */
+    WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout scatter_layout; /**< Bind group layout of the scatter pass */
     WGPUPipelineLayout scatter_pipeline_layout; /**< Pipeline layout of the scatter pass */
@@ -444,6 +451,58 @@ void box_gpu_draw_views(
     const box_render_target_t *frame,
     WGPUCommandEncoder encoder,
     WGPUTextureView color);
+
+/** Create the layouts of the cluster pass and the empty light buffer.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_light_init(
+    box_gpu_t *gpu);
+
+/** Release the pipeline, layouts and buffers of the cluster pass.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_light_fini(
+    box_gpu_t *gpu);
+
+/** Write the light members of the uniforms of a view.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param proj Projection of the view for its target
+ * @param u The uniforms
+ */
+void box_gpu_light_uniforms(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    mat4 proj,
+    box_gpu_view_uniforms_t *u);
+
+/** Record the cluster pass of a view when it has point or spot lights.
+ *
+ * @param gpu The backend
+ * @param encoder The encoder of the frame
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
+ */
+void box_gpu_light_cluster(
+    box_gpu_t *gpu,
+    WGPUCommandEncoder encoder,
+    const box_render_view_t *v,
+    int32_t slot);
+
+/** Create the bind group of the forward pass of a view: its uniforms, lights and clusters.
+ *
+ * @param gpu The backend
+ * @param v The view
+ * @param slot Slot of the view in the view buffer
+ * @return The bind group, released by the caller
+ */
+WGPUBindGroup box_gpu_light_group(
+    box_gpu_t *gpu,
+    const box_render_view_t *v,
+    int32_t slot);
 
 /** Create the layouts of the scatter pass.
  *

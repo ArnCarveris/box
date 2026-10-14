@@ -127,8 +127,16 @@ static void box_cmd_render_size(
 {
     ecs_entity_t surface = box_cmd_render_surface(world);
     const SurfaceStatus *status = surface ? ecs_get(world, surface, SurfaceStatus) : NULL;
-    width[0] = status && status->width > 0 ? status->width : BOX_SURFACE_WIDTH;
-    height[0] = status && status->height > 0 ? status->height : BOX_SURFACE_HEIGHT;
+    const Surface *desc = surface ? ecs_get(world, surface, Surface) : NULL;
+    width[0] = BOX_SURFACE_WIDTH;
+    height[0] = BOX_SURFACE_HEIGHT;
+    if (status && status->width > 0 && status->height > 0) {
+        width[0] = status->width;
+        height[0] = status->height;
+    } else if (desc && desc->width > 0 && desc->height > 0) {
+        width[0] = desc->width;
+        height[0] = desc->height;
+    }
 }
 
 /** Find the first view, in creation order, that renders a camera.

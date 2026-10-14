@@ -1,0 +1,59 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+camera {
+  Position: {0, 4, 9}
+  Rotation: {-0.4, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {20, 22, 28, 255}}}
+}
+
+$ {
+  AmbientLight: {sky: {50, 54, 64}, ground: {24, 22, 20}}
+}
+
+key {
+  Rotation: {-0.9, 2.6, 0}
+  DirectionalLight: {intensity: 1.2}
+  Rgb: {255, 226, 190}
+}
+
+fill {
+  Rotation: {-0.4, -2.3, 0}
+  DirectionalLight: {intensity: 0.4}
+  Rgb: {110, 150, 255}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {14, 0.2, 8}
+  Rgb: {170, 170, 175}
+}
+
+ball {
+  Position: {-3, 1, 0}
+  Sphere: {segments: 32, smooth: true, radius: 1}
+  Rgb: {230, 230, 230}
+}
+
+block {
+  Position: {0, 0.8, -1}
+  Rotation: {0, 0.6, 0}
+  Box: {1.6, 1.6, 1.6}
+  Rgb: {220, 90, 70}
+}
+
+ring {
+  Position: {3, 1, 0}
+  Rotation: {0.4, 0, 0.3}
+  Torus: {segments: 32, rings: 16, smooth: true, radius: 0.8, tube: 0.3}
+  Rgb: {80, 180, 120}
+  PbrMaterial: {metallic: 1, roughness: 0.3}
+}

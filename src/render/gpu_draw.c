@@ -11,18 +11,6 @@
 
 #ifdef BOX_RENDER_WGPU
 
-/** Direction toward the default directional light, in world space */
-static const float box_gpu_light[3] = { 0.35f, 0.8f, 0.5f };
-
-/** Linear color of the default directional light, scaled by pi into illuminance */
-static const float box_gpu_light_color[3] = { 1.0f, 0.96f, 0.9f };
-
-/** Linear default ambient light from above */
-static const float box_gpu_ambient_sky[3] = { 0.18f, 0.22f, 0.3f };
-
-/** Linear default ambient light from below */
-static const float box_gpu_ambient_ground[3] = { 0.08f, 0.07f, 0.06f };
-
 /** Instance attributes of the forward pass, vec4 each */
 #define BOX_GPU_INSTANCE_ATTRS ((int32_t)(sizeof(box_render_instance_t) / sizeof(vec4)))
 
@@ -62,16 +50,28 @@ static WGPUBuffer box_gpu_buffer_new(
 void box_gpu_draw_init(
     box_gpu_t *gpu)
 {
-    WGPUBindGroupLayoutEntry entry = {
-        .binding = 0,
-        .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
-        .buffer = {
-            .type = WGPUBufferBindingType_Uniform,
-            .hasDynamicOffset = true,
-            .minBindingSize = sizeof(box_gpu_view_uniforms_t)
+    WGPUBindGroupLayoutEntry entries[3] = {
+        {
+            .binding = 0,
+            .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment,
+            .buffer = {
+                .type = WGPUBufferBindingType_Uniform,
+                .hasDynamicOffset = true,
+                .minBindingSize = sizeof(box_gpu_view_uniforms_t)
+            }
+        },
+        {
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
+        },
+        {
+            .binding = 2,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
-    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 1, .entries = &entry };
+    WGPUBindGroupLayoutDescriptor layout = { .entryCount = 3, .entries = entries };
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
     WGPUBindGroupLayout groups[2] = { gpu->view_layout, gpu->material_layout };
     gpu->mesh_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -82,6 +82,7 @@ void box_gpu_draw_init(
     ecs_map_init(&gpu->meshes, NULL);
     ecs_map_init(&gpu->buffers, NULL);
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
+    box_gpu_light_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -145,11 +146,7 @@ void box_gpu_draw_fini(
     ecs_map_fini(&gpu->buffers);
     ecs_vec_fini_t(NULL, &gpu->view_data, uint8_t);
     box_gpu_forward_reset(gpu);
-    if (gpu->view_group) {
-        wgpuBindGroupRelease(gpu->view_group);
-        gpu->view_group = NULL;
-    }
-
+    box_gpu_light_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -459,10 +456,6 @@ static void box_gpu_view_reserve(
         capacity *= 2;
     }
 
-    if (gpu->view_group) {
-        wgpuBindGroupRelease(gpu->view_group);
-    }
-
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
     }
@@ -470,17 +463,6 @@ static void box_gpu_view_reserve(
     gpu->view_capacity = capacity;
     gpu->view_buffer = box_gpu_buffer_new(gpu,
         (uint64_t)capacity * BOX_GPU_VIEW_STRIDE, WGPUBufferUsage_Uniform);
-    WGPUBindGroupEntry entry = {
-        .binding = 0,
-        .buffer = gpu->view_buffer,
-        .size = sizeof(box_gpu_view_uniforms_t)
-    };
-    WGPUBindGroupDescriptor desc = {
-        .layout = gpu->view_layout,
-        .entryCount = 1,
-        .entries = &entry
-    };
-    gpu->view_group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
 done:
     return;
 }
@@ -534,10 +516,7 @@ static int32_t box_gpu_view_write(
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
-        glm_vec3_normalize_to(ECS_CONST_CAST(float*, box_gpu_light), u->light);
-        glm_vec3_scale(ECS_CONST_CAST(float*, box_gpu_light_color), GLM_PIf, u->light_color);
-        glm_vec3_copy(ECS_CONST_CAST(float*, box_gpu_ambient_sky), u->ambient_sky);
-        glm_vec3_copy(ECS_CONST_CAST(float*, box_gpu_ambient_ground), u->ambient_ground);
+        box_gpu_light_uniforms(gpu, v, proj, u);
         result ++;
     }
 
@@ -649,12 +628,15 @@ void box_gpu_draw_views(
             .depthStencilAttachment = &depth
         };
         uint32_t offset = (uint32_t)(slot * BOX_GPU_VIEW_STRIDE);
+        box_gpu_light_cluster(gpu, encoder, v, slot);
+        WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
         WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
-        wgpuRenderPassEncoderSetBindGroup(pass, 0, gpu->view_group, 1, &offset);
+        wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
         box_gpu_draw_batches(gpu, pass, t->format, packet, i);
 
         wgpuRenderPassEncoderEnd(pass);
         wgpuRenderPassEncoderRelease(pass);
+        wgpuBindGroupRelease(group);
         box_gpu_count(gpu, BOX_GPU_STAT_PASS);
         slot ++;
     }

@@ -212,6 +212,25 @@
                     "gpu_inherited_from_prefab",
                     "gpu_svg_colors"
                 ]
+            },
+            {
+                "id": "Light",
+                "testcases": [
+                    "point_light_reaches_its_range",
+                    "point_light_color",
+                    "spot_light_cone",
+                    "directional_light_direction",
+                    "lights_replace_default_sun",
+                    "light_scoped_to_scene",
+                    "nested_scene_keeps_its_lights",
+                    "lighting_disabled_is_unlit",
+                    "ambient_light_of_scene",
+                    "intensity_zero_lights_nothing",
+                    "moved_light_follows_transform",
+                    "many_point_lights",
+                    "unchanged_lights_upload_nothing",
+                    "component_defaults"
+                ]
             }
         ]
     }

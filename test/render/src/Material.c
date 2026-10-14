@@ -104,7 +104,8 @@ void Material_pbr_material(void) {
     ecs_set(world, camera, Camera, {.fov = 60});
     ecs_entity_t view = ecs_new(world);
     ecs_set(world, view, View, {
-        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
     ecs_entity_t plain = ecs_new(world);
     ecs_set(world, plain, Position, {-1.5f, 0, 0});
     ecs_set(world, plain, Box, {2, 2, 2});

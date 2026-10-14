@@ -23,6 +23,9 @@
 /** Shader handle of the engine compute shader that scatters changed instances into slots */
 #define BOX_RENDER_SHADER_SCATTER (3)
 
+/** Shader handle of the engine compute shader that assigns the lights of a view to clusters */
+#define BOX_RENDER_SHADER_CLUSTER (4)
+
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
 
@@ -34,6 +37,9 @@
 
 /** Words of the header of a scatter segment: count, words per instance and two unused */
 #define BOX_RENDER_SCATTER_HEADER (4)
+
+/** First buffer handle of the light buffers of scenes */
+#define BOX_RENDER_BUFFER_LIGHT_FIRST (0x20000000u)
 
 /** First target handle of captures, the handles below belong to surfaces */
 #define BOX_RENDER_CAPTURE_TARGET_FIRST (0x40000000u)
@@ -92,6 +98,30 @@ typedef struct box_render_upload_t {
     uint32_t data;      /**< Offset of the bytes in the packet data */
 } box_render_upload_t;
 
+/** A light of a scene as the forward pass reads it from the light buffer of the scene.
+ *
+ * The directional lights of a scene come first in its buffer, then its point and spot lights.
+ * A light without a cone has a spot_scale of 0 and a spot_offset of 1.
+ */
+typedef struct box_render_light_t {
+    float position[3];  /**< World position, the direction toward a directional light */
+    float range;        /**< Distance at which the light reaches zero, 0 for directional */
+    float color[3];     /**< Linear color times intensity times pi */
+    float spot_scale;   /**< Cone falloff scale, 1 / (cos inner - cos outer) */
+    float direction[3]; /**< Direction a spot light shines in */
+    float spot_offset;  /**< Cone falloff offset, -cos outer times spot_scale */
+} box_render_light_t;
+
+/** The lights a view is shaded with: the light buffer of its scene and its ambient light */
+typedef struct box_render_view_lights_t {
+    bool enabled;            /**< Shade with the lights, else draw base color and emission */
+    uint32_t buffer;         /**< Handle of the light buffer, 0 for the default sun */
+    uint32_t directional;    /**< Directional lights at the start of the buffer */
+    uint32_t count;          /**< Lights in the buffer, the directional ones included */
+    float ambient_sky[4];    /**< Linear ambient light from above */
+    float ambient_ground[4]; /**< Linear ambient light from below */
+} box_render_view_lights_t;
+
 /** A view of the frame: the camera it renders, the scene it draws and how it clears.
  *
  * The projection is built by the renderer per target, because its aspect follows the
@@ -107,6 +137,7 @@ typedef struct box_render_view_t {
     Camera camera_data;         /**< Settings of the camera */
     ClearSettings clear;        /**< Clear settings of the view */
     uint32_t target;            /**< Handle of the only target that renders the view, 0 for any */
+    box_render_view_lights_t lights; /**< Lights of the scene, filled by the light extract */
 } box_render_view_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
@@ -431,6 +462,32 @@ void box_render_draws_stats(
  */
 void box_render_textures_init(
     ecs_world_t *world);
+
+/** Counters of the light extract of a world */
+typedef struct box_render_lights_stats_t {
+    int32_t scenes;             /**< Scenes that have lights */
+    int32_t lights;             /**< Lights that light something, of every scene */
+    int64_t upload_bytes;       /**< Bytes the last extract uploaded into light buffers */
+} box_render_lights_stats_t;
+
+/** Register the system that sends the lights of every scene and the lights of every view.
+ *
+ * Lights are collected per scene into a light buffer that is uploaded when it changed; every
+ * view of the packet gets the buffer and the ambient light of the scene of its camera.
+ *
+ * @param world The world
+ */
+void box_render_lights_init(
+    ecs_world_t *world);
+
+/** Read the counters of the light extract of a world.
+ *
+ * @param world The world
+ * @param stats Receives the counters
+ */
+void box_render_lights_stats(
+    const ecs_world_t *world,
+    box_render_lights_stats_t *stats);
 
 /** A one-off render of a camera into an offscreen image that is written as a PNG file.
  *
