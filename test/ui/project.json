@@ -108,6 +108,29 @@
                     "view_root_views_skipped_by_other_surfaces",
                     "script"
                 ]
+            },
+            {
+                "id": "Console",
+                "testcases": [
+                    "toggle_opens",
+                    "toggle_closes",
+                    "escape_closes",
+                    "toggle_remapped",
+                    "typing_goes_to_input",
+                    "typing_fires_no_actions",
+                    "close_restores_actions",
+                    "enter_runs_line",
+                    "line_logged_in_session",
+                    "error_output",
+                    "history",
+                    "cursor_editing",
+                    "scroll",
+                    "view_stacked_last",
+                    "look_from_script",
+                    "run_from_script",
+                    "scrollback_limit",
+                    "renders_over_scene"
+                ]
             }
         ]
     }
