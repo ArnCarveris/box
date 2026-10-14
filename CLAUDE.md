@@ -52,6 +52,13 @@ doc comment on every type and member.
   `ecs_set(e, PointLight, {.range = 5})` writes 0 into the intensity, which means off. Set
   the intensity in C; script `PointLight: {range: 5}` keeps the default.
 
+## Tests
+
+Tests verify the requirements of DESIGN.md and the task spec through observable behaviour. They
+never assert internals: struct sizes, strides, buffer, shader or resource counts, slot indices,
+memory layout or private bookkeeping. An agent-written test that does, or that no requirement
+motivates, is changed or deleted. Tests in `test/transform` were written by the user.
+
 ## Headless only
 
 Never open a window. Run `boxrun`, benches and scenes with `--headless` and `--frames` or
