@@ -58,9 +58,14 @@ static uint64_t box_draws_hash(
     const box_draw_key_t *key)
 {
     uint64_t h = key->scene * 0x9E3779B97F4A7C15ull;
+    int32_t i;
     h ^= ((uint64_t)key->mesh + 0x632BE59BD9B4E019ull) * 0xC2B2AE3D27D4EB4Full;
     h ^= ((uint64_t)key->pipeline * 2 + key->dynamic) * 0x165667B19E3779F9ull;
-    h ^= ((uint64_t)key->blend * 2 + key->back_face + 1) * 0x27D4EB2F165667C5ull;
+    h ^= (((uint64_t)key->blend * 2 + key->back_face) * 4 + key->wrap + 1) *
+        0x27D4EB2F165667C5ull;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        h = (h ^ (h >> 31)) * 0x9E3779B97F4A7C15ull + key->textures[i];
+    }
 
     return h ^ (h >> 29);
 }
@@ -76,7 +81,8 @@ static bool box_draws_key_eq(
     const box_draw_key_t *b)
 {
     return a->scene == b->scene && a->mesh == b->mesh && a->pipeline == b->pipeline &&
-        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic;
+        a->blend == b->blend && a->back_face == b->back_face && a->dynamic == b->dynamic &&
+        a->wrap == b->wrap && !ecs_os_memcmp(a->textures, b->textures, ECS_SIZEOF(a->textures));
 }
 
 box_draw_batch_t* box_draws_batch(
@@ -255,17 +261,24 @@ void box_draws_material(
     const Rgb *color = material->color;
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
+    const TextureTransform *uv = material->uv;
     out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
     out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
     out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
     out->color[3] = box_draws_alpha(material);
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
-    out->normal[0][3] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
-    out->normal[1][3] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
-    out->normal[2][3] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
-    out->model[0][3] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : 0.0f;
-    out->model[1][3] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : 0.5f;
-    out->model[2][3] = 0.0f;
+    out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
+    out->emissive[1] = emissive ? box_draws_linear(emissive->color.g) * strength : 0.0f;
+    out->emissive[2] = emissive ? box_draws_linear(emissive->color.b) * strength : 0.0f;
+    out->emissive[3] = 0.0f;
+    out->material[0] = pbr ? glm_clamp(pbr->metallic, 0.0f, 1.0f) : 0.0f;
+    out->material[1] = pbr ? glm_clamp(pbr->roughness, 0.0f, 1.0f) : 0.5f;
+    out->material[2] = 0.0f;
+    out->material[3] = 0.0f;
+    out->uv[0] = uv ? uv->scale_x : 1.0f;
+    out->uv[1] = uv ? uv->scale_y : 1.0f;
+    out->uv[2] = uv ? uv->offset_x : 0.0f;
+    out->uv[3] = uv ? uv->offset_y : 0.0f;
 }
 
 void box_draws_transform(
@@ -273,12 +286,6 @@ void box_draws_transform(
     const WorldTransform *transform,
     const ShapeMesh *shape)
 {
-    mat3 m, inv;
-    int32_t i;
-    float packed[6] = {
-        out->model[0][3], out->model[1][3], out->model[2][3],
-        out->normal[0][3], out->normal[1][3], out->normal[2][3]
-    };
     if (transform) {
         glm_mat4_copy(ECS_CONST_CAST(vec4*, transform->m), out->model);
     } else {
@@ -288,13 +295,6 @@ void box_draws_transform(
     glm_vec4_scale(out->model[0], shape->scale[0], out->model[0]);
     glm_vec4_scale(out->model[1], shape->scale[1], out->model[1]);
     glm_vec4_scale(out->model[2], shape->scale[2], out->model[2]);
-    glm_mat4_pick3(out->model, m);
-    glm_mat3_inv(m, inv);
-    glm_mat3_transpose(inv);
-    for (i = 0; i < 3; i ++) {
-        glm_vec4(inv[i], packed[3 + i], out->normal[i]);
-        out->model[i][3] = packed[i];
-    }
 }
 
 void box_draws_instance(
@@ -478,6 +478,26 @@ static uint32_t box_draws_segment_size(
     return (size + BOX_RENDER_SCATTER_ALIGN - 1) & ~(uint32_t)(BOX_RENDER_SCATTER_ALIGN - 1);
 }
 
+/** Write the texture handles and the sampler wrap of a batch into its draw.
+ *
+ * @param d The state
+ * @param b The batch
+ * @param out The draw
+ */
+static void box_draws_batch_textures(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        ecs_entity_t e = b->key.textures[i];
+        out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
+    }
+
+    out->wrap = b->key.wrap;
+}
+
 /** Upload the instances of a batch it needs this frame and add its draw.
  *
  * @param p The packet
@@ -514,6 +534,7 @@ static uint32_t box_draws_send_batch(
     out->blend = b->key.blend;
     out->back_face = b->key.back_face;
     out->mesh = b->key.mesh;
+    box_draws_batch_textures(d, b, out);
     out->instances = b->buffer;
     out->first_instance = 0;
     out->instance_count = count;
@@ -614,6 +635,7 @@ static void box_draws_send_blended(
             out->blend = b->key.blend;
             out->back_face = b->key.back_face;
             out->mesh = b->key.mesh;
+            box_draws_batch_textures(d, b, out);
             out->instances = b->buffer;
             out->first_instance = (uint32_t)sorted[i].slot;
             out->instance_count = 1;
@@ -759,11 +781,13 @@ static void box_draws_fill_material(
     const void *pbrs = ecs_field(it, PbrMaterial, 5);
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
+    const void *uvs = ecs_field(it, TextureTransform, 8);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
     ecs_size_t pbr_step = box_draws_stride(it, pbrs, ECS_SIZEOF(PbrMaterial), 5);
     ecs_size_t emissive_step = box_draws_stride(it, emissives, ECS_SIZEOF(Emissive), 6);
     ecs_size_t mode_step = box_draws_stride(it, modes, ECS_SIZEOF(BlendMode), 7);
+    ecs_size_t uv_step = box_draws_stride(it, uvs, ECS_SIZEOF(TextureTransform), 8);
     int32_t i;
     for (i = 0; i < it->count; i ++) {
         if (slots[i].batch < 0) {
@@ -780,6 +804,7 @@ static void box_draws_fill_material(
             .opacity = box_draws_at(opacities, opacity_step, i),
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
+            .uv = box_draws_at(uvs, uv_step, i),
             .fade = walk ? box_draws_fade(it->world, it->entities[i]) : slots[i].fade
         };
         box_render_instance_t *inst = ecs_vec_get_t(
@@ -831,15 +856,15 @@ static void box_draws_dynamic(
     ecs_iter_t it = ecs_query_iter(world, d->dynamic_transform);
     while (ecs_query_next(&it)) {
         box_draws_fill_transform(&it, d);
-        if (ecs_field_is_set(&it, 9)) {
-            box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
+        if (ecs_field_is_set(&it, 10)) {
+            box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 10));
         }
     }
 
     it = ecs_query_iter(world, d->dynamic_material);
     while (ecs_query_next(&it)) {
         box_draws_fill_transform(&it, d);
-        box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 8));
+        box_draws_fill_material(&it, d, !ecs_field_is_self(&it, 9));
     }
 }
 
@@ -852,6 +877,7 @@ void box_draws_send(
     int32_t i, count = ecs_vec_count(&d->batches);
     uint32_t changes = 0;
     bool views = ecs_vec_count(&p->views) != 0;
+    d->textures = box_textures_get(world);
     d->stats.batches = 0;
     d->stats.instances = 0;
     d->stats.dynamic = 0;

@@ -322,6 +322,7 @@ static int box_gpu_init(
     }
 
     box_gpu_blit_init(gpu);
+    box_gpu_texture_init(gpu);
     box_gpu_draw_init(gpu);
     box_gpu_scatter_init(gpu);
     ecs_map_init(&gpu->targets, NULL);
@@ -362,6 +363,9 @@ static void box_gpu_render(
         } else if (r->kind == BOX_RENDER_BUFFER) {
             box_gpu_buffer_apply(gpu, r->op, r->handle,
                 r->size >= sizeof(box_render_buffer_desc_t) ? data : NULL);
+        } else if (r->kind == BOX_RENDER_TEXTURE) {
+            box_gpu_texture_apply(gpu, r->op, r->handle,
+                r->size >= sizeof(box_render_texture_desc_t) ? data : NULL);
         }
 
         if (r->kind != BOX_RENDER_TARGET) {
@@ -377,6 +381,7 @@ static void box_gpu_render(
         }
     }
 
+    box_gpu_texture_mips(gpu);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     count = ecs_vec_count(&packet->targets);
@@ -411,6 +416,7 @@ static void box_gpu_fini(
         box_gpu_shader_fini(gpu);
         ecs_map_fini(&gpu->shaders);
         box_gpu_draw_fini(gpu);
+        box_gpu_texture_fini(gpu);
         box_gpu_scatter_fini(gpu);
     }
 
