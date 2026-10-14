@@ -784,3 +784,25 @@ void Text_dynamic_transform(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Text_module_child_fini(void) {
+    // ui/fini_crash
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t m = ecs_entity(world, { .name = "game" });
+    ecs_add_id(world, m, EcsModule);
+    ecs_entity_t t = ecs_entity(world, { .name = "label", .parent = m });
+    ecs_set(world, t, Text, {.value = "Hello", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_progress(world, 0);
+
+    const TextBounds *b = ecs_get(world, t, TextBounds);
+    test_assert(b != NULL);
+    test_assert(b->width > 0);
+
+    test_int(ecs_fini(world), 0);
+}

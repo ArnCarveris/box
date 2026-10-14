@@ -9,6 +9,8 @@
 #define BOX_LAYOUT_IMPL
 #include "layout_internal.h"
 
+static ECS_COMPONENT_DECLARE(LayoutRegistry);
+
 /** Mark an element whose layout input changed.
  *
  * @param state The state of the layout module
@@ -228,21 +230,49 @@ done:
     return;
 }
 
-/** Free the state of the layout module.
+/** Free the states of LayoutRegistry values.
  *
- * @param world The world
- * @param ctx The state
+ * The world destroys components after the OnRemove observers of its last entities ran, so the
+ * observers of the module never see a freed state.
+ *
+ * @param ptr The values
+ * @param count Number of values
+ * @param ti Type info
  */
-static void box_layout_fini(
-    ecs_world_t *world,
-    void *ctx)
+static void box_layout_registry_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
 {
-    box_layout_state_t *state = ctx;
-    (void)world;
-    ecs_vec_fini_t(NULL, &state->marks, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &state->roots, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &state->nodes, box_layout_node_t);
-    ecs_os_free(state);
+    LayoutRegistry *r = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        box_layout_state_t *state = r[i].state;
+        if (state) {
+            ecs_vec_fini_t(NULL, &state->marks, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->roots, ecs_entity_t);
+            ecs_vec_fini_t(NULL, &state->nodes, box_layout_node_t);
+            ecs_os_free(state);
+        }
+    }
+}
+
+/** Move LayoutRegistry values, the source no longer owns its state.
+ *
+ * @param dst The destination values
+ * @param src The source values
+ * @param count Number of values
+ * @param ti Type info
+ */
+static void box_layout_registry_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    ecs_os_memcpy(dst, src, ti->size * count);
+    ecs_os_memset(src, 0, ti->size * count);
 }
 
 /** Construct LayoutItem values whose sizes have a value of one, the weight of a growing size.
@@ -284,11 +314,18 @@ void BoxLayoutImport(
     ecs_add_pair(world, ecs_id(Layout), EcsWith, EcsOrderedChildren);
     ecs_add_pair(world, ecs_id(LayoutItem), EcsWith, ecs_id(LayoutBounds));
 
+    ECS_COMPONENT_DEFINE(world, LayoutRegistry);
+    ecs_set_hooks(world, LayoutRegistry, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_layout_registry_dtor,
+        .move = box_layout_registry_move
+    });
+
     box_layout_state_t *state = ecs_os_calloc_t(box_layout_state_t);
     ecs_vec_init_t(NULL, &state->marks, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->nodes, box_layout_node_t, 0);
-    ecs_atfini(world, box_layout_fini, state);
+    ecs_singleton_ensure(world, LayoutRegistry)->state = state;
 
     ecs_id_t elements[] = {
         ecs_id(Layout), ecs_id(LayoutItem), ecs_id(Rect), ecs_id(Circle)
