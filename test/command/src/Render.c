@@ -840,6 +840,54 @@ void Render_gpu_capture_png(void) {
     ecs_fini(world);
 }
 
+void Render_gpu_capture_first_frame(void) {
+    // command/capture_first_frame
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 64, .height = 64});
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {2, 2, 2});
+    ecs_set(world, shape, Rgb, {0, 0, 0});
+    ecs_set(world, shape, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, shape, Emissive, {.strength = 1, .color = {255, 0, 0}});
+    ecs_entity_t s = box_terminal_new(world);
+
+    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    char *path = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    int i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 64);
+    int32_t c = (h / 2 * w + w / 2) * 4;
+    test_assert(px[c] > 200);
+    test_assert(px[c + 1] < 40);
+    test_assert(px[c + 2] < 40);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
 void Render_gpu_render_isolated(void) {
     // command/render
     ecs_world_t *world = ecs_init();
