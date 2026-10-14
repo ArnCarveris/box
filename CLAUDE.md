@@ -34,6 +34,9 @@ doc comment on every type and member.
   `it->world`. OnSet observers may set components directly.
 - `ecs_ensure` in a system on a stage returns a temporary copy; use
   `ecs_get_mut` for existing components and keep registries in heap structs.
+- A struct registered with ECS_META_COMPONENT gets only a default ctor: flecs expects the
+  application to supply dtor, copy and move. Every component with  or  members
+  installs them with  (box.types).
 - Components without a ctor are not zero initialized. Register
   `.ctor = flecs_default_ctor` for every private component with flags.
 - During deletion the OnRemove destination table is the empty root table, not
