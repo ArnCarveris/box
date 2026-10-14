@@ -407,14 +407,20 @@ static int box_app_start(
     ecs_world_t *world)
 {
     const App *app = ecs_singleton_get(world, App);
+    const AppStatus *status = ecs_singleton_get(world, AppStatus);
     int result = -1;
-    if (!app) {
+    if (!app || !status) {
         ecs_err("box.app is not imported");
         goto done;
     }
 
     if (app->headless && app->frames <= 0 && app->timeout == 0) {
         ecs_err("headless mode requires --frames or --timeout");
+        goto done;
+    }
+
+    if (app->headless && !status->tmp_dir) {
+        ecs_err("headless mode requires its temporary folder in %s", BOX_TMP_ROOT);
         goto done;
     }
 

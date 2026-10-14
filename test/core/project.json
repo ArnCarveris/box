@@ -61,7 +61,18 @@
                     "headless_creates_folder",
                     "not_headless_no_folder",
                     "parse_headless_creates_folder",
-                    "removed_at_fini"
+                    "removed_at_fini",
+                    "folder_private",
+                    "stale_folder_reclaimed",
+                    "symlink_refused",
+                    "symlink_inside_not_followed",
+                    "refused_folder_fails_start",
+                    "worlds_share_folder",
+                    "root_of_user_accepted",
+                    "root_of_root_accepted",
+                    "root_of_other_user_refused",
+                    "root_writable_without_sticky_refused",
+                    "root_not_a_folder_refused"
                 ]
             },
             {

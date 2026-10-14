@@ -6,11 +6,33 @@
 #include "input.h"
 #include <string.h>
 
+/** Copy the text collected this frame into Input.text.
+ *
+ * Input.text is reallocated to the size of the text rather than grown in place, so a string
+ * that was replaced from outside InputUpdate never has its capacity guessed.
+ *
+ * @param dev The device state, which holds the text of the frame
+ * @param in The Input singleton
+ */
+static void box_input_text_publish(
+    InputDevice *dev,
+    Input *in)
+{
+    int32_t size = ecs_vec_count(&dev->text);
+    if (size) {
+        in->text = ecs_os_realloc(in->text, size + 1);
+        memcpy(in->text, ecs_vec_first(&dev->text), (size_t)size);
+        in->text[size] = '\0';
+    }
+}
+
 /** Clear the state that only describes one frame.
  *
+ * @param dev The device state
  * @param in The Input singleton
  */
 static void box_input_frame_begin(
+    InputDevice *dev,
     Input *in)
 {
     int32_t i;
@@ -19,7 +41,11 @@ static void box_input_frame_begin(
         in->keys[i].released = false;
     }
 
-    in->text[0] = '\0';
+    ecs_vec_clear(&dev->text);
+    if (in->text) {
+        in->text[0] = '\0';
+    }
+
     in->mouse.delta[0] = in->mouse.delta[1] = 0;
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
 }
@@ -206,18 +232,17 @@ static void box_input_release_all(
     }
 }
 
-/** Append a code point to the text of the frame as UTF-8, dropping it when the text is full.
+/** Append a code point to the text of the frame as UTF-8.
  *
- * @param in The Input singleton
+ * @param dev The device state
  * @param code The unicode code point
  */
 static void box_input_text(
-    Input *in,
+    InputDevice *dev,
     int32_t code)
 {
     char utf8[4];
     int32_t size = 0;
-    size_t len = strlen(in->text);
     if (code < 0x80) {
         utf8[size ++] = (char)code;
     } else if (code < 0x800) {
@@ -234,9 +259,8 @@ static void box_input_text(
         utf8[size ++] = (char)(0x80 | (code & 0x3f));
     }
 
-    if (code > 0 && len + (size_t)size < BOX_INPUT_TEXT_MAX) {
-        memcpy(&in->text[len], utf8, (size_t)size);
-        in->text[len + (size_t)size] = '\0';
+    if (code > 0) {
+        memcpy(ecs_vec_grow_t(NULL, &dev->text, char, size), utf8, (size_t)size);
     }
 }
 
@@ -312,7 +336,7 @@ static void box_input_apply(
         box_input_key_up(dev, in, ev->key);
         break;
     case InputText:
-        box_input_text(in, ev->code);
+        box_input_text(dev, ev->code);
         break;
     case InputMove:
         in->mouse.pinned = in->mouse.pinned || synthetic;
@@ -331,11 +355,13 @@ static void box_input_apply(
         in->size[1] = ev->value[1];
         break;
     case InputRelease:
+        dev->has_position = dev->has_position && !in->mouse.pinned;
         in->mouse.pinned = false;
         break;
     case InputReset:
         box_input_release_all(dev, in);
         box_input_hold_release_all(dev);
+        dev->has_position = dev->has_position && !in->mouse.pinned;
         in->mouse.pinned = false;
         break;
     case InputActionDown:
@@ -441,9 +467,10 @@ void BoxInputUpdate(
     }
 
     in = ecs_singleton_get_mut(world, Input);
-    box_input_frame_begin(in);
+    box_input_frame_begin(dev, in);
     box_input_apply_platform(dev, in);
     box_input_apply_queue(dev, in);
+    box_input_text_publish(dev, in);
     box_input_derive(in);
     ecs_singleton_modified(world, Input);
     box_input_emit(world, dev);
