@@ -163,7 +163,7 @@ unchanged.
 compiles in an error scope, keeping the old module on failure. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
-tonemap, exposure) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
+tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
 
 ## Scenes
 
@@ -206,8 +206,9 @@ are keyed by texture entities; normal maps use a cotangent frame (no tangents).
 
 ## Renderer passes
 
-For each target the backend applies resource changes and uploads, runs the scatter pass, then
-for each view in packet order (creation order, only views whose camera has a `Camera`):
+For each packet the backend applies resource changes and uploads, runs the scatter pass and
+the probe captures (see Lights, baked lighting), then for each target and each view in packet
+order (creation order, only views whose camera has a `Camera`):
 
 1. Effects begin: a view with enabled effects renders into an `rgba16float` target.
 2. Light clustering (`cluster.wgsl`, only with point or spot lights).
@@ -269,7 +270,43 @@ the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, 
 `bounds_padding` 1 and `cache` (`".box/bake"`, owned string, empty for none), all set by the
 constructor and taken literally otherwise. Adding it makes the engine add `LightBakeStatus`
 (`probes`, `baked`, `pass`, `converged`, `cache_hit`), removed with it. `NoBake` keeps a static
-shape out of the captures. These are data only for now: nothing samples a volume yet.
+shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
+
+**Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over
+the static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
+`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above
+262144 probes), again only when the index or the settings change. Probes inside the oriented
+bounds of a static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource
+(`gpu_bake.c`): a grid uniform, 9 rgb L2 SH irradiance coefficients per probe
+(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, filled with the exact SH of the
+hemisphere ambient when it is created or the ambient changes. A view with `lighting.baked`
+binds it as group 3 of `mesh.wgsl`, whose `ambient()` term blends the 8 surrounding valid
+probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
+hemisphere, so a scene without `LightBake` renders exactly as before.
+
+**Probe captures.** Every frame the bake extract takes the unbaked valid probes nearest to the
+cameras of the views of the scene (a quickselect over the queue) and adds them to the packet
+as a bake batch with the lights of the scene; their number is `budget_ms` over the GPU time per
+probe, an average of measurements, at most 256. The GPU time comes from timestamp queries
+around the captures of a packet (requested when the adapter has `timestamp-query`, resolved a
+packet later because Metal writes pass timestamps when the pass completes, read back without
+waiting). Without timestamps, as in the browser whose page creates the device, a probe is
+assumed to cost 1 ms. On the render thread the captures run before the targets, in chunks of
+at most 32 probes per command buffer: six 90 degree faces of `capture_size` texels per probe
+render the static batches of the scene (batch key `bake`) with the forward pipeline into an
+rgba16float array, culled per face by frustum and 1 px size, without history, effects or 2D.
+The faces are lit by the lights of the scene with a black ambient term; the sun is shadowed by
+one cascade fitted around the bounding sphere of the static bounds (`gpu_shadow.c`), point and
+spot lights are clustered per face and unshadowed. `bake_sh.wgsl` then projects each probe:
+radiance times the SH basis times the exact solid angle of each texel, texels nothing covered
+seeing the hemisphere ambient as a + 1.5 b y so an open probe equals the hemisphere, then the
+clamped cosine convolution per band. Probes not captured yet keep their ambient values, so a
+partial bake blends in. `LightBakeStatus.baked` counts the captured probes, `pass` is 1 and
+`converged` is set once the packet with the last capture rendered; a new grid or ambient
+starts the pass again. A headless run captures every probe in the packet of the frame the
+volume appears in, so its frames show the converged bake, and `PerfRun` warms up again until
+every bake with a budget converged. `budget_ms` 0 never bakes. Only one pass is baked: the
+captures see emission and direct light, one bounce.
 
 ## Spatial index
 
@@ -280,7 +317,8 @@ changed shapes and subtree roots; `SpatialUpdate` (`EcsOnStore`) places only tho
 shapes are marked stale and placed by the first query after a frame, so an idle frame pays
 nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
 phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
-uses them for collision. Bounds are boxes; there is no mesh level narrow phase and no picking.
+uses them for collision, `box_spatial_static_bounds` gives the box around the static shapes of
+a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and no picking.
 
 ## Text, layout and UI
 
@@ -367,7 +405,7 @@ deletes the scene the next frame.
   delta and number of differing pixels), writing an HTML report; `--update-baseline` refreshes.
 - Performance scenes: `box.perf` `PerfRun` (fps 30/60/90/120) paces frames to the target
   interval, orbits a camera around the bounds of every shape and counts intervals outside 10%
-  as errors; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
+  as errors, warming up again while a bake has not converged; `PerfStatus` and a JSON report carry the numbers. `tools/integration.py perf` runs
   `test/integration/perf`. `test/perf` uses a fake clock so it is machine independent.
 - Benchmarks: `bench/{core,controller,render,scene,transform,ui}` and `tools/bench.py` report
   median, confidence interval and percentiles; `--baseline` flags changes beyond 5%.
