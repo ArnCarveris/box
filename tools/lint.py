@@ -316,39 +316,52 @@ def fix_signature(lines, i):
     return i + 1
 
 
-def fix_blank_lines(lines):
-    out = []
-    depth = 0
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        prev = out[-1].strip() if out else "{"
-        if not stripped and not prev:
+def fix_blank_lines(lines, lint):
+    wanted = set()
+    for name, start, brace_line, end in lint.function_bodies():
+        if end is None:
             continue
-        if depth > 0 and re.match(r"return\b", stripped) and prev and not prev.endswith(("{", ":")) \
-                and not prev.startswith("#"):
-            out.append("\n")
-        elif depth > 0 and prev == "}" and stripped and not stripped.startswith(("}", "else", "#", "case", "default", "while", "*/")) \
-                and not stripped.endswith(":"):
+        body = lines[brace_line + 1:end]
+        for idx, raw in enumerate(body):
+            stripped = raw.strip()
+            at = brace_line + 1 + idx
+            if re.match(r"return\b", stripped):
+                prev = body[idx - 1].strip() if idx > 0 else "{"
+                if prev and not prev.endswith("{") and not prev.endswith(":") \
+                        and not prev.startswith("#"):
+                    wanted.add(at)
+            if stripped == "}":
+                nxt = body[idx + 1].strip() if idx + 1 < len(body) else ""
+                if nxt and not nxt.startswith(("}", "else", "#", "case", "default", "while")) \
+                        and not nxt.endswith(":") and not nxt.startswith("*/"):
+                    wanted.add(at + 1)
+    out = []
+    for idx, line in enumerate(lines):
+        if idx in wanted:
             out.append("\n")
         out.append(line)
-        code = re.sub(r'"(?:\\.|[^"\\])*"', '""', line.split("//")[0])
-        depth += code.count("{") - code.count("}")
     return out
 
 
-def fix_file(path):
+def fix_file(path, rel=None):
     with open(path) as f:
-        lines = f.readlines()
+        original = f.read()
+    lines = original.splitlines(True)
+    rel = rel or os.path.relpath(path, ROOT)
+    lint = Lint(rel, lines)
     i = 0
     while i < len(lines):
+        if lint.is_test and not (lint.is_bench and lines[i].startswith("static")):
+            i += 1
+            continue
         i = fix_signature(lines, i)
+    lines = "".join(lines).splitlines(True)
+    lint = Lint(rel, lines)
+    lines = fix_blank_lines(lines, lint)
     text = "".join(lines)
-    lines = [l + "\n" for l in text.split("\n")]
-    if lines and lines[-1] == "\n":
-        lines.pop()
-    lines = fix_blank_lines(lines)
-    with open(path, "w") as f:
-        f.write("".join(lines))
+    if text != original:
+        with open(path, "w") as f:
+            f.write(text)
 
 
 def lint_one(path, action):
