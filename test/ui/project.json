@@ -7,6 +7,11 @@
             "box"
         ]
     },
+    "lang.c": {
+        "include": [
+            "../../src/render"
+        ]
+    },
     "test": {
         "testsuites": [
             {
@@ -50,6 +55,29 @@
                     "unchanged_tree_not_laid_out",
                     "root_item",
                     "script"
+                ]
+            },
+            {
+                "id": "Text",
+                "testcases": [
+                    "measure_line",
+                    "measure_empty",
+                    "measure_newlines",
+                    "trailing_spaces_not_measured",
+                    "wrap_between_words",
+                    "wrap_long_word",
+                    "kerning",
+                    "size_change_relayouts",
+                    "font_change_reloads",
+                    "default_font_removed",
+                    "script",
+                    "measured_by_layout",
+                    "renders_color",
+                    "crisp_at_any_scale",
+                    "crisp_in_perspective",
+                    "align_lines",
+                    "many_glyphs",
+                    "dynamic_transform"
                 ]
             }
         ]

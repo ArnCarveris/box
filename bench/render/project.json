@@ -78,6 +78,13 @@
                     "fog",
                     "all"
                 ]
+            },
+            {
+                "id": "Text",
+                "benchcases": [
+                    "layout_10k",
+                    "changed_1pct"
+                ]
             }
         ]
     }

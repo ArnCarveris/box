@@ -237,20 +237,10 @@ void Layout_fit_text(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t tb = ecs_lookup_symbol(world, "TextBounds", false, false);
-    if (!tb) {
-        tb = ecs_component_init(world, &(ecs_component_desc_t){
-            .entity = ecs_entity(world, { .name = "TextBounds", .symbol = "TextBounds" }),
-            .type.size = 2 * sizeof(float),
-            .type.alignment = sizeof(float)
-        });
-    }
-
     ecs_entity_t p = ecs_new(world);
     ecs_set(world, p, Layout, { .direction = DirectionColumn });
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
-    float size[2] = {80, 16};
-    ecs_set_id(world, a, tb, sizeof(size), size);
+    ecs_set(world, a, TextBounds, {80, 16});
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, b, Rect, {20, 10});
     ecs_progress(world, 0);
@@ -260,8 +250,7 @@ void Layout_fit_text(void) {
     test_flt(ecs_get(world, p, LayoutBounds)->width, 80);
     test_flt(ecs_get(world, p, LayoutBounds)->height, 26);
 
-    float wider[2] = {100, 20};
-    ecs_set_id(world, a, tb, sizeof(wider), wider);
+    ecs_set(world, a, TextBounds, {100, 20});
     ecs_progress(world, 0);
 
     test_flt(ecs_get(world, a, LayoutBounds)->width, 100);
