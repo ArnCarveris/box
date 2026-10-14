@@ -34,6 +34,10 @@
 /** Timestamp measurements in flight at most */
 #define BOX_GPU_BAKE_READBACKS (4)
 
+/** Milliseconds a measurement of the captures of one packet may take at most, longer ones are
+ * stale timestamps or a stalled queue and are dropped */
+#define BOX_GPU_BAKE_MEASURE_MAX (1000.0)
+
 /** Byte alignment of the destination of a query resolve */
 #define BOX_GPU_BAKE_RESOLVE_ALIGN (256)
 
@@ -65,6 +69,15 @@ typedef struct box_gpu_bake_readback_t {
     int32_t state;                  /**< box_gpu_bake_readback_state_t */
     int32_t probes;                 /**< Probes the measured captures held */
 } box_gpu_bake_readback_t;
+
+/** A measurement of the captures of a packet from the CPU, used without timestamp queries:
+ * from the start of their recording until the queue reports their work done */
+typedef struct box_gpu_bake_done_t {
+    struct box_gpu_bake_t *bake;    /**< The capture state */
+    box_gpu_t *gpu;                 /**< The backend */
+    uint64_t start;                 /**< ecs_os_now when the captures started recording */
+    int32_t probes;                 /**< Probes the captures held, 0 while the slot is free */
+} box_gpu_bake_done_t;
 
 /** The timestamps around the captures of a packet */
 typedef struct box_gpu_bake_timer_t {
@@ -100,7 +113,9 @@ struct box_gpu_bake_t {
     WGPUQuerySet queries;           /**< Two timestamps per readback, NULL without the feature */
     WGPUBuffer resolve;             /**< Resolved timestamps */
     box_gpu_bake_readback_t readbacks[BOX_GPU_BAKE_READBACKS]; /**< Timestamp copies */
+    box_gpu_bake_done_t done[BOX_GPU_BAKE_READBACKS]; /**< Measurements without timestamps */
     box_render_bake_timing_t timing; /**< Measured time not yet taken, under the gpu lock */
+    ecs_vec_t captured;             /**< box_render_bake_result_t not taken, under the gpu lock */
 };
 
 /** Axis a face looks along and its up axis, the right axis is their cross product */
@@ -262,6 +277,7 @@ static void box_gpu_bake_state_free(
     int32_t i;
     box_gpu_bake_layers_free(b);
     ecs_vec_fini_t(NULL, &b->layer_views, WGPUTextureView);
+    ecs_vec_fini_t(NULL, &b->captured, box_render_bake_result_t);
     ecs_vec_fini_t(NULL, &b->view_data, uint8_t);
     for (i = 0; i < BOX_GPU_BAKE_READBACKS; i ++) {
         box_gpu_bake_readback_t *r = &b->readbacks[i];
@@ -372,6 +388,7 @@ static box_gpu_bake_t* box_gpu_bake_state_new(
     b->clusters = box_gpu_light_clusters_new(gpu);
     ecs_vec_init_t(NULL, &b->view_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &b->layer_views, WGPUTextureView, 0);
+    ecs_vec_init_t(NULL, &b->captured, box_render_bake_result_t, 0);
     box_gpu_bake_queries_init(gpu, b);
 
     return b;
@@ -486,7 +503,58 @@ static void box_gpu_bake_on_map(
     box_gpu_bake_readback_t *r = userdata1;
     (void)message;
     (void)userdata2;
-    r->state = status == WGPUMapAsyncStatus_Success ? BOX_GPU_BAKE_MAPPED : BOX_GPU_BAKE_FAILED;
+    if (status != WGPUMapAsyncStatus_CallbackCancelled) {
+        r->state = status == WGPUMapAsyncStatus_Success
+            ? BOX_GPU_BAKE_MAPPED
+            : BOX_GPU_BAKE_FAILED;
+    }
+}
+
+/** Add a measurement of the captures of a packet to the time the main thread takes.
+ *
+ * @param gpu The backend
+ * @param b The capture state
+ * @param probes Probes the captures held
+ * @param ms Milliseconds they took, dropped when not plausible
+ */
+static void box_gpu_bake_measured(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b,
+    int32_t probes,
+    double ms)
+{
+    if (probes > 0 && ms > 0 && ms < BOX_GPU_BAKE_MEASURE_MAX) {
+        ecs_os_mutex_lock(gpu->lock);
+        b->timing.probes += probes;
+        b->timing.ms += ms;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+}
+
+/** Measure the captures of a packet when the queue finished their work.
+ *
+ * @param status Outcome of the request
+ * @param message Error text
+ * @param userdata1 The box_gpu_bake_done_t
+ * @param userdata2 Unused
+ */
+static void box_gpu_bake_on_done(
+    WGPUQueueWorkDoneStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    box_gpu_bake_done_t *d = userdata1;
+    (void)message;
+    (void)userdata2;
+    if (status == WGPUQueueWorkDoneStatus_Success) {
+        box_gpu_bake_measured(d->gpu, d->bake, d->probes,
+            (double)(ecs_os_now() - d->start) * 1e-6);
+    }
+
+    if (status != WGPUQueueWorkDoneStatus_CallbackCancelled) {
+        d->probes = 0;
+    }
 }
 
 /** Get the nanoseconds of one tick of the timestamps.
@@ -518,7 +586,7 @@ static void box_gpu_bake_readback_poll(
     int32_t i;
 #ifndef __EMSCRIPTEN__
     for (i = 0; i < BOX_GPU_BAKE_READBACKS; i ++) {
-        if (b->readbacks[i].state == BOX_GPU_BAKE_MAPPING) {
+        if (b->readbacks[i].state == BOX_GPU_BAKE_MAPPING || b->done[i].probes) {
             wgpuDevicePoll(gpu->device, false, NULL);
             break;
         }
@@ -531,10 +599,8 @@ static void box_gpu_bake_readback_poll(
             const uint64_t *t = wgpuBufferGetConstMappedRange(r->buffer, 0,
                 2 * sizeof(uint64_t));
             if (t && t[1] > t[0]) {
-                ecs_os_mutex_lock(gpu->lock);
-                b->timing.probes += r->probes;
-                b->timing.ms += (double)(t[1] - t[0]) * box_gpu_bake_period(gpu) * 1e-6;
-                ecs_os_mutex_unlock(gpu->lock);
+                box_gpu_bake_measured(gpu, b, r->probes,
+                    (double)(t[1] - t[0]) * box_gpu_bake_period(gpu) * 1e-6);
             }
 
             wgpuBufferUnmap(r->buffer);
@@ -800,6 +866,15 @@ static void box_gpu_bake_project(
     wgpuBindGroupRelease(group);
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.probes += count;
+    for (i = 0; i < count; i ++) {
+        *ecs_vec_append_t(NULL, &b->captured, box_render_bake_result_t) =
+            (box_render_bake_result_t){
+                .volume = batch->volume,
+                .generation = batch->generation,
+                .probe = probes[i].index
+            };
+    }
+
     ecs_os_mutex_unlock(gpu->lock);
 }
 
@@ -1090,12 +1165,46 @@ static bool box_gpu_bake_batch_valid(
         batch->first + batch->count <= ecs_vec_count(&packet->probes);
 }
 
+/** Measure captures from the CPU until the queue reports their work done, the fallback of
+ * devices without timestamp queries. The time includes queued work before the captures and,
+ * natively, the wait for the next poll, so it errs on the expensive side.
+ *
+ * @param gpu The backend
+ * @param b The capture state
+ * @param start ecs_os_now when the captures started recording
+ * @param probes Probes the captures held
+ */
+static void box_gpu_bake_done_measure(
+    box_gpu_t *gpu,
+    box_gpu_bake_t *b,
+    uint64_t start,
+    int32_t probes)
+{
+    int32_t i;
+    for (i = 0; probes && i < BOX_GPU_BAKE_READBACKS; i ++) {
+        box_gpu_bake_done_t *d = &b->done[i];
+        if (!d->probes) {
+            d->bake = b;
+            d->gpu = gpu;
+            d->start = start;
+            d->probes = probes;
+            wgpuQueueOnSubmittedWorkDone(gpu->queue, (WGPUQueueWorkDoneCallbackInfo){
+                .mode = WGPUCallbackMode_AllowSpontaneous,
+                .callback = box_gpu_bake_on_done,
+                .userdata1 = d
+            });
+            break;
+        }
+    }
+}
+
 void box_gpu_bake_capture(
     box_gpu_t *gpu,
     const box_render_packet_t *packet)
 {
     int32_t i, count = ecs_vec_count(&packet->bakes), probes = 0, last = -1;
     box_gpu_bake_timer_t timer = { .readback = -1 };
+    uint64_t start = ecs_os_now();
     if (gpu->bake) {
         box_gpu_bake_readback_poll(gpu, gpu->bake);
         box_gpu_bake_resolve(gpu, gpu->bake);
@@ -1134,10 +1243,38 @@ void box_gpu_bake_capture(
     if (timer.ended) {
         b->readbacks[timer.readback].probes = probes;
         b->readbacks[timer.readback].state = BOX_GPU_BAKE_WRITTEN;
+    } else if (!b->queries) {
+        box_gpu_bake_done_measure(gpu, b, start, probes);
     }
 
 done:
     return;
+}
+
+bool box_render_gpu_bake_captured(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
+    box_render_gpu_stats_t stats;
+    bool result = box_render_gpu_stats(world, &stats);
+    ecs_vec_clear(out);
+    if (!result) {
+        goto done;
+    }
+
+    box_gpu_t *gpu = box_render_get_backend(world)->ctx;
+    ecs_os_mutex_lock(gpu->lock);
+    int32_t count = gpu->bake ? ecs_vec_count(&gpu->bake->captured) : 0;
+    if (count) {
+        ecs_vec_set_count_t(NULL, out, box_render_bake_result_t, count);
+        ecs_os_memcpy_n(ecs_vec_first(out), ecs_vec_first(&gpu->bake->captured),
+            box_render_bake_result_t, count);
+        ecs_vec_clear(&gpu->bake->captured);
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+done:
+    return result;
 }
 
 bool box_render_gpu_bake_timing(
@@ -1167,6 +1304,16 @@ done:
 }
 
 #else
+
+bool box_render_gpu_bake_captured(
+    ecs_world_t *world,
+    ecs_vec_t *out)
+{
+    (void)world;
+    ecs_vec_clear(out);
+
+    return false;
+}
 
 bool box_render_gpu_bake_timing(
     ecs_world_t *world,

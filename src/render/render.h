@@ -302,6 +302,7 @@ typedef struct box_render_probe_capture_t {
  */
 typedef struct box_render_bake_batch_t {
     uint32_t volume;        /**< Handle of the volume the probes are written into */
+    uint32_t generation;    /**< Pass of the volume the probes belong to, reported back */
     ecs_entity_t scene;     /**< Scene root of the batches the faces draw */
     int32_t size;           /**< Edge of a face in texels */
     box_render_view_lights_t lights; /**< Lights of the scene, enabled */
@@ -488,10 +489,30 @@ typedef struct box_render_bake_timing_t {
     bool measured;              /**< The device measures with timestamp queries */
 } box_render_bake_timing_t;
 
+/** A probe the GPU backend captured, reported back to the main thread */
+typedef struct box_render_bake_result_t {
+    uint32_t volume;            /**< Handle of the volume */
+    uint32_t generation;        /**< Generation of the bake batch of the probe */
+    uint32_t probe;             /**< Index of the probe in the volume */
+} box_render_bake_result_t;
+
+/** Take the probes the GPU backend of a world captured since the last call.
+ *
+ * A probe of a packet that was rendered and is not among them was not captured.
+ *
+ * @param world The world
+ * @param out Receives box_render_bake_result_t
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_bake_captured(
+    ecs_world_t *world,
+    ecs_vec_t *out);
+
 /** Take the GPU time of the probe captures the GPU backend of a world measured.
  *
  * Timestamps are read back without waiting, so a measurement arrives a few frames after its
- * captures. Without timestamp queries nothing is measured.
+ * captures. Without timestamp queries the time from recording until the queue reports the work
+ * done is measured on the CPU instead, which includes waits and errs on the expensive side.
  *
  * @param world The world
  * @param out Receives the time, zero when nothing arrived
@@ -865,6 +886,18 @@ bool box_render_bake_probe(
     ecs_entity_t scene,
     const vec3 position,
     box_render_probe_t *out);
+
+/** Get the probes left to bake in the volumes whose bake can progress.
+ *
+ * A volume can progress when its settings are valid, its budget_ms is positive, a view of its
+ * scene was in the packet of the last frame and the GPU backend renders; a volume that cannot
+ * progress counts nothing.
+ *
+ * @param world The world
+ * @return Probes queued or in flight, 0 when every bake that can progress converged
+ */
+int32_t box_render_bake_pending(
+    const ecs_world_t *world);
 
 /** Register the system that adds the effect passes of every view to the packet.
  *
