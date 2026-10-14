@@ -1360,8 +1360,8 @@ void Camera_mouse_look_platform(void) {
     ecs_fini(world);
 }
 
-void Camera_mouse_look_coasts(void) {
-    // controllers/camera_flecs_engine
+void Camera_mouse_look_stops(void) {
+    // controller_fixes/look_release
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
@@ -1375,20 +1375,23 @@ void Camera_mouse_look_coasts(void) {
     box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 80, 100 } });
     ecs_progress(world, dt);
     float yaw = ecs_get(world, cam, Rotation)->y;
-    float av = 20 * 0.003f / dt;
     test_assert(fabsf(yaw - 0.06f) < 0.00001f);
-    test_assert(fabsf(ecs_get(world, cam, CameraController)->angular_velocity[1] - av) < 0.001f);
+    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[1], 0);
 
     box_input_glfw_on_button(world, 1, 0);
-    for (int32_t n = 1; n <= 20; n ++) {
-        ecs_progress(world, dt);
-        av -= av * (1.0f - expf(-15.0f * dt));
-        yaw += av * dt;
-        test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 0.0001f);
-    }
+    ecs_progress(world, dt);
+    test_flt(ecs_get(world, cam, Rotation)->y, yaw);
+    test_flt(ecs_get(world, cam, CameraController)->angular_velocity[1], 0);
 
-    test_assert(yaw > 0.06f + 0.1f);
-    test_assert(ecs_get(world, cam, CameraController)->angular_velocity[1] < av + 0.001f);
+    box_input_key(world, KeyLeft, true);
+    float av = 0;
+    for (int32_t n = 0; n < 10; n ++) {
+        ecs_progress(world, dt);
+        av += (1.5f - av) * (1.0f - expf(-5.0f * dt));
+        yaw += av * dt;
+        test_assert(fabsf(ecs_get(world, cam, CameraController)->angular_velocity[1] - av) < 1e-5f);
+        test_assert(fabsf(ecs_get(world, cam, Rotation)->y - yaw) < 1e-5f);
+    }
 
     ecs_fini(world);
 }
@@ -1684,6 +1687,34 @@ void Camera_stall_clamped(void) {
     test_flt(ecs_get(world, cam, Position)->z, -5);
     ecs_progress(world, 0.25f);
     test_flt(ecs_get(world, cam, Position)->z, -7.5f);
+
+    ecs_fini(world);
+}
+
+void Camera_look_release_stops(void) {
+    // controller_fixes/look_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, dt);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 80, 110 } });
+    ecs_progress(world, dt);
+    Rotation r = *ecs_get(world, cam, Rotation);
+    test_assert(fabsf(r.y - 0.06f) < 0.00001f);
+    test_assert(fabsf(r.x + 0.03f) < 0.00001f);
+
+    box_input_glfw_on_button(world, 1, 0);
+    for (int32_t n = 0; n < 10; n ++) {
+        ecs_progress(world, dt);
+        test_flt(ecs_get(world, cam, Rotation)->y, r.y);
+        test_flt(ecs_get(world, cam, Rotation)->x, r.x);
+    }
 
     ecs_fini(world);
 }

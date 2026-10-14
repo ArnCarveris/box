@@ -1127,3 +1127,31 @@ void FirstPerson_stall_clamped(void) {
 
     ecs_fini(world);
 }
+
+void FirstPerson_look_release_stops(void) {
+    // controller_fixes/look_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    float dt = 1.0f / 60.0f;
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 100, 100 } });
+    box_input_glfw_on_button(world, 1, 1);
+    ecs_progress(world, dt);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = { 120, 90 } });
+    ecs_progress(world, dt);
+    Rotation r = *ecs_get(world, fp, Rotation);
+    test_assert(fabsf(r.y + 0.06f) < 0.00001f);
+    test_assert(fabsf(r.x - 0.03f) < 0.00001f);
+
+    box_input_glfw_on_button(world, 1, 0);
+    for (int32_t n = 0; n < 10; n ++) {
+        ecs_progress(world, dt);
+        test_flt(ecs_get(world, fp, Rotation)->y, r.y);
+        test_flt(ecs_get(world, fp, Rotation)->x, r.x);
+    }
+
+    ecs_fini(world);
+}

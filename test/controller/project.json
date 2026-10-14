@@ -58,7 +58,7 @@
                     "turn_speed_zero",
                     "pitch_limit",
                     "mouse_look_platform",
-                    "mouse_look_coasts",
+                    "mouse_look_stops",
                     "mouse_left_no_look",
                     "ease_in",
                     "ease_out",
@@ -68,7 +68,8 @@
                     "wheel_zoom",
                     "zoom_zero",
                     "script_turn_settings",
-                    "stall_clamped"
+                    "stall_clamped",
+                    "look_release_stops"
                 ]
             },
             {
@@ -115,7 +116,8 @@
                     "command_key",
                     "command_action",
                     "arrows_turn",
-                    "stall_clamped"
+                    "stall_clamped",
+                    "look_release_stops"
                 ]
             },
             {
