@@ -12,8 +12,12 @@
 
 #ifdef BOX_RENDER_WGPU
 
+#ifdef __EMSCRIPTEN__
+#include <webgpu/webgpu.h>
+#else
 #include <webgpu.h>
 #include <wgpu.h>
+#endif
 
 /** Color format of offscreen targets */
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
@@ -115,6 +119,7 @@ typedef struct box_gpu_t {
     ecs_vec_t results;              /**< box_render_shader_result_t not yet taken */
     ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
+    uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -137,6 +142,31 @@ typedef enum box_gpu_stat_t {
     BOX_GPU_STAT_DRAW,              /**< A draw call was recorded */
     BOX_GPU_STAT_SCATTER            /**< A scatter dispatch was recorded */
 } box_gpu_stat_t;
+
+#ifdef __EMSCRIPTEN__
+/** Stand in for the wgpu-native poll, which the browser has no equivalent of.
+ *
+ * The browser maps buffers from its event loop, so a readback that waits inside a frame never
+ * completes there; the web build does not record captures and aborts a blocking readback.
+ *
+ * @param device The device
+ * @param wait Whether to wait for the queue
+ * @param index Unused submission index
+ * @return Never returns
+ */
+static inline WGPUBool wgpuDevicePoll(
+    WGPUDevice device,
+    WGPUBool wait,
+    const void *index)
+{
+    (void)device;
+    (void)wait;
+    (void)index;
+    ecs_abort(ECS_UNSUPPORTED, "blocking GPU readback is not available in the browser");
+
+    return 0;
+}
+#endif
 
 /** Queue the outcome of a shader compilation for the main thread.
  *

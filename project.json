@@ -19,6 +19,15 @@
                 "BOX_PLATFORM_GLFW",
                 "BOX_RENDER_WGPU"
             ]
+        },
+        "${os Emscripten}": {
+            "defines": [
+                "BOX_RENDER_WGPU",
+                "_GNU_SOURCE"
+            ],
+            "cflags": [
+                "--use-port=emdawnwebgpu"
+            ]
         }
     },
     "dependee": {
@@ -41,6 +50,16 @@
                     "-framework CoreGraphics",
                     "-framework Foundation",
                     "-framework AppKit"
+                ]
+            },
+            "${os Emscripten}": {
+                "cflags": [
+                    "--use-port=emdawnwebgpu"
+                ],
+                "ldflags": [
+                    "--use-port=emdawnwebgpu",
+                    "-sDEFAULT_TO_CXX=1",
+                    "-sSTACK_SIZE=8388608"
                 ]
             }
         }

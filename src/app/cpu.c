@@ -10,12 +10,14 @@
 
 double box_app_cpu_time(void)
 {
-    struct rusage usage;
     double result = 0;
+#ifndef __EMSCRIPTEN__
+    struct rusage usage;
     if (!getrusage(RUSAGE_SELF, &usage)) {
         result = (double)usage.ru_utime.tv_sec + (double)usage.ru_utime.tv_usec * 1e-6 +
             (double)usage.ru_stime.tv_sec + (double)usage.ru_stime.tv_usec * 1e-6;
     }
+#endif
 
     return result;
 }
