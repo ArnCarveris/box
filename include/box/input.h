@@ -86,6 +86,7 @@ ECS_STRUCT(InputEvent, {
     bool repeat;         /**< A platform key down repeated while the key is held */
     int32_t delay;       /**< Frames a synthetic event waits after the one before it */
     ecs_entity_t action; /**< Action of an action event */
+    ecs_entity_t surface; /**< Surface whose window sent a platform event, 0 for any surface */
 });
 
 /** Cursor and wheel state of the current frame */
@@ -104,6 +105,7 @@ ECS_STRUCT(Input, {
     char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
+    ecs_entity_t surface; /**< Surface with the input focus, 0 until one gains it */
 });
 
 /** A named game action, an entity that bindings and synthetic input drive */
@@ -189,6 +191,9 @@ void box_input_platform_set(
  *
  * Cursor moves are ignored while a synthetic cursor is pinned; focus and resize events
  * always apply. The delay of the event is ignored.
+ *
+ * Only events of Input.surface apply, or of any surface while it is 0. A focus gain of another
+ * surface releases the held keys and gives it the input at the size it last reported.
  *
  * @param world The world
  * @param event The event

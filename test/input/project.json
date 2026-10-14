@@ -124,7 +124,11 @@
                     "camera_look_like_synthetic",
                     "camera_look_needs_right_button",
                     "camera_dom_like_synthetic",
-                    "camera_focus_lost_stops"
+                    "camera_focus_lost_stops",
+                    "surfaces_input_follows_focus",
+                    "surfaces_focus_lost",
+                    "surfaces_untagged_events",
+                    "surfaces_deleted_surface"
                 ]
             }
         ]

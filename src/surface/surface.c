@@ -230,12 +230,14 @@ static void box_surface_ctor(
 /** Give a surface its target handle and, unless it renders offscreen, its window.
  *
  * @param world The world
+ * @param e The surface entity
  * @param s The surface
  * @param impl The engine side of the surface
  * @param state The module state
  */
 static void box_surface_open(
     ecs_world_t *world,
+    ecs_entity_t e,
     const Surface *s,
     SurfaceImpl *impl,
     box_surface_state_t *state)
@@ -247,7 +249,8 @@ static void box_surface_open(
 
     impl->window_width = box_surface_points(s->width);
     impl->window_height = box_surface_points(s->height);
-    impl->window = box_window_new(world, impl->window_width, impl->window_height, "box");
+    impl->window = box_window_new(
+        world, e, impl->window_width, impl->window_height, "box");
     if (!impl->window) {
         ecs_warn("cannot open a window, the surface renders offscreen");
     }
@@ -404,7 +407,7 @@ static void box_surface_frame(
     box_render_target_desc_t desc;
     float clear[4];
     if (!impl->handle) {
-        box_surface_open(world, s, impl, state);
+        box_surface_open(world, e, s, impl, state);
         op = BOX_RENDER_CREATE;
     }
 

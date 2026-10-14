@@ -43,6 +43,12 @@ typedef struct box_input_hold_t {
     bool pressed;        /**< The hold started since the actions last resolved */
 } box_input_hold_t;
 
+/** Last window size a surface reported */
+typedef struct box_input_surface_size_t {
+    ecs_entity_t surface; /**< The surface */
+    vec2 size;            /**< Its size in points */
+} box_input_surface_size_t;
+
 /** Queues and backend of the module, a private singleton */
 typedef struct InputDevice {
     ecs_vec_t platform;            /**< InputEvent pushed by the backend since the last frame */
@@ -53,6 +59,8 @@ typedef struct InputDevice {
     box_input_router_t router;     /**< Takes the events of a frame, emitted directly when unset */
     ecs_entity_t screen;           /**< Target of the mouse events, focused for keyboard events */
     ecs_vec_t text;                /**< char of the text typed this frame, without terminator */
+    ecs_vec_t sizes;               /**< box_input_surface_size_t of the surfaces that resized */
+    ecs_entity_t source;           /**< Surface stamped on pushed events that name none */
     bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 
@@ -84,6 +92,16 @@ void box_input_actions_import(
  */
 InputDevice* box_input_device(
     ecs_world_t *world);
+
+/** Set the surface that platform events pushed from now on come from, for events that do not
+ * name one. Window callbacks set it around their pushes.
+ *
+ * @param world The world
+ * @param surface The surface, 0 for none
+ */
+void box_input_platform_source(
+    ecs_world_t *world,
+    ecs_entity_t surface);
 
 /** Install the router that takes the events of every frame, replacing the previous one.
  *

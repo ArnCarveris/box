@@ -133,7 +133,8 @@
                     "capture_drag_across_second_view",
                     "capture_release_outside",
                     "capture_cleared_after_release",
-                    "capture_cleared_when_deleted"
+                    "capture_cleared_when_deleted",
+                    "focused_surface_views"
                 ]
             },
             {

@@ -20,6 +20,7 @@
 /** State of the browser backend of a world */
 typedef struct box_web_t {
     ecs_world_t *world;     /**< World the events are pushed to */
+    ecs_entity_t surface;   /**< Surface that presents to the canvas, stamped on the events */
     ecs_entity_t status;    /**< SurfaceStatus component, 0 until the world has one */
     vec2 size;              /**< Point size of the first surface, the canvas */
 } box_web_t;
@@ -49,6 +50,26 @@ EM_JS(void, box_web_canvas_point, (double x, double y, float *out), {
     HEAPF32[(out >> 2) + 1] = h > 0 ? (y - r.top - (r.height - h) / 2) / h : 0;
 });
 
+/** Start pushing the events of the canvas: its surface is stamped on them.
+ *
+ * @param web The backend state
+ */
+static void box_web_begin(
+    const box_web_t *web)
+{
+    box_input_platform_source(web->world, web->surface);
+}
+
+/** Stop stamping the surface of the canvas on pushed events.
+ *
+ * @param web The backend state
+ */
+static void box_web_end(
+    const box_web_t *web)
+{
+    box_input_platform_source(web->world, 0);
+}
+
 /** Push a key event and its text.
  *
  * @param type Keydown or keyup
@@ -62,9 +83,13 @@ static bool box_web_key(
     void *ctx)
 {
     box_web_t *web = ctx;
-
-    return box_input_dom_on_key(web->world, event->code, event->key,
+    bool result;
+    box_web_begin(web);
+    result = box_input_dom_on_key(web->world, event->code, event->key,
         type == EMSCRIPTEN_EVENT_KEYDOWN, event->repeat, event->ctrlKey || event->metaKey);
+    box_web_end(web);
+
+    return result;
 }
 
 /** Push a cursor move in surface points.
@@ -80,7 +105,8 @@ static void box_web_push_move(
     box_web_canvas_point((double)event->clientX, (double)event->clientY, point);
     box_input_platform_push(web->world, &(InputEvent){
         .kind = InputMove,
-        .value = { point[0] * web->size[0], point[1] * web->size[1] }
+        .value = { point[0] * web->size[0], point[1] * web->size[1] },
+        .surface = web->surface
     });
 }
 
@@ -120,7 +146,8 @@ static bool box_web_button(
         box_web_push_move(web, event);
         box_input_platform_push(web->world, &(InputEvent){
             .kind = type == EMSCRIPTEN_EVENT_MOUSEDOWN ? InputKeyDown : InputKeyUp,
-            .key = key
+            .key = key,
+            .surface = web->surface
         });
     }
 
@@ -141,7 +168,9 @@ static bool box_web_wheel(
 {
     box_web_t *web = ctx;
     (void)type;
+    box_web_begin(web);
     box_input_dom_on_wheel(web->world, event->deltaX, event->deltaY, (int32_t)event->deltaMode);
+    box_web_end(web);
 
     return true;
 }
@@ -161,7 +190,7 @@ static bool box_web_focus(
     box_web_t *web = ctx;
     (void)event;
     box_input_platform_push(web->world, &(InputEvent){
-        .kind = InputFocus, .code = type == EMSCRIPTEN_EVENT_FOCUS });
+        .kind = InputFocus, .code = type == EMSCRIPTEN_EVENT_FOCUS, .surface = web->surface });
 
     return false;
 }
@@ -184,7 +213,7 @@ static void box_web_callbacks(
     emscripten_set_blur_callback(BOX_WEB_CANVAS, web, false, web ? box_web_focus : NULL);
 }
 
-/** Push the point size of the first surface when it changed, the poll of the backend.
+/** Push the point size of the surface of the canvas when it changed, the poll of the backend.
  *
  * @param world The world
  * @param ctx The backend state
@@ -194,27 +223,25 @@ static void box_web_poll(
     void *ctx)
 {
     box_web_t *web = ctx;
-    ecs_iter_t it;
+    const SurfaceStatus *s;
+    float w, h;
     if (!web->status) {
         web->status = ecs_lookup(world, "box.surface.SurfaceStatus");
     }
 
-    if (!web->status) {
+    s = web->status && ecs_is_alive(world, web->surface) ?
+        ecs_get_id(world, web->surface, web->status) : NULL;
+    if (!s) {
         goto done;
     }
 
-    it = ecs_each_id(world, web->status);
-    if (ecs_each_next(&it)) {
-        const SurfaceStatus *s = ecs_field_w_size(&it, sizeof(SurfaceStatus), 0);
-        float w = (float)s->point_width, h = (float)s->point_height;
-        if (w != web->size[0] || h != web->size[1]) {
-            web->size[0] = w;
-            web->size[1] = h;
-            box_input_platform_push(world, &(InputEvent){
-                .kind = InputResize, .value = { w, h } });
-        }
-
-        ecs_iter_fini(&it);
+    w = (float)s->point_width;
+    h = (float)s->point_height;
+    if (w != web->size[0] || h != web->size[1]) {
+        web->size[0] = w;
+        web->size[1] = h;
+        box_input_platform_push(world, &(InputEvent){
+            .kind = InputResize, .value = { w, h }, .surface = web->surface });
     }
 
 done:
@@ -233,7 +260,8 @@ static void box_web_free(
 }
 
 void box_input_web_attach(
-    ecs_world_t *world)
+    ecs_world_t *world,
+    ecs_entity_t surface)
 {
     box_web_t *web;
     if (!ecs_lookup(world, "box.input") || !box_web_has_canvas()) {
@@ -246,6 +274,7 @@ void box_input_web_attach(
 
     web = ecs_os_calloc_t(box_web_t);
     web->world = world;
+    web->surface = surface;
     box_web_callbacks(web);
     box_input_platform_set(world, &(box_input_platform_t){
         .poll = box_web_poll, .free = box_web_free, .ctx = web });
@@ -257,9 +286,11 @@ done:
 #else
 
 void box_input_web_attach(
-    ecs_world_t *world)
+    ecs_world_t *world,
+    ecs_entity_t surface)
 {
     (void)world;
+    (void)surface;
 }
 
 #endif

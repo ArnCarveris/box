@@ -292,24 +292,92 @@ static void box_input_move(
     box_input_emit_mouse(dev, in, 0);
 }
 
-/** Change the focus, releasing every held key and action when it is lost.
+/** Find the size a surface last reported.
+ *
+ * @param dev The device state
+ * @param surface The surface
+ * @return The entry of the surface, NULL when it never reported a size
+ */
+static box_input_surface_size_t* box_input_surface_size(
+    InputDevice *dev,
+    ecs_entity_t surface)
+{
+    box_input_surface_size_t *sizes = ecs_vec_first_t(&dev->sizes, box_input_surface_size_t);
+    box_input_surface_size_t *result = NULL;
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&dev->sizes) && !result; i ++) {
+        if (sizes[i].surface == surface) {
+            result = &sizes[i];
+        }
+    }
+
+    return result;
+}
+
+/** Remember the size a surface reported, forgetting the surfaces that no longer exist.
+ *
+ * @param world The world
+ * @param dev The device state
+ * @param ev The resize event of the surface
+ */
+static void box_input_surface_resize(
+    ecs_world_t *world,
+    InputDevice *dev,
+    const InputEvent *ev)
+{
+    box_input_surface_size_t *entry = box_input_surface_size(dev, ev->surface);
+    box_input_surface_size_t *sizes;
+    int32_t i = 0;
+    if (!entry) {
+        sizes = ecs_vec_first_t(&dev->sizes, box_input_surface_size_t);
+        while (i < ecs_vec_count(&dev->sizes)) {
+            if (ecs_is_alive(world, sizes[i].surface)) {
+                i ++;
+            } else {
+                sizes[i] = sizes[ecs_vec_count(&dev->sizes) - 1];
+                ecs_vec_remove_last(&dev->sizes);
+            }
+        }
+
+        entry = ecs_vec_append_t(NULL, &dev->sizes, box_input_surface_size_t);
+        entry->surface = ev->surface;
+    }
+
+    entry->size[0] = ev->value[0];
+    entry->size[1] = ev->value[1];
+}
+
+/** Change the focus, releasing every held key and action when it is lost or moves to another
+ * surface, which then takes the input with its last reported size.
  *
  * @param dev The device state
  * @param in The Input singleton
- * @param focused Whether input is focused
+ * @param ev The focus event
  */
 static void box_input_set_focus(
     InputDevice *dev,
     Input *in,
-    bool focused)
+    const InputEvent *ev)
 {
-    if (!focused) {
+    bool focused = ev->code != 0;
+    bool moved = focused && ev->surface && ev->surface != in->surface;
+    const box_input_surface_size_t *size;
+    if (!focused || moved) {
         box_input_release_all(dev, in);
         box_input_hold_release_all(dev);
     }
 
-    if (focused != in->focused) {
+    if (focused != in->focused || moved) {
         dev->has_position = false;
+    }
+
+    if (moved) {
+        in->surface = ev->surface;
+        size = box_input_surface_size(dev, ev->surface);
+        if (size) {
+            in->size[0] = size->size[0];
+            in->size[1] = size->size[1];
+        }
     }
 
     in->focused = focused;
@@ -348,7 +416,7 @@ static void box_input_apply(
         box_input_emit_scroll(dev, in, ev);
         break;
     case InputFocus:
-        box_input_set_focus(dev, in, ev->code != 0);
+        box_input_set_focus(dev, in, ev);
         break;
     case InputResize:
         in->size[0] = ev->value[0];
@@ -371,21 +439,59 @@ static void box_input_apply(
     }
 }
 
-/** Apply the events the backend pushed, ignoring them while input is unfocused.
+/** Check whether a platform event applies: events of other surfaces than the one with the
+ * input focus only apply when they give it the focus, and none but focus and resize events
+ * apply while input is unfocused.
  *
+ * @param world The world
+ * @param dev The device state
+ * @param in The Input singleton
+ * @param ev The event
+ * @return Whether the event applies
+ */
+static bool box_input_platform_accept(
+    ecs_world_t *world,
+    InputDevice *dev,
+    const Input *in,
+    const InputEvent *ev)
+{
+    bool own = !ev->surface || !in->surface || ev->surface == in->surface;
+    bool result;
+    if (ev->kind == InputResize) {
+        if (ev->surface) {
+            box_input_surface_resize(world, dev, ev);
+        }
+
+        result = own;
+    } else if (ev->kind == InputFocus) {
+        result = own || ev->code != 0;
+    } else {
+        result = own && in->focused && !(ev->kind == InputMove && in->mouse.pinned);
+    }
+
+    return result;
+}
+
+/** Apply the events the backend pushed, ignoring them while input is unfocused and those of
+ * surfaces without the input focus.
+ *
+ * @param world The world
  * @param dev The device state
  * @param in The Input singleton
  */
 static void box_input_apply_platform(
+    ecs_world_t *world,
     InputDevice *dev,
     Input *in)
 {
     int32_t i;
+    if (in->surface && !ecs_is_alive(world, in->surface)) {
+        in->surface = 0;
+    }
+
     for (i = 0; i < ecs_vec_count(&dev->platform); i ++) {
         const InputEvent *ev = ecs_vec_get_t(&dev->platform, InputEvent, i);
-        bool always = ev->kind == InputFocus || ev->kind == InputResize;
-        bool pinned = ev->kind == InputMove && in->mouse.pinned;
-        if (always || (in->focused && !pinned)) {
+        if (box_input_platform_accept(world, dev, in, ev)) {
             box_input_apply(dev, in, ev, false);
         }
     }
@@ -468,7 +574,7 @@ void BoxInputUpdate(
 
     in = ecs_singleton_get_mut(world, Input);
     box_input_frame_begin(dev, in);
-    box_input_apply_platform(dev, in);
+    box_input_apply_platform(world, dev, in);
     box_input_apply_queue(dev, in);
     box_input_text_publish(dev, in);
     box_input_derive(in);

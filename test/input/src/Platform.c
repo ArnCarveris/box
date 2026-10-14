@@ -9,6 +9,18 @@
 #include <math.h>
 #include <string.h>
 
+static InputEvent surface_events[16];
+static int32_t surface_event_count = 0;
+
+static void SurfaceEventsPoll(ecs_world_t *world, void *ctx) {
+    (void)ctx;
+    for (int32_t i = 0; i < surface_event_count; i ++) {
+        box_input_platform_push(world, &surface_events[i]);
+    }
+
+    surface_event_count = 0;
+}
+
 void Platform_glfw_key_letters_digits(void) {
     // input/platform_backends
     for (int32_t i = 0; i < 26; i ++) {
@@ -624,6 +636,180 @@ void Platform_camera_focus_lost_stops(void) {
     box_input_glfw_on_key(world, 'W', 1);
     ecs_progress(world, 0.5f);
     test_flt(ecs_get(world, cam, Position)->z, -10);
+
+    ecs_fini(world);
+}
+
+void Platform_surfaces_input_follows_focus(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_entity_t b = ecs_new(world);
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){ .poll = SurfaceEventsPoll });
+
+    surface_events[0] = (InputEvent){ .kind = InputResize, .surface = a, .value = {800, 600} };
+    surface_events[1] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_events[2] = (InputEvent){ .kind = InputResize, .surface = b, .value = {400, 300} };
+    surface_event_count = 3;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, a);
+    test_bool(in->focused, true);
+    test_flt(in->size[0], 800);
+    test_flt(in->size[1], 600);
+
+    surface_events[0] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyW };
+    surface_events[1] = (InputEvent){ .kind = InputMove, .surface = b, .value = {10, 10} };
+    surface_events[2] = (InputEvent){ .kind = InputText, .surface = b, .code = 'b' };
+    surface_events[3] = (InputEvent){ .kind = InputScroll, .surface = b, .value = {0, 1} };
+    surface_events[4] = (InputEvent){ .kind = InputKeyDown, .surface = a, .key = KeyE };
+    surface_events[5] = (InputEvent){ .kind = InputMove, .surface = a, .value = {100, 50} };
+    surface_events[6] = (InputEvent){ .kind = InputText, .surface = a, .code = 'a' };
+    surface_event_count = 7;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_bool(in->keys[KeyW].down, false);
+    test_bool(in->keys[KeyE].down, true);
+    test_flt(in->mouse.position[0], 100);
+    test_flt(in->mouse.position[1], 50);
+    test_flt(in->mouse.scroll[1], 0);
+    test_str(in->text, "a");
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = b, .code = 1 };
+    surface_events[1] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 0 };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, b);
+    test_bool(in->focused, true);
+    test_flt(in->size[0], 400);
+    test_flt(in->size[1], 300);
+    test_bool(in->keys[KeyE].down, false);
+    test_bool(in->keys[KeyE].released, true);
+
+    surface_events[0] = (InputEvent){ .kind = InputKeyDown, .surface = a, .key = KeyQ };
+    surface_events[1] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyR };
+    surface_events[2] = (InputEvent){ .kind = InputMove, .surface = b, .value = {5, 5} };
+    surface_events[3] = (InputEvent){ .kind = InputResize, .surface = a, .value = {1024, 768} };
+    surface_event_count = 4;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_bool(in->keys[KeyQ].down, false);
+    test_bool(in->keys[KeyR].pressed, true);
+    test_flt(in->mouse.position[0], 5);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+    test_flt(in->size[0], 400);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = b, .code = 0 };
+    surface_events[1] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, a);
+    test_bool(in->focused, true);
+    test_flt(in->size[0], 1024);
+    test_flt(in->size[1], 768);
+    test_bool(in->keys[KeyR].down, false);
+
+    ecs_fini(world);
+}
+
+void Platform_surfaces_focus_lost(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_entity_t b = ecs_new(world);
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){ .poll = SurfaceEventsPoll });
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_events[1] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 0 };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, a);
+    test_bool(in->focused, false);
+
+    surface_events[0] = (InputEvent){ .kind = InputKeyDown, .surface = a, .key = KeyA };
+    surface_events[1] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyB };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_bool(in->keys[KeyA].down, false);
+    test_bool(in->keys[KeyB].down, false);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = b, .code = 1 };
+    surface_events[1] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyB };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, b);
+    test_bool(in->focused, true);
+    test_bool(in->keys[KeyB].pressed, true);
+
+    ecs_fini(world);
+}
+
+void Platform_surfaces_untagged_events(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_entity_t b = ecs_new(world);
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){ .poll = SurfaceEventsPoll });
+
+    surface_events[0] = (InputEvent){ .kind = InputKeyDown, .surface = a, .key = KeyA };
+    surface_events[1] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyB };
+    surface_event_count = 2;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, 0);
+    test_bool(in->keys[KeyA].down, true);
+    test_bool(in->keys[KeyB].down, true);
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = b, .code = 1 };
+    surface_events[1] = (InputEvent){ .kind = InputKeyDown, .key = KeyC };
+    surface_event_count = 2;
+    box_input_key_press(world, KeyD, 1);
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, b);
+    test_bool(in->keys[KeyC].pressed, true);
+    test_bool(in->keys[KeyD].pressed, true);
+
+    ecs_fini(world);
+}
+
+void Platform_surfaces_deleted_surface(void) {
+    // input_fixes/multi_window_input
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_entity_t b = ecs_new(world);
+    surface_event_count = 0;
+    box_input_platform_set(world, &(box_input_platform_t){ .poll = SurfaceEventsPoll });
+
+    surface_events[0] = (InputEvent){ .kind = InputFocus, .surface = a, .code = 1 };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    test_uint(ecs_singleton_get(world, Input)->surface, a);
+
+    ecs_delete(world, a);
+    surface_events[0] = (InputEvent){ .kind = InputKeyDown, .surface = b, .key = KeyB };
+    surface_event_count = 1;
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_uint(in->surface, 0);
+    test_bool(in->keys[KeyB].pressed, true);
 
     ecs_fini(world);
 }
