@@ -425,9 +425,6 @@ static ecs_entity_t box_component_type(
 
 /** The set command: assign a flecs script expression to a component or one of its members.
  *
- * A session may not be changed; an entity of a module only gets new values for the
- * components it has, such as a singleton.
- *
  * @param ctx The call context
  * @param argc Number of arguments
  * @param argv The session, the entity path, the component path and the value
@@ -449,15 +446,9 @@ static void box_component_set(
     char *member = NULL;
     const char *end;
     const void *cur;
-    if (box_component_args(ctx, result, argv, BoxShellSet, &e, &id, &member) ||
+    if (box_component_args(ctx, result, argv, BoxShellDelete, &e, &id, &member) ||
         box_component_check(ctx, result, e, id, expr, true))
     {
-        goto done;
-    }
-
-    if (!ecs_has_id(world, e, id) && box_shell_protected(world, e)) {
-        box_command_error(ctx, result, "'%s' belongs to a module or session",
-            *(char**)argv[1].ptr);
         goto done;
     }
 

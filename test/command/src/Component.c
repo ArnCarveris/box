@@ -692,23 +692,41 @@ void Component_remove_terminal_host(void) {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
-    ecs_entity_t s = box_terminal_new(world);
-    bool error = false;
-    char *out = box_terminal_run(world, s,
-        "remove /box.command.TerminalHost box.command.TerminalHost", &error);
-    test_bool(error, true);
-    ecs_os_free(out);
+    ecs_entity_t s1 = box_terminal_new(world);
+    ecs_entity_t s2 = box_terminal_new(world);
+    const char *lines[] = {
+        "remove /box.command.TerminalHost box.command.TerminalHost",
+        "clear /box.command.TerminalHost",
+        "set /box.command.TerminalHost box.command.TerminalHost {}",
+        "set /box.command.TerminalHost box.command.TerminalHost.host 0",
+        "set /box.command.commands (Identifier, Name) {value: \"x\"}",
+        "set /box.command.TerminalServer TerminalServer.port 0"
+    };
+    const char *paths[] = {
+        "/box.command.TerminalHost", "/box.command.TerminalHost", "/box.command.TerminalHost",
+        "/box.command.TerminalHost", "/box.command.commands", "/box.command.TerminalServer"
+    };
+    int32_t i;
+    for (i = 0; i < 6; i ++) {
+        bool error = false;
+        char *expect = flecs_asprintf("error: '%s' belongs to a module or session", paths[i]);
+        char *out = box_terminal_run(world, s1, lines[i], &error);
+        test_bool(error, true);
+        test_str(out, expect);
+        ecs_os_free(out);
+        ecs_os_free(expect);
+    }
 
-    out = box_terminal_run(world, s,
-        "clear /box.command.TerminalHost", &error);
-    test_bool(error, true);
+    bool error = true;
+    char *out = box_terminal_run(world, s2, "commands 1", &error);
+    test_bool(error, false);
     ecs_os_free(out);
-
-    out = box_terminal_run(world, s, "commands 1", &error);
+    out = box_terminal_run(world, s2, "ls /box.command", &error);
     test_bool(error, false);
     ecs_os_free(out);
     test_assert(box_terminal_new(world) != 0);
     ecs_progress(world, 0);
+    test_assert(ecs_is_alive(world, s2));
 
     ecs_fini(world);
 }
@@ -742,12 +760,20 @@ void Component_set_module_singleton(void) {
     ECS_IMPORT(world, Box);
 
     ecs_entity_t s = box_terminal_new(world);
-    bool error = true;
+    bool error = false;
     char *out = box_terminal_run(world, s,
         "set /box.command.TerminalLimits TerminalLimits.sessions 3", &error);
-    test_bool(error, false);
+    test_bool(error, true);
+    test_str(out, "error: '/box.command.TerminalLimits' belongs to a module or session");
     ecs_os_free(out);
-    test_int(ecs_singleton_get(world, TerminalLimits)->sessions, 3);
+    test_int(ecs_singleton_get(world, TerminalLimits)->sessions, BOX_TERMINAL_SESSIONS);
+
+    out = box_terminal_run(world, s,
+        "set /box.command.TerminalLimits TerminalLimits.idle_timeout 0", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+    ecs_progress(world, 0);
+    test_assert(ecs_is_alive(world, s));
 
     out = box_terminal_run(world, s, "set /box.command.TerminalLimits Position {1, 2, 3}",
         &error);
