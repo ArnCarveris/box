@@ -87,7 +87,13 @@
                     "chord_bound_modifier",
                     "chord_ignore_modifiers",
                     "chord_ignore_modifiers_masked",
-                    "chord_script"
+                    "chord_script",
+                    "chord_modifier_released_first",
+                    "chord_modifier_after_key",
+                    "chord_equal_specificity",
+                    "chord_extra_modifier",
+                    "chord_disabled_no_mask",
+                    "chord_disabled_modifier_unbound"
                 ]
             },
             {

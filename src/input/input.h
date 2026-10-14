@@ -61,11 +61,12 @@ extern ECS_COMPONENT_DECLARE(InputDevice);
 
 /** Private state of the action layer, a singleton */
 typedef struct InputActions {
-    ecs_vec_t waiters;      /**< box_input_waiter_t of the script tasks awaiting an action */
-    ecs_vec_t events;       /**< box_input_action_event_t the frame raises */
-    ecs_map_t bound;        /**< Action entity to the BOX_INPUT_BOUND_* bits of this frame */
-    ecs_query_t *bindings;  /**< Entities with a Binding */
-    ecs_query_t *actions;   /**< Entities with an Action and its ActionState */
+    ecs_vec_t waiters;                 /**< box_input_waiter_t of the tasks awaiting an action */
+    ecs_vec_t events;                  /**< box_input_action_event_t the frame raises */
+    ecs_map_t bound;                   /**< Action entity to the BOX_INPUT_BOUND_* bits */
+    ecs_query_t *bindings;             /**< Entities with a Binding */
+    ecs_query_t *actions;              /**< Entities with an Action and its ActionState */
+    uint8_t press_mods[BOX_KEY_COUNT]; /**< Modifier keys held when each key last went down */
 } InputActions;
 
 extern ECS_COMPONENT_DECLARE(InputActions);

@@ -123,11 +123,13 @@ ECS_STRUCT(ActionState, {
 
 /** Binds a key, with optional modifiers, to an action.
  *
- * The binding holds the action while the key and every required modifier are down. Of the
- * matching bindings of a key only those requiring the most modifiers apply (Ctrl+S masks S).
+ * The modifiers held when the key goes down decide: of the bindings whose modifiers were held,
+ * those requiring the most apply (Ctrl+S masks S), unless another modifier key was held that no
+ * binding uses as its key and the binding does not ignore. Equally specific bindings all apply.
  *
- * A binding without modifiers does not apply while a modifier key that is not the key of a
- * binding is held, unless it ignores modifiers. Disabled entities and prefabs do not bind.
+ * The action is held until the key comes up or a required modifier is released; a modifier
+ * pressed later changes nothing and no other binding takes the key before it is pressed again.
+ * Disabled entities and prefabs do not bind.
  */
 ECS_STRUCT(Binding, {
     ecs_entity_t action;   /**< Action, when 0 the binding entity if it is one, else its parent */
@@ -136,7 +138,7 @@ ECS_STRUCT(Binding, {
     bool shift;            /**< A shift key must be held too */
     bool alt;              /**< An alt key must be held too */
     bool meta;             /**< A super key must be held too */
-    bool ignore_modifiers; /**< Applies while modifiers no binding uses as its key are held */
+    bool ignore_modifiers; /**< Applies while modifiers it does not require are held */
 });
 
 /** What on.pressed, on.held, on.dragged and on.released resolve with */

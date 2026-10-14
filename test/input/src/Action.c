@@ -959,13 +959,19 @@ void Action_chord_unbound_modifier(void) {
 
     box_input_key(world, KeyCtrlLeft, false);
     ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->pressed, false);
+    test_bool(ecs_get(world, back, ActionState)->down, false);
+
+    box_input_key(world, KeyS, false);
+    ecs_progress(world, 0);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
     test_bool(ecs_get(world, back, ActionState)->pressed, true);
     test_bool(ecs_get(world, back, ActionState)->down, true);
 
     box_input_key(world, KeyAltRight, true);
     ecs_progress(world, 0);
-    test_bool(ecs_get(world, back, ActionState)->down, false);
-    test_bool(ecs_get(world, back, ActionState)->released, true);
+    test_bool(ecs_get(world, back, ActionState)->down, true);
 
     ecs_fini(world);
 }
@@ -989,6 +995,13 @@ void Action_chord_bound_modifier(void) {
     test_bool(ecs_get(world, fast, ActionState)->pressed, true);
 
     box_input_key(world, KeyShiftRight, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, fwd, ActionState)->down, true);
+    test_bool(ecs_get(world, fast, ActionState)->down, true);
+
+    box_input_key(world, KeyW, false);
+    ecs_progress(world, 0);
+    box_input_key(world, KeyW, true);
     ecs_progress(world, 0);
     test_bool(ecs_get(world, fwd, ActionState)->down, false);
     test_bool(ecs_get(world, fast, ActionState)->down, true);
@@ -1039,7 +1052,11 @@ void Action_chord_ignore_modifiers_masked(void) {
     test_bool(ecs_get(world, back, ActionState)->pressed, true);
     test_bool(ecs_get(world, save, ActionState)->down, false);
 
+    box_input_key(world, KeyS, false);
+    box_input_key(world, KeyAltLeft, false);
+    ecs_progress(world, 0);
     box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyS, true);
     ecs_progress(world, 0);
     test_bool(ecs_get(world, save, ActionState)->down, true);
     test_bool(ecs_get(world, back, ActionState)->down, false);
@@ -1077,6 +1094,192 @@ void Action_chord_script(void) {
     test_bool(ecs_get(world, save, ActionState)->pressed, true);
     test_bool(ecs_get(world, back, ActionState)->down, false);
     test_bool(ecs_get(world, fire, ActionState)->pressed, true);
+
+    ecs_fini(world);
+}
+
+void Action_chord_modifier_released_first(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, Action, { 0 });
+    ecs_entity_t save = ecs_new(world);
+    ecs_set(world, save, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = back, .key = KeyS });
+    ecs_set(world, ecs_new(world), Binding, { .action = save, .key = KeyS, .ctrl = true });
+
+    box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, save, ActionState)->pressed, true);
+
+    box_input_key(world, KeyCtrlLeft, false);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, save, ActionState)->released, true);
+    test_bool(ecs_get(world, back, ActionState)->pressed, false);
+    test_bool(ecs_get(world, back, ActionState)->down, false);
+
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->down, false);
+
+    box_input_key(world, KeyS, false);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->pressed, false);
+    test_bool(ecs_get(world, back, ActionState)->released, false);
+
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->pressed, true);
+    test_bool(ecs_get(world, save, ActionState)->down, false);
+
+    ecs_fini(world);
+}
+
+void Action_chord_modifier_after_key(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, Action, { 0 });
+    ecs_entity_t save = ecs_new(world);
+    ecs_set(world, save, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = back, .key = KeyS });
+    ecs_set(world, ecs_new(world), Binding, { .action = save, .key = KeyS, .ctrl = true });
+
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->pressed, true);
+
+    box_input_key(world, KeyCtrlLeft, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->down, true);
+    test_bool(ecs_get(world, back, ActionState)->released, false);
+    test_bool(ecs_get(world, save, ActionState)->down, false);
+
+    box_input_key(world, KeyCtrlLeft, false);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->down, true);
+    test_bool(ecs_get(world, back, ActionState)->pressed, false);
+
+    ecs_fini(world);
+}
+
+void Action_chord_equal_specificity(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t save = ecs_new(world);
+    ecs_set(world, save, Action, { 0 });
+    ecs_entity_t select = ecs_new(world);
+    ecs_set(world, select, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = save, .key = KeyS, .ctrl = true });
+    ecs_set(world, ecs_new(world), Binding, { .action = select, .key = KeyS, .shift = true });
+
+    box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyShiftLeft, true);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, save, ActionState)->down, false);
+    test_bool(ecs_get(world, select, ActionState)->down, false);
+
+    ecs_entity_t crouch = ecs_new(world);
+    ecs_set(world, crouch, Action, { 0 });
+    ecs_entity_t fast = ecs_new(world);
+    ecs_set(world, fast, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = crouch, .key = KeyCtrlLeft });
+    ecs_set(world, ecs_new(world), Binding, { .action = fast, .key = KeyShiftLeft });
+
+    box_input_key(world, KeyS, false);
+    ecs_progress(world, 0);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, save, ActionState)->pressed, true);
+    test_bool(ecs_get(world, select, ActionState)->pressed, true);
+
+    ecs_fini(world);
+}
+
+void Action_chord_extra_modifier(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t undo = ecs_new(world);
+    ecs_set(world, undo, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = undo, .key = KeyZ, .ctrl = true });
+
+    box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyAltRight, true);
+    box_input_key(world, KeyZ, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, undo, ActionState)->down, false);
+
+    box_input_key(world, KeyZ, false);
+    box_input_key(world, KeyAltRight, false);
+    box_input_key(world, KeyShiftLeft, true);
+    ecs_progress(world, 0);
+    box_input_key(world, KeyZ, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, undo, ActionState)->down, false);
+
+    box_input_key(world, KeyZ, false);
+    box_input_key(world, KeyShiftLeft, false);
+    ecs_progress(world, 0);
+    box_input_key(world, KeyZ, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, undo, ActionState)->pressed, true);
+    test_bool(ecs_get(world, undo, ActionState)->down, true);
+
+    ecs_fini(world);
+}
+
+void Action_chord_disabled_no_mask(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t back = ecs_new(world);
+    ecs_set(world, back, Action, { 0 });
+    ecs_entity_t save = ecs_new(world);
+    ecs_set(world, save, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, {
+        .action = back, .key = KeyS, .ignore_modifiers = true });
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Binding, { .action = save, .key = KeyS, .ctrl = true });
+    ecs_enable(world, b, false);
+
+    box_input_key(world, KeyCtrlLeft, true);
+    box_input_key(world, KeyS, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, back, ActionState)->pressed, true);
+    test_bool(ecs_get(world, save, ActionState)->down, false);
+
+    ecs_fini(world);
+}
+
+void Action_chord_disabled_modifier_unbound(void) {
+    // input_fixes/chord_bindings
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fwd = ecs_new(world);
+    ecs_set(world, fwd, Action, { 0 });
+    ecs_entity_t fast = ecs_new(world);
+    ecs_set(world, fast, Action, { 0 });
+    ecs_set(world, ecs_new(world), Binding, { .action = fwd, .key = KeyW });
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, Binding, { .action = fast, .key = KeyShiftLeft });
+    ecs_enable(world, b, false);
+
+    box_input_key(world, KeyShiftLeft, true);
+    box_input_key(world, KeyW, true);
+    ecs_progress(world, 0);
+    test_bool(ecs_get(world, fwd, ActionState)->down, false);
+    test_bool(ecs_get(world, fast, ActionState)->down, false);
 
     ecs_fini(world);
 }
