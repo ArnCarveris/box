@@ -674,6 +674,7 @@ static void box_gpu_cull_view_add(
     cv->first_dispatch = ecs_vec_count(&c->dispatches);
     cv->counter = base->jobs[3];
     cv->hiz = hiz;
+    cv->report = cascade < 0 && !v->target && v->view;
     cv->group = history ? box_gpu_hiz_group(gpu, history, hiz) : c->empty_group;
     ecs_vec_clear(&c->order);
     for (i = 0; i < count; i ++) {
@@ -1030,7 +1031,7 @@ void box_gpu_cull_finish(
     ecs_vec_clear(&r->records);
     for (i = 0; i < count; i ++) {
         const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
-        if (cv->cascade >= 0 || !cv->view) {
+        if (!cv->report) {
             continue;
         }
 

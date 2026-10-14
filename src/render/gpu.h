@@ -167,6 +167,7 @@ typedef struct box_gpu_cull_view_t {
     uint32_t counter;               /**< Index of its counters */
     box_gpu_hiz_t *hiz;             /**< Pyramid of a view that culls by occlusion, else NULL */
     WGPUBindGroup group;            /**< History and pyramid, or the empty ones */
+    bool report;                    /**< Its counts become the CullStatus, false for captures */
 } box_gpu_cull_view_t;
 
 /** A batch a cull view draws: where its visible instances and its draw arguments are */

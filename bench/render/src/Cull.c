@@ -1,10 +1,11 @@
 /**
  * @file Cull.c
- * @brief Benchmarks for the frustum cull pass of views on the GPU.
+ * @brief Benchmarks for the frustum and occlusion cull passes of views on the GPU.
  *
- * A headless world renders 100k static boxes on a floor into a 1280x720 offscreen surface on
- * the main thread and waits for the GPU after every frame, so a case measures a whole frame.
- * The offscreen cases look through a narrow camera that sees about a tenth of the boxes.
+ * Headless worlds render about 100k static boxes into a 1280x720 offscreen surface on the main
+ * thread and wait for the GPU after every frame, so a case measures a whole frame.
+ *
+ * The offscreen cases see a tenth of the boxes; the city hides most of its street boxes.
  */
 
 #include <box.h>
@@ -87,6 +88,81 @@ static void bench_cull(
     ecs_fini(world);
 }
 
+/** Blocks of the city along each axis */
+#define BENCH_CITY (50)
+
+/** Render frames of a city whose blocks hide most of the boxes in its streets.
+ *
+ * @param b The benchmark
+ * @param frustum_only Whether the view culls by frustum only, without occlusion
+ */
+static void bench_city(
+    bench_t *b,
+    bool frustum_only)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 70, 190});
+    ecs_set(world, camera, Rotation, {-0.4f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 50});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {150, 180, 220, 255}}, .lighting.enabled = true,
+        .culling = {.frustum_only = frustum_only}});
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {-0.7f, 2.5f, 0});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    ecs_entity_t ground = ecs_new(world);
+    ecs_set(world, ground, Position, {0, -0.1f, 0});
+    ecs_set(world, ground, Box, {250, 0.2f, 250});
+    int32_t x, z, i;
+    for (x = 0; x < BENCH_CITY; x ++) {
+        for (z = 0; z < BENCH_CITY; z ++) {
+            float h = 12 + (float)((x * 7 + z * 3) % 5) * 3;
+            ecs_entity_t block = ecs_new(world);
+            ecs_set(world, block, Position, {(float)x * 5 - 122.5f, h * 0.5f,
+                (float)z * 5 - 122.5f});
+            ecs_set(world, block, Box, {3.6f, h, 3.6f});
+            for (i = 0; i < 40; i ++) {
+                float t = (float)(i % 10) * 0.42f;
+                float side = (float)(i / 10 % 2) * 0.4f;
+                ecs_entity_t e = ecs_new(world);
+                ecs_set(world, e, Position, {
+                    (float)x * 5 - 124.6f + (i < 20 ? t : side),
+                    0.15f,
+                    (float)z * 5 - 124.6f + (i < 20 ? side : 0.8f + t)});
+                ecs_set(world, e, Box, {0.3f, 0.3f, 0.3f});
+                ecs_set(world, e, Rgb, {250, 120, 60});
+            }
+        }
+    }
+
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720});
+    uint32_t word = 0;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    bench_set_items(b, BENCH_CITY * BENCH_CITY * 41);
+    while (bench_iter(b)) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+        bench_keep(word);
+    }
+
+    ecs_fini(world);
+}
+
 void Cull_offscreen_100k(
     bench_t *b)
 {
@@ -106,4 +182,18 @@ void Cull_shadows_100k(
 {
     // culling/frustum
     bench_cull(b, true, 50, true);
+}
+
+void Cull_occluded_city_100k(
+    bench_t *b)
+{
+    // culling/hiz
+    bench_city(b, false);
+}
+
+void Cull_occluded_city_100k_frustum_only(
+    bench_t *b)
+{
+    // culling/hiz
+    bench_city(b, true);
 }
