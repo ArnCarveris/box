@@ -1096,7 +1096,7 @@ static void box_gpu_fx_projection(
     mat4 proj)
 {
     box_camera_projection(&ctx->v->camera_data,
-        (float)ctx->t->desc.width, (float)ctx->t->desc.height, proj);
+        (float)ctx->t->desc.point_width, (float)ctx->t->desc.point_height, proj);
 }
 
 /** Record the passes of ambient occlusion: the occlusion of every other pixel into the half

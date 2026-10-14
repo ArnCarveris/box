@@ -119,11 +119,7 @@ static void box_gpu_texture_free(
     ecs_os_free(tex);
 }
 
-/** Release every cached bind group, after a texture they may bind changed.
- *
- * @param gpu The backend
- */
-static void box_gpu_materials_clear(
+void box_gpu_materials_clear(
     box_gpu_t *gpu)
 {
     ecs_map_iter_t it = ecs_map_iter(&gpu->materials);
@@ -399,15 +395,26 @@ static WGPUTextureView box_gpu_material_view(
     uint32_t handle,
     int32_t slot)
 {
-    box_gpu_texture_t *tex = handle
+    box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
         ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
         : NULL;
+    box_gpu_target_t *target = handle & BOX_RENDER_TEXTURE_TARGET
+        ? ecs_map_get_deref(&gpu->targets, box_gpu_target_t, handle & ~BOX_RENDER_TEXTURE_TARGET)
+        : NULL;
     bool color = slot < 2;
+    WGPUTextureView result = NULL;
+    if (target && target->output_view) {
+        result = target->output_view;
+        goto done;
+    }
+
     if (!tex) {
         tex = slot == BOX_RENDER_TEXTURE_SLOTS - 1 ? gpu->flat : gpu->white;
     }
 
-    return color ? tex->srgb : tex->linear;
+    result = color ? tex->srgb : tex->linear;
+done:
+    return result;
 }
 
 WGPUBindGroup box_gpu_material_group(
@@ -415,14 +422,21 @@ WGPUBindGroup box_gpu_material_group(
     const box_render_batch_t *b,
     uint32_t anisotropy)
 {
-    uint64_t hash = box_gpu_material_hash(b->textures, b->wrap, anisotropy);
-    ecs_map_val_t *head = ecs_map_ensure(&gpu->materials, hash);
-    box_gpu_material_t *m = (box_gpu_material_t*)(uintptr_t)*head;
+    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS];
     WGPUBindGroupEntry entries[BOX_RENDER_TEXTURE_SLOTS + 1];
     int32_t i;
+    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+        bool self = gpu->rendering &&
+            b->textures[i] == (BOX_RENDER_TEXTURE_TARGET | gpu->rendering);
+        textures[i] = self ? 0 : b->textures[i];
+    }
+
+    uint64_t hash = box_gpu_material_hash(textures, b->wrap, anisotropy);
+    ecs_map_val_t *head = ecs_map_ensure(&gpu->materials, hash);
+    box_gpu_material_t *m = (box_gpu_material_t*)(uintptr_t)*head;
     while (m) {
         if (m->wrap == b->wrap && m->anisotropy == anisotropy &&
-            !ecs_os_memcmp(m->textures, b->textures, ECS_SIZEOF(m->textures)))
+            !ecs_os_memcmp(m->textures, textures, ECS_SIZEOF(m->textures)))
         {
             goto done;
         }
@@ -433,7 +447,7 @@ WGPUBindGroup box_gpu_material_group(
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         entries[i] = (WGPUBindGroupEntry){
             .binding = (uint32_t)i,
-            .textureView = box_gpu_material_view(gpu, b->textures[i], i)
+            .textureView = box_gpu_material_view(gpu, textures[i], i)
         };
     }
 
@@ -447,7 +461,7 @@ WGPUBindGroup box_gpu_material_group(
         .entries = entries
     };
     m = ecs_os_calloc_t(box_gpu_material_t);
-    ecs_os_memcpy(m->textures, b->textures, ECS_SIZEOF(m->textures));
+    ecs_os_memcpy(m->textures, textures, ECS_SIZEOF(m->textures));
     m->wrap = b->wrap;
     m->anisotropy = anisotropy;
     m->group = wgpuDeviceCreateBindGroup(gpu->device, &desc);

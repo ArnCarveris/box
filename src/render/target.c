@@ -254,13 +254,20 @@ static WGPUTextureView box_gpu_target_view(
 
 #endif
 
-/** Release the textures of a target, keeping its window surface.
+/** Release the textures of a target, keeping its window surface. The cached material bind
+ * groups of a target that materials sample are released with them.
  *
+ * @param gpu The backend
  * @param t The target
  */
 static void box_gpu_target_release(
+    box_gpu_t *gpu,
     box_gpu_target_t *t)
 {
+    if (t->output_view) {
+        box_gpu_materials_clear(gpu);
+    }
+
     if (t->blit_group) {
         wgpuBindGroupRelease(t->blit_group);
     }
@@ -281,10 +288,15 @@ static void box_gpu_target_release(
         wgpuTextureRelease(t->depth);
     }
 
+    if (t->output_view) {
+        wgpuTextureViewRelease(t->output_view);
+    }
+
     if (t->output) {
         wgpuTextureRelease(t->output);
     }
 
+    t->output_view = NULL;
     t->blit_group = NULL;
     t->scene_view = NULL;
     t->scene = NULL;
@@ -329,11 +341,13 @@ static void box_gpu_target_configure(
     box_gpu_target_t *t)
 {
     box_render_target_desc_t *d = &t->desc;
-    box_gpu_target_release(t);
+    box_gpu_target_release(gpu, t);
     d->width = d->width > 0 ? d->width : 1;
     d->height = d->height > 0 ? d->height : 1;
     d->render_width = d->render_width > 0 ? d->render_width : d->width;
     d->render_height = d->render_height > 0 ? d->render_height : d->height;
+    d->point_width = d->point_width > 0 ? d->point_width : d->width;
+    d->point_height = d->point_height > 0 ? d->point_height : d->height;
     if (t->surface) {
         WGPUSurfaceConfiguration config = {
             .device = gpu->device,
@@ -352,6 +366,10 @@ static void box_gpu_target_configure(
         wgpuSurfaceConfigure(t->surface, &config);
     } else {
         t->output = box_gpu_texture(gpu, d->width, d->height, t->format, t->usage);
+        if (d->texture) {
+            t->output_view = wgpuTextureCreateView(t->output, NULL);
+            box_gpu_materials_clear(gpu);
+        }
     }
 
     if (d->render_width != d->width || d->render_height != d->height) {
@@ -464,7 +482,7 @@ static void box_gpu_target_free(
     box_gpu_t *gpu,
     box_gpu_target_t *t)
 {
-    box_gpu_target_release(t);
+    box_gpu_target_release(gpu, t);
     box_gpu_capture_fini(t);
     if (t->surface) {
         wgpuSurfaceUnconfigure(t->surface);
@@ -645,6 +663,8 @@ void box_gpu_target_render(
         goto done;
     }
 
+    gpu->rendering = frame->handle;
+
     WGPUTextureView view = box_gpu_target_view(t, texture);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     box_gpu_clear(encoder, t->scene_view ? t->scene_view : view, frame->clear);
@@ -675,7 +695,7 @@ void box_gpu_target_render(
 
     box_gpu_count(gpu, BOX_GPU_STAT_FRAMES);
 done:
-    return;
+    gpu->rendering = 0;
 }
 
 void box_gpu_target_fini(

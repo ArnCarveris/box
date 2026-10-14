@@ -51,6 +51,9 @@ void BoxMovementImport(
     ECS_META_COMPONENT(world, Velocity);
     ECS_META_COMPONENT(world, AngularVelocity);
 
+    ecs_add_pair(world, ecs_id(Velocity), EcsWith, DynamicTransform);
+    ecs_add_pair(world, ecs_id(AngularVelocity), EcsWith, DynamicTransform);
+
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "BoxIntegrateVelocity" }),
         .query.terms = {

@@ -69,6 +69,7 @@ typedef struct box_gpu_target_t {
     WGPUTextureFormat format;       /**< Color format of the presented image */
     WGPUTextureUsage usage;         /**< Usage of the presented image */
     WGPUTexture output;             /**< Texture of an offscreen target, NULL for a window */
+    WGPUTextureView output_view;    /**< View materials sample the output of a texture target */
     WGPUTexture scene;              /**< Render size texture, NULL when it equals the output */
     WGPUTextureView scene_view;     /**< View of the scene texture */
     WGPUBindGroup blit_group;       /**< Binds the scene texture to the blit pipeline */
@@ -379,6 +380,7 @@ typedef struct box_gpu_t {
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     uint32_t canvas;                /**< Target presented on the page canvas, 0 for none */
     box_gpu_effects_t *effects;     /**< Effect passes of the views */
+    uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -565,7 +567,17 @@ void box_gpu_texture_apply(
 void box_gpu_texture_mips(
     box_gpu_t *gpu);
 
+/** Release every cached bind group of the texture layers, after a texture they bind changed.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_materials_clear(
+    box_gpu_t *gpu);
+
 /** Get the bind group of the texture layers and sampler of a batch, created on first use.
+ *
+ * A layer whose handle has BOX_RENDER_TEXTURE_TARGET samples the image of that target, or the
+ * default of the layer while the target itself renders or does not exist.
  *
  * @param gpu The backend
  * @param b The batch

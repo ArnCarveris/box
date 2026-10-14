@@ -26,6 +26,7 @@ typedef struct DrawSlot {
     int32_t batch;  /**< Index of the batch, -1 when the entity is not drawn */
     int32_t slot;   /**< Slot of the entity in the batch */
     float fade;     /**< Product of the Opacity of the ancestors, 1 without any */
+    float layer;    /**< Layer of a 2D shape, its depth in the hierarchy */
     bool dirty;     /**< The entity is in the list of changed entities */
     bool tinted;    /**< An ancestor has a Tint of a strength above 0 */
     box_draw_tint_t tint; /**< Tints of the ancestors, composed from the root down */
@@ -82,6 +83,28 @@ typedef struct box_draw_sorted_t {
     int32_t slot;           /**< Slot of the instance in the batch */
 } box_draw_sorted_t;
 
+/** An entity with 2D slots in the draw order */
+typedef struct box_draw_order_t {
+    ecs_entity_t entity;    /**< The entity, its shape slot first and then its glyph slots */
+    const uint64_t *path;   /**< Sibling keys of the entity and its ancestors, root first */
+    int32_t depth;          /**< Keys in path */
+} box_draw_order_t;
+
+/** Consecutive slots of one batch that draw one after another in the draw order of a scene */
+typedef struct box_draw_run_t {
+    ecs_entity_t scene;     /**< Scene root, 0 for the default scene */
+    int32_t batch;          /**< Index of the batch */
+    uint32_t first;         /**< First slot */
+    uint32_t count;         /**< Slots of the run */
+} box_draw_run_t;
+
+/** A parent with OrderedChildren whose child order the draw order was computed from */
+typedef struct box_draw_parent_t {
+    ecs_entity_t parent;    /**< The parent */
+    int32_t first;          /**< First of its children in the copied children */
+    int32_t count;          /**< Children it had */
+} box_draw_parent_t;
+
 /** A batch: the entities of its slots, their instance data and what the GPU still needs */
 typedef struct box_draw_batch_t {
     box_draw_key_t key;     /**< Key of the batch */
@@ -118,6 +141,19 @@ typedef struct box_render_draws_t {
     uint32_t next_buffer;       /**< Next instance buffer handle */
     uint32_t changes_size;      /**< Bytes of the change buffer, 0 before it is created */
     const box_textures_t *textures; /**< Registry the texture handles resolve from in a send */
+    const ecs_world_t *world;   /**< World of the send, whose surfaces render texture entities */
+    bool order_dirty;           /**< The entities or the hierarchy changed since the order */
+    bool runs_dirty;            /**< 2D slots moved since the runs were made */
+    ecs_vec_t order;            /**< box_draw_order_t, the entities with 2D slots in order */
+    ecs_map_t ordered;          /**< Entity of the order to 1 */
+    ecs_vec_t order_keys;       /**< uint64_t, the paths of the order */
+    ecs_map_t paths;            /**< Entity to the offset and depth of its path, while ordering */
+    ecs_vec_t runs;             /**< box_draw_run_t, the order as runs of consecutive slots */
+    ecs_vec_t ordered_parents;  /**< box_draw_parent_t, parents the order read the order of */
+    ecs_vec_t ordered_children; /**< ecs_entity_t, children of ordered_parents as read */
+    ecs_map_t ranks;            /**< Child to its rank, while the order is made */
+    ecs_map_t parents;          /**< Parents whose children have a rank, while the order is made */
+    ecs_map_t order_z;          /**< Entity of a path to the z key it was ordered by */
     const void *backend;        /**< Context of the backend the GPU state was sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
     box_render_draws_stats_t stats; /**< Counters of the last extract */
@@ -290,6 +326,32 @@ float box_draws_fade(
     ecs_entity_t e,
     box_draw_tint_t *tint);
 
+/** Get the layer of a 2D shape or glyph: twice the number of its ancestors, plus one for a
+ * glyph, so it can be lifted over coplanar ancestors and the shape of its own entity.
+ *
+ * @param world The world
+ * @param e The entity
+ * @param glyph Whether the layer is for the glyphs of the Text of the entity
+ * @return The layer
+ */
+float box_draws_layer(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    bool glyph);
+
+/** Lift a 2D instance by its layer along the local z axis of its entity, toward the side it
+ * faces, so it wins the depth test over coplanar ancestors whose depth rounds differently when
+ * the plane is rotated in perspective. A step is a tenth of a millimeter in world units.
+ *
+ * @param out The instance
+ * @param transform World transform of the entity, NULL for the identity
+ * @param layer The layer
+ */
+void box_draws_lift(
+    box_render_instance_t *out,
+    const WorldTransform *transform,
+    float layer);
+
 /** Send the batches of the frame: meshes, instance buffers, uploads and scatters.
  *
  * The texture entities of a batch resolve to the handles of the images the backend has.
@@ -302,6 +364,78 @@ void box_draws_send(
     ecs_world_t *world,
     box_render_draws_t *d,
     box_render_packet_t *p);
+
+/** Initialize the draw order of the 2D slots.
+ *
+ * @param d The state
+ */
+void box_draws_order_init(
+    box_render_draws_t *d);
+
+/** Release the draw order of the 2D slots.
+ *
+ * @param d The state
+ */
+void box_draws_order_fini(
+    box_render_draws_t *d);
+
+/** Remember that a 2D slot was added or removed, so the runs are made again.
+ *
+ * A slot of an entity the order does not have yet makes the order again.
+ *
+ * @param d The state
+ * @param e The entity of the slot, 0 for a removed slot
+ */
+void box_draws_order_slot(
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Bring the draw order of the 2D slots up to date.
+ *
+ * 2D shapes and glyphs draw in hierarchy order, not by view depth: parents before children,
+ * siblings by Position z, then OrderedChildren order or entity id, a shape before its glyphs.
+ *
+ * The order is made again when an entity got 2D slots, the hierarchy or the z of an entity in
+ * it changed, or an OrderedChildren parent reordered its children; moved slots only make the
+ * runs again.
+ *
+ * @param world The world
+ * @param d The state
+ */
+void box_draws_order_update(
+    ecs_world_t *world,
+    box_render_draws_t *d);
+
+/** Make the draw order again when the Position z of an entity it was made from changed.
+ *
+ * @param world The world
+ * @param d The state
+ * @param e The entity whose Position was set or removed
+ */
+void box_draws_order_position(
+    const ecs_world_t *world,
+    box_render_draws_t *d,
+    ecs_entity_t e);
+
+/** Add the 2D draws of every view in draw order, as runs of consecutive slots.
+ *
+ * @param p The packet
+ * @param d The state
+ */
+void box_draws_send_ordered(
+    box_render_packet_t *p,
+    box_render_draws_t *d);
+
+/** Write the texture handles and the sampler wrap of a batch into its draw.
+ *
+ * @param d The state
+ * @param b The batch
+ * @param out The draw
+ */
+void box_draws_batch_textures(
+    const box_render_draws_t *d,
+    const box_draw_batch_t *b,
+    box_render_batch_t *out);
 
 /** Register the glyph batches of the texts: their slots, quad mesh and observers.
  *

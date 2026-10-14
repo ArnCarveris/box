@@ -16,22 +16,22 @@ ECS_TAG_DECLARE(ProjectedHidden);
 typedef struct box_projection_lens_t {
     ecs_entity_t view; /**< View the lens was made for */
     mat4 view_proj;    /**< Projection times the inverse of the camera transform */
-    float width;       /**< Width of the surface of the view in pixels */
-    float height;      /**< Height of the surface of the view in pixels */
+    float width;       /**< Width of the surface of the view in points */
+    float height;      /**< Height of the surface of the view in points */
     bool valid;        /**< The view exists and its camera has a Camera */
 } box_projection_lens_t;
 
 /** Find the size of the surface a view renders to.
  *
  * The first surface whose view_root is 0 or the parent of the view counts; its measured size
- * comes from SurfaceStatus, else from the size it requests. Without one the default surface
- * size is used.
+ * comes from SurfaceStatus in points, else from the size it requests. Without one the
+ * default surface size is used.
  *
  * @param world The world
  * @param surfaces Query for Surface and an optional SurfaceStatus
  * @param view The view
- * @param width Receives the width in pixels
- * @param height Receives the height in pixels
+ * @param width Receives the width in points
+ * @param height Receives the height in points
  */
 static void box_projection_surface_size(
     ecs_world_t *world,
@@ -55,9 +55,9 @@ static void box_projection_surface_size(
             }
 
             found = true;
-            if (st && st[i].width > 0 && st[i].height > 0) {
-                *width = (float)st[i].width;
-                *height = (float)st[i].height;
+            if (st && st[i].point_width > 0 && st[i].point_height > 0) {
+                *width = (float)st[i].point_width;
+                *height = (float)st[i].point_height;
             } else {
                 *width = (float)s[i].width;
                 *height = (float)s[i].height;
@@ -110,7 +110,7 @@ static void box_projection_lens(
  * @param world The world
  * @param anchor The anchor
  * @param lens The lens of the view of the anchor
- * @param x Receives x in pixels of the surface, origin at the center
+ * @param x Receives x in points of the surface, origin at the center
  * @param y Receives y in pixels of the surface, y up
  * @return Whether the point is in front of the camera and inside the view
  */

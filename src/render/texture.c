@@ -4,6 +4,7 @@
  *
  * A texture gets a backend handle with its first image; a removed texture releases it. The
  * pixels are freed once they are in a packet, so a new backend loads every texture again.
+ * A texture entity a surface renders into resolves to the image of the target of the surface.
  */
 
 #include "render.h"
@@ -14,6 +15,106 @@ typedef struct box_render_textures_t {
     const void *backend;    /**< Context of the backend the textures were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
 } box_render_textures_t;
+
+/** Singleton with the texture entities surfaces render into */
+typedef struct RenderTargetTextures {
+    ecs_map_t *targets;     /**< Texture entity to target handle */
+} RenderTargetTextures;
+
+static ECS_COMPONENT_DECLARE(RenderTargetTextures);
+
+/** Free the maps of the singletons.
+ *
+ * @param ptr The components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_render_target_textures_dtor(
+    void *ptr,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    RenderTargetTextures *values = ptr;
+    int32_t i;
+    (void)ti;
+    for (i = 0; i < count; i ++) {
+        if (values[i].targets) {
+            ecs_map_fini(values[i].targets);
+            ecs_os_free(values[i].targets);
+        }
+    }
+}
+
+/** Move the maps of the singletons.
+ *
+ * @param dst The destination components
+ * @param src The source components
+ * @param count Number of components
+ * @param ti Type info
+ */
+static void box_render_target_textures_move(
+    void *dst,
+    void *src,
+    int32_t count,
+    const ecs_type_info_t *ti)
+{
+    RenderTargetTextures *d = dst;
+    RenderTargetTextures *s = src;
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        if (d[i].targets != s[i].targets) {
+            box_render_target_textures_dtor(&d[i], 1, ti);
+        }
+
+        d[i].targets = s[i].targets;
+        s[i].targets = NULL;
+    }
+}
+
+/** Get the map of the texture entities surfaces render into.
+ *
+ * @param world The world
+ * @return The map, NULL when box.render is not imported
+ */
+static ecs_map_t* box_render_target_textures(
+    const ecs_world_t *world)
+{
+    const RenderTargetTextures *t = ecs_id(RenderTargetTextures)
+        ? ecs_singleton_get(world, RenderTargetTextures)
+        : NULL;
+
+    return t ? t->targets : NULL;
+}
+
+void box_render_texture_targets_clear(
+    ecs_world_t *world)
+{
+    ecs_map_t *map = box_render_target_textures(world);
+    if (map) {
+        ecs_map_clear(map);
+    }
+}
+
+void box_render_texture_target(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    uint32_t target)
+{
+    ecs_map_t *map = box_render_target_textures(world);
+    if (map && texture && target) {
+        ecs_map_insert(map, texture, target);
+    }
+}
+
+uint32_t box_render_texture_target_handle(
+    const ecs_world_t *world,
+    ecs_entity_t texture)
+{
+    ecs_map_t *map = box_render_target_textures(world);
+    const ecs_map_val_t *target = map && texture ? ecs_map_get(map, texture) : NULL;
+
+    return target ? BOX_RENDER_TEXTURE_TARGET | (uint32_t)*target : 0;
+}
 
 /** Get the anisotropic samples of the samplers: the most any surface asks for.
  *
@@ -163,6 +264,15 @@ void box_render_textures_init(
     ecs_world_t *world)
 {
     box_render_textures_t *state = ecs_os_calloc_t(box_render_textures_t);
+    ecs_map_t *targets = ecs_os_calloc_t(ecs_map_t);
+    ECS_COMPONENT_DEFINE(world, RenderTargetTextures);
+    ecs_set_hooks(world, RenderTargetTextures, {
+        .ctor = flecs_default_ctor,
+        .dtor = box_render_target_textures_dtor,
+        .move = box_render_target_textures_move
+    });
+    ecs_map_init(targets, NULL);
+    ecs_singleton_set(world, RenderTargetTextures, { .targets = targets });
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderExtractTextures" }),
         .phase = RenderExtract,

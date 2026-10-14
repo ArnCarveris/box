@@ -19,6 +19,12 @@
 /** Shapes per row of the grid */
 #define BENCH_SHAPES2D_ROW (300)
 
+/** Panels of the UI tree, each with an OrderedChildren list of rows */
+#define BENCH_SHAPES2D_PANELS (100)
+
+/** Rows of a panel of the UI tree, each a background with an icon */
+#define BENCH_SHAPES2D_ROWS (50)
+
 /** Accept a packet without rendering it.
  *
  * @param ctx Unused
@@ -152,4 +158,123 @@ void Shapes2D_changed_1pct(
     box_render_sync(world);
     ecs_fini(world);
     ecs_os_free(shapes);
+}
+
+void Shapes2D_ui_tree_idle(
+    bench_t *b)
+{
+    // ui/screen
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    box_render_backend_t backend = { .render = bench_shapes2d_drop };
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    int32_t p, r;
+    for (p = 0; p < BENCH_SHAPES2D_PANELS; p ++) {
+        ecs_entity_t panel = ecs_new(world);
+        ecs_add_id(world, panel, EcsOrderedChildren);
+        ecs_set(world, panel, Position, {(float)(p % 10) * 120, (float)(p / 10) * 220, 0});
+        ecs_set(world, panel, Rect, {110, 210});
+        ecs_set(world, panel, Rgb, {40, 44, 56});
+        for (r = 0; r < BENCH_SHAPES2D_ROWS; r ++) {
+            ecs_entity_t row = ecs_new_w_pair(world, EcsChildOf, panel);
+            ecs_set(world, row, Position, {0, (float)r * 4 - 100, 0});
+            ecs_set(world, row, Rect, {100, 3});
+            ecs_set(world, row, Rgb, {60, 66, 84});
+            ecs_entity_t icon = ecs_new_w_pair(world, EcsChildOf, row);
+            ecs_set(world, icon, Position, {-45, 0, 0});
+            ecs_set(world, icon, Circle, {1.5f});
+            ecs_set(world, icon, Rgb, {250, 190, 60});
+        }
+    }
+
+    for (p = 0; p < 4; p ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_draws_stats_t stats = {0};
+    bench_set_items(b, BENCH_SHAPES2D_PANELS * (1 + BENCH_SHAPES2D_ROWS * 2));
+    while (bench_iter(b)) {
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+    }
+
+    bench_counter(b, "batches", (double)stats.batches);
+    box_render_sync(world);
+    ecs_fini(world);
+}
+
+void Shapes2D_ui_tree_add_remove(
+    bench_t *b)
+{
+    // ui/screen
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    box_render_backend_t backend = { .render = bench_shapes2d_drop };
+    box_render_set_backend(world, &backend);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t *panels = ecs_os_malloc_n(ecs_entity_t, BENCH_SHAPES2D_PANELS);
+    int32_t p, r;
+    for (p = 0; p < BENCH_SHAPES2D_PANELS; p ++) {
+        ecs_entity_t panel = panels[p] = ecs_new(world);
+        ecs_add_id(world, panel, EcsOrderedChildren);
+        ecs_set(world, panel, Position, {(float)(p % 10) * 120, (float)(p / 10) * 220, 0});
+        ecs_set(world, panel, Rect, {110, 210});
+        ecs_set(world, panel, Rgb, {40, 44, 56});
+        for (r = 0; r < BENCH_SHAPES2D_ROWS; r ++) {
+            ecs_entity_t row = ecs_new_w_pair(world, EcsChildOf, panel);
+            ecs_set(world, row, Position, {0, (float)r * 4 - 100, 0});
+            ecs_set(world, row, Rect, {100, 3});
+            ecs_set(world, row, Rgb, {60, 66, 84});
+            ecs_entity_t icon = ecs_new_w_pair(world, EcsChildOf, row);
+            ecs_set(world, icon, Position, {-45, 0, 0});
+            ecs_set(world, icon, Circle, {1.5f});
+            ecs_set(world, icon, Rgb, {250, 190, 60});
+        }
+    }
+
+    for (p = 0; p < 4; p ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_draws_stats_t stats = {0};
+    ecs_entity_t added = 0;
+    int32_t frame = 0;
+    bench_set_items(b, 1);
+    while (bench_iter(b)) {
+        if (added) {
+            ecs_delete(world, added);
+        }
+
+        added = ecs_new_w_pair(world, EcsChildOf, panels[(frame * 37) % BENCH_SHAPES2D_PANELS]);
+        ecs_set(world, added, Position, {0, 100, 0});
+        ecs_set(world, added, Rect, {100, 3});
+        ecs_set(world, added, Rgb, {230, 80, 70});
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+        frame ++;
+    }
+
+    bench_counter(b, "batches", (double)stats.batches);
+    box_render_sync(world);
+    ecs_fini(world);
+    ecs_os_free(panels);
 }

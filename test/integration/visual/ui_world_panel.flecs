@@ -1,0 +1,143 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+using box.layout
+using box.text
+
+camera {
+  Position: {0, 1.5, 3.2}
+  Rotation: {-0.1, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {
+    camera: camera,
+    clear: {enabled: true, color: {120, 150, 190, 255}},
+    shadows: {enabled: true}
+  }
+}
+
+sun {
+  Rotation: {-0.8, 2.4, 0}
+  DirectionalLight: {intensity: 2}
+  Rgb: {255, 244, 225}
+}
+
+ground {
+  Position: {0, -0.05, 0}
+  Box: {24, 0.1, 24}
+  Rgb: {140, 150, 125}
+  PbrMaterial: {roughness: 0.9}
+}
+
+post {
+  Position: {-1.55, 0.9, -0.5}
+  Box: {0.12, 1.8, 0.12}
+  Rgb: {110, 80, 60}
+}
+
+barrel {
+  Position: {0.55, 0.45, 0.9}
+  Cylinder: {segments: 24, smooth: true, radius: 0.35, length: 0.9}
+  Rgb: {170, 90, 60}
+}
+
+template Row {
+  prop label: string = "Item"
+  prop value: string = "0"
+  prop r: u8 = 90
+  prop g: u8 = 160
+  prop b: u8 = 250
+
+  Layout: {direction: Row, spacing: 8, padding: {6, 6, 8, 8}, v: Middle}
+  LayoutItem: {width: {mode: Grow}}
+  Rect: {1, 1}
+  Rgb: {52, 58, 76}
+  Border: {radius: 6}
+
+  dot {
+    Circle: {6}
+    Rgb: {r, g, b}
+  }
+
+  name {
+    Text: {value: label, size: 16}
+    Rgb: {225, 230, 240}
+  }
+
+  gap {
+    LayoutItem: {width: {mode: Grow}}
+  }
+
+  amount {
+    Text: {value: value, size: 16}
+    Rgb: {255, 220, 90}
+  }
+}
+
+board {
+  Position: {-0.45, 1.45, -0.5}
+  Rotation: {0, 0.45, 0}
+  Scale: {0.0065, 0.0065, 0.0065}
+  Layout: {direction: Column, spacing: 8, padding: {14, 14, 16, 16}}
+  LayoutItem: {width: {mode: Fixed, value: 300}}
+  Rect: {1, 1}
+  Rgb: {30, 34, 46}
+  Border: {width: 3, radius: 16, color: {120, 140, 200, 255}}
+
+  title {
+    Text: {value: "Quest Board", size: 28}
+    Rgb: {255, 255, 255}
+  }
+
+  first {
+    Row: {label: "Wolves", value: "3 / 5", r: 230, g: 80, b: 70}
+  }
+
+  second {
+    Row: {label: "Herbs", value: "8 / 8", r: 90, g: 210, b: 110}
+  }
+
+  third {
+    Row: {label: "Ore", value: "1 / 4"}
+  }
+
+  progress {
+    Layout: {padding: {3, 3, 3, 3}}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 16}}
+    Rect: {1, 1}
+    Rgb: {52, 58, 76}
+    Border: {radius: 8}
+
+    fill {
+      LayoutItem: {h: Left, width: {mode: Fixed, value: 150}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {250, 190, 60}
+      Border: {radius: 5}
+    }
+  }
+}
+
+sign {
+  Position: {1.45, 1.15, -0.8}
+  Rotation: {0, -0.6, 0}
+  Scale: {0.008, 0.008, 0.008}
+  Layout: {direction: Row, spacing: 8, padding: {8, 8, 12, 12}, v: Middle}
+  Rect: {1, 1}
+  Rgb: {250, 240, 220}
+  Border: {width: 2, radius: 10, color: {110, 80, 60, 255}}
+
+  arrow {
+    Circle: {10}
+    Rgb: {230, 80, 70}
+  }
+
+  label {
+    Text: {value: "Village", size: 22}
+    Rgb: {60, 40, 30}
+  }
+}

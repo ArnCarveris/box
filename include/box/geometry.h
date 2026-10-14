@@ -206,7 +206,7 @@ ECS_STRUCT(Border, {
  * with the Rgb of the entity, which defaults to white for an Image.
  */
 ECS_STRUCT(Image, {
-    ecs_entity_t texture; /**< Entity with a TexturePath */
+    ecs_entity_t texture; /**< Entity with a TexturePath, or the texture of a Surface */
     float u0;             /**< Left edge of the area */
     float v0;             /**< Top edge of the area */
     float u1;             /**< Right edge of the area, default 1 */

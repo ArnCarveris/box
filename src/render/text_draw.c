@@ -278,11 +278,14 @@ void box_draws_text_update(
     }
 
     const WorldTransform *transform = ecs_get(world, e, WorldTransform);
+    float layer = count ? box_draws_layer(world, e, true) : 0.0f;
     for (i = 0; i < count; i ++) {
         const box_draw_glyph_slot_t *at = ecs_vec_get_t(&ts->slots, box_draw_glyph_slot_t, i);
         box_draw_batch_t *b = box_draws_batch(d, at->batch);
-        box_draws_glyph(ecs_vec_get_t(&b->instances, box_render_instance_t, at->slot),
-            transform, &glyphs[i], &material);
+        box_render_instance_t *inst = ecs_vec_get_t(
+            &b->instances, box_render_instance_t, at->slot);
+        box_draws_glyph(inst, transform, &glyphs[i], &material);
+        box_draws_lift(inst, transform, layer);
         box_draws_slot_changed(b, at->slot);
     }
 }

@@ -17,6 +17,9 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 /** Instances the smallest instance buffer holds */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
+/** Distance in world units a 2D instance is lifted along its local z axis per layer */
+#define BOX_DRAWS_LAYER_STEP (0.0001f)
+
 /** Bytes the smallest change buffer holds */
 #define BOX_DRAWS_MIN_CHANGES (64 * 1024)
 
@@ -270,6 +273,10 @@ int32_t box_draws_slot_add(
 {
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t result = ecs_vec_count(&b->entities);
+    if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+        box_draws_order_slot(d, e);
+    }
+
     *ecs_vec_append_t(NULL, &b->entities, ecs_entity_t) = e;
     ecs_vec_append_t(NULL, &b->instances, box_render_instance_t);
 
@@ -319,6 +326,10 @@ void box_draws_slot_remove(
 {
     box_draw_batch_t *b = box_draws_batch(d, index);
     int32_t last = ecs_vec_count(&b->entities) - 1;
+    if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+        box_draws_order_slot(d, 0);
+    }
+
     if (slot != last) {
         ecs_entity_t moved = *ecs_vec_get_t(&b->entities, ecs_entity_t, last);
         DrawSlot *s = b->key.atlas ? NULL : ecs_get_mut(world, moved, DrawSlot);
@@ -440,6 +451,21 @@ void box_draws_transform(
     glm_vec4_scale(out->model[0], shape->scale[0], out->model[0]);
     glm_vec4_scale(out->model[1], shape->scale[1], out->model[1]);
     glm_vec4_scale(out->model[2], shape->scale[2], out->model[2]);
+}
+
+void box_draws_lift(
+    box_render_instance_t *out,
+    const WorldTransform *transform,
+    float layer)
+{
+    float step = layer * BOX_DRAWS_LAYER_STEP;
+    vec3 axis = {0, 0, 1};
+    if (transform) {
+        glm_vec3_copy(ECS_CONST_CAST(float*, transform->m[2]), axis);
+        glm_vec3_normalize(axis);
+    }
+
+    glm_vec3_muladds(axis, step, out->model[3]);
 }
 
 void box_draws_instance(
@@ -620,13 +646,7 @@ static uint32_t box_draws_segment_size(
     return (size + BOX_RENDER_SCATTER_ALIGN - 1) & ~(uint32_t)(BOX_RENDER_SCATTER_ALIGN - 1);
 }
 
-/** Write the texture handles and the sampler wrap of a batch into its draw.
- *
- * @param d The state
- * @param b The batch
- * @param out The draw
- */
-static void box_draws_batch_textures(
+void box_draws_batch_textures(
     const box_render_draws_t *d,
     const box_draw_batch_t *b,
     box_render_batch_t *out)
@@ -635,6 +655,9 @@ static void box_draws_batch_textures(
     for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
         ecs_entity_t e = b->key.textures[i];
         out->textures[i] = e ? box_textures_handle(d->textures, e) : 0;
+        if (e && !out->textures[i] && d->world) {
+            out->textures[i] = box_render_texture_target_handle(d->world, e);
+        }
     }
 
     if (b->key.atlas) {
@@ -670,7 +693,7 @@ static uint32_t box_draws_send_batch(
     }
 
     b->ready = true;
-    if (b->key.blend != Opaque) {
+    if (b->key.blend != Opaque || b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
         goto done;
     }
 
@@ -998,8 +1021,12 @@ static void box_draws_fill_transform(
             continue;
         }
 
-        box_draws_transform(ecs_vec_get_t(&b->instances, box_render_instance_t, slots[i].slot),
-            transforms ? &transforms[i] : NULL, &shapes[i]);
+        box_render_instance_t *inst = ecs_vec_get_t(
+            &b->instances, box_render_instance_t, slots[i].slot);
+        box_draws_transform(inst, transforms ? &transforms[i] : NULL, &shapes[i]);
+        if (b->key.pipeline == BOX_RENDER_SHADER_SHAPE2D) {
+            box_draws_lift(inst, transforms ? &transforms[i] : NULL, slots[i].layer);
+        }
     }
 }
 
@@ -1037,6 +1064,7 @@ void box_draws_send(
     uint32_t changes = 0;
     bool views = ecs_vec_count(&p->views) != 0;
     d->textures = box_textures_get(world);
+    d->world = world;
     d->stats.batches = 0;
     d->stats.instances = 0;
     d->stats.dynamic = 0;
@@ -1072,11 +1100,14 @@ void box_draws_send(
             changes += box_draws_send_batch(p, d, b);
         }
 
-        if (b->ready && b->key.blend != Opaque) {
+        if (b->ready && b->key.blend != Opaque &&
+            b->key.pipeline != BOX_RENDER_SHADER_SHAPE2D)
+        {
             *ecs_vec_append_t(NULL, &d->blended, int32_t) = i;
         }
     }
 
+    box_draws_send_ordered(p, d);
     if (ecs_vec_count(&d->blended)) {
         box_draws_send_blended(p, d);
     }

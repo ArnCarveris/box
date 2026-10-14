@@ -84,6 +84,7 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
+    box_draws_order_fini(d);
     ecs_os_free(d);
 done:
     return;
@@ -141,6 +142,108 @@ static void BoxDrawsOnMove(
 
 done:
     return;
+}
+
+/** Test whether a table holds static entities with a local transform.
+ *
+ * The draw observers filter on DynamicTransform and ManualTransform here instead of with Not
+ * terms: a Not term fires the observer for every entity of the table when one entity gains
+ * or loses the tag.
+ *
+ * @param world The world
+ * @param table The table
+ * @return True when the table has Position, Rotation or Scale and no dynamic or manual tag
+ */
+static bool box_draws_static_local(
+    const ecs_world_t *world,
+    const ecs_table_t *table)
+{
+    bool result = table &&
+        (ecs_table_has_id(world, table, ecs_id(Position)) ||
+        ecs_table_has_id(world, table, ecs_id(Rotation)) ||
+        ecs_table_has_id(world, table, ecs_id(Scale))) &&
+        !ecs_table_has_id(world, table, DynamicTransform) &&
+        !ecs_table_has_id(world, table, ManualTransform);
+
+    return result;
+}
+
+/** Remember static entities whose Position, Rotation or Scale changed as moved.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnLocal(
+    ecs_iter_t *it)
+{
+    if (box_draws_static_local(it->world, it->table)) {
+        BoxDrawsOnMove(it);
+    }
+}
+
+/** Remember entities that gain or lose DynamicTransform or ManualTransform as moved when
+ * they were or become static entities with a local transform.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnKind(
+    ecs_iter_t *it)
+{
+    if (box_draws_static_local(it->world, it->other_table)) {
+        BoxDrawsOnMove(it);
+    }
+}
+
+/** Mark static entities whose WorldTransform was set as changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnWorld(
+    ecs_iter_t *it)
+{
+    if (!ecs_table_has_id(it->world, it->table, DynamicTransform)) {
+        BoxDrawsOnChange(it);
+    }
+}
+
+/** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
+ * draw order again.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnHierarchy(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    d->order_dirty = true;
+    BoxDrawsOnMove(it);
+}
+
+/** Remember the entities whose Position changed as roots of changed subtrees, and make the
+ * 2D draw order again when the z it was made from changed.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnPosition(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    int32_t i;
+    for (i = 0; !ecs_is_fini(it->world) && i < it->count; i ++) {
+        box_draws_order_position(it->world, d, it->entities[i]);
+    }
+
+    BoxDrawsOnLocal(it);
+}
+
+/** Make the 2D draw order again after a parent got or lost OrderedChildren.
+ *
+ * @param it The iterator of the observer
+ */
+static void BoxDrawsOnOrdered(
+    ecs_iter_t *it)
+{
+    box_render_draws_t *d = it->ctx;
+    d->order_dirty = true;
 }
 
 /** Free the slots of entities that lose their shape.
@@ -222,6 +325,21 @@ static void box_draws_walk(
     }
 
     ecs_vec_clear(&d->moved);
+}
+
+float box_draws_layer(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    bool glyph)
+{
+    float result = glyph ? 1.0f : 0.0f;
+    ecs_entity_t cur = ecs_get_parent(world, e);
+    while (cur) {
+        result += 2.0f;
+        cur = ecs_get_parent(world, cur);
+    }
+
+    return result;
 }
 
 float box_draws_fade(
@@ -343,6 +461,8 @@ static void box_draws_update_shape(
 {
     box_draw_key_t key;
     box_draw_batch_t *b;
+    box_render_instance_t *inst;
+    const WorldTransform *transform;
     box_draw_material_t material;
     const ShapeMesh *shape = ecs_get(world, e, ShapeMesh);
     bool drawn = shape && shape->mesh && !ecs_has_id(world, e, EcsPrefab);
@@ -384,8 +504,14 @@ static void box_draws_update_shape(
     s->slot = box_draws_slot_add(d, s->batch, e);
     b = box_draws_batch(d, s->batch);
 write:
-    box_draws_instance(ecs_vec_get_t(&b->instances, box_render_instance_t, s->slot),
-        ecs_get(world, e, WorldTransform), shape, &material);
+    inst = ecs_vec_get_t(&b->instances, box_render_instance_t, s->slot);
+    transform = ecs_get(world, e, WorldTransform);
+    box_draws_instance(inst, transform, shape, &material);
+    if (material.shape2d) {
+        s->layer = box_draws_layer(world, e, false);
+        box_draws_lift(inst, transform, s->layer);
+    }
+
     box_draws_slot_changed(b, s->slot);
 done:
     return;
@@ -463,6 +589,7 @@ static void BoxRenderExtractDraws(
     d->stats.scattered = 0;
     d->stats.upload_bytes = 0;
     box_draws_process(world, d);
+    box_draws_order_update(world, d);
     box_draws_send(world, d, p);
     RenderStatus *status = ecs_singleton_get_mut(world, RenderStatus);
     if (status) {
@@ -568,11 +695,8 @@ static void box_draws_observers(
         .query.terms = {{ .id = DynamicTransform }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
-        .query.terms = {
-            { .id = ecs_id(WorldTransform) },
-            { .id = DynamicTransform, .oper = EcsNot }
-        },
-        .events = { EcsOnSet } }, BoxDrawsOnChange);
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet } }, BoxDrawsOnWorld);
     box_draws_observer(world, d, "DrawsOnDynamicMaterial", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicMaterial }},
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
@@ -584,10 +708,13 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
     box_draws_observer(world, d, "DrawsOnChildOf", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_pair(EcsChildOf, EcsWildcard) }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnMove);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnHierarchy);
     box_draws_observer(world, d, "DrawsOnParent", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(EcsParent) }},
-        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+        .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnHierarchy);
+    box_draws_observer(world, d, "DrawsOnOrderedChildren", (ecs_observer_desc_t){
+        .query.terms = {{ .id = EcsOrderedChildren }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnOrdered);
 }
 
 /** Register the observers of the components a static transform is computed from.
@@ -604,13 +731,16 @@ static void box_draws_transform_observers(
     int32_t i;
     for (i = 0; i < 3; i ++) {
         box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
-            .query.terms = {
-                { .id = components[i] },
-                { .id = DynamicTransform, .oper = EcsNot },
-                { .id = ManualTransform, .oper = EcsNot }
-            },
-            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnMove);
+            .query.terms = {{ .id = components[i] }},
+            .events = { EcsOnSet, EcsOnRemove } }, i ? BoxDrawsOnLocal : BoxDrawsOnPosition);
     }
+
+    box_draws_observer(world, d, "DrawsOnDynamicKind", (ecs_observer_desc_t){
+        .query.terms = {{ .id = DynamicTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnKind);
+    box_draws_observer(world, d, "DrawsOnManualKind", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ManualTransform }},
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnKind);
 }
 
 /** Create the queries of the dynamic shapes.
@@ -694,6 +824,7 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);
     ecs_map_init(&d->lookup, NULL);
     ecs_map_init(&d->meshes, NULL);
+    box_draws_order_init(d);
     d->next_buffer = BOX_RENDER_BUFFER_FIRST;
     d->refs = 1;
     box_draws_queries(world, d);

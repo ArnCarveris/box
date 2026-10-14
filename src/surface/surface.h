@@ -46,6 +46,17 @@ void box_window_size(
     int32_t *width,
     int32_t *height);
 
+/** Read the size of a window in points.
+ *
+ * @param window The window
+ * @param width Receives the width in points
+ * @param height Receives the height in points
+ */
+void box_window_points(
+    box_window_t *window,
+    int32_t *width,
+    int32_t *height);
+
 /** Change the size of a window.
  *
  * @param window The window

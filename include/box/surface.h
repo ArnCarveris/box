@@ -48,18 +48,23 @@ ECS_ENUM(TextureQuality, {
 
 /** Window or offscreen render target.
  *
- * A headless run, a surface with a texture and BOX_TEST=1 in the environment render offscreen,
- * where a point is a pixel. Changing a member reconfigures the surface before the next frame.
+ * Headless, with a texture or with BOX_TEST=1 a surface is offscreen, where a point is a pixel.
+ * Views render in creation order: those under view_root, or without one those not under the
+ * view_root of another surface. A change reconfigures the surface before the next frame.
+ *
+ * A surface with a texture renders before the others; a material that samples the texture
+ * entity (PbrTextures, Image) samples its image of the same frame, never inside itself.
  */
 ECS_STRUCT(Surface, {
     int32_t width;                   /**< Requested width in points, default 1280 */
     int32_t height;                  /**< Requested height in points, default 720 */
     float resolution_scale;          /**< Divides the render pixels, 2 is half, default 1 */
+    float pixel_ratio;               /**< Offscreen pixels per point, default 1, 0 or less is 1 */
     bool vsync;                      /**< Present with vertical sync */
     Anisotropy anisotropy;           /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;  /**< Largest dimension a texture is scaled to */
-    ecs_entity_t texture;            /**< For offscreen rendering to texture (window if 0) */
-    ecs_entity_t view_root;          /**< Parent of the views to render in order, 0 for all views */
+    ecs_entity_t texture;            /**< Texture entity materials sample it as, 0 for none */
+    ecs_entity_t view_root;          /**< Parent of the views it renders, 0 for unclaimed views */
     char *write_to_file;             /**< PNG every frame is written to, NULL for none */
 });
 
@@ -71,6 +76,8 @@ ECS_STRUCT(Surface, {
 ECS_STRUCT(SurfaceStatus, {
     int32_t width;          /**< Width of the presented image in pixels */
     int32_t height;         /**< Height of the presented image in pixels */
+    int32_t point_width;    /**< Width in points, the size cameras and anchors count in */
+    int32_t point_height;   /**< Height in points */
     int32_t render_width;   /**< Width the views render at, after resolution_scale */
     int32_t render_height;  /**< Height the views render at */
     bool window;            /**< The surface presents to a window, not to an offscreen texture */

@@ -89,6 +89,9 @@
 /** Bytes of texture images a packet carries before the rest waits for the next frame */
 #define BOX_RENDER_TEXTURE_BUDGET (32 * 1024 * 1024)
 
+/** Flag of a texture handle that samples the image of the target in its low bits */
+#define BOX_RENDER_TEXTURE_TARGET (0x80000000u)
+
 /** Bytes of packet data a reused packet keeps, a larger block is freed when it is reset */
 #define BOX_RENDER_DATA_KEEP (16 * 1024 * 1024)
 
@@ -197,6 +200,8 @@ typedef struct box_render_view_t {
     Camera camera_data;         /**< Settings of the camera */
     ClearSettings clear;        /**< Clear settings of the view */
     uint32_t target;            /**< Handle of the only target that renders the view, 0 for any */
+    bool claimed;               /**< A surface has the parent of the view as its view_root, so
+                                 *   surfaces without a view_root skip the view */
     box_render_view_lights_t lights; /**< Lights of the scene, filled by the light extract */
     box_render_view_shadows_t shadows; /**< Shadows of the view, filled by the shadow extract */
     box_render_view_cull_t cull; /**< Culling of the view and of its shadow casters */
@@ -231,7 +236,10 @@ typedef struct box_render_target_desc_t {
     int32_t height;         /**< Height of the presented image in pixels */
     int32_t render_width;   /**< Width the views render at, after the resolution scale */
     int32_t render_height;  /**< Height the views render at, after the resolution scale */
+    int32_t point_width;    /**< Width in points cameras are sized by, the width when 0 */
+    int32_t point_height;   /**< Height in points cameras are sized by, the height when 0 */
     bool vsync;             /**< A window presents with vertical sync */
+    bool texture;           /**< Materials sample the image, so it renders before other targets */
 } box_render_target_desc_t;
 
 /** Description of a BOX_RENDER_MESH create, followed by its vertices and its indices.
@@ -584,6 +592,35 @@ void box_render_draws_init(
 void box_render_draws_stats(
     const ecs_world_t *world,
     box_render_draws_stats_t *stats);
+
+/** Forget the texture entities surfaces render into, before the surfaces register them again.
+ *
+ * @param world The world
+ */
+void box_render_texture_targets_clear(
+    ecs_world_t *world);
+
+/** Register the texture entity a surface renders into, so materials that sample the entity
+ * sample the image of the target of the surface.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @param target Handle of the target
+ */
+void box_render_texture_target(
+    ecs_world_t *world,
+    ecs_entity_t texture,
+    uint32_t target);
+
+/** Get the texture handle of the image of the target that renders into a texture entity.
+ *
+ * @param world The world
+ * @param texture The texture entity
+ * @return BOX_RENDER_TEXTURE_TARGET with the target handle, 0 when no surface renders into it
+ */
+uint32_t box_render_texture_target_handle(
+    const ecs_world_t *world,
+    ecs_entity_t texture);
 
 /** Register the system that sends loaded texture images to the backend.
  *
