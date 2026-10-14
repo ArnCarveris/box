@@ -1,8 +1,8 @@
 // Forward pass: draws shape meshes with a physically based surface, a GGX distribution with
 // height correlated Smith visibility and Schlick Fresnel, lit by the lights of the scene.
-// Instance normals use the inverse transpose of the model rotation for non-uniform scale.
-// The model matrix is affine: the w of its first columns holds metallic and roughness, the w
-// of the normal columns holds the emitted color.
+// Instance normals use the cofactor matrix of the model rotation, the inverse transpose up to
+// a scale, so non-uniform scale keeps them perpendicular. Texture layers (group 1) are sampled
+// with the instance UV transform; the normal map uses a tangent frame from screen derivatives.
 #include "include/lights.wgsl"
 
 // BlendMode of the pipeline: the output is shaped for the blend equation it is drawn with.
@@ -15,6 +15,12 @@ const MIN_ROUGHNESS: f32 = 0.045;
 @group(0) @binding(1) var<storage, read> lights: array<Light>;
 @group(0) @binding(2) var<storage, read> clusters: array<u32>;
 
+@group(1) @binding(0) var albedo_map: texture_2d<f32>;
+@group(1) @binding(1) var emissive_map: texture_2d<f32>;
+@group(1) @binding(2) var roughness_map: texture_2d<f32>;
+@group(1) @binding(3) var normal_map: texture_2d<f32>;
+@group(1) @binding(4) var material_sampler: sampler;
+
 struct VertexIn {
     @location(0) position: vec3f,
     @location(1) normal: vec3f,
@@ -23,10 +29,10 @@ struct VertexIn {
     @location(4) model_1: vec4f,
     @location(5) model_2: vec4f,
     @location(6) model_3: vec4f,
-    @location(7) normal_0: vec4f,
-    @location(8) normal_1: vec4f,
-    @location(9) normal_2: vec4f,
-    @location(10) color: vec4f,
+    @location(7) color: vec4f,
+    @location(8) emissive: vec4f,
+    @location(9) material: vec4f,
+    @location(10) uv_transform: vec4f,
 };
 
 struct VertexOut {
@@ -40,18 +46,21 @@ struct VertexOut {
 };
 
 @vertex fn vs(v: VertexIn) -> VertexOut {
-    let model = mat4x4f(vec4f(v.model_0.xyz, 0.0), vec4f(v.model_1.xyz, 0.0),
-        vec4f(v.model_2.xyz, 0.0), vec4f(v.model_3.xyz, 1.0));
-    let normal_matrix = mat3x3f(v.normal_0.xyz, v.normal_1.xyz, v.normal_2.xyz);
+    let model = mat4x4f(v.model_0, v.model_1, v.model_2, v.model_3);
+    let c0 = v.model_0.xyz;
+    let c1 = v.model_1.xyz;
+    let c2 = v.model_2.xyz;
+    let cofactor = mat3x3f(cross(c1, c2), cross(c2, c0), cross(c0, c1));
+    let flip = select(1.0, -1.0, dot(c0, cross(c1, c2)) < 0.0);
     let world = model * vec4f(v.position, 1.0);
     var o: VertexOut;
     o.pos = view.view_proj * world;
     o.world = world.xyz;
-    o.normal = normal_matrix * v.normal;
+    o.normal = cofactor * v.normal * flip;
     o.color = v.color;
-    o.emissive = vec3f(v.normal_0.w, v.normal_1.w, v.normal_2.w);
-    o.material = vec2f(v.model_0.w, v.model_1.w);
-    o.uv = v.uv;
+    o.emissive = v.emissive.rgb;
+    o.material = v.material.xy;
+    o.uv = v.uv * v.uv_transform.xy + v.uv_transform.zw;
     return o;
 }
 
@@ -71,16 +80,44 @@ struct Surface {
     normal: vec3f,
 };
 
+// Tangent frame from the screen derivatives of the position and the UVs (cotangent frame),
+// applied to a tangent space normal whose y points up the image, toward smaller v. The
+// framebuffer y of dpdy points down, which negates both derivative axes of the frame.
+fn perturb(n: vec3f, p: vec3f, uv: vec2f, m: vec3f) -> vec3f {
+    let dp1 = dpdx(p);
+    let dp2 = dpdy(p);
+    let duv1 = dpdx(uv);
+    let duv2 = dpdy(uv);
+    let dp2perp = cross(dp2, n);
+    let dp1perp = cross(n, dp1);
+    let t = dp2perp * duv1.x + dp1perp * duv2.x;
+    let b = dp2perp * duv1.y + dp1perp * duv2.y;
+    let len2 = max(dot(t, t), dot(b, b));
+    let scale = inverseSqrt(max(len2, 1e-20));
+    let tangent = mat3x3f(-t * scale, b * scale, n);
+    return select(normalize(tangent * m), n, len2 < 1e-20);
+}
+
 fn surface(f: VertexOut, front: bool) -> Surface {
+    let albedo = textureSample(albedo_map, material_sampler, f.uv);
+    let emissive = textureSample(emissive_map, material_sampler, f.uv).rgb;
+    let roughness = textureSample(roughness_map, material_sampler, f.uv).g;
+    let tangent_normal = textureSample(normal_map, material_sampler, f.uv).xyz * 2.0 - 1.0;
+    let geometric = normalize(f.normal);
+    let mapped = perturb(geometric, f.world, f.uv, tangent_normal);
     var s: Surface;
     s.albedo = f.color.rgb;
     s.alpha = f.color.a;
     s.metallic = clamp(f.material.x, 0.0, 1.0);
     s.roughness = clamp(f.material.y, MIN_ROUGHNESS, 1.0);
     s.emissive = f.emissive;
-    s.normal = normalize(f.normal);
-    if (!front) {
-        s.normal = -s.normal;
+    s.normal = -geometric;
+    if (front) {
+        s.albedo *= albedo.rgb;
+        s.alpha *= albedo.a;
+        s.roughness = clamp(f.material.y * roughness, MIN_ROUGHNESS, 1.0);
+        s.emissive *= emissive;
+        s.normal = mapped;
     }
     return s;
 }

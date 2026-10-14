@@ -30,6 +30,12 @@
                 ]
             },
             {
+                "id": "Texture",
+                "benchcases": [
+                    "textured_batches"
+                ]
+            },
+            {
                 "id": "Light",
                 "benchcases": [
                     "static_1000",

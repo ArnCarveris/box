@@ -73,10 +73,11 @@ void box_gpu_draw_init(
     };
     WGPUBindGroupLayoutDescriptor layout = { .entryCount = 3, .entries = entries };
     gpu->view_layout = wgpuDeviceCreateBindGroupLayout(gpu->device, &layout);
+    WGPUBindGroupLayout groups[2] = { gpu->view_layout, gpu->material_layout };
     gpu->mesh_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
         &(WGPUPipelineLayoutDescriptor){
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &gpu->view_layout
+            .bindGroupLayoutCount = 2,
+            .bindGroupLayouts = groups
         });
     ecs_map_init(&gpu->meshes, NULL);
     ecs_map_init(&gpu->buffers, NULL);
@@ -545,6 +546,7 @@ static void box_gpu_draw_batches(
 {
     const box_render_view_t *v = ecs_vec_get_t(&packet->views, box_render_view_t, index);
     WGPURenderPipeline bound = NULL;
+    WGPUBindGroup material = NULL;
     int32_t i, count = ecs_vec_count(&packet->batches);
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
@@ -565,6 +567,12 @@ static void box_gpu_draw_batches(
         if (pipeline != bound) {
             wgpuRenderPassEncoderSetPipeline(pass, pipeline);
             bound = pipeline;
+        }
+
+        WGPUBindGroup group = box_gpu_material_group(gpu, b, packet->anisotropy);
+        if (group != material) {
+            wgpuRenderPassEncoderSetBindGroup(pass, 1, group, 0, NULL);
+            material = group;
         }
 
         wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);

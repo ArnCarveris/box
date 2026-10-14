@@ -1,0 +1,90 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 0.6, 9}
+  Rotation: {-0.05, 0, 0}
+  Camera: {fov: 45}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 32, 38, 255}}}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+backdrop {
+  Position: {0, 0, -1}
+  Box: {16, 9, 0.2}
+  Rgb: {70, 74, 84}
+}
+
+plain {
+  Position: {-4.5, 1.6, 0}
+  Quad: {2, 2}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: letter}
+}
+
+stretched {
+  Position: {-1.5, 1.6, 0}
+  Quad: {2, 2}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: letter}
+  TextureTransform: {scale_x: 2, scale_y: 1}
+}
+
+shifted {
+  Position: {1.5, 1.6, 0}
+  Quad: {2, 2}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: letter}
+  TextureTransform: {scale_x: 1, scale_y: 1, offset_x: 0.25, offset_y: 0.25}
+}
+
+flipped {
+  Position: {4.5, 1.6, 0}
+  Quad: {2, 2}
+  Rgb: {0, 0, 0}
+  Emissive: {strength: 1, color: {255, 255, 255}}
+  PbrTextures: {emissive: letter}
+  TextureTransform: {scale_x: -1, scale_y: 1, offset_x: 1, offset_y: 0}
+}
+
+cube {
+  Position: {-3, -1.6, 0.5}
+  Rotation: {0.4, 0.6, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+}
+
+ball {
+  Position: {0, -1.6, 0.5}
+  Rotation: {0, -1.2, 0}
+  Sphere: {segments: 48, smooth: true, radius: 1.1}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.6}
+  PbrTextures: {albedo: letter}
+  TextureTransform: {scale_x: 2, scale_y: 1}
+}
+
+tiled {
+  Position: {3, -1.6, 0.5}
+  Rotation: {0.4, -0.6, 0}
+  Box: {1.8, 1.8, 1.8}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.8}
+  PbrTextures: {albedo: letter}
+  TextureTransform: {scale_x: 3, scale_y: 3}
+}

@@ -17,7 +17,8 @@
         "${os Darwin}": {
             "defines": [
                 "BOX_PLATFORM_GLFW",
-                "BOX_RENDER_WGPU"
+                "BOX_RENDER_WGPU",
+                "BOX_TEXTURE_SVG"
             ]
         },
         "${os Emscripten}": {
@@ -112,6 +113,20 @@
                 "include": [
                     "ffi",
                     "ffi/webgpu-headers"
+                ]
+            },
+            "resvg": {
+                "repository": "https://github.com/linebender/resvg.git",
+                "tag": "v0.47.0",
+                "subdir": "crates/c-api",
+                "build-system": "cargo",
+                "library": "resvg",
+                "cargo-args": [
+                    "--no-default-features",
+                    "--features=text,system-fonts,memmap-fonts"
+                ],
+                "include": [
+                    "."
                 ]
             }
         }

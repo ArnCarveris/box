@@ -23,7 +23,19 @@
 #define BOX_GPU_OFFSCREEN_FORMAT (WGPUTextureFormat_RGBA8UnormSrgb)
 
 /** Color formats the blit pipeline is created for, at most */
-#define BOX_GPU_BLIT_FORMATS (4)
+#define BOX_GPU_BLIT_FORMATS (6)
+
+/** Format of sampled textures, which albedo and emissive layers read through an sRGB view */
+#define BOX_GPU_TEXTURE_FORMAT (WGPUTextureFormat_RGBA8Unorm)
+
+/** Format of the view of a texture that decodes display encoded colors */
+#define BOX_GPU_TEXTURE_SRGB (WGPUTextureFormat_RGBA8UnormSrgb)
+
+/** TextureWrap modes the samplers are created for */
+#define BOX_GPU_WRAPS (3)
+
+/** Anisotropy levels the samplers are created for: 1, 2, 4, 8 and 16 samples */
+#define BOX_GPU_ANISOTROPY_LEVELS (5)
 
 /** Bytes a row of a texture to buffer copy is aligned to */
 #define BOX_GPU_ROW_ALIGN (256)
@@ -73,6 +85,24 @@ typedef struct box_gpu_mesh_t {
     uint32_t index_count;           /**< Indices to draw */
 } box_gpu_mesh_t;
 
+/** A sampled texture with its mip chain and the two views the layers bind */
+typedef struct box_gpu_texture_t {
+    WGPUTexture texture;            /**< The texture, BOX_GPU_TEXTURE_FORMAT */
+    WGPUTextureView linear;         /**< View of every mip level as stored */
+    WGPUTextureView srgb;           /**< View of every mip level decoded from sRGB */
+    uint32_t mips;                  /**< Mip levels of the texture */
+    bool mipped;                    /**< The levels below the first were generated */
+} box_gpu_texture_t;
+
+/** Bind group of the texture layers and sampler of a batch, cached by its key */
+typedef struct box_gpu_material_t {
+    uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles, 0 for the default */
+    uint32_t wrap;                  /**< TextureWrap of the sampler */
+    uint32_t anisotropy;            /**< Anisotropic samples of the sampler */
+    WGPUBindGroup group;            /**< The bind group */
+    struct box_gpu_material_t *next; /**< Next material with the same hash */
+} box_gpu_material_t;
+
 /** A buffer the main thread created by handle */
 typedef struct box_gpu_buffer_t {
     WGPUBuffer buffer;              /**< The buffer */
@@ -120,6 +150,13 @@ typedef struct box_gpu_t {
     box_gpu_blit_t blits[BOX_GPU_BLIT_FORMATS]; /**< Blit pipelines by format */
     int32_t blit_count;             /**< Blit pipelines created */
     WGPUBindGroupLayout view_layout; /**< Bind group layout of the view uniforms */
+    WGPUBindGroupLayout material_layout; /**< Bind group layout of the texture layers */
+    WGPUSampler samplers[BOX_GPU_WRAPS][BOX_GPU_ANISOTROPY_LEVELS]; /**< Created on use */
+    box_gpu_texture_t *white;       /**< Default of the albedo, emissive and roughness layers */
+    box_gpu_texture_t *flat;        /**< Default of the normal layer, an unperturbed normal */
+    ecs_map_t textures;             /**< Handle to box_gpu_texture_t */
+    ecs_map_t materials;            /**< Key hash to the first box_gpu_material_t */
+    ecs_vec_t mips;                 /**< uint32_t, textures whose mip levels are not generated */
     WGPUPipelineLayout mesh_layout; /**< Pipeline layout of the forward pass */
     box_gpu_forward_t forward[BOX_GPU_FORWARD_PIPELINES]; /**< Forward pipelines */
     int32_t forward_count;          /**< Forward pipelines created */
@@ -285,6 +322,62 @@ void box_gpu_shader_fini(
  */
 void box_gpu_blit_reset(
     box_gpu_t *gpu);
+
+/** Get the blit pipeline of a color format, creating it on first use.
+ *
+ * @param gpu The backend
+ * @param format The format of the color target
+ * @return The pipeline, NULL without a blit shader or when too many formats are in use
+ */
+WGPURenderPipeline box_gpu_blit_pipeline(
+    box_gpu_t *gpu,
+    WGPUTextureFormat format);
+
+/** Create the bind group layout of the texture layers and the default textures.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_texture_init(
+    box_gpu_t *gpu);
+
+/** Release the textures, samplers and bind groups of the texture layers.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_texture_fini(
+    box_gpu_t *gpu);
+
+/** Create, replace or release a texture from a BOX_RENDER_TEXTURE resource.
+ *
+ * @param gpu The backend
+ * @param op What happens to the texture
+ * @param handle Handle of the texture
+ * @param desc Size followed by the pixels, NULL for a release
+ */
+void box_gpu_texture_apply(
+    box_gpu_t *gpu,
+    box_render_resource_op_t op,
+    uint32_t handle,
+    const box_render_texture_desc_t *desc);
+
+/** Generate the mip levels of the new textures, after the resources of a packet applied.
+ *
+ * @param gpu The backend
+ */
+void box_gpu_texture_mips(
+    box_gpu_t *gpu);
+
+/** Get the bind group of the texture layers and sampler of a batch, created on first use.
+ *
+ * @param gpu The backend
+ * @param b The batch
+ * @param anisotropy Anisotropic samples of the sampler
+ * @return The bind group
+ */
+WGPUBindGroup box_gpu_material_group(
+    box_gpu_t *gpu,
+    const box_render_batch_t *b,
+    uint32_t anisotropy);
 
 /** Create the layouts the forward pass shares.
  *

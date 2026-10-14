@@ -37,6 +37,7 @@ void box_render_packet_reset(
     p->frame = 0;
     p->time = 0;
     p->delta = 0;
+    p->anisotropy = 0;
     ecs_vec_clear(&p->resources);
     ecs_vec_clear(&p->uploads);
     ecs_vec_clear(&p->scatters);
@@ -44,6 +45,10 @@ void box_render_packet_reset(
     ecs_vec_clear(&p->batches);
     ecs_vec_clear(&p->targets);
     ecs_vec_clear(&p->data);
+    if (ecs_vec_size(&p->data) > BOX_RENDER_DATA_KEEP) {
+        ecs_vec_fini_t(NULL, &p->data, uint8_t);
+        ecs_vec_init_t(NULL, &p->data, uint8_t, 0);
+    }
 }
 
 /** Copy one vector of a packet into another, reusing the storage of the destination.
@@ -71,6 +76,7 @@ void box_render_packet_copy(
     dst->frame = src->frame;
     dst->time = src->time;
     dst->delta = src->delta;
+    dst->anisotropy = src->anisotropy;
     box_render_vec_copy(&dst->resources, &src->resources, ECS_SIZEOF(box_render_resource_t));
     box_render_vec_copy(&dst->uploads, &src->uploads, ECS_SIZEOF(box_render_upload_t));
     box_render_vec_copy(&dst->scatters, &src->scatters, ECS_SIZEOF(box_render_scatter_t));
