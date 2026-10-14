@@ -41,6 +41,9 @@
 /** PCF taps per axis of a shadow lookup at most */
 #define BOX_RENDER_SHADOW_FILTER_MAX (7)
 
+/** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
+#define BOX_RENDER_SHADER_SHAPE2D (7)
+
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
 

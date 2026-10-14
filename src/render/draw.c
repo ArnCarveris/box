@@ -251,6 +251,7 @@ static void box_draws_key(
     const BackFaceMode *back_face = ecs_get(world, e, BackFaceMode);
     const PbrTextures *textures = ecs_get(world, e, PbrTextures);
     const TextureWrap *wrap = ecs_get(world, e, TextureWrap);
+    const Shape2D *shape2d = ecs_get(world, e, Shape2D);
     ecs_os_memset_t(key, 0, box_draw_key_t);
     key->blend = box_draws_blend(ecs_get(world, e, BlendMode), alpha);
     key->back_face = back_face ? (uint8_t)*back_face : (uint8_t)BackFaceCull;
@@ -264,11 +265,15 @@ static void box_draws_key(
 
     key->scene = box_render_scene_of(world, e);
     key->mesh = shape->mesh;
-    key->pipeline = BOX_RENDER_SHADER_MESH;
+    key->pipeline = shape2d ? BOX_RENDER_SHADER_SHAPE2D : BOX_RENDER_SHADER_MESH;
+    if (shape2d && shape2d->texture) {
+        key->textures[0] = shape2d->texture;
+    }
+
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
         ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
-    key->shadow = !ecs_has_id(world, e, NoShadow) &&
+    key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
 }
 
@@ -304,6 +309,7 @@ static void box_draws_update(
             .pbr = ecs_get(world, e, PbrMaterial),
             .emissive = ecs_get(world, e, Emissive),
             .uv = ecs_get(world, e, TextureTransform),
+            .shape2d = ecs_get(world, e, Shape2D),
             .tint = ecs_get(world, e, Tint),
             .inherited = s->tinted ? &s->tint : NULL,
             .fade = s->fade
@@ -469,6 +475,9 @@ static void box_draws_observers(
     box_draws_observer(world, d, "DrawsOnShapeRemove", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(ShapeMesh) }},
         .events = { EcsOnRemove } }, BoxDrawsOnRemove);
+    box_draws_observer(world, d, "DrawsOnShape2D", (ecs_observer_desc_t){
+        .query.terms = {{ .id = ecs_id(Shape2D) }},
+        .events = { EcsOnSet } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnColor", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Rgb) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnChange);
@@ -549,7 +558,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone,
                 .oper = EcsOptional
-            }
+            },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });
@@ -571,7 +581,8 @@ static void box_draws_queries(
                 .trav = EcsChildOf,
                 .inout = EcsInOutNone
             },
-            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot }
+            { .id = DynamicTransform, .inout = EcsInOutNone, .oper = EcsNot },
+            { .id = ecs_id(Shape2D), .src.id = EcsSelf, .inout = EcsIn, .oper = EcsOptional }
         },
         .cache_kind = EcsQueryCacheAuto
     });

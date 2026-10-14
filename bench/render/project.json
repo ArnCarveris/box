@@ -37,6 +37,13 @@
                 ]
             },
             {
+                "id": "Shapes2D",
+                "benchcases": [
+                    "dynamic_material",
+                    "changed_1pct"
+                ]
+            },
+            {
                 "id": "Light",
                 "benchcases": [
                     "static_1000",

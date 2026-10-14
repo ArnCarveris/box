@@ -11,6 +11,9 @@
 /** Color of a shape without Rgb, display encoded */
 static const uint8_t box_draws_default_color[3] = { 204, 204, 204 };
 
+/** Color of a 2D shape with an Image and without Rgb, which shows the texture as is */
+static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
+
 /** Instances the smallest instance buffer holds */
 #define BOX_DRAWS_MIN_CAPACITY (64)
 
@@ -316,9 +319,14 @@ void box_draws_material(
     const Emissive *emissive = material->emissive;
     const PbrMaterial *pbr = material->pbr;
     const TextureTransform *uv = material->uv;
-    out->color[0] = box_draws_linear(color ? color->r : box_draws_default_color[0]);
-    out->color[1] = box_draws_linear(color ? color->g : box_draws_default_color[1]);
-    out->color[2] = box_draws_linear(color ? color->b : box_draws_default_color[2]);
+    const uint8_t *base = color ? &color->r : box_draws_default_color;
+    if (!color && material->shape2d && material->shape2d->texture) {
+        base = box_draws_image_color;
+    }
+
+    out->color[0] = box_draws_linear(base[0]);
+    out->color[1] = box_draws_linear(base[1]);
+    out->color[2] = box_draws_linear(base[2]);
     out->color[3] = box_draws_alpha(material);
     float strength = emissive && emissive->strength > 0.0f ? emissive->strength : 0.0f;
     out->emissive[0] = emissive ? box_draws_linear(emissive->color.r) * strength : 0.0f;
@@ -334,7 +342,17 @@ void box_draws_material(
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
     if (material->inherited || material->tint) {
-        box_draws_tinted(out->color, color ? &color->r : box_draws_default_color, material);
+        box_draws_tinted(out->color, base, material);
+    }
+
+    if (material->shape2d) {
+        float border[3];
+        bool tinted = material->inherited || material->tint;
+        if (tinted) {
+            box_draws_tinted(border, &material->shape2d->border_color.r, material);
+        }
+
+        box_draws_shape2d(out, material, tinted ? border : NULL);
     }
 }
 
@@ -838,6 +856,7 @@ static void box_draws_fill_material(
     const void *emissives = ecs_field(it, Emissive, 6);
     const void *modes = ecs_field(it, BlendMode, 7);
     const void *uvs = ecs_field(it, TextureTransform, 8);
+    const Shape2D *shapes2d = ecs_field(it, Shape2D, 11);
     const Tint *tints = ecs_table_get_id(it->world, it->table, ecs_id(Tint), it->offset);
     ecs_size_t color_step = box_draws_stride(it, colors, ECS_SIZEOF(Rgb), 3);
     ecs_size_t opacity_step = box_draws_stride(it, opacities, ECS_SIZEOF(Opacity), 4);
@@ -863,6 +882,7 @@ static void box_draws_fill_material(
             .pbr = box_draws_at(pbrs, pbr_step, i),
             .emissive = box_draws_at(emissives, emissive_step, i),
             .uv = box_draws_at(uvs, uv_step, i),
+            .shape2d = shapes2d ? &shapes2d[i] : NULL,
             .tint = tints ? &tints[i] : NULL,
             .inherited = slots[i].tinted ? &slots[i].tint : NULL,
             .fade = slots[i].fade

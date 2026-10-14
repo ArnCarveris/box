@@ -355,10 +355,14 @@ static void box_gpu_blend_state(
     out->alpha = alpha;
 }
 
-/** Create the forward pipeline of a color format, blend mode and back face mode.
+/** Create the forward pipeline of a shader, color format, blend mode and back face mode.
+ *
+ * The 2D shape shader blends its edges in the opaque pass too and draws over equal depths, so
+ * coplanar shapes draw in order.
  *
  * @param gpu The backend
- * @param shader The mesh shader
+ * @param handle Handle of the shader, the mesh or the 2D shape shader
+ * @param shader The shader module
  * @param format The format of the color target
  * @param blend The BlendMode, Opaque writes depth and does not blend
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
@@ -366,11 +370,13 @@ static void box_gpu_blend_state(
  */
 static WGPURenderPipeline box_gpu_forward_create(
     box_gpu_t *gpu,
+    uint32_t handle,
     WGPUShaderModule shader,
     WGPUTextureFormat format,
     uint32_t blend,
     uint32_t back_face)
 {
+    bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -394,10 +400,10 @@ static WGPURenderPipeline box_gpu_forward_create(
             .attributes = &slot_attr
         }
     };
-    box_gpu_blend_state(blend, &blend_state);
+    box_gpu_blend_state(shape2d && blend == Opaque ? AlphaBlend : blend, &blend_state);
     WGPUColorTargetState target = {
         .format = format,
-        .blend = blend == Opaque ? NULL : &blend_state,
+        .blend = blend == Opaque && !shape2d ? NULL : &blend_state,
         .writeMask = WGPUColorWriteMask_All
     };
     WGPUConstantEntry constant = {
@@ -415,7 +421,9 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_DEPTH_FORMAT,
         .depthWriteEnabled = blend == Opaque ? WGPUOptionalBool_True : WGPUOptionalBool_False,
-        .depthCompare = WGPUCompareFunction_Greater,
+        .depthCompare = shape2d
+            ? WGPUCompareFunction_GreaterEqual
+            : WGPUCompareFunction_Greater,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
@@ -453,12 +461,14 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b)
 {
     WGPURenderPipeline result = NULL;
-    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, b->pipeline);
     box_gpu_forward_t *f;
     int32_t i;
     for (i = 0; i < gpu->forward_count; i ++) {
         f = &gpu->forward[i];
-        if (f->format == format && f->blend == b->blend && f->back_face == b->back_face) {
+        if (f->shader == b->pipeline && f->format == format && f->blend == b->blend &&
+            f->back_face == b->back_face)
+        {
             result = f->pipeline;
             goto done;
         }
@@ -468,8 +478,9 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-    result = box_gpu_forward_create(gpu, shader, format, b->blend, b->back_face);
+    result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face);
     f = &gpu->forward[gpu->forward_count ++];
+    f->shader = b->pipeline;
     f->format = format;
     f->blend = b->blend;
     f->back_face = b->back_face;
@@ -557,6 +568,10 @@ static int32_t box_gpu_view_write(
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
+        u->viewport[0] = (float)t->desc.render_width;
+        u->viewport[1] = (float)t->desc.render_height;
+        u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
+        u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
