@@ -371,3 +371,34 @@ void Frames_statistics(void) {
     box_perf_clock = NULL;
     box_perf_sleep = NULL;
 }
+
+void Frames_late_wakeups_absorbed(void) {
+    // testing/perf_orbit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep_late;
+
+    ecs_system(world, { .entity = ecs_entity(world, { .name = "FakeWork" }),
+        .phase = EcsOnUpdate, .run = fake_work });
+    ecs_singleton_set(world, PerfRun, { .fps = 120, .warmup = 2, .frames = 60 });
+    for (int i = 0; i < 62; i ++) {
+        fake_work_ms = (i % 7) * 0.9;
+        ecs_progress(world, 0);
+    }
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    test_int(status->state, PerfDone);
+    test_int(status->frame, 60);
+    test_int(status->errors, 0);
+    test_bool(status->passed, true);
+    test_assert(status->min_ms >= status->target_ms);
+    test_assert(status->max_ms < status->target_ms + 0.05);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}

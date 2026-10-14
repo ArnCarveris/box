@@ -76,9 +76,12 @@ read like any other component.
 - Frame interval: the wall time between the ends of two consecutive frames, taken in the last
   `EcsPostFrame` system after the CPU budget sleep. A frame that finishes early waits until one
   target interval `T = 1 / fps` has passed since the previous end, so an early frame is never
-  counted as fast. The wait sleeps 60% of the time left at a time (a process without a window gets
-  up to 50% timer leeway on macOS: a 10 ms sleep returns after up to 15 ms) and spins the last
-  0.2 ms, which lands within microseconds of `T`.
+  counted as fast. The wait sleeps 60% of the time left before the last millisecond at a time (a
+  process without a window gets up to 50% timer leeway on macOS: a 10 ms sleep returns after up to
+  15 ms) and spins the last millisecond, which lands within microseconds of `T`. Every sleep ends
+  at least a millisecond early even with the full leeway, so a thread that wakes up late on a busy
+  machine (seen up to 2 ms with 0.2 ms of spin) does not turn a 1 ms frame into an error; the spin
+  costs about a quarter of a core at 120 FPS.
 - Error rule: a measured interval `i` is an error when `i > 1.1 T` (slow) or `i < 0.9 T` (fast).
   Warmup frames are not measured. A run passes only when all `frames` intervals were measured and
   none is an error.

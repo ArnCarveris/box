@@ -38,7 +38,8 @@
                     "budget_sleep_reported",
                     "only_slow_frames_counted",
                     "tolerance_edges",
-                    "statistics"
+                    "statistics",
+                    "late_wakeups_absorbed"
                 ]
             },
             {

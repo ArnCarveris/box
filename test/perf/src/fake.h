@@ -33,6 +33,14 @@ double fake_now(void);
 void fake_sleep(
     double seconds);
 
+/** Sleep on the fake clock like a busy machine: with 50% timer leeway and a millisecond of
+ * wake up latency.
+ *
+ * @param seconds Seconds asked for
+ */
+void fake_sleep_late(
+    double seconds);
+
 /** System that spends fake_work_ms of fake time and reports fake_slept_ms of budget sleep.
  *
  * @param it The iterator of the system

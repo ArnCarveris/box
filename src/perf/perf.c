@@ -9,13 +9,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/** Seconds before a deadline the pacer stops sleeping and spins */
-#define BOX_PERF_SPIN (0.0002)
+/** Seconds before a deadline the pacer stops sleeping and spins.
+ *
+ * Every sleep of the pacer ends at least this long before the deadline, even with the full
+ * timer leeway, so a thread that wakes up this much late on a busy machine still makes it.
+ */
+#define BOX_PERF_SPIN (0.001)
 
-/** Fraction of the time left that one sleep of the pacer asks for.
+/** Fraction of the time left before the spin that one sleep of the pacer asks for.
  *
  * A process without a window gets up to 50% timer leeway on macOS, so a sleep of the whole
- * time left would overshoot the deadline by up to half of it.
+ * time left would overshoot by up to half of it.
  */
 #define BOX_PERF_SLEEP (0.6)
 
@@ -41,7 +45,7 @@ static double box_perf_now(void)
     return result;
 }
 
-/** Wait until a deadline with ever shorter sleeps that cannot overshoot it, then spin.
+/** Wait until a deadline with ever shorter sleeps that end a spin interval before it, then spin.
  *
  * @param deadline Wall seconds to wait for
  * @return The wall clock after the wait
@@ -51,7 +55,7 @@ static double box_perf_wait(
 {
     double now = box_perf_now();
     while (now < deadline) {
-        double left = deadline - now;
+        double left = deadline - now - BOX_PERF_SPIN;
         if (left > BOX_PERF_SPIN) {
             if (box_perf_sleep) {
                 box_perf_sleep(left * BOX_PERF_SLEEP);
