@@ -124,10 +124,12 @@ of every scene. `--out` moves both.
 ## Scenes
 
 Targets are what minime (Apple silicon, 12 cores, debug build, 1280x720 offscreen) holds with every
-frame inside 10% while other agents build: every scene held 120 FPS in three full passes at load
-averages of up to 4, except `instanced_dynamic`, whose 10,000 dynamic transforms cost 5 to 10 ms
-of work per frame (the spread follows which core the main thread lands on), so 120 FPS (8.3 ms)
-is not honest for it. Counts are the ranges over the orbit of one pass.
+frame inside 10% while other agents build: every scene held 120 FPS in three consecutive full
+passes at load averages of 2.5 to 5, with a work p99 of 0.7 to 1.6 ms out of 8.3, except
+`instanced_dynamic`, whose 10,000 dynamic transforms cost 8 to 10 ms of work per frame, so it
+targets 60. Earlier passes failed the 1M walks twice with one or two late frames (9 to 38 ms)
+whose work was under 2 ms: the pacer's sleep woke late on a busy machine, not the scene; run with
+`--max-load` on a quiet machine. Counts are the ranges over the orbit of one pass.
 
 | Scene | Feature | Target | Content | Visible | Frustum culled | Occlusion culled |
 | --- | --- | --- | --- | --- | --- | --- |
