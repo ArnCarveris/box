@@ -1,0 +1,62 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 3.2, 8.5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {26, 30, 40, 255}}}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 10}
+  Rgb: {255, 255, 255}
+  PbrTextures: {albedo: checker}
+  TextureTransform: {scale_x: 8, scale_y: 5}
+}
+
+repeat {
+  Position: {-3, 1.4, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: letter}
+  TextureWrap: WrapRepeat
+  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+}
+
+clamp {
+  Position: {0, 1.4, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: letter}
+  TextureWrap: WrapClamp
+  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+}
+
+mirror {
+  Position: {3, 1.4, 0}
+  Quad: {2.4, 2.4}
+  Rgb: {255, 255, 255}
+  PbrMaterial: {roughness: 0.9}
+  PbrTextures: {albedo: letter}
+  TextureWrap: WrapMirror
+  TextureTransform: {scale_x: 2, scale_y: 2, offset_x: -0.5, offset_y: -0.5}
+}

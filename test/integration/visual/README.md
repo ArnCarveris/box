@@ -46,7 +46,10 @@ that ran. The output folder ignores itself in git.
 ## Rules for a scene
 
 - Self contained: the scene declares its camera, views and content, never a `Surface`, and
-  refers to no file by a relative path.
+  refers to no file by a relative path other than the images in `assets/`, which it names
+  from the repository root (`test/integration/visual/assets/checker.png`); a `TexturePath`
+  finds them from the working directory of `boxrun` upwards. `assets/gen_assets.py` writes
+  the PNGs.
 - Static: the camera does not move, and nothing that depends on wall time or history across
   many frames is guarded by a baseline; cover that with a C test.
 - Small: a scene renders in well under a second.
@@ -65,3 +68,7 @@ that ran. The output folder ignores itself in git.
 | `materials_emissive` | Emissive | Five dark spheres glowing orange with strength 0 to 1, a cyan emissive box and a green emissive ring that stay bright on their shadow side, next to a lit grey box. |
 | `materials_blend` | Opacity, blend modes, sort | Red, green and blue panes at half opacity overlapping back to front over a blue pillar, two spheres under a parent with `Opacity` 0.4 (the pink one in front), an additive blue sphere and a multiply yellow slab. |
 | `materials_backface` | Back face modes | Two quads and two stars turned away from the camera: the culled ones on the left of each pair are invisible, the `BackFacePlain` ones show their lit back; a yellow strip behind faces the camera. |
+| `textures_tiling` | `TextureWrap`, tiling | A floor tiled 8 by 5 with a red and cream checker, crisp near and smooth far (mip levels). Three quads show the `F` texture at UV -0.5 to 1.5: repeat (four partial tiles), clamp (one `F`, the red top and green left edges stretched out), mirror (the tiles mirrored around the center). |
+| `textures_transform` | `TextureTransform` | Emissive quads with the `F` (red bar on top, green on the left): plain, scaled 2 by 1 (two narrow `F`s), offset by a quarter (shifted up left, wrapping), scale -1 (mirrored, green on the right). Below a lit cube, a sphere and a cube tiled 3 by 3 with the texture as albedo. |
+| `textures_normal` | Normal, roughness and emissive maps | A flat orange panel next to the same panel with a bump normal map (round bumps lit from the top right), a blue sphere covered in bumps, a metal panel with rough and smooth bands, a dark box with glowing orange rings and a floor of bumps. |
+| `textures_svg` | SVG at a requested size | One badge SVG (blue disc, yellow star) loaded at 16 px (blurry), its own 64 px, 512 px and 256 by 128 (squashed), and as the albedo of a lit cube. |
