@@ -1,0 +1,38 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.perf
+
+camera {
+  Position: {0, 4, 10}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 36, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {8, 0.2, 8}
+  Rgb: {90, 96, 104}
+}
+
+cube {
+  Position: {-1.5, 0.5, 0}
+  Box: {1, 1, 1}
+  Rgb: {230, 120, 60}
+}
+
+ball {
+  Position: {1.5, 0.6, 0}
+  Sphere: {segments: 24, smooth: true, radius: 0.6}
+  Rgb: {80, 160, 230}
+}
+
+$ {
+  PerfRun: {fps: 60, frames: 300, warmup: 60, camera: camera}
+}

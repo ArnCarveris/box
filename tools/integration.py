@@ -20,6 +20,19 @@ render and a difference image of every scene, failures first. The difference is 
 render is brighter, red where it is darker, yellow where only the hue moved, at half strength
 when no channel moved more than 16, over a dimmed grey copy of the baseline where the pixels are
 identical. --json writes the results in the bake3 test report format.
+
+  integration.py perf [--dir dir] [--app project] [--env name] [--cfg mode] [--out dir]
+                      [--size WxH] [--cpu-budget pct] [--stall ms] [--max-load n]
+                      [--json file] [scene ...]
+
+perf runs every <dir>/<scene>.flecs (test/integration/perf by default) headless with boxrun on an
+offscreen surface. The scene sets the box.perf.PerfRun singleton (30, 60, 90 or 120 FPS); the
+engine paces every frame to the target, orbits the camera around the bounds of the shapes and
+counts every frame interval outside [0.9, 1.1] target intervals as an error. A scene passes only
+with zero errors. The results go to <out>/perf.json (test/integration/out by default), which the
+pm page charts, with the 1 minute load average before and after every scene. --stall adds busy
+milliseconds to every frame to prove that the checks fail a slow scene. --max-load waits, up to
+--load-wait seconds, until the load average is at most n before every scene.
 """
 import argparse
 import glob
@@ -35,6 +48,7 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VISUAL_DIR = os.path.join(ROOT, "test", "integration", "visual")
+PERF_DIR = os.path.join(ROOT, "test", "integration", "perf")
 OUT_DIR = os.path.join(ROOT, "test", "integration", "out")
 DEFAULT_APP = "apps/boxrun"
 MAX_DELTA = 24
@@ -43,6 +57,10 @@ MAX_PIXELS = 200
 RENDER_TIMEOUT = 120
 GUARD_RETRIES = 6
 GUARD_WAIT = 10
+PERF_TIMEOUT = 120
+PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean_ms", "p50_ms",
+               "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
+               "slept_ms", "stalls", "stall_ms")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_CHANNELS = {0: 1, 2: 3, 4: 2, 6: 4}
 
@@ -369,12 +387,12 @@ this.checked)"> Only failures</label></p>
     return path
 
 
-def write_json(path, results, project, elapsed):
+def write_json(path, results, project, elapsed, suite="Visual", keys=("max", "mean", "px")):
     tests = []
     for r in results:
-        row = {"suite": "Visual", "case": r["scene"], "status": r["status"],
+        row = {"suite": suite, "case": r["scene"], "status": r["status"],
                "elapsed": r["elapsed"], "detail": r.get("detail", "")}
-        for key in ("max", "mean", "px"):
+        for key in keys:
             if key in r:
                 row[key] = r[key]
         tests.append(row)
@@ -443,6 +461,144 @@ def cmd_visual(args):
     return 1 if failed else 0
 
 
+def load_average():
+    try:
+        return round(os.getloadavg()[0], 2)
+    except OSError:
+        return None
+
+
+def wait_for_load(limit, wait):
+    load = load_average()
+    deadline = time.time() + wait
+    while limit is not None and load is not None and load > limit and time.time() < deadline:
+        time.sleep(5)
+        load = load_average()
+    return load
+
+
+def perf_script(scene, report, args):
+    width, height = (int(v) for v in args.size.lower().split("x"))
+    with open(scene) as f:
+        source = f.read()
+    stall = ", stall: %g" % args.stall if args.stall else ""
+    return ("%s\n\nperf_surface {\n  box.surface.Surface: {width: %d, height: %d}\n}\n\n"
+            "$ {\n  box.perf.PerfRun: {quit: true, report: \"%s\"%s}\n}\n" % (
+                source.rstrip(), width, height, report, stall))
+
+
+def perf_command(harness, args):
+    env = "--local-env=" + args.env if args.env else "--local-env"
+    cmd = ["bake3", "run", app_project(args.app), env]
+    if args.cfg:
+        cmd += ["--cfg", args.cfg]
+    cmd += ["--", "--headless", "--timeout", str(PERF_TIMEOUT), "--port", "0"]
+    if args.cpu_budget is not None:
+        cmd += ["--cpu-budget", str(args.cpu_budget)]
+    return cmd + [harness]
+
+
+def run_perf_process(cmd, report):
+    log = ""
+    code = -1
+    for attempt in range(GUARD_RETRIES):
+        if os.path.exists(report):
+            os.unlink(report)
+        try:
+            proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
+                                  timeout=PERF_TIMEOUT * 2)
+            log = proc.stdout + proc.stderr
+            code = proc.returncode
+        except subprocess.TimeoutExpired as e:
+            log = "perf run timed out\n" + str(e.stdout or "") + str(e.stderr or "")
+            code = -1
+        if "cpu oversubscribed" not in log or attempt + 1 == GUARD_RETRIES:
+            break
+        time.sleep(GUARD_WAIT)
+    return code, log
+
+
+def perf_detail(data):
+    return ("%d errors (%d slow, %d fast) in %d frames at %d fps, frame mean %.2f ms, p99 %.2f "
+            "ms, max %.2f ms, work mean %.2f ms, p99 %.2f ms, budget slept %.1f ms" % (
+                data.get("errors", 0), data.get("slow", 0), data.get("fast", 0),
+                data.get("frames", 0), data.get("target_fps", 0), data.get("mean_ms", 0),
+                data.get("p99_ms", 0), data.get("max_ms", 0), data.get("work_mean_ms", 0),
+                data.get("work_p99_ms", 0), data.get("slept_ms", 0)))
+
+
+def run_perf_scene(scene, out, args):
+    name = scene_name(scene)
+    report = os.path.join(out, name + ".json")
+    harness = os.path.join(out, name + ".run.flecs")
+    result = {"scene": display(scene), "name": name, "status": "fail",
+              "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    with open(scene) as f:
+        if "PerfRun" not in f.read():
+            result.update({"detail": "the scene sets no PerfRun", "elapsed": 0})
+            return result
+    with open(harness, "w") as f:
+        f.write(perf_script(scene, report, args))
+    result["load_before"] = wait_for_load(args.max_load, args.load_wait)
+    start = time.time()
+    code, log = run_perf_process(perf_command(harness, args), report)
+    result["elapsed"] = round(time.time() - start, 6)
+    result["load_after"] = load_average()
+    with open(os.path.join(out, name + ".log"), "w") as f:
+        f.write(log)
+    data = None
+    if os.path.isfile(report):
+        with open(report) as f:
+            data = json.load(f)
+    if code != 0 or not data:
+        result["detail"] = "run failed (exit %d), see perf/%s.log" % (code, name)
+        print("\n".join("    " + line for line in log.strip().splitlines()[-15:]))
+        return result
+    for key in PERF_FIELDS:
+        if key in data:
+            result[key] = data[key]
+    result["entities"] = data.get("shapes", 0)
+    result["intervals_ms"] = data.get("intervals_ms", [])
+    result["status"] = "pass" if data.get("passed") else "fail"
+    result["detail"] = perf_detail(data)
+    return result
+
+
+def cmd_perf(args):
+    directory = os.path.abspath(args.dir) if args.dir else PERF_DIR
+    base = os.path.abspath(args.out) if args.out else OUT_DIR
+    ignore_out(base)
+    out = os.path.join(base, "perf")
+    os.makedirs(out, exist_ok=True)
+    if args.scenes:
+        scenes = [resolve_scene(directory, s) for s in args.scenes]
+    else:
+        scenes = sorted(glob.glob(os.path.join(directory, "*.flecs")))
+    if not scenes:
+        sys.exit("no scenes in %s" % directory)
+    start = time.time()
+    results = []
+    for scene in scenes:
+        r = run_perf_scene(scene, out, args)
+        results.append(r)
+        print("%s %s (%s, load %s -> %s)" % ("PASS" if r["status"] == "pass" else "FAIL",
+                                              r["scene"], r.get("detail", ""),
+                                              r.get("load_before"), r.get("load_after")))
+    failed = sum(1 for r in results if r["status"] != "pass")
+    path = os.path.join(base, "perf.json")
+    with open(path, "w") as f:
+        json.dump({"kind": "perf", "timestamp": results[0]["timestamp"],
+                   "cores": os.cpu_count(), "results": results}, f, indent=2)
+        f.write("\n")
+    print("%d passed, %d failed, report %s" % (len(results) - failed, failed, display(path)))
+    if args.json:
+        cases = [dict(r, scene=r["name"]) for r in results]
+        write_json(args.json, cases, display(directory), time.time() - start, "Perf",
+                   PERF_FIELDS)
+
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -460,6 +616,23 @@ def main():
                         help="store the render of this scene as its baseline")
     visual.add_argument("--json", help="write the results in the bake3 test report format")
     visual.set_defaults(fn=cmd_visual)
+    perf = sub.add_parser("perf", help="run the perf scenes and check every frame time")
+    perf.add_argument("scenes", nargs="*", help="scene names or paths, all scenes when empty")
+    perf.add_argument("--dir", help="folder of the scenes, test/integration/perf by default")
+    perf.add_argument("--app", default=DEFAULT_APP, help="bake project that runs the scenes")
+    perf.add_argument("--env", help="bake3 local environment, the default one when absent")
+    perf.add_argument("--cfg", help="bake3 build mode, the bake3 default when absent")
+    perf.add_argument("--out", help="folder of perf.json, the runs go to its perf/ folder")
+    perf.add_argument("--size", default="1280x720", help="surface size in pixels")
+    perf.add_argument("--cpu-budget", type=float, help="App.cpu_budget of the runs in percent")
+    perf.add_argument("--stall", type=float, default=0,
+                      help="busy milliseconds added to every frame, to check that slow fails")
+    perf.add_argument("--max-load", type=float,
+                      help="wait until the 1 minute load average is at most this")
+    perf.add_argument("--load-wait", type=float, default=300,
+                      help="seconds --max-load waits at most before running anyway")
+    perf.add_argument("--json", help="write the results in the bake3 test report format")
+    perf.set_defaults(fn=cmd_perf)
     args = parser.parse_args()
 
     return args.fn(args)

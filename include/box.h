@@ -26,6 +26,7 @@
 #include "box/input.h"
 #include "box/controllers.h"
 #include "box/controllers.h"
+#include "box/perf.h"
 
 #ifdef __cplusplus
 extern "C" {
