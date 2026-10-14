@@ -21,6 +21,8 @@
 #include "box/layout.h"
 #include "box/app.h"
 #include "box/render.h"
+#include "box/command.h"
+#include "box/input.h"
 
 #ifdef __cplusplus
 extern "C" {
