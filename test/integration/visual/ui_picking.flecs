@@ -12,6 +12,7 @@ const wait = box.command.commands.mouse.sweep(0, "[220, 295]", "[220, 295]", 1, 
 const click = box.command.commands.mouse.click(0, "left", "[220, 295]", 1)
 const move = box.command.commands.mouse.move(0, "[320, 180]", false)
 const press = box.command.commands.mouse.button(0, "left", true)
+const release = box.command.commands.mouse.button(0, "left", false)
 const hover = box.command.commands.mouse.move(0, "[320, 120]", false)
 
 world_camera {
@@ -82,8 +83,6 @@ template PickButton {
     while true {
       await on.press(this)
       down = true
-      await on.release(this)
-      down = false
     }
   }
 }
