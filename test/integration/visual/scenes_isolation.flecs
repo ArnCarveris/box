@@ -76,7 +76,7 @@ cool {
   }
 
   sun {
-    Rotation: {-0.8, 2.6, 0}
+    Rotation: {0.662, 2.4293, 0}
     DirectionalLight: {intensity: 1.5}
     Rgb: {90, 150, 255}
   }
@@ -110,7 +110,7 @@ cool {
 
     cube {
       Position: {5, 2.8, -0.5}
-      Rotation: {0.5, 0.7, 0}
+      Rotation: {0.3754, 0.7649, 0.3384}
       Box: {1, 1, 1}
       Rgb: {240, 240, 240}
     }

@@ -13,7 +13,7 @@ $ {
 }
 
 sun {
-  Rotation: {0.9, -0.6, 0}
+  Rotation: {0.703, -0.8332, 0}
   DirectionalLight: {intensity: 1.1}
   Rgb: {255, 255, 255}
 }

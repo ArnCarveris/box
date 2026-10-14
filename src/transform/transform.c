@@ -32,7 +32,7 @@ void transformSingle(
     vec4 *m = t_parent ? local : t->m;
 
     if (r) {
-        glm_euler_xyz((vec3){ r->x, r->y, r->z }, m);
+        glm_euler_yxz((vec3){ r->x, r->y, r->z }, m);
     } else {
         glm_mat4_identity(m);
     }
