@@ -75,8 +75,9 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
     `tests.json` or `bench.json` is missing, while the review loop has not passed, or
     while a report predates the review, and prints what it wants; a task that
     changes nothing that runs per frame sets `"bench": false` in its
-    `progress.json` instead. `--force` completes anyway and says so, loudly when it
-    skips the review.
+    `progress.json` instead. `--force` completes past a missing deliverable and says
+    so, but never past the review loop: only `--skip-review "<reason>"` closes a task
+    whose review has not passed, and it records the reason in `progress.json`.
 
 ## Closing a task
 
@@ -84,34 +85,50 @@ After each task:
 
 1. **Review.** A review agent reads the change (`git diff <range>`), the task and
    epic README, `DESIGN.md` and `CLAUDE.md`, and writes
-   `deliverable/review/review.md`: a `## Findings` section with one
-   `### R<n> [blocker|major|minor] <title>` block per finding (File, Problem,
-   Expected), or `None.` when there is nothing to fix.
-2. **Respond.** An agent addresses every open finding, by fixing the code with a test
-   that proves it or by explaining with evidence why it is not a defect, and appends a
-   `## Round <k>` section to `deliverable/review/response.md` with one
-   `R<n>: fixed in <commit> — ...` or `R<n>: not a defect — ...` line per finding.
-3. **Verify.** A verifying agent judges only the listed findings, never new ones, and
-   writes `deliverable/review/verification_r<k>.md`, copied to `verification.md`:
-   one `R<n>: ADDRESSED|NOT ADDRESSED — <evidence>` line per finding and a closing
-   `Verdict: ALL ADDRESSED` or `Verdict: OPEN: R<n>, ...`. An open verdict goes back
-   to step 2 for round k+1.
+   `deliverable/review/review.md`: a `Date: <UTC time>` line, then a `## Findings`
+   section with one `### R<n> [blocker|major|minor] <title>` block per finding (File,
+   Problem, Expected), or `None.` when there is nothing to fix.
+2. **Respond.** An agent addresses every finding left open, by fixing the code with a
+   test that proves it or by explaining with evidence why it is not a defect, and
+   appends a `## Round <k>` section to `deliverable/review/response.md`: a
+   `Date: <UTC time>` line and one `R<n>: fixed in <commit> — ...` or
+   `R<n>: not a defect — ...` line per finding. Round 1 answers every finding, round
+   k answers exactly the findings verification round k-1 left open.
+3. **Verify.** A verifying agent judges only the findings of the response round, never
+   new ones, and writes `deliverable/review/verification_r<k>.md`, copied to
+   `verification.md`: a `Date: <UTC time>` line, one
+   `R<n>: ADDRESSED|NOT ADDRESSED — <evidence>` line per finding and, as the last
+   line, `Verdict: ALL ADDRESSED` or `Verdict: OPEN: R<n>, ...` listing exactly the
+   findings it marks NOT ADDRESSED. An open verdict goes back to step 2 for round k+1.
 4. **Deliver.** Once the verdict is `ALL ADDRESSED` (or the review had no findings),
    rerun `pm deliver`, so `tests.json` and `bench*.json` postdate the review, and
    close with `pm done`. The review folder is part of the deliverable and shows in
    the task's deliverable listing on the status page.
 
+Every date is UTC in ISO 8601 (`date -u +%Y-%m-%dT%H:%M:%SZ`) and is written when the
+artefact is written. These dates and the `timestamp` that `pm deliver` puts in every
+report are the one clock of the loop: committing, copying or touching the files
+never changes it, so a task that passed `pm done` stays clean in `pm check`.
+
 `python3 project/pm.py review <epic>/<task>` prints the state of the loop: the
 findings by severity, the response rounds, the open findings, what is missing and
-the next step (review, respond, verify, deliver or done). `pm done` enforces it:
-it wants `review.md`; with findings, an answer to every `R<n>` in `response.md`, a
-`verification.md` equal to the latest round that marks every finding ADDRESSED,
-judges nothing else and ends with `Verdict: ALL ADDRESSED`; and reports that are
-newer than `review.md` and `verification.md` (the report `timestamp`, else the
-author date of the file's last commit, else its mtime). `pm check` reports a
-completed task without a passing review as a problem. The gate (`REVIEW_SINCE` in
-`pm.py`) covers every open task and every task started on or after
-2026-10-14T22:50Z; tasks completed before it are exempt.
+the next step (review, respond, verify, repair, deliver or done). `pm done` enforces
+it strictly:
+
+- every line that looks like a finding, answer, judgement, verdict or date must be
+  in the exact form above; anything else, a duplicate id, a finding judged twice or a
+  second verdict is a gap, never skipped;
+- the rounds are replayed in order: verification round k needs response round k,
+  response round k answers what round k-1 left open, every round file exists and
+  `verification.md` equals the latest one, which ends in `Verdict: ALL ADDRESSED`;
+- review, response round 1, verification round 1, response round 2, ... and the
+  reports carry non decreasing dates.
+
+`pm check` reports a completed gated task without a passing review as a problem, and
+one closed with `--skip-review` as a warning that names the reason (`pm status` and
+the state the status page reads carry it too). The gate (`REVIEW_SINCE` in `pm.py`)
+covers every open task and every task started or completed on or after
+2026-10-14T22:50Z; tasks started and completed before it are exempt.
 
 ## Closing an epic
 

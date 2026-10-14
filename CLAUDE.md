@@ -106,14 +106,17 @@ brief <epic>/<task> --files <owned paths>` instead of writing a prompt by hand.
 
 Every task goes through the review loop before it closes: a review agent writes
 `deliverable/review/review.md` (findings `### R<n> [blocker|major|minor] title`, or `None.`),
-an agent addresses each finding and answers it under `## Round <k>` in `response.md`, and a
-verifier, who may not raise new issues, writes `verification_r<k>.md` and `verification.md`
+an agent addresses each open finding and answers it under `## Round <k>` in `response.md`, and
+a verifier, who may not raise new issues, writes `verification_r<k>.md` and `verification.md`
 ending in `Verdict: ALL ADDRESSED` or `Verdict: OPEN: R<n>, ...`; an open verdict goes back
-to the response step. Implementation agents run `pm deliver` but never `pm done`; the
-coordinator runs the loop, delivers again and closes the task. `pm done` refuses a task
-without a passing review or with reports older than it, `pm check` reports a completed one
-as a problem, and `pm review <epic>/<task>` prints the state and the next step. Tasks
-completed before the gate (`REVIEW_SINCE` in `pm.py`) are exempt.
+to the response step. Each artefact (and each response round) carries a `Date: <UTC time>`
+line, and pm parses them strictly. Implementation agents run `pm deliver` but never `pm done`;
+the coordinator runs the loop, delivers again and closes the task. `pm done` refuses a task
+without a passing review or with reports older than it, even with `--force`; only
+`--skip-review "<reason>"` closes it unreviewed, recorded in `progress.json`. `pm check`
+reports a completed unreviewed task as a problem (a skipped one as a warning), and `pm review
+<epic>/<task>` prints the state and the next step. Tasks started and completed before the
+gate (`REVIEW_SINCE` in `pm.py`) are exempt; see docs/PROCESS.md.
 
 A task that touches a hot path (transform propagation, mesh generation, extract,
 command dispatch) adds or updates a benchcase under `bench/<module>` and attaches
