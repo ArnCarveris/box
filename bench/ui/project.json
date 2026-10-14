@@ -2,7 +2,7 @@
     "id": "bench_ui",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the layout of box.layout with a 10k element tree",
+        "description": "Benchmarks for the layout of box.layout with a 10k element tree and for picking",
         "public": false,
         "use": [
             "box"
@@ -16,6 +16,14 @@
                     "layout_10k",
                     "one_leaf_10k",
                     "idle_frame_10k"
+                ]
+            },
+            {
+                "id": "Picking",
+                "benchcases": [
+                    "move_10k_ui_100k_shapes",
+                    "still_cursor_10k_ui_100k_shapes",
+                    "no_cursor_10k_ui_100k_shapes"
                 ]
             }
         ]
