@@ -949,3 +949,27 @@ void Terminal_headless_root_shared(void) {
     test_assert(lstat(root, &st) != 0);
     ecs_os_free(root);
 }
+
+void Terminal_host_removed(void) {
+    // hardening/session_isolation
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_remove(world, ecs_id(TerminalHost), TerminalHost);
+    ecs_log_set_level(-4);
+
+    bool error = false;
+    char *out = box_terminal_run(world, s, "commands", &error);
+    test_bool(error, true);
+    test_str(out, "error: box.command is not imported");
+    ecs_os_free(out);
+
+    test_assert(box_terminal_new(world) == 0);
+    ecs_http_reply_t reply = ECS_HTTP_REPLY_INIT;
+    test_int(box_command_request(world, "GET", "/terminal/new", NULL, &reply), 503);
+    ecs_os_free(ecs_strbuf_get(&reply.body));
+    ecs_progress(world, 0);
+
+    ecs_fini(world);
+}
