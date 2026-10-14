@@ -1,0 +1,181 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+letter {
+  TexturePath: {path: "test/integration/visual/assets/letter.png"}
+}
+
+badge {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 128}
+}
+
+checker {
+  TexturePath: {path: "test/integration/visual/assets/checker.png"}
+}
+
+panel {
+  Rect: {600, 320}
+  Rgb: {40, 44, 56}
+  Border: {width: 3, radius: 18, color: {120, 140, 200, 255}}
+
+  plain {
+    Position: {-240, 100, 1}
+    Rect: {80, 50}
+    Rgb: {230, 80, 70}
+  }
+
+  rounded {
+    Position: {-140, 100, 1}
+    Rect: {80, 50}
+    Rgb: {250, 190, 60}
+    Border: {radius: 14}
+  }
+
+  outlined {
+    Position: {-40, 100, 1}
+    Rect: {80, 50}
+    Rgb: {60, 70, 90}
+    Border: {width: 4, radius: 10, color: {120, 220, 140, 255}}
+  }
+
+  pill {
+    Position: {65, 100, 1}
+    Rect: {100, 34}
+    Rgb: {90, 160, 250}
+    Border: {radius: 100}
+  }
+
+  turned {
+    Position: {180, 100, 1}
+    Rotation: {0, 0, 0.5}
+    Rect: {70, 40}
+    Rgb: {200, 110, 230}
+    Border: {width: 2, radius: 6, color: {255, 255, 255, 255}}
+  }
+
+  half {
+    Position: {235, 85, 2}
+    Rect: {60, 60}
+    Rgb: {255, 255, 255}
+    Opacity: {0.5}
+  }
+
+  dot {
+    Position: {-250, 20, 1}
+    Circle: {3}
+    Rgb: {255, 255, 255}
+  }
+
+  small {
+    Position: {-225, 20, 1}
+    Circle: {8}
+    Rgb: {250, 120, 90}
+  }
+
+  disc {
+    Position: {-180, 20, 1}
+    Circle: {28}
+    Rgb: {90, 200, 180}
+  }
+
+  ring {
+    Position: {-105, 20, 1}
+    Circle: {32}
+    Rgb: {40, 44, 56}
+    Border: {width: 6, color: {250, 200, 80, 255}}
+  }
+
+  avatar {
+    Position: {-25, 20, 1}
+    Circle: {32}
+    Image: {texture: badge}
+    Border: {width: 3, color: {255, 255, 255, 255}}
+  }
+
+  photo {
+    Position: {65, 20, 1}
+    Rect: {72, 72}
+    Image: {texture: letter}
+    Border: {radius: 12}
+  }
+
+  area {
+    Position: {155, 20, 1}
+    Rect: {72, 72}
+    Image: {texture: checker, u0: 0.25, v0: 0.25, u1: 0.5, v1: 0.5}
+  }
+
+  tinted {
+    Position: {240, 20, 1}
+    Rect: {72, 72}
+    Rgb: {120, 200, 255}
+    Image: {texture: letter}
+  }
+
+  hair {
+    Position: {0, 0, 1}
+    Line: {x1: -270, y1: -50, x2: -170, y2: -130, width: 1}
+    Rgb: {255, 255, 255}
+  }
+
+  thin {
+    Position: {0, 0, 1}
+    Line: {x1: -250, y1: -50, x2: -150, y2: -130, width: 2}
+    Rgb: {250, 190, 60}
+  }
+
+  thick {
+    Position: {0, 0, 1}
+    Line: {x1: -230, y1: -50, x2: -130, y2: -130, width: 8}
+    Rgb: {90, 160, 250}
+  }
+
+  flat {
+    Position: {0, 0, 1}
+    Line: {x1: -110, y1: -60, x2: 10, y2: -60, width: 3}
+    Rgb: {230, 80, 70}
+  }
+
+  steep {
+    Position: {0, 0, 1}
+    Line: {x1: -100, y1: -130, x2: 0, y2: -75, width: 5}
+    Rgb: {120, 220, 140}
+  }
+
+  scale_1 {
+    Position: {60, -95, 1}
+    Scale: {0.25, 0.25, 1}
+    Rect: {120, 120}
+    Rgb: {250, 190, 60}
+    Border: {width: 12, radius: 30, color: {230, 80, 70, 255}}
+  }
+
+  scale_2 {
+    Position: {110, -95, 1}
+    Scale: {0.5, 0.5, 1}
+    Rect: {120, 120}
+    Rgb: {250, 190, 60}
+    Border: {width: 12, radius: 30, color: {230, 80, 70, 255}}
+  }
+
+  scale_3 {
+    Position: {210, -95, 1}
+    Scale: {1, 1, 1}
+    Rect: {120, 120}
+    Rgb: {250, 190, 60}
+    Border: {width: 12, radius: 30, color: {230, 80, 70, 255}}
+  }
+}

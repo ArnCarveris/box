@@ -1,0 +1,111 @@
+using box.transform
+using box.geometry
+using box.material
+using box.texture
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 2.8, 7.5}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 55}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+badge {
+  TexturePath: {path: "test/integration/visual/assets/badge.svg", width: 128}
+}
+
+ground {
+  Rotation: {-1.5708, 0, 0}
+
+  board {
+    Position: {0, 30, -0.01}
+    Rect: {14, 80}
+    Rgb: {48, 54, 70}
+    Border: {width: 0.15, radius: 1, color: {120, 140, 200, 255}}
+  }
+
+  for i in 0..16 {
+    {
+      Position: {-4, i * 4 - 4, 0}
+      Circle: {0.8}
+      Rgb: {250, 190, 60}
+      Border: {width: 0.15, color: {230, 80, 70, 255}}
+    }
+
+    {
+      Position: {0, i * 4 - 4, 0}
+      Rect: {2.4, 1.4}
+      Rgb: {90, 160, 250}
+      Border: {width: 0.12, radius: 0.4, color: {255, 255, 255, 255}}
+    }
+
+    {
+      Position: {4, i * 4 - 4, 0}
+      Line: {x1: -1, y1: -1, x2: 1, y2: 1, width: 0.12}
+      Rgb: {120, 220, 140}
+    }
+  }
+
+  rail_left {
+    Position: {0, 0, 0}
+    Line: {x1: -6, y1: -5, x2: -6, y2: 68, width: 0.05}
+    Rgb: {255, 255, 255}
+  }
+
+  rail_right {
+    Position: {0, 0, 0}
+    Line: {x1: 6, y1: -5, x2: 6, y2: 68, width: 0.05}
+    Rgb: {255, 255, 255}
+  }
+}
+
+sign {
+  Position: {-3.4, 1.6, 1}
+  Rotation: {0, 0.6, 0}
+
+  frame {
+    Position: {0, 0, 0}
+    Rect: {2.6, 1.8}
+    Rgb: {40, 44, 56}
+    Border: {width: 0.06, radius: 0.25, color: {250, 190, 60, 255}}
+  }
+
+  icon {
+    Position: {-0.55, 0, 0.01}
+    Circle: {0.6}
+    Image: {texture: badge}
+  }
+
+  bar {
+    Position: {0.65, 0.25, 0.01}
+    Rect: {0.9, 0.2}
+    Rgb: {90, 200, 180}
+    Border: {radius: 0.1}
+  }
+
+  bar_short {
+    Position: {0.45, -0.15, 0.01}
+    Rect: {0.5, 0.2}
+    Rgb: {230, 80, 70}
+    Border: {radius: 0.1}
+  }
+}
+
+cube {
+  Position: {2.6, 0.6, 1.5}
+  Rotation: {0, 0.5, 0}
+  Box: {1.2, 1.2, 1.2}
+  Rgb: {200, 110, 230}
+
+  label {
+    Position: {0, 0, 0.601}
+    Circle: {0.4}
+    Rgb: {255, 255, 255}
+    Border: {width: 0.08, color: {40, 44, 56, 255}}
+  }
+}

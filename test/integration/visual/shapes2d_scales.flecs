@@ -1,0 +1,73 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {24, 28, 38, 255}}}
+}
+
+template Badge {
+  card {
+    Position: {0, 0, 0}
+    Rect: {20, 14}
+    Rgb: {90, 160, 250}
+    Border: {width: 1.5, radius: 4, color: {255, 255, 255, 255}}
+  }
+
+  dot {
+    Position: {-5, 0, 0.1}
+    Circle: {3}
+    Rgb: {250, 190, 60}
+    Border: {width: 0.75, color: {230, 80, 70, 255}}
+  }
+
+  stroke {
+    Position: {0, 0, 0.1}
+    Line: {x1: -1, y1: -3, x2: 8, y2: 3, width: 0.5}
+    Rgb: {40, 44, 56}
+  }
+}
+
+tiny {
+  Position: {-290, 140, 0}
+  Scale: {0.5, 0.5, 1}
+  Badge: {}
+}
+
+small {
+  Position: {-262, 140, 0}
+  Scale: {1, 1, 1}
+  Badge: {}
+}
+
+medium {
+  Position: {-205, 125, 0}
+  Scale: {3, 3, 1}
+  Badge: {}
+}
+
+large {
+  Position: {-70, 70, 0}
+  Scale: {9, 9, 1}
+  Badge: {}
+}
+
+huge {
+  Position: {520, -180, 0}
+  Scale: {40, 40, 1}
+  Badge: {}
+}
+
+turned {
+  Position: {-200, -90, 0}
+  Rotation: {0, 0, 0.35}
+  Scale: {6, 6, 1}
+  Badge: {}
+}
