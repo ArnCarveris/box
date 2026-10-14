@@ -58,7 +58,8 @@
                     "turn_speed_zero",
                     "pitch_limit",
                     "mouse_look_platform",
-                    "mouse_look_coasts",
+                    "key_turn_after_look",
+                    "look_with_key_turn",
                     "mouse_left_no_look",
                     "ease_in",
                     "ease_out",
@@ -67,7 +68,9 @@
                     "boost_yaw",
                     "wheel_zoom",
                     "zoom_zero",
-                    "script_turn_settings"
+                    "script_turn_settings",
+                    "stall_clamped",
+                    "look_release_stops"
                 ]
             },
             {
@@ -113,7 +116,9 @@
                     "script_controller",
                     "command_key",
                     "command_action",
-                    "arrows_turn"
+                    "arrows_turn",
+                    "stall_clamped",
+                    "look_release_stops"
                 ]
             },
             {
@@ -137,7 +142,22 @@
                     "ground_below_plane",
                     "camera_collide",
                     "camera_radius",
-                    "script_settings"
+                    "script_settings",
+                    "camera_thin_wall_boost",
+                    "first_person_thin_wall_boost",
+                    "first_person_thin_wall_walk",
+                    "steep_slope_blocks_walk",
+                    "steep_slope_blocks_jump",
+                    "walkable_slope_climbs",
+                    "stairs_climb",
+                    "camera_rotated_thin_wall",
+                    "first_person_rotated_thin_wall",
+                    "step_up_long_frame",
+                    "camera_huge_speed",
+                    "camera_infinite_velocity",
+                    "steep_crease_holds",
+                    "steep_slope_wall_crease_holds",
+                    "steep_crease_walk_along"
                 ]
             }
         ]

@@ -1,6 +1,6 @@
 /**
  * @file controllers/turn.c
- * @brief The eased turn the camera and first person controllers share, as flecs-engine turns.
+ * @brief The turn the camera and first person controllers share: eased keys, direct mouse look.
  */
 
 #include "controllers.h"
@@ -29,13 +29,13 @@ bool box_controller_turn(
 
     angular_velocity[0] += (tx - angular_velocity[0]) * alpha;
     angular_velocity[1] += (ty - angular_velocity[1]) * alpha;
-    if (turn->look) {
-        angular_velocity[1] = -turn->delta[0] * turn->sensitivity * turn->yaw_scale / dt;
-        angular_velocity[0] = -dy * turn->sensitivity / dt;
-    }
-
     yaw += angular_velocity[1] * dt;
     pitch += angular_velocity[0] * dt;
+    if (turn->look) {
+        yaw -= turn->delta[0] * turn->sensitivity * turn->yaw_scale;
+        pitch -= dy * turn->sensitivity;
+    }
+
     if (pitch > BOX_CONTROLLER_PITCH_MAX) {
         pitch = BOX_CONTROLLER_PITCH_MAX;
         angular_velocity[0] = angular_velocity[0] > 0 ? 0 : angular_velocity[0];
