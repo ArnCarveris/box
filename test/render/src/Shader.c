@@ -32,7 +32,8 @@ static char* test_read(
     return result;
 }
 
-void Shader_plain_source(void) {
+void Shader_plain_source(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "fn a() {}\nfn b() {}", NULL};
@@ -45,7 +46,8 @@ void Shader_plain_source(void) {
     ecs_os_fini();
 }
 
-void Shader_include_relative(void) {
+void Shader_include_relative(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -60,7 +62,8 @@ void Shader_include_relative(void) {
     ecs_os_fini();
 }
 
-void Shader_include_nested(void) {
+void Shader_include_nested(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -76,7 +79,8 @@ void Shader_include_nested(void) {
     ecs_os_fini();
 }
 
-void Shader_include_search_path(void) {
+void Shader_include_search_path(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -91,7 +95,8 @@ void Shader_include_search_path(void) {
     ecs_os_fini();
 }
 
-void Shader_include_once(void) {
+void Shader_include_once(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -106,7 +111,8 @@ void Shader_include_once(void) {
     ecs_os_fini();
 }
 
-void Shader_include_missing(void) {
+void Shader_include_missing(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "a\n#include \"nope.wgsl\"\n", NULL};
@@ -119,7 +125,8 @@ void Shader_include_missing(void) {
     ecs_os_fini();
 }
 
-void Shader_include_recursive(void) {
+void Shader_include_recursive(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -134,7 +141,8 @@ void Shader_include_recursive(void) {
     ecs_os_fini();
 }
 
-void Shader_include_syntax_error(void) {
+void Shader_include_syntax_error(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "\n#include common.wgsl\n", NULL};
@@ -146,7 +154,8 @@ void Shader_include_syntax_error(void) {
     ecs_os_fini();
 }
 
-void Shader_define_expands(void) {
+void Shader_define_expands(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -159,7 +168,8 @@ void Shader_define_expands(void) {
     ecs_os_fini();
 }
 
-void Shader_define_whole_identifiers(void) {
+void Shader_define_whole_identifiers(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "#define N 4\nN_MAX + N + aN + N2 + 1N\n", NULL};
@@ -171,7 +181,8 @@ void Shader_define_whole_identifiers(void) {
     ecs_os_fini();
 }
 
-void Shader_define_nested(void) {
+void Shader_define_nested(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "#define A B * 2\n#define B 3\nA\n", NULL};
@@ -183,7 +194,8 @@ void Shader_define_nested(void) {
     ecs_os_fini();
 }
 
-void Shader_define_self_reference(void) {
+void Shader_define_self_reference(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -196,7 +208,8 @@ void Shader_define_self_reference(void) {
     ecs_os_fini();
 }
 
-void Shader_define_empty(void) {
+void Shader_define_empty(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "#define E\na E b\n", NULL};
@@ -208,7 +221,8 @@ void Shader_define_empty(void) {
     ecs_os_fini();
 }
 
-void Shader_define_in_include(void) {
+void Shader_define_in_include(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -223,7 +237,8 @@ void Shader_define_in_include(void) {
     ecs_os_fini();
 }
 
-void Shader_undef(void) {
+void Shader_undef(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -236,7 +251,8 @@ void Shader_undef(void) {
     ecs_os_fini();
 }
 
-void Shader_function_macro_error(void) {
+void Shader_function_macro_error(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "#define F(x) x\n", NULL};
@@ -248,7 +264,8 @@ void Shader_function_macro_error(void) {
     ecs_os_fini();
 }
 
-void Shader_ifdef_else(void) {
+void Shader_ifdef_else(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -266,7 +283,8 @@ void Shader_ifdef_else(void) {
     ecs_os_fini();
 }
 
-void Shader_ifndef(void) {
+void Shader_ifndef(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -285,7 +303,8 @@ void Shader_ifndef(void) {
     ecs_os_fini();
 }
 
-void Shader_nested_conditionals(void) {
+void Shader_nested_conditionals(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -319,7 +338,8 @@ void Shader_nested_conditionals(void) {
     ecs_os_fini();
 }
 
-void Shader_pipeline_defines(void) {
+void Shader_pipeline_defines(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "COUNT SCALE\n#ifdef SHADOW\nshadow\n#endif\n", NULL};
@@ -332,7 +352,8 @@ void Shader_pipeline_defines(void) {
     ecs_os_fini();
 }
 
-void Shader_same_file_two_pipelines(void) {
+void Shader_same_file_two_pipelines(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -350,7 +371,8 @@ void Shader_same_file_two_pipelines(void) {
     ecs_os_fini();
 }
 
-void Shader_invalid_define(void) {
+void Shader_invalid_define(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "a\n", NULL};
@@ -362,7 +384,8 @@ void Shader_invalid_define(void) {
     ecs_os_fini();
 }
 
-void Shader_error_in_included_file(void) {
+void Shader_error_in_included_file(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -377,7 +400,8 @@ void Shader_error_in_included_file(void) {
     ecs_os_fini();
 }
 
-void Shader_unterminated_ifdef(void) {
+void Shader_unterminated_ifdef(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -392,7 +416,8 @@ void Shader_unterminated_ifdef(void) {
     ecs_os_fini();
 }
 
-void Shader_else_without_ifdef(void) {
+void Shader_else_without_ifdef(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "a\n#else\n", NULL};
@@ -404,7 +429,8 @@ void Shader_else_without_ifdef(void) {
     ecs_os_fini();
 }
 
-void Shader_endif_without_ifdef(void) {
+void Shader_endif_without_ifdef(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -419,7 +445,8 @@ void Shader_endif_without_ifdef(void) {
     ecs_os_fini();
 }
 
-void Shader_double_else(void) {
+void Shader_double_else(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {"main.wgsl", "#ifdef A\n#else\n#else\n#endif\n", NULL};
@@ -431,7 +458,8 @@ void Shader_double_else(void) {
     ecs_os_fini();
 }
 
-void Shader_skipped_directives_ignored(void) {
+void Shader_skipped_directives_ignored(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -444,7 +472,8 @@ void Shader_skipped_directives_ignored(void) {
     ecs_os_fini();
 }
 
-void Shader_files_listed(void) {
+void Shader_files_listed(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {
@@ -464,7 +493,8 @@ void Shader_files_listed(void) {
     ecs_os_fini();
 }
 
-void Shader_missing_file(void) {
+void Shader_missing_file(void)
+{
     // renderer/shader
     ecs_os_init();
     const char *files[] = {NULL};
@@ -476,7 +506,8 @@ void Shader_missing_file(void) {
     ecs_os_fini();
 }
 
-void Shader_engine_shader_from_disk(void) {
+void Shader_engine_shader_from_disk(void)
+{
     // renderer/shader
     ecs_os_init();
     char *path = box_shader_locate("etc/shaders/blit.wgsl");
@@ -496,7 +527,8 @@ void Shader_engine_shader_from_disk(void) {
     ecs_os_fini();
 }
 
-void Shader_component_sends_code(void) {
+void Shader_component_sends_code(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -545,7 +577,8 @@ void Shader_component_sends_code(void) {
     box_render_null_free(null);
 }
 
-void Shader_component_defines(void) {
+void Shader_component_defines(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -586,7 +619,8 @@ void Shader_component_defines(void) {
     box_render_null_free(null);
 }
 
-void Shader_unchanged_not_sent(void) {
+void Shader_unchanged_not_sent(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -620,7 +654,8 @@ void Shader_unchanged_not_sent(void) {
     box_render_null_free(null);
 }
 
-void Shader_set_again_recompiles(void) {
+void Shader_set_again_recompiles(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -660,7 +695,8 @@ void Shader_set_again_recompiles(void) {
     box_render_null_free(null);
 }
 
-void Shader_file_change_recompiles(void) {
+void Shader_file_change_recompiles(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -706,7 +742,8 @@ void Shader_file_change_recompiles(void) {
     box_render_null_free(null);
 }
 
-void Shader_include_change_recompiles(void) {
+void Shader_include_change_recompiles(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -752,7 +789,8 @@ void Shader_include_change_recompiles(void) {
     box_render_null_free(null);
 }
 
-void Shader_poll_disabled(void) {
+void Shader_poll_disabled(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -787,7 +825,8 @@ void Shader_poll_disabled(void) {
     box_render_null_free(null);
 }
 
-void Shader_status_error(void) {
+void Shader_status_error(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -824,7 +863,8 @@ void Shader_status_error(void) {
     box_render_null_free(null);
 }
 
-void Shader_error_keeps_code(void) {
+void Shader_error_keeps_code(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -878,7 +918,8 @@ void Shader_error_keeps_code(void) {
     box_render_null_free(null);
 }
 
-void Shader_missing_file_appears(void) {
+void Shader_missing_file_appears(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -914,7 +955,8 @@ void Shader_missing_file_appears(void) {
     box_render_null_free(null);
 }
 
-void Shader_remove_destroys(void) {
+void Shader_remove_destroys(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -956,7 +998,8 @@ void Shader_remove_destroys(void) {
     box_render_null_free(null);
 }
 
-void Shader_delete_destroys(void) {
+void Shader_delete_destroys(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -992,7 +1035,8 @@ void Shader_delete_destroys(void) {
     box_render_null_free(null);
 }
 
-void Shader_new_backend_resends(void) {
+void Shader_new_backend_resends(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1035,7 +1079,8 @@ void Shader_new_backend_resends(void) {
     box_render_null_free(second);
 }
 
-void Shader_engine_shader_not_sent_to_null(void) {
+void Shader_engine_shader_not_sent_to_null(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1056,7 +1101,8 @@ void Shader_engine_shader_not_sent_to_null(void) {
     box_render_null_free(null);
 }
 
-void Shader_copy_owns_strings(void) {
+void Shader_copy_owns_strings(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1103,7 +1149,8 @@ void Shader_copy_owns_strings(void) {
     box_render_null_free(null);
 }
 
-void Shader_gpu_compiles_engine_shader(void) {
+void Shader_gpu_compiles_engine_shader(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1130,7 +1177,8 @@ void Shader_gpu_compiles_engine_shader(void) {
     ecs_fini(world);
 }
 
-void Shader_gpu_compiles_component(void) {
+void Shader_gpu_compiles_component(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1170,7 +1218,8 @@ void Shader_gpu_compiles_component(void) {
     ecs_fini(world);
 }
 
-void Shader_gpu_invalid_code(void) {
+void Shader_gpu_invalid_code(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1206,7 +1255,8 @@ void Shader_gpu_invalid_code(void) {
     ecs_fini(world);
 }
 
-void Shader_gpu_recompiles_on_change(void) {
+void Shader_gpu_recompiles_on_change(void)
+{
     // renderer/shader
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1244,7 +1294,8 @@ void Shader_gpu_recompiles_on_change(void) {
     ecs_fini(world);
 }
 
-void Shader_gpu_error_in_status(void) {
+void Shader_gpu_error_in_status(void)
+{
     // renderer/shader_errors
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -1272,7 +1323,7 @@ void Shader_gpu_error_in_status(void) {
     test_assert(st != NULL);
     test_bool(st->ok, false);
     test_assert(st->error != NULL);
-    test_assert(strstr(st->error, "invalid.wgsl:2: ") != NULL);
+    test_assert(strstr(st->error, "invalid.wgsl:3: ") != NULL);
     test_assert(strstr(st->error, "undefined_name") != NULL);
     test_int(st->revision, 1);
 
@@ -1289,5 +1340,85 @@ void Shader_gpu_error_in_status(void) {
     test_int(st->revision, 2);
 
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Shader_gpu_error_in_include(void)
+{
+    // renderer/shader_lines
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *inc = flecs_asprintf("%s/inc_lines.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    FILE *f_inc = fopen(inc, "w");
+    fputs("#pragma once\nconst B = 1.0;\n\nfn g() -> f32 { return undefined_name; }\n", f_inc);
+    fclose(f_inc);
+    char *main = flecs_asprintf("%s/main_lines.wgsl", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    FILE *f_main = fopen(main, "w");
+    fputs("const A = 1.0;\n#include \"inc_lines.wgsl\"\nconst C = 1.0;\n", f_main);
+    fclose(f_main);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Shader, {.path = main});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_log_set_level(-1);
+    ecs_progress(world, 0);
+
+    const ShaderStatus *st = ecs_get(world, s, ShaderStatus);
+    test_assert(st != NULL);
+    test_bool(st->ok, false);
+    test_assert(st->error != NULL);
+    test_assert(strstr(st->error, "inc_lines.wgsl:4: ") != NULL);
+    test_assert(strstr(st->error, "undefined_name") != NULL);
+
+    ecs_os_free(inc);
+    ecs_os_free(main);
+    ecs_fini(world);
+}
+
+void Shader_gpu_error_after_directives(void)
+{
+    // renderer/shader_lines
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, ShaderSettings, {.poll_interval = 0});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    char *main = flecs_asprintf("%s/dropped_lines.wgsl",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    FILE *f_main = fopen(main, "w");
+    fputs("#define X 1\n#ifdef X\n#define Y 2\n#endif\n#ifndef X\n"
+        "const Z = 1.0;\n#endif\nconst A = 1.0;\n"
+        "fn f() -> f32 { return undefined_name; }\n", f_main);
+    fclose(f_main);
+
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Shader, {.path = main});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 16, .height = 16});
+    ecs_log_set_level(-4);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    ecs_log_set_level(-1);
+    ecs_progress(world, 0);
+
+    const ShaderStatus *st = ecs_get(world, s, ShaderStatus);
+    test_assert(st != NULL);
+    test_bool(st->ok, false);
+    test_assert(st->error != NULL);
+    test_assert(strstr(st->error, "dropped_lines.wgsl:9: ") != NULL);
+    test_assert(strstr(st->error, "undefined_name") != NULL);
+
+    ecs_os_free(main);
     ecs_fini(world);
 }

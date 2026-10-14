@@ -120,7 +120,9 @@
                     "gpu_compiles_component",
                     "gpu_invalid_code",
                     "gpu_recompiles_on_change",
-                    "gpu_error_in_status"
+                    "gpu_error_in_status",
+                    "gpu_error_in_include",
+                    "gpu_error_after_directives"
                 ]
             },
             {

@@ -732,6 +732,35 @@ done:
     return;
 }
 
+/** Record the source position of the line that is about to be written.
+ *
+ * @param pp The preprocessing
+ * @param file The file of the line
+ * @param line The line number in the file
+ */
+static void box_shader_locate_line(
+    box_shader_pp_t *pp,
+    const char *file,
+    int32_t line)
+{
+    int32_t i, count = ecs_vec_count(&pp->out->sources);
+    char **sources = ecs_vec_first(&pp->out->sources);
+    box_shader_loc_t *loc;
+    for (i = 0; i < count; i ++) {
+        if (!strcmp(sources[i], file)) {
+            break;
+        }
+    }
+
+    if (i == count) {
+        *ecs_vec_append_t(NULL, &pp->out->sources, char*) = ecs_os_strdup(file);
+    }
+
+    loc = ecs_vec_append_t(NULL, &pp->out->lines, box_shader_loc_t);
+    loc->file = i;
+    loc->line = line;
+}
+
 /** Process one line of a file.
  *
  * @param pp The preprocessing
@@ -754,6 +783,7 @@ static void box_shader_line(
         if (box_shader_active(pp)) {
             box_shader_expand(pp, text, len);
             ecs_strbuf_appendch(&pp->code, '\n');
+            box_shader_locate_line(pp, d->file, d->line);
         }
 
         goto done;
@@ -916,6 +946,8 @@ int box_shader_preprocess(
     int32_t i;
     ecs_os_memset_t(out, 0, box_shader_output_t);
     ecs_vec_init_t(NULL, &out->files, box_shader_file_t, 0);
+    ecs_vec_init_t(NULL, &out->sources, char*, 0);
+    ecs_vec_init_t(NULL, &out->lines, box_shader_loc_t, 0);
     ecs_vec_init_t(NULL, &pp.macros, box_shader_macro_t, 0);
     ecs_vec_init_t(NULL, &pp.conds, box_shader_cond_t, 0);
     ecs_vec_init_t(NULL, &pp.stack, const char*, 0);
@@ -963,6 +995,12 @@ void box_shader_output_fini(
     }
 
     ecs_vec_fini_t(NULL, &out->files, box_shader_file_t);
+    for (i = 0; i < ecs_vec_count(&out->sources); i ++) {
+        ecs_os_free(*ecs_vec_get_t(&out->sources, char*, i));
+    }
+
+    ecs_vec_fini_t(NULL, &out->sources, char*);
+    ecs_vec_fini_t(NULL, &out->lines, box_shader_loc_t);
     ecs_os_free(out->code);
     ecs_os_free(out->error);
     out->code = NULL;
