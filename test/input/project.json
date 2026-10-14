@@ -76,7 +76,14 @@
                     "script_dragged",
                     "script_parent_target",
                     "script_tap_sequence",
-                    "script_wait_no_action"
+                    "script_wait_no_action",
+                    "chord_most_specific",
+                    "chord_two_modifiers",
+                    "chord_unbound_modifier",
+                    "chord_bound_modifier",
+                    "chord_ignore_modifiers",
+                    "chord_ignore_modifiers_masked",
+                    "chord_script"
                 ]
             },
             {
