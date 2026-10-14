@@ -1,0 +1,27 @@
+{
+    "id": "bench_render",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the extract and upload of the instanced batches of box.render",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/render"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Extract",
+                "benchcases": [
+                    "unchanged",
+                    "changed_1pct"
+                ]
+            }
+        ]
+    }
+}
