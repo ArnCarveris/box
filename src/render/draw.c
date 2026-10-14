@@ -259,7 +259,7 @@ static void box_draws_key(
     key->dynamic = ecs_has_id(world, e, DynamicTransform) ||
         ecs_has_id(world, e, DynamicMaterial) ||
         ecs_get_target_for_id(world, e, EcsChildOf, DynamicMaterial) != 0;
-    key->shadow = !ecs_has_id(world, e, NoShadow) &&
+    key->shadow = !shape2d && !ecs_has_id(world, e, NoShadow) &&
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
 }
 
