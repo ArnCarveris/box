@@ -4,6 +4,7 @@
  *
  * A platform backend pushes device events and agents queue synthetic ones; the InputUpdate
  * system applies both to the Input singleton and emits them through flecs.script.event.
+ * Binding entities map keys to Action entities, which ActionUpdate resolves every frame.
  */
 
 #ifndef BOX_INPUT_H
@@ -65,15 +66,17 @@ ECS_STRUCT(KeyState, {
 
 /** What an input event does */
 ECS_ENUM(InputEventKind, {
-    InputKeyDown,  /**< Key or mouse button went down */
-    InputKeyUp,    /**< Key or mouse button came up */
-    InputText,     /**< Character typed, code is a unicode code point */
-    InputMove,     /**< Cursor moved to value */
-    InputScroll,   /**< Wheel moved by value */
-    InputFocus,    /**< Focus changed, code is 1 when focused */
-    InputResize,   /**< Window resized to value points */
-    InputRelease,  /**< The synthetic cursor is unpinned, the real pointer resumes */
-    InputReset     /**< Every held key and button is released and the cursor unpinned */
+    InputKeyDown,    /**< Key or mouse button went down */
+    InputKeyUp,      /**< Key or mouse button came up */
+    InputText,       /**< Character typed, code is a unicode code point */
+    InputMove,       /**< Cursor moved to value */
+    InputScroll,     /**< Wheel moved by value */
+    InputFocus,      /**< Focus changed, code is 1 when focused */
+    InputResize,     /**< Window resized to value points */
+    InputRelease,    /**< The synthetic cursor is unpinned, the real pointer resumes */
+    InputReset,      /**< Every held key, button and action is released, the cursor unpinned */
+    InputActionDown, /**< A synthetic hold of an action starts */
+    InputActionUp    /**< A synthetic hold of an action ends */
 });
 
 /** One device event, pushed by the platform or queued as synthetic input */
@@ -85,6 +88,7 @@ ECS_STRUCT(InputEvent, {
     bool normalized;     /**< The position of a move is in 0..1 of the window size */
     bool repeat;         /**< A platform key down repeated while the key is held */
     int32_t delay;       /**< Frames a synthetic event waits after the one before it */
+    ecs_entity_t action; /**< Action of an action event */
 });
 
 /** Cursor and wheel state of the current frame */
@@ -103,6 +107,46 @@ ECS_STRUCT(Input, {
     char text[32];      /**< Text typed this frame as zero terminated UTF-8 */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
+});
+
+/** A named game action, an entity that bindings and synthetic input drive */
+ECS_STRUCT(Action, {
+    char *description; /**< What the action does */
+});
+
+/** State of an action in the current frame, written by the ActionUpdate system */
+ECS_STRUCT(ActionState, {
+    bool down;     /**< The action is held */
+    bool pressed;  /**< The action went down this frame */
+    bool released; /**< The action came up this frame */
+    vec2 start;    /**< Cursor position of the frame the action went down */
+    vec2 delta;    /**< Cursor movement this frame while the action is held */
+    vec2 drag;     /**< Cursor movement since the action went down */
+});
+
+/** Binds a key, with optional modifiers, to an action.
+ *
+ * The binding holds the action while the key and every required modifier are down; other
+ * modifiers are ignored. Bindings on disabled entities and prefabs do not apply.
+ */
+ECS_STRUCT(Binding, {
+    ecs_entity_t action; /**< Action, when 0 the binding entity if it is one, else its parent */
+    Key key;             /**< Key or mouse button */
+    bool ctrl;           /**< A control key must be held too */
+    bool shift;          /**< A shift key must be held too */
+    bool alt;            /**< An alt key must be held too */
+    bool meta;           /**< A super key must be held too */
+});
+
+/** What on.pressed, on.held, on.dragged and on.released resolve with */
+ECS_STRUCT(ActionEvent, {
+    ecs_entity_t action; /**< Action the event is about */
+    float screen_x;      /**< Cursor x in window points */
+    float screen_y;      /**< Cursor y in window points */
+    float delta_x;       /**< Horizontal cursor movement this frame while held */
+    float delta_y;       /**< Vertical cursor movement this frame while held */
+    float drag_x;        /**< Horizontal cursor movement since the action went down */
+    float drag_y;        /**< Vertical cursor movement since the action went down */
 });
 
 /** Backend that feeds real device input, such as glfw or the browser */
@@ -262,7 +306,8 @@ void box_input_mouse_scroll(
     float dx,
     float dy);
 
-/** Queue a focus change; losing focus releases the held keys and ignores platform input.
+/** Queue a focus change; losing focus releases the held keys and actions and ignores platform
+ * input.
  *
  * @param world The world
  * @param focused Whether input is focused
@@ -271,7 +316,7 @@ void box_input_focus(
     ecs_world_t *world,
     bool focused);
 
-/** Empty both queues and queue the release of every held key and the synthetic cursor.
+/** Empty both queues and queue the release of every held key, action and the synthetic cursor.
  *
  * @param world The world
  */
@@ -285,6 +330,41 @@ void box_input_reset(
  */
 int32_t box_input_pending(
     ecs_world_t *world);
+
+/** Queue a synthetic hold of an action starting or ending.
+ *
+ * A held action stays down until it is released here, regardless of its bindings.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @param down Whether the hold starts
+ */
+void box_input_action(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    bool down);
+
+/** Queue an action tap that holds the action for a number of frames.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @param frames Frames the action is held, one when 0
+ */
+void box_input_action_press(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    int32_t frames);
+
+/** Queue an action drag: the action goes down at the start, the cursor walks and it comes up.
+ *
+ * @param world The world
+ * @param action The action entity
+ * @param drag The walk, its button is ignored
+ */
+void box_input_action_drag(
+    ecs_world_t *world,
+    ecs_entity_t action,
+    const box_input_sweep_t *drag);
 
 /** Look up a key by its name, case insensitive.
  *

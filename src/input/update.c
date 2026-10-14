@@ -250,7 +250,7 @@ static void box_input_move(
     box_input_emit_mouse(dev, in, 0);
 }
 
-/** Change the focus, releasing every held key when it is lost.
+/** Change the focus, releasing every held key and action when it is lost.
  *
  * @param dev The device state
  * @param in The Input singleton
@@ -263,6 +263,7 @@ static void box_input_set_focus(
 {
     if (!focused) {
         box_input_release_all(dev, in);
+        box_input_hold_release_all(dev);
     }
 
     if (focused != in->focused) {
@@ -315,7 +316,12 @@ static void box_input_apply(
         break;
     case InputReset:
         box_input_release_all(dev, in);
+        box_input_hold_release_all(dev);
         in->mouse.pinned = false;
+        break;
+    case InputActionDown:
+    case InputActionUp:
+        box_input_hold(dev, ev->action, ev->kind == InputActionDown);
         break;
     }
 }

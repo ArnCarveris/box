@@ -1,6 +1,6 @@
 /**
  * @file input/input.c
- * @brief Registers the box.input module: the device singletons, the screen target and the system.
+ * @brief Registers the box.input module: the device singletons, the screen target and the systems.
  */
 
 #define BOX_INPUT_IMPL
@@ -30,6 +30,7 @@ static void box_input_device_dtor(
         ecs_vec_fini_t(NULL, &dev[i].platform, InputEvent);
         ecs_vec_fini_t(NULL, &dev[i].queue, InputEvent);
         ecs_vec_fini_t(NULL, &dev[i].emits, box_input_emit_t);
+        ecs_vec_fini_t(NULL, &dev[i].holds, box_input_hold_t);
     }
 }
 
@@ -84,6 +85,10 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, InputEvent);
     ECS_META_COMPONENT(world, Mouse);
     ECS_META_COMPONENT(world, Input);
+    ECS_META_COMPONENT(world, Action);
+    ECS_META_COMPONENT(world, ActionState);
+    ECS_META_COMPONENT(world, Binding);
+    ECS_META_COMPONENT(world, ActionEvent);
     ECS_COMPONENT_DEFINE(world, InputDevice);
 
     ecs_set_hooks(world, Input, { .ctor = flecs_default_ctor });
@@ -99,6 +104,7 @@ void BoxInputImport(
     ecs_vec_init_t(NULL, &dev->platform, InputEvent, 0);
     ecs_vec_init_t(NULL, &dev->queue, InputEvent, 0);
     ecs_vec_init_t(NULL, &dev->emits, box_input_emit_t, 0);
+    ecs_vec_init_t(NULL, &dev->holds, box_input_hold_t, 0);
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;
@@ -111,5 +117,6 @@ void BoxInputImport(
         .immediate = true
     });
 
+    box_input_actions_import(world);
     box_input_focus_screen(world, screen);
 }
