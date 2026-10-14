@@ -29,6 +29,15 @@
                     "wide_childof",
                     "wide_parent"
                 ]
+            },
+            {
+                "id": "Delete",
+                "benchcases": [
+                    "static_childof",
+                    "static_parent",
+                    "dynamic_childof",
+                    "dynamic_parent"
+                ]
             }
         ]
     }
