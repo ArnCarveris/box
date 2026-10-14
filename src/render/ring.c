@@ -16,6 +16,7 @@ struct box_render_ring_t {
     RenderSettings settings;        /**< Settings to apply before the next acquire */
     bool dirty;                     /**< The settings changed since they were applied */
     box_render_backend_t backend;   /**< The backend */
+    bool backend_set;               /**< The backend was replaced since the ring was created */
     bool backend_ready;             /**< The backend ran init and not yet fini */
     bool backend_failed;            /**< The init of the backend failed */
     bool running;                   /**< The render thread exists */
@@ -366,6 +367,19 @@ void box_render_ring_set_backend(
     }
 
     ring->backend = *backend;
+    ring->backend_set = true;
+}
+
+const box_render_backend_t* box_render_ring_backend(
+    const box_render_ring_t *ring)
+{
+    return &ring->backend;
+}
+
+bool box_render_ring_is_default(
+    const box_render_ring_t *ring)
+{
+    return !ring->backend_set;
 }
 
 void box_render_ring_pause(

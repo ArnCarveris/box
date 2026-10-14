@@ -2,7 +2,8 @@
  * @file box/surface.h
  * @brief Surface component: setting it brings up a window or an offscreen target.
  *
- * The box.surface module connects the Surface component to the platform and renderer.
+ * The box.surface module connects the Surface component to the platform and renderer: a
+ * surface is a window, or an offscreen texture in a headless run or when it has a texture.
  */
 
 #ifndef BOX_SURFACE_H
@@ -19,6 +20,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** Width in points of a surface that does not set one */
+#define BOX_SURFACE_WIDTH (1280)
+
+/** Height in points of a surface that does not set one */
+#define BOX_SURFACE_HEIGHT (720)
 
 /** Maximum anisotropic filtering samples of the texture samplers */
 ECS_ENUM(Anisotropy, {
@@ -39,16 +46,34 @@ ECS_ENUM(TextureQuality, {
     TextureQualityVeryHigh = 4096 /**< Textures are capped at 4096 pixels */
 });
 
-/** Window or offscreen render target. */
+/** Window or offscreen render target.
+ *
+ * A headless run, a surface with a texture and BOX_TEST=1 in the environment render offscreen,
+ * where a point is a pixel. Changing a member reconfigures the surface before the next frame.
+ */
 ECS_STRUCT(Surface, {
-    int32_t width;                   /**< Requested width in points */
-    int32_t height;                  /**< Requested height in points */
+    int32_t width;                   /**< Requested width in points, 0 for 1280 */
+    int32_t height;                  /**< Requested height in points, 0 for 720 */
     float resolution_scale;          /**< Divides the pixels the scene is rendered at, 2 is half */
     bool vsync;                      /**< Present with vertical sync */
     Anisotropy anisotropy;           /**< Anisotropic samples of the texture samplers */
     TextureQuality texture_quality;  /**< Largest dimension a texture is scaled to */
     ecs_entity_t texture;            /**< For offscreen rendering to texture (window if 0) */
     ecs_entity_t view_root;          /**< Parent of the views to render in order, 0 for all views */
+    char *write_to_file;             /**< PNG every frame is written to, NULL for none */
+});
+
+/** Size and kind of a surface, written by the engine and read only for applications.
+ *
+ * A relative Surface.write_to_file is a file in AppStatus.tmp_dir, or in the working
+ * directory of a process without one.
+ */
+ECS_STRUCT(SurfaceStatus, {
+    int32_t width;          /**< Width of the presented image in pixels */
+    int32_t height;         /**< Height of the presented image in pixels */
+    int32_t render_width;   /**< Width the views render at, after resolution_scale */
+    int32_t render_height;  /**< Height the views render at */
+    bool window;            /**< The surface presents to a window, not to an offscreen texture */
 });
 
 /** Register the box.surface module.

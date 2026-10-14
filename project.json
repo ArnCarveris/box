@@ -13,7 +13,13 @@
         "defines": [
             "FLECS_SCRIPT_MATH",
             "FLECS_CREATE_MEMBER_ENTITIES"
-        ]
+        ],
+        "${os Darwin}": {
+            "defines": [
+                "BOX_PLATFORM_GLFW",
+                "BOX_RENDER_WGPU"
+            ]
+        }
     },
     "dependee": {
         "lang.c": {
@@ -24,6 +30,17 @@
             "${os Darwin}": {
                 "lib": [
                     "m"
+                ],
+                "ldflags": [
+                    "-framework Cocoa",
+                    "-framework QuartzCore",
+                    "-framework Metal",
+                    "-framework IOKit",
+                    "-framework CoreVideo",
+                    "-framework CoreFoundation",
+                    "-framework CoreGraphics",
+                    "-framework Foundation",
+                    "-framework AppKit"
                 ]
             }
         }
@@ -49,6 +66,35 @@
                 "-DCGLM_STATIC=ON",
                 "-DCGLM_USE_TEST=OFF"
             ]
+        },
+        "stb": {
+            "repository": "https://github.com/nothings/stb.git",
+            "commit": "28d546d5eb77d4585506a20480f4de2e706dff4c",
+            "header-only": true
+        }
+    },
+    "${os Darwin}": {
+        "bundle": {
+            "glfw": {
+                "repository": "https://github.com/glfw/glfw.git",
+                "tag": "3.4",
+                "library": "glfw3",
+                "cmake-args": [
+                    "-DGLFW_BUILD_EXAMPLES=OFF",
+                    "-DGLFW_BUILD_TESTS=OFF",
+                    "-DGLFW_BUILD_DOCS=OFF"
+                ]
+            },
+            "wgpu_native": {
+                "repository": "https://github.com/gfx-rs/wgpu-native.git",
+                "tag": "v29.0.1.1",
+                "build-system": "cargo",
+                "library": "wgpu_native",
+                "include": [
+                    "ffi",
+                    "ffi/webgpu-headers"
+                ]
+            }
         }
     }
 }

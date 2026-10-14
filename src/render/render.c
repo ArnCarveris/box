@@ -107,6 +107,26 @@ void box_render_set_backend(
     box_render_ring_set_backend(box_render_get_ring(world), backend);
 }
 
+const box_render_backend_t* box_render_get_backend(
+    const ecs_world_t *world)
+{
+    return box_render_ring_backend(box_render_get_ring(world));
+}
+
+void box_render_use_gpu(
+    ecs_world_t *world)
+{
+    box_render_ring_t *ring = box_render_get_ring(world);
+#ifdef BOX_RENDER_WGPU
+    if (box_render_ring_is_default(ring)) {
+        box_render_backend_t backend = box_render_gpu_backend();
+        box_render_ring_set_backend(ring, &backend);
+    }
+#else
+    (void)ring;
+#endif
+}
+
 void box_render_pause(
     ecs_world_t *world,
     bool paused)

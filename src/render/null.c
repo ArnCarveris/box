@@ -56,6 +56,7 @@ static void box_render_null_render(
     null->batches += ecs_vec_count(&packet->batches);
     null->uploads += ecs_vec_count(&packet->uploads);
     null->resources += ecs_vec_count(&packet->resources);
+    null->targets += ecs_vec_count(&packet->targets);
     for (i = 0; i < ecs_vec_count(&packet->uploads); i ++) {
         null->bytes += ecs_vec_get_t(&packet->uploads, box_render_upload_t, i)->size;
     }

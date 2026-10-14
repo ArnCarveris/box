@@ -1,0 +1,69 @@
+{
+    "id": "render",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/render"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Surface",
+                "testcases": [
+                    "create_offscreen_target",
+                    "default_size",
+                    "status_written",
+                    "two_surfaces_two_targets",
+                    "target_every_frame",
+                    "no_surface_no_target"
+                ]
+            },
+            {
+                "id": "Reconfigure",
+                "testcases": [
+                    "resize_updates_target",
+                    "resolution_scale_updates_render_size",
+                    "fractional_resolution_scale",
+                    "vsync_updates_target",
+                    "unchanged_sends_no_update",
+                    "remove_destroys_target",
+                    "delete_destroys_target",
+                    "set_again_after_remove"
+                ]
+            },
+            {
+                "id": "Device",
+                "testcases": [
+                    "surface_creates_device",
+                    "no_surface_no_device",
+                    "own_backend_kept",
+                    "resize_reconfigures",
+                    "resolution_scale_reconfigures",
+                    "unchanged_not_reconfigured",
+                    "remove_releases_target",
+                    "main_thread_renders"
+                ]
+            },
+            {
+                "id": "Capture",
+                "testcases": [
+                    "cleared_surface",
+                    "no_clearing_view_is_black",
+                    "resolution_scale",
+                    "after_resize",
+                    "absolute_path",
+                    "view_root_selects_clear",
+                    "every_frame",
+                    "main_thread"
+                ]
+            }
+        ]
+    }
+}

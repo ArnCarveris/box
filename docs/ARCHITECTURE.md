@@ -17,7 +17,7 @@ component ids are registered in the same order in every world.
 | `box.transform` | `include/box/transform.h` | `src/transform`  | `Position`, `Rotation`, `Scale`, `WorldTransform`, static and dynamic propagation |
 | `box.geometry`  | `include/box/geometry.h`  | `src/geometry`   | Scalable 3D and 2D shapes |
 | `box.camera`    | `include/box/camera.h`    | `src/camera`     | `Camera` |
-| `box.surface`   | `include/box/surface.h`   | `src/surface`    | `Surface`, a window or a texture that views render to |
+| `box.surface`   | `include/box/surface.h`   | `src/surface`    | `Surface`, `SurfaceStatus`, glfw windows, render targets |
 | `box.view`      | `include/box/view.h`      | `src/view`       | `View`, `Scene` |
 | `box.effects`   | `include/box/effects.h`   | `src/effects`    | Post process effect settings |
 | `box.material`  | `include/box/material.h`  | `src/material`   | PBR material components, `Tint` |
@@ -26,6 +26,8 @@ component ids are registered in the same order in every world.
 | `box.movement`  | `include/box/movement.h`  | `src/movement`   | `Velocity`, `AngularVelocity` |
 | `box.layout`    | `include/box/layout.h`    | `src/layout`     | UI layout components |
 | `box.app`       | `include/box/app.h`       | `src/app`        | `App`, `AppStatus`, argument parsing, the run loop |
+| `box.jobs`      | `src/jobs/jobs.h` (private) | `src/jobs`     | Worker pool for IO and asset work |
+| `box.render`    | `include/box/render.h`    | `src/render`     | `RenderSettings`, `RenderStatus`, packet ring, render thread, backends |
 
 A module keeps private declarations in a header next to its sources
 (`src/transform/transform.h`, `src/app/app.h`); test projects that need them add the
@@ -63,17 +65,78 @@ and a running process picks up a new value set through the REST API.
 ## Threads
 
 The main thread owns the world: it runs every flecs system and observer, and no other
-thread reads or writes the world. Planned in the `engine_core` epic and not yet
-present:
+thread reads or writes the world. Two kinds of threads work next to it:
 
-- A render thread that owns the GPU backend and consumes render packets the main
-  thread fills during extract. At most N packets are in flight and their buffers are
-  reused, so a steady state frame does not allocate.
-- A job system whose workers run IO and asset processing without world access; a
-  job's result is applied by a system on the main thread.
+- The render thread (`box.render`) is the only thread that calls webgpu. It consumes
+  render packets the main thread fills, see below. With `RenderSettings.main_thread`
+  (the default in the browser) there is no render thread and the main thread renders
+  the packet at the end of the frame instead.
+- The job workers (`box.jobs`) run IO and asset processing without world access.
 
 The REST server of flecs accepts connections on its own threads but runs requests on
 the main thread during `ecs_progress`.
+
+## Job system
+
+`src/jobs/jobs.h` is private to box modules; there is no public job component.
+`box_job_submit` queues a `box_job_desc_t`: `work` runs on a worker and must not touch
+the world, `complete` runs on the main thread in the `JobsComplete` system (`EcsOnLoad`)
+in submission order, and `ctx_free` releases the context afterwards. The first job
+starts the pool, sized from the core count and `App.cpu_budget` (`BOX_JOBS_AUTO`, two
+cores kept for the main and render thread, at most 16 workers). With zero workers jobs
+run inline in `JobsInline` (`EcsPostFrame`). Deleting the world drops queued work,
+waits for running work and frees every context without running completions.
+
+## Render module
+
+`box.render` moves a frame from the world to the renderer through a ring of render
+packets (`src/render/render.h`, private). `RenderSettings.in_flight` (default 2, at
+most 8) packets exist; their vectors keep their storage, so a steady frame does not
+allocate. A packet holds, in apply order: resource changes (create, update or destroy
+of a buffer, mesh, texture, target or shader by handle, with a description in the
+packet data), uploads into buffers, the targets to render and the views with their
+batches. Upload and description bytes live in one 16 byte aligned data block.
+
+Two phases run after `EcsOnStore`: in `RenderExtract` modules call
+`box_render_packet` to append to the packet of the frame (the first call acquires a
+free packet and waits when all are in flight, counted in `RenderStatus.stalls`), and
+`RenderSubmit` hands it to the consumer. `RenderExtractViews` adds every `View` whose
+camera has a `Camera`. `box_render_sync` waits until every submitted packet rendered.
+
+A backend (`box_render_backend_t`) is four callbacks: `init`, `render` and `fini` run on
+the consuming thread only, `free` on the main thread. A new ring has the null backend,
+which renders nothing and records what it received; tests set their own with
+`box_render_set_backend`. The first `Surface` replaces a ring that still has its
+initial backend with the webgpu backend (`box_render_use_gpu`), so a world without
+surfaces never creates a device and a test that set a backend keeps it.
+
+## Surfaces and the GPU device
+
+`box.surface` runs on the main thread. Setting a `Surface` makes the world render with
+the GPU; in `RenderExtract` the `SurfaceExtract` system gives a new surface a target
+handle and, unless the run is headless, the surface has a `texture` or `BOX_TEST` is
+set, a glfw window with a `CAMetalLayer` (`src/surface/window.c`; glfw only runs on
+the main thread, `SurfacePoll` in `EcsOnLoad` polls events and quits when a window
+closes). Every frame the surface is measured: width and height in points (default
+1280x720; a window reports its framebuffer in pixels, offscreen a point is a pixel)
+and the render size, the pixel size divided by `resolution_scale`. A changed
+description goes into the packet as a `BOX_RENDER_TARGET` create or update and into
+`SurfaceStatus`; removing the surface sends a destroy and closes its window once that
+packet rendered. Each frame adds a target entry with the clear color of the first
+clearing view (under `view_root` when set, opaque black otherwise) and, when
+`write_to_file` is set, the PNG path; a relative path lands in `AppStatus.tmp_dir`.
+
+The webgpu backend (`src/render/gpu.c`, `target.c`, `capture.c`, compiled with
+`BOX_RENDER_WGPU`) creates the instance, adapter and device in its `init` on the
+render thread and keeps targets by handle. A window target configures a webgpu
+surface on the layer (vsync picks Fifo, otherwise Immediate when offered), an
+offscreen target owns an `RGBA8UnormSrgb` texture. When the render size differs from
+the image, views render into a scene texture that a blit scales up to the image. Per
+frame the backend clears, blits, presents and, for a capture, copies the image into a
+readback buffer, waits for it and writes the PNG next to the target path before
+renaming it over. `box_render_gpu_stats` returns the counters of the backend for tests.
+Colors are display encoded `rgba`; the targets are sRGB, so a clear color comes back
+unchanged in a capture.
 
 ## From a component change to a reconfiguration
 
