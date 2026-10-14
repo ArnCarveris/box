@@ -126,6 +126,7 @@
                     "cursor_editing",
                     "scroll",
                     "view_stacked_last",
+                    "rebuilt_after_delete",
                     "look_from_script",
                     "run_from_script",
                     "scrollback_limit",

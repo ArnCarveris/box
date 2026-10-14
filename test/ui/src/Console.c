@@ -589,6 +589,39 @@ void Console_view_stacked_last(void) {
     ecs_fini(world);
 }
 
+void Console_rebuilt_after_delete(void) {
+    // ui/console
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_progress(world, 0);
+
+    box_input_key_type(world, "`ab", 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    ecs_delete(world, ecs_lookup(world, BOX_CONSOLE_SCOPE));
+    ecs_progress(world, 0);
+    test_assert(ecs_lookup(world, BOX_CONSOLE_VIEW) != 0);
+    ecs_entity_t before = ecs_lookup(world, "console.ui.panel.input.before");
+    test_assert(before != 0);
+    test_str(ecs_get(world, before, Text)->value, "ab");
+
+    box_input_key_press(world, KeyEnter, 1);
+    while (box_input_pending(world)) {
+        ecs_progress(world, 0);
+    }
+
+    test_assert(ecs_lookup(world, BOX_CONSOLE_SESSION) != 0);
+
+    ecs_fini(world);
+}
+
 void Console_look_from_script(void) {
     // ui/console
     ecs_world_t *world = ecs_init();

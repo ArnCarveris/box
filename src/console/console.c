@@ -348,6 +348,11 @@ static void BoxConsoleUpdate(
         box_console_hide(world, con);
     }
 
+    if (con->shown && (!ecs_is_alive(world, con->view) || !ecs_is_alive(world, con->ui.root))) {
+        box_console_hide(world, con);
+        box_console_show(world, con);
+    }
+
     if (con->shown) {
         box_console_measure(world, con);
         box_console_ui_sync(world, con, console);
