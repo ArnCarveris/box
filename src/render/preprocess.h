@@ -47,11 +47,19 @@ typedef struct box_shader_desc_t {
     void *ctx;                  /**< Passed to read */
 } box_shader_desc_t;
 
+/** Source position of a line of preprocessed code */
+typedef struct box_shader_loc_t {
+    int32_t file;       /**< Index in the sources of the output */
+    int32_t line;       /**< Line in that file, starting at 1 */
+} box_shader_loc_t;
+
 /** Result of a preprocessing */
 typedef struct box_shader_output_t {
     char *code;         /**< Preprocessed code, NULL on error */
     char *error;        /**< First error as file:line: message, NULL on success */
     ecs_vec_t files;    /**< box_shader_file_t, the main file first */
+    ecs_vec_t sources;  /**< char*, the files lines of the code come from */
+    ecs_vec_t lines;    /**< box_shader_loc_t, source position of every line of the code */
 } box_shader_output_t;
 
 /** Preprocess a shader.

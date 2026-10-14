@@ -25,6 +25,8 @@ typedef struct box_shader_t {
     bool prep_failed;       /**< The last preprocessing failed */
     char *label;            /**< Path the code was read from, the label of the module */
     ecs_vec_t files;        /**< box_shader_file_t the last preprocessing read */
+    ecs_vec_t sources;      /**< char*, files the lines of the code come from */
+    ecs_vec_t lines;        /**< box_shader_loc_t, source position of every line of the code */
 } box_shader_t;
 
 /** State of the box.shader module shared by its observers and its extract system */
@@ -208,6 +210,24 @@ static void box_shader_files_fini(
     ecs_vec_fini_t(NULL, files, box_shader_file_t);
 }
 
+/** Free the line table of a shader.
+ *
+ * @param sources The source files
+ * @param lines The source positions
+ */
+static void box_shader_lines_fini(
+    ecs_vec_t *sources,
+    ecs_vec_t *lines)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(sources); i ++) {
+        ecs_os_free(*ecs_vec_get_t(sources, char*, i));
+    }
+
+    ecs_vec_fini_t(NULL, sources, char*);
+    ecs_vec_fini_t(NULL, lines, box_shader_loc_t);
+}
+
 /** Free the engine side of a shader.
  *
  * @param s The shader
@@ -216,6 +236,7 @@ static void box_shader_free(
     box_shader_t *s)
 {
     box_shader_files_fini(&s->files);
+    box_shader_lines_fini(&s->sources, &s->lines);
     ecs_os_free(s->code);
     ecs_os_free(s->label);
     ecs_os_free(s->gpu_error);
@@ -267,6 +288,8 @@ static box_shader_t* box_shader_ensure(
     result->entity = entity;
     result->handle = handle ? handle : ++ state->last_handle;
     ecs_vec_init_t(NULL, &result->files, box_shader_file_t, 0);
+    ecs_vec_init_t(NULL, &result->sources, char*, 0);
+    ecs_vec_init_t(NULL, &result->lines, box_shader_loc_t, 0);
     ecs_map_insert_ptr(&state->shaders, entity, result);
 done:
     return result;
@@ -295,6 +318,14 @@ static void box_shader_compile(
     box_shader_files_fini(&s->files);
     s->files = out.files;
     ecs_vec_init_t(NULL, &out.files, box_shader_file_t, 0);
+    if (out.code) {
+        box_shader_lines_fini(&s->sources, &s->lines);
+        s->sources = out.sources;
+        s->lines = out.lines;
+        ecs_vec_init_t(NULL, &out.sources, char*, 0);
+        ecs_vec_init_t(NULL, &out.lines, box_shader_loc_t, 0);
+    }
+
     if (out.code && (!s->code || strcmp(s->code, out.code))) {
         ecs_os_free(s->code);
         ecs_os_free(s->label);
@@ -435,6 +466,38 @@ static bool box_shader_used(
     return result;
 }
 
+/** Rewrite the line of a GPU message from the preprocessed code to the source file and line.
+ *
+ * @param s The shader
+ * @param message The message as label:line: text, consumed
+ * @return The message as file:line: text, or the message when the line is unknown
+ */
+static char* box_shader_map_message(
+    box_shader_t *s,
+    char *message)
+{
+    char *result = message;
+    size_t len = s->label ? strlen(s->label) : 0;
+    if (!len || strncmp(message, s->label, len) || message[len] != ':') {
+        goto done;
+    }
+
+    char *end;
+    long line = strtol(message + len + 1, &end, 10);
+    if (end == message + len + 1 || *end != ':' || line < 1 ||
+        line > ecs_vec_count(&s->lines))
+    {
+        goto done;
+    }
+
+    box_shader_loc_t *loc = ecs_vec_get_t(&s->lines, box_shader_loc_t, (int32_t)line - 1);
+    result = flecs_asprintf("%s:%d%s", *ecs_vec_get_t(&s->sources, char*, loc->file),
+        loc->line, end);
+    ecs_os_free(message);
+done:
+    return result;
+}
+
 /** Apply the compile results the GPU backend produced to the shaders and their status.
  *
  * @param world The world or a stage
@@ -454,7 +517,7 @@ static void box_shader_results(
             }
 
             ecs_os_free(s->gpu_error);
-            s->gpu_error = r.message;
+            s->gpu_error = r.message ? box_shader_map_message(s, r.message) : NULL;
             r.message = NULL;
             if (!s->prep_failed && ecs_has(world, s->entity, ShaderStatus)) {
                 ecs_set(world, s->entity, ShaderStatus, {
