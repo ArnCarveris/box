@@ -29,6 +29,13 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 /** Bytes of the header of a scatter segment */
 #define BOX_DRAWS_HEADER ((uint32_t)(BOX_RENDER_SCATTER_HEADER * sizeof(uint32_t)))
 
+/** Keep a function out of line where the compiler supports it */
+#if defined(__GNUC__) || defined(__clang__)
+#define BOX_DRAWS_NOINLINE __attribute__((noinline))
+#else
+#define BOX_DRAWS_NOINLINE
+#endif
+
 /** Linear light of every display encoded channel value */
 static float box_draws_srgb[256];
 
@@ -311,6 +318,34 @@ uint8_t box_draws_blend(
     return result;
 }
 
+/** Mix the color of a shape toward its tints and write the shape of a 2D shape.
+ *
+ * Kept out of line so the plain material path does not pay for the registers it needs.
+ *
+ * @param out The instance, with the plain material written
+ * @param material Material components of the entity
+ * @param base The base color, display encoded
+ */
+static BOX_DRAWS_NOINLINE void box_draws_material_mixed(
+    box_render_instance_t *out,
+    const box_draw_material_t *material,
+    const uint8_t *base)
+{
+    float border[3];
+    bool tinted = material->inherited || material->tint;
+    if (tinted) {
+        box_draws_tinted(out->color, base, material);
+    }
+
+    if (material->shape2d && tinted) {
+        box_draws_tinted(border, &material->shape2d->border_color.r, material);
+    }
+
+    if (material->shape2d) {
+        box_draws_shape2d(out, material, tinted ? border : NULL);
+    }
+}
+
 void box_draws_material(
     box_render_instance_t *out,
     const box_draw_material_t *material)
@@ -341,18 +376,8 @@ void box_draws_material(
     out->uv[1] = uv ? uv->scale_y : 1.0f;
     out->uv[2] = uv ? uv->offset_x : 0.0f;
     out->uv[3] = uv ? uv->offset_y : 0.0f;
-    if (material->inherited || material->tint) {
-        box_draws_tinted(out->color, base, material);
-    }
-
-    if (material->shape2d) {
-        float border[3];
-        bool tinted = material->inherited || material->tint;
-        if (tinted) {
-            box_draws_tinted(border, &material->shape2d->border_color.r, material);
-        }
-
-        box_draws_shape2d(out, material, tinted ? border : NULL);
+    if (material->inherited || material->tint || material->shape2d) {
+        box_draws_material_mixed(out, material, base);
     }
 }
 
