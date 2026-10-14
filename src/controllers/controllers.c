@@ -10,34 +10,71 @@ ECS_COMPONENT_DECLARE(CameraActionMap);
 ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 
 const box_controller_action_t box_camera_actions[BoxCameraActionCount] = {
-    [BoxCameraForward] = { "Forward", "Move the camera forward", KeyW },
-    [BoxCameraBack] = { "Back", "Move the camera back", KeyS },
-    [BoxCameraLeft] = { "Left", "Move the camera left", KeyA },
-    [BoxCameraRight] = { "Right", "Move the camera right", KeyD },
-    [BoxCameraUp] = { "Up", "Move the camera up", KeyE },
-    [BoxCameraDown] = { "Down", "Move the camera down", KeyQ },
-    [BoxCameraFast] = { "Fast", "Move the camera faster while held", KeyShiftLeft },
-    [BoxCameraLook] = { "Look", "Turn the camera with the cursor while held", KeyMouseRight }
+    [BoxCameraForward] = { "Forward", "Move the camera forward", KeyW, KeyNone },
+    [BoxCameraBack] = { "Back", "Move the camera back", KeyS, KeyNone },
+    [BoxCameraLeft] = { "Left", "Move the camera left", KeyA, KeyNone },
+    [BoxCameraRight] = { "Right", "Move the camera right", KeyD, KeyNone },
+    [BoxCameraUp] = { "Up", "Move the camera up", KeyE, KeyNone },
+    [BoxCameraDown] = { "Down", "Move the camera down", KeyQ, KeyNone },
+    [BoxCameraFast] = { "Fast", "Move the camera faster while held", KeyShiftLeft, KeyShiftRight },
+    [BoxCameraLook] = { "Look", "Turn the camera with the cursor while held", KeyMouseRight,
+        KeyNone },
+    [BoxCameraTurnLeft] = { "TurnLeft", "Turn the camera left while held", KeyLeft, KeyNone },
+    [BoxCameraTurnRight] = { "TurnRight", "Turn the camera right while held", KeyRight, KeyNone },
+    [BoxCameraTurnUp] = { "TurnUp", "Turn the camera up while held", KeyUp, KeyNone },
+    [BoxCameraTurnDown] = { "TurnDown", "Turn the camera down while held", KeyDown, KeyNone }
 };
 
-/** Create the default camera actions, disabled and each bound to its key.
- *
- * @param world The world
- * @param map The action map, written
- */
-static void box_controllers_camera_actions(
+ecs_entity_t box_controller_actions_create(
     ecs_world_t *world,
-    CameraActionMap *map)
+    const char *name,
+    const box_controller_action_t *table,
+    int32_t count,
+    ecs_entity_t *actions,
+    ecs_entity_t *alts)
 {
+    ecs_entity_t scope = ecs_entity(world, { .name = name });
     int32_t i;
-    map->scope = ecs_entity(world, { .name = "camera" });
-    for (i = 0; i < BoxCameraActionCount; i ++) {
-        const box_controller_action_t *a = &box_camera_actions[i];
-        ecs_entity_t action = ecs_entity(world, { .name = a->name, .parent = map->scope });
+    for (i = 0; i < count; i ++) {
+        const box_controller_action_t *a = &table[i];
+        ecs_entity_t action = ecs_entity(world, { .name = a->name, .parent = scope });
+        ecs_entity_t alt = 0;
         ecs_set(world, action, Action, { .description = ECS_CONST_CAST(char*, a->description) });
         ecs_set(world, action, Binding, { .key = a->key });
+        if (a->alt != KeyNone) {
+            alt = ecs_entity(world, { .name = box_input_key_name(a->alt), .parent = action });
+            ecs_set(world, alt, Binding, { .key = a->alt });
+            ecs_enable(world, alt, false);
+        }
+
         ecs_enable(world, action, false);
-        map->actions[i] = action;
+        actions[i] = action;
+        alts[i] = alt;
+    }
+
+    return scope;
+}
+
+void box_controller_actions_enable(
+    ecs_world_t *world,
+    const ecs_entity_t *actions,
+    const ecs_entity_t *alts,
+    int32_t count,
+    bool enabled)
+{
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ActionState *state = ecs_is_alive(world, actions[i])
+            ? ecs_get_mut(world, actions[i], ActionState)
+            : NULL;
+        if (state) {
+            ecs_os_zeromem(state);
+            ecs_enable(world, actions[i], enabled);
+        }
+
+        if (alts[i] && ecs_is_alive(world, alts[i])) {
+            ecs_enable(world, alts[i], enabled);
+        }
     }
 }
 
@@ -97,11 +134,13 @@ void BoxControllersImport(
     ecs_add_pair(world, ecs_id(FirstPersonController), EcsWith, ecs_id(Rotation));
 
     CameraActionMap *map = ecs_singleton_ensure(world, CameraActionMap);
-    box_controllers_camera_actions(world, map);
+    map->scope = box_controller_actions_create(world, "camera", box_camera_actions,
+        BoxCameraActionCount, map->actions, map->alts);
     box_controllers_ctor(world, ecs_id(CameraController), box_camera_controller_ctor, map->scope);
 
     FirstPersonActionMap *fp_map = ecs_singleton_ensure(world, FirstPersonActionMap);
-    box_first_person_actions_create(world, fp_map);
+    fp_map->scope = box_controller_actions_create(world, "first_person",
+        box_first_person_actions, BoxFirstPersonActionCount, fp_map->actions, fp_map->alts);
     box_controllers_ctor(world, ecs_id(FirstPersonController), box_first_person_controller_ctor,
         fp_map->scope);
 

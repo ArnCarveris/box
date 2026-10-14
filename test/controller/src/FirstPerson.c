@@ -25,14 +25,15 @@ void FirstPerson_default_bindings(void) {
     ECS_IMPORT(world, Box);
 
     const char *names[] = {
-        "Forward", "Back", "Left", "Right", "Up", "Down", "Fast", "Look", "Jump", "Crouch", "Fly"
+        "Forward", "Back", "Left", "Right", "Up", "Down", "Fast", "Look", "Jump", "Crouch", "Fly",
+        "TurnLeft", "TurnRight", "TurnUp", "TurnDown"
     };
     Key keys[] = {
         KeyW, KeyS, KeyA, KeyD, KeyE, KeyQ, KeyShiftLeft, KeyMouseRight, KeySpace, KeyCtrlLeft,
-            KeyF
+            KeyF, KeyLeft, KeyRight, KeyUp, KeyDown
     };
     ecs_entity_t scope = ecs_lookup(world, "box.controllers.first_person");
-    for (int32_t i = 0; i < 11; i ++) {
+    for (int32_t i = 0; i < 15; i ++) {
         ecs_entity_t action = ecs_lookup_child(world, scope, names[i]);
         test_assert(action != 0);
         const Action *a = ecs_get(world, action, Action);
@@ -374,6 +375,7 @@ void FirstPerson_look_sensitivity_invert_y(void) {
     ecs_add(world, fp, FirstPersonController);
     ecs_get_mut(world, fp, FirstPersonController)->sensitivity = 0.01f;
     ecs_get_mut(world, fp, FirstPersonController)->invert_y = true;
+    ecs_get_mut(world, fp, FirstPersonController)->turn_deceleration = 1e9f;
 
     box_input_mouse_drag(world, &(box_input_sweep_t){
         .from = { 0, 0 }, .to = { 10, 20 }, .steps = 1, .button = KeyMouseRight
@@ -897,6 +899,9 @@ void FirstPerson_with_camera_controller(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->acceleration = 1e9f;
     ecs_entity_t fp = ecs_new(world);
     ecs_add(world, fp, FirstPersonController);
 
@@ -1027,6 +1032,79 @@ void FirstPerson_command_action(void) {
     test_bool(c->grounded, true);
     test_bool(c->crouched, true);
     test_flt(ecs_get(world, fp, Position)->y, 0.9f);
+
+    ecs_fini(world);
+}
+
+void FirstPerson_arrows_turn(void) {
+    // controllers/camera_flecs_engine
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    const FirstPersonController *c = ecs_get(world, fp, FirstPersonController);
+    test_flt(c->turn_speed, 1.5f);
+    test_flt(c->turn_acceleration, 5);
+    test_flt(c->turn_deceleration, 15);
+
+    float dt = 1.0f / 60.0f, yaw = 0, av = 0;
+    box_input_glfw_on_key(world, 263, 1);
+    for (int32_t n = 1; n <= 20; n ++) {
+        ecs_progress(world, dt);
+        av += (1.5f - av) * (1.0f - expf(-5.0f * dt));
+        yaw += av * dt;
+        test_assert(fabsf(ecs_get(world, fp, Rotation)->y - yaw) < 0.0001f);
+    }
+
+    box_input_glfw_on_key(world, 263, 0);
+    box_input_glfw_on_key(world, 264, 1);
+    for (int32_t n = 0; n < 20; n ++) {
+        ecs_progress(world, dt);
+    }
+
+    test_assert(ecs_get(world, fp, Rotation)->y > yaw);
+    test_assert(ecs_get(world, fp, Rotation)->x < -0.1f);
+    test_assert(fabsf(ecs_get(world, fp, Position)->x) < 0.0001f);
+    test_assert(fabsf(ecs_get(world, fp, Position)->z) < 0.0001f);
+
+    ecs_fini(world);
+}
+
+void FirstPerson_look_level_horizon(void) {
+    // engine_core/rotation_order
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+    ecs_get_mut(world, fp, FirstPersonController)->turn_deceleration = 1e9f;
+
+    box_input_mouse_drag(world, &(box_input_sweep_t){
+        .from = { 300, 300 }, .to = { 100, 300 }, .steps = 2, .frames = 2,
+        .button = KeyMouseRight
+    });
+    box_input_mouse_drag(world, &(box_input_sweep_t){
+        .from = { 100, 300 }, .to = { 100, 400 }, .steps = 2, .frames = 2,
+        .button = KeyMouseRight
+    });
+    for (int32_t i = 0; i < 12; i ++) {
+        ecs_progress(world, 0.5f);
+    }
+
+    const Rotation *r = ecs_get(world, fp, Rotation);
+    test_assert(fabsf(r->y - 0.6f) < 0.0001f);
+    test_assert(fabsf(r->x + 0.3f) < 0.0001f);
+    test_flt(r->z, 0);
+
+    const WorldTransform *t = ecs_get(world, fp, WorldTransform);
+    test_assert(fabsf(t->m[0][1]) < 0.0001f);
+    test_assert(fabsf(t->m[0][0] - cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->m[0][2] + sinf(0.6f)) < 0.0001f);
+    test_assert(t->m[1][1] > 0.9f);
+    test_assert(fabsf(t->m[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->m[2][1] - sinf(0.3f)) < 0.0001f);
+    test_assert(fabsf(t->m[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
 
     ecs_fini(world);
 }

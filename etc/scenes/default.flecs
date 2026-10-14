@@ -1,5 +1,6 @@
 // Default box scene: a lit cube on a ground plane with shadows and post effects.
-// Fly with WASD (QE for down/up), hold the right mouse button to look around.
+// Fly with WASD (QE for down/up, Shift to go faster), turn with the arrow keys or hold the right
+// mouse button to look around, and scroll to push the camera along the view.
 
 using box.transform
 using box.geometry
@@ -49,7 +50,7 @@ main_view {
 }
 
 sun {
-  Rotation: {-0.9, 2.6, 0}
+  Rotation: {0.7359, 2.3726, 0}
   DirectionalLight: {intensity: 2}
   Rgb: {255, 244, 225}
 }

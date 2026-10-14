@@ -85,7 +85,7 @@ void box_mesh_gen_ngon(
 /** UV sphere with unit radius.
  *
  * @param mesh The mesh
- * @param segments Steps around the axis, half as many along it
+ * @param segments Steps around the axis and along each half, from pole to equator
  * @param smooth Shared vertices with smooth normals, else flat faces
  */
 void box_mesh_gen_sphere(
@@ -96,7 +96,7 @@ void box_mesh_gen_sphere(
 /** Upper half of a unit sphere, closed with a base at y = 0.
  *
  * @param mesh The mesh
- * @param segments Steps around the axis
+ * @param segments Steps around the axis and from the pole to the base
  * @param smooth Shared vertices with smooth normals, else flat faces
  */
 void box_mesh_gen_hemisphere(
@@ -148,7 +148,7 @@ void box_mesh_gen_torus(
 /** Capsule along Y with unit radius, the cylinder part spans -length/2 to length/2.
  *
  * @param mesh The mesh
- * @param segments Steps around the axis
+ * @param segments Steps around the axis and from each pole to the cylinder
  * @param smooth Shared vertices with smooth normals, else flat faces
  * @param length Cylinder length relative to the radius
  */

@@ -7,17 +7,35 @@
 #include "../render/render.h"
 #include <math.h>
 
-/** Pitch the camera stops at, short of looking straight up or down */
-#define BOX_CAMERA_PITCH_MAX (1.55f)
-
 /** Units per second of a constructed controller */
-#define BOX_CAMERA_SPEED (10.0f)
+#define BOX_CAMERA_SPEED (40.0f)
 
 /** Speed multiplier while Fast is held of a constructed controller */
-#define BOX_CAMERA_BOOST (4.0f)
+#define BOX_CAMERA_BOOST (5.0f)
+
+/** Rate the velocity follows a held movement of a constructed controller */
+#define BOX_CAMERA_ACCELERATION (6.0f)
+
+/** Rate the velocity follows a stop of a constructed controller */
+#define BOX_CAMERA_DECELERATION (18.0f)
+
+/** Radians per second of the turn actions of a constructed controller */
+#define BOX_CAMERA_TURN_SPEED (1.5f)
+
+/** Rate the turn follows a held turn action of a constructed controller */
+#define BOX_CAMERA_TURN_ACCELERATION (5.0f)
+
+/** Rate the turn follows a stop of a constructed controller */
+#define BOX_CAMERA_TURN_DECELERATION (15.0f)
+
+/** Yaw rate multiplier while Fast is held of a constructed controller */
+#define BOX_CAMERA_BOOST_YAW (0.33f)
 
 /** Radians per point of cursor movement of a constructed controller */
 #define BOX_CAMERA_SENSITIVITY (0.003f)
+
+/** Units per second a wheel notch adds along the view of a constructed controller */
+#define BOX_CAMERA_ZOOM (3.0f)
 
 /** Radius of the colliding sphere of a constructed controller */
 #define BOX_CAMERA_RADIUS (0.25f)
@@ -27,6 +45,7 @@ typedef struct box_camera_input_t {
     ecs_entity_t scope;                 /**< Scope of the actions, 0 for none */
     bool held[BoxCameraActionCount];    /**< Which actions are down */
     vec2 look;                          /**< Cursor movement of the Look action this frame */
+    float wheel;                        /**< Vertical wheel offset of the frame */
 } box_camera_input_t;
 
 void box_camera_controller_ctor(
@@ -41,14 +60,21 @@ void box_camera_controller_ctor(
         values[i] = (CameraController){
             .speed = BOX_CAMERA_SPEED,
             .boost = BOX_CAMERA_BOOST,
+            .acceleration = BOX_CAMERA_ACCELERATION,
+            .deceleration = BOX_CAMERA_DECELERATION,
+            .turn_speed = BOX_CAMERA_TURN_SPEED,
+            .turn_acceleration = BOX_CAMERA_TURN_ACCELERATION,
+            .turn_deceleration = BOX_CAMERA_TURN_DECELERATION,
+            .boost_yaw = BOX_CAMERA_BOOST_YAW,
             .sensitivity = BOX_CAMERA_SENSITIVITY,
+            .zoom = BOX_CAMERA_ZOOM,
             .actions = *scope,
             .radius = BOX_CAMERA_RADIUS
         };
     }
 }
 
-/** Read the state of the camera actions of a controller.
+/** Read the state of the camera actions of a controller and the wheel of the frame.
  *
  * @param world The world
  * @param map The default action map
@@ -62,8 +88,10 @@ static void box_camera_read(
     box_camera_input_t *out)
 {
     int32_t i;
+    const Input *input = ecs_singleton_get(world, Input);
     ecs_os_zeromem(out);
     out->scope = scope;
+    out->wheel = input ? input->mouse.scroll[1] : 0;
     for (i = 0; i < BoxCameraActionCount; i ++) {
         ecs_entity_t action = scope == map->scope
             ? map->actions[i]
@@ -83,71 +111,75 @@ static void box_camera_read(
     }
 }
 
-/** Turn a camera by the cursor movement of the Look action.
+/** Turn a camera with the turn actions and the cursor movement of the Look action.
  *
- * @param cc The controller
+ * @param cc The controller, its angular velocity is written
  * @param in The input of the frame
  * @param r The rotation, written in place
+ * @param dt Seconds the frame took
  * @return Whether the rotation changed
  */
 static bool box_camera_turn(
-    const CameraController *cc,
+    CameraController *cc,
     const box_camera_input_t *in,
-    Rotation *r)
+    Rotation *r,
+    float dt)
 {
-    float sensitivity = cc->sensitivity;
-    float dy = cc->invert_y ? -in->look[1] : in->look[1];
-    float yaw = r->y - in->look[0] * sensitivity;
-    float pitch = r->x - dy * sensitivity;
-    bool result = false;
-    if (pitch > BOX_CAMERA_PITCH_MAX) {
-        pitch = BOX_CAMERA_PITCH_MAX;
-    }
+    const bool *held = in->held;
+    box_controller_turn_t turn = {
+        .speed = cc->turn_speed,
+        .acceleration = cc->turn_acceleration,
+        .deceleration = cc->turn_deceleration,
+        .sensitivity = cc->sensitivity,
+        .yaw_scale = held[BoxCameraFast] ? cc->boost_yaw : 1.0f,
+        .invert_y = cc->invert_y,
+        .yaw = (float)(held[BoxCameraTurnLeft] - held[BoxCameraTurnRight]),
+        .pitch = (float)(held[BoxCameraTurnUp] - held[BoxCameraTurnDown]),
+        .look = held[BoxCameraLook],
+        .delta = { in->look[0], in->look[1] }
+    };
 
-    if (pitch < -BOX_CAMERA_PITCH_MAX) {
-        pitch = -BOX_CAMERA_PITCH_MAX;
-    }
-
-    result = yaw != r->y || pitch != r->x;
-    r->y = yaw;
-    r->x = pitch;
-
-    return result;
+    return box_controller_turn(&turn, cc->angular_velocity, r, dt);
 }
 
 /** Move the velocity of a controller towards what the movement actions ask for.
  *
- * Forward and right lie in the XZ plane along the yaw; up is the Y axis.
+ * Forward and right lie in the XZ plane along the yaw; up is the Y axis. The wheel then pushes
+ * the velocity along the view.
  *
  * @param cc The controller, its velocity is written
  * @param in The input of the frame
- * @param yaw The yaw of the camera
+ * @param r The rotation of the camera
  * @param dt Seconds the frame took
  */
 static void box_camera_accelerate(
     CameraController *cc,
     const box_camera_input_t *in,
-    float yaw,
+    const Rotation *r,
     float dt)
 {
     const bool *held = in->held;
     float forward = (float)(held[BoxCameraForward] - held[BoxCameraBack]);
     float right = (float)(held[BoxCameraRight] - held[BoxCameraLeft]);
     float up = (float)(held[BoxCameraUp] - held[BoxCameraDown]);
-    float s = sinf(yaw), c = cosf(yaw);
+    float s = sinf(r->y), c = cosf(r->y);
+    float sp = sinf(r->x), cp = cosf(r->x);
     vec3 dir = { right * c - forward * s, up, -forward * c - right * s };
-    vec3 target = { 0, 0, 0 };
+    vec3 view = { -s * cp, sp, -c * cp };
     float len = sqrtf(dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
     float speed = cc->speed;
-    float alpha = cc->acceleration > 0 ? 1.0f - expf(-cc->acceleration * dt) : 1.0f;
+    float rate = len > 0 ? cc->acceleration : cc->deceleration;
+    float alpha = 1.0f - expf(-rate * dt);
+    float push = in->wheel * cc->zoom;
     int32_t i;
     if (held[BoxCameraFast]) {
         speed *= cc->boost;
     }
 
     for (i = 0; i < 3; i ++) {
-        target[i] = len > 0 ? dir[i] * speed / len : 0;
-        cc->velocity[i] += (target[i] - cc->velocity[i]) * alpha;
+        float target = len > 0 ? dir[i] * speed / len : 0;
+        cc->velocity[i] += (target - cc->velocity[i]) * alpha;
+        cc->velocity[i] += view[i] * push;
     }
 }
 
@@ -197,15 +229,8 @@ void BoxCameraActionsActivate(
         }
     }
 
-    for (i = 0; used != map->active && i < BoxCameraActionCount; i ++) {
-        ecs_entity_t action = map->actions[i];
-        ActionState *state = ecs_is_alive(world, action)
-            ? ecs_get_mut(world, action, ActionState)
-            : NULL;
-        if (state) {
-            ecs_os_zeromem(state);
-            ecs_enable(world, action, used);
-        }
+    if (used != map->active) {
+        box_controller_actions_enable(world, map->actions, map->alts, BoxCameraActionCount, used);
     }
 
     map->active = used;
@@ -229,11 +254,11 @@ void BoxCameraControllerUpdate(
             read = true;
         }
 
-        if (box_camera_turn(&cc[i], &in, &r[i])) {
+        if (box_camera_turn(&cc[i], &in, &r[i], dt)) {
             ecs_modified(it->world, e, Rotation);
         }
 
-        box_camera_accelerate(&cc[i], &in, r[i].y, dt);
+        box_camera_accelerate(&cc[i], &in, &r[i], dt);
         if (box_camera_move(it->world, e, &cc[i], &p[i], dt)) {
             ecs_modified(it->world, e, Position);
         }

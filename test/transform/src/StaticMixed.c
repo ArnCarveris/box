@@ -142,9 +142,9 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -158,10 +158,10 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -174,10 +174,10 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -196,9 +196,9 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -212,10 +212,10 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -228,10 +228,10 @@ void StaticMixed_depth_1_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -391,9 +391,9 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -407,10 +407,10 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -423,10 +423,10 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -446,9 +446,9 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -462,10 +462,10 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -478,10 +478,10 @@ void StaticMixed_depth_1_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -602,9 +602,9 @@ void StaticMixed_depth_1_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.938791f, 0.290096f, -0.185783f, 0.0f,
-            -0.239713f, 0.937438f, 0.252482f, 0.0f,
-            0.247404f, -0.192493f, 0.949599f, 0.0f,
+            0.950952f, 0.242472f, -0.192089f, 0.0f,
+            -0.192089f, 0.949599f, 0.247718f, 0.0f,
+            0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -618,9 +618,9 @@ void StaticMixed_depth_1_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.275387f, -0.217983f, 0.0f,
-            -0.189796f, 0.918943f, 0.345718f, 0.0f,
-            0.29552f, -0.282321f, 0.912668f, 0.0f,
+            0.953644f, 0.189796f, -0.233541f, 0.0f,
+            -0.104205f, 0.936293f, 0.335404f, 0.0f,
+            0.282321f, -0.29552f, 0.912668f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -641,9 +641,9 @@ void StaticMixed_depth_1_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.910718f, 0.412278f, 0.02487f, 0.0f,
-            -0.385046f, 0.825692f, 0.412278f, 0.0f,
-            0.149438f, -0.385046f, 0.910718f, 0.0f,
+            0.93338f, 0.358678f, 0.012302f, 0.0f,
+            -0.331445f, 0.848353f, 0.412844f, 0.0f,
+            0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -657,9 +657,9 @@ void StaticMixed_depth_1_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.275387f, -0.217983f, 0.0f,
-            -0.189796f, 0.918943f, 0.345718f, 0.0f,
-            0.29552f, -0.282321f, 0.912668f, 0.0f,
+            0.953644f, 0.189796f, -0.233541f, 0.0f,
+            -0.104205f, 0.936293f, 0.335404f, 0.0f,
+            0.282321f, -0.29552f, 0.912668f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -786,9 +786,9 @@ void StaticMixed_depth_1_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.469396f, 0.145048f, -0.092891f, 0.0f,
-            -0.479426f, 1.874877f, 0.504964f, 0.0f,
-            0.371106f, -0.28874f, 1.424398f, 0.0f,
+            0.475476f, 0.121236f, -0.096045f, 0.0f,
+            -0.384178f, 1.899197f, 0.495436f, 0.0f,
+            0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -802,9 +802,9 @@ void StaticMixed_depth_1_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.872587f, 0.550775f, -0.435966f, 0.0f,
-            -0.284694f, 1.378415f, 0.518577f, 0.0f,
-            0.14776f, -0.141161f, 0.456334f, 0.0f,
+            1.907287f, 0.379592f, -0.467082f, 0.0f,
+            -0.156307f, 1.40444f, 0.503107f, 0.0f,
+            0.141161f, -0.14776f, 0.456334f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -826,9 +826,9 @@ void StaticMixed_depth_1_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.683039f, 0.309209f, 0.018653f, 0.0f,
-            -0.962614f, 2.064229f, 1.030696f, 0.0f,
-            0.186798f, -0.481307f, 1.138398f, 0.0f,
+            0.700035f, 0.269009f, 0.009227f, 0.0f,
+            -0.828614f, 2.120883f, 1.032111f, 0.0f,
+            0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -842,9 +842,9 @@ void StaticMixed_depth_1_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.872587f, 0.550775f, -0.435966f, 0.0f,
-            -0.284694f, 1.378415f, 0.518577f, 0.0f,
-            0.14776f, -0.141161f, 0.456334f, 0.0f,
+            1.907287f, 0.379592f, -0.467082f, 0.0f,
+            -0.156307f, 1.40444f, 0.503107f, 0.0f,
+            0.141161f, -0.14776f, 0.456334f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -965,9 +965,9 @@ void StaticMixed_depth_1_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -982,10 +982,10 @@ void StaticMixed_depth_1_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1004,9 +1004,9 @@ void StaticMixed_depth_1_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1021,10 +1021,10 @@ void StaticMixed_depth_1_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1149,9 +1149,9 @@ void StaticMixed_depth_1_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1166,10 +1166,10 @@ void StaticMixed_depth_1_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1189,9 +1189,9 @@ void StaticMixed_depth_1_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1206,10 +1206,10 @@ void StaticMixed_depth_1_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1329,9 +1329,9 @@ void StaticMixed_depth_1_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1345,10 +1345,10 @@ void StaticMixed_depth_1_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1368,9 +1368,9 @@ void StaticMixed_depth_1_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1384,10 +1384,10 @@ void StaticMixed_depth_1_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1513,9 +1513,9 @@ void StaticMixed_depth_1_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1529,10 +1529,10 @@ void StaticMixed_depth_1_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1553,9 +1553,9 @@ void StaticMixed_depth_1_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1569,10 +1569,10 @@ void StaticMixed_depth_1_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1726,9 +1726,9 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1742,10 +1742,10 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1758,10 +1758,10 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1780,9 +1780,9 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1796,10 +1796,10 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1812,10 +1812,10 @@ void StaticMixed_depth_2_cp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -1975,9 +1975,9 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -1991,10 +1991,10 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2007,10 +2007,10 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2030,9 +2030,9 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2046,10 +2046,10 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2062,10 +2062,10 @@ void StaticMixed_depth_2_cp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2218,9 +2218,9 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2234,10 +2234,10 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2250,10 +2250,10 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2272,9 +2272,9 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2288,10 +2288,10 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2304,10 +2304,10 @@ void StaticMixed_depth_2_pc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2467,9 +2467,9 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2483,10 +2483,10 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2499,10 +2499,10 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2522,9 +2522,9 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2538,10 +2538,10 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2554,10 +2554,10 @@ void StaticMixed_depth_2_pc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2678,9 +2678,9 @@ void StaticMixed_depth_2_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.938791f, 0.290096f, -0.185783f, 0.0f,
-            -0.239713f, 0.937438f, 0.252482f, 0.0f,
-            0.247404f, -0.192493f, 0.949599f, 0.0f,
+            0.950952f, 0.242472f, -0.192089f, 0.0f,
+            -0.192089f, 0.949599f, 0.247718f, 0.0f,
+            0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2694,10 +2694,10 @@ void StaticMixed_depth_2_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.75904f, 0.571734f, -0.311413f, 0.0f,
-            -0.312929f, 0.739845f, 0.595571f, 0.0f,
-            0.570905f, -0.354612f, 0.740485f, 0.0f,
-            5.18748f, 1.581548f, 1.867049f, 1.0f
+            0.813784f, 0.45786f, -0.357939f, 0.0f,
+            -0.197619f, 0.797202f, 0.570453f, 0.0f,
+            0.546537f, -0.39349f, 0.739232f, 0.0f,
+            5.216563f, 1.429413f, 1.84813f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2717,9 +2717,9 @@ void StaticMixed_depth_2_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.910718f, 0.412278f, 0.02487f, 0.0f,
-            -0.385046f, 0.825692f, 0.412278f, 0.0f,
-            0.149438f, -0.385046f, 0.910718f, 0.0f,
+            0.93338f, 0.358678f, 0.012302f, 0.0f,
+            -0.331445f, 0.848353f, 0.412844f, 0.0f,
+            0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2733,10 +2733,10 @@ void StaticMixed_depth_2_cp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.714088f, 0.697332f, -0.061699f, 0.0f,
-            -0.475022f, 0.547398f, 0.688992f, 0.0f,
-            0.51423f, -0.462692f, 0.722138f, 0.0f,
-            9.956313f, -1.340734f, 4.440689f, 1.0f
+            0.79506f, 0.59401f, -0.122602f, 0.0f,
+            -0.361427f, 0.626319f, 0.690721f, 0.0f,
+            0.487083f, -0.504853f, 0.712653f, 0.0f,
+            10.006603f, -1.508093f, 4.402984f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2862,9 +2862,9 @@ void StaticMixed_depth_2_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.469396f, 0.145048f, -0.092891f, 0.0f,
-            -0.479426f, 1.874877f, 0.504964f, 0.0f,
-            0.371106f, -0.28874f, 1.424398f, 0.0f,
+            0.475476f, 0.121236f, -0.096045f, 0.0f,
+            -0.384178f, 1.899197f, 0.495436f, 0.0f,
+            0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2878,10 +2878,10 @@ void StaticMixed_depth_2_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.453139f, 1.43013f, -0.516815f, 0.0f,
-            -0.602034f, 2.39333f, 1.461155f, 0.0f,
-            0.306382f, -0.374988f, 0.564994f, 0.0f,
-            3.964846f, 1.002034f, 2.857923f, 1.0f
+            0.591156f, 1.091345f, -0.660432f, 0.0f,
+            -0.430892f, 2.498431f, 1.427446f, 0.0f,
+            0.289857f, -0.399501f, 0.563238f, 0.0f,
+            3.97199f, 0.916703f, 2.848463f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -2902,9 +2902,9 @@ void StaticMixed_depth_2_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.683039f, 0.309209f, 0.018653f, 0.0f,
-            -0.962614f, 2.064229f, 1.030696f, 0.0f,
-            0.186798f, -0.481307f, 1.138398f, 0.0f,
+            0.700035f, 0.269009f, 0.009227f, 0.0f,
+            -0.828614f, 2.120883f, 1.032111f, 0.0f,
+            0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -2918,10 +2918,10 @@ void StaticMixed_depth_2_cp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.667429f, 1.925779f, 0.106308f, 0.0f,
-            -1.424469f, 2.507739f, 2.005763f, 0.0f,
-            0.322051f, -0.465336f, 0.376752f, 0.0f,
-            9.329313f, -1.794334f, 4.763555f, 1.0f
+            0.940271f, 1.54551f, -0.122346f, 0.0f,
+            -1.186598f, 2.691707f, 2.020832f, 0.0f,
+            0.299767f, -0.49754f, 0.368287f, 0.0f,
+            9.358184f, -1.923134f, 4.735277f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3041,9 +3041,9 @@ void StaticMixed_depth_2_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3058,10 +3058,10 @@ void StaticMixed_depth_2_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3080,9 +3080,9 @@ void StaticMixed_depth_2_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3097,10 +3097,10 @@ void StaticMixed_depth_2_cp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3225,9 +3225,9 @@ void StaticMixed_depth_2_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3242,10 +3242,10 @@ void StaticMixed_depth_2_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3265,9 +3265,9 @@ void StaticMixed_depth_2_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3282,10 +3282,10 @@ void StaticMixed_depth_2_cp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3405,9 +3405,9 @@ void StaticMixed_depth_2_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3421,10 +3421,10 @@ void StaticMixed_depth_2_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3444,9 +3444,9 @@ void StaticMixed_depth_2_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3460,10 +3460,10 @@ void StaticMixed_depth_2_cp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3589,9 +3589,9 @@ void StaticMixed_depth_2_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3605,10 +3605,10 @@ void StaticMixed_depth_2_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3629,9 +3629,9 @@ void StaticMixed_depth_2_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3645,10 +3645,10 @@ void StaticMixed_depth_2_cp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -3738,9 +3738,9 @@ void StaticMixed_depth_2_cp_r_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.275387f, -0.217983f, 0.0f,
-            -0.189796f, 0.918943f, 0.345718f, 0.0f,
-            0.29552f, -0.282321f, 0.912668f, 0.0f,
+            0.953644f, 0.189796f, -0.233541f, 0.0f,
+            -0.104205f, 0.936293f, 0.335404f, 0.0f,
+            0.282321f, -0.29552f, 0.912668f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3762,9 +3762,9 @@ void StaticMixed_depth_2_cp_r_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.920648f, 0.390394f, 0.000616f, 0.0f,
-            -0.336063f, 0.791717f, 0.510143f, 0.0f,
-            0.198669f, -0.469869f, 0.860089f, 0.0f,
+            0.953308f, 0.300921f, -0.025508f, 0.0f,
+            -0.24659f, 0.824377f, 0.509505f, 0.0f,
+            0.174349f, -0.479426f, 0.860089f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3857,9 +3857,9 @@ void StaticMixed_depth_2_cp_rs_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.872587f, 0.550775f, -0.435966f, 0.0f,
-            -0.284694f, 1.378415f, 0.518577f, 0.0f,
-            0.14776f, -0.141161f, 0.456334f, 0.0f,
+            1.907287f, 0.379592f, -0.467082f, 0.0f,
+            -0.156307f, 1.40444f, 0.503107f, 0.0f,
+            0.141161f, -0.14776f, 0.456334f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -3882,9 +3882,9 @@ void StaticMixed_depth_2_cp_rs_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.071458f, 0.878386f, 0.001385f, 0.0f,
-            -0.672125f, 1.583434f, 1.020286f, 0.0f,
-            0.049667f, -0.117467f, 0.215022f, 0.0f,
+            2.144943f, 0.677073f, -0.057392f, 0.0f,
+            -0.49318f, 1.648754f, 1.019011f, 0.0f,
+            0.043587f, -0.119856f, 0.215022f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4006,9 +4006,9 @@ void StaticMixed_depth_2_pc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.938791f, 0.290096f, -0.185783f, 0.0f,
-            -0.239713f, 0.937438f, 0.252482f, 0.0f,
-            0.247404f, -0.192493f, 0.949599f, 0.0f,
+            0.950952f, 0.242472f, -0.192089f, 0.0f,
+            -0.192089f, 0.949599f, 0.247718f, 0.0f,
+            0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4022,10 +4022,10 @@ void StaticMixed_depth_2_pc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.75904f, 0.571734f, -0.311413f, 0.0f,
-            -0.312929f, 0.739845f, 0.595571f, 0.0f,
-            0.570905f, -0.354612f, 0.740485f, 0.0f,
-            5.18748f, 1.581548f, 1.867049f, 1.0f
+            0.813784f, 0.45786f, -0.357939f, 0.0f,
+            -0.197619f, 0.797202f, 0.570453f, 0.0f,
+            0.546537f, -0.39349f, 0.739232f, 0.0f,
+            5.216563f, 1.429413f, 1.84813f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4045,9 +4045,9 @@ void StaticMixed_depth_2_pc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.910718f, 0.412278f, 0.02487f, 0.0f,
-            -0.385046f, 0.825692f, 0.412278f, 0.0f,
-            0.149438f, -0.385046f, 0.910718f, 0.0f,
+            0.93338f, 0.358678f, 0.012302f, 0.0f,
+            -0.331445f, 0.848353f, 0.412844f, 0.0f,
+            0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4061,10 +4061,10 @@ void StaticMixed_depth_2_pc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.714088f, 0.697332f, -0.061699f, 0.0f,
-            -0.475022f, 0.547398f, 0.688992f, 0.0f,
-            0.51423f, -0.462692f, 0.722138f, 0.0f,
-            9.956313f, -1.340734f, 4.440689f, 1.0f
+            0.79506f, 0.59401f, -0.122602f, 0.0f,
+            -0.361427f, 0.626319f, 0.690721f, 0.0f,
+            0.487083f, -0.504853f, 0.712653f, 0.0f,
+            10.006603f, -1.508093f, 4.402984f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4190,9 +4190,9 @@ void StaticMixed_depth_2_pc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.469396f, 0.145048f, -0.092891f, 0.0f,
-            -0.479426f, 1.874877f, 0.504964f, 0.0f,
-            0.371106f, -0.28874f, 1.424398f, 0.0f,
+            0.475476f, 0.121236f, -0.096045f, 0.0f,
+            -0.384178f, 1.899197f, 0.495436f, 0.0f,
+            0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4206,10 +4206,10 @@ void StaticMixed_depth_2_pc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.453139f, 1.43013f, -0.516815f, 0.0f,
-            -0.602034f, 2.39333f, 1.461155f, 0.0f,
-            0.306382f, -0.374988f, 0.564994f, 0.0f,
-            3.964846f, 1.002034f, 2.857923f, 1.0f
+            0.591156f, 1.091345f, -0.660432f, 0.0f,
+            -0.430892f, 2.498431f, 1.427446f, 0.0f,
+            0.289857f, -0.399501f, 0.563238f, 0.0f,
+            3.97199f, 0.916703f, 2.848463f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4230,9 +4230,9 @@ void StaticMixed_depth_2_pc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.683039f, 0.309209f, 0.018653f, 0.0f,
-            -0.962614f, 2.064229f, 1.030696f, 0.0f,
-            0.186798f, -0.481307f, 1.138398f, 0.0f,
+            0.700035f, 0.269009f, 0.009227f, 0.0f,
+            -0.828614f, 2.120883f, 1.032111f, 0.0f,
+            0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4246,10 +4246,10 @@ void StaticMixed_depth_2_pc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.667429f, 1.925779f, 0.106308f, 0.0f,
-            -1.424469f, 2.507739f, 2.005763f, 0.0f,
-            0.322051f, -0.465336f, 0.376752f, 0.0f,
-            9.329313f, -1.794334f, 4.763555f, 1.0f
+            0.940271f, 1.54551f, -0.122346f, 0.0f,
+            -1.186598f, 2.691707f, 2.020832f, 0.0f,
+            0.299767f, -0.49754f, 0.368287f, 0.0f,
+            9.358184f, -1.923134f, 4.735277f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4369,9 +4369,9 @@ void StaticMixed_depth_2_pc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4386,10 +4386,10 @@ void StaticMixed_depth_2_pc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4408,9 +4408,9 @@ void StaticMixed_depth_2_pc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4425,10 +4425,10 @@ void StaticMixed_depth_2_pc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4553,9 +4553,9 @@ void StaticMixed_depth_2_pc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4570,10 +4570,10 @@ void StaticMixed_depth_2_pc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4593,9 +4593,9 @@ void StaticMixed_depth_2_pc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4610,10 +4610,10 @@ void StaticMixed_depth_2_pc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4733,9 +4733,9 @@ void StaticMixed_depth_2_pc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4749,10 +4749,10 @@ void StaticMixed_depth_2_pc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4772,9 +4772,9 @@ void StaticMixed_depth_2_pc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4788,10 +4788,10 @@ void StaticMixed_depth_2_pc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4917,9 +4917,9 @@ void StaticMixed_depth_2_pc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4933,10 +4933,10 @@ void StaticMixed_depth_2_pc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -4957,9 +4957,9 @@ void StaticMixed_depth_2_pc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -4973,10 +4973,10 @@ void StaticMixed_depth_2_pc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5066,9 +5066,9 @@ void StaticMixed_depth_2_pc_r_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.275387f, -0.217983f, 0.0f,
-            -0.189796f, 0.918943f, 0.345718f, 0.0f,
-            0.29552f, -0.282321f, 0.912668f, 0.0f,
+            0.953644f, 0.189796f, -0.233541f, 0.0f,
+            -0.104205f, 0.936293f, 0.335404f, 0.0f,
+            0.282321f, -0.29552f, 0.912668f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5090,9 +5090,9 @@ void StaticMixed_depth_2_pc_r_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.920648f, 0.390394f, 0.000616f, 0.0f,
-            -0.336063f, 0.791717f, 0.510143f, 0.0f,
-            0.198669f, -0.469869f, 0.860089f, 0.0f,
+            0.953308f, 0.300921f, -0.025508f, 0.0f,
+            -0.24659f, 0.824377f, 0.509505f, 0.0f,
+            0.174349f, -0.479426f, 0.860089f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5185,9 +5185,9 @@ void StaticMixed_depth_2_pc_rs_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.872587f, 0.550775f, -0.435966f, 0.0f,
-            -0.284694f, 1.378415f, 0.518577f, 0.0f,
-            0.14776f, -0.141161f, 0.456334f, 0.0f,
+            1.907287f, 0.379592f, -0.467082f, 0.0f,
+            -0.156307f, 1.40444f, 0.503107f, 0.0f,
+            0.141161f, -0.14776f, 0.456334f, 0.0f,
             3.0f, 0.0f, 1.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5210,9 +5210,9 @@ void StaticMixed_depth_2_pc_rs_skip_0_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.071458f, 0.878386f, 0.001385f, 0.0f,
-            -0.672125f, 1.583434f, 1.020286f, 0.0f,
-            0.049667f, -0.117467f, 0.215022f, 0.0f,
+            2.144943f, 0.677073f, -0.057392f, 0.0f,
+            -0.49318f, 1.648754f, 1.019011f, 0.0f,
+            0.043587f, -0.119856f, 0.215022f, 0.0f,
             8.0f, -3.0f, 3.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5403,9 +5403,9 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5419,10 +5419,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5435,10 +5435,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5451,10 +5451,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5473,9 +5473,9 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5489,10 +5489,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5505,10 +5505,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5521,10 +5521,10 @@ void StaticMixed_depth_3_ccp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5723,9 +5723,9 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5739,10 +5739,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5755,10 +5755,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5771,10 +5771,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5794,9 +5794,9 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -5810,10 +5810,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5826,10 +5826,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -5842,10 +5842,10 @@ void StaticMixed_depth_3_ccp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6035,9 +6035,9 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6051,10 +6051,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6067,10 +6067,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6083,10 +6083,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6105,9 +6105,9 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6121,10 +6121,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6137,10 +6137,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6153,10 +6153,10 @@ void StaticMixed_depth_3_cpc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6355,9 +6355,9 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6371,10 +6371,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6387,10 +6387,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6403,10 +6403,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6426,9 +6426,9 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6442,10 +6442,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6458,10 +6458,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6474,10 +6474,10 @@ void StaticMixed_depth_3_cpc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6667,9 +6667,9 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6683,10 +6683,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6699,10 +6699,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6715,10 +6715,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6737,9 +6737,9 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -6753,10 +6753,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6769,10 +6769,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6785,10 +6785,10 @@ void StaticMixed_depth_3_cpp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -6987,9 +6987,9 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7003,10 +7003,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7019,10 +7019,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7035,10 +7035,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7058,9 +7058,9 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7074,10 +7074,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7090,10 +7090,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7106,10 +7106,10 @@ void StaticMixed_depth_3_cpp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7299,9 +7299,9 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7315,10 +7315,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7331,10 +7331,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7347,10 +7347,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7369,9 +7369,9 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7385,10 +7385,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7401,10 +7401,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7417,10 +7417,10 @@ void StaticMixed_depth_3_pcc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7619,9 +7619,9 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7635,10 +7635,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7651,10 +7651,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7667,10 +7667,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7690,9 +7690,9 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7706,10 +7706,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7722,10 +7722,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7738,10 +7738,10 @@ void StaticMixed_depth_3_pcc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7931,9 +7931,9 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -7947,10 +7947,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7963,10 +7963,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -7979,10 +7979,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8001,9 +8001,9 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8017,10 +8017,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8033,10 +8033,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8049,10 +8049,10 @@ void StaticMixed_depth_3_pcp_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8251,9 +8251,9 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8267,10 +8267,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8283,10 +8283,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8299,10 +8299,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8322,9 +8322,9 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8338,10 +8338,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8354,10 +8354,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8370,10 +8370,10 @@ void StaticMixed_depth_3_pcp_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8563,9 +8563,9 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8579,10 +8579,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8595,10 +8595,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8611,10 +8611,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.144646f, 0.955123f, -0.258491f, 0.0f,
-            -0.075269f, 0.271102f, 0.959603f, 0.0f,
-            0.986617f, -0.119346f, 0.111105f, 0.0f,
-            9.660424f, 7.167451f, 0.799266f, 1.0f
+            0.284633f, 0.843989f, -0.454606f, 0.0f,
+            0.048796f, 0.460851f, 0.886135f, 0.0f,
+            0.957394f, -0.274406f, 0.08999f, 0.0f,
+            10.005639f, 6.332136f, 0.476077f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8633,9 +8633,9 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8649,10 +8649,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8665,10 +8665,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8681,10 +8681,10 @@ void StaticMixed_depth_3_ppc_r(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.039281f, 0.998824f, -0.028417f, 0.0f,
-            -0.218983f, 0.036352f, 0.975051f, 0.0f,
-            0.974938f, -0.032078f, 0.220154f, 0.0f,
-            13.774656f, 4.885994f, 5.089374f, 1.0f
+            0.224253f, 0.948574f, -0.223421f, 0.0f,
+            -0.113053f, 0.253034f, 0.960829f, 0.0f,
+            0.967951f, -0.190211f, 0.163983f, 0.0f,
+            14.317083f, 4.107589f, 4.646667f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8883,9 +8883,9 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8899,10 +8899,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8915,10 +8915,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8931,10 +8931,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.171345f, 1.383829f, -0.414747f, 0.0f,
-            -0.202255f, 0.224601f, 2.55301f, 0.0f,
-            1.37103f, 0.013878f, -0.963571f, 0.0f,
-            10.484375f, 6.883498f, 0.000149f, 1.0f
+            0.196131f, 1.265376f, -1.423546f, 0.0f,
+            -0.051522f, 0.426847f, 2.420036f, 0.0f,
+            1.316493f, -0.210862f, -1.141022f, 0.0f,
+            11.077468f, 6.20269f, -1.305818f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8954,9 +8954,9 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -8970,10 +8970,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -8986,10 +8986,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9002,10 +9002,10 @@ void StaticMixed_depth_3_ppc_rs(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.815337f, 2.514017f, 0.33504f, 0.0f,
-            -0.911863f, 0.228513f, 2.400951f, 0.0f,
-            1.909066f, 0.013655f, -0.811747f, 0.0f,
-            15.494348f, 7.206342f, 4.887313f, 1.0f
+            -0.048019f, 2.367938f, -0.617458f, 0.0f,
+            -0.778848f, 0.607675f, 2.39081f, 0.0f,
+            1.968016f, -0.381453f, -1.081359f, 0.0f,
+            16.862834f, 6.09883f, 3.443547f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9163,9 +9163,9 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.938791f, 0.290096f, -0.185783f, 0.0f,
-            -0.239713f, 0.937438f, 0.252482f, 0.0f,
-            0.247404f, -0.192493f, 0.949599f, 0.0f,
+            0.950952f, 0.242472f, -0.192089f, 0.0f,
+            -0.192089f, 0.949599f, 0.247718f, 0.0f,
+            0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9179,10 +9179,10 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.75904f, 0.571734f, -0.311413f, 0.0f,
-            -0.312929f, 0.739845f, 0.595571f, 0.0f,
-            0.570905f, -0.354612f, 0.740485f, 0.0f,
-            5.18748f, 1.581548f, 1.867049f, 1.0f
+            0.813784f, 0.45786f, -0.357939f, 0.0f,
+            -0.197619f, 0.797202f, 0.570453f, 0.0f,
+            0.546537f, -0.39349f, 0.739232f, 0.0f,
+            5.216563f, 1.429413f, 1.84813f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9195,10 +9195,10 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.475566f, 0.82066f, -0.316788f, 0.0f,
-            -0.138529f, 0.42549f, 0.894297f, 0.0f,
-            0.868704f, -0.381413f, 0.316034f, 0.0f,
-            9.678381f, 2.419414f, 1.506795f, 1.0f
+            0.589476f, 0.656037f, -0.471311f, 0.0f,
+            0.038921f, 0.559716f, 0.82777f, 0.0f,
+            0.806848f, -0.506294f, 0.304405f, 0.0f,
+            9.762392f, 1.676671f, 1.324385f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9218,9 +9218,9 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.910718f, 0.412278f, 0.02487f, 0.0f,
-            -0.385046f, 0.825692f, 0.412278f, 0.0f,
-            0.149438f, -0.385046f, 0.910718f, 0.0f,
+            0.93338f, 0.358678f, 0.012302f, 0.0f,
+            -0.331445f, 0.848353f, 0.412844f, 0.0f,
+            0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9234,10 +9234,10 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.714088f, 0.697332f, -0.061699f, 0.0f,
-            -0.475022f, 0.547398f, 0.688992f, 0.0f,
-            0.51423f, -0.462692f, 0.722138f, 0.0f,
-            9.956313f, -1.340734f, 4.440689f, 1.0f
+            0.79506f, 0.59401f, -0.122602f, 0.0f,
+            -0.361427f, 0.626319f, 0.690721f, 0.0f,
+            0.487083f, -0.504853f, 0.712653f, 0.0f,
+            10.006603f, -1.508093f, 4.402984f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9250,10 +9250,10 @@ void StaticMixed_depth_3_cpc_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.404502f, 0.912882f, -0.054993f, 0.0f,
-            -0.301103f, 0.189717f, 0.934529f, 0.0f,
-            0.863548f, -0.36146f, 0.351612f, 0.0f,
-            14.316146f, -0.024189f, 4.949178f, 1.0f
+            0.566072f, 0.793363f, -0.223916f, 0.0f,
+            -0.134657f, 0.356967f, 0.92436f, 0.0f,
+            0.813284f, -0.493102f, 0.308901f, 0.0f,
+            14.522437f, -0.768077f, 4.647162f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9418,9 +9418,9 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.469396f, 0.145048f, -0.092891f, 0.0f,
-            -0.479426f, 1.874877f, 0.504964f, 0.0f,
-            0.371106f, -0.28874f, 1.424398f, 0.0f,
+            0.475476f, 0.121236f, -0.096045f, 0.0f,
+            -0.384178f, 1.899197f, 0.495436f, 0.0f,
+            0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9434,10 +9434,10 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.453139f, 1.43013f, -0.516815f, 0.0f,
-            -0.602034f, 2.39333f, 1.461155f, 0.0f,
-            0.306382f, -0.374988f, 0.564994f, 0.0f,
-            3.964846f, 1.002034f, 2.857923f, 1.0f
+            0.591156f, 1.091345f, -0.660432f, 0.0f,
+            -0.430892f, 2.498431f, 1.427446f, 0.0f,
+            0.289857f, -0.399501f, 0.563238f, 0.0f,
+            3.97199f, 0.916703f, 2.848463f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9450,10 +9450,10 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.225857f, 2.586296f, -0.286944f, 0.0f,
-            -0.350587f, 1.326785f, 1.213731f, 0.0f,
-            0.961047f, -1.06434f, -0.334311f, 0.0f,
-            6.992201f, 3.57925f, 0.459498f, 1.0f
+            0.523922f, 1.86618f, -0.737878f, 0.0f,
+            -0.208245f, 1.575965f, 1.153574f, 0.0f,
+            0.907938f, -1.460868f, -0.4157f, 0.0f,
+            7.347221f, 1.984648f, -0.094234f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9474,9 +9474,9 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.683039f, 0.309209f, 0.018653f, 0.0f,
-            -0.962614f, 2.064229f, 1.030696f, 0.0f,
-            0.186798f, -0.481307f, 1.138398f, 0.0f,
+            0.700035f, 0.269009f, 0.009227f, 0.0f,
+            -0.828614f, 2.120883f, 1.032111f, 0.0f,
+            0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9490,10 +9490,10 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.667429f, 1.925779f, 0.106308f, 0.0f,
-            -1.424469f, 2.507739f, 2.005763f, 0.0f,
-            0.322051f, -0.465336f, 0.376752f, 0.0f,
-            9.329313f, -1.794334f, 4.763555f, 1.0f
+            0.940271f, 1.54551f, -0.122346f, 0.0f,
+            -1.186598f, 2.691707f, 2.020832f, 0.0f,
+            0.299767f, -0.49754f, 0.368287f, 0.0f,
+            9.358184f, -1.923134f, 4.735277f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9506,10 +9506,10 @@ void StaticMixed_depth_3_cpc_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.192442f, 3.229021f, 0.67989f, 0.0f,
-            -0.917516f, 1.321746f, 1.45094f, 0.0f,
-            1.542883f, -0.989439f, -0.55695f, 0.0f,
-            14.067599f, 2.47037f, 3.936527f, 1.0f
+            0.80442f, 2.472912f, 0.071671f, 0.0f,
+            -0.723539f, 1.674774f, 1.495134f, 0.0f,
+            1.527619f, -1.485844f, -0.76041f, 0.0f,
+            14.905397f, 0.57212f, 2.961636f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9666,9 +9666,9 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9683,10 +9683,10 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9699,10 +9699,10 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.461615f, 0.809571f, -0.362638f, 0.0f,
-            -0.206661f, 0.495696f, 0.84355f, 0.0f,
-            0.862672f, -0.314452f, 0.396128f, 0.0f,
-            8.575935f, 3.788446f, 1.297366f, 1.0f
+            0.570947f, 0.655208f, -0.494693f, 0.0f,
+            -0.049153f, 0.628759f, 0.776045f, 0.0f,
+            0.819514f, -0.418765f, 0.391194f, 0.0f,
+            8.664842f, 3.265045f, 1.18388f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9721,9 +9721,9 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9738,10 +9738,10 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9754,10 +9754,10 @@ void StaticMixed_depth_3_cpc_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.382973f, 0.916499f, -0.115594f, 0.0f,
-            -0.366325f, 0.265552f, 0.891789f, 0.0f,
-            0.84802f, -0.299187f, 0.437436f, 0.0f,
-            13.118678f, 1.383792f, 4.707052f, 1.0f
+            0.535139f, 0.803255f, -0.26155f, 0.0f,
+            -0.218439f, 0.430659f, 0.875681f, 0.0f,
+            0.816034f, -0.411478f, 0.405925f, 0.0f,
+            13.308904f, 0.841343f, 4.5018f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9921,9 +9921,9 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9938,10 +9938,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9954,10 +9954,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.497107f, 1.589553f, -1.326095f, 0.0f,
-            -0.380392f, 0.120881f, 1.197703f, 0.0f,
-            1.969617f, 0.289245f, -0.201083f, 0.0f,
-            16.529089f, 7.424281f, -1.811357f, 1.0f
+            2.738143f, 1.44318f, -1.69857f, 0.0f,
+            -0.036396f, 0.302562f, 1.038989f, 0.0f,
+            1.808012f, 0.108634f, -0.19728f, 0.0f,
+            16.682215f, 6.787077f, -2.104296f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -9977,9 +9977,9 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -9994,10 +9994,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10010,10 +10010,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.604319f, 2.79024f, -0.28727f, 0.0f,
-            -0.791481f, 0.151794f, 1.124748f, 0.0f,
-            2.354361f, 0.415343f, 0.034856f, 0.0f,
-            23.14916f, 7.94739f, 3.743226f, 1.0f
+            3.067368f, 2.554774f, -0.672618f, 0.0f,
+            -0.407954f, 0.476948f, 1.087432f, 0.0f,
+            2.224541f, 0.100841f, -0.049929f, 0.0f,
+            23.68248f, 6.870867f, 3.248715f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10170,9 +10170,9 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10186,10 +10186,10 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10203,10 +10203,10 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.462922f, 0.806418f, -0.367957f, 0.0f,
-            -0.297739f, 0.53246f, 0.792362f, 0.0f,
-            0.834898f, -0.257247f, 0.48659f, 0.0f,
-            7.211736f, 4.636587f, 1.45109f, 1.0f
+            0.564564f, 0.675627f, -0.474126f, 0.0f,
+            -0.16687f, 0.655994f, 0.736088f, 0.0f,
+            0.808345f, -0.336452f, 0.483093f, 0.0f,
+            7.309582f, 4.309808f, 1.388523f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10225,9 +10225,9 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10241,10 +10241,10 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10258,10 +10258,10 @@ void StaticMixed_depth_3_cpc_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.385291f, 0.914798f, -0.121222f, 0.0f,
-            -0.455301f, 0.302714f, 0.837297f, 0.0f,
-            0.802653f, -0.26741f, 0.533141f, 0.0f,
-            11.641804f, 2.019464f, 4.844081f, 1.0f
+            0.523863f, 0.817799f, -0.238268f, 0.0f,
+            -0.333295f, 0.454217f, 0.826197f, 0.0f,
+            0.783889f, -0.3534f, 0.510516f, 0.0f,
+            11.816209f, 1.672419f, 4.728318f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10425,9 +10425,9 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10441,10 +10441,10 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10458,10 +10458,10 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.088718f, 0.622369f, -0.755564f, 0.0f,
-            -0.19449f, 0.264835f, 1.72518f, 0.0f,
-            2.182858f, -0.462912f, 2.633974f, 0.0f,
-            9.468847f, 3.40042f, 5.011063f, 1.0f
+            0.231257f, 0.543351f, -1.08851f, 0.0f,
+            -0.070399f, 0.349182f, 1.650046f, 0.0f,
+            2.095741f, -0.5795f, 2.620385f, 0.0f,
+            9.395843f, 3.138277f, 5.004176f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10481,9 +10481,9 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10497,10 +10497,10 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10514,10 +10514,10 @@ void StaticMixed_depth_3_cpc_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.037956f, 1.162098f, -0.354597f, 0.0f,
-            -0.744699f, 0.359951f, 1.678747f, 0.0f,
-            2.387519f, -1.147249f, 2.199638f, 0.0f,
-            14.891865f, 0.676647f, 7.556756f, 1.0f
+            0.262595f, 1.040567f, -0.6878f, 0.0f,
+            -0.601872f, 0.52133f, 1.65873f, 0.0f,
+            2.30292f, -1.3502f, 2.135966f, 0.0f,
+            14.879272f, 0.241178f, 7.461272f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10674,9 +10674,9 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10690,10 +10690,10 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10706,10 +10706,10 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10729,9 +10729,9 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10745,10 +10745,10 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10761,10 +10761,10 @@ void StaticMixed_depth_3_cpc_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10929,9 +10929,9 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -10945,10 +10945,10 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10961,10 +10961,10 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -10985,9 +10985,9 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11001,10 +11001,10 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11017,10 +11017,10 @@ void StaticMixed_depth_3_cpc_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11145,9 +11145,9 @@ void StaticMixed_depth_3_cpc_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11163,10 +11163,10 @@ void StaticMixed_depth_3_cpc_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.741067f, 0.570336f, -0.354311f, 0.0f,
-            -0.303553f, 0.755278f, 0.580871f, 0.0f,
-            0.598895f, -0.322912f, 0.732839f, 0.0f,
-            5.432142f, 2.111578f, 1.659168f, 1.0f
+            0.800424f, 0.438211f, -0.409015f, 0.0f,
+            -0.172749f, 0.822016f, 0.54263f, 0.0f,
+            0.574003f, -0.363677f, 0.733662f, 0.0f,
+            5.434654f, 2.025945f, 1.654631f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11185,9 +11185,9 @@ void StaticMixed_depth_3_cpc_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11203,10 +11203,10 @@ void StaticMixed_depth_3_cpc_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.6901f, 0.713871f, -0.118956f, 0.0f,
-            -0.468135f, 0.565671f, 0.678871f, 0.0f,
-            0.551916f, -0.412801f, 0.724558f, 0.0f,
-            10.216254f, -0.667068f, 4.264188f, 1.0f
+            0.779196f, 0.596698f, -0.191845f, 0.0f,
+            -0.338159f, 0.657926f, 0.672891f, 0.0f,
+            0.527732f, -0.45944f, 0.714432f, 0.0f,
+            10.232101f, -0.789117f, 4.244949f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11335,9 +11335,9 @@ void StaticMixed_depth_3_cpc_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11353,10 +11353,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.455583f, 0.766468f, -0.871037f, 0.0f,
-            -0.115801f, 0.202698f, 0.708802f, 0.0f,
-            1.317509f, -0.271674f, 2.366078f, 0.0f,
-            7.557252f, 3.014226f, 3.367715f, 1.0f
+            1.512232f, 0.675843f, -0.966411f, 0.0f,
+            0.021154f, 0.260037f, 0.65752f, 0.0f,
+            1.261669f, -0.327806f, 2.372437f, 0.0f,
+            7.578976f, 2.889647f, 3.359301f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11376,9 +11376,9 @@ void StaticMixed_depth_3_cpc_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11394,10 +11394,10 @@ void StaticMixed_depth_3_cpc_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.619012f, 1.347355f, -0.337979f, 0.0f,
-            -0.397575f, 0.317851f, 0.736901f, 0.0f,
-            1.27067f, -0.73487f, 2.028546f, 0.0f,
-            13.05385f, 0.218178f, 5.818018f, 1.0f
+            1.756911f, 1.194274f, -0.45943f, 0.0f,
+            -0.235733f, 0.42285f, 0.725287f, 0.0f,
+            1.207331f, -0.829166f, 2.010404f, 0.0f,
+            13.101507f, 0.014218f, 5.784808f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11491,9 +11491,9 @@ void StaticMixed_depth_3_cpc_r_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.928825f, 0.269673f, -0.254089f, 0.0f,
-            -0.140378f, 0.890764f, 0.432243f, 0.0f,
-            0.342898f, -0.365809f, 0.86522f, 0.0f,
+            0.948779f, 0.137642f, -0.284382f, 0.0f,
+            -0.008347f, 0.910718f, 0.412943f, 0.0f,
+            0.31583f, -0.389418f, 0.86522f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11516,9 +11516,9 @@ void StaticMixed_depth_3_cpc_r_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.925637f, 0.377359f, -0.028208f, 0.0f,
-            -0.286333f, 0.747191f, 0.599766f, 0.0f,
-            0.247404f, -0.547089f, 0.799678f, 0.0f,
+            0.96692f, 0.243903f, -0.074678f, 0.0f,
+            -0.152878f, 0.788473f, 0.595767f, 0.0f,
+            0.204191f, -0.564642f, 0.799678f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11616,9 +11616,9 @@ void StaticMixed_depth_3_cpc_rs_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.161031f, 0.337091f, -0.317612f, 0.0f,
-            -0.105284f, 0.668073f, 0.324182f, 0.0f,
-            0.514347f, -0.548713f, 1.297829f, 0.0f,
+            1.185974f, 0.172052f, -0.355477f, 0.0f,
+            -0.00626f, 0.683039f, 0.309707f, 0.0f,
+            0.473745f, -0.584128f, 1.297829f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11642,9 +11642,9 @@ void StaticMixed_depth_3_cpc_rs_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.388456f, 0.566038f, -0.042312f, 0.0f,
-            -0.357916f, 0.933988f, 0.749708f, 0.0f,
-            0.309255f, -0.683861f, 0.999597f, 0.0f,
+            1.45038f, 0.365855f, -0.112017f, 0.0f,
+            -0.191097f, 0.985592f, 0.744709f, 0.0f,
+            0.255239f, -0.705803f, 0.999597f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11803,9 +11803,9 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.938791f, 0.290096f, -0.185783f, 0.0f,
-            -0.239713f, 0.937438f, 0.252482f, 0.0f,
-            0.247404f, -0.192493f, 0.949599f, 0.0f,
+            0.950952f, 0.242472f, -0.192089f, 0.0f,
+            -0.192089f, 0.949599f, 0.247718f, 0.0f,
+            0.242472f, -0.198669f, 0.949599f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11819,10 +11819,10 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.75904f, 0.571734f, -0.311413f, 0.0f,
-            -0.312929f, 0.739845f, 0.595571f, 0.0f,
-            0.570905f, -0.354612f, 0.740485f, 0.0f,
-            5.18748f, 1.581548f, 1.867049f, 1.0f
+            0.813784f, 0.45786f, -0.357939f, 0.0f,
+            -0.197619f, 0.797202f, 0.570453f, 0.0f,
+            0.546537f, -0.39349f, 0.739232f, 0.0f,
+            5.216563f, 1.429413f, 1.84813f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11835,10 +11835,10 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.475566f, 0.82066f, -0.316788f, 0.0f,
-            -0.138529f, 0.42549f, 0.894297f, 0.0f,
-            0.868704f, -0.381413f, 0.316034f, 0.0f,
-            9.678381f, 2.419414f, 1.506795f, 1.0f
+            0.589476f, 0.656037f, -0.471311f, 0.0f,
+            0.038921f, 0.559716f, 0.82777f, 0.0f,
+            0.806848f, -0.506294f, 0.304405f, 0.0f,
+            9.762392f, 1.676671f, 1.324385f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11858,9 +11858,9 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.910718f, 0.412278f, 0.02487f, 0.0f,
-            -0.385046f, 0.825692f, 0.412278f, 0.0f,
-            0.149438f, -0.385046f, 0.910718f, 0.0f,
+            0.93338f, 0.358678f, 0.012302f, 0.0f,
+            -0.331445f, 0.848353f, 0.412844f, 0.0f,
+            0.137642f, -0.389418f, 0.910718f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -11874,10 +11874,10 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.714088f, 0.697332f, -0.061699f, 0.0f,
-            -0.475022f, 0.547398f, 0.688992f, 0.0f,
-            0.51423f, -0.462692f, 0.722138f, 0.0f,
-            9.956313f, -1.340734f, 4.440689f, 1.0f
+            0.79506f, 0.59401f, -0.122602f, 0.0f,
+            -0.361427f, 0.626319f, 0.690721f, 0.0f,
+            0.487083f, -0.504853f, 0.712653f, 0.0f,
+            10.006603f, -1.508093f, 4.402984f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -11890,10 +11890,10 @@ void StaticMixed_depth_3_pcp_r_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.404502f, 0.912882f, -0.054993f, 0.0f,
-            -0.301103f, 0.189717f, 0.934529f, 0.0f,
-            0.863548f, -0.36146f, 0.351612f, 0.0f,
-            14.316146f, -0.024189f, 4.949178f, 1.0f
+            0.566072f, 0.793363f, -0.223916f, 0.0f,
+            -0.134657f, 0.356967f, 0.92436f, 0.0f,
+            0.813284f, -0.493102f, 0.308901f, 0.0f,
+            14.522437f, -0.768077f, 4.647162f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12058,9 +12058,9 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.469396f, 0.145048f, -0.092891f, 0.0f,
-            -0.479426f, 1.874877f, 0.504964f, 0.0f,
-            0.371106f, -0.28874f, 1.424398f, 0.0f,
+            0.475476f, 0.121236f, -0.096045f, 0.0f,
+            -0.384178f, 1.899197f, 0.495436f, 0.0f,
+            0.363709f, -0.298004f, 1.424398f, 0.0f,
             2.0f, 1.0f, 1.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12074,10 +12074,10 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.453139f, 1.43013f, -0.516815f, 0.0f,
-            -0.602034f, 2.39333f, 1.461155f, 0.0f,
-            0.306382f, -0.374988f, 0.564994f, 0.0f,
-            3.964846f, 1.002034f, 2.857923f, 1.0f
+            0.591156f, 1.091345f, -0.660432f, 0.0f,
+            -0.430892f, 2.498431f, 1.427446f, 0.0f,
+            0.289857f, -0.399501f, 0.563238f, 0.0f,
+            3.97199f, 0.916703f, 2.848463f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12090,10 +12090,10 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.225857f, 2.586296f, -0.286944f, 0.0f,
-            -0.350587f, 1.326785f, 1.213731f, 0.0f,
-            0.961047f, -1.06434f, -0.334311f, 0.0f,
-            6.992201f, 3.57925f, 0.459498f, 1.0f
+            0.523922f, 1.86618f, -0.737878f, 0.0f,
+            -0.208245f, 1.575965f, 1.153574f, 0.0f,
+            0.907938f, -1.460868f, -0.4157f, 0.0f,
+            7.347221f, 1.984648f, -0.094234f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12114,9 +12114,9 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.683039f, 0.309209f, 0.018653f, 0.0f,
-            -0.962614f, 2.064229f, 1.030696f, 0.0f,
-            0.186798f, -0.481307f, 1.138398f, 0.0f,
+            0.700035f, 0.269009f, 0.009227f, 0.0f,
+            -0.828614f, 2.120883f, 1.032111f, 0.0f,
+            0.172052f, -0.486773f, 1.138398f, 0.0f,
             7.0f, -2.0f, 3.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12130,10 +12130,10 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.667429f, 1.925779f, 0.106308f, 0.0f,
-            -1.424469f, 2.507739f, 2.005763f, 0.0f,
-            0.322051f, -0.465336f, 0.376752f, 0.0f,
-            9.329313f, -1.794334f, 4.763555f, 1.0f
+            0.940271f, 1.54551f, -0.122346f, 0.0f,
+            -1.186598f, 2.691707f, 2.020832f, 0.0f,
+            0.299767f, -0.49754f, 0.368287f, 0.0f,
+            9.358184f, -1.923134f, 4.735277f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12146,10 +12146,10 @@ void StaticMixed_depth_3_pcp_rs_skip_0(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.192442f, 3.229021f, 0.67989f, 0.0f,
-            -0.917516f, 1.321746f, 1.45094f, 0.0f,
-            1.542883f, -0.989439f, -0.55695f, 0.0f,
-            14.067599f, 2.47037f, 3.936527f, 1.0f
+            0.80442f, 2.472912f, 0.071671f, 0.0f,
+            -0.723539f, 1.674774f, 1.495134f, 0.0f,
+            1.527619f, -1.485844f, -0.76041f, 0.0f,
+            14.905397f, 0.57212f, 2.961636f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12306,9 +12306,9 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12323,10 +12323,10 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.753578f, 0.57454f, -0.319412f, 0.0f,
-            -0.375174f, 0.774897f, 0.508703f, 0.0f,
-            0.539781f, -0.263513f, 0.799498f, 0.0f,
-            4.106884f, 2.79221f, 1.48472f, 1.0f
+            0.80094f, 0.484141f, -0.352282f, 0.0f,
+            -0.285313f, 0.825881f, 0.48633f, 0.0f,
+            0.526395f, -0.289011f, 0.799613f, 0.0f,
+            4.122979f, 2.732381f, 1.480111f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12339,10 +12339,10 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.461615f, 0.809571f, -0.362638f, 0.0f,
-            -0.206661f, 0.495696f, 0.84355f, 0.0f,
-            0.862672f, -0.314452f, 0.396128f, 0.0f,
-            8.575935f, 3.788446f, 1.297366f, 1.0f
+            0.570947f, 0.655208f, -0.494693f, 0.0f,
+            -0.049153f, 0.628759f, 0.776045f, 0.0f,
+            0.819514f, -0.418765f, 0.391194f, 0.0f,
+            8.664842f, 3.265045f, 1.18388f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12361,9 +12361,9 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12378,10 +12378,10 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.697923f, 0.711398f, -0.082558f, 0.0f,
-            -0.533245f, 0.593144f, 0.603183f, 0.0f,
-            0.478072f, -0.376952f, 0.793319f, 0.0f,
-            8.837596f, -0.114753f, 4.05383f, 1.0f
+            0.767279f, 0.62856f, -0.127259f, 0.0f,
+            -0.443058f, 0.663008f, 0.603424f, 0.0f,
+            0.463662f, -0.406612f, 0.787201f, 0.0f,
+            8.869406f, -0.196665f, 4.039858f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12394,10 +12394,10 @@ void StaticMixed_depth_3_pcp_r_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.382973f, 0.916499f, -0.115594f, 0.0f,
-            -0.366325f, 0.265552f, 0.891789f, 0.0f,
-            0.84802f, -0.299187f, 0.437436f, 0.0f,
-            13.118678f, 1.383792f, 4.707052f, 1.0f
+            0.535139f, 0.803255f, -0.26155f, 0.0f,
+            -0.218439f, 0.430659f, 0.875681f, 0.0f,
+            0.816034f, -0.411478f, 0.405925f, 0.0f,
+            13.308904f, 0.841343f, 4.5018f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12561,9 +12561,9 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12578,10 +12578,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.376949f, 1.224628f, -1.25551f, 0.0f,
-            -0.3934f, 0.415957f, 1.185443f, 0.0f,
-            0.409281f, -0.086604f, 0.843835f, 0.0f,
-            5.809328f, 3.114933f, 2.708458f, 1.0f
+            2.459403f, 1.114913f, -1.342355f, 0.0f,
+            -0.212071f, 0.49811f, 1.125816f, 0.0f,
+            0.399904f, -0.099081f, 0.844698f, 0.0f,
+            5.832726f, 3.023697f, 2.701545f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12594,10 +12594,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.497107f, 1.589553f, -1.326095f, 0.0f,
-            -0.380392f, 0.120881f, 1.197703f, 0.0f,
-            1.969617f, 0.289245f, -0.201083f, 0.0f,
-            16.529089f, 7.424281f, -1.811357f, 1.0f
+            2.738143f, 1.44318f, -1.69857f, 0.0f,
+            -0.036396f, 0.302562f, 1.038989f, 0.0f,
+            1.808012f, 0.108634f, -0.19728f, 0.0f,
+            16.682215f, 6.787077f, -2.104296f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12617,9 +12617,9 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12634,10 +12634,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.621509f, 2.13985f, -0.41601f, 0.0f,
-            -0.952342f, 0.680954f, 1.265371f, 0.0f,
-            0.372493f, -0.240119f, 0.726718f, 0.0f,
-            10.965793f, 0.549182f, 5.219202f, 1.0f
+            2.801128f, 1.955057f, -0.533147f, 0.0f,
+            -0.735136f, 0.834289f, 1.259357f, 0.0f,
+            0.360686f, -0.260455f, 0.722955f, 0.0f,
+            11.02146f, 0.405836f, 5.194752f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12650,10 +12650,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            2.604319f, 2.79024f, -0.28727f, 0.0f,
-            -0.791481f, 0.151794f, 1.124748f, 0.0f,
-            2.354361f, 0.415343f, 0.034856f, 0.0f,
-            23.14916f, 7.94739f, 3.743226f, 1.0f
+            3.067368f, 2.554774f, -0.672618f, 0.0f,
+            -0.407954f, 0.476948f, 1.087432f, 0.0f,
+            2.224541f, 0.100841f, -0.049929f, 0.0f,
+            23.68248f, 6.870867f, 3.248715f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12810,9 +12810,9 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12826,10 +12826,10 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12843,10 +12843,10 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.462922f, 0.806418f, -0.367957f, 0.0f,
-            -0.297739f, 0.53246f, 0.792362f, 0.0f,
-            0.834898f, -0.257247f, 0.48659f, 0.0f,
-            7.211736f, 4.636587f, 1.45109f, 1.0f
+            0.564564f, 0.675627f, -0.474126f, 0.0f,
+            -0.16687f, 0.655994f, 0.736088f, 0.0f,
+            0.808345f, -0.336452f, 0.483093f, 0.0f,
+            7.309582f, 4.309808f, 1.388523f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12865,9 +12865,9 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -12881,10 +12881,10 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -12898,10 +12898,10 @@ void StaticMixed_depth_3_pcp_r_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.385291f, 0.914798f, -0.121222f, 0.0f,
-            -0.455301f, 0.302714f, 0.837297f, 0.0f,
-            0.802653f, -0.26741f, 0.533141f, 0.0f,
-            11.641804f, 2.019464f, 4.844081f, 1.0f
+            0.523863f, 0.817799f, -0.238268f, 0.0f,
+            -0.333295f, 0.454217f, 0.826197f, 0.0f,
+            0.783889f, -0.3534f, 0.510516f, 0.0f,
+            11.816209f, 1.672419f, 4.728318f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13065,9 +13065,9 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13081,10 +13081,10 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13098,10 +13098,10 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.088718f, 0.622369f, -0.755564f, 0.0f,
-            -0.19449f, 0.264835f, 1.72518f, 0.0f,
-            2.182858f, -0.462912f, 2.633974f, 0.0f,
-            9.468847f, 3.40042f, 5.011063f, 1.0f
+            0.231257f, 0.543351f, -1.08851f, 0.0f,
+            -0.070399f, 0.349182f, 1.650046f, 0.0f,
+            2.095741f, -0.5795f, 2.620385f, 0.0f,
+            9.395843f, 3.138277f, 5.004176f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13121,9 +13121,9 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13137,10 +13137,10 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13154,10 +13154,10 @@ void StaticMixed_depth_3_pcp_rs_skip_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            -0.037956f, 1.162098f, -0.354597f, 0.0f,
-            -0.744699f, 0.359951f, 1.678747f, 0.0f,
-            2.387519f, -1.147249f, 2.199638f, 0.0f,
-            14.891865f, 0.676647f, 7.556756f, 1.0f
+            0.262595f, 1.040567f, -0.6878f, 0.0f,
+            -0.601872f, 0.52133f, 1.65873f, 0.0f,
+            2.30292f, -1.3502f, 2.135966f, 0.0f,
+            14.879272f, 0.241178f, 7.461272f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13314,9 +13314,9 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13330,10 +13330,10 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.758054f, 0.586066f, -0.286147f, 0.0f,
-            -0.445791f, 0.785869f, 0.42858f, 0.0f,
-            0.476051f, -0.197325f, 0.856994f, 0.0f,
-            2.781627f, 3.472843f, 1.310272f, 1.0f
+            0.792339f, 0.529284f, -0.30341f, 0.0f,
+            -0.389048f, 0.821441f, 0.416984f, 0.0f,
+            0.469936f, -0.212352f, 0.856777f, 0.0f,
+            2.811305f, 3.438818f, 1.305592f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13346,10 +13346,10 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.483225f, 0.808162f, -0.336702f, 0.0f,
-            -0.388953f, 0.542717f, 0.744429f, 0.0f,
-            0.784353f, -0.228766f, 0.576591f, 0.0f,
-            5.769865f, 4.935053f, 1.737321f, 1.0f
+            0.57202f, 0.710247f, -0.410295f, 0.0f,
+            -0.28921f, 0.642732f, 0.709403f, 0.0f,
+            0.767561f, -0.287131f, 0.573066f, 0.0f,
+            5.893226f, 4.708141f, 1.680528f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13369,9 +13369,9 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13385,10 +13385,10 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.69701f, 0.715498f, -0.047319f, 0.0f,
-            -0.595281f, 0.614164f, 0.518116f, 0.0f,
-            0.399773f, -0.332964f, 0.854001f, 0.0f,
-            7.458938f, 0.437562f, 3.843472f, 1.0f
+            0.747388f, 0.660505f, -0.071724f, 0.0f,
+            -0.536694f, 0.663847f, 0.520833f, 0.0f,
+            0.391627f, -0.35077f, 0.85064f, 0.0f,
+            7.50671f, 0.395787f, 3.834767f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13401,10 +13401,10 @@ void StaticMixed_depth_3_pcp_r_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.40153f, 0.91163f, -0.08778f, 0.0f,
-            -0.54111f, 0.313472f, 0.780343f, 0.0f,
-            0.7389f, -0.265832f, 0.61916f, 0.0f,
-            10.149627f, 2.084611f, 4.982515f, 1.0f
+            0.519418f, 0.837801f, -0.168206f, 0.0f,
+            -0.449031f, 0.435078f, 0.780435f, 0.0f,
+            0.727032f, -0.329842f, 0.602186f, 0.0f,
+            10.336314f, 1.851147f, 4.895555f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13569,9 +13569,9 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13585,10 +13585,10 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.601324f, 0.307067f, -0.28221f, 0.0f,
-            -0.744193f, 0.561701f, 1.243613f, 0.0f,
-            1.128978f, -0.240893f, 2.667158f, 0.0f,
-            4.061404f, 3.21564f, 2.049201f, 1.0f
+            0.617578f, 0.286514f, -0.292837f, 0.0f,
+            -0.6041f, 0.634284f, 1.203493f, 0.0f,
+            1.117478f, -0.265622f, 2.667615f, 0.0f,
+            4.086477f, 3.157747f, 2.043789f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13601,10 +13601,10 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.223952f, 0.989401f, -1.006301f, 0.0f,
-            -0.611537f, 0.561916f, 3.177684f, 0.0f,
-            0.709093f, -0.143845f, 0.999866f, 0.0f,
-            7.558842f, 3.775501f, 5.203307f, 1.0f
+            0.426633f, 0.911301f, -1.347683f, 0.0f,
+            -0.382743f, 0.712394f, 3.0781f, 0.0f,
+            0.686382f, -0.174489f, 0.998158f, 0.0f,
+            7.615427f, 3.618857f, 5.166699f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13625,9 +13625,9 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13641,10 +13641,10 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e1, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.656966f, 0.533876f, -0.074865f, 0.0f,
-            -1.474907f, 0.958f, 1.380891f, 0.0f,
-            0.95568f, -0.690521f, 2.308361f, 0.0f,
-            8.877736f, 0.880185f, 4.620386f, 1.0f
+            0.690901f, 0.499724f, -0.090782f, 0.0f,
+            -1.299799f, 1.098155f, 1.383923f, 0.0f,
+            0.937227f, -0.728508f, 2.301813f, 0.0f,
+            8.941413f, 0.797454f, 4.604696f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13657,10 +13657,10 @@ void StaticMixed_depth_3_pcp_rs_skip_3(void) {
         const WorldTransform *t = ecs_get(world, e2, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.00124f, 1.828415f, -0.385997f, 0.0f,
-            -1.724475f, 0.810441f, 3.121818f, 0.0f,
-            0.741381f, -0.371455f, 0.847394f, 0.0f,
-            12.282152f, 1.446031f, 7.858332f, 1.0f
+            0.386592f, 1.710241f, -0.722956f, 0.0f,
+            -1.461957f, 1.097666f, 3.115884f, 0.0f,
+            0.717275f, -0.424165f, 0.833092f, 0.0f,
+            12.419958f, 1.203863f, 7.78507f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13785,9 +13785,9 @@ void StaticMixed_depth_3_pcp_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.936293f, 0.312992f, -0.159345f, 0.0f,
-            -0.289629f, 0.944702f, 0.153792f, 0.0f,
-            0.198669f, -0.097843f, 0.97517f, 0.0f,
+            0.942155f, 0.294044f, -0.160881f, 0.0f,
+            -0.270681f, 0.950564f, 0.152184f, 0.0f,
+            0.197677f, -0.099833f, 0.97517f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13803,10 +13803,10 @@ void StaticMixed_depth_3_pcp_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.741067f, 0.570336f, -0.354311f, 0.0f,
-            -0.303553f, 0.755278f, 0.580871f, 0.0f,
-            0.598895f, -0.322912f, 0.732839f, 0.0f,
-            5.432142f, 2.111578f, 1.659168f, 1.0f
+            0.800424f, 0.438211f, -0.409015f, 0.0f,
+            -0.172749f, 0.822016f, 0.54263f, 0.0f,
+            0.574003f, -0.363677f, 0.733662f, 0.0f,
+            5.434654f, 2.025945f, 1.654631f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13825,9 +13825,9 @@ void StaticMixed_depth_3_pcp_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.895949f, 0.442104f, 0.042661f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.099833f, -0.294044f, 0.950564f, 0.0f,
+            0.908781f, 0.415538f, 0.038004f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.095375f, -0.29552f, 0.950564f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13843,10 +13843,10 @@ void StaticMixed_depth_3_pcp_r_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.6901f, 0.713871f, -0.118956f, 0.0f,
-            -0.468135f, 0.565671f, 0.678871f, 0.0f,
-            0.551916f, -0.412801f, 0.724558f, 0.0f,
-            10.216254f, -0.667068f, 4.264188f, 1.0f
+            0.779196f, 0.596698f, -0.191845f, 0.0f,
+            -0.338159f, 0.657926f, 0.672891f, 0.0f,
+            0.527732f, -0.45944f, 0.714432f, 0.0f,
+            10.232101f, -0.789117f, 4.244949f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -13975,9 +13975,9 @@ void StaticMixed_depth_3_pcp_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.40444f, 0.469488f, -0.239018f, 0.0f,
-            -0.144815f, 0.472351f, 0.076896f, 0.0f,
-            0.397339f, -0.195687f, 1.950341f, 0.0f,
+            1.413232f, 0.441066f, -0.241322f, 0.0f,
+            -0.135341f, 0.475282f, 0.076092f, 0.0f,
+            0.395354f, -0.199667f, 1.950341f, 0.0f,
             1.0f, 2.0f, 0.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -13993,10 +13993,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.455583f, 0.766468f, -0.871037f, 0.0f,
-            -0.115801f, 0.202698f, 0.708802f, 0.0f,
-            1.317509f, -0.271674f, 2.366078f, 0.0f,
-            7.557252f, 3.014226f, 3.367715f, 1.0f
+            1.512232f, 0.675843f, -0.966411f, 0.0f,
+            0.021154f, 0.260037f, 0.65752f, 0.0f,
+            1.261669f, -0.327806f, 2.372437f, 0.0f,
+            7.578976f, 2.889647f, 3.359301f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -14016,9 +14016,9 @@ void StaticMixed_depth_3_pcp_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e0, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.56791f, 0.773682f, 0.074657f, 0.0f,
-            -0.432793f, 0.847397f, 0.307585f, 0.0f,
-            0.174708f, -0.514577f, 1.663487f, 0.0f,
+            1.590367f, 0.727192f, 0.066507f, 0.0f,
+            -0.406227f, 0.86023f, 0.308195f, 0.0f,
+            0.166905f, -0.51716f, 1.663487f, 0.0f,
             6.0f, -1.0f, 2.5f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -14034,10 +14034,10 @@ void StaticMixed_depth_3_pcp_rs_skip_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.619012f, 1.347355f, -0.337979f, 0.0f,
-            -0.397575f, 0.317851f, 0.736901f, 0.0f,
-            1.27067f, -0.73487f, 2.028546f, 0.0f,
-            13.05385f, 0.218178f, 5.818018f, 1.0f
+            1.756911f, 1.194274f, -0.45943f, 0.0f,
+            -0.235733f, 0.42285f, 0.725287f, 0.0f,
+            1.207331f, -0.829166f, 2.010404f, 0.0f,
+            13.101507f, 0.014218f, 5.784808f, 1.0f
         };
         const float *m = &t->m[0][0];
         for (int i = 0; i < 16; i ++) {
@@ -14131,9 +14131,9 @@ void StaticMixed_depth_3_pcp_r_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.928825f, 0.269673f, -0.254089f, 0.0f,
-            -0.140378f, 0.890764f, 0.432243f, 0.0f,
-            0.342898f, -0.365809f, 0.86522f, 0.0f,
+            0.948779f, 0.137642f, -0.284382f, 0.0f,
+            -0.008347f, 0.910718f, 0.412943f, 0.0f,
+            0.31583f, -0.389418f, 0.86522f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -14156,9 +14156,9 @@ void StaticMixed_depth_3_pcp_r_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            0.925637f, 0.377359f, -0.028208f, 0.0f,
-            -0.286333f, 0.747191f, 0.599766f, 0.0f,
-            0.247404f, -0.547089f, 0.799678f, 0.0f,
+            0.96692f, 0.243903f, -0.074678f, 0.0f,
+            -0.152878f, 0.788473f, 0.595767f, 0.0f,
+            0.204191f, -0.564642f, 0.799678f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -14256,9 +14256,9 @@ void StaticMixed_depth_3_pcp_rs_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.161031f, 0.337091f, -0.317612f, 0.0f,
-            -0.105284f, 0.668073f, 0.324182f, 0.0f,
-            0.514347f, -0.548713f, 1.297829f, 0.0f,
+            1.185974f, 0.172052f, -0.355477f, 0.0f,
+            -0.00626f, 0.683039f, 0.309707f, 0.0f,
+            0.473745f, -0.584128f, 1.297829f, 0.0f,
             4.0f, -1.0f, 2.0f, 1.0f
         };
         const float *m = &t->m[0][0];
@@ -14282,9 +14282,9 @@ void StaticMixed_depth_3_pcp_rs_skip_0_1_2(void) {
         const WorldTransform *t = ecs_get(world, e3, WorldTransform);
         test_assert(t != NULL);
         const float expect[16] = {
-            1.388456f, 0.566038f, -0.042312f, 0.0f,
-            -0.357916f, 0.933988f, 0.749708f, 0.0f,
-            0.309255f, -0.683861f, 0.999597f, 0.0f,
+            1.45038f, 0.365855f, -0.112017f, 0.0f,
+            -0.191097f, 0.985592f, 0.744709f, 0.0f,
+            0.255239f, -0.705803f, 0.999597f, 0.0f,
             9.0f, -4.0f, 4.0f, 1.0f
         };
         const float *m = &t->m[0][0];

@@ -600,6 +600,10 @@ void Platform_camera_focus_lost_stops(void) {
 
     ecs_entity_t cam = ecs_new(world);
     ecs_add(world, cam, CameraController);
+    CameraController *cc = ecs_get_mut(world, cam, CameraController);
+    cc->speed = 10;
+    cc->acceleration = 1e9f;
+    cc->deceleration = 1e9f;
 
     box_input_glfw_on_key(world, 'W', 1);
     ecs_progress(world, 0.5f);

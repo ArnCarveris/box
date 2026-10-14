@@ -97,7 +97,8 @@
                     "cache_shared",
                     "scale",
                     "default_segments",
-                    "default_segments_normals"
+                    "default_segments_normals",
+                    "lantern_ribs"
                 ]
             },
             {
@@ -256,6 +257,21 @@
                     "register_without_module",
                     "star",
                     "star_cache_shared"
+                ]
+            },
+            {
+                "id": "Watertight",
+                "testcases": [
+                    "sphere",
+                    "hemisphere",
+                    "icosphere",
+                    "cylinder",
+                    "cone",
+                    "capsule",
+                    "torus",
+                    "tube",
+                    "frustum",
+                    "rounded_box"
                 ]
             }
         ]
