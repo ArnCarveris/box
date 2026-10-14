@@ -220,17 +220,12 @@ static void box_perf_orbit(
         : 0.0f;
     float d = perf->distance;
     float ce = cosf(elevation);
-    mat4 m = GLM_MAT4_IDENTITY_INIT;
-    vec3 euler;
-    glm_rotate_make(m, angle, GLM_YUP);
-    glm_rotate_x(m, -elevation, m);
-    glm_euler_angles(m, euler);
     ecs_set(world, camera, Position, {
         perf->center[0] + d * ce * sinf(angle),
         perf->center[1] + d * sinf(elevation),
         perf->center[2] + d * ce * cosf(angle)
     });
-    ecs_set(world, camera, Rotation, { euler[0], euler[1], euler[2] });
+    ecs_set(world, camera, Rotation, { -elevation, angle, 0 });
 }
 
 /** Measure the bounds of every shape and the camera distance that fits them.

@@ -29,11 +29,16 @@ ECS_STRUCT(Position, {
     float z; /**< Z coordinate */
 });
 
-/** Euler angles in radians, composed as Rx * Ry * Rz */
+/** Euler angles in radians: x is pitch, y is yaw and z is roll.
+ *
+ * The angles are applied as yaw, then pitch, then roll, each about the axis of the
+ * already rotated frame (the matrix is Ry * Rx * Rz). Combined pitch and yaw never
+ * produce roll, so a camera rotated by pitch and yaw keeps a level horizon.
+ */
 ECS_STRUCT(Rotation, {
-    float x; /**< Angle about X */
-    float y; /**< Angle about Y */
-    float z; /**< Angle about Z */
+    float x; /**< Pitch, angle about X */
+    float y; /**< Yaw, angle about Y */
+    float z; /**< Roll, angle about Z */
 });
 
 /** Scale relative to the parent, defaults to one */

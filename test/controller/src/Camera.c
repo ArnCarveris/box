@@ -963,3 +963,40 @@ void Camera_command_action(void) {
     ecs_fini(world);
 }
 
+
+void Camera_look_level_horizon(void) {
+    // engine_core/rotation_order
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+
+    box_input_mouse_drag(world, &(box_input_sweep_t){
+        .from = { 300, 300 }, .to = { 100, 300 }, .steps = 2, .frames = 2,
+        .button = KeyMouseRight
+    });
+    box_input_mouse_drag(world, &(box_input_sweep_t){
+        .from = { 100, 300 }, .to = { 100, 400 }, .steps = 2, .frames = 2,
+        .button = KeyMouseRight
+    });
+    for (int32_t i = 0; i < 12; i ++) {
+        ecs_progress(world, 0.5f);
+    }
+
+    const Rotation *r = ecs_get(world, cam, Rotation);
+    test_assert(fabsf(r->y - 0.6f) < 0.0001f);
+    test_assert(fabsf(r->x + 0.3f) < 0.0001f);
+    test_flt(r->z, 0);
+
+    const WorldTransform *t = ecs_get(world, cam, WorldTransform);
+    test_assert(fabsf(t->m[0][1]) < 0.0001f);
+    test_assert(fabsf(t->m[0][0] - cosf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->m[0][2] + sinf(0.6f)) < 0.0001f);
+    test_assert(t->m[1][1] > 0.9f);
+    test_assert(fabsf(t->m[2][0] - cosf(0.3f) * sinf(0.6f)) < 0.0001f);
+    test_assert(fabsf(t->m[2][1] - sinf(0.3f)) < 0.0001f);
+    test_assert(fabsf(t->m[2][2] - cosf(0.3f) * cosf(0.6f)) < 0.0001f);
+
+    ecs_fini(world);
+}
