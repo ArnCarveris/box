@@ -18,6 +18,7 @@ engine reacts to component changes. See `DESIGN.md` for the full brief and
 ```sh
 bake3 --local-env                                         # build the library and the app
 bake3 run apps/boxrun --local-env -- --headless --frames 10  # headless run, exits after 10 frames
+bake3 run apps/boxrun --local-env -- etc/scenes/default.flecs  # open the default scene in a window
 ```
 
 ## Browser build
