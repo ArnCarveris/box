@@ -27,7 +27,7 @@ extern "C" {
  * wheel pushes along the view. Velocity and turn rate ease to their target at e^-(rate * t),
  * at the acceleration rates while an action is held, else at the deceleration rates.
  *
- * Turn actions turn at turn_speed, Look makes the cursor turn and coast once let go. The yaw
+ * Turn actions ease to turn_speed, Look adds the cursor on top and stops on release. The yaw
  * (Rotation.y) turns left, the pitch (Rotation.x) looks up, 0.05 short of vertical, along -Z.
  * Members apply as specified (a rate of 0 never changes), the constructor sets the defaults.
  */
