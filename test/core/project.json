@@ -9,7 +9,8 @@
     },
     "lang.c": {
         "include": [
-            "../../src/app"
+            "../../src/app",
+            "../../src/jobs"
         ]
     },
     "test": {
@@ -84,6 +85,30 @@
                     "unpaced_never_sleeps",
                     "not_headless_never_sleeps",
                     "env_sets_unpaced"
+                ]
+            },
+            {
+                "id": "Jobs",
+                "setup": true,
+                "testcases": [
+                    "complete_after_work",
+                    "complete_on_main_thread",
+                    "completion_order",
+                    "completion_order_inline",
+                    "many_jobs",
+                    "many_jobs_inline",
+                    "submit_from_completion",
+                    "submit_from_completion_inline",
+                    "no_complete",
+                    "ctx_free_after_complete",
+                    "submit_without_work",
+                    "pending_count",
+                    "set_workers_after_start",
+                    "inline_runs_at_end_of_frame",
+                    "shutdown_with_pending",
+                    "shutdown_with_finished",
+                    "shutdown_idle_workers",
+                    "worker_count"
                 ]
             }
         ]
