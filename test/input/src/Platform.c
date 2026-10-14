@@ -411,7 +411,10 @@ void Platform_binding_modifier(void) {
     ecs_progress(world, 0);
     test_bool(ecs_get(world, save, ActionState)->down, false);
 
+    box_input_glfw_on_key(world, 'S', 0);
     box_input_glfw_on_key(world, 345, 1);
+    ecs_progress(world, 0);
+    box_input_glfw_on_key(world, 'S', 1);
     ecs_progress(world, 0);
     test_bool(ecs_get(world, save, ActionState)->down, true);
 

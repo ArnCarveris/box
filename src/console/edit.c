@@ -116,11 +116,16 @@ static void box_console_set_line(
 static void box_console_type(
     box_console_t *con)
 {
-    int32_t i;
-    for (i = 0; i < con->typed_length; i ++) {
-        unsigned char ch = (unsigned char)con->typed[i];
-        if (ch >= 0x20 && ch != 0x7f) {
-            box_console_insert(con, &con->typed[i], 1);
+    const char *typed = ecs_vec_first(&con->typed);
+    int32_t i, start = 0, count = ecs_vec_count(&con->typed);
+    for (i = 0; i <= count; i ++) {
+        unsigned char ch = i < count ? (unsigned char)typed[i] : 0;
+        if ((ch < 0x20 || ch == 0x7f) && i > start) {
+            box_console_insert(con, &typed[start], i - start);
+        }
+
+        if (ch < 0x20 || ch == 0x7f) {
+            start = i + 1;
         }
     }
 }
@@ -404,6 +409,7 @@ void box_console_edit_fini(
     ecs_vec_fini_t(NULL, &con->lines, box_console_line_t);
     ecs_vec_fini_t(NULL, &con->history, char*);
     ecs_vec_fini_t(NULL, &con->ui.lines, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &con->typed, char);
     ecs_os_free(con->draft);
     ecs_os_free(con->line);
 }

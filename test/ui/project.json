@@ -161,7 +161,9 @@
                     "covers_left_half",
                     "width_fraction",
                     "follows_resize",
-                    "scrollback_follows_height"
+                    "scrollback_follows_height",
+                    "paste_long",
+                    "null_text"
                 ]
             }
         ]

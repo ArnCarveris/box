@@ -141,13 +141,12 @@ static void box_console_capture(
         }
     }
 
-    size = (int32_t)strlen(in->text);
-    if (con->typed_length + size < BOX_CONSOLE_TYPED_MAX) {
-        memcpy(&con->typed[con->typed_length], in->text, (size_t)size);
-        con->typed_length += size;
+    size = in->text ? (int32_t)strlen(in->text) : 0;
+    if (size) {
+        memcpy(ecs_vec_grow_t(NULL, &con->typed, char, size), in->text, (size_t)size);
+        in->text[0] = '\0';
     }
 
-    in->text[0] = '\0';
     con->wheel += in->mouse.scroll[1];
     in->mouse.scroll[0] = in->mouse.scroll[1] = 0;
 done:
@@ -173,7 +172,7 @@ static void box_console_reset_input(
     box_console_t *con)
 {
     ecs_os_zeromem(&con->pressed);
-    con->typed_length = 0;
+    ecs_vec_clear(&con->typed);
     con->wheel = 0;
 }
 
@@ -482,6 +481,7 @@ void BoxConsoleImport(
     ecs_vec_init_t(NULL, &con->lines, box_console_line_t, 0);
     ecs_vec_init_t(NULL, &con->history, char*, 0);
     ecs_vec_init_t(NULL, &con->ui.lines, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &con->typed, char, 0);
     ecs_singleton_set(world, ConsoleHost, { con });
     ecs_atfini(world, box_console_free, con);
     box_console_action(world, con);

@@ -25,9 +25,6 @@ extern "C" {
 /** Number of keys, the size of Input.keys */
 #define BOX_KEY_COUNT (104)
 
-/** Bytes of text one frame collects, including the terminating zero */
-#define BOX_INPUT_TEXT_MAX (32)
-
 /** Steps of a cursor sweep or drag that does not give them */
 #define BOX_INPUT_SWEEP_STEPS (10)
 
@@ -104,7 +101,7 @@ ECS_STRUCT(Mouse, {
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
     Mouse mouse;        /**< Cursor and wheel state */
-    char text[32];      /**< Text typed this frame as zero terminated UTF-8 */
+    char *text;         /**< Text typed this frame as UTF-8, owned, NULL for none */
     vec2 size;          /**< Window size in points, 0 until a resize event */
     bool focused;       /**< Platform input is applied, false ignores it */
 });
@@ -126,16 +123,22 @@ ECS_STRUCT(ActionState, {
 
 /** Binds a key, with optional modifiers, to an action.
  *
- * The binding holds the action while the key and every required modifier are down; other
- * modifiers are ignored. Bindings on disabled entities and prefabs do not apply.
+ * The modifiers held when the key goes down decide: of the bindings whose modifiers were held,
+ * those requiring the most apply (Ctrl+S masks S), unless another modifier key was held that no
+ * binding uses as its key and the binding does not ignore. Equally specific bindings all apply.
+ *
+ * The action is held until the key comes up or a required modifier is released; a modifier
+ * pressed later changes nothing and no other binding takes the key before it is pressed again.
+ * Disabled entities and prefabs do not bind.
  */
 ECS_STRUCT(Binding, {
-    ecs_entity_t action; /**< Action, when 0 the binding entity if it is one, else its parent */
-    Key key;             /**< Key or mouse button */
-    bool ctrl;           /**< A control key must be held too */
-    bool shift;          /**< A shift key must be held too */
-    bool alt;            /**< An alt key must be held too */
-    bool meta;           /**< A super key must be held too */
+    ecs_entity_t action;   /**< Action, when 0 the binding entity if it is one, else its parent */
+    Key key;               /**< Key or mouse button */
+    bool ctrl;             /**< A control key must be held too */
+    bool shift;            /**< A shift key must be held too */
+    bool alt;              /**< An alt key must be held too */
+    bool meta;             /**< A super key must be held too */
+    bool ignore_modifiers; /**< Applies while modifiers it does not require are held */
 });
 
 /** What on.pressed, on.held, on.dragged and on.released resolve with */
