@@ -90,10 +90,8 @@ ECS_STRUCT(LayoutBounds, {
 /** Makes an element take the size of a surface in points, the root of a layout that fills the
  * screen.
  *
- * Every frame before the layout runs, the LayoutItem of the element is set to a fixed width and
- * height of Surface.width and Surface.height, so the tree follows the surface when it is
- * resized. A surface that is not alive or has no Surface gives a size of zero. Adding it adds a
- * LayoutItem.
+ * Before the layout runs, the LayoutItem of the element is set to a fixed Surface.width by
+ * Surface.height, so the tree follows a resized surface. A missing surface gives size zero.
  */
 ECS_STRUCT(LayoutFill, {
     ecs_entity_t surface; /**< Surface whose size in points the element takes */

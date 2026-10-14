@@ -637,7 +637,8 @@ void Console_look_from_script(void) {
     test_assert(ecs_script_run(world, "look",
         "using box.console\n"
         "$ {\n"
-        "  Console: {open: true, width: 0.5, height: 0.25, font_size: 24, line_height: 30, padding: 5,\n"
+        "  Console: {open: true, width: 0.5, height: 0.25, font_size: 24, line_height: 30,\n"
+        "    padding: 5,\n"
         "    background: {255, 0, 0, 128}, input: {0, 255, 0}}\n"
         "}\n", NULL) == 0);
     ecs_progress(world, 0);

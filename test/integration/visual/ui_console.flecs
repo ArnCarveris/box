@@ -1,6 +1,6 @@
-// The in game console open over the default scene: its own UI scene and view, drawn after the
-// 3D view and its effects. The scrollback holds three lines that ran through its session.
-
+// The in game console, the left half of the surface at full height, open over the default
+// scene: its own UI scene and view, drawn after the 3D view and its effects. The scrollback
+// holds three lines that ran through its session.
 using box.transform
 using box.geometry
 using box.material
@@ -77,5 +77,5 @@ const read: string = box.console.run("get cube Position")
 const failed: string = box.console.run("rm nothing")
 
 $ {
-  Console: {open: true, height: 0.6}
+  Console: {open: true}
 }
