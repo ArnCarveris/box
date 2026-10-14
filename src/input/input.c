@@ -31,6 +31,7 @@ static void box_input_device_dtor(
         ecs_vec_fini_t(NULL, &dev[i].queue, InputEvent);
         ecs_vec_fini_t(NULL, &dev[i].emits, box_input_emit_t);
         ecs_vec_fini_t(NULL, &dev[i].holds, box_input_hold_t);
+        ecs_vec_fini_t(NULL, &dev[i].text, char);
     }
 }
 
@@ -109,7 +110,7 @@ void BoxInputImport(
     ECS_META_COMPONENT(world, ActionEvent);
     ECS_COMPONENT_DEFINE(world, InputDevice);
 
-    ecs_set_hooks(world, Input, { .ctor = flecs_default_ctor });
+    box_owned_hooks(world, Input, BOX_OWNED_STR(Input, text));
     ecs_set_hooks(world, InputDevice, {
         .ctor = flecs_default_ctor,
         .dtor = box_input_device_dtor,
@@ -123,9 +124,11 @@ void BoxInputImport(
     ecs_vec_init_t(NULL, &dev->queue, InputEvent, 0);
     ecs_vec_init_t(NULL, &dev->emits, box_input_emit_t, 0);
     ecs_vec_init_t(NULL, &dev->holds, box_input_hold_t, 0);
+    ecs_vec_init_t(NULL, &dev->text, char, 0);
 
     Input *in = ecs_singleton_ensure(world, Input);
     in->focused = true;
+    in->text = ecs_os_strdup("");
     ecs_singleton_modified(world, Input);
 
     ecs_system(world, {

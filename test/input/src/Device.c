@@ -939,3 +939,186 @@ void Device_script_mouse_drag(void) {
 
     ecs_fini(world);
 }
+
+void Device_mouse_release_no_jump(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {500, 400} });
+    ecs_progress(world, 0);
+
+    box_input_mouse_move(world, 10, 10, false);
+    ecs_progress(world, 0);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {700, 600} });
+    ecs_progress(world, 0);
+
+    box_input_mouse_release(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {702, 601} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 702);
+    test_flt(in->mouse.position[1], 601);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {705, 605} });
+    ecs_progress(world, 0);
+    in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.delta[0], 3);
+    test_flt(in->mouse.delta[1], 4);
+
+    ecs_fini(world);
+}
+
+void Device_reset_no_jump(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_mouse_move(world, 10, 10, false);
+    ecs_progress(world, 0);
+
+    box_input_reset(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {800, 700} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 800);
+    test_flt(in->mouse.delta[0], 0);
+    test_flt(in->mouse.delta[1], 0);
+
+    ecs_fini(world);
+}
+
+void Device_release_unpinned_keeps_delta(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {500, 400} });
+    ecs_progress(world, 0);
+
+    box_input_mouse_release(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {510, 405} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 510);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], 5);
+
+    ecs_fini(world);
+}
+
+void Device_reset_unpinned_keeps_delta(void) {
+    // input_fixes/release_jump
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {500, 400} });
+    ecs_progress(world, 0);
+
+    box_input_reset(world);
+    ecs_progress(world, 0);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputMove, .value = {510, 405} });
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_flt(in->mouse.position[0], 510);
+    test_flt(in->mouse.delta[0], 10);
+    test_flt(in->mouse.delta[1], 5);
+
+    ecs_fini(world);
+}
+
+void Device_text_long_platform(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char expect[1001];
+    for (int32_t i = 0; i < 1000; i ++) {
+        expect[i] = (char)('a' + i % 26);
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = expect[i] });
+    }
+
+    expect[1000] = '\0';
+
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_int((int32_t)strlen(in->text), 1000);
+    test_str(in->text, expect);
+
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "");
+
+    ecs_fini(world);
+}
+
+void Device_text_long_synthetic(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    for (int32_t i = 0; i < 1000; i ++) {
+        box_input_queue(world, &(InputEvent){ .kind = InputText, .code = 0x20ac });
+    }
+
+    ecs_progress(world, 0);
+    const Input *in = ecs_singleton_get(world, Input);
+    test_int((int32_t)strlen(in->text), 3000);
+    for (int32_t i = 0; i < 1000; i ++) {
+        test_assert(!memcmp(&in->text[i * 3], "\xe2\x82\xac", 3));
+    }
+
+    box_input_queue(world, &(InputEvent){ .kind = InputText, .code = 'x' });
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "x");
+
+    ecs_fini(world);
+}
+
+void Device_text_replaced_from_outside(void) {
+    // input_fixes/text_input_limit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    char paste[1501];
+    for (int32_t i = 0; i < 1500; i ++) {
+        paste[i] = (char)('a' + i % 26);
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = paste[i] });
+    }
+
+    paste[1500] = '\0';
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, paste);
+
+    char replaced[1101];
+    memset(replaced, 'z', 1100);
+    replaced[1100] = '\0';
+    Input value = *ecs_singleton_get(world, Input);
+    value.text = replaced;
+    ecs_singleton_set_ptr(world, Input, &value);
+    test_str(ecs_singleton_get(world, Input)->text, replaced);
+
+    for (int32_t i = 0; i < 1500; i ++) {
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = paste[i] });
+    }
+
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, paste);
+
+    ecs_singleton_set(world, Input, { .focused = true });
+    test_assert(ecs_singleton_get(world, Input)->text == NULL);
+    ecs_progress(world, 0);
+    box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = 'x' });
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text, "x");
+
+    ecs_fini(world);
+}
