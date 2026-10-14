@@ -32,9 +32,9 @@ extern "C" {
 
 /** How frames travel from the main thread to the renderer, applied before the next frame.
  *
- * display_rate simulates a vsync display for offscreen targets: a frame shows at the first free
- * refresh after the GPU finished it, for swap_interval refreshes, and the renderer blocks until
- * one present of the frame before is queued, like a FIFO swap chain of three images.
+ * display_rate simulates a vsync display for offscreen targets, like a FIFO swap chain of three
+ * images: a frame shows at the first free refresh after its submit, for swap_interval refreshes,
+ * the GPU may fall two frames behind and the renderer blocks while a present is still queued.
  */
 ECS_STRUCT(RenderSettings, {
     int32_t in_flight;  /**< Packets in flight, default 2, from 1 to 8 */

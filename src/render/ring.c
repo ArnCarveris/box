@@ -8,18 +8,16 @@
 
 #include "render.h"
 #include <math.h>
+#if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
+#include <pthread.h>
+#include <sys/qos.h>
+#endif
 
 /** Relative difference of the refresh rate from a whole multiple of the cap that still counts */
 #define BOX_RENDER_SWAP_SLACK (0.01f)
 
-/** A frame the GPU renders for the simulated display, shown once the GPU finished it */
-typedef struct box_render_shown_t {
-    bool active;        /**< A frame waits to be shown */
-    uint64_t fence;     /**< Fence of the GPU work of the frame, 0 for none */
-    double ready;       /**< Seconds when the CPU submitted the frame */
-    float delta;        /**< Delta of the frame */
-    float fps;          /**< Frame rate cap of the frame */
-} box_render_shown_t;
+/** Frames whose GPU work may be in flight on a simulated display, like a three image swap chain */
+#define BOX_RENDER_GPU_FRAMES (2)
 
 /** State of the packet ring and its consumer */
 struct box_render_ring_t {
@@ -58,7 +56,7 @@ struct box_render_ring_t {
     int32_t presents_late;          /**< Present intervals over 1.1 frame intervals */
     int32_t presents_early;         /**< Present intervals under 0.9 frame intervals */
     int32_t delta_mismatches;       /**< Shown intervals that differ from the packet delta */
-    box_render_shown_t pending;     /**< Frame on the simulated display not yet shown */
+    uint64_t fences[BOX_RENDER_GPU_FRAMES]; /**< GPU fences of the last frames, oldest first */
 };
 
 /** Read the clock the frame loop measures with.
@@ -169,18 +167,18 @@ static double box_render_display_time(
     return result;
 }
 
-/** Count a presented frame and check its interval against its frame interval and its delta.
+/** Count a presented packet and check its interval against its frame interval and its delta.
  *
  * @param ring The ring
- * @param frame The frame
- * @param shown Seconds when the frame is first shown
+ * @param p The packet
+ * @param shown Seconds when the packet is first shown
  */
 static void box_render_count_present(
     box_render_ring_t *ring,
-    const box_render_shown_t *frame,
+    const box_render_packet_t *p,
     double shown)
 {
-    double expected = frame->fps > 0 ? 1.0 / (double)frame->fps : 0;
+    double expected = p->fps > 0 ? 1.0 / (double)p->fps : 0;
     ecs_os_mutex_lock(ring->lock);
     if (ring->frame_shown > 0) {
         double interval = shown - ring->frame_shown;
@@ -192,7 +190,7 @@ static void box_render_count_present(
         }
 
         ring->delta_mismatches += ring->display_rate > 0 &&
-            fabs((double)frame->delta - interval) * 1000.0 > BOX_FRAME_TOLERANCE_MS;
+            fabs((double)p->delta - interval) * 1000.0 > BOX_FRAME_TOLERANCE_MS;
     }
 
     ring->presented ++;
@@ -200,38 +198,40 @@ static void box_render_count_present(
     ecs_os_mutex_unlock(ring->lock);
 }
 
-/** Show the frame the GPU renders for the simulated display once the GPU finished it: at the
- * first refresh after that, for swap interval refreshes.
+/** Wait until the GPU finished the oldest frame that may be in flight on a simulated display,
+ * so the GPU falls behind the presents by at most BOX_RENDER_GPU_FRAMES frames.
  *
  * @param ring The ring
  */
-static void box_render_show_pending(
+static void box_render_gpu_backpressure(
     box_render_ring_t *ring)
 {
-    box_render_shown_t *frame = &ring->pending;
-    int32_t swap = box_render_swap_interval(ring->display_rate, frame->fps);
-    double period, done, shown;
-    if (!frame->active) {
-        goto done;
+    uint64_t oldest = ring->fences[0];
+    if (oldest && ring->backend_ready && ring->backend.wait) {
+        ring->backend.wait(ring->backend.ctx, oldest);
     }
-
-    if (frame->fence && ring->backend_ready && ring->backend.wait) {
-        ring->backend.wait(ring->backend.ctx, frame->fence);
-    }
-
-    done = box_render_now();
-    period = 1.0 / (double)ring->display_rate;
-    shown = box_render_display_time(ring, done > frame->ready ? done : frame->ready);
-    box_render_count_present(ring, frame, shown);
-    ring->shown = shown + (double)((swap > 1 ? swap : 1) - 1) * period;
-    frame->active = false;
-done:
-    return;
 }
 
-/** Hand a packet to the backend and present it. On a simulated display the frame is shown
- * once the GPU finished it, while the next frame already renders, and the consumer blocks
- * until only the last present of the frame before it is queued, like a FIFO swap chain.
+/** Remember the GPU fence of the frame the backend just rendered.
+ *
+ * @param ring The ring
+ */
+static void box_render_gpu_fence(
+    box_render_ring_t *ring)
+{
+    int32_t i;
+    for (i = 0; i < BOX_RENDER_GPU_FRAMES - 1; i ++) {
+        ring->fences[i] = ring->fences[i + 1];
+    }
+
+    ring->fences[BOX_RENDER_GPU_FRAMES - 1] = ring->backend_ready && ring->backend.fence
+        ? ring->backend.fence(ring->backend.ctx)
+        : 0;
+}
+
+/** Hand a packet to the backend and present it. On a simulated display the frame is shown at
+ * the first free refresh after its submit for swap interval refreshes, the GPU stays at most
+ * two frames behind and the consumer blocks while a present is queued, like a FIFO.
  *
  * @param ring The ring
  * @param p The packet
@@ -240,8 +240,10 @@ static void box_render_consume(
     box_render_ring_t *ring,
     const box_render_packet_t *p)
 {
+    int32_t swap = box_render_swap_interval(ring->display_rate, p->fps);
+    double period, shown;
     if (ring->display_rate > 0) {
-        box_render_show_pending(ring);
+        box_render_gpu_backpressure(ring);
     }
 
     if (ring->backend_ready && ring->backend.render) {
@@ -249,29 +251,16 @@ static void box_render_consume(
     }
 
     if (ring->display_rate <= 0) {
-        box_render_shown_t frame = { .delta = p->delta, .fps = p->fps };
-        box_render_count_present(ring, &frame, box_render_now());
+        box_render_count_present(ring, p, box_render_now());
         goto done;
     }
 
-    ring->pending = (box_render_shown_t){
-        .active = true,
-        .fence = ring->backend_ready && ring->backend.fence
-            ? ring->backend.fence(ring->backend.ctx)
-            : 0,
-        .ready = box_render_now(),
-        .delta = p->delta,
-        .fps = p->fps
-    };
-
-    if (ring->main_thread) {
-        box_render_show_pending(ring);
-    }
-
-    if (ring->shown > 0) {
-        box_wait_until(ring->shown - 1.0 / (double)ring->display_rate);
-    }
-
+    box_render_gpu_fence(ring);
+    period = 1.0 / (double)ring->display_rate;
+    shown = box_render_display_time(ring, box_render_now());
+    box_render_count_present(ring, p, shown);
+    ring->shown = shown + (double)((swap > 1 ? swap : 1) - 1) * period;
+    box_wait_until(ring->shown - period);
 done:
     return;
 }
@@ -289,7 +278,8 @@ static bool box_render_ring_readable(
     return ring->taken < ring->submitted && !held;
 }
 
-/** Render packets until the ring stops and every submitted packet is rendered.
+/** Render packets until the ring stops and every submitted packet is rendered. On macOS the
+ * thread runs at the user interactive QoS, as Apple recommends for threads that render frames.
  *
  * @param arg The ring
  * @return NULL
@@ -298,17 +288,13 @@ static void* box_render_thread_main(
     void *arg)
 {
     box_render_ring_t *ring = arg;
+#if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+#endif
     box_render_backend_start(ring);
     ecs_os_mutex_lock(ring->lock);
     while (true) {
         while (!box_render_ring_readable(ring) && !(ring->stop && ring->taken == ring->submitted)) {
-            if (ring->pending.active) {
-                ecs_os_mutex_unlock(ring->lock);
-                box_render_show_pending(ring);
-                ecs_os_mutex_lock(ring->lock);
-                continue;
-            }
-
             ecs_os_cond_wait(ring->can_read, ring->lock);
         }
 
@@ -429,7 +415,7 @@ static void box_render_ring_apply(
         ring->origin = 0;
         ring->shown = 0;
         ring->frame_shown = 0;
-        ring->pending.active = false;
+        ecs_os_memset_n(ring->fences, 0, uint64_t, BOX_RENDER_GPU_FRAMES);
     }
 
     ecs_os_mutex_unlock(ring->lock);
