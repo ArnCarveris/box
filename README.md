@@ -39,7 +39,7 @@ against `design/coding_style.c`; `--fix` reformats what it can.
 Work is tracked with `project/pm.py`; `docs/PROCESS.md` describes the loop.
 
 ```sh
-python3 project/pm.py serve --host 0.0.0.0 --port 8090   # status page
+python3 project/pm.py serve --host :: --port 8090        # status page on all interfaces
 python3 project/pm.py next 5                              # ready tasks
 python3 project/pm.py check                               # validate the database
 ```
