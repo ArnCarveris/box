@@ -146,7 +146,7 @@ static int box_render_capture_camera(
     transform = ecs_get(world, d->camera, WorldTransform);
     v->camera = d->camera;
     v->camera_data = *data;
-    v->scene = ecs_get_target_for_id(world, d->camera, EcsChildOf, ecs_id(Scene));
+    v->scene = box_render_scene_of(world, d->camera);
     if (transform) {
         ecs_os_memcpy_t(v->camera_transform, transform->m, mat4);
     } else {
