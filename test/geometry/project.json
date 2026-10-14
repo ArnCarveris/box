@@ -1,0 +1,263 @@
+{
+    "id": "geometry",
+    "type": "application",
+    "value": {
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "lang.c": {
+        "include": [
+            "../../src/geometry"
+        ]
+    },
+    "test": {
+        "testsuites": [
+            {
+                "id": "Box",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Quad",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Triangle",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "RightTriangle",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "TrianglePrism",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "RightTrianglePrism",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "NGon",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "default_sides",
+                    "default_sides_normals"
+                ]
+            },
+            {
+                "id": "Sphere",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "default_segments",
+                    "default_segments_normals"
+                ]
+            },
+            {
+                "id": "HemiSphere",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "IcoSphere",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "level_0",
+                    "level_0_normals"
+                ]
+            },
+            {
+                "id": "Cone",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Cylinder",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Torus",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Capsule",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "zero_length",
+                    "zero_length_normals"
+                ]
+            },
+            {
+                "id": "Tube",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "partial_arc"
+                ]
+            },
+            {
+                "id": "Frustum",
+                "testcases": [
+                    "vertex_count",
+                    "flat_vertex_count",
+                    "normals",
+                    "flat_normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "zero_top",
+                    "zero_top_normals"
+                ]
+            },
+            {
+                "id": "RoundedBox",
+                "testcases": [
+                    "vertex_count",
+                    "normals",
+                    "uvs",
+                    "cache_shared",
+                    "scale",
+                    "zero_radius",
+                    "zero_radius_normals"
+                ]
+            },
+            {
+                "id": "Mesh3",
+                "testcases": [
+                    "with_normals",
+                    "derive_normals",
+                    "no_indices",
+                    "invalid_index_skipped",
+                    "colors",
+                    "cache_shared",
+                    "update_content",
+                    "scale"
+                ]
+            },
+            {
+                "id": "Cache",
+                "testcases": [
+                    "release_on_remove",
+                    "release_on_delete",
+                    "shared_release",
+                    "change_topology",
+                    "change_size",
+                    "handle_reused",
+                    "different_shapes",
+                    "quantized_proportions",
+                    "bounds",
+                    "prefab_instances",
+                    "clone",
+                    "set_in_system"
+                ]
+            },
+            {
+                "id": "Registry",
+                "testcases": [
+                    "register_custom",
+                    "register_in_use",
+                    "register_without_scale",
+                    "register_twice",
+                    "register_invalid",
+                    "register_without_module",
+                    "star",
+                    "star_cache_shared"
+                ]
+            }
+        ]
+    }
+}
