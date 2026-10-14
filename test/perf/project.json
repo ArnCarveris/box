@@ -17,7 +17,8 @@
                     "moves_every_frame",
                     "first_camera_when_unset",
                     "elevation",
-                    "no_shapes"
+                    "no_shapes",
+                    "period"
                 ]
             },
             {
@@ -31,7 +32,10 @@
                     "sets_app_fps",
                     "restart_on_set",
                     "quit_when_done",
-                    "budget_sleep_reported"
+                    "budget_sleep_reported",
+                    "only_slow_frames_counted",
+                    "tolerance_edges",
+                    "statistics"
                 ]
             },
             {

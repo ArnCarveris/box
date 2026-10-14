@@ -888,6 +888,71 @@ void Render_gpu_capture_first_frame(void) {
     ecs_fini(world);
 }
 
+void Render_gpu_capture_effects(void) {
+    // command/capture_effects
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_entity_t fog = ecs_new(world);
+    ecs_set(world, fog, HeightFog, {.density = 0.5f, .falloff = 0.1f, .max_opacity = 1,
+        .color = {40, 200, 40}, .sun_inscatter = 1, .ambient_inscatter = 1});
+    ecs_entity_t tonemap = ecs_new(world);
+    ecs_add(world, tonemap, Tonemap);
+    View value = {.camera = camera, .lighting = {.enabled = true},
+        .clear = {.enabled = true, .color = {0, 0, 0, 255}}};
+    ecs_vec_init_t(NULL, &value.effects, ViewEffect, 2);
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = fog };
+    *ecs_vec_append_t(NULL, &value.effects, ViewEffect) = (ViewEffect){
+        .enabled = true, .effect = tonemap };
+    ecs_entity_t view = ecs_new(world);
+    ecs_set_ptr(world, view, View, &value);
+    ecs_vec_fini_t(NULL, &value.effects, ViewEffect);
+    ecs_entity_t shape = ecs_new(world);
+    ecs_set(world, shape, Position, {0, 0, 0});
+    ecs_set(world, shape, Box, {2, 2, 2});
+    ecs_set(world, shape, Rgb, {0, 0, 0});
+    ecs_set(world, shape, Emissive, {.strength = 3, .color = {255, 0, 0}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 64, .height = 64,
+        .write_to_file = "capture_effects.png"});
+    ecs_entity_t s = box_terminal_new(world);
+
+    ecs_os_free(box_terminal_run(world, s, "capture", NULL));
+    ecs_progress(world, 1.0f / 60);
+    box_render_sync(world);
+
+    char *capture = flecs_asprintf("%s/resources/capture_0.png",
+        ecs_get(world, s, TerminalStatus)->dir);
+    char *frame = flecs_asprintf("%s/capture_effects.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, fw = 0, fh = 0, i, k;
+    unsigned char *px = stbi_load(capture, &w, &h, &n, 4);
+    unsigned char *fx = stbi_load(frame, &fw, &fh, &n, 4);
+    test_assert(px != NULL);
+    test_assert(fx != NULL);
+    test_int(w, fw);
+    test_int(h, fh);
+    int32_t pixels[2] = {(h / 2 * w + w / 2) * 4, (2 * w + 2) * 4};
+    for (i = 0; i < 2; i ++) {
+        for (k = 0; k < 3; k ++) {
+            test_assert(abs((int)px[pixels[i] + k] - (int)fx[pixels[i] + k]) <= 3);
+        }
+    }
+
+    stbi_image_free(px);
+    stbi_image_free(fx);
+    ecs_os_free(capture);
+    ecs_os_free(frame);
+    ecs_fini(world);
+}
+
 void Render_gpu_render_isolated(void) {
     // command/render
     ecs_world_t *world = ecs_init();

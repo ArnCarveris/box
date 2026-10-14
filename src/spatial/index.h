@@ -61,6 +61,7 @@ typedef struct box_spatial_t {
     ecs_vec_t empty;           /**< ecs_entity_t, scenes that lost their last entity */
     ecs_query_t *dynamic;      /**< Indexed entities with DynamicTransform */
     box_spatial_stats_t stats; /**< Counters of the last update */
+    bool stale;                /**< Dynamic entities may have moved since they were placed */
     int32_t refs;              /**< Observers and systems that use the state */
 } box_spatial_t;
 
@@ -72,7 +73,10 @@ typedef struct SpatialIndex {
 /** Component id of SpatialIndex */
 extern ECS_COMPONENT_DECLARE(SpatialIndex);
 
-/** Get the index of a world.
+/** Get the index of a world to query it.
+ *
+ * Places the dynamic entities for their current transforms first when they may have moved
+ * since they were last placed, so a frame without queries does not visit them.
  *
  * @param world The world
  * @return The index, NULL when box.spatial was not imported

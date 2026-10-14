@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract of the instanced batches and lights the shadow pass and the frustum and occlusion cull passes of box.render",
+        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes and the effect passes of box.render",
         "public": false,
         "use": [
             "box"
@@ -37,6 +37,13 @@
                 ]
             },
             {
+                "id": "Shapes2D",
+                "benchcases": [
+                    "dynamic_material",
+                    "changed_1pct"
+                ]
+            },
+            {
                 "id": "Light",
                 "benchcases": [
                     "static_1000",
@@ -59,6 +66,19 @@
                     "shadows_100k",
                     "occluded_city_100k",
                     "occluded_city_100k_frustum_only"
+                ]
+            },
+            {
+                "id": "Effects",
+                "benchcases": [
+                    "none",
+                    "disabled",
+                    "tonemap",
+                    "auto_exposure",
+                    "bloom",
+                    "ssao",
+                    "fog",
+                    "all"
                 ]
             }
         ]

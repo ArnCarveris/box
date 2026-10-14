@@ -1,0 +1,226 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.layout
+
+camera {
+  Position: {0, 0, 100}
+  Camera: {ortho: true, ortho_scale: 1}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {236, 238, 242, 255}}}
+}
+
+window {
+  Layout: {direction: Column, spacing: 10, padding: {12, 12, 12, 12}}
+  LayoutItem: {width: {mode: Fixed, value: 600}}
+  Rect: {1, 1}
+  Rgb: {40, 44, 56}
+  Border: {width: 2, radius: 14, color: {120, 140, 200, 255}}
+
+  title_bar {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 8, padding: {6, 6, 10, 10}, v: Middle}
+    LayoutItem: {width: {mode: Grow}}
+    Rect: {1, 1}
+    Rgb: {60, 66, 84}
+    Border: {radius: 8}
+
+    icon {
+      Position: {0, 0, 1}
+      Circle: {9}
+      Rgb: {250, 190, 60}
+    }
+
+    title {
+      Position: {0, 0, 1}
+      Rect: {140, 12}
+      Rgb: {200, 205, 220}
+      Border: {radius: 6}
+    }
+
+    spacer {
+      LayoutItem: {width: {mode: Grow}}
+    }
+
+    minimize {
+      Position: {0, 0, 1}
+      Circle: {7}
+      Rgb: {120, 220, 140}
+    }
+
+    close {
+      Position: {0, 0, 1}
+      Circle: {7}
+      Rgb: {230, 80, 70}
+    }
+  }
+
+  buttons {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 8}
+    LayoutItem: {width: {mode: Grow}}
+
+    one {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
+      Rect: {1, 1}
+      Rgb: {90, 160, 250}
+      Border: {radius: 6}
+    }
+
+    two {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 2}, height: {mode: Fixed, value: 36}}
+      Rect: {1, 1}
+      Rgb: {250, 190, 60}
+      Border: {radius: 6}
+    }
+
+    three {
+      Position: {0, 0, 1}
+      LayoutItem: {width: {mode: Grow, value: 1}, height: {mode: Fixed, value: 36}}
+      Rect: {1, 1}
+      Rgb: {200, 110, 230}
+      Border: {radius: 6}
+    }
+  }
+
+  chart {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 6, padding: {6, 6, 6, 6}, h: Center, v: Bottom}
+    LayoutItem: {width: {mode: Grow}, height: {mode: Fixed, value: 64}}
+    Rect: {1, 1}
+    Rgb: {55, 60, 76}
+    Border: {radius: 8}
+
+    bar_1 {
+      Position: {0, 0, 1}
+      Rect: {28, 20}
+      Rgb: {90, 200, 180}
+    }
+
+    bar_2 {
+      Position: {0, 0, 1}
+      Rect: {28, 40}
+      Rgb: {90, 200, 180}
+    }
+
+    bar_3 {
+      Position: {0, 0, 1}
+      Rect: {28, 52}
+      Rgb: {250, 120, 90}
+    }
+
+    bar_4 {
+      Position: {0, 0, 1}
+      Rect: {28, 30}
+      Rgb: {90, 200, 180}
+    }
+
+    bar_5 {
+      Position: {0, 0, 1}
+      Rect: {28, 12}
+      Rgb: {90, 200, 180}
+    }
+  }
+
+  body {
+    Position: {0, 0, 1}
+    Layout: {direction: Row, spacing: 10}
+    LayoutItem: {width: {mode: Grow}}
+
+    list {
+      Position: {0, 0, 1}
+      Layout: {direction: Column, spacing: 6, padding: {8, 8, 8, 8}, h: Right}
+      LayoutItem: {width: {mode: Fixed, value: 180}}
+      Rect: {1, 1}
+      Rgb: {55, 60, 76}
+      Border: {radius: 8}
+
+      item_1 {
+        Position: {0, 0, 1}
+        Rect: {150, 14}
+        Rgb: {200, 205, 220}
+        Border: {radius: 7}
+      }
+
+      item_2 {
+        Position: {0, 0, 1}
+        Rect: {100, 14}
+        Rgb: {200, 205, 220}
+        Border: {radius: 7}
+      }
+
+      item_3 {
+        Position: {0, 0, 1}
+        Rect: {60, 14}
+        Rgb: {250, 190, 60}
+        Border: {radius: 7}
+      }
+
+      item_4 {
+        Position: {0, 0, 1}
+        Rect: {120, 14}
+        Rgb: {200, 205, 220}
+        Border: {radius: 7}
+      }
+    }
+
+    stage {
+      Position: {0, 0, 1}
+      Layout: {padding: {8, 8, 8, 8}}
+      LayoutItem: {width: {mode: Grow}, height: {mode: Grow}}
+      Rect: {1, 1}
+      Rgb: {30, 33, 42}
+      Border: {width: 1, radius: 8, color: {90, 100, 130, 255}}
+
+      top_left {
+        Position: {0, 0, 1}
+        LayoutItem: {h: Left, v: Top}
+        Circle: {10}
+        Rgb: {230, 80, 70}
+      }
+
+      top_right {
+        Position: {0, 0, 1}
+        LayoutItem: {h: Right, v: Top}
+        Rect: {30, 20}
+        Rgb: {120, 220, 140}
+      }
+
+      bottom_left {
+        Position: {0, 0, 1}
+        LayoutItem: {h: Left, v: Bottom, x: 10, y: 4}
+        Rect: {50, 10}
+        Rgb: {90, 160, 250}
+      }
+
+      bottom_right {
+        Position: {0, 0, 1}
+        LayoutItem: {h: Right, v: Bottom}
+        Circle: {10}
+        Rgb: {250, 190, 60}
+      }
+
+      center {
+        Position: {0, 0, 1}
+        LayoutItem: {
+          width: {mode: Fixed, value: 120}, height: {mode: Fixed, value: 36}, h: Center, v: Middle
+        }
+        Rect: {1, 1}
+        Rgb: {200, 110, 230}
+        Border: {radius: 18}
+      }
+
+      free {
+        Position: {-120, -10, 1}
+        Circle: {6}
+        Rgb: {255, 255, 255}
+      }
+    }
+  }
+}

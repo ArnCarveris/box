@@ -283,6 +283,7 @@ void BoxRenderImport(
     ECS_IMPORT(world, BoxView);
     ECS_IMPORT(world, BoxMaterial);
     ECS_IMPORT(world, BoxLight);
+    ECS_IMPORT(world, BoxEffects);
 
     ECS_META_COMPONENT(world, RenderSettings);
     ECS_META_COMPONENT(world, RenderStatus);
@@ -330,6 +331,7 @@ void BoxRenderImport(
     box_render_lights_init(world);
     box_render_shadows_init(world);
     box_render_cull_status_init(world);
+    box_render_effects_init(world);
 
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "RenderSubmitPacket" }),

@@ -35,11 +35,29 @@
 /** Projected size in pixels below which a view culls an instance when its View sets 0 */
 #define BOX_RENDER_CULL_MIN_DIMENSION (1.0f)
 
+/** Shader handle of the engine shader of the tone map and exposure passes and the effect output */
+#define BOX_RENDER_SHADER_TONEMAP (40)
+
+/** Shader handle of the engine compute shader that measures and adapts the exposure */
+#define BOX_RENDER_SHADER_EXPOSURE (41)
+
+/** Shader handle of the engine shader of the bloom passes */
+#define BOX_RENDER_SHADER_BLOOM (42)
+
+/** Shader handle of the engine shader of the ambient occlusion passes */
+#define BOX_RENDER_SHADER_SSAO (43)
+
+/** Shader handle of the engine shader of the height fog pass */
+#define BOX_RENDER_SHADER_FOG (44)
+
 /** Cascades of the shadow map of a view at most */
 #define BOX_RENDER_SHADOW_CASCADES (4)
 
 /** PCF taps per axis of a shadow lookup at most */
 #define BOX_RENDER_SHADOW_FILTER_MAX (7)
+
+/** Shader handle of the engine shader of the forward pass that draws the 2D shapes */
+#define BOX_RENDER_SHADER_SHAPE2D (7)
 
 /** Buffer handle of the change buffer the scatter pass reads changed instances from */
 #define BOX_RENDER_BUFFER_CHANGES (1)
@@ -136,6 +154,7 @@ typedef struct box_render_view_lights_t {
     float ambient_sky[4];    /**< Linear ambient light from above */
     float ambient_ground[4]; /**< Linear ambient light from below */
     float sun[3];            /**< Direction toward the first directional light, if any */
+    float sun_color[3];      /**< Linear color times intensity times pi of that light */
 } box_render_view_lights_t;
 
 /** The shadow settings of a view, resolved, with the view depths its cascades end at.
@@ -181,7 +200,29 @@ typedef struct box_render_view_t {
     box_render_view_lights_t lights; /**< Lights of the scene, filled by the light extract */
     box_render_view_shadows_t shadows; /**< Shadows of the view, filled by the shadow extract */
     box_render_view_cull_t cull; /**< Culling of the view and of its shadow casters */
+    int32_t effect_first;       /**< Index of the first effect pass of the view in the packet */
+    int32_t effect_count;       /**< Effect passes of the view, 0 renders without an HDR target */
 } box_render_view_t;
+
+/** Kind of an effect pass of a view */
+typedef enum box_render_effect_kind_t {
+    BOX_RENDER_EFFECT_TONEMAP,  /**< Tonemap, optionally scaled by an adapted exposure first */
+    BOX_RENDER_EFFECT_EXPOSURE, /**< AutoExposure on its own: scales by the adapted exposure */
+    BOX_RENDER_EFFECT_BLOOM,    /**< Bloom */
+    BOX_RENDER_EFFECT_SSAO,     /**< Ssao */
+    BOX_RENDER_EFFECT_FOG       /**< HeightFog */
+} box_render_effect_kind_t;
+
+/** An effect pass of a view with its settings resolved, in the order of View.effects */
+typedef struct box_render_effect_t {
+    box_render_effect_kind_t kind; /**< Kind of pass */
+    ecs_entity_t entity;        /**< Effect entity, keys the state the pass keeps across frames */
+    ecs_entity_t exposure;      /**< AutoExposure entity whose adapted exposure scales, 0 none */
+    AutoExposure auto_exposure; /**< Resolved exposure settings when exposure is set */
+    Bloom bloom;                /**< Resolved settings of a bloom pass */
+    Ssao ssao;                  /**< Resolved settings of an ambient occlusion pass */
+    HeightFog fog;              /**< Resolved settings of a fog pass */
+} box_render_effect_t;
 
 /** Description of a BOX_RENDER_TARGET create or update: the size and kind of a surface */
 typedef struct box_render_target_desc_t {
@@ -315,6 +356,7 @@ typedef struct box_render_packet_t {
     ecs_vec_t views;        /**< box_render_view_t in render order */
     ecs_vec_t batches;      /**< box_render_batch_t */
     ecs_vec_t targets;      /**< box_render_target_t in the order they render */
+    ecs_vec_t effects;      /**< box_render_effect_t, the effect passes of the views */
     ecs_vec_t data;         /**< Bytes the resources and uploads point into */
 } box_render_packet_t;
 
@@ -682,10 +724,70 @@ void box_render_shadow_cascade(
     float distance,
     box_render_cascade_t *out);
 
+/** Register the system that adds the effect passes of every view to the packet.
+ *
+ * Runs after the light extract, because fog is lit by the lights of the scene of the view.
+ *
+ * @param world The world
+ */
+void box_render_effects_init(
+    ecs_world_t *world);
+
+/** Resolve settings of effects: the constructor defaults that zero fields stand for and the
+ * valid range of every field.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_bloom_settings(
+    const Bloom *in,
+    Bloom *out);
+
+/** Resolve the settings of an ambient occlusion pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_ssao_settings(
+    const Ssao *in,
+    Ssao *out);
+
+/** Resolve the settings of a fog pass.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_fog_settings(
+    const HeightFog *in,
+    HeightFog *out);
+
+/** Resolve the settings of an adapted exposure.
+ *
+ * @param in The settings of an effect entity
+ * @param out Receives the resolved settings
+ */
+void box_render_exposure_settings(
+    const AutoExposure *in,
+    AutoExposure *out);
+
+/** Check whether the effect passes of a packet run an engine shader.
+ *
+ * @param p The packet
+ * @param handle Handle of the shader
+ * @return Whether a pass of a view uses the shader
+ */
+bool box_render_effects_use(
+    const box_render_packet_t *p,
+    uint32_t handle);
+
 /** A one-off render of a camera into an offscreen image that is written as a PNG file.
  *
  * The camera is an entity read when the frame is extracted, or, when camera is 0, the
  * settings, transform and scene in the description.
+ *
+ * A camera that a view renders is captured as its first view renders it, effects included
+ * (exposure and temporal bloom start fresh). Other cameras render lit, without shadows or
+ * effects, with the default culling.
  */
 typedef struct box_render_capture_desc_t {
     ecs_entity_t camera;        /**< Entity with Camera, 0 to use the fields below */

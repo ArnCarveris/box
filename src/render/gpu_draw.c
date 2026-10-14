@@ -100,6 +100,7 @@ void box_gpu_draw_init(
     ecs_vec_init_t(NULL, &gpu->view_data, uint8_t, 0);
     box_gpu_light_init(gpu);
     box_gpu_shadow_init(gpu);
+    box_gpu_effects_init(gpu);
 }
 
 /** Release the buffers of a mesh and the mesh.
@@ -170,6 +171,7 @@ void box_gpu_draw_fini(
     box_gpu_light_fini(gpu);
     box_gpu_shadow_fini(gpu);
     box_gpu_cull_fini(gpu);
+    box_gpu_effects_fini(gpu);
     if (gpu->view_buffer) {
         wgpuBufferRelease(gpu->view_buffer);
         gpu->view_buffer = NULL;
@@ -357,10 +359,14 @@ static void box_gpu_blend_state(
     out->alpha = alpha;
 }
 
-/** Create the forward pipeline of a color format, blend mode and back face mode.
+/** Create the forward pipeline of a shader, color format, blend mode and back face mode.
+ *
+ * The 2D shape shader blends its edges in the opaque pass too and draws over equal depths, so
+ * coplanar shapes draw in order.
  *
  * @param gpu The backend
- * @param shader The mesh shader
+ * @param handle Handle of the shader, the mesh or the 2D shape shader
+ * @param shader The shader module
  * @param format The format of the color target
  * @param blend The BlendMode, Opaque writes depth and does not blend
  * @param back_face The BackFaceMode, BackFaceCull culls the back faces
@@ -368,11 +374,13 @@ static void box_gpu_blend_state(
  */
 static WGPURenderPipeline box_gpu_forward_create(
     box_gpu_t *gpu,
+    uint32_t handle,
     WGPUShaderModule shader,
     WGPUTextureFormat format,
     uint32_t blend,
     uint32_t back_face)
 {
+    bool shape2d = handle == BOX_RENDER_SHADER_SHAPE2D;
     WGPUVertexAttribute vertex_attrs[3] = {
         { .format = WGPUVertexFormat_Float32x3, .offset = 0, .shaderLocation = 0 },
         { .format = WGPUVertexFormat_Float32x3, .offset = 12, .shaderLocation = 1 },
@@ -396,10 +404,10 @@ static WGPURenderPipeline box_gpu_forward_create(
             .attributes = &slot_attr
         }
     };
-    box_gpu_blend_state(blend, &blend_state);
+    box_gpu_blend_state(shape2d && blend == Opaque ? AlphaBlend : blend, &blend_state);
     WGPUColorTargetState target = {
         .format = format,
-        .blend = blend == Opaque ? NULL : &blend_state,
+        .blend = blend == Opaque && !shape2d ? NULL : &blend_state,
         .writeMask = WGPUColorWriteMask_All
     };
     WGPUConstantEntry constant = {
@@ -417,7 +425,9 @@ static WGPURenderPipeline box_gpu_forward_create(
     WGPUDepthStencilState depth = {
         .format = BOX_GPU_DEPTH_FORMAT,
         .depthWriteEnabled = blend == Opaque ? WGPUOptionalBool_True : WGPUOptionalBool_False,
-        .depthCompare = WGPUCompareFunction_Greater,
+        .depthCompare = shape2d
+            ? WGPUCompareFunction_GreaterEqual
+            : WGPUCompareFunction_Greater,
         .stencilFront = { .compare = WGPUCompareFunction_Always },
         .stencilBack = { .compare = WGPUCompareFunction_Always }
     };
@@ -455,12 +465,14 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
     const box_render_batch_t *b)
 {
     WGPURenderPipeline result = NULL;
-    WGPUShaderModule shader = box_gpu_shader_get(gpu, BOX_RENDER_SHADER_MESH);
+    WGPUShaderModule shader = box_gpu_shader_get(gpu, b->pipeline);
     box_gpu_forward_t *f;
     int32_t i;
     for (i = 0; i < gpu->forward_count; i ++) {
         f = &gpu->forward[i];
-        if (f->format == format && f->blend == b->blend && f->back_face == b->back_face) {
+        if (f->shader == b->pipeline && f->format == format && f->blend == b->blend &&
+            f->back_face == b->back_face)
+        {
             result = f->pipeline;
             goto done;
         }
@@ -470,8 +482,9 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
-    result = box_gpu_forward_create(gpu, shader, format, b->blend, b->back_face);
+    result = box_gpu_forward_create(gpu, b->pipeline, shader, format, b->blend, b->back_face);
     f = &gpu->forward[gpu->forward_count ++];
+    f->shader = b->pipeline;
     f->format = format;
     f->blend = b->blend;
     f->back_face = b->back_face;
@@ -559,6 +572,10 @@ static int32_t box_gpu_view_write(
         glm_mat4_mul(proj, ECS_CONST_CAST(vec4*, v->view_matrix), u->view_proj);
         glm_vec3_copy(ECS_CONST_CAST(float*, v->camera_transform[3]), u->camera);
         u->camera[3] = 1;
+        u->viewport[0] = (float)t->desc.render_width;
+        u->viewport[1] = (float)t->desc.render_height;
+        u->viewport[2] = 1.0f / (float)(t->desc.render_width > 0 ? t->desc.render_width : 1);
+        u->viewport[3] = 1.0f / (float)(t->desc.render_height > 0 ? t->desc.render_height : 1);
         box_gpu_light_uniforms(gpu, v, proj, u);
         box_gpu_shadow_uniforms(gpu, v, proj, result, u);
         box_gpu_cull_add(gpu, t, packet, i, result, proj, u);
@@ -583,8 +600,8 @@ static int32_t box_gpu_view_write(
  * @param format The format of the color target
  * @param packet The packet
  * @param slot Slot of the view in the view buffer
- * @param phase 0 for every draw of a view without occlusion, 1 for the opaque draws of the
- * early phase, 2 for what the late phase kept and the blended draws
+ * @param phase 0 for every draw of a view without occlusion, 1 for the opaque meshes of the
+ * early phase, 2 for what the late phase kept, the 2D shapes and the blended draws
  */
 static void box_gpu_draw_batches(
     box_gpu_t *gpu,
@@ -604,7 +621,8 @@ static void box_gpu_draw_batches(
         const box_render_batch_t *b = ecs_vec_get_t(
             &packet->batches, box_render_batch_t, d->batch);
         WGPURenderPipeline pipeline = box_gpu_forward_pipeline(gpu, format, b);
-        if (!pipeline || (phase == 1 && b->view != -1)) {
+        bool mesh = b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
+        if (!pipeline || (phase == 1 && !mesh)) {
             continue;
         }
 
@@ -619,7 +637,7 @@ static void box_gpu_draw_batches(
             material = group;
         }
 
-        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, phase == 2 && b->view == -1)) {
+        if (box_gpu_cull_draw(gpu, pass, packet, d, 2, phase == 2 && mesh)) {
             box_gpu_count(gpu, BOX_GPU_STAT_DRAW);
         }
     }
@@ -631,6 +649,7 @@ static void box_gpu_draw_batches(
  * @param t The target
  * @param encoder The encoder of the frame
  * @param color The texture view the view renders into
+ * @param hdr The HDR image of a view with effects, NULL to render into color
  * @param packet The packet
  * @param v The view
  * @param slot Slot of the view in the view buffer
@@ -642,15 +661,17 @@ static void box_gpu_draw_pass(
     box_gpu_target_t *t,
     WGPUCommandEncoder encoder,
     WGPUTextureView color,
+    WGPUTextureView hdr,
     const box_render_packet_t *packet,
     const box_render_view_t *v,
     int32_t slot,
     int32_t phase)
 {
+    bool clear = (v->clear.enabled || hdr) && phase < 2;
     WGPURenderPassColorAttachment attachment = {
-        .view = color,
+        .view = hdr ? hdr : color,
         .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
-        .loadOp = v->clear.enabled && phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
+        .loadOp = clear ? WGPULoadOp_Clear : WGPULoadOp_Load,
         .storeOp = WGPUStoreOp_Store,
         .clearValue = {
             box_gpu_linear(v->clear.color.r),
@@ -659,10 +680,14 @@ static void box_gpu_draw_pass(
             (double)v->clear.color.a / 255.0
         }
     };
+    if (hdr && !v->clear.enabled) {
+        attachment.clearValue = (WGPUColor){0};
+    }
+
     WGPURenderPassDepthStencilAttachment depth = {
         .view = t->depth_view,
         .depthLoadOp = phase < 2 ? WGPULoadOp_Clear : WGPULoadOp_Load,
-        .depthStoreOp = phase == 1 ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
+        .depthStoreOp = phase == 1 || hdr ? WGPUStoreOp_Store : WGPUStoreOp_Discard,
         .depthClearValue = 0.0f
     };
     WGPURenderPassDescriptor desc = {
@@ -674,7 +699,7 @@ static void box_gpu_draw_pass(
     WGPUBindGroup group = box_gpu_light_group(gpu, v, slot);
     WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &desc);
     wgpuRenderPassEncoderSetBindGroup(pass, 0, group, 1, &offset);
-    box_gpu_draw_batches(gpu, pass, t->format, packet, slot, phase);
+    box_gpu_draw_batches(gpu, pass, hdr ? BOX_GPU_HDR_FORMAT : t->format, packet, slot, phase);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
     wgpuBindGroupRelease(group);
@@ -699,14 +724,19 @@ void box_gpu_draw_views(
             continue;
         }
 
+        WGPUTextureView hdr = box_gpu_effects_begin(gpu, t, packet, v);
         bool occludes = box_gpu_cull_occludes(gpu, slot);
         box_gpu_light_cluster(gpu, encoder, v, slot);
         box_gpu_cull_record(gpu, encoder, slot);
         box_gpu_shadow_render(gpu, encoder, packet, i, slot);
-        box_gpu_draw_pass(gpu, t, encoder, color, packet, v, slot, occludes ? 1 : 0);
+        box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, occludes ? 1 : 0);
         if (occludes) {
             box_gpu_cull_record_late(gpu, encoder, t->depth_view, slot);
-            box_gpu_draw_pass(gpu, t, encoder, color, packet, v, slot, 2);
+            box_gpu_draw_pass(gpu, t, encoder, color, hdr, packet, v, slot, 2);
+        }
+
+        if (hdr) {
+            box_gpu_effects_run(gpu, t, encoder, packet, v, color);
         }
 
         box_gpu_count(gpu, BOX_GPU_STAT_PASS);

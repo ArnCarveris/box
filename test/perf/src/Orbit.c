@@ -5,12 +5,18 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include "fake.h"
 #include <math.h>
 
 void Orbit_fits_bounds(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {-5, 0, 0});
@@ -42,12 +48,19 @@ void Orbit_fits_bounds(void) {
     test_assert(fabsf(glm_vec3_distance(eye, (float*)status->center) - status->distance) < 1e-3f);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Orbit_looks_at_center(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {10, 3, -4});
@@ -80,12 +93,19 @@ void Orbit_looks_at_center(void) {
     }
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Orbit_moves_every_frame(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -113,12 +133,19 @@ void Orbit_moves_every_frame(void) {
     }
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Orbit_first_camera_when_unset(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -139,12 +166,19 @@ void Orbit_first_camera_when_unset(void) {
     test_assert(status->distance < 10);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Orbit_elevation(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t a = ecs_new(world);
     ecs_set(world, a, Position, {0, 0, 0});
@@ -165,12 +199,19 @@ void Orbit_elevation(void) {
     test_assert(fabsf(wt->m[2][1] - sinf(glm_rad(45))) < 1e-4f);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }
 
 void Orbit_no_shapes(void) {
-    // testing/perf
+    // testing/perf_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
+    fake_time = 100;
+    fake_work_ms = 0;
+    fake_slept_ms = 0;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
 
     ecs_entity_t camera = ecs_new(world);
     ecs_set(world, camera, Camera, {.fov = 60});
@@ -186,4 +227,52 @@ void Orbit_no_shapes(void) {
     test_assert(ecs_get(world, camera, Position) != NULL);
 
     ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
+}
+
+void Orbit_period(void) {
+    // testing/perf_flake
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    fake_time = 100;
+    box_perf_clock = fake_now;
+    box_perf_sleep = fake_sleep;
+
+    ecs_entity_t a = ecs_new(world);
+    ecs_set(world, a, Position, {4, 0, 0});
+    ecs_set(world, a, Box, {1, 1, 1});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60});
+    ecs_singleton_set(world, PerfRun, {
+        .fps = 120, .warmup = 2, .frames = 400, .period = 1, .camera = camera });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    const PerfStatus *status = ecs_singleton_get(world, PerfStatus);
+    Position start = *ecs_get(world, camera, Position);
+    double t0 = fake_time;
+    float cx = status->center[0], cz = status->center[2];
+    int32_t frames = 0;
+    while (fake_time - t0 < 0.5) {
+        ecs_progress(world, 0);
+        frames ++;
+    }
+
+    Position half = *ecs_get(world, camera, Position);
+    test_assert(frames >= 59 && frames <= 61);
+    test_assert(fabsf((half.x - cx) + (start.x - cx)) < 0.1f);
+    test_assert(fabsf((half.z - cz) + (start.z - cz)) < 0.1f);
+
+    while (fake_time - t0 < 1.0) {
+        ecs_progress(world, 0);
+    }
+
+    Position full = *ecs_get(world, camera, Position);
+    test_assert(fabsf(full.x - start.x) < 0.1f);
+    test_assert(fabsf(full.z - start.z) < 0.1f);
+
+    ecs_fini(world);
+    box_perf_clock = NULL;
+    box_perf_sleep = NULL;
 }

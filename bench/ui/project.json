@@ -1,0 +1,23 @@
+{
+    "id": "bench_ui",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for the layout of box.layout with a 10k element tree",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Layout",
+                "benchcases": [
+                    "layout_10k",
+                    "one_leaf_10k",
+                    "idle_frame_10k"
+                ]
+            }
+        ]
+    }
+}
