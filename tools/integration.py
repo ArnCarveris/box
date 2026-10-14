@@ -10,7 +10,9 @@ visual renders every <dir>/<scene>.flecs (test/integration/visual by default) he
 boxrun, a static camera and a fixed delta, and compares the last frame with
 <dir>/baseline/<scene>.png. A scene fails when the difference is strong and widespread: the
 largest channel delta is above 24 and more than 200 pixels have a channel off by more than 16,
-so GPU speckle and faint drift pass. A missing baseline fails too.
+so GPU speckle and faint drift pass. A missing baseline fails too. A scene that includes scripts
+from elsewhere (`include town_content`) lists them in <scene>.sources, one path relative to the
+scene per line; they are copied next to the harness the scene runs from (visual and perf).
 
 --update-baseline <scene> renders that scene and stores the render as its baseline; repeat it
 for more scenes. Scenes are names or paths; without any, every scene of the folder runs.
@@ -255,11 +257,27 @@ def app_project(app):
     return app
 
 
+def copy_sources(scene, folder):
+    sidecar = os.path.splitext(scene)[0] + ".sources"
+    if not os.path.isfile(sidecar):
+        return
+    with open(sidecar) as f:
+        lines = [line.strip() for line in f]
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        source = os.path.normpath(os.path.join(os.path.dirname(scene), line))
+        if not os.path.isfile(source):
+            sys.exit("%s: no source %s" % (display(sidecar), display(source)))
+        shutil.copyfile(source, os.path.join(folder, os.path.basename(source)))
+
+
 def render_scene(scene, png, args):
     width, height = (int(v) for v in args.size.lower().split("x"))
     with open(scene) as f:
         source = f.read()
     harness = os.path.join(os.path.dirname(png), scene_name(scene) + ".run.flecs")
+    copy_sources(scene, os.path.dirname(png))
     with open(harness, "w") as f:
         f.write("%s\n\nvisual_capture {\n  box.surface.Surface: {width: %d, height: %d, "
                 "write_to_file: \"%s\"}\n}\n" % (source.rstrip(), width, height, png))
@@ -548,6 +566,8 @@ def perf_problems(data):
     period = data.get("period") or 0
     if not data.get("views"):
         problems.append("no view renders the orbiting camera")
+    if period <= 0:
+        problems.append("the camera does not orbit (period %g)" % period)
     if fps and period and data.get("frames", 0) < fps * period:
         problems.append("the measurement covers %.2f of a revolution, frames must be at least "
                         "fps * period (%d)" % (data.get("frames", 0) / (fps * period),
@@ -585,6 +605,7 @@ def run_perf_scene(scene, out, args):
         if "PerfRun" not in f.read():
             result.update({"detail": "the scene sets no PerfRun", "elapsed": 0})
             return result
+    copy_sources(scene, out)
     with open(harness, "w") as f:
         f.write(perf_script(scene, report, args))
     result["load_before"] = wait_for_load(args.max_load, args.load_wait)
