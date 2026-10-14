@@ -131,7 +131,7 @@ static void box_terminal_on_add(
         }
 
         ecs_vec_init_t(NULL, &s.entries, box_command_entry_t, 0);
-        ecs_vec_init_t(NULL, &s.images, char*, 0);
+        ecs_vec_init_t(NULL, &s.images, box_terminal_image_t, 0);
         ecs_set(it->stage, e, TerminalStatus, { .dir = s.dir });
         ecs_set_ptr(it->stage, e, TerminalSession, &s);
     }
@@ -311,28 +311,55 @@ done:
     return;
 }
 
+/** Delete the oldest image of a session that the renderer is done with.
+ *
+ * @param s The session
+ * @param rendered RenderStatus.rendered, packets the renderer finished
+ * @return Whether an image was deleted or dropped
+ */
+static bool box_terminal_image_evict(
+    TerminalSession *s,
+    int32_t rendered)
+{
+    int32_t i, count = ecs_vec_count(&s->images);
+    bool result = false;
+    for (i = 0; i < count && !result; i ++) {
+        box_terminal_image_t *image = ecs_vec_get_t(&s->images, box_terminal_image_t, i);
+        result = !unlink(image->path) || (errno == ENOENT && rendered >= image->packet);
+        if (result) {
+            ecs_os_free(image->path);
+            ecs_vec_remove_ordered_t(&s->images, box_terminal_image_t, i);
+        }
+    }
+
+    return result;
+}
+
 int box_terminal_image(
     ecs_world_t *world,
     ecs_entity_t session,
     const char *path)
 {
     TerminalSession *s = ecs_get_mut(world, session, TerminalSession);
-    char **slot;
-    int result = -1;
+    const RenderStatus *status = ecs_singleton_get(world, RenderStatus);
+    int32_t submitted = status ? status->submitted : 0;
+    int32_t rendered = status ? status->rendered : 0;
+    box_terminal_image_t *image;
+    int result = BOX_TERMINAL_IMAGE_NONE;
     if (!s || s->images_max <= 0) {
         goto done;
     }
 
-    if (ecs_vec_count(&s->images) < s->images_max) {
-        slot = ecs_vec_append_t(NULL, &s->images, char*);
-    } else {
-        slot = ecs_vec_get_t(&s->images, char*, (int32_t)(s->images_total % s->images_max));
-        unlink(slot[0]);
-        ecs_os_free(slot[0]);
+    result = BOX_TERMINAL_IMAGE_PENDING;
+    while (ecs_vec_count(&s->images) >= s->images_max) {
+        if (!box_terminal_image_evict(s, rendered)) {
+            goto done;
+        }
     }
 
-    slot[0] = ecs_os_strdup(path);
-    s->images_total ++;
+    image = ecs_vec_append_t(NULL, &s->images, box_terminal_image_t);
+    image->path = ecs_os_strdup(path);
+    image->packet = submitted + BOX_TERMINAL_IMAGE_PACKETS;
     result = 0;
 done:
     return result;

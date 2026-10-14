@@ -374,6 +374,10 @@ static void box_search_next(
     if (count < 0 || count > BOX_COMMAND_NEXT_MAX) {
         box_command_error(ctx, result, "count: %d is out of range, 0 to %d", count,
             BOX_COMMAND_NEXT_MAX);
+        if (st && logged - st->mark <= 1) {
+            st->mark = logged;
+        }
+
         goto done;
     }
 

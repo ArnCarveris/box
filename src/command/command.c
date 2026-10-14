@@ -42,12 +42,12 @@ static void box_terminal_session_dtor(
         }
 
         ecs_vec_fini_t(NULL, &s[i].entries, box_command_entry_t);
-        char **images = ecs_vec_first(&s[i].images);
+        box_terminal_image_t *images = ecs_vec_first(&s[i].images);
         for (j = 0; j < ecs_vec_count(&s[i].images); j ++) {
-            ecs_os_free(images[j]);
+            ecs_os_free(images[j].path);
         }
 
-        ecs_vec_fini_t(NULL, &s[i].images, char*);
+        ecs_vec_fini_t(NULL, &s[i].images, box_terminal_image_t);
         ecs_os_memset_t(&s[i], 0, TerminalSession);
     }
 }

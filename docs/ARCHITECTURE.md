@@ -360,6 +360,21 @@ are script functions registered with `box_command_register` (`src/command`):
 The HTTP server has no deferred reply, so commands that wait (`input.wait`, `capture`, `render`)
 answer at once with a pending state and the caller polls.
 
+**Limits.** Numeric arguments are range checked: an i32 outside the i32 range, a non finite
+f64, walk `steps` above 1000, `dur` above 36000 frames and `next` counts above 1000 fail with
+"is out of range, min to max" (a rejected `next` keeps the iteration). The `TerminalLimits`
+singleton holds the session bounds, with defaults from its constructor. `sessions` (16) caps
+the sessions `/terminal/new` keeps open (HTTP 400 "too many sessions") and `idle_timeout`
+(1800 s) closes such a session when it ran no command for that long (`TerminalIdle`, every
+frame); both are read live and do not apply to the `Terminal` entities of a scene. `history`
+(1000 lines, the `commands` output; `TerminalStatus.commands` stays the total), `log_size`
+(1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
+read when a session opens and do not change open sessions. An image of `capture` or `render`
+counts against `images` from the moment it is named until it is deleted: naming one more
+deletes the oldest image the renderer is done with (written, or dropped once
+`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+the command fails, so a burst of captures cannot leave files behind.
+
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`
 creates an offscreen target for one packet, an exclusive view assigned to it and a PNG path, and
 destroys the target in the next packet. An exclusive target renders only its views and other

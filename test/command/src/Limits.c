@@ -5,6 +5,7 @@
 
 #include <box.h>
 #include <bake_test.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -395,6 +396,113 @@ void Limits_images_bounded(void) {
 
         ecs_os_free(path);
     }
+
+    ecs_fini(world);
+}
+
+void Limits_images_pending_not_evicted(void) {
+    // hardening/command_limits
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_singleton_get_mut(world, TerminalLimits)->images = 2;
+    ecs_singleton_modified(world, TerminalLimits);
+
+    ecs_entity_t camera = ecs_entity(world, { .name = "cam" });
+    ecs_set(world, camera, Position, {0, 0, 5});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 8, .height = 8, .resolution_scale = 1});
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_progress(world, 0);
+
+    char *resources = flecs_asprintf("%s/resources", ecs_get(world, s, TerminalStatus)->dir);
+    int32_t round;
+    for (round = 0; round < 3; round ++) {
+        bool error = false;
+        char *out = box_terminal_run(world, s, "capture cam cam cam cam", &error);
+        test_bool(error, true);
+        test_str(out, "error: 2 images are still being written, TerminalLimits.images is 2");
+        ecs_os_free(out);
+
+        ecs_progress(world, 0);
+        box_render_sync(world);
+
+        int32_t pngs = 0;
+        DIR *dir = opendir(resources);
+        test_assert(dir != NULL);
+        struct dirent *entry;
+        while ((entry = readdir(dir))) {
+            const char *ext = strrchr(entry->d_name, '.');
+            pngs += ext && !strcmp(ext, ".png");
+        }
+
+        closedir(dir);
+        test_int(pngs, 2);
+    }
+
+    ecs_os_free(resources);
+    ecs_fini(world);
+}
+
+void Limits_next_out_of_range_keeps_iteration(void) {
+    // hardening/command_limits
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t parent = ecs_entity(world, { .name = "parent" });
+    ecs_entity(world, { .name = "e1", .parent = parent });
+    ecs_entity(world, { .name = "e2", .parent = parent });
+    ecs_entity(world, { .name = "e3", .parent = parent });
+
+    ecs_entity_t s = box_terminal_new(world);
+    ecs_os_free(box_terminal_run(world, s, "query q (ChildOf, parent)", NULL));
+    ecs_os_free(box_terminal_run(world, s, "iter q", NULL));
+
+    bool error = true;
+    char *out = box_terminal_run(world, s, "next", &error);
+    test_bool(error, false);
+    test_str(out, "parent.e1");
+    ecs_os_free(out);
+
+    out = box_terminal_run(world, s, "next 5000", &error);
+    test_bool(error, true);
+    ecs_os_free(out);
+
+    out = box_terminal_run(world, s, "next", &error);
+    test_bool(error, false);
+    test_str(out, "parent.e2");
+    ecs_os_free(out);
+
+    ecs_fini(world);
+}
+
+void Limits_command_resets_idle_timer(void) {
+    // hardening/command_limits
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_get_mut(world, TerminalLimits)->idle_timeout = 0.2;
+    ecs_singleton_modified(world, TerminalLimits);
+
+    ecs_entity_t active = box_terminal_new(world);
+    ecs_entity_t idle = box_terminal_new(world);
+    test_assert(active != 0);
+    test_assert(idle != 0);
+
+    ecs_sleepf(0.3);
+    ecs_os_free(box_terminal_run(world, active, "commands", NULL));
+    ecs_progress(world, 0);
+
+    test_assert(ecs_is_alive(world, active));
+    test_assert(ecs_has(world, active, TerminalStatus));
+    test_assert(!ecs_is_alive(world, idle));
 
     ecs_fini(world);
 }

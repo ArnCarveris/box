@@ -22,6 +22,23 @@
 /** Name of the file in the session folder that every command line is appended to */
 #define BOX_TERMINAL_LOG "commands.log"
 
+/** Packets after the last submitted one by which the renderer has written or dropped an image
+ * that a command names now: a capture goes into the next packet, a render one packet later
+ * at most */
+#define BOX_TERMINAL_IMAGE_PACKETS (2)
+
+/** box_terminal_image result: the session keeps no images */
+#define BOX_TERMINAL_IMAGE_NONE (-1)
+
+/** box_terminal_image result: every image the session keeps is still being written */
+#define BOX_TERMINAL_IMAGE_PENDING (-2)
+
+/** An image a render command named, which the renderer writes in a later frame */
+typedef struct box_terminal_image_t {
+    char *path;         /**< The PNG file */
+    int32_t packet;     /**< RenderStatus.rendered from which the renderer is done with it */
+} box_terminal_image_t;
+
 /** One command line a session ran and its result */
 typedef struct box_command_entry_t {
     char *line;         /**< The command line */
@@ -34,9 +51,8 @@ typedef struct TerminalSession {
     char *dir;          /**< The session folder, removed with the session */
     FILE *log;          /**< Open commands.log in the session folder */
     ecs_vec_t entries;  /**< Ring of box_command_entry_t of the last lines the session ran */
-    ecs_vec_t images;   /**< Ring of char* paths of the last images of the render commands */
+    ecs_vec_t images;   /**< box_terminal_image_t of the images the session keeps, oldest first */
     int64_t total;      /**< Lines the session ran since it opened */
-    int64_t images_total; /**< Images the session named since it opened */
     int32_t history;    /**< Size of the entries ring */
     int32_t images_max; /**< Size of the images ring */
     int32_t log_size;   /**< Bytes of commands.log before it moves to commands.log.1 */
@@ -121,13 +137,17 @@ const box_command_entry_t* box_terminal_history_get(
     const TerminalSession *s,
     int32_t i);
 
-/** Keep an image a render command names in the resources folder of a session, deleting the
- * oldest image when the session keeps more than its TerminalLimits.images.
+/** Keep an image a render command names in the resources folder of a session.
+ *
+ * An image counts against TerminalLimits.images of the session until it is deleted. When the
+ * session keeps that many, the oldest image the renderer is done with is deleted; an image
+ * that is still being written is never evicted, so its file cannot appear untracked later.
  *
  * @param world The world
  * @param session The session entity
  * @param path The image file
- * @return 0 when the image is kept, -1 when the session keeps no images
+ * @return 0 when the image is kept, BOX_TERMINAL_IMAGE_NONE when the session keeps no
+ * images, BOX_TERMINAL_IMAGE_PENDING when every image it keeps is still being written
  */
 int box_terminal_image(
     ecs_world_t *world,

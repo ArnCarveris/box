@@ -67,14 +67,17 @@ ECS_STRUCT(TerminalServer, {
 /** Singleton with the limits of the terminal sessions, added with its defaults on import.
  *
  * The session cap and the idle timeout apply to sessions opened with box_terminal_new
- * (/terminal/new), not to entities a scene gives a Terminal.
+ * (/terminal/new), not to entities a scene gives a Terminal, and changes apply at once.
+ *
+ * history, log_size and images are read when a session opens: a change applies to sessions
+ * opened afterwards and leaves open sessions as they are.
  */
 ECS_STRUCT(TerminalLimits, {
     int32_t sessions;       /**< Sessions box_terminal_new keeps open at once */
     double idle_timeout;    /**< Seconds without a command before such a session is closed */
     int32_t history;        /**< Command lines a session keeps for the commands command */
     int32_t log_size;       /**< Bytes of commands.log before it moves to commands.log.1 */
-    int32_t images;         /**< Images of the render commands a session keeps in resources */
+    int32_t images;         /**< Images of the render commands a session keeps, pending too */
 });
 
 /** A parameter of a command, after the session parameter every command has */

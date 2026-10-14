@@ -1,0 +1,23 @@
+{
+    "id": "bench_command",
+    "type": "application",
+    "value": {
+        "description": "Benchmarks for command dispatch and the frame cost of open terminal sessions",
+        "public": false,
+        "use": [
+            "box"
+        ]
+    },
+    "bench": {
+        "benchsuites": [
+            {
+                "id": "Dispatch",
+                "benchcases": [
+                    "run_i32_arg",
+                    "frame_no_sessions",
+                    "frame_16_sessions"
+                ]
+            }
+        ]
+    }
+}
