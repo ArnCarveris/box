@@ -25,6 +25,8 @@ component ids are registered in the same order in every world.
 | `box.light`     | `include/box/light.h`     | `src/light`      | Directional, point and spot lights |
 | `box.movement`  | `include/box/movement.h`  | `src/movement`   | `Velocity`, `AngularVelocity` |
 | `box.layout`    | `include/box/layout.h`    | `src/layout`     | UI layout components |
+| `box.input`     | `include/box/input.h`     | `src/input`      | `Input`, `Key`, synthetic input queue, `Action`, `ActionState`, `Binding` |
+| `box.controllers` | `include/box/controllers.h` | `src/controllers` | `CameraController`, `FirstPersonController` and their default actions |
 | `box.app`       | `include/box/app.h`       | `src/app`        | `App`, `AppStatus`, argument parsing, the run loop |
 | `box.jobs`      | `src/jobs/jobs.h` (private) | `src/jobs`     | Worker pool for IO and asset work |
 | `box.render`    | `include/box/render.h`    | `src/render`     | `RenderSettings`, `RenderStatus`, packet ring, render thread, backends |
