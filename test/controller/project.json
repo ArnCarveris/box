@@ -151,7 +151,10 @@
                     "first_person_rotated_thin_wall",
                     "step_up_long_frame",
                     "camera_huge_speed",
-                    "camera_infinite_velocity"
+                    "camera_infinite_velocity",
+                    "steep_crease_holds",
+                    "steep_slope_wall_crease_holds",
+                    "steep_crease_walk_along"
                 ]
             }
         ]

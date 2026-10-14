@@ -156,7 +156,7 @@ bool box_collider_resolve(
 typedef struct box_collider_contact_t {
     vec3 normal;  /**< Direction from the collider towards the capsule, that moves it out */
     vec3 surface; /**< Normal of the face touched, the most upward one at an edge or corner */
-    float depth;  /**< Distance the capsule must move along the normal, negative for a gap */
+    float depth;  /**< Overlap of the capsule and the collider along the normal, positive */
 } box_collider_contact_t;
 
 /** Find the signed distance between a capsule and a collider.

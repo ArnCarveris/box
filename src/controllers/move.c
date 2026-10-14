@@ -199,28 +199,51 @@ static void box_move_touch(
     }
 }
 
+/** Test whether an upright body treats a contact as a wall: too steep to stand on, not a ceiling.
+ *
+ * @param m The move
+ * @param n The normal of the contact
+ * @return true when the contact is steep
+ */
+static bool box_move_steep(
+    const box_move_t *m,
+    const vec3 n)
+{
+    return m->body->upright && n[1] >= 0 && n[1] < BOX_MOVE_WALKABLE &&
+        (n[0] != 0 || n[2] != 0);
+}
+
 /** Find the deepest contact of the capsule at a position.
  *
  * @param m The move
  * @param pos The feet
  * @param out Receives the deepest contact
+ * @param steep Receives the sum of the normals of the steep contacts, see box_move_steep
  * @return The depth of the deepest contact, 0 when there is none
  */
 static float box_move_deepest(
     const box_move_t *m,
     const vec3 pos,
-    box_collider_contact_t *out)
+    box_collider_contact_t *out,
+    vec3 steep)
 {
     const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
     int32_t i, count = ecs_vec_count(&m->colliders);
     float result = 0;
     vec3 a, b;
+    glm_vec3_zero(steep);
     box_move_segment(m->body, pos, a, b);
     for (i = 0; i < count; i ++) {
         box_collider_contact_t contact;
-        if (box_collider_push(&c[i], a, b, m->body->radius, &contact) &&
-            contact.depth > result)
-        {
+        if (!box_collider_push(&c[i], a, b, m->body->radius, &contact)) {
+            continue;
+        }
+
+        if (box_move_steep(m, contact.normal)) {
+            glm_vec3_add(steep, contact.normal, steep);
+        }
+
+        if (contact.depth > result) {
             result = contact.depth;
             *out = contact;
         }
@@ -234,6 +257,10 @@ static float box_move_deepest(
  * A contact the body can stand on lifts it straight up, so standing on a slope does not slide.
  * An upright body is pushed off a surface too steep to stand on horizontally, like off a wall,
  * so walking or jumping into a steep slope does not climb it.
+ *
+ * Steep surfaces the body touches at once that together face up enough to stand on, a valley
+ * of two slopes or a slope against a wall, form a crease that holds it like ground, as Jolt's
+ * CharacterVirtual supports a character by the average normal of its steep contacts.
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -249,9 +276,10 @@ static void box_move_push(
     for (i = 0; i < BOX_MOVE_PUSHES && again; i ++) {
         box_collider_contact_t contact;
         float *n = contact.normal;
-        float depth = box_move_deepest(m, pos, &contact);
+        vec3 steep, away;
+        float depth = box_move_deepest(m, pos, &contact, steep);
         float flat = 0, d = 0;
-        vec3 away;
+        bool crease = false;
         again = depth > BOX_MOVE_EPS;
         if (!again) {
             continue;
@@ -259,9 +287,18 @@ static void box_move_push(
 
         flat = sqrtf(n[0] * n[0] + n[2] * n[2]);
         glm_vec3_copy(n, away);
+        if (box_move_steep(m, n)) {
+            glm_vec3_normalize(steep);
+            crease = steep[1] >= BOX_MOVE_WALKABLE;
+        }
+
         if (n[1] >= (m->support ? BOX_MOVE_SUPPORT : BOX_MOVE_WALKABLE)) {
             pos[1] += depth / n[1];
-        } else if (m->body->upright && n[1] > 0 && flat > 0) {
+        } else if (crease && n[1] > 0) {
+            pos[1] += depth / n[1];
+            glm_vec3_copy(steep, contact.normal);
+            glm_vec3_copy(steep, contact.surface);
+        } else if (box_move_steep(m, n)) {
             away[0] = n[0] / flat;
             away[1] = 0;
             away[2] = n[2] / flat;
@@ -543,10 +580,11 @@ bool box_controller_fits(
     vec3 still = { 0, 0, 0 };
     box_collider_contact_t contact;
     box_move_t m;
+    vec3 steep;
     bool result = true;
     if (body->radius > 0) {
         box_move_init(world, &m, body, pos, still);
-        result = box_move_deepest(&m, pos, &contact) <= BOX_MOVE_FIT;
+        result = box_move_deepest(&m, pos, &contact, steep) <= BOX_MOVE_FIT;
         ecs_vec_fini_t(NULL, &m.colliders, box_collider_t);
     }
 
