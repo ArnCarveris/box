@@ -59,6 +59,23 @@ void box_input_platform_set(
     }
 }
 
+void box_input_router_set(
+    ecs_world_t *world,
+    const box_input_router_t *router)
+{
+    InputDevice *dev = box_input_device(world);
+    ecs_os_zeromem(&dev->router);
+    if (router) {
+        dev->router = *router;
+    }
+}
+
+ecs_entity_t box_input_screen(
+    ecs_world_t *world)
+{
+    return box_input_device(world)->screen;
+}
+
 /** Make the screen the entity that received the last press, so keyboard events reach it.
  *
  * @param world The world
