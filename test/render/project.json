@@ -189,6 +189,24 @@
                 ]
             },
             {
+                "id": "Tint",
+                "testcases": [
+                    "mix_by_strength",
+                    "compose_childof",
+                    "compose_parent",
+                    "compose_mixed",
+                    "own_tint_after_ancestors",
+                    "change_updates_descendants",
+                    "remove_tint",
+                    "reparent_childof",
+                    "reparent_parent",
+                    "leave_hierarchy",
+                    "dynamic_material",
+                    "dynamic_material_inherited",
+                    "keeps_opacity"
+                ]
+            },
+            {
                 "id": "Texture",
                 "testcases": [
                     "load_png",

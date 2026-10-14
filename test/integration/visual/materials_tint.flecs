@@ -1,0 +1,115 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+
+camera {
+  Position: {0, 3.2, 9}
+  Rotation: {-0.3, 0, 0}
+  Camera: {fov: 50}
+}
+
+main_view {
+  View: {camera: camera, clear: {enabled: true, color: {30, 34, 44, 255}}}
+}
+
+floor {
+  Position: {0, -0.1, 0}
+  Box: {16, 0.2, 8}
+  Rgb: {200, 200, 205}
+}
+
+plain {
+  Position: {-4.8, 0, 0}
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {128, 192, 255}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {128, 192, 255}
+  }
+}
+
+blue {
+  Position: {-2.4, 0, 0}
+  Tint: {r: 0, g: 0, b: 255, a: 128}
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {128, 192, 255}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {128, 192, 255}
+  }
+}
+
+blue_black {
+  Position: {0, 0, 0}
+  Tint: {r: 0, g: 0, b: 255, a: 128}
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {128, 192, 255}
+  }
+  dark {
+    Tint: {r: 0, g: 0, b: 0, a: 128}
+    block {
+      Position: {0, 1.7, 0}
+      Box: {0.8, 0.8, 0.8}
+      Rgb: {128, 192, 255}
+    }
+  }
+}
+
+mixed_root {
+  Position: {2.4, 0, 0}
+  Tint: {r: 0, g: 0, b: 255, a: 128}
+}
+
+mixed_dark {
+  Parent: {mixed_root}
+  Position: {0, 0, 0}
+  Tint: {r: 0, g: 0, b: 0, a: 128}
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {128, 192, 255}
+  }
+}
+
+mixed_ball {
+  Parent: {mixed_root}
+  Position: {0, 0.6, 0}
+  Sphere: {segments: 32, smooth: true, radius: 0.6}
+  Rgb: {128, 192, 255}
+}
+
+orange {
+  Position: {4.8, 0, 0}
+  Tint: {r: 255, g: 140, b: 0, a: 255}
+  ball {
+    Position: {0, 0.6, 0}
+    Sphere: {segments: 32, smooth: true, radius: 0.6}
+    Rgb: {40, 200, 90}
+  }
+  block {
+    Position: {0, 1.7, 0}
+    Box: {0.8, 0.8, 0.8}
+    Rgb: {200, 40, 200}
+  }
+}
+
+for i in 0..8 {
+  {
+    Position: {i * 1.2 - 4.2, 0.25, 2.2}
+    Box: {0.8, 0.5, 0.8}
+    Rgb: {255, 255, 255}
+    Tint: {r: 220, g: 40, b: 40, a: i * 32}
+  }
+}

@@ -41,7 +41,12 @@ ECS_STRUCT(Opacity, {
     float value; /**< Opacity */
 });
 
-/** Color the surface mixes toward, composed with the tints down the hierarchy */
+/** Color the display encoded base color (Rgb) mixes toward by the strength in a, before lighting.
+ *
+ * It is not transparency (Opacity) and applies to every shape below it through ChildOf and
+ * Parent, composed from the root down: a child's tint mixes the result of its ancestors'. An
+ * albedo texture multiplies the tinted color; emission is not tinted.
+ */
 ECS_STRUCT(Tint, {
     uint8_t r;  /**< Red of the tint color */
     uint8_t g;  /**< Green of the tint color */

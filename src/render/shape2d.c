@@ -121,12 +121,6 @@ void box_draws_shape2d(
         box_shape2d_rect(out, s);
     }
 
-    if (s->texture && !material->color) {
-        out->color[0] = 1.0f;
-        out->color[1] = 1.0f;
-        out->color[2] = 1.0f;
-    }
-
     out->uv[2] = s->uv[2] * out->uv[0] + out->uv[2];
     out->uv[3] = s->uv[3] * out->uv[1] + out->uv[3];
     out->uv[0] *= s->uv[0];
