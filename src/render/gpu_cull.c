@@ -30,6 +30,12 @@
 /** Timestamps of the cull passes of one target at most, a begin and an end per pass */
 #define BOX_GPU_CULL_STAMPS (64)
 
+/** Scan words of a workgroup of a parallel dispatch: two mask words and its count or offset */
+#define BOX_GPU_CULL_SCAN_WORDS (3)
+
+/** Workgroups along x of a cull_write dispatch at most, the WebGPU dispatch size limit */
+#define BOX_GPU_CULL_WRITE_ROW (65535)
+
 /** Words of the counters of a cull view: drawn, frustum culled and two unused */
 #define BOX_GPU_CULL_COUNTERS (4)
 
@@ -127,6 +133,7 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->uniform_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &c->job_data, box_gpu_cull_job_t, 0);
     ecs_vec_init_t(NULL, &c->pages, box_gpu_cull_page_t, 0);
+    ecs_vec_init_t(NULL, &c->tables, box_gpu_cull_table_t, 0);
     if (gpu->timestamps) {
         c->stamps = wgpuDeviceCreateQuerySet(gpu->device, &(WGPUQuerySetDescriptor){
             .type = WGPUQueryType_Timestamp,
@@ -227,9 +234,11 @@ void box_gpu_cull_fini(
         box_gpu_cull_release(&pg->lists);
         box_gpu_cull_release(&pg->scan);
         ecs_vec_fini_t(NULL, &pg->list_data, uint32_t);
+        ecs_vec_fini_t(NULL, &pg->table_data, uint32_t);
     }
 
     ecs_vec_fini_t(NULL, &c->pages, box_gpu_cull_page_t);
+    ecs_vec_fini_t(NULL, &c->tables, box_gpu_cull_table_t);
     if (c->stamps) {
         wgpuQuerySetRelease(c->stamps);
         c->stamps = NULL;
@@ -286,7 +295,7 @@ done:
 /** Get the cull pipelines, created again when the cull shader was recompiled.
  *
  * @param gpu The backend
- * @return Whether both pipelines exist
+ * @return Whether every cull pipeline exists
  */
 static bool box_gpu_cull_pipelines(
     box_gpu_t *gpu)
@@ -497,6 +506,7 @@ void box_gpu_cull_begin(
     ecs_vec_clear(&c->job_data);
     ecs_vec_clear(&c->arg_data);
     c->page_count = 0;
+    ecs_vec_clear(&c->tables);
 }
 
 /** Write the frustum planes of a clip space matrix, normalized and in world space.
@@ -607,11 +617,6 @@ static void box_gpu_cull_dispatch(
     u->jobs[0] = first;
     u->jobs[1] = count;
     u->jobs[2] = phase;
-    if (instances) {
-        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page);
-        u->scan[0] = pg->scan_used;
-        pg->scan_used += (work + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP * 3;
-    }
 
     box_gpu_cull_dispatch_t *d = ecs_vec_append_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t);
     d->buffer = buffer;
@@ -620,6 +625,15 @@ static void box_gpu_cull_dispatch(
     d->late = phase == BOX_GPU_CULL_PHASE_LATE;
     d->page = page;
     d->history = history;
+    d->first = first;
+    d->scan = 0;
+    d->scan_groups = 0;
+    if (instances) {
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page);
+        d->scan = u->scan[0] = pg->scan_used;
+        d->scan_groups = d->groups;
+        pg->scan_used += d->groups * BOX_GPU_CULL_SCAN_WORDS;
+    }
 }
 
 /** Start the next page of visible slots of the target.
@@ -640,6 +654,7 @@ static box_gpu_cull_page_t* box_gpu_cull_page_next(
     }
 
     ecs_vec_clear(&result->list_data);
+    ecs_vec_clear(&result->table_data);
     result->used = 0;
     result->scan_used = 0;
     c->page_count ++;
@@ -965,6 +980,7 @@ void box_gpu_cull_reset(
     ecs_vec_clear(&c->job_data);
     ecs_vec_clear(&c->arg_data);
     c->page_count = 0;
+    ecs_vec_clear(&c->tables);
 }
 
 /** Check whether a probe capture draws a batch.
@@ -1121,6 +1137,120 @@ static void box_gpu_cull_page_upload(
         wgpuQueueWriteBuffer(gpu->queue, pg->lists, 0, ecs_vec_first(&pg->list_data),
             (size_t)lists * sizeof(uint32_t));
     }
+
+    if (ecs_vec_count(&pg->table_data)) {
+        wgpuQueueWriteBuffer(gpu->queue, pg->scan, (uint64_t)pg->table_base * sizeof(uint32_t),
+            ecs_vec_first(&pg->table_data),
+            (size_t)ecs_vec_count(&pg->table_data) * sizeof(uint32_t));
+    }
+}
+
+/** Add the table of the parallel dispatches of a cull view, phase and page.
+ *
+ * Appends a table entry per dispatch (job, first scan word, workgroups) and a list entry per
+ * workgroup (its first scan word, its table entry) to the table data of the page, and the
+ * uniforms of the cull_scan and cull_write dispatches, copied from the first dispatch.
+ *
+ * @param gpu The backend
+ * @param v Index of the cull view
+ * @param late The phase
+ * @param page The page
+ */
+static void box_gpu_cull_table(
+    box_gpu_t *gpu,
+    int32_t v,
+    bool late,
+    uint32_t page)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, v);
+    box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, (int32_t)page);
+    box_gpu_cull_table_t table = { .view = v, .late = late, .page = page };
+    int32_t d, g, first = -1;
+    uint32_t entries = pg->table_base + (uint32_t)ecs_vec_count(&pg->table_data);
+    for (d = cv->first_dispatch; d < cv->first_dispatch + cv->dispatch_count; d ++) {
+        const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
+            &c->dispatches, box_gpu_cull_dispatch_t, d);
+        if (dp->scan_groups && dp->late == late && dp->page == page) {
+            uint32_t *e = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t, 4);
+            e[0] = dp->first;
+            e[1] = dp->scan;
+            e[2] = dp->scan_groups;
+            e[3] = 0;
+            first = first < 0 ? d : first;
+            table.buffer = dp->buffer;
+            table.entries ++;
+        }
+    }
+
+    if (first < 0) {
+        goto done;
+    }
+
+    uint32_t list = pg->table_base + (uint32_t)ecs_vec_count(&pg->table_data);
+    uint32_t entry = entries;
+    for (d = first; d < cv->first_dispatch + cv->dispatch_count; d ++) {
+        const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
+            &c->dispatches, box_gpu_cull_dispatch_t, d);
+        if (!dp->scan_groups || dp->late != late || dp->page != page) {
+            continue;
+        }
+
+        uint32_t *l = ecs_vec_grow_t(NULL, &pg->table_data, uint32_t,
+            (int32_t)dp->scan_groups * 2);
+        for (g = 0; g < (int32_t)dp->scan_groups; g ++) {
+            l[g * 2] = dp->scan + (uint32_t)g * BOX_GPU_CULL_SCAN_WORDS;
+            l[g * 2 + 1] = entry;
+        }
+
+        table.groups += dp->scan_groups;
+        entry += 4;
+    }
+
+    int32_t offset = ecs_vec_count(&c->uniform_data);
+    ecs_vec_grow_t(NULL, &c->uniform_data, uint8_t, BOX_GPU_CULL_STRIDE);
+    box_gpu_cull_uniforms_t *u = (box_gpu_cull_uniforms_t*)ecs_vec_get_t(
+        &c->uniform_data, uint8_t, offset);
+    *u = *(box_gpu_cull_uniforms_t*)ecs_vec_get_t(
+        &c->uniform_data, uint8_t, first * BOX_GPU_CULL_STRIDE);
+    u->scan[0] = entries;
+    u->scan[1] = table.entries;
+    u->scan[2] = list;
+    u->scan[3] = table.groups;
+    table.uniform = (uint32_t)(offset / BOX_GPU_CULL_STRIDE);
+    *ecs_vec_append_t(NULL, &c->tables, box_gpu_cull_table_t) = table;
+done:
+    return;
+}
+
+/** Add the tables of every cull view, phase and page of the target.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_cull_tables(
+    box_gpu_t *gpu)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    int32_t v, p, late;
+    ecs_vec_clear(&c->tables);
+    for (p = 0; p < c->page_count; p ++) {
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, p);
+        ecs_vec_clear(&pg->table_data);
+        pg->table_base = pg->scan_used;
+    }
+
+    for (v = 0; v < ecs_vec_count(&c->views); v ++) {
+        for (late = 0; late < 2; late ++) {
+            for (p = 0; p < c->page_count; p ++) {
+                box_gpu_cull_table(gpu, v, late != 0, (uint32_t)p);
+            }
+        }
+    }
+
+    for (p = 0; p < c->page_count; p ++) {
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, p);
+        pg->scan_used += (uint32_t)ecs_vec_count(&pg->table_data);
+    }
 }
 
 void box_gpu_cull_upload(
@@ -1136,6 +1266,7 @@ void box_gpu_cull_upload(
         goto done;
     }
 
+    box_gpu_cull_tables(gpu);
     grown |= box_gpu_cull_reserve(gpu, &c->uniforms, &c->uniforms_size,
         (uint64_t)ecs_vec_count(&c->uniform_data), WGPUBufferUsage_Uniform);
     grown |= box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
@@ -1170,10 +1301,40 @@ done:
     return;
 }
 
+/** Bind the groups of a cull dispatch and dispatch it.
+ *
+ * @param gpu The backend
+ * @param pass The compute pass
+ * @param page Page whose bind group is group 0
+ * @param uniform Index of the uniforms of the dispatch
+ * @param buffer Instance buffer bound as group 1
+ * @param history Group 2
+ * @param groups Workgroups along x and y
+ */
+static void box_gpu_cull_run(
+    box_gpu_t *gpu,
+    WGPUComputePassEncoder pass,
+    uint32_t page,
+    uint32_t uniform,
+    uint32_t buffer,
+    WGPUBindGroup history,
+    const uint32_t *groups)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    box_gpu_buffer_t *b = ecs_map_get_deref(&gpu->buffers, box_gpu_buffer_t, buffer);
+    uint32_t offset = uniform * BOX_GPU_CULL_STRIDE;
+    wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
+        box_gpu_cull_page_t, (int32_t)page)->group, 1, &offset);
+    wgpuComputePassEncoderSetBindGroup(pass, 1, box_gpu_instance_group(gpu, b), 0, NULL);
+    wgpuComputePassEncoderSetBindGroup(pass, 2, history, 0, NULL);
+    wgpuComputePassEncoderDispatchWorkgroups(pass, groups[0], groups[1], 1);
+}
+
 /** Record the dispatches of the views of a slot in one phase.
  *
- * Every parallel dispatch runs in three stages, each over all dispatches before the next:
- * cull_instances, cull_scan and cull_write, so its draw keeps the order of its slots.
+ * Every draw has its cull_instances or cull_ordered dispatch; then one cull_scan and one
+ * cull_write dispatch per table (cull view, phase and page) finish its parallel draws, so the
+ * draws keep the order of their slots at a fixed number of dispatches per view.
  *
  * @param gpu The backend
  * @param encoder The encoder of the frame
@@ -1196,47 +1357,60 @@ static void box_gpu_cull_dispatches(
         goto done;
     }
 
-    for (stage = 0; stage < 3; stage ++) {
-        for (i = 0; i < count; i ++) {
-            const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
-            if (slot != -1 && cv->slot != slot) {
+    for (i = 0; i < count; i ++) {
+        const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
+        if (slot != -1 && cv->slot != slot) {
+            continue;
+        }
+
+        for (d = cv->first_dispatch; d < cv->first_dispatch + cv->dispatch_count; d ++) {
+            const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
+                &c->dispatches, box_gpu_cull_dispatch_t, d);
+            WGPUComputePipeline pipeline = dp->ordered ? c->ordered : c->parallel;
+            uint32_t groups[2] = { dp->groups, 1 };
+            if (dp->late != late) {
                 continue;
             }
 
-            for (d = cv->first_dispatch; d < cv->first_dispatch + cv->dispatch_count; d ++) {
-                const box_gpu_cull_dispatch_t *dp = ecs_vec_get_t(
-                    &c->dispatches, box_gpu_cull_dispatch_t, d);
-                box_gpu_buffer_t *b = ecs_map_get_deref(
-                    &gpu->buffers, box_gpu_buffer_t, dp->buffer);
-                WGPUComputePipeline pipeline = stage == 1 ? c->scan : c->write;
-                uint32_t offset = (uint32_t)d * BOX_GPU_CULL_STRIDE;
-                if (dp->late != late || (stage && dp->ordered)) {
-                    continue;
-                }
-
-                if (!stage) {
-                    pipeline = dp->ordered ? c->ordered : c->parallel;
-                }
-
-                if (!pass) {
-                    pass = wgpuCommandEncoderBeginComputePass(encoder,
-                        &(WGPUComputePassDescriptor){ .timestampWrites = writes });
-                }
-
-                if (pipeline != bound) {
-                    wgpuComputePassEncoderSetPipeline(pass, pipeline);
-                    bound = pipeline;
-                }
-
-                wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
-                    box_gpu_cull_page_t, (int32_t)dp->page)->group, 1, &offset);
-                wgpuComputePassEncoderSetBindGroup(pass, 1, box_gpu_instance_group(gpu, b),
-                    0, NULL);
-                wgpuComputePassEncoderSetBindGroup(pass, 2,
-                    dp->history ? dp->history : cv->group, 0, NULL);
-                wgpuComputePassEncoderDispatchWorkgroups(pass, stage == 1 ? 1 : dp->groups,
-                    1, 1);
+            if (!pass) {
+                pass = wgpuCommandEncoderBeginComputePass(encoder,
+                    &(WGPUComputePassDescriptor){ .timestampWrites = writes });
             }
+
+            if (pipeline != bound) {
+                wgpuComputePassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
+
+            box_gpu_cull_run(gpu, pass, dp->page, (uint32_t)d, dp->buffer,
+                dp->history ? dp->history : cv->group, groups);
+        }
+    }
+
+    for (stage = 0; stage < 2; stage ++) {
+        WGPUComputePipeline pipeline = stage ? c->write : c->scan;
+        for (i = 0; i < ecs_vec_count(&c->tables); i ++) {
+            const box_gpu_cull_table_t *t = ecs_vec_get_t(&c->tables, box_gpu_cull_table_t, i);
+            const box_gpu_cull_view_t *cv = ecs_vec_get_t(
+                &c->views, box_gpu_cull_view_t, t->view);
+            uint32_t rows = (t->groups + BOX_GPU_CULL_WRITE_ROW - 1) / BOX_GPU_CULL_WRITE_ROW;
+            uint32_t groups[2] = { t->entries, 1 };
+            if ((slot != -1 && cv->slot != slot) || t->late != late) {
+                continue;
+            }
+
+            if (stage) {
+                groups[0] = t->groups < BOX_GPU_CULL_WRITE_ROW
+                    ? t->groups : BOX_GPU_CULL_WRITE_ROW;
+                groups[1] = rows;
+            }
+
+            if (pipeline != bound) {
+                wgpuComputePassEncoderSetPipeline(pass, pipeline);
+                bound = pipeline;
+            }
+
+            box_gpu_cull_run(gpu, pass, t->page, t->uniform, t->buffer, cv->group, groups);
         }
     }
 

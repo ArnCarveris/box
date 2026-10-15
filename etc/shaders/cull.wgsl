@@ -18,9 +18,12 @@
 //
 // cull_instances tests one instance per invocation of one job and records which instances of
 // its workgroup it draws as a 64 bit mask with their count in the scan words of the dispatch.
-// cull_scan turns the counts of the workgroups into exclusive offsets, in workgroup order, and
-// writes the instance count of the draw; cull_write puts every drawn slot at the offset of its
-// workgroup plus the drawn slots before it in the mask. The visible slots keep slot order, so
+// One cull_scan dispatch per cull view, phase and page turns the counts of the workgroups of each
+// of its parallel draws into exclusive offsets, in workgroup order, and writes their instance
+// counts (a workgroup per draw, from a table of job, first scan word and workgroups); one
+// cull_write dispatch over the workgroups of all those draws (a list of their scan words and
+// table entries) puts every drawn slot at the offset of its workgroup plus the drawn slots before
+// it in the mask. The visible slots keep slot order, so
 // exact depth ties resolve the same way every frame (a prefix sum stream compaction, GPU Gems 3
 // chapter 39, in passes because WebGPU gives no forward progress guarantee for a single pass
 // scan). cull_ordered tests one job per invocation in the order of its slots, for the blended
@@ -89,6 +92,7 @@ var<workgroup> group_mask: array<atomic<u32>, 2>;
 var<workgroup> group_culled: atomic<u32>;
 var<workgroup> scan_sums: array<u32, 64>;
 var<workgroup> scan_carry: u32;
+var<workgroup> scan_groups: u32;
 
 // Whether the world space box around an instance reaches into the frustum and is large enough.
 // The size is the diameter of the sphere around the box in pixels, tested only when the box is
@@ -245,22 +249,28 @@ fn cull_instances(
     }
 }
 
-// Exclusive offsets of the workgroups of a parallel dispatch, 64 at a time, and the instance
-// count of its draw. Runs as one workgroup.
+// Exclusive offsets of the workgroups of the parallel draws of a table, 64 at a time, and their
+// instance counts. A workgroup per draw; its table entry at scan.x holds the job, the first scan
+// word and the workgroups of the draw.
 @compute @workgroup_size(64)
-fn cull_scan(@builtin(local_invocation_index) local: u32) {
-    let job = jobs[cull.jobs.x];
-    let groups = (job.count + 63u) / 64u;
+fn cull_scan(
+    @builtin(local_invocation_index) local: u32,
+    @builtin(workgroup_id) group: vec3u)
+{
+    let entry = cull.scan.x + group.x * 4u;
+    let job = jobs[scan_words[entry]];
+    let base = scan_words[entry + 1u];
     if (local == 0u) {
         scan_carry = 0u;
+        scan_groups = scan_words[entry + 2u];
     }
 
-    workgroupBarrier();
+    let groups = workgroupUniformLoad(&scan_groups);
     for (var start = 0u; start < groups; start += 64u) {
         let g = start + local;
         var own = 0u;
         if (g < groups) {
-            own = scan_words[cull.scan.x + g * SCAN_WORDS + 2u];
+            own = scan_words[base + g * SCAN_WORDS + 2u];
         }
 
         scan_sums[local] = own;
@@ -278,7 +288,7 @@ fn cull_scan(@builtin(local_invocation_index) local: u32) {
 
         let carry = scan_carry;
         if (g < groups) {
-            scan_words[cull.scan.x + g * SCAN_WORDS + 2u] = carry + scan_sums[local] - own;
+            scan_words[base + g * SCAN_WORDS + 2u] = carry + scan_sums[local] - own;
         }
 
         workgroupBarrier();
@@ -296,22 +306,31 @@ fn cull_scan(@builtin(local_invocation_index) local: u32) {
     }
 }
 
-// Writes the drawn slots of a parallel dispatch at their offsets, in slot order.
+// Writes the drawn slots of the parallel draws of a table at their offsets, in slot order. The
+// workgroups of all its draws are listed at scan.z (scan.w of them) as their first scan word and
+// their table entry.
 @compute @workgroup_size(64)
 fn cull_write(
-    @builtin(global_invocation_id) id: vec3u,
     @builtin(local_invocation_index) local: u32,
-    @builtin(workgroup_id) group: vec3u)
+    @builtin(workgroup_id) group: vec3u,
+    @builtin(num_workgroups) groups: vec3u)
 {
-    let job = jobs[cull.jobs.x];
-    let at = cull.scan.x + group.x * SCAN_WORDS;
+    let g = group.y * groups.x + group.x;
+    if (g >= cull.scan.w) {
+        return;
+    }
+
+    let at = scan_words[cull.scan.z + g * 2u];
+    let entry = scan_words[cull.scan.z + g * 2u + 1u];
+    let job = jobs[scan_words[entry]];
+    let index = (at - scan_words[entry + 1u]) / SCAN_WORDS * 64u + local;
     let low = scan_words[at];
     let mask = select(scan_words[at + 1u], low, local < 32u);
     let bit = local % 32u;
-    if (id.x < job.count && ((mask >> bit) & 1u) != 0u) {
+    if (index < job.count && ((mask >> bit) & 1u) != 0u) {
         let below = countOneBits(mask & ((1u << bit) - 1u)) +
             select(countOneBits(low), 0u, local < 32u);
-        visible_slots[base_of(job) + scan_words[at + 2u] + below] = job.first + id.x;
+        visible_slots[base_of(job) + scan_words[at + 2u] + below] = job.first + index;
     }
 }
 

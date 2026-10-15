@@ -202,7 +202,22 @@ typedef struct box_gpu_cull_dispatch_t {
     bool late;                      /**< Runs after the early draw, against the pyramid */
     uint32_t page;                  /**< Page that holds the visible slots of its jobs */
     WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
+    uint32_t first;                 /**< Its job */
+    uint32_t scan;                  /**< First scan word of its workgroups, parallel only */
+    uint32_t scan_groups;           /**< Its workgroups, 0 for an ordered dispatch */
 } box_gpu_cull_dispatch_t;
+
+/** The parallel dispatches of one cull view, phase and page that one cull_scan and one
+ * cull_write dispatch finish */
+typedef struct box_gpu_cull_table_t {
+    int32_t view;                   /**< Index of the cull view */
+    bool late;                      /**< Phase of its dispatches */
+    uint32_t page;                  /**< Page of its dispatches */
+    uint32_t uniform;               /**< Index of its uniforms in the uniform buffer */
+    uint32_t buffer;                /**< An instance buffer of its dispatches, for group 1 */
+    uint32_t entries;               /**< Draws, the workgroups of cull_scan */
+    uint32_t groups;                /**< Workgroups of all its draws, those of cull_write */
+} box_gpu_cull_table_t;
 
 /** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
 typedef struct box_gpu_cull_job_t {
@@ -266,7 +281,9 @@ typedef struct box_gpu_cull_page_t {
     uint64_t visible_size;          /**< Bytes of the visible buffer */
     uint64_t lists_size;            /**< Bytes of the list buffer */
     uint64_t scan_size;             /**< Bytes of the scan buffer */
-    uint32_t scan_used;             /**< Scan words its parallel dispatches use */
+    uint32_t scan_used;             /**< Scan words its parallel dispatches and tables use */
+    uint32_t table_base;            /**< First scan word of its tables */
+    ecs_vec_t table_data;           /**< uint32_t, its tables and workgroup lists */
     ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
     uint32_t used;                  /**< Visible slots its draws use in the target */
     WGPUBindGroup group;            /**< Binds the shared buffers and its own */
@@ -325,6 +342,7 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
     ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
     ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
+    ecs_vec_t tables;               /**< box_gpu_cull_table_t of the target */
     WGPUQuerySet stamps;            /**< Begin and end of the cull passes of a target, NULL
                                      *   without timestamp queries */
     WGPUBuffer stamp_resolve;       /**< Resolved timestamps, copied into the readback */
