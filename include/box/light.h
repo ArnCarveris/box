@@ -58,6 +58,13 @@ ECS_STRUCT(AmbientLight, {
  * every later pass adds a bounce by shading its captures with the probes of the pass before it.
  * Views show the last complete pass while the next one bakes. Changing bounces bakes again.
  *
+ * A change rebakes the probes it can reach, which keep their values until then: the bounds a
+ * static shape had and has, padded by probe_spacing * (1 + bounces), when it moves, is added
+ * or removed or its look or NoBake changes; the range of a point or spot light that changes;
+ * every probe for a directional light, the ambient light, bounces or capture_size. Dynamic
+ * shapes rebake nothing. probe_spacing, bounds_padding or static bounds that move the grid
+ * place a new volume, which bakes from the ambient again.
+ *
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
  * LightBakeStatus.error.
@@ -74,10 +81,11 @@ ECS_STRUCT(LightBake, {
 /** Progress of the bake of a scene, written by the engine next to LightBake */
 ECS_STRUCT(LightBakeStatus, {
     int32_t probes;      /**< Probes of the volume */
-    int32_t baked;       /**< Probes baked in the pass being baked, or in the last when converged */
-    int32_t pass;        /**< Completed capture passes: the first bakes direct light and emission,
-                          *   each later one a bounce; bounces + 1 when converged */
-    bool converged;      /**< All bounces + 1 passes are baked, pass equals bounces + 1 */
+    int32_t baked;       /**< Valid probes not waiting to be (re)baked in the pass being baked */
+    int32_t pass;        /**< Completed capture passes of the bake in progress: the first bakes
+                          *   direct light and emission, each later one a bounce; bounces + 1
+                          *   when converged */
+    bool converged;      /**< All bounces + 1 passes are baked and no change is queued */
     bool cache_hit;      /**< The volume was loaded from the cache */
     char *error;         /**< Why nothing is baked, such as an invalid setting, NULL for none */
 });

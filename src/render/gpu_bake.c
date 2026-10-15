@@ -234,6 +234,32 @@ static void box_gpu_volume_write(
     ecs_os_free(probes);
 }
 
+/** Write the validity mask of a volume, after copying one probe buffer into the other for a
+ * BOX_RENDER_VOLUME_COPY; the probes keep their values otherwise.
+ *
+ * @param gpu The backend
+ * @param v The volume
+ * @param desc The op, followed by the mask
+ */
+static void box_gpu_volume_keep(
+    box_gpu_t *gpu,
+    box_gpu_volume_t *v,
+    const box_render_volume_desc_t *desc)
+{
+    if (desc->op == BOX_RENDER_VOLUME_COPY && desc->from < 2) {
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, v->probes[desc->from], 0,
+            v->probes[1 - desc->from], 0, (uint64_t)v->count * BOX_GPU_PROBE_SIZE);
+        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
+        wgpuQueueSubmit(gpu->queue, 1, &commands);
+        wgpuCommandBufferRelease(commands);
+        wgpuCommandEncoderRelease(encoder);
+    }
+
+    wgpuQueueWriteBuffer(gpu->queue, v->valid, 0, desc + 1,
+        (size_t)(v->count + 31) / 32 * sizeof(uint32_t));
+}
+
 /** Release a texture view when it exists.
  *
  * @param view The view, set to NULL
@@ -1147,9 +1173,13 @@ void box_gpu_bake_apply(
     if (!v) {
         v = box_gpu_volume_new(gpu, desc->probes);
         ecs_map_insert_ptr(&gpu->volumes, handle, v);
+        box_gpu_volume_write(gpu, v, desc);
+    } else if (op == BOX_RENDER_CREATE || desc->op == BOX_RENDER_VOLUME_FILL) {
+        box_gpu_volume_write(gpu, v, desc);
+    } else {
+        box_gpu_volume_keep(gpu, v, desc);
     }
 
-    box_gpu_volume_write(gpu, v, desc);
 done:
     return;
 }

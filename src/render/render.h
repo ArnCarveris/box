@@ -271,6 +271,13 @@ typedef struct box_render_texture_desc_t {
 /** Coefficients of an L2 spherical harmonic: one for band 0, three for 1 and five for 2 */
 #define BOX_RENDER_SH_COEFFICIENTS (9)
 
+/** What an update of a BOX_RENDER_VOLUME does */
+typedef enum box_render_volume_op_t {
+    BOX_RENDER_VOLUME_FILL = 0, /**< Fill every probe of both buffers with sh, write the mask */
+    BOX_RENDER_VOLUME_MASK = 1, /**< Write the mask only, the probes keep their values */
+    BOX_RENDER_VOLUME_COPY = 2  /**< Copy probe buffer from into the other one, then the mask */
+} box_render_volume_op_t;
+
 /** Description of a BOX_RENDER_VOLUME create or update, followed by the validity mask.
  *
  * Probe (x, y, z) is at origin + (x, y, z) * spacing, stored x fastest, then y, then z. A
@@ -278,8 +285,8 @@ typedef struct box_render_texture_desc_t {
  * evaluated as E(n) / pi in place of the hemisphere ambient.
  *
  * It has two probe buffers, so a pass reads the one the previous pass wrote. The mask has one
- * bit per probe, (probes + 31) / 32 words, set outside static geometry. A create fills every
- * probe of both buffers with sh; an update of the same grid refills them and the mask.
+ * bit per probe, (probes + 31) / 32 words, set where views sample the probe. A create fills
+ * every probe of both buffers with sh and writes the mask; an update does what its op says.
  */
 typedef struct box_render_volume_desc_t {
     float origin[3];        /**< World position of the first probe */
@@ -287,6 +294,8 @@ typedef struct box_render_volume_desc_t {
     uint32_t size[3];       /**< Probes per axis, at least 1 */
     uint32_t probes;        /**< Probes of the grid, the product of size */
     float sh[BOX_RENDER_SH_COEFFICIENTS][4]; /**< Linear rgb irradiance coefficients, w unused */
+    uint32_t op;            /**< box_render_volume_op_t of an update */
+    uint32_t from;          /**< Probe buffer a BOX_RENDER_VOLUME_COPY reads, 0 or 1 */
 } box_render_volume_desc_t;
 
 /** A probe the backend captures: six faces around its position, projected onto its SH */
@@ -763,6 +772,21 @@ void box_render_lights_stats(
     const ecs_world_t *world,
     box_render_lights_stats_t *stats);
 
+/** Get the lights the light extract collected for a scene in this frame.
+ *
+ * The directional lights come first, then the point and spot lights; a scene without light
+ * entities has none here and is lit by the default sun.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param count Receives the number of lights
+ * @return The lights, NULL when the scene has none
+ */
+const box_render_light_t* box_render_lights_of(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t *count);
+
 /** Register the cached query that knows the scene of every entity in a scene.
  *
  * @param world The world
@@ -905,8 +929,8 @@ bool box_render_bake_probe(
  * progress counts nothing.
  *
  * @param world The world
- * @return Probe captures of every pass not reported yet, 0 when every bake that can progress
- *         converged
+ * @return Probe captures of every pass not reported yet, those of the probes a change queued
+ *         included, 0 when every bake that can progress converged
  */
 int32_t box_render_bake_pending(
     const ecs_world_t *world);

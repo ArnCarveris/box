@@ -346,6 +346,25 @@ the converged bake. `PerfRun` warms up again while a bake that can progress (val
 remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
 bakes.
 
+**Invalidation.** `bake_change.c` queues the probes a change can reach instead of rebaking the
+volume, as Lumen invalidates its surface cache by the bounds of changed primitives. Static shapes
+come from `box_transform_on_moved` (their old bounds are still in the spatial index then) and from
+observers of their look (`Rgb`, `Emissive`, `PbrMaterial`, `BlendMode`, `BackFaceMode`,
+`TextureWrap`, `TextureTransform`, `PbrTextures`, `Opacity`, `Tint`, `ShapeMesh`) and of
+`DynamicTransform`, `ManualTransform` and `NoBake`; dynamic, manual and `NoBake` shapes otherwise
+queue nothing. At extract the old and new bounds of each are checked again for probes inside
+geometry (newly invalid probes are hidden at once, newly valid ones shown with the next bake) and
+padded by `probe_spacing * (1 + bounces)`; the valid probes inside are queued. The light extract's
+lights of each scene are compared with the last frame: a point or spot light that changed queues
+the probes within its old and new range, a directional light or the default sun every probe; an
+ambient change after a bake, `bounces` and `capture_size` queue every probe too, while `budget_ms`
+changes nothing. When no bake is in progress the queued probes start a staged bake: a
+`BOX_RENDER_VOLUME_COPY` copies the shown probe buffer into the other one, every pass bakes the
+queued probes there in place, and the views and the validity mask switch to it when the last pass
+is in a packet, so requeued probes keep their values until rebaked. `converged` is false while
+probes are queued and `baked` counts the valid probes not waiting. Bounds that move the grid still
+place a new volume that bakes from the ambient.
+
 ## Spatial index
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times

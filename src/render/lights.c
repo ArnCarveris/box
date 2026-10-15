@@ -651,3 +651,20 @@ void box_render_lights_stats(
         *stats = ((const box_render_lights_t*)s->ctx)->stats;
     }
 }
+
+const box_render_light_t* box_render_lights_of(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    int32_t *count)
+{
+    ecs_entity_t system = ecs_lookup(world, "box.render.RenderExtractLights");
+    const ecs_system_t *sys = system ? ecs_system_get(world, system) : NULL;
+    const box_render_lights_t *l = sys ? sys->ctx : NULL;
+    int32_t index = l ? box_lights_find(ECS_CONST_CAST(box_render_lights_t*, l), scene) : -1;
+    const box_light_scene_t *s = index != -1
+        ? ecs_vec_get_t(&l->scenes, box_light_scene_t, index)
+        : NULL;
+    *count = s ? ecs_vec_count(&s->lights) : 0;
+
+    return s ? ecs_vec_first(&s->lights) : NULL;
+}
