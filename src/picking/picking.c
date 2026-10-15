@@ -43,6 +43,7 @@ static void box_pick_state_dtor(
         ecs_vec_fini_t(NULL, &st->emits, box_input_emit_t);
         ecs_vec_fini_t(NULL, &st->candidates, box_pick_candidate_t);
         ecs_vec_fini_t(NULL, &st->waiters, box_pick_waiter_t);
+        box_pick_meshes_fini(st);
         ecs_os_free(st);
     }
 }
@@ -82,6 +83,9 @@ static bool box_pick_blocks(
     int32_t depth = 0;
     bool result = false;
     box_pick_at(world, st, cursor, &pick);
+    st->memo = (box_pick_memo_t){
+        .pick = pick, .cursor = { cursor[0], cursor[1] },
+        .frame = ecs_get_world_info(world)->frame_count_total, .valid = true };
     for (e = pick.target; e && !result && depth < BOX_PICK_CHAIN_MAX; depth ++) {
         result = ecs_has_id(world, e, InputBlocker);
         e = ecs_get_parent(world, e);
@@ -277,6 +281,7 @@ static void box_pick_send(
         ecs_script_mouse_event(world, &evt);
     }
 
+    st->memo.valid = false;
     st->cursor[0] = src->screen_x;
     st->cursor[1] = src->screen_y;
     st->buttons = src->buttons;
@@ -321,6 +326,7 @@ static void box_pick_scroll(
     }
 
     if (resolved) {
+        st->memo.valid = false;
         ecs_script_tasks_progress(world);
     }
 }
@@ -368,6 +374,36 @@ static void box_pick_refresh(
     }
 }
 
+/** Check whether a pointer event only moves the cursor and the next event of the frame moves it
+ * again with the same buttons and modifiers, so only the later one needs a pick.
+ *
+ * Moves are coalesced once per frame like the animation frame aligned pointer moves of
+ * browsers; presses, releases, the wheel and keyboard events are never skipped or reordered.
+ *
+ * @param st The module state
+ * @param i Index of the event in the queue of the frame
+ * @param buttons Buttons held before the event
+ * @return Whether the event can be skipped
+ */
+static bool box_pick_coalesced(
+    const box_pick_state_t *st,
+    int32_t i,
+    uint32_t buttons)
+{
+    const box_input_emit_t *emits = ecs_vec_first_t(&st->emits, box_input_emit_t);
+    const EcsScriptMouseEvent *a = &emits[i].mouse;
+    const EcsScriptMouseEvent *b = &emits[i + 1].mouse;
+    bool result = false;
+    if (i + 1 < ecs_vec_count(&st->emits) && emits[i].is_mouse && !emits[i].is_scroll &&
+        emits[i + 1].is_mouse && !emits[i + 1].is_scroll)
+    {
+        result = a->buttons == buttons && b->buttons == buttons && a->ctrl == b->ctrl &&
+            a->shift == b->shift && a->alt == b->alt && a->meta == b->meta;
+    }
+
+    return result;
+}
+
 void BoxPickingUpdate(
     ecs_iter_t *it)
 {
@@ -375,15 +411,21 @@ void BoxPickingUpdate(
     box_pick_state_t *st = it->ctx;
     bool pointer = false;
     int32_t i;
+    box_pick_meshes_prune(world, st);
     for (i = 0; i < ecs_vec_count(&st->emits); i ++) {
         box_input_emit_t emit = *ecs_vec_get_t(&st->emits, box_input_emit_t, i);
         box_pick_t pick;
         if (!emit.is_mouse) {
+            st->memo.valid = false;
             ecs_script_keyboard_event(world, &emit.keyboard);
             continue;
         }
 
         pointer = true;
+        if (box_pick_coalesced(st, i, st->buttons)) {
+            continue;
+        }
+
         if (emit.is_scroll) {
             box_pick_at(world, st, (vec2){ emit.mouse.screen_x, emit.mouse.screen_y }, &pick);
             box_pick_scroll(world, st, &emit.mouse, &pick);
@@ -395,6 +437,7 @@ void BoxPickingUpdate(
     }
 
     ecs_vec_clear(&st->emits);
+    st->memo.valid = false;
     if (!pointer && st->has_cursor) {
         box_pick_refresh(world, st);
     }
@@ -479,6 +522,7 @@ void BoxPickingImport(
     ecs_vec_init_t(NULL, &st->emits, box_input_emit_t, 0);
     ecs_vec_init_t(NULL, &st->candidates, box_pick_candidate_t, 0);
     ecs_vec_init_t(NULL, &st->waiters, box_pick_waiter_t, 0);
+    ecs_map_init(&st->meshes, NULL);
     box_pick_queries_init(world, st);
     ecs_singleton_ensure(world, PickingState)->state = st;
     ecs_singleton_set(world, PickStatus, {0});

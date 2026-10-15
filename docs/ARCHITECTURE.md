@@ -429,8 +429,10 @@ dynamic transforms publish no change signal, so finding them is one compare per 
 Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow phase
 filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them
 for collision, `box_spatial_static_bounds` gives the box around the static shapes of a scene to
-the bake. Bounds are boxes; there is no mesh
-level narrow phase and no picking.
+the bake. Bounds are boxes; there is no mesh level narrow phase. A third tree per scene holds the
+UI elements without a shape (`LayoutBounds`, else `TextBounds`, flat in the XY plane of their
+`WorldTransform`); only ray casts that set `ui` see it, which picking does, so collision, overlap
+queries and the bake never meet UI.
 
 ## Text, layout and UI
 
@@ -499,7 +501,13 @@ rendered before, unless an `InputBlocker` element on its path takes it, so a HUD
 `InputBlocker` keeps clicks from the 3D scene. Through the router's `blocks` callback the input
 layer asks picking, when a mouse button goes down or the wheel turns, whether a blocker is under
 the cursor: such a press keeps the bindings of that button up until its next press (like
-Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`.
+Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`. Picking casts through
+the spatial index (shapes and UI elements) and tests the triangles of a mesh with 64 or more
+through a hierarchy of its unit mesh, built on its first pick and kept while the mesh is used.
+Consecutive moves of a frame with the same buttons and modifiers are coalesced into the last
+one, which carries their summed delta (like the animation frame aligned moves of browsers);
+presses, releases, the wheel and keys are never skipped. The pick of the `blocks` callback is
+reused by the first pointer event of the frame at the same cursor.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled

@@ -212,6 +212,17 @@
                 ]
             },
             {
+                "id": "PickingCost",
+                "testcases": [
+                    "moves_in_one_frame_hover_last",
+                    "drag_moves_in_one_frame_keep_delta",
+                    "layout_element_follows_resize",
+                    "text_bounds_element",
+                    "disabled_layout_element",
+                    "dense_mesh_hits_surface"
+                ]
+            },
+            {
                 "id": "Blocking",
                 "testcases": [
                     "stops_pass_through",
