@@ -735,3 +735,88 @@ void RenderPacket_large_data_shrinks_when_load_settles(void) {
 
     ecs_fini(world);
 }
+
+void RenderPacket_lowered_in_flight_releases_slots(void) {
+    // render_fixes/packet_slot_memory
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_render_backend_t backend = { .render = DropPacket };
+    box_render_set_backend(world, &backend);
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 4 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 12; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_free_count;
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 1 });
+    for (i = 0; i < 4; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_assert(ecs_os_api_free_count - before >= 3);
+
+    before = ecs_os_api_malloc_count + ecs_os_api_calloc_count + ecs_os_api_realloc_count;
+    for (i = 0; i < 20; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    ecs_fini(world);
+}
+
+void RenderPacket_null_backend_copy_shrinks(void) {
+    // render_fixes/packet_slot_memory
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_singleton_set(world, RenderSettings, { .in_flight = 2 });
+    extract_large_size = RENDER_PACKET_LARGE;
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "ExtractLarge" }),
+        .phase = RenderExtract,
+        .callback = ExtractLarge
+    });
+
+    int32_t i;
+    for (i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t before = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    for (i = 0; i < 20; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    int64_t after = ecs_os_api_malloc_count + ecs_os_api_calloc_count +
+        ecs_os_api_realloc_count;
+    test_int(after - before, 0);
+
+    extract_large_size = 64;
+    before = ecs_os_api_free_count;
+    for (i = 0; i < BOX_RENDER_DATA_TRIM_RESETS * 2 * 2; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    box_render_sync(world);
+    test_assert(ecs_os_api_free_count - before >= 3);
+
+    ecs_fini(world);
+}

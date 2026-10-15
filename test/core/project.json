@@ -157,6 +157,8 @@
                     "no_alloc_after_warmup_large",
                     "large_data_released_after_drop",
                     "large_data_shrinks_when_load_settles",
+                    "lowered_in_flight_releases_slots",
+                    "null_backend_copy_shrinks",
                     "shutdown_with_packets_in_flight",
                     "shutdown_without_frames",
                     "set_backend_replaces",
