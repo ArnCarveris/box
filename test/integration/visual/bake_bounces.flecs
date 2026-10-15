@@ -1,0 +1,195 @@
+using box.transform
+using box.geometry
+using box.material
+using box.camera
+using box.view
+using box.light
+
+zero {
+  Scene: {}
+  LightBake: {probe_spacing: 0.5, bounds_padding: 0, bounces: 0}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+
+  camera {
+    Position: {0, 12.5, 2.4}
+    Rotation: {-1.35, 0, 0}
+    Camera: {fov: 45}
+  }
+
+  darkness {
+    DirectionalLight: {intensity: 0}
+  }
+
+  floor {
+    Position: {0, -0.1, -2.6}
+    Box: {10.4, 0.2, 2}
+    Rgb: {230, 230, 230}
+  }
+
+  near_wall {
+    Position: {0, 0.75, -1.7}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  far_wall {
+    Position: {0, 0.75, -3.5}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  end_wall {
+    Position: {5.1, 0.75, -2.6}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_0 {
+    Position: {-1.7, 0.75, -2.3}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_1 {
+    Position: {1.7, 0.75, -2.9}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  panel {
+    Position: {-5.1, 0.75, -2.6}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {255, 255, 255}
+    Emissive: {strength: 12, color: {255, 230, 200}}
+  }
+}
+
+one {
+  Scene: {}
+  LightBake: {probe_spacing: 0.5, bounds_padding: 0, bounces: 1}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+
+  camera {
+    Position: {0, 12.5, 2.4}
+    Rotation: {-1.35, 0, 0}
+    Camera: {fov: 45}
+  }
+
+  darkness {
+    DirectionalLight: {intensity: 0}
+  }
+
+  floor {
+    Position: {0, -0.1, 0}
+    Box: {10.4, 0.2, 2}
+    Rgb: {230, 230, 230}
+  }
+
+  near_wall {
+    Position: {0, 0.75, 0.9}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  far_wall {
+    Position: {0, 0.75, -0.9}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  end_wall {
+    Position: {5.1, 0.75, 0}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_0 {
+    Position: {-1.7, 0.75, 0.3}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_1 {
+    Position: {1.7, 0.75, -0.3}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  panel {
+    Position: {-5.1, 0.75, 0}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {255, 255, 255}
+    Emissive: {strength: 12, color: {255, 230, 200}}
+  }
+}
+
+three {
+  Scene: {}
+  LightBake: {probe_spacing: 0.5, bounds_padding: 0, bounces: 3}
+  AmbientLight: {sky: {0, 0, 0}, ground: {0, 0, 0}, intensity: 0}
+
+  camera {
+    Position: {0, 12.5, 2.4}
+    Rotation: {-1.35, 0, 0}
+    Camera: {fov: 45}
+  }
+
+  darkness {
+    DirectionalLight: {intensity: 0}
+  }
+
+  floor {
+    Position: {0, -0.1, 2.6}
+    Box: {10.4, 0.2, 2}
+    Rgb: {230, 230, 230}
+  }
+
+  near_wall {
+    Position: {0, 0.75, 3.5}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  far_wall {
+    Position: {0, 0.75, 1.7}
+    Box: {10.4, 1.5, 0.2}
+    Rgb: {230, 230, 230}
+  }
+
+  end_wall {
+    Position: {5.1, 0.75, 2.6}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_0 {
+    Position: {-1.7, 0.75, 2.9}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  baffle_1 {
+    Position: {1.7, 0.75, 2.3}
+    Box: {0.2, 1.5, 1}
+    Rgb: {230, 230, 230}
+  }
+
+  panel {
+    Position: {-5.1, 0.75, 2.6}
+    Box: {0.2, 1.5, 1.6}
+    Rgb: {255, 255, 255}
+    Emissive: {strength: 12, color: {255, 230, 200}}
+  }
+}
+
+zero_view {
+  View: {camera: zero.camera, clear: {enabled: true, color: {0, 0, 0, 255}}}
+}
+
+one_view {
+  View: {camera: one.camera}
+}
+
+three_view {
+  View: {camera: three.camera}
+}
