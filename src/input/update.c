@@ -413,14 +413,57 @@ static void box_input_set_focus(
     in->focused = focused;
 }
 
+/** Check whether an element under the cursor keeps presses and the wheel from the actions.
+ *
+ * @param world The world
+ * @param dev The device state
+ * @param in The Input singleton
+ * @return Whether the router finds a blocking element at the cursor
+ */
+static bool box_input_blocks(
+    ecs_world_t *world,
+    const InputDevice *dev,
+    const Input *in)
+{
+    return dev->router.blocks && dev->router.blocks(world, in->mouse.position, dev->router.ctx);
+}
+
+/** Decide, when a mouse button goes down, whether its press hit a blocking element, which keeps
+ * the bindings of the button up until its next press.
+ *
+ * @param world The world
+ * @param dev The device state
+ * @param in The Input singleton
+ * @param key The key that goes down
+ */
+static void box_input_press_block(
+    ecs_world_t *world,
+    InputDevice *dev,
+    const Input *in,
+    Key key)
+{
+    if (key >= KeyMouseLeft && key <= KeyMouseRight && !in->keys[key].down) {
+        dev->blocked[key - KeyMouseLeft] = box_input_blocks(world, dev, in);
+    }
+}
+
+bool box_input_key_blocked(
+    const InputDevice *dev,
+    Key key)
+{
+    return key >= KeyMouseLeft && key <= KeyMouseRight && dev->blocked[key - KeyMouseLeft];
+}
+
 /** Apply one event to the Input singleton.
  *
+ * @param world The world
  * @param dev The device state
  * @param in The Input singleton
  * @param ev The event
  * @param synthetic Whether the event comes from the synthetic queue
  */
 static void box_input_apply(
+    ecs_world_t *world,
     InputDevice *dev,
     Input *in,
     const InputEvent *ev,
@@ -428,6 +471,7 @@ static void box_input_apply(
 {
     switch (ev->kind) {
     case InputKeyDown:
+        box_input_press_block(world, dev, in, ev->key);
         box_input_key_down(dev, in, ev->key, ev->repeat);
         break;
     case InputKeyUp:
@@ -441,8 +485,11 @@ static void box_input_apply(
         box_input_move(dev, in, ev);
         break;
     case InputScroll:
-        in->mouse.scroll[0] += ev->value[0];
-        in->mouse.scroll[1] += ev->value[1];
+        if (!box_input_blocks(world, dev, in)) {
+            in->mouse.scroll[0] += ev->value[0];
+            in->mouse.scroll[1] += ev->value[1];
+        }
+
         box_input_emit_scroll(dev, in, ev);
         break;
     case InputFocus:
@@ -532,7 +579,7 @@ static void box_input_apply_platform(
     for (i = 0; i < ecs_vec_count(&dev->platform); i ++) {
         const InputEvent *ev = ecs_vec_get_t(&dev->platform, InputEvent, i);
         if (box_input_platform_accept(world, dev, in, ev)) {
-            box_input_apply(dev, in, ev, false);
+            box_input_apply(world, dev, in, ev, false);
         }
     }
 
@@ -541,10 +588,12 @@ static void box_input_apply_platform(
 
 /** Apply the synthetic events that are due, in order, up to the first one that waits.
  *
+ * @param world The world
  * @param dev The device state
  * @param in The Input singleton
  */
 static void box_input_apply_queue(
+    ecs_world_t *world,
     InputDevice *dev,
     Input *in)
 {
@@ -556,7 +605,7 @@ static void box_input_apply_queue(
             break;
         }
 
-        box_input_apply(dev, in, &events[i], true);
+        box_input_apply(world, dev, in, &events[i], true);
     }
 
     if (i > 0) {
@@ -664,7 +713,7 @@ void BoxInputUpdate(
     in = ecs_singleton_get_mut(world, Input);
     box_input_frame_begin(dev, in);
     box_input_apply_platform(world, dev, in);
-    box_input_apply_queue(dev, in);
+    box_input_apply_queue(world, dev, in);
     box_input_capture_sync(world, dev, in);
     box_input_text_publish(dev, in);
     box_input_derive(in);
