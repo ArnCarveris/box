@@ -30,6 +30,13 @@
                     "wall",
                     "ground"
                 ]
+            },
+            {
+                "id": "Frame",
+                "benchcases": [
+                    "default_scope",
+                    "custom_scope"
+                ]
             }
         ]
     }

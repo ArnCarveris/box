@@ -1480,3 +1480,128 @@ void Collision_crowded_stretch_walls(void) {
 
     ecs_fini(world);
 }
+
+void Collision_acute_corner_still(void) {
+    // controller_fixes/controller_minor
+    float turn[] = { 0, 0.17f, -0.35f };
+    float fps[] = { 30, 60, 144 };
+    for (int32_t c = 0; c < 9; c ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+
+        float t = turn[c % 3], dt = 1.0f / fps[c / 3];
+        float half = 15 * (float)GLM_PI / 180;
+        for (int32_t side = -1; side <= 1; side += 2) {
+            float yaw = (float)side * half + t;
+            ecs_entity_t wall = ecs_new(world);
+            ecs_set(world, wall, Position, { 3 * sinf(yaw), 1, -5 + 3 * cosf(yaw) });
+            ecs_set(world, wall, Rotation, { 0, yaw, 0 });
+            ecs_set(world, wall, Box, { 0.2f, 2, 6 });
+        }
+
+        ecs_entity_t body[3];
+        for (int32_t b = 0; b < 3; b ++) {
+            body[b] = ecs_new(world);
+            ecs_set(world, body[b], Position, { 2 * sinf(t), b == 2 ? 1 : 1.7f,
+                -5 + 2 * cosf(t) });
+            ecs_set(world, body[b], Rotation, { 0, -t * 0.5f, 0 });
+            if (b < 2) {
+                ecs_add(world, body[b], FirstPersonController);
+                ecs_get_mut(world, body[b], FirstPersonController)->acceleration = b ? 8.0f : 0;
+            } else {
+                ecs_add(world, body[b], CameraController);
+                CameraController *cc = ecs_get_mut(world, body[b], CameraController);
+                cc->collide = true;
+                cc->speed = 4;
+            }
+        }
+
+        ecs_progress(world, dt);
+        box_input_key(world, KeyW, true);
+        for (int32_t i = 0; i < (int32_t)(3 * fps[c / 3]); i ++) {
+            ecs_progress(world, dt);
+        }
+
+        Position prev[3];
+        for (int32_t b = 0; b < 3; b ++) {
+            prev[b] = *ecs_get(world, body[b], Position);
+        }
+
+        for (int32_t i = 0; i < (int32_t)fps[c / 3]; i ++) {
+            ecs_progress(world, dt);
+            for (int32_t b = 0; b < 3; b ++) {
+                const Position *p = ecs_get(world, body[b], Position);
+                test_assert(fabsf(p->x - prev[b].x) < 0.0005f);
+                test_assert(fabsf(p->z - prev[b].z) < 0.0005f);
+                test_assert(fabsf(p->y - (b == 2 ? 1 : 1.7f)) < 0.001f);
+                prev[b] = *p;
+            }
+        }
+
+        ecs_fini(world);
+    }
+}
+
+static int32_t position_sets;
+
+static void count_position_sets(
+    ecs_iter_t *it)
+{
+    position_sets += it->count;
+}
+
+void Collision_idle_keeps_position(void) {
+    // controller_fixes/controller_minor
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    float a = 40 * (float)GLM_PI / 180, s = sinf(a), c = cosf(a);
+    ecs_entity_t box = ecs_new(world);
+    ecs_set(world, box, Position, { 10, 0.5f, 0 });
+    ecs_set(world, box, Box, { 2, 1, 2 });
+    ecs_entity_t slope = ecs_new(world);
+    ecs_set(world, slope, Position, { 20, -0.5f * c + 5 * s, -2 - 0.5f * s - 5 * c });
+    ecs_set(world, slope, Rotation, { a, 0, 0 });
+    ecs_set(world, slope, Box, { 10, 1, 10 });
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, { 30, 1, 0 });
+    ecs_set(world, ball, Sphere, { .segments = 24, .radius = 1 });
+    float x[] = { 0, 10, 20, 30 };
+    float y[] = { 1.7f, 2.7f, 1.7f + 4 * s / c, 3.7f };
+    float z[] = { 0, 0, -6, 0 };
+    ecs_entity_t fp[4];
+    for (int32_t i = 0; i < 4; i ++) {
+        fp[i] = ecs_new(world);
+        ecs_set(world, fp[i], Position, { x[i], y[i] + 0.5f, z[i] });
+        ecs_add(world, fp[i], FirstPersonController);
+    }
+
+    for (int32_t i = 0; i < 120; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    Position rest[4];
+    for (int32_t i = 0; i < 4; i ++) {
+        rest[i] = *ecs_get(world, fp[i], Position);
+        test_bool(ecs_get(world, fp[i], FirstPersonController)->grounded, true);
+    }
+
+    ecs_observer(world, {
+        .query.terms = {{ ecs_id(Position) }, { ecs_id(FirstPersonController) }},
+        .events = { EcsOnSet },
+        .callback = count_position_sets
+    });
+    for (int32_t i = 0; i < 60; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+    }
+
+    test_int(position_sets, 0);
+    for (int32_t i = 0; i < 4; i ++) {
+        const Position *p = ecs_get(world, fp[i], Position);
+        test_flt(p->x, rest[i].x);
+        test_flt(p->y, rest[i].y);
+        test_flt(p->z, rest[i].z);
+    }
+
+    ecs_fini(world);
+}

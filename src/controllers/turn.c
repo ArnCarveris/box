@@ -46,6 +46,7 @@ bool box_controller_turn(
         angular_velocity[0] = angular_velocity[0] < 0 ? 0 : angular_velocity[0];
     }
 
+    yaw = remainderf(yaw, 2 * (float)GLM_PI);
     result = yaw != r->y || pitch != r->x;
     r->y = yaw;
     r->x = pitch;

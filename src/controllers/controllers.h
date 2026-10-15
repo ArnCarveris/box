@@ -310,9 +310,9 @@ void box_controller_actions_enable(
  * The angular velocity eases towards the turn actions at the acceleration rate while one is
  * held and towards a stop at the deceleration rate when none is.
  *
- * While Look is held the cursor movement turns the rotation by exactly the movement on top of
- * that. Mouse look never feeds the angular velocity, so the turn stops the frame the cursor
- * does. The pitch stops short of straight up and down, dropping the angular velocity towards it.
+ * While Look is held the cursor turns the rotation by exactly its movement, never through the
+ * angular velocity, so the turn stops when the cursor does. The pitch stops short of vertical,
+ * dropping the angular velocity towards it, and the yaw wraps to [-pi, pi].
  *
  * @param turn What the frame asks for
  * @param angular_velocity Pitch (x) and yaw (y) rate in radians per second, written in place

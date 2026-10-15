@@ -70,7 +70,8 @@
                     "zoom_zero",
                     "script_turn_settings",
                     "stall_clamped",
-                    "look_release_stops"
+                    "look_release_stops",
+                    "yaw_wraps"
                 ]
             },
             {
@@ -168,7 +169,9 @@
                     "capsule_core_crossing",
                     "camera_on_capsule_core",
                     "sheared_box_gap",
-                    "crowded_stretch_walls"
+                    "crowded_stretch_walls",
+                    "acute_corner_still",
+                    "idle_keeps_position"
                 ]
             }
         ]

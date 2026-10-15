@@ -1740,3 +1740,31 @@ void Camera_look_release_stops(void) {
 
     ecs_fini(world);
 }
+
+void Camera_yaw_wraps(void) {
+    // controller_fixes/controller_minor
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_add(world, cam, CameraController);
+    ecs_entity_t fp = ecs_new(world);
+    ecs_add(world, fp, FirstPersonController);
+
+    box_input_key(world, KeyLeft, true);
+    float prev = 0;
+    for (int32_t i = 0; i < 600; i ++) {
+        ecs_progress(world, 1.0f / 60.0f);
+        float yaw = ecs_get(world, cam, Rotation)->y;
+        test_assert(yaw > -(float)GLM_PI - 0.0001f);
+        test_assert(yaw <= (float)GLM_PI + 0.0001f);
+        test_assert(fabsf(ecs_get(world, fp, Rotation)->y) <= (float)GLM_PI + 0.0001f);
+        float step = yaw - prev;
+        step += step < -(float)GLM_PI ? 2 * (float)GLM_PI : 0;
+        test_assert(step >= 0);
+        test_assert(step < 0.03f);
+        prev = yaw;
+    }
+
+    ecs_fini(world);
+}
