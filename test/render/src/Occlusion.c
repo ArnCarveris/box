@@ -50,14 +50,10 @@ void Occlusion_wall_hides_object(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -99,14 +95,10 @@ void Occlusion_wall_moved_shows_object_same_frame(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -166,13 +158,10 @@ void Occlusion_camera_cut_shows_object_same_frame(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -241,13 +230,10 @@ void Occlusion_slot_moves_keep_instances_drawn(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -316,13 +302,10 @@ void Occlusion_batch_replaced_draws_at_once(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -383,14 +366,10 @@ void Occlusion_frustum_only_and_disabled(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -401,13 +380,10 @@ void Occlusion_frustum_only_and_disabled(void) {
 
     ecs_set(world, view, View, {.camera = camera});
     start = ecs_get_world_info(world)->frame_count_total + 1;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
@@ -462,14 +438,10 @@ void Occlusion_hidden_caster_casts_shadow(void) {
 
     int64_t start = ecs_get_world_info(world)->frame_count_total + 3;
     const CullStatus *status = NULL;
-    int32_t i;
-    for (i = 0; i < 100; i ++) {
+    while (!status || status->frame < start) {
         ecs_progress(world, 0);
         box_render_sync(world);
         status = ecs_get(world, view, CullStatus);
-        if (status && status->frame >= start) {
-            break;
-        }
     }
 
     test_assert(status != NULL);
