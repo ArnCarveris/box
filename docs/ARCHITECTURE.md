@@ -431,7 +431,9 @@ level narrow phase and no picking.
 **Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
+page. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
+(`src/text/msdf_correct.c`, edge priority with the distance checked at edges). Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
 font load; atlas placement makes at most `BOX_TEXT_PLACE_TRIES` passes. A font whose table
 directory, tables or `loca` entries (one per glyph plus the end, each inside `glyf`) lie
