@@ -32,9 +32,10 @@ fails as "not rendered: cpu oversubscribed", never as a render difference. When 
 changes etc, src, include, apps or test/integration lands in the tree during the run, the run
 says so. Every run is also kept in test/integration/out/history (--history moves it):
 <run>/results.json with every scene's diff stats, exit code, attempts, refusals, load wait, load
-before, at the render and after, render seconds and the error lines of its log, plus the render,
-baseline, diff, log and script of every failing scene, and one summary line per run in
-runs.jsonl. The last 30 runs are kept.
+before, at the render and after, render seconds, the error lines of its log and the warnings of
+headless readiness waits that timed out (readiness, also appended to a failing scene's detail),
+plus the render, baseline, diff, log and script of every failing scene, and one summary line per
+run in runs.jsonl. The last 30 runs are kept.
 
   integration.py perf [--dir dir] [--app project] [--env name] [--cfg mode] [--out dir]
                       [--size WxH] [--seconds s] [--cpu-budget pct] [--stall ms] [--max-load n]
@@ -107,10 +108,12 @@ PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "
 MAX_SETTLE_SECONDS = 1.0
 HISTORY_RUNS = 30
 VISUAL_KEYS = ("max", "mean", "px", "frames", "run_seconds", "exit", "attempts", "refusals",
-               "load_wait", "load_before", "load_run", "load_after")
+               "load_wait", "load_before", "load_run", "load_after", "readiness")
 HISTORY_FILES = (".png", "_baseline.png", "_diff.png", ".log", ".run.flecs")
 LOG_NOTE = re.compile(r"error|warning|timed out|lost|failed|abort", re.IGNORECASE)
 LOG_NOTES = 20
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+READINESS = re.compile(r"headless \w+ wait timed out")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_CHANNELS = {0: 1, 2: 3, 4: 2, 6: 4}
 
@@ -366,8 +369,9 @@ def run_guarded(cmd, args, output, timeout, refused):
         run["load_wait"] += pause
     run["refused"] = refused(log)
     run["exit"] = code
-    run["log_notes"] = [line.strip() for line in log.splitlines()
-                        if LOG_NOTE.search(line)][:LOG_NOTES]
+    lines = [ANSI.sub("", line).strip() for line in log.splitlines()]
+    run["log_notes"] = [line for line in lines if LOG_NOTE.search(line)][:LOG_NOTES]
+    run["readiness"] = [line for line in lines if READINESS.search(line)][:LOG_NOTES]
     return code, log, run
 
 
@@ -472,6 +476,8 @@ def run_scene(scene, baseline_dir, out, update, args):
                 result["status"] = "pass" if cmp["ok"] else "fail"
                 result["detail"] = "max %d, mean %.4f, %d px > %d" % (
                     cmp["max"], cmp["mean"], cmp["px"], PIXEL_DELTA)
+    if result["status"] != "pass" and result.get("readiness"):
+        result["detail"] = "%s; %s" % (result.get("detail", ""), "; ".join(result["readiness"]))
     result["elapsed"] = round(time.time() - start, 6)
     return result
 
@@ -637,7 +643,8 @@ def write_history(results, out, directory, args, started, elapsed, app, commit, 
         "elapsed": round(elapsed, 3),
         "passed": len(results) - len(failed),
         "failed": [{"scene": r["scene"], "detail": r.get("detail", ""),
-                    "load_before": r.get("load_before"), "load_run": r.get("load_run")}
+                    "load_before": r.get("load_before"), "load_run": r.get("load_run"),
+                    "readiness": r.get("readiness", [])}
                    for r in failed],
     }
     with open(os.path.join(folder, "results.json"), "w") as f:
