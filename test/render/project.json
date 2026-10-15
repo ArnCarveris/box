@@ -269,7 +269,8 @@
                     "no_bake_tag",
                     "cache_is_owned",
                     "view_baked_defaults",
-                    "scene_renders_identically"
+                    "scene_renders_identically",
+                    "projected_anchor_not_baked"
                 ]
             },
             {

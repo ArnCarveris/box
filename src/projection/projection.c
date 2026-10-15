@@ -307,6 +307,16 @@ static void BoxProjectionUpdate(
     }
 }
 
+bool box_projection_anchored(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t anchor = ecs_id(ProjectedAnchor);
+
+    return anchor && ecs_is_alive(world, anchor) && (ecs_has_id(world, e, anchor) ||
+        ecs_get_target_for_id(world, e, EcsChildOf, anchor) != 0);
+}
+
 void BoxProjectionImport(
     ecs_world_t *world)
 {

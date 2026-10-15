@@ -459,7 +459,7 @@ static void box_draws_key(
         !ecs_get_target_for_id(world, e, EcsChildOf, NoShadow);
     key->bake = !shape2d && key->blend == Opaque && !ecs_has_id(world, e, DynamicTransform) &&
         !ecs_has_id(world, e, ManualTransform) && !ecs_has_id(world, e, NoBake) &&
-        box_draws_baked(world, key->scene);
+        !box_projection_anchored(world, e) && box_draws_baked(world, key->scene);
 }
 
 /** Bring the shape of a changed entity into the batch of its key and write its instance.

@@ -40,6 +40,19 @@ ECS_STRUCT(ProjectedAnchor, {
  */
 extern ECS_TAG_DECLARE(ProjectedHidden);
 
+/** Test whether an entity or one of its ChildOf ancestors has a ProjectedAnchor.
+ *
+ * Anchored subtrees move every frame by projection, so the bake does not capture them, the
+ * same as shapes with DynamicTransform or NoBake.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when the entity is anchored or below an anchored entity
+ */
+bool box_projection_anchored(
+    const ecs_world_t *world,
+    ecs_entity_t e);
+
 /** Register the box.projection module.
  *
  * @param world The world

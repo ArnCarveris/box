@@ -198,7 +198,9 @@ the draw, light and spatial observers, which move it in the next frame. The only
 reference is `ProjectedAnchor`: it projects the world position of a target through a view's
 camera into pixel `Position` of a UI scene (origin at center, y up) in the same frame. It writes
 that `Position` without OnSet and the `WorldTransform` of the anchored subtree itself, so static
-transforms do not compute the anchor again in the next frame. Behind
+transforms do not compute the anchor again in the next frame. An anchored subtree moves every
+frame by design, so the bake treats it like `DynamicTransform` or `NoBake` and never captures it
+(`box_projection_anchored`). Behind
 the camera, past the far plane or with a missing target the entity gets `ProjectedHidden` and
 collapses to a point.
 

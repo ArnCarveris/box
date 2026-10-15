@@ -254,7 +254,7 @@ static bool box_bake_captured_but(
     bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform);
     bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
 
-    return !dynamic && !manual && !hidden;
+    return !dynamic && !manual && !hidden && !box_projection_anchored(world, e);
 }
 
 /** Remember the static shapes whose captured look changed.
@@ -408,7 +408,7 @@ void box_bake_changes(
         }
 
         if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
-            !ecs_has_id(world, e, ManualTransform) &&
+            !ecs_has_id(world, e, ManualTransform) && !box_projection_anchored(world, e) &&
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max))
         {
