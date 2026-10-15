@@ -11,6 +11,7 @@
 #include "../jobs/jobs.h"
 #include "../render/preprocess.h"
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 #define STBTT_malloc(size, user) ((void)(user), ecs_os_malloc((ecs_size_t)(size)))
@@ -22,7 +23,10 @@
 /** Largest font file that loads, in bytes */
 #define BOX_TEXT_MAX_FILE (64 * 1024 * 1024)
 
-/** Deepest nesting of composite glyphs that is drawn, a cycle exceeds it */
+/** Smallest font file that is parsed: the header of a font collection */
+#define BOX_TEXT_MIN_FILE (16)
+
+/** Most levels of composite glyphs above a simple glyph that are drawn, a cycle exceeds it */
 #define BOX_TEXT_COMPOSITE_DEPTH (16)
 
 /** Most component references a glyph may make through all of its nested composites */
@@ -50,6 +54,7 @@
 struct box_text_face_t {
     uint8_t *data;          /**< The bytes of the file */
     int32_t size;           /**< Bytes in data */
+    int64_t glyf_end;       /**< Offset after the glyf table, every loca entry points before it */
     stbtt_fontinfo info;    /**< The parsed font */
     float units;            /**< Font units per em */
     int32_t refs;           /**< The font and every job, changed on the main thread */
@@ -160,6 +165,107 @@ done:
     return result;
 }
 
+/** Read a big endian 16 bit value.
+ *
+ * @param p The bytes
+ * @return The value
+ */
+static uint32_t box_text_u16(
+    const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 8) | p[1];
+}
+
+/** Read a big endian 32 bit value.
+ *
+ * @param p The bytes
+ * @return The value
+ */
+static uint32_t box_text_u32(
+    const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
+}
+
+/** Check that the table directory of a font and every table it lists lie in the file, which
+ * stb_truetype assumes, that the head, hhea and maxp tables hold the fields it reads, and find
+ * the loca and glyf tables.
+ *
+ * @param data The file
+ * @param size Bytes in the file
+ * @param start Offset of the font in the file
+ * @param loca Receives offset and length of the loca table, 0 when there is none
+ * @param glyf Receives offset and length of the glyf table, 0 when there is none
+ * @return Whether the directory and the tables are inside the file
+ */
+static bool box_text_tables_valid(
+    const uint8_t *data,
+    int64_t size,
+    int64_t start,
+    int64_t *loca,
+    int64_t *glyf)
+{
+    int64_t tables, i;
+    bool result = start >= 0 && start <= size - 12;
+    loca[0] = loca[1] = glyf[0] = glyf[1] = 0;
+    if (!result) {
+        goto done;
+    }
+
+    tables = box_text_u16(data + start + 4);
+    result = tables * 16 <= size - start - 12;
+    for (i = 0; result && i < tables; i ++) {
+        const uint8_t *rec = data + start + 12 + i * 16;
+        int64_t off = box_text_u32(rec + 8), len = box_text_u32(rec + 12);
+        result = off <= size && len <= size - off &&
+            (memcmp(rec, "head", 4) || len >= 54) && (memcmp(rec, "hhea", 4) || len >= 36) &&
+            (memcmp(rec, "maxp", 4) || len >= 6);
+        if (!memcmp(rec, "loca", 4)) {
+            loca[0] = off;
+            loca[1] = len;
+        } else if (!memcmp(rec, "glyf", 4)) {
+            glyf[0] = off;
+            glyf[1] = len;
+        }
+    }
+
+done:
+    return result;
+}
+
+/** Check that the loca table holds an entry for every glyph and the end, each pointing into
+ * the glyf table, so stb_truetype and the composite walk only read glyph records in the file.
+ *
+ * @param face The parsed face
+ * @param loca Offset and length of the loca table
+ * @param glyf Offset and length of the glyf table
+ * @return Whether every loca entry is in the file and points into the glyf table
+ */
+static bool box_text_loca_valid(
+    box_text_face_t *face,
+    const int64_t *loca,
+    const int64_t *glyf)
+{
+    const stbtt_fontinfo *info = &face->info;
+    int64_t entry = info->indexToLocFormat ? 4 : 2, i, value;
+    int64_t count = (int64_t)info->numGlyphs + 1;
+    bool result = info->cff.size || (info->indexToLocFormat < 2 && info->numGlyphs >= 0 &&
+        loca[0] == info->loca && glyf[0] == info->glyf && count * entry <= loca[1]);
+    if (info->cff.size || !result) {
+        goto done;
+    }
+
+    for (i = 0; result && i < count; i ++) {
+        value = entry == 2 ? 2 * (int64_t)box_text_u16(face->data + loca[0] + i * 2)
+            : (int64_t)box_text_u32(face->data + loca[0] + i * 4);
+        result = value <= glyf[1];
+    }
+
+    face->glyf_end = glyf[0] + glyf[1];
+done:
+    return result;
+}
+
 /** Load and parse the font file of a job, on a worker thread.
  *
  * @param ctx The job
@@ -171,7 +277,8 @@ static void box_text_load_work(
     char *resolved = box_shader_locate(job->path);
     int32_t size = 0;
     uint8_t *data = resolved ? box_text_read(resolved, &size) : NULL;
-    int offset = data ? stbtt_GetFontOffsetForIndex(data, 0) : -1;
+    int offset = data && size >= BOX_TEXT_MIN_FILE ? stbtt_GetFontOffsetForIndex(data, 0) : -1;
+    int64_t loca[2], glyf[2];
     box_text_face_t *face = NULL;
     if (!data) {
         job->error = flecs_asprintf("box.text: cannot read font '%s'",
@@ -183,8 +290,21 @@ static void box_text_load_work(
     face->data = data;
     face->size = size;
     face->refs = 1;
-    if (offset < 0 || !stbtt_InitFont(&face->info, data, offset)) {
+    if (offset < 0 || !box_text_tables_valid(data, size, offset, loca, glyf)) {
+        job->error = flecs_asprintf("box.text: font '%s' has tables outside the file", resolved);
+        box_text_face_release(face);
+        goto done;
+    }
+
+    if (!stbtt_InitFont(&face->info, data, offset)) {
         job->error = flecs_asprintf("box.text: cannot parse font '%s'", resolved);
+        box_text_face_release(face);
+        goto done;
+    }
+
+    if (!box_text_loca_valid(face, loca, glyf)) {
+        job->error = flecs_asprintf(
+            "box.text: font '%s' has a loca table that does not fit its glyf table", resolved);
         box_text_face_release(face);
         goto done;
     }
@@ -573,9 +693,11 @@ static int32_t box_text_component_args(
     return result;
 }
 
-/** Check that stb_truetype can read the outline of a glyph without unbounded recursion: its
- * composite components nest at most BOX_TEXT_COMPOSITE_DEPTH deep (a cycle never ends), make
- * at most BOX_TEXT_COMPOSITE_MAX references in total, use x, y offsets and stay in the file.
+/** Check that stb_truetype can read the outline of a glyph without unbounded recursion.
+ *
+ * At most BOX_TEXT_COMPOSITE_DEPTH levels of composites lie above a simple glyph (a cycle never
+ * ends), at most BOX_TEXT_COMPOSITE_MAX references in total, with x, y offsets and records in
+ * the glyf table.
  *
  * @param face The face
  * @param glyph The glyph index
@@ -585,8 +707,9 @@ static bool box_text_composite_valid(
     const box_text_face_t *face,
     int32_t glyph)
 {
-    int32_t glyphs[BOX_TEXT_COMPOSITE_MAX], depths[BOX_TEXT_COMPOSITE_MAX];
+    int32_t glyphs[BOX_TEXT_COMPOSITE_MAX + 1], depths[BOX_TEXT_COMPOSITE_MAX + 1];
     int32_t count = 1, refs = 0;
+    int64_t end = face->glyf_end;
     bool result = true;
     if (face->info.cff.size) {
         goto done;
@@ -597,13 +720,13 @@ static bool box_text_composite_valid(
     while (count && result) {
         count --;
         int32_t depth = depths[count];
-        int32_t at = stbtt__GetGlyfOffset(&face->info, glyphs[count]);
+        int64_t at = stbtt__GetGlyfOffset(&face->info, glyphs[count]);
         uint16_t flags = BOX_TEXT_COMP_MORE;
         if (at < 0) {
             continue;
         }
 
-        if (at + 10 > face->size) {
+        if (at > end || end - at < 10) {
             result = false;
             break;
         }
@@ -614,7 +737,7 @@ static bool box_text_composite_valid(
 
         at += 10;
         while (result && (flags & BOX_TEXT_COMP_MORE)) {
-            if (at + 4 > face->size) {
+            if (end - at < 4) {
                 result = false;
                 break;
             }
@@ -622,9 +745,10 @@ static bool box_text_composite_valid(
             flags = ttUSHORT(face->data + at);
             glyphs[count] = ttUSHORT(face->data + at + 2);
             depths[count] = depth + 1;
+            result = (flags & BOX_TEXT_COMP_XY) &&
+                end - at - 4 >= box_text_component_args(flags) &&
+                depth + 1 <= BOX_TEXT_COMPOSITE_DEPTH && ++ refs <= BOX_TEXT_COMPOSITE_MAX;
             at += 4 + box_text_component_args(flags);
-            result = (flags & BOX_TEXT_COMP_XY) && at <= face->size &&
-                depth + 1 < BOX_TEXT_COMPOSITE_DEPTH && ++ refs < BOX_TEXT_COMPOSITE_MAX;
             count ++;
         }
     }
