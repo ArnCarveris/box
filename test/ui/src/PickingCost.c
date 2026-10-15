@@ -413,45 +413,39 @@ void PickingCost_ui_wins_tie_with_shape(void) {
     // spatial_perf/picking_cost
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
-
-    test_assert(ecs_script(world, { .code =
-        "using box.transform\n"
-        "using box.geometry\n"
-        "using box.camera\n"
-        "using box.view\n"
-        "using box.picking\n"
-        "hud {\n"
-        "  Scene: {}\n"
-        "  camera {\n"
-        "    Position: {0, 0, 100}\n"
-        "    Camera: {ortho: true, ortho_scale: 1}\n"
-        "  }\n"
-        "  slab {\n"
-        "    Position: {0, 0, 0}\n"
-        "    Box: {80, 80, 0}\n"
-        "    Interactive\n"
-        "  }\n"
-        "  label {\n"
-        "    Position: {0, 0, 0}\n"
-        "    Interactive\n"
-        "  }\n"
-        "}\n"
-        "hud_view {\n"
-        "  View: {camera: hud.camera}\n"
-        "}\n" }) != 0);
-
-    ecs_entity_t slab = ecs_lookup(world, "hud.slab");
-    ecs_entity_t label = ecs_lookup(world, "hud.label");
-    ecs_set(world, label, TextBounds, {40, 20});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0.37f, 0.21f, 7.3f});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_entity_t slab = ecs_new(world);
+    ecs_set(world, slab, Position, {0.13f, -0.07f, 0.41f});
+    ecs_set(world, slab, Box, {3.1f, 2.3f, 0});
+    ecs_add(world, slab, Interactive);
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, Position, {0.13f, -0.07f, 0.41f});
+    ecs_set(world, label, TextBounds, {1.7f, 0.9f});
+    ecs_add(world, label, Interactive);
     ecs_progress(world, 0);
 
-    box_input_mouse_move(world, 640 + 10, 360, false);
-    ecs_progress(world, 0);
-    test_uint(ecs_singleton_get(world, PickStatus)->target, label);
+    int32_t x, y, inside = 0;
+    for (y = 0; y < 30; y ++) {
+        for (x = 0; x < 30; x ++) {
+            box_input_mouse_move(world, 520.0f + (float)x * 6.7f, 330.0f + (float)y * 3.8f,
+                false);
+            ecs_progress(world, 0);
+            const PickStatus *status = ecs_singleton_get(world, PickStatus);
+            float dx = fabsf(status->point[0] - 0.13f), dy = fabsf(status->point[1] + 0.07f);
+            if (status->hit && dx < 0.85f - 1e-3f && dy < 0.45f - 1e-3f) {
+                test_uint(status->target, label);
+                inside ++;
+            } else if (status->hit && (dx > 0.85f + 1e-3f || dy > 0.45f + 1e-3f)) {
+                test_uint(status->target, slab);
+            }
+        }
+    }
 
-    box_input_mouse_move(world, 640 + 30, 360 + 25, false);
-    ecs_progress(world, 0);
-    test_uint(ecs_singleton_get(world, PickStatus)->target, slab);
+    test_assert(inside > 200);
 
     ecs_fini(world);
 }
