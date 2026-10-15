@@ -6,8 +6,8 @@
  * from one cache line; a child is a node or an item, so a node over two items is a leaf of two.
  *
  * Built top down with SAH bins on all three axes. Inserts go to the cheapest sibling; ancestors
- * take the rotation that lowers their area most (as Box2D v3 on create), else one that balances
- * them at no cost in area, so boxes at one spot do not pile up. Coherent movers only balance.
+ * take the area rotation of Box2D v3, else balance at no area cost or 16 levels off, so boxes
+ * at one spot, equal or nested, do not pile up. Coherent movers only balance.
  */
 
 #ifndef BOX_SPATIAL_BVH_H

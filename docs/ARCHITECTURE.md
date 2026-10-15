@@ -416,7 +416,8 @@ boxes of both children (a child is a node or an item, so a node over two items i
 leaf). The build bins all three axes for the surface area heuristic; inserts descend to the
 cheapest sibling and every ancestor takes the Box2D v3 rotation that lowers its area most (v3
 rotates on create only; here teleports and static moves rotate too), else a swap that balances
-its height at no cost in area, so boxes at one spot do not pile into a chain; reinserts of
+its height at no cost in area or when its children are 16 levels apart, so boxes at one spot,
+equal or nested, do not pile into a chain; reinserts of
 coherent movers (a predicted displacement) only balance.
 A static move refits its ancestors exactly (shrinking too) when one of its four closest ancestors
 still contains it, and is inserted again otherwise. A fat leaf has a

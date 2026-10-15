@@ -33,6 +33,10 @@
 /** Rotations that lower the area of a node, else balance its height at no cost in area */
 #define BOX_BVH_ROTATE_AREA (2)
 
+/** Height difference of the children of a node above which it is balanced whatever the area,
+ * which bounds the height of nested boxes at one spot; well above what SAH trees produce */
+#define BOX_BVH_HEIGHT_SLACK (16)
+
 /** Child reference of an item */
 #define BOX_BVH_ITEM(item) (-2 - (item))
 
@@ -473,12 +477,12 @@ static void box_bvh_rotate_area(
     }
 }
 
-/** Find the swap that balances a node whose children differ in height by more than one while
- * every box keeps its size: the lower child moves down next to the lower grandchild of the
- * higher one, which moves up, when the higher child keeps its box.
+/** Find the swap that balances a node whose children differ in height by more than one: the
+ * lower child moves down next to the lower grandchild of the higher one, which moves up.
  *
- * Boxes at one spot cost the same area wherever they go, so the area rotations never move them
- * and an insert chain of them would grow the tree one level per box.
+ * It is taken when the higher child keeps its box, as boxes at one spot cost the same area
+ * wherever they go, or when the heights differ by more than BOX_BVH_HEIGHT_SLACK, as with nested
+ * boxes at one spot; either would otherwise pile into a chain one level per box.
  *
  * @param tree The tree
  * @param n The node
@@ -501,9 +505,9 @@ static void box_bvh_rotate_height(
         vec3 min, max;
         box_bvh_union(n->min[1 - high], n->max[1 - high], pn->min[1 - up], pn->max[1 - up],
             min, max);
-        if (glm_vec3_eqv(min, ECS_CONST_CAST(float*, n->min[high])) &&
-            glm_vec3_eqv(max, ECS_CONST_CAST(float*, n->max[high])))
-        {
+        bool same = glm_vec3_eqv(min, ECS_CONST_CAST(float*, n->min[high])) &&
+            glm_vec3_eqv(max, ECS_CONST_CAST(float*, n->max[high]));
+        if (same || h0 > h1 + BOX_BVH_HEIGHT_SLACK || h1 > h0 + BOX_BVH_HEIGHT_SLACK) {
             *side = 1 - high;
             *pick = up;
         }
