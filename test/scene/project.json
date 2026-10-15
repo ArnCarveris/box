@@ -86,6 +86,12 @@
                     "dynamic_resized_at_rest",
                     "dynamic_moved_without_queries"
                 ]
+            },
+            {
+                "id": "SpatialChurn",
+                "testcases": [
+                    "static_vs_brute_force"
+                ]
             }
         ]
     }
