@@ -355,9 +355,10 @@ static void box_spatial_refresh(
     if (indexed && p->item < 0) {
         box_spatial_scene_t *s = box_spatial_scene_ensure(index, scene);
         p->scene = scene;
-        p->item = box_spatial_item_add(s, e, tree, min, max);
+        p->item = box_spatial_item_add(s, e, tree, min, max, index->frame);
     } else if (indexed) {
-        box_spatial_item_set(box_spatial_scene(index, scene), p->item, tree, min, max);
+        box_spatial_item_set(
+            box_spatial_scene(index, scene), p->item, tree, min, max, index->frame);
     }
 
     index->stats.updated += indexed;
@@ -458,7 +459,7 @@ static void box_spatial_dynamic(
             }
 
             index->stats.moved += box_spatial_item_set(
-                s, p[i].item, BOX_SPATIAL_DYNAMIC, min, max);
+                s, p[i].item, BOX_SPATIAL_DYNAMIC, min, max, index->frame);
         }
     }
 }
@@ -476,6 +477,7 @@ static void box_spatial_sync(
         index->stale = false;
         box_spatial_move(index);
         box_spatial_dynamic(world, index, box_mesh_cache_of(world));
+        index->stats.moved += box_spatial_settle(index);
     }
 }
 
@@ -505,6 +507,7 @@ static void box_spatial_process(
     index->stats.updated = 0;
     index->stats.rebound = 0;
     index->stats.moved = 0;
+    index->frame ++;
     box_spatial_walk(world, index, &index->rescoped, true);
     for (i = 0; i < ecs_vec_count(&index->dirty); i ++) {
         box_spatial_refresh(world, index, cache, *ecs_vec_get_t(&index->dirty, ecs_entity_t, i));

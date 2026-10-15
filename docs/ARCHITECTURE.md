@@ -351,8 +351,10 @@ bakes.
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
 AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. A fat leaf has a
-margin and reaches four times the last displacement ahead; it is inserted again only when the
-bounds leave it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`).
+margin and reaches four times the displacement per frame ahead, at most four margins (a larger
+displacement is a teleport and predicts nothing); it is inserted again only when the bounds leave
+it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`), and a stretched leaf
+whose shape kept its bounds since the last query gets a leaf with only the margin.
 Observers queue changed shapes and `box_transform_on_moved` the moved static entities;
 `SpatialUpdate` (`EcsOnStore`) places only those. Dynamic shapes are placed by the first query
 after a frame, so an idle frame pays nothing. Each keeps the `WorldTransform` its bounds came from
