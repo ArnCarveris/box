@@ -27,9 +27,9 @@ extern "C" {
  * wheel pushes along the view. Velocity and turn rate ease to their target at e^-(rate * t),
  * at the acceleration rates while an action is held, else at the deceleration rates.
  *
- * Turn actions ease to turn_speed, Look adds the cursor on top and stops on release. The yaw
- * (Rotation.y) turns left, the pitch (Rotation.x) looks up, 0.05 short of vertical, along -Z.
- * Members apply as specified (a rate of 0 never changes), the constructor sets the defaults.
+ * Turn actions ease to turn_speed, Look adds the cursor and stops on release. The yaw (Rotation.y)
+ * turns left and stays in [-pi, pi]: one set outside is rewritten next frame, with an OnSet. The
+ * pitch looks up, 0.05 short of vertical. Members apply as specified, a rate of 0 never changes.
  */
 ECS_STRUCT(CameraController, {
     float speed;             /**< Units per second, 40 by default */

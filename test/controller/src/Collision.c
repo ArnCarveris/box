@@ -1524,7 +1524,14 @@ void Collision_acute_corner_still(void) {
 
         Position prev[3];
         for (int32_t b = 0; b < 3; b ++) {
+            float r = b == 2 ? 0.25f : 0.3f;
+            float rest = (r + 0.1f) / sinf(half);
             prev[b] = *ecs_get(world, body[b], Position);
+            float along = prev[b].x * sinf(t) + (prev[b].z + 5) * cosf(t);
+            float side = prev[b].x * cosf(t) - (prev[b].z + 5) * sinf(t);
+            test_assert(along > rest - 0.25f);
+            test_assert(along < rest + 0.05f);
+            test_assert(fabsf(side) < 0.1f);
         }
 
         for (int32_t i = 0; i < (int32_t)fps[c / 3]; i ++) {
