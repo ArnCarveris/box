@@ -30,6 +30,8 @@
                     "overlap_sparse_movers_100k",
                     "ray_after_static_moves_100k",
                     "overlap_after_static_moves_100k",
+                    "ray_after_static_churn_100k",
+                    "overlap_after_static_churn_100k",
                     "idle_100k",
                     "idle_ray_100k"
                 ]

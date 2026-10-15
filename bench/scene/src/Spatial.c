@@ -491,12 +491,16 @@ void Spatial_overlap_sparse_movers_100k(
     ecs_fini(world);
 }
 
-/** Create a world with 100k static shapes on the grid and move every hundredth of them by up
- * to 3 units on each axis in each of 10 frames, 10k random moves in all.
+/** Create a world with 100k static shapes on the grid and move some of them in each of 10
+ * frames by a random offset on the x and z axes.
  *
+ * @param step Distance between moved shapes, 100 moves every hundredth shape
+ * @param range Largest offset of a move on an axis
  * @return The world
  */
-static ecs_world_t* bench_spatial_static_moves_world(void)
+static ecs_world_t* bench_spatial_static_moves_world(
+    int32_t step,
+    float range)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -512,11 +516,11 @@ static ecs_world_t* bench_spatial_static_moves_world(void)
 
     ecs_progress(world, 0);
     for (f = 0; f < 10; f ++) {
-        for (i = 0; i < 100000; i += 100) {
+        for (i = 0; i < 100000; i += step) {
             ecs_entity_t e = shapes[i];
             const Position *p = ecs_get(world, e, Position);
-            ecs_set(world, e, Position, {p->x + (bench_random(&seed) - 0.5f) * 6.0f, p->y,
-                p->z + (bench_random(&seed) - 0.5f) * 6.0f});
+            ecs_set(world, e, Position, {p->x + (bench_random(&seed) - 0.5f) * 2.0f * range,
+                p->y, p->z + (bench_random(&seed) - 0.5f) * 2.0f * range});
         }
 
         ecs_progress(world, 0);
@@ -543,11 +547,15 @@ static void bench_spatial_rebuilt_cost(
         box_bvh_cost(&box_spatial_of(world)->root->trees[0]));
 }
 
-void Spatial_ray_after_static_moves_100k(
-    bench_t *b)
+/** Cast 1000 rays down onto a grid of 100k shapes.
+ *
+ * @param b The bench
+ * @param world The world
+ */
+static void bench_spatial_ray_100k(
+    bench_t *b,
+    ecs_world_t *world)
 {
-    // spatial_perf/bvh_quality
-    ecs_world_t *world = bench_spatial_static_moves_world();
     box_spatial_ray_t *rays = ecs_os_malloc_n(box_spatial_ray_t, BENCH_QUERIES);
     uint32_t seed = 41;
     int32_t i, hits = 0;
@@ -571,8 +579,26 @@ void Spatial_ray_after_static_moves_100k(
     }
 
     bench_counter(b, "hits", hits);
-    bench_spatial_rebuilt_cost(b, world);
     ecs_os_free(rays);
+}
+
+void Spatial_ray_after_static_moves_100k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = bench_spatial_static_moves_world(100, 3.0f);
+    bench_spatial_ray_100k(b, world);
+    bench_spatial_rebuilt_cost(b, world);
+    ecs_fini(world);
+}
+
+void Spatial_ray_after_static_churn_100k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = bench_spatial_static_moves_world(2, 15.0f);
+    bench_spatial_ray_100k(b, world);
+    bench_spatial_rebuilt_cost(b, world);
     ecs_fini(world);
 }
 
@@ -580,7 +606,19 @@ void Spatial_overlap_after_static_moves_100k(
     bench_t *b)
 {
     // spatial_perf/bvh_quality
-    ecs_world_t *world = bench_spatial_static_moves_world();
+    ecs_world_t *world = bench_spatial_static_moves_world(100, 3.0f);
+    bench_set_items(b, BENCH_QUERIES);
+    int32_t count = bench_spatial_overlap_100k(b, world);
+    bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
+    bench_spatial_rebuilt_cost(b, world);
+    ecs_fini(world);
+}
+
+void Spatial_overlap_after_static_churn_100k(
+    bench_t *b)
+{
+    // spatial_perf/bvh_quality
+    ecs_world_t *world = bench_spatial_static_moves_world(2, 15.0f);
     bench_set_items(b, BENCH_QUERIES);
     int32_t count = bench_spatial_overlap_100k(b, world);
     bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
