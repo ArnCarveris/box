@@ -4,6 +4,7 @@
  */
 
 #include <box.h>
+#include "transform_version.h"
 
 /** Compute the world transforms of one depth level of the ChildOf hierarchy.
  *
