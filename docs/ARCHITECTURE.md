@@ -356,7 +356,7 @@ a scene to the bake. Bounds are boxes; there is no mesh level narrow phase and n
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
