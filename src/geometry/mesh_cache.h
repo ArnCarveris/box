@@ -124,16 +124,6 @@ const box_mesh_t* box_mesh_cache_get(
     const box_mesh_cache_t *cache,
     uint32_t handle);
 
-/** Get the number of references to a mesh.
- *
- * @param cache The cache
- * @param handle The mesh handle
- * @return The reference count, 0 when the handle is not alive
- */
-int32_t box_mesh_cache_refs(
-    const box_mesh_cache_t *cache,
-    uint32_t handle);
-
 /** Get the number of meshes alive in the cache.
  *
  * @param cache The cache

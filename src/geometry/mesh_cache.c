@@ -293,19 +293,6 @@ const box_mesh_t* box_mesh_cache_get(
     return result;
 }
 
-int32_t box_mesh_cache_refs(
-    const box_mesh_cache_t *cache,
-    uint32_t handle)
-{
-    int32_t result = 0;
-    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
-    if (entry && entry->shape) {
-        result = entry->refs;
-    }
-
-    return result;
-}
-
 int32_t box_mesh_cache_count(
     const box_mesh_cache_t *cache)
 {
