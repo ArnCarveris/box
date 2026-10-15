@@ -8,7 +8,8 @@
 
 #include "bvh.h"
 
-/** Bins per axis of the surface area heuristic of a top down build */
+/** Most bins per axis of the surface area heuristic of a top down build, which uses one bin per
+ * leaf for fewer leaves */
 #define BOX_BVH_BINS (16)
 
 /** Ancestors that may still contain a moved exact item before it is inserted again */
@@ -51,6 +52,7 @@ typedef struct box_bvh_bin_t {
 typedef struct box_bvh_split_t {
     float cost;   /**< Area times leaves of both sides, FLT_MAX when nothing splits */
     int32_t axis; /**< Axis of the bins */
+    int32_t bins; /**< Number of bins */
     int32_t bin;  /**< Last bin of the left side */
     float origin; /**< Lowest centroid on the axis */
     float scale;  /**< Bins per unit of centroid */
@@ -687,8 +689,8 @@ static int32_t box_bvh_bin_of(
 {
     int32_t result = (int32_t)((box_bvh_centroid(leaf, split->axis) - split->origin) *
         split->scale);
-    if (result >= BOX_BVH_BINS) {
-        result = BOX_BVH_BINS - 1;
+    if (result >= split->bins) {
+        result = split->bins - 1;
     } else if (result < 0) {
         result = 0;
     }
@@ -696,47 +698,59 @@ static int32_t box_bvh_bin_of(
     return result;
 }
 
-/** Choose the bin on one axis after which to split a range of leaves, weighing area times
- * count, and keep it when it is cheaper than the split found so far.
+/** Put a range of leaves in the bins of all three axes in one pass.
  *
  * @param leaves The leaves
  * @param count Number of leaves
- * @param axis The axis of the bins
- * @param cmin Lowest centroid on the axis
- * @param cmax Highest centroid on the axis
- * @param best The cheapest split so far, replaced by a cheaper one
+ * @param splits The splits of the three axes with their origin, scale and number of bins
+ * @param bins Receives the bins of the three axes
  */
-static void box_bvh_split_axis(
+static void box_bvh_fill_bins(
     const box_bvh_leaf_t *leaves,
     int32_t count,
-    int32_t axis,
-    float cmin,
-    float cmax,
-    box_bvh_split_t *best)
+    const box_bvh_split_t *splits,
+    box_bvh_bin_t bins[3][BOX_BVH_BINS])
 {
-    box_bvh_bin_t bins[BOX_BVH_BINS];
-    float right_cost[BOX_BVH_BINS];
-    box_bvh_split_t split = {
-        .cost = FLT_MAX, .axis = axis, .origin = cmin,
-        .scale = (float)BOX_BVH_BINS / (cmax - cmin)
-    };
-    int32_t i, seen = 0;
-    vec3 min, max;
-    for (i = 0; i < BOX_BVH_BINS; i ++) {
-        glm_vec3_fill(bins[i].min, FLT_MAX);
-        glm_vec3_fill(bins[i].max, -FLT_MAX);
-        bins[i].count = 0;
+    int32_t i, a, n = splits[0].bins;
+    for (a = 0; a < 3; a ++) {
+        for (i = 0; i < n; i ++) {
+            glm_vec3_fill(bins[a][i].min, FLT_MAX);
+            glm_vec3_fill(bins[a][i].max, -FLT_MAX);
+            bins[a][i].count = 0;
+        }
     }
 
     for (i = 0; i < count; i ++) {
-        box_bvh_bin_t *bin = &bins[box_bvh_bin_of(&leaves[i], &split)];
-        box_bvh_union(bin->min, bin->max, leaves[i].min, leaves[i].max, bin->min, bin->max);
-        bin->count ++;
+        const box_bvh_leaf_t *l = &leaves[i];
+        for (a = 0; a < 3; a ++) {
+            box_bvh_bin_t *bin = &bins[a][box_bvh_bin_of(l, &splits[a])];
+            box_bvh_union(bin->min, bin->max, l->min, l->max, bin->min, bin->max);
+            bin->count ++;
+        }
     }
+}
 
+/** Choose the bin of one axis after which to split a range of leaves, weighing area times
+ * count, and keep it when it is cheaper than the split found so far.
+ *
+ * @param bins The bins of the axis
+ * @param count Number of leaves
+ * @param split The axis, origin, scale and number of bins, which receives the cost and bin
+ * @param best The cheapest split so far, replaced by a cheaper one
+ */
+static void box_bvh_split_axis(
+    const box_bvh_bin_t *bins,
+    int32_t count,
+    box_bvh_split_t *split,
+    box_bvh_split_t *best)
+{
+    float right_cost[BOX_BVH_BINS];
+    int32_t i, seen = 0, n = split->bins;
+    vec3 min, max;
+    split->cost = FLT_MAX;
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
-    for (i = BOX_BVH_BINS - 1; i > 0; i --) {
+    for (i = n - 1; i > 0; i --) {
         box_bvh_union(min, max, bins[i].min, bins[i].max, min, max);
         seen += bins[i].count;
         right_cost[i - 1] = seen ? (float)seen * box_bvh_area(min, max) : 0;
@@ -745,18 +759,18 @@ static void box_bvh_split_axis(
     glm_vec3_fill(min, FLT_MAX);
     glm_vec3_fill(max, -FLT_MAX);
     seen = 0;
-    for (i = 0; i < BOX_BVH_BINS - 1; i ++) {
+    for (i = 0; i < n - 1; i ++) {
         box_bvh_union(min, max, bins[i].min, bins[i].max, min, max);
         seen += bins[i].count;
         float cost = (seen ? (float)seen * box_bvh_area(min, max) : 0) + right_cost[i];
-        if (seen && seen < count && cost < split.cost) {
-            split.cost = cost;
-            split.bin = i;
+        if (seen && seen < count && cost < split->cost) {
+            split->cost = cost;
+            split->bin = i;
         }
     }
 
-    if (split.cost < best->cost) {
-        *best = split;
+    if (split->cost < best->cost) {
+        *best = *split;
     }
 }
 
@@ -773,8 +787,13 @@ static int32_t box_bvh_partition(
     int32_t depth)
 {
     int32_t result = count / 2, i, a;
-    box_bvh_split_t best = { .cost = FLT_MAX };
+    box_bvh_split_t best = { .cost = FLT_MAX }, splits[3];
+    box_bvh_bin_t bins[3][BOX_BVH_BINS];
     vec3 cmin, cmax;
+    if (count == 2 || depth > BOX_BVH_MAX_SAH_DEPTH) {
+        goto done;
+    }
+
     glm_vec3_fill(cmin, FLT_MAX);
     glm_vec3_fill(cmax, -FLT_MAX);
     for (i = 0; i < count; i ++) {
@@ -785,9 +804,17 @@ static int32_t box_bvh_partition(
         }
     }
 
-    for (a = 0; a < 3 && depth <= BOX_BVH_MAX_SAH_DEPTH; a ++) {
-        if (cmax[a] > cmin[a]) {
-            box_bvh_split_axis(leaves, count, a, cmin[a], cmax[a], &best);
+    for (a = 0; a < 3; a ++) {
+        splits[a] = (box_bvh_split_t){
+            .axis = a, .origin = cmin[a], .bins = count < BOX_BVH_BINS ? count : BOX_BVH_BINS
+        };
+        splits[a].scale = cmax[a] > cmin[a] ? (float)splits[a].bins / (cmax[a] - cmin[a]) : 0;
+    }
+
+    box_bvh_fill_bins(leaves, count, splits, bins);
+    for (a = 0; a < 3; a ++) {
+        if (splits[a].scale > 0) {
+            box_bvh_split_axis(bins[a], count, &splits[a], &best);
         }
     }
 
