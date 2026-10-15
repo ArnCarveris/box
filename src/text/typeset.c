@@ -192,10 +192,11 @@ static void box_text_char(
         box_text_wrap(run, &x, advance);
     }
 
+    const box_text_atlas_glyph_t *area = box_text_font_glyph(world, run->s, font, glyph);
     box_text_placed_t *p = ecs_vec_append_t(NULL, &run->s->placed, box_text_placed_t);
     p->x = x;
     p->line = run->line;
-    p->glyph = box_text_font_glyph(world, run->s, font, glyph);
+    p->glyph = area;
     run->pen = x + advance;
     run->line_end = run->pen;
     if (run->line_end - run->word_x > run->longest) {
