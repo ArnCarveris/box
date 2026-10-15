@@ -467,8 +467,8 @@ static WGPURenderPipeline box_gpu_forward_create(
  * @param shader Shader handle
  * @param format Format of the color target, below 2^24
  * @param blend BlendMode, below 16
- * @param back_face BackFaceMode, below 16
- * @return The key, distinct for every distinct state
+ * @param back_face BackFaceMode, of which the pipeline only tells BackFaceCull from the rest
+ * @return The key, distinct for every distinct pipeline
  */
 static uint64_t box_gpu_forward_key(
     uint32_t shader,
@@ -477,15 +477,15 @@ static uint64_t box_gpu_forward_key(
     uint32_t back_face)
 {
     ecs_assert((uint32_t)format < (1u << 24), ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(back_face < 16, ECS_INTERNAL_ERROR, NULL);
 
     return ((uint64_t)shader << 32) | ((uint64_t)format << 8) | ((uint64_t)blend << 4) |
-        back_face;
+        (back_face == BackFaceCull ? 0u : 1u);
 }
 
 /** Get the forward pipeline of a color format and the state of a batch, created on first use.
  *
- * The cache grows with the states in use; a recompiled mesh or 2D shape shader empties it.
+ * The cache grows with the states in use; a recompiled or released mesh or 2D shape shader
+ * empties it, and a batch whose shader does not exist draws nothing.
  *
  * @param gpu The backend
  * @param format The format of the color target
@@ -505,15 +505,15 @@ static WGPURenderPipeline box_gpu_forward_pipeline(
         goto done;
     }
 
+    shader = box_gpu_shader_get(gpu, b->pipeline);
+    if (!shader) {
+        goto done;
+    }
+
     key = box_gpu_forward_key(b->pipeline, format, b->blend, b->back_face);
     cached = ecs_map_get(&gpu->forward, key);
     if (cached) {
         result = (WGPURenderPipeline)(uintptr_t)*cached;
-        goto done;
-    }
-
-    shader = box_gpu_shader_get(gpu, b->pipeline);
-    if (!shader) {
         goto done;
     }
 

@@ -465,7 +465,7 @@ void box_gpu_shader_report(
     ecs_os_mutex_unlock(gpu->lock);
 }
 
-/** Release a shader and its handle.
+/** Release a shader, its handle and the blit or forward pipelines made with it.
  *
  * @param gpu The backend
  * @param handle Handle of the shader
@@ -479,6 +479,12 @@ static void box_gpu_shader_release(
     if (slot) {
         ecs_map_remove(&gpu->shaders, handle);
         box_gpu_shader_slot_free(gpu, slot);
+    }
+
+    if (handle == BOX_RENDER_SHADER_BLIT) {
+        box_gpu_blit_reset(gpu);
+    } else if (handle == BOX_RENDER_SHADER_MESH || handle == BOX_RENDER_SHADER_SHAPE2D) {
+        box_gpu_forward_reset(gpu);
     }
 }
 

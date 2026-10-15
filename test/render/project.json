@@ -462,7 +462,10 @@
             {
                 "id": "PipelineCache",
                 "testcases": [
-                    "every_state_combination_draws"
+                    "every_state_combination_draws",
+                    "invalid_back_face_mode_keeps_states_apart",
+                    "shader_reload_redraws_every_state",
+                    "released_shader_draws_nothing"
                 ]
             }
         ]
