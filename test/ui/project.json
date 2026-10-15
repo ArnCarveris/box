@@ -175,7 +175,11 @@
                 "id": "Blocking",
                 "testcases": [
                     "stops_pass_through",
-                    "press_stays_on_panel"
+                    "press_stays_on_panel",
+                    "mouse_binding",
+                    "camera_look_and_zoom",
+                    "hover_and_wheel",
+                    "render_to_texture"
                 ]
             }
         ]

@@ -393,7 +393,8 @@ static void box_input_bind(
     while (ecs_query_next(&it)) {
         const Binding *b = ecs_field(&it, Binding, 0);
         for (i = 0; i < it.count; i ++) {
-            uint64_t bits = box_input_binding_bits(in, &chords, &b[i]);
+            uint64_t bits = box_input_key_blocked(dev, b[i].key) ?
+                0 : box_input_binding_bits(in, &chords, &b[i]);
             ecs_entity_t action = bits ? box_input_binding_action(world, it.entities[i], &b[i]) : 0;
             if (action) {
                 ecs_map_ensure(&st->bound, action)[0] |= bits;

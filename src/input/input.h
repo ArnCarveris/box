@@ -27,13 +27,26 @@ typedef void (*box_input_route_t)(
     const box_input_emit_t *emit,
     void *ctx);
 
+/** Check whether an element that takes pointer events from the world is under a cursor.
+ *
+ * @param world The world
+ * @param cursor Cursor in window points
+ * @param ctx Context of the router
+ * @return Whether presses and the wheel at the cursor do not reach the actions
+ */
+typedef bool (*box_input_blocks_t)(
+    ecs_world_t *world,
+    const vec2 cursor,
+    void *ctx);
+
 /** Receives the events of a frame in order instead of flecs.script.event.
  *
  * box.picking installs one to aim the mouse events at the entities under the cursor.
  */
 typedef struct box_input_router_t {
-    box_input_route_t route; /**< Takes one event */
-    void *ctx;               /**< Passed to route */
+    box_input_route_t route;   /**< Takes one event */
+    box_input_blocks_t blocks; /**< Finds a blocking element under the cursor, NULL for none */
+    void *ctx;                 /**< Passed to route and blocks */
 } box_input_router_t;
 
 /** A synthetic hold of an action */
@@ -66,6 +79,7 @@ typedef struct InputDevice {
     ecs_entity_t source;           /**< Surface stamped on pushed events that name none */
     ecs_entity_t capture_surface;  /**< Surface the backend captured the cursor in */
     bool capture_applied;          /**< The backend was asked to capture the cursor */
+    bool blocked[3];               /**< The last press of a mouse button hit a blocking element */
     bool has_position;             /**< A cursor position arrived since focus or release */
 } InputDevice;
 
@@ -116,6 +130,16 @@ void box_input_platform_source(
 void box_input_capture_release(
     ecs_world_t *world,
     InputDevice *dev);
+
+/** Check whether the last press of a mouse button hit an element that blocks it from actions.
+ *
+ * @param dev The device state
+ * @param key The key
+ * @return Whether the key is a mouse button whose press was blocked
+ */
+bool box_input_key_blocked(
+    const InputDevice *dev,
+    Key key);
 
 /** Install the router that takes the events of every frame, replacing the previous one.
  *

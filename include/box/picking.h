@@ -38,6 +38,10 @@ extern ECS_TAG_DECLARE(Interactive);
  * An Interactive entity on the path of the hit still handles the event; otherwise the blocker
  * does, like an Interactive entity: it is the handler, a press on it captures the pointer, and
  * the event bubbles from the hit to it. Without it a hit nothing handles passes through.
+ *
+ * World actions do not see it either: a mouse button pressed over a blocker (or an element under
+ * one) leaves its bindings up until it is pressed again, and the wheel over one is not counted
+ * in Mouse.scroll. A press that started elsewhere keeps acting when the cursor moves over one.
  */
 extern ECS_TAG_DECLARE(InputBlocker);
 
