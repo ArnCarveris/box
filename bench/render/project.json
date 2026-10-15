@@ -108,6 +108,12 @@
                     "mesh3_instantiate",
                     "box_instantiate"
                 ]
+            },
+            {
+                "id": "Pipelines",
+                "benchcases": [
+                    "state_combinations"
+                ]
             }
         ]
     }
