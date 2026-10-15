@@ -82,6 +82,38 @@ void box_mesh_cache_release(
     box_mesh_cache_t *cache,
     uint32_t handle);
 
+/** Take a reference to a mesh for a module that follows it, such as the renderer that uploaded
+ * it or picking that built its triangle hierarchy, as opposed to a shape that uses it.
+ *
+ * Each such module drops its own hold once box_mesh_cache_users reports no users; the mesh is
+ * freed with the last reference, whichever module drops it.
+ *
+ * @param cache The cache
+ * @param handle The mesh handle, 0 is ignored
+ */
+void box_mesh_cache_hold(
+    box_mesh_cache_t *cache,
+    uint32_t handle);
+
+/** Drop a hold taken with box_mesh_cache_hold, freeing the mesh with its last reference.
+ *
+ * @param cache The cache
+ * @param handle The mesh handle, 0 is ignored
+ */
+void box_mesh_cache_unhold(
+    box_mesh_cache_t *cache,
+    uint32_t handle);
+
+/** Get the number of references to a mesh that are not holds: the shapes that use it.
+ *
+ * @param cache The cache
+ * @param handle The mesh handle
+ * @return The number of users, 0 when the handle is not alive or only held
+ */
+int32_t box_mesh_cache_users(
+    const box_mesh_cache_t *cache,
+    uint32_t handle);
+
 /** Get a cached mesh.
  *
  * @param cache The cache
