@@ -21,7 +21,7 @@ typedef struct box_shader_t {
     bool pending;           /**< The code changed since the backend received it */
     int32_t revision;       /**< Times preprocessing produced new code */
     char *code;             /**< Last code that preprocessed without error */
-    char *gpu_error;        /**< Error the GPU reported for the revision, NULL when it compiled */
+    char *gpu_error;        /**< Error of the newest GPU outcome, NULL when it compiled */
     bool prep_failed;       /**< The last preprocessing failed */
     char *label;            /**< Path the code was read from, the label of the module */
     ecs_vec_t files;        /**< box_shader_file_t the last preprocessing read */
@@ -334,8 +334,6 @@ static void box_shader_compile(
         out.code = NULL;
         s->pending = true;
         s->revision ++;
-        ecs_os_free(s->gpu_error);
-        s->gpu_error = NULL;
     }
 
     if (out.error) {

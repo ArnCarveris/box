@@ -2,8 +2,9 @@
  * @file spatial/index.h
  * @brief State of the spatial index of a world, private to box.spatial.
  *
- * Every scene has a static tree with exact leaves and a dynamic tree whose leaves have a
- * margin, so a mover only changes its place in the tree once it leaves its margin.
+ * A static tree with exact leaves and a dynamic tree with fat leaves per scene. A fat leaf
+ * reaches ahead along the last displacement, so a mover moves in its tree once it leaves it.
+ * A query computes bounds only for dynamic shapes whose transform differs from SpatialPose.
  *
  * Items hold the bounds of the last update; moved static leaves catch up on the next query.
  */
@@ -31,6 +32,15 @@ typedef struct SpatialProxy {
 /** Component id of SpatialProxy */
 extern ECS_COMPONENT_DECLARE(SpatialProxy);
 
+/** World transform the bounds of an indexed dynamic shape were computed from, all zero (which
+ * no world transform is) until the first update places the shape */
+typedef struct SpatialPose {
+    mat4 m; /**< The matrix */
+} SpatialPose;
+
+/** Component id of SpatialPose */
+extern ECS_COMPONENT_DECLARE(SpatialPose);
+
 /** An indexed entity with its exact world bounds */
 typedef struct box_spatial_item_t {
     ecs_entity_t entity; /**< The entity, 0 when the item is free */
@@ -38,7 +48,9 @@ typedef struct box_spatial_item_t {
     vec3 max;            /**< Maximum corner of the world bounds */
     int32_t node;        /**< Leaf in its tree, -1 while it waits, next free item when free */
     int32_t tree;        /**< BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC */
+    uint32_t frame;      /**< Update in which the bounds were last set */
     bool moved;          /**< The static leaf of the item waits for the bounds of the item */
+    bool stretched;      /**< The dynamic leaf of the item reaches ahead of its margin */
 } box_spatial_item_t;
 
 /** The index of one scene */
@@ -48,6 +60,7 @@ typedef struct box_spatial_scene_t {
     ecs_vec_t items;      /**< box_spatial_item_t by index */
     ecs_vec_t pending;    /**< int32_t, static items that wait for the next commit */
     ecs_vec_t moved;      /**< int32_t, static items whose leaf waits for their bounds */
+    ecs_vec_t stretched;  /**< int32_t, dynamic items whose leaf may reach ahead */
     int32_t free_item;    /**< First free item, -1 when there is none */
     int32_t count;        /**< Items in use */
 } box_spatial_scene_t;
@@ -62,8 +75,9 @@ typedef struct box_spatial_t {
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
     ecs_vec_t nodes;           /**< int32_t, scratch of a build */
     ecs_vec_t empty;           /**< ecs_entity_t, scenes that lost their last entity */
-    ecs_query_t *dynamic;      /**< Indexed entities with DynamicTransform */
+    ecs_query_t *dynamic;      /**< Shapes with SpatialPose */
     box_spatial_stats_t stats; /**< Counters of the last update */
+    uint32_t frame;            /**< Updates so far, which tell the frames between bounds */
     bool stale;                /**< Leaves may lag behind the entities since the last update */
     int32_t refs;              /**< Observers and systems that use the state */
 } box_spatial_t;
@@ -79,8 +93,8 @@ extern ECS_COMPONENT_DECLARE(SpatialIndex);
 /** Get the index of a world to query it.
  *
  * Moves the leaves of the static items of the last update and places the dynamic entities
- * for their current transforms first when that did not happen yet, so a frame without queries
- * does not visit them.
+ * whose transform changed first when that did not happen yet, so a frame without queries does
+ * not visit them.
  *
  * @param world The world
  * @return The index, NULL when box.spatial was not imported
@@ -140,6 +154,7 @@ box_spatial_scene_t* box_spatial_scene_ensure(
  * @param tree BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC
  * @param min Minimum corner of its world bounds
  * @param max Maximum corner of its world bounds
+ * @param frame The current update
  * @return The item of the entity
  */
 int32_t box_spatial_item_add(
@@ -147,17 +162,21 @@ int32_t box_spatial_item_add(
     ecs_entity_t e,
     int32_t tree,
     const vec3 min,
-    const vec3 max);
+    const vec3 max,
+    uint32_t frame);
 
 /** Give an item new bounds, moving it to another tree when it changed kind.
  *
- * A static item that has a leaf keeps it until box_spatial_move gives it the new bounds.
+ * A static item that has a leaf keeps it until box_spatial_move gives it the new bounds. A
+ * dynamic item that leaves its fat leaf gets one that reaches ahead along its displacement per
+ * update, unless that displacement is too large to predict, as a teleport is.
  *
  * @param s The scene
  * @param item The item
  * @param tree BOX_SPATIAL_STATIC or BOX_SPATIAL_DYNAMIC
  * @param min Minimum corner of its world bounds
  * @param max Maximum corner of its world bounds
+ * @param frame The current update
  * @return true when the leaf of the item changed
  */
 bool box_spatial_item_set(
@@ -165,7 +184,8 @@ bool box_spatial_item_set(
     int32_t item,
     int32_t tree,
     const vec3 min,
-    const vec3 max);
+    const vec3 max,
+    uint32_t frame);
 
 /** Remove an item from a scene.
  *
@@ -192,6 +212,15 @@ void box_spatial_commit(
  * @param index The index
  */
 void box_spatial_move(
+    box_spatial_t *index);
+
+/** Give the dynamic items whose leaf reaches ahead but whose bounds did not change in this
+ * update a leaf with only the margin, so a shape that stopped does not keep a stretched leaf.
+ *
+ * @param index The index
+ * @return Number of leaves inserted again
+ */
+int32_t box_spatial_settle(
     box_spatial_t *index);
 
 /** Build the static tree of a scene again from all its static items.

@@ -177,7 +177,9 @@ unchanged.
 `Shader {path, defines}` is the shader abstraction. A C style preprocessor
 (`src/render/preprocess.c`: `#include`, `#define`, `#ifdef`, `#pragma once`) runs in
 `RenderExtract`, reloads on mtime or size change (`ShaderSettings.poll_interval`) and the backend
-compiles in an error scope, keeping the old module on failure. Compile errors come back into
+compiles in an error scope natively and through `getCompilationInfo` in the browser, where the
+outcome arrives after the frame. A new module replaces the old one only once its outcome arrived
+and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
 tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
@@ -204,10 +206,17 @@ collapses to a point.
 
 `RenderExtractDraws` (`src/render/draw.c`) resolves 3D shapes to a shared unit mesh (keyed by
 topology and quantized proportions) plus an instance scale in the private `ShapeMesh`; radius
-and size are never baked. A mesh is sent once per backend as a resource create. Shapes live in
-persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, textures) and
-whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
-(model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
+and size are never baked. Prefabs resolve their shape too: `Mesh3` is `(OnInstantiate, Inherit)`,
+so instances share the prefab's vertex data and copy the prefab's `ShapeMesh` instead of hashing
+it again. A prefab edit reaches every instance that does not override it (`ecs_set`; `ecs_get_mut`
+on an inheriting instance returns NULL), and instances lose the mesh when the prefab loses it or
+is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
+resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
+blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
+one. The backend creates a forward pipeline per shader, color format, blend and back face on
+first use in a map without a limit, emptied when the mesh or 2D shape shader recompiles. An
+instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
@@ -375,12 +384,18 @@ ambient.
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
-AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and `box_transform_on_moved` the moved static entities; `SpatialUpdate`
-(`EcsOnStore`) places only those. Dynamic shapes are marked stale and placed by the first query
-after a frame, so an idle frame pays nothing. Queries (`src/spatial/spatial.h`) are scoped to
-one scene: nearest ray with a narrow phase filter, all hits sorted, box and sphere overlap,
-entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
+AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. A fat leaf has a
+margin and reaches four times the displacement per frame ahead, at most four margins (a larger
+displacement is a teleport and predicts nothing); it is inserted again only when the bounds leave
+it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`), and a stretched leaf
+whose shape kept its bounds since the last query gets a leaf with only the margin.
+Observers queue changed shapes and `box_transform_on_moved` the moved static entities;
+`SpatialUpdate` (`EcsOnStore`) places only those. Dynamic shapes are placed by the first query
+after a frame, so an idle frame pays nothing. Each keeps the `WorldTransform` its bounds came from
+in `SpatialPose`, and the query computes bounds only for shapes whose transform differs from it;
+dynamic transforms publish no change signal, so finding them is one compare per dynamic shape.
+Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow phase
+filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
 the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
 level narrow phase and no picking.
 

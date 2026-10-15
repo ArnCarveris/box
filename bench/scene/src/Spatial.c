@@ -329,6 +329,167 @@ void Spatial_update_dynamic_10k(
     ecs_fini(world);
 }
 
+void Spatial_update_dynamic_100k_1pct(
+    bench_t *b)
+{
+    // spatial_perf/dynamic_bounds
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t *shapes = ecs_os_malloc_n(ecs_entity_t, 100000);
+    box_spatial_stats_t stats = {0};
+    int32_t i, frame = 0, moved = 0, rebound = 0;
+    for (i = 0; i < 100000; i ++) {
+        shapes[i] = ecs_new(world);
+        ecs_add(world, shapes[i], DynamicTransform);
+        ecs_set(world, shapes[i], Position, {(float)(i % BENCH_ROW) * BENCH_SPACING, 0,
+            (float)(i / BENCH_ROW) * BENCH_SPACING});
+        ecs_set(world, shapes[i], Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    bench_spatial_manual(world);
+    box_spatial_update(world);
+    bench_set_items(b, 100000);
+    while (bench_iter(b)) {
+        bench_pause(b);
+        frame ++;
+        for (i = 0; i < 100000; i += 100) {
+            Position *p = ecs_get_mut(world, shapes[i], Position);
+            p->x += 0.05f * (float)((i / 100 + frame / 50) % 3 - 1);
+            p->z += 0.03f;
+        }
+
+        ecs_progress(world, 0);
+        bench_resume(b);
+        box_spatial_update(world);
+        box_spatial_stats(world, &stats);
+        moved += stats.moved;
+        rebound += stats.rebound;
+    }
+
+    bench_counter(b, "moved_in_tree_per_frame", frame ? (double)moved / frame : 0);
+    bench_counter(b, "rebound_per_frame", frame ? (double)rebound / frame : 0);
+    ecs_os_free(shapes);
+    ecs_fini(world);
+}
+
+/** Create a world with dynamic shapes on the grid and run its first frame.
+ *
+ * @param count Shapes of the world
+ * @param shapes Receives the shapes
+ * @return The world
+ */
+static ecs_world_t* bench_spatial_dynamic_world(
+    int32_t count,
+    ecs_entity_t **shapes)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    int32_t i;
+    *shapes = ecs_os_malloc_n(ecs_entity_t, count);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = (*shapes)[i] = ecs_new(world);
+        ecs_add(world, e, DynamicTransform);
+        ecs_set(world, e, Position, {(float)(i % BENCH_ROW) * BENCH_SPACING, 0,
+            (float)(i / BENCH_ROW) * BENCH_SPACING});
+        ecs_set(world, e, Box, {1, 1, 1});
+    }
+
+    ecs_progress(world, 0);
+    box_spatial_update(world);
+
+    return world;
+}
+
+/** Run box overlap queries around random points of a grid of 100k shapes.
+ *
+ * @param b The bench
+ * @param world The world
+ * @return Results of the last iteration
+ */
+static int32_t bench_spatial_overlap_100k(
+    bench_t *b,
+    ecs_world_t *world)
+{
+    vec3 *points = ecs_os_malloc_n(vec3, BENCH_QUERIES);
+    ecs_vec_t out;
+    uint32_t seed = 29;
+    int32_t i, count = 0;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    for (i = 0; i < BENCH_QUERIES; i ++) {
+        points[i][0] = bench_random(&seed) * BENCH_ROW * BENCH_SPACING;
+        points[i][1] = 0;
+        points[i][2] = bench_random(&seed) * 100 * BENCH_SPACING;
+    }
+
+    while (bench_iter(b)) {
+        count = 0;
+        for (i = 0; i < BENCH_QUERIES; i ++) {
+            vec3 min, max;
+            glm_vec3_subs(points[i], 2.0f, min);
+            glm_vec3_adds(points[i], 2.0f, max);
+            ecs_vec_clear(&out);
+            count += box_spatial_overlap_box(world, 0, min, max, &out);
+        }
+
+        bench_keep(count);
+    }
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_os_free(points);
+
+    return count;
+}
+
+void Spatial_overlap_after_teleports_100k(
+    bench_t *b)
+{
+    // spatial_perf/dynamic_bounds
+    ecs_entity_t *shapes = NULL;
+    ecs_world_t *world = bench_spatial_dynamic_world(100000, &shapes);
+    uint32_t seed = 23;
+    int32_t i;
+    for (i = 0; i < 100000; i += 10) {
+        Position *p = ecs_get_mut(world, shapes[i], Position);
+        p->x = bench_random(&seed) * BENCH_ROW * BENCH_SPACING;
+        p->z = bench_random(&seed) * 100 * BENCH_SPACING;
+    }
+
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_spatial_update(world);
+    }
+
+    bench_set_items(b, BENCH_QUERIES);
+    int32_t count = bench_spatial_overlap_100k(b, world);
+    bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
+    ecs_os_free(shapes);
+    ecs_fini(world);
+}
+
+void Spatial_overlap_sparse_movers_100k(
+    bench_t *b)
+{
+    // spatial_perf/dynamic_bounds
+    ecs_entity_t *shapes = NULL;
+    ecs_world_t *world = bench_spatial_dynamic_world(100000, &shapes);
+    int32_t i, f;
+    for (f = 0; f < 30; f ++) {
+        for (i = 0; i < 100000; i += 100) {
+            ecs_get_mut(world, shapes[i], Position)->x += 0.1f;
+        }
+
+        ecs_progress(world, 0);
+    }
+
+    box_spatial_update(world);
+    bench_set_items(b, BENCH_QUERIES);
+    int32_t count = bench_spatial_overlap_100k(b, world);
+    bench_counter(b, "results_per_query", (double)count / BENCH_QUERIES);
+    ecs_os_free(shapes);
+    ecs_fini(world);
+}
+
 /** Create a world with static and dynamic shapes that do not move and run its first frames.
  *
  * @param count Shapes of the world, a tenth of them dynamic

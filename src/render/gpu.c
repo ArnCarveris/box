@@ -381,6 +381,7 @@ static void box_gpu_render(
 {
     box_gpu_t *gpu = ctx;
     int32_t i, count = ecs_vec_count(&packet->resources);
+    box_gpu_shader_deliver(gpu);
     for (i = 0; i < count; i ++) {
         const box_render_resource_t *r = ecs_vec_get_t(
             &packet->resources, box_render_resource_t, i);
@@ -418,7 +419,7 @@ static void box_gpu_render(
         }
     }
 
-    box_gpu_texture_mips(gpu);
+    box_gpu_texture_mips(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
@@ -679,6 +680,22 @@ bool box_render_gpu_stats(
     return result;
 }
 
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->delivery = delivery;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
 bool box_render_gpu_shader_result(
     ecs_world_t *world,
     box_render_shader_result_t *result)
@@ -716,6 +733,16 @@ bool box_render_gpu_stats(
 {
     (void)world;
     ecs_os_memset_t(stats, 0, box_render_gpu_stats_t);
+
+    return false;
+}
+
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery)
+{
+    (void)world;
+    (void)delivery;
 
     return false;
 }

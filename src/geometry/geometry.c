@@ -90,10 +90,48 @@ static void box_shape_mesh_move(
     }
 }
 
+/** Resolve the shape values of an event to meshes, taking a reference to each.
+ *
+ * Entities that inherit the shape take the mesh their source resolved. The source's own OnSet
+ * runs before the event propagates to its instances, so an inherited shape such as a Mesh3 is
+ * keyed once per prefab instead of once per instance.
+ *
+ * @param it The iterator
+ * @param shape The shape
+ * @param resolved The resolved values, one per entity
+ */
+static void box_shape_resolve(
+    ecs_iter_t *it,
+    const box_shape_t *shape,
+    ShapeMesh *resolved)
+{
+    const void *values = ecs_field_w_size(it, (size_t)shape->size, 0);
+    bool self = ecs_field_is_self(it, 0);
+    const ShapeMesh *shared = NULL;
+    if (!self) {
+        shared = ecs_get(it->world, ecs_field_src(it, 0), ShapeMesh);
+    }
+
+    for (int32_t i = 0; i < it->count; i ++) {
+        if (shared && shared->mesh) {
+            box_mesh_cache_keep(shape->cache, shared->mesh);
+            resolved[i] = *shared;
+        } else {
+            const void *value = ECS_ELEM(values, shape->size, self ? i : 0);
+            resolved[i].mesh = box_mesh_cache_acquire(shape->cache, shape, value);
+            glm_vec3_one(resolved[i].scale);
+            if (shape->desc.scale) {
+                shape->desc.scale(value, resolved[i].scale);
+            }
+        }
+    }
+}
+
 /** Resolve set shape values to a cached mesh and an instance scale.
  *
  * ShapeMesh comes with the shape through the With trait, so the value is written in place
- * without moving the entity, which also holds while the entity is being instantiated.
+ * without moving the entity, which also holds while the entity is being instantiated. An
+ * inherited value that resolves to the ShapeMesh the instance already has is left alone.
  *
  * @param it The iterator
  */
@@ -101,23 +139,18 @@ static void box_shape_on_set(
     ecs_iter_t *it)
 {
     const box_shape_t *shape = it->ctx;
-    const void *values = ecs_field_w_size(it, (size_t)shape->size, 0);
     bool self = ecs_field_is_self(it, 0);
     int32_t count = it->count;
     ShapeMesh *resolved = ecs_os_malloc_n(ShapeMesh, count);
     ecs_entity_t *entities = ecs_os_memdup_n(it->entities, ecs_entity_t, count);
-    for (int32_t i = 0; i < count; i ++) {
-        const void *value = ECS_ELEM(values, shape->size, self ? i : 0);
-        resolved[i].mesh = box_mesh_cache_acquire(shape->cache, shape, value);
-        glm_vec3_one(resolved[i].scale);
-        if (shape->desc.scale) {
-            shape->desc.scale(value, resolved[i].scale);
-        }
-    }
-
+    box_shape_resolve(it, shape, resolved);
     for (int32_t i = 0; i < count; i ++) {
         ShapeMesh *dst = ecs_get_mut(it->world, entities[i], ShapeMesh);
-        if (dst) {
+        bool same = dst && !self && dst->mesh == resolved[i].mesh &&
+            glm_vec3_eqv(dst->scale, resolved[i].scale);
+        if (same) {
+            box_mesh_cache_release(shape->cache, resolved[i].mesh);
+        } else if (dst) {
             box_mesh_cache_release(shape->cache, dst->mesh);
             *dst = resolved[i];
             ecs_modified(it->stage, entities[i], ShapeMesh);
@@ -131,16 +164,87 @@ static void box_shape_on_set(
     ecs_os_free(entities);
 }
 
-/** Remove the resolved mesh when the shape is removed from a live entity.
+/** Drop the resolved mesh of an entity.
+ *
+ * Flecs forbids adding or removing a copied component such as ShapeMesh on a prefab once it has
+ * instances, so a prefab keeps ShapeMesh without a mesh; other entities lose ShapeMesh.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param table The table of the entity
+ * @param e The entity
+ */
+static void box_shape_drop(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    const ecs_table_t *table,
+    ecs_entity_t e)
+{
+    ShapeMesh *dst = NULL;
+    if (ecs_table_has_id(world, table, EcsPrefab)) {
+        dst = ecs_get_mut(world, e, ShapeMesh);
+    } else {
+        ecs_remove(stage, e, ShapeMesh);
+    }
+
+    if (dst) {
+        box_mesh_cache_release(shape->cache, dst->mesh);
+        dst->mesh = 0;
+        glm_vec3_one(dst->scale);
+    }
+}
+
+/** Drop the resolved mesh of the instances that inherit a shape their base no longer has.
+ *
+ * Flecs reports the removal to these instances without a destination table, the same way it
+ * reports the deletion of an instance, so the base walks its instances instead.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param base The base that lost the shape
+ */
+static void box_shape_drop_instances(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    ecs_entity_t base)
+{
+    ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, base));
+    while (ecs_each_next(&it)) {
+        bool owned = ecs_table_has_id(world, it.table, shape->desc.component);
+        for (int32_t i = 0; !owned && i < it.count; i ++) {
+            box_shape_drop(world, stage, shape, it.table, it.entities[i]);
+            box_shape_drop_instances(world, stage, shape, it.entities[i]);
+        }
+    }
+}
+
+/** Remove the resolved mesh when a live entity loses the shape.
+ *
+ * Only an inherited shape (Mesh3) stays reachable through IsA: an instance that removes its own
+ * value keeps the prefab's, which the OnSet flecs then emits resolves. A copied shape is gone.
+ *
+ * An entity that loses an inherited shape also drops it from the instances that inherit it.
  *
  * @param it The iterator
  */
 static void box_shape_on_remove(
     ecs_iter_t *it)
 {
-    if (it->other_table && ecs_table_get_type(it->other_table)->count) {
-        for (int32_t i = 0; i < it->count; i ++) {
-            ecs_remove(it->stage, it->entities[i], ShapeMesh);
+    const box_shape_t *shape = it->ctx;
+    ecs_entity_t component = shape->desc.component;
+    bool live = it->other_table && ecs_table_get_type(it->other_table)->count;
+    bool inherited = ecs_has_pair(it->world, component, EcsOnInstantiate, EcsInherit);
+    bool kept = live && inherited && ecs_search_relation(it->world, it->other_table, 0,
+        component, EcsIsA, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+    bool self = ecs_field_is_self(it, 0);
+    for (int32_t i = 0; live && !kept && i < it->count; i ++) {
+        box_shape_drop(it->world, it->stage, shape, it->table, it->entities[i]);
+        if (inherited && self) {
+            box_shape_drop_instances(it->world, it->stage, shape, it->entities[i]);
         }
     }
 }
@@ -179,12 +283,14 @@ int box_shape_register(
     ecs_add_pair(world, desc->component, EcsWith, ecs_id(ShapeMesh));
     ecs_observer(world, {
         .query.terms = {{ .id = desc->component }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnSet },
         .callback = box_shape_on_set,
         .ctx = shape
     });
     ecs_observer(world, {
         .query.terms = {{ .id = desc->component }},
+        .query.flags = EcsQueryMatchPrefab | EcsQueryMatchDisabled,
         .events = { EcsOnRemove },
         .callback = box_shape_on_remove,
         .ctx = shape
@@ -201,6 +307,7 @@ void BoxGeometryImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Mesh3);
+    ecs_add_pair(world, ecs_id(Mesh3), EcsOnInstantiate, EcsInherit);
     box_owned_hooks(world, Mesh3,
         BOX_OWNED_VEC(Mesh3, vertices, vec3),
         BOX_OWNED_VEC(Mesh3, normals, vec3),
