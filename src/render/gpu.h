@@ -580,7 +580,8 @@ void box_gpu_texture_fini(
  * @param gpu The backend
  * @param op What happens to the texture
  * @param handle Handle of the texture
- * @param desc Size followed by the pixels, NULL for a release
+ * @param desc Size followed by the pixels, a box_render_texture_region_t for an update, NULL
+ * for a release
  */
 void box_gpu_texture_apply(
     box_gpu_t *gpu,

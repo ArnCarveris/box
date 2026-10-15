@@ -77,7 +77,8 @@ typedef struct box_text_page_t {
     int32_t pen_x;      /**< Column the next glyph of the shelf goes at */
     int32_t pen_y;      /**< Row of the shelf being filled */
     int32_t shelf;      /**< Height of the shelf being filled */
-    bool dirty;         /**< The backend does not have the current pixels */
+    int32_t sent;       /**< Size of the page the backend has, 0 before the first upload */
+    int32_t dirty[4];   /**< Area the backend does not have: left, top, right, bottom */
 } box_text_page_t;
 
 /** Where the field of a glyph is in the atlas of its font */

@@ -270,6 +270,21 @@ typedef struct box_render_texture_desc_t {
     uint32_t height;        /**< Height in pixels */
 } box_render_texture_desc_t;
 
+/** Description of a BOX_RENDER_TEXTURE update, followed by the RGBA8 pixels of its region row
+ * by row.
+ *
+ * An update writes a region of a texture that has one mip level, such as a page of a glyph
+ * atlas. When the handle has no texture of the given size, the backend first creates one that is
+ * cleared to zero.
+ */
+typedef struct box_render_texture_region_t {
+    box_render_texture_desc_t texture; /**< Width and height of the whole texture */
+    uint32_t x;             /**< Left column of the region */
+    uint32_t y;             /**< Top row of the region, 0 at the top of the image */
+    uint32_t width;         /**< Columns of the region */
+    uint32_t height;        /**< Rows of the region */
+} box_render_texture_region_t;
+
 /** Coefficients of an L2 spherical harmonic: one for band 0, three for 1 and five for 2 */
 #define BOX_RENDER_SH_COEFFICIENTS (9)
 

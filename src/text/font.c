@@ -557,13 +557,13 @@ static box_text_page_t* box_text_page_new(
     page->handle = s->next_page ++;
     page->size = BOX_TEXT_PAGE_MIN;
     page->pixels = ecs_os_calloc(page->size * page->size * 4);
-    page->dirty = true;
     *ecs_vec_append_t(NULL, &font->pages, box_text_page_t*) = page;
 
     return page;
 }
 
-/** Double the size of a page, keeping every glyph on its row and column.
+/** Double the size of a page, keeping every glyph on its row and column. The backend receives
+ * a grown page whole.
  *
  * @param page The page
  */
@@ -580,7 +580,6 @@ static void box_text_page_grow(
     ecs_os_free(page->pixels);
     page->pixels = pixels;
     page->size = size;
-    page->dirty = true;
 }
 
 /** Find room for an area on the shelves of a page.
@@ -831,7 +830,18 @@ static void box_text_glyph_complete(
         glyph->ready = true;
     }
 
-    page->dirty = true;
+    if (page->dirty[2] <= page->dirty[0]) {
+        page->dirty[0] = a->x;
+        page->dirty[1] = a->y;
+        page->dirty[2] = a->x + a->width;
+        page->dirty[3] = a->y + a->height;
+    } else {
+        page->dirty[0] = glm_imin(page->dirty[0], a->x);
+        page->dirty[1] = glm_imin(page->dirty[1], a->y);
+        page->dirty[2] = glm_imax(page->dirty[2], a->x + a->width);
+        page->dirty[3] = glm_imax(page->dirty[3], a->y + a->height);
+    }
+
 done:
     return;
 }

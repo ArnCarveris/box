@@ -225,12 +225,101 @@ void box_gpu_texture_fini(
     }
 }
 
+/** Create a texture with one mip level and no pixels, which the backend clears to zero.
+ *
+ * @param gpu The backend
+ * @param width Width in pixels
+ * @param height Height in pixels
+ * @return The texture
+ */
+static box_gpu_texture_t* box_gpu_texture_single(
+    box_gpu_t *gpu,
+    uint32_t width,
+    uint32_t height)
+{
+    box_gpu_texture_t *result = ecs_os_calloc_t(box_gpu_texture_t);
+    WGPUTextureFormat srgb = BOX_GPU_TEXTURE_SRGB;
+    WGPUTextureDescriptor desc = {
+        .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_2D,
+        .size = { width, height, 1 },
+        .format = BOX_GPU_TEXTURE_FORMAT,
+        .mipLevelCount = 1,
+        .sampleCount = 1,
+        .viewFormatCount = 1,
+        .viewFormats = &srgb
+    };
+    result->mips = 1;
+    result->mipped = true;
+    result->texture = wgpuDeviceCreateTexture(gpu->device, &desc);
+    result->linear = box_gpu_texture_view(result->texture, BOX_GPU_TEXTURE_FORMAT, 0, 1);
+    result->srgb = box_gpu_texture_view(result->texture, srgb, 0, 1);
+
+    return result;
+}
+
+/** Write a region of a texture with one mip level, creating the texture when the handle has none
+ * of the size of the update.
+ *
+ * @param gpu The backend
+ * @param handle Handle of the texture
+ * @param region The region, followed by its pixels
+ */
+static void box_gpu_texture_update(
+    box_gpu_t *gpu,
+    uint32_t handle,
+    const box_render_texture_region_t *region)
+{
+    box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
+    uint32_t width = region->texture.width, height = region->texture.height;
+    if (!width || !height || !region->width || !region->height ||
+        region->x + region->width > width || region->y + region->height > height)
+    {
+        goto done;
+    }
+
+    if (tex && (tex->mips != 1 || wgpuTextureGetWidth(tex->texture) != width ||
+        wgpuTextureGetHeight(tex->texture) != height))
+    {
+        box_gpu_materials_clear(gpu);
+        ecs_map_remove(&gpu->textures, handle);
+        box_gpu_texture_free(tex);
+        tex = NULL;
+    }
+
+    if (!tex) {
+        box_gpu_materials_clear(gpu);
+        tex = box_gpu_texture_single(gpu, width, height);
+        ecs_map_insert_ptr(&gpu->textures, handle, tex);
+    }
+
+    WGPUTexelCopyTextureInfo dst = {
+        .texture = tex->texture,
+        .origin = { region->x, region->y, 0 },
+        .aspect = WGPUTextureAspect_All
+    };
+    WGPUTexelCopyBufferLayout layout = {
+        .bytesPerRow = region->width * 4,
+        .rowsPerImage = region->height
+    };
+    WGPUExtent3D extent = { region->width, region->height, 1 };
+    wgpuQueueWriteTexture(gpu->queue, &dst, region + 1,
+        (size_t)region->width * region->height * 4, &layout, &extent);
+done:
+    return;
+}
+
 void box_gpu_texture_apply(
     box_gpu_t *gpu,
     box_render_resource_op_t op,
     uint32_t handle,
     const box_render_texture_desc_t *desc)
 {
+    if (op == BOX_RENDER_UPDATE && desc) {
+        box_gpu_texture_update(gpu, handle, (const box_render_texture_region_t*)desc);
+        goto done;
+    }
+
     box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
     box_gpu_mip_space_t space = BOX_GPU_MIP_UNKNOWN;
     box_gpu_materials_clear(gpu);

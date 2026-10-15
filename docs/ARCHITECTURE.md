@@ -431,7 +431,9 @@ level narrow phase and no picking.
 **Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
-page. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+page. A page reaches the backend as `BOX_RENDER_UPDATE` texture regions into a texture with one mip
+level: whole when it is new or grew, then once per frame the area that covers the glyphs completed
+since the last frame (`wgpuQueueWriteTexture`). Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
 combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
 (`src/text/msdf_correct.c`, edge priority with the distance checked at edges). Font data is untrusted: a face without units per em fails to load, and a glyph whose box
 is larger than a page (1024 minus spacing) is drawn as the missing glyph with one warning per
