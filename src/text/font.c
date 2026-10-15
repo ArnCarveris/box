@@ -159,6 +159,12 @@ static void box_text_load_work(
     }
 
     face->units = 1.0f / stbtt_ScaleForMappingEmToPixels(&face->info, 1.0f);
+    if (!isfinite(face->units) || face->units <= 0) {
+        job->error = flecs_asprintf("box.text: font '%s' has no units per em", resolved);
+        box_text_face_release(face);
+        goto done;
+    }
+
     job->face = face;
 done:
     ecs_os_free(resolved);
@@ -232,6 +238,7 @@ static void box_text_load_complete(
     font->face = job->face;
     job->face = NULL;
     font->relayout = true;
+    font->oversized = false;
     box_text_status(world, job->font, FontReady, revision + 1, NULL);
     box_text_relayout(world, s, false);
 done:
@@ -463,18 +470,21 @@ done:
  *
  * @param s The registry
  * @param font The font
- * @param area The area, receives its page, column and row
+ * @param area The area, at most BOX_TEXT_PAGE_MAX - BOX_TEXT_SPACING on a side; receives its
+ * page, column and row
+ * @return Whether the area was placed within BOX_TEXT_PLACE_TRIES passes
  */
-static void box_text_atlas_place(
+static bool box_text_atlas_place(
     box_text_state_t *s,
     box_text_font_t *font,
     box_text_atlas_glyph_t *area)
 {
-    int32_t count = ecs_vec_count(&font->pages);
+    int32_t count = ecs_vec_count(&font->pages), tries = 0;
     box_text_page_t *page = count
         ? *ecs_vec_get_t(&font->pages, box_text_page_t*, count - 1)
         : box_text_page_new(s, font);
-    while (!box_text_page_fit(page, area)) {
+    bool result = false;
+    while (!(result = box_text_page_fit(page, area)) && tries ++ < BOX_TEXT_PLACE_TRIES) {
         if (page->size < BOX_TEXT_PAGE_MAX) {
             box_text_page_grow(page);
             font->relayout = true;
@@ -483,7 +493,28 @@ static void box_text_atlas_place(
         }
     }
 
-    area->page = ecs_vec_count(&font->pages) - 1;
+    area->page = result ? ecs_vec_count(&font->pages) - 1 : -1;
+
+    return result;
+}
+
+/** Log once per load of a font that a glyph does not fit an atlas page.
+ *
+ * @param world The world
+ * @param font The font
+ * @param glyph The glyph index
+ */
+static void box_text_oversized(
+    ecs_world_t *world,
+    box_text_font_t *font,
+    int32_t glyph)
+{
+    const Font *f = ecs_is_alive(world, font->entity) ? ecs_get(world, font->entity, Font) : NULL;
+    if (!font->oversized) {
+        ecs_warn("box.text: glyph %d of font '%s' is larger than an atlas page, it is drawn "
+            "as the missing glyph", glyph, f && f->path ? f->path : "");
+        font->oversized = true;
+    }
 }
 
 /** Generate the field of a glyph from its outline, on a worker thread.
@@ -639,12 +670,32 @@ const box_text_atlas_glyph_t* box_text_font_glyph(
     }
 
     float scale = (float)BOX_TEXT_EM / font->face->units;
-    result->left = (int32_t)floorf((float)x0 * scale) - BOX_TEXT_PAD;
-    result->top = (int32_t)floorf(-(float)y1 * scale) - BOX_TEXT_PAD;
-    result->width = (int32_t)ceilf((float)x1 * scale) + BOX_TEXT_PAD - result->left;
-    result->height = (int32_t)ceilf(-(float)y0 * scale) + BOX_TEXT_PAD - result->top;
-    box_text_atlas_place(s, font, result);
+    float left = floorf((float)x0 * scale) - BOX_TEXT_PAD;
+    float top = floorf(-(float)y1 * scale) - BOX_TEXT_PAD;
+    float width = ceilf((float)x1 * scale) + BOX_TEXT_PAD - left;
+    float height = ceilf(-(float)y0 * scale) + BOX_TEXT_PAD - top;
+    float limit = (float)(BOX_TEXT_PAGE_MAX - BOX_TEXT_SPACING);
+    if (!(width <= limit && height <= limit)) {
+        goto oversized;
+    }
+
+    result->left = (int32_t)left;
+    result->top = (int32_t)top;
+    result->width = (int32_t)width;
+    result->height = (int32_t)height;
+    if (!box_text_atlas_place(s, font, result)) {
+        goto oversized;
+    }
+
     box_text_glyph_submit(world, s, font, glyph, result);
+    goto done;
+oversized:
+    box_text_oversized(world, font, glyph);
+    *result = (box_text_atlas_glyph_t){ .page = -1 };
+    if (glyph) {
+        *result = *box_text_font_glyph(world, s, font, 0);
+    }
+
 done:
     return result;
 }
