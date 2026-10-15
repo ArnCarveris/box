@@ -275,20 +275,30 @@ Key box_input_dom_button(
 
 /** Decode a key value that is one printable character.
  *
+ * The bytes must be the well formed encoding of that character: an ill formed key types
+ * nothing, while a key that is U+FFFD itself types it.
+ *
  * @param key The UTF-8 KeyboardEvent.key value
- * @return The code point, 0 when the value names a key such as Enter or is not printable
+ * @return The code point, 0 when the value names a key such as Enter, is not printable or is
+ * ill formed
  */
 static int32_t box_input_dom_char(
     const char *key)
 {
     const char *rest = key;
-    int32_t result = 0;
+    char encoded[4];
+    int32_t result = 0, size;
     if (!key || !key[0]) {
         goto done;
     }
 
     result = box_utf8_next(&rest);
-    if (rest[0] || result < 0x20 || result == 0x7f) {
+    size = box_utf8_encode(result, encoded);
+    if (rest[0] || (int32_t)(rest - key) != size || memcmp(key, encoded, (size_t)size)) {
+        result = 0;
+    }
+
+    if (result < 0x20 || result == 0x7f) {
         result = 0;
     }
 

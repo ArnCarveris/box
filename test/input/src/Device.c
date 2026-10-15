@@ -1125,18 +1125,21 @@ void Device_text_replaced_from_outside(void) {
 
 void Device_key_type_ill_formed(void) {
     // input_fixes/input_utf8
-    const char *typed[5] = {
-        "\xC0\xAF", "\xE0\x80\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "\xE2\x82x"
+    const char *typed[7] = {
+        "\xC0\xAF", "\xE0\x80\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "\xE2\x82x",
+        "\xF0\x9F\x98", "a\xF4"
     };
-    const int32_t chars[5] = { 2, 3, 3, 4, 2 };
-    const char *expect[5] = {
+    const int32_t chars[7] = { 2, 3, 3, 4, 2, 1, 2 };
+    const char *expect[7] = {
         "\xEF\xBF\xBD\xEF\xBF\xBD",
         "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
         "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
         "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
-        "\xEF\xBF\xBDx"
+        "\xEF\xBF\xBDx",
+        "\xEF\xBF\xBD",
+        "a\xEF\xBF\xBD"
     };
-    for (int32_t t = 0; t < 5; t ++) {
+    for (int32_t t = 0; t < 7; t ++) {
         ecs_world_t *world = ecs_init();
         ECS_IMPORT(world, Box);
         char text[64] = {0};
