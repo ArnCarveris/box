@@ -439,7 +439,10 @@ outside the file fails to load. Before stb_truetype reads an outline, box walks 
 components of the glyph in the `glyf` table without recursion: more than 16 composite levels
 above a simple glyph (any cycle), more than 256 references in total, matching point offsets or
 records past the end of `glyf` draw the glyph as the missing glyph, again with one warning per
-font load. Layout handles UTF-8, kerning, newlines, word breaks and alignment; the block is centered
+font load. Layout decodes UTF-8 per the Unicode standard: every maximal subpart of an ill formed
+sequence (stray or truncated bytes, overlong forms, surrogates, code points above U+10FFFF)
+reads as one U+FFFD, which B612 draws as its missing glyph. Layout handles kerning, newlines,
+word breaks and alignment; the block is centered
 on the origin and measured into `TextBounds`. Glyphs are slots of the 2D batches keyed by atlas
 page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures, RTL).
 

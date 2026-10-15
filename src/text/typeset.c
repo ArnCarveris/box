@@ -12,6 +12,9 @@
 /** Logical pixels a line may pass its width by, so a block wraps at its own measured width */
 #define BOX_TEXT_WRAP_SLACK (0.001f)
 
+/** Code point an ill formed UTF-8 sequence reads as, U+FFFD REPLACEMENT CHARACTER */
+#define BOX_TEXT_REPLACEMENT (0xFFFD)
+
 /** State of the layout of one string */
 typedef struct box_text_run_t {
     box_text_state_t *s;    /**< The registry, its placed and lines vectors are filled */
@@ -30,38 +33,51 @@ typedef struct box_text_run_t {
 
 /** Read the code point of a UTF-8 sequence and move past it.
  *
- * A byte that starts no valid sequence is read as itself.
+ * Decodes per table 3-7 of the Unicode standard, as the WHATWG Encoding decoder does: overlong
+ * forms, surrogates and code points above U+10FFFF are ill formed.
  *
- * @param str The string, advanced past the sequence
- * @return The code point
+ * Each maximal subpart of an ill formed sequence reads as one U+FFFD and the next sequence
+ * starts at the byte that broke it, so a terminating zero is never passed.
+ *
+ * @param str The string, advanced past the sequence or the maximal subpart
+ * @return The code point, U+FFFD for an ill formed sequence
  */
 static int32_t box_text_utf8(
     const char **str)
 {
     const uint8_t *p = (const uint8_t*)*str;
-    int32_t result = p[0], extra = 0, i;
-    if (result >= 0xF0) {
-        result &= 0x07;
-        extra = 3;
-    } else if (result >= 0xE0) {
-        result &= 0x0F;
-        extra = 2;
-    } else if (result >= 0xC0) {
-        result &= 0x1F;
+    int32_t result = p[0], extra = 0, length = 1, i;
+    uint8_t lower = 0x80, upper = 0xBF;
+    if (p[0] >= 0xC2 && p[0] <= 0xDF) {
+        result = p[0] & 0x1F;
         extra = 1;
+    } else if (p[0] >= 0xE0 && p[0] <= 0xEF) {
+        result = p[0] & 0x0F;
+        extra = 2;
+        lower = p[0] == 0xE0 ? 0xA0 : 0x80;
+        upper = p[0] == 0xED ? 0x9F : 0xBF;
+    } else if (p[0] >= 0xF0 && p[0] <= 0xF4) {
+        result = p[0] & 0x07;
+        extra = 3;
+        lower = p[0] == 0xF0 ? 0x90 : 0x80;
+        upper = p[0] == 0xF4 ? 0x8F : 0xBF;
+    } else if (p[0] >= 0x80) {
+        result = BOX_TEXT_REPLACEMENT;
     }
 
     for (i = 1; i <= extra; i ++) {
-        if ((p[i] & 0xC0) != 0x80) {
-            result = p[0];
-            extra = 0;
+        if (p[i] < lower || p[i] > upper) {
+            result = BOX_TEXT_REPLACEMENT;
             break;
         }
 
         result = (result << 6) | (p[i] & 0x3F);
+        lower = 0x80;
+        upper = 0xBF;
+        length = i + 1;
     }
 
-    *str = (const char*)(p + extra + 1);
+    *str = (const char*)(p + length);
 
     return result;
 }
