@@ -529,6 +529,14 @@
                 "testcases": [
                     "older_frame_never_replaces_newer"
                 ]
+            },
+            {
+                "id": "OrthoPlanes",
+                "testcases": [
+                    "inverted_planes_draw_nothing",
+                    "equal_planes_projection_is_finite",
+                    "valid_planes_after_invalid_draw"
+                ]
             }
         ]
     }

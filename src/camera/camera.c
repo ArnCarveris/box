@@ -30,7 +30,28 @@ static void box_camera_ctor(
     }
 }
 
+/** Warn when an orthographic camera is set with a far plane that is not beyond its near plane.
+ *
+ * @param it The iterator of the hook
+ */
+static void box_camera_on_set(
+    ecs_iter_t *it)
+{
+    const Camera *cameras = ecs_field(it, Camera, 0);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (cameras[i].ortho && cameras[i].far_ <= cameras[i].near_) {
+            ecs_warn("orthographic camera '%s' has far %g not beyond near %g, it draws nothing",
+                ecs_get_name(it->world, it->entities[i]), (double)cameras[i].far_,
+                (double)cameras[i].near_);
+        }
+    }
+}
+
 /** Build a reversed Z orthographic projection.
+ *
+ * A far plane that is not beyond the near plane leaves an empty depth range: every point
+ * gets a depth below 0 and is clipped.
  *
  * @param camera The camera
  * @param aspect Width over height
@@ -53,9 +74,13 @@ static void box_camera_ortho(
     glm_mat4_zero(out);
     out[0][0] = 2.0f / (visible * aspect);
     out[1][1] = 2.0f / visible;
-    out[2][2] = 1.0f / (f - n);
-    out[3][2] = f / (f - n);
     out[3][3] = 1.0f;
+    if (f > n) {
+        out[2][2] = 1.0f / (f - n);
+        out[3][2] = f / (f - n);
+    } else {
+        out[3][2] = -1.0f;
+    }
 }
 
 /** Build a reversed Z perspective projection.
@@ -109,5 +134,5 @@ void BoxCameraImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Camera);
-    ecs_set_hooks(world, Camera, { .ctor = box_camera_ctor });
+    ecs_set_hooks(world, Camera, { .ctor = box_camera_ctor, .on_set = box_camera_on_set });
 }

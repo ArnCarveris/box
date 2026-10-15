@@ -37,7 +37,8 @@ extern "C" {
 ECS_STRUCT(Camera, {
     float fov;           /**< Vertical field of view in degrees, default 60 */
     float near_;         /**< Near plane distance, default 0.1 */
-    float far_;          /**< Far plane distance, default 1000, 0 has none in perspective */
+    float far_;          /**< Far plane distance, default 1000, 0 has none in perspective;
+                          *   an orthographic camera with far <= near draws nothing */
     float aspect_ratio;  /**< Width over height, 0 follows the surface */
     bool ortho;          /**< Use an orthographic projection */
     float ortho_height;  /**< Visible height in world units when orthographic, default 10 */
