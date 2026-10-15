@@ -242,23 +242,7 @@ static void box_input_text(
     int32_t code)
 {
     char utf8[4];
-    int32_t size = 0;
-    if (code < 0x80) {
-        utf8[size ++] = (char)code;
-    } else if (code < 0x800) {
-        utf8[size ++] = (char)(0xc0 | (code >> 6));
-        utf8[size ++] = (char)(0x80 | (code & 0x3f));
-    } else if (code < 0x10000) {
-        utf8[size ++] = (char)(0xe0 | (code >> 12));
-        utf8[size ++] = (char)(0x80 | ((code >> 6) & 0x3f));
-        utf8[size ++] = (char)(0x80 | (code & 0x3f));
-    } else {
-        utf8[size ++] = (char)(0xf0 | (code >> 18));
-        utf8[size ++] = (char)(0x80 | ((code >> 12) & 0x3f));
-        utf8[size ++] = (char)(0x80 | ((code >> 6) & 0x3f));
-        utf8[size ++] = (char)(0x80 | (code & 0x3f));
-    }
-
+    int32_t size = box_utf8_encode(code, utf8);
     if (code > 0) {
         memcpy(ecs_vec_grow_t(NULL, &dev->text, char, size), utf8, (size_t)size);
     }

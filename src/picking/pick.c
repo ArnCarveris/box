@@ -334,7 +334,7 @@ static const box_bvh_t* box_pick_mesh_tree(
         result = ecs_os_calloc_t(box_pick_mesh_t);
         result->handle = handle;
         box_bvh_init(&result->tree);
-        box_mesh_cache_keep(cache, handle);
+        box_mesh_cache_hold(cache, handle);
         ecs_map_insert_ptr(&st->meshes, handle, result);
         result->building = !box_job_submit(ECS_CONST_CAST(ecs_world_t*, world),
             &(box_job_desc_t){ .work = box_pick_build_work,
@@ -494,7 +494,7 @@ void box_pick_meshes_prune(
     int32_t i, count = 0;
     while (cache && count < 64 && ecs_map_next(&it)) {
         box_pick_mesh_t *pm = ecs_map_ptr(&it);
-        pm->idle = box_mesh_cache_refs(cache, pm->handle) <= 1 ? pm->idle + 1 : 0;
+        pm->idle = box_mesh_cache_users(cache, pm->handle) ? 0 : pm->idle + 1;
         if (!pm->building && pm->idle > BOX_PICK_MESH_IDLE) {
             drop[count ++] = pm->handle;
         }
@@ -503,7 +503,7 @@ void box_pick_meshes_prune(
     for (i = 0; i < count; i ++) {
         box_pick_mesh_t *pm = ecs_map_get_deref(&st->meshes, box_pick_mesh_t, drop[i]);
         ecs_map_remove(&st->meshes, drop[i]);
-        box_mesh_cache_release(cache, pm->handle);
+        box_mesh_cache_unhold(cache, pm->handle);
         box_bvh_fini(&pm->tree);
         ecs_os_free(pm);
     }

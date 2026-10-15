@@ -311,6 +311,7 @@ void box_gpu_capture_flush(
     }
 #endif
 
+    box_gpu_stats_publish(gpu);
     ecs_os_mutex_lock(gpu->lock);
     if (!ecs_vec_count(&gpu->captures)) {
         ecs_vec_fini_t(NULL, &gpu->captures, box_gpu_capture_t*);

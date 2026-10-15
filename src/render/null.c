@@ -32,7 +32,8 @@ static void box_render_null_check_thread(
     }
 }
 
-/** Record a packet.
+/** Record a packet and keep a copy of it; the reset before the copy shrinks a large data block
+ * of the copy with the same hysteresis as the packets of the ring.
  *
  * @param ctx The null backend
  * @param packet The packet
@@ -62,6 +63,7 @@ static void box_render_null_render(
         null->bytes += ecs_vec_get_t(&packet->uploads, box_render_upload_t, i)->size;
     }
 
+    box_render_packet_reset(&null->last);
     box_render_packet_copy(&null->last, packet);
 }
 

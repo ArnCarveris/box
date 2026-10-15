@@ -34,12 +34,14 @@
                     "missing_view_hidden",
                     "deleted_target_hidden",
                     "from_script",
-                    "drawn_at_projection"
+                    "drawn_at_projection",
+                    "transformed_once_per_frame"
                 ]
             },
             {
                 "id": "Spatial",
                 "testcases": [
+                    "delete_dynamic_hierarchy",
                     "insert",
                     "insert_rotated_scaled",
                     "insert_child",

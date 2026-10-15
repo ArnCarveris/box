@@ -30,7 +30,42 @@ static void box_camera_ctor(
     }
 }
 
+bool box_camera_has_depth(
+    const Camera *camera)
+{
+    bool result;
+    if (camera->ortho) {
+        result = camera->far_ > camera->near_;
+    } else {
+        result = camera->near_ > 0 && (camera->far_ == 0 || camera->far_ > camera->near_);
+    }
+
+    return result;
+}
+
+/** Warn when a camera is set with planes that leave no depth range.
+ *
+ * @param it The iterator of the hook
+ */
+static void box_camera_on_set(
+    ecs_iter_t *it)
+{
+    const Camera *cameras = ecs_field(it, Camera, 0);
+    int32_t i;
+    for (i = 0; i < it->count; i ++) {
+        if (!box_camera_has_depth(&cameras[i])) {
+            char *path = ecs_get_path(it->world, it->entities[i]);
+            ecs_warn("camera '%s' has near %g and far %g, which leave no depth: it draws nothing",
+                path, (double)cameras[i].near_, (double)cameras[i].far_);
+            ecs_os_free(path);
+        }
+    }
+}
+
 /** Build a reversed Z orthographic projection.
+ *
+ * A far plane that is not beyond the near plane leaves an empty depth range: every point
+ * gets a depth below 0 and is clipped.
  *
  * @param camera The camera
  * @param aspect Width over height
@@ -53,9 +88,13 @@ static void box_camera_ortho(
     glm_mat4_zero(out);
     out[0][0] = 2.0f / (visible * aspect);
     out[1][1] = 2.0f / visible;
-    out[2][2] = 1.0f / (f - n);
-    out[3][2] = f / (f - n);
     out[3][3] = 1.0f;
+    if (f > n) {
+        out[2][2] = 1.0f / (f - n);
+        out[3][2] = f / (f - n);
+    } else {
+        out[3][2] = -1.0f;
+    }
 }
 
 /** Build a reversed Z perspective projection.
@@ -76,7 +115,9 @@ static void box_camera_perspective(
     out[0][0] = focal / aspect;
     out[1][1] = focal;
     out[2][3] = -1.0f;
-    if (camera->far_ > n) {
+    if (!box_camera_has_depth(camera)) {
+        out[3][2] = -1.0f;
+    } else if (camera->far_ > n) {
         out[2][2] = n / (camera->far_ - n);
         out[3][2] = n * camera->far_ / (camera->far_ - n);
     } else {
@@ -109,5 +150,5 @@ void BoxCameraImport(
     ECS_IMPORT(world, BoxTypes);
 
     ECS_META_COMPONENT(world, Camera);
-    ecs_set_hooks(world, Camera, { .ctor = box_camera_ctor });
+    ecs_set_hooks(world, Camera, { .ctor = box_camera_ctor, .on_set = box_camera_on_set });
 }

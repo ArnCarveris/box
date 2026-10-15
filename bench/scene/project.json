@@ -2,7 +2,7 @@
     "id": "bench_scene",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the spatial index of box.spatial with one million shapes",
+        "description": "Benchmarks for the spatial index of box.spatial with one million shapes and for ProjectedAnchor",
         "public": false,
         "use": [
             "box"
@@ -37,6 +37,12 @@
                     "update_dynamic_coincident_10k",
                     "idle_100k",
                     "idle_ray_100k"
+                ]
+            },
+            {
+                "id": "Projection",
+                "benchcases": [
+                    "anchors_1k_moving"
                 ]
             }
         ]

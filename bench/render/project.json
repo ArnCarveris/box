@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting and prefab instantiation of box.render",
+        "description": "Benchmarks for the packet data, the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes, the baked lighting and prefab instantiation of box.render",
         "public": false,
         "use": [
             "box"
@@ -16,6 +16,12 @@
     "bench": {
         "benchsuites": [
             {
+                "id": "Packet",
+                "benchcases": [
+                    "steady_20mb"
+                ]
+            },
+            {
                 "id": "Extract",
                 "benchcases": [
                     "unchanged",
@@ -28,7 +34,8 @@
                 "benchcases": [
                     "dynamic_material",
                     "blended_sort",
-                    "tint_subtree"
+                    "tint_subtree",
+                    "dynamic_material_dynamic_parents"
                 ]
             },
             {
@@ -73,7 +80,9 @@
                     "offscreen_100k_unculled",
                     "shadows_100k",
                     "occluded_city_100k",
-                    "occluded_city_100k_frustum_only"
+                    "occluded_city_100k_frustum_only",
+                    "many_batches_shadows",
+                    "town"
                 ]
             },
             {
@@ -119,6 +128,20 @@
                 "id": "Pipelines",
                 "benchcases": [
                     "state_combinations"
+                ]
+            },
+            {
+                "id": "Blended",
+                "benchcases": [
+                    "gpu_10k",
+                    "gpu_10k_lit_culled"
+                ]
+            },
+            {
+                "id": "LargeBatch",
+                "benchcases": [
+                    "instances_1m",
+                    "instances_1m5"
                 ]
             }
         ]

@@ -9,6 +9,27 @@
 #include <box.h>
 #include <bake_bench.h>
 #include "render.h"
+#ifdef __APPLE__
+#include <libproc.h>
+#include <unistd.h>
+#endif
+
+/** Get the instructions the process retired so far.
+ *
+ * @return The instructions, 0 where the platform does not count them
+ */
+static uint64_t bench_material_instructions(void)
+{
+    uint64_t result = 0;
+#ifdef __APPLE__
+    struct rusage_info_v4 info;
+    if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t*)&info)) {
+        result = info.ri_instructions;
+    }
+#endif
+
+    return result;
+}
 
 /** Static opaque shapes of the scene */
 #define BENCH_MATERIAL_STATIC (100000)
@@ -78,6 +99,8 @@ static void bench_material(
     ecs_progress(world, 0);
     ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
+    double frames = 0;
+    uint64_t start = bench_material_instructions();
     bench_set_items(b, BENCH_MATERIAL_SHAPES);
     while (bench_iter(b)) {
         x += 0.01f;
@@ -85,10 +108,13 @@ static void bench_material(
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
         bench_keep(stats.upload_bytes);
+        frames ++;
     }
 
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     box_render_sync(world);
+    bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
+    bench_counter(b, "frames", frames);
     ecs_fini(world);
 }
 
@@ -148,6 +174,8 @@ void Material_tint_subtree(
     ecs_progress(world, 0);
     box_render_draws_stats_t stats = {0};
     uint8_t strength = 0;
+    double frames = 0;
+    uint64_t start = bench_material_instructions();
     bench_set_items(b, BENCH_MATERIAL_SHAPES);
     while (bench_iter(b)) {
         strength ++;
@@ -155,9 +183,60 @@ void Material_tint_subtree(
         ecs_progress(world, 0);
         box_render_draws_stats(world, &stats);
         bench_keep(stats.processed);
+        frames ++;
     }
 
     bench_counter(b, "processed", (double)stats.processed);
+    bench_counter(b, "instructions", (double)(bench_material_instructions() - start));
+    bench_counter(b, "frames", frames);
+    bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
+    box_render_sync(world);
+    ecs_fini(world);
+}
+
+void Material_dynamic_material_dynamic_parents(
+    bench_t *b)
+{
+    // core_fixes/unspread_delete_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    box_render_backend_t backend = { .render = bench_material_drop };
+    box_render_set_backend(world, &backend);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
+    ecs_entity_t parent = 0;
+    int32_t i;
+    float x = 0;
+    for (i = 0; i < BENCH_MATERIAL_SHAPES; i ++) {
+        if (!(i % 100)) {
+            parent = ecs_new(world);
+            ecs_add(world, parent, DynamicTransform);
+            ecs_add(world, parent, DynamicMaterial);
+            ecs_set(world, parent, Position, {0, 2, (float)(i / 100)});
+        }
+
+        ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
+        ecs_set(world, e, Position, {(float)(i % 100), 0, 0});
+        ecs_set(world, e, Sphere, {.segments = 8, .radius = 0.25f});
+        ecs_set(world, e, Rgb, {50, 100, 200});
+        ecs_set(world, e, PbrMaterial, {.metallic = 0.5f, .roughness = 0.3f});
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_draws_stats_t stats = {0};
+    bench_set_items(b, BENCH_MATERIAL_SHAPES);
+    while (bench_iter(b)) {
+        x += 0.01f;
+        ecs_set(world, camera, Position, {x, 10, -20});
+        ecs_progress(world, 0);
+        box_render_draws_stats(world, &stats);
+        bench_keep(stats.upload_bytes);
+    }
+
     bench_counter(b, "upload_bytes", (double)stats.upload_bytes);
     box_render_sync(world);
     ecs_fini(world);

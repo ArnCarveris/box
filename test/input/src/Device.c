@@ -1122,3 +1122,50 @@ void Device_text_replaced_from_outside(void) {
 
     ecs_fini(world);
 }
+
+void Device_key_type_ill_formed(void) {
+    // input_fixes/input_utf8
+    const char *typed[7] = {
+        "\xC0\xAF", "\xE0\x80\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "\xE2\x82x",
+        "\xF0\x9F\x98", "a\xF4"
+    };
+    const int32_t chars[7] = { 2, 3, 3, 4, 2, 1, 2 };
+    const char *expect[7] = {
+        "\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD\xEF\xBF\xBD",
+        "\xEF\xBF\xBDx",
+        "\xEF\xBF\xBD",
+        "a\xEF\xBF\xBD"
+    };
+    for (int32_t t = 0; t < 7; t ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        char text[64] = {0};
+        test_int(box_input_key_type(world, typed[t], 1), chars[t]);
+        while (box_input_pending(world)) {
+            ecs_progress(world, 0);
+            const char *frame = ecs_singleton_get(world, Input)->text;
+            strncat(text, frame ? frame : "", sizeof(text) - strlen(text) - 1);
+        }
+
+        test_str(text, expect[t]);
+        ecs_fini(world);
+    }
+}
+
+void Device_text_invalid_code_point(void) {
+    // input_fixes/input_utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = 0xD800 });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = 0x110000 });
+    box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = 0x1F600 });
+    ecs_progress(world, 0);
+    test_str(ecs_singleton_get(world, Input)->text,
+        "\xEF\xBF\xBD\xEF\xBF\xBD\xF0\x9F\x98\x80");
+
+    ecs_fini(world);
+}

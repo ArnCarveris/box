@@ -183,7 +183,8 @@
                     "manual_parent_move_updates_children",
                     "manual_parent_moved_in_on_store",
                     "mesh3_prefab_instances",
-                    "mesh3_prefab_removed"
+                    "mesh3_prefab_removed",
+                    "dynamic_hierarchy_deleted"
                 ]
             },
             {
@@ -295,7 +296,8 @@
                     "no_bake_tag",
                     "cache_is_owned",
                     "view_baked_defaults",
-                    "scene_renders_identically"
+                    "scene_renders_identically",
+                    "projected_anchor_not_baked"
                 ]
             },
             {
@@ -506,6 +508,47 @@
                     "invalid_back_face_mode_keeps_states_apart",
                     "shader_reload_redraws_every_state",
                     "released_shader_draws_nothing"
+                ]
+            },
+            {
+                "id": "BlendedDraws",
+                "testcases": [
+                    "interleaved_batches_blend_back_to_front",
+                    "one_batch_is_few_draws",
+                    "interleaved_batches_one_draw_per_run",
+                    "long_run_blends_back_to_front"
+                ]
+            },
+            {
+                "id": "BatchChunks",
+                "testcases": [
+                    "instances_past_binding_limit_render",
+                    "shapes_across_batches_stay_drawn",
+                    "lowered_limits_render_like_defaults"
+                ]
+            },
+            {
+                "id": "CullReadback",
+                "testcases": [
+                    "older_frame_never_replaces_newer",
+                    "read_off_render_thread_aborts",
+                    "older_frame_after_a_take_is_ignored"
+                ]
+            },
+            {
+                "id": "OrthoPlanes",
+                "testcases": [
+                    "inverted_planes_draw_nothing",
+                    "equal_planes_projection_is_finite",
+                    "valid_planes_after_invalid_draw",
+                    "perspective_bad_planes_draw_nothing",
+                    "empty_depth_view_draws_no_instances"
+                ]
+            },
+            {
+                "id": "CullOrder",
+                "testcases": [
+                    "equal_depth_ties_render_identically"
                 ]
             }
         ]

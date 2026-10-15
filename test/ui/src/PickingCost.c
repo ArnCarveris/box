@@ -7,6 +7,13 @@
 #include <box.h>
 #include <bake_test.h>
 #include <math.h>
+#include "../../../src/geometry/mesh_cache.h"
+#include "../../../src/jobs/jobs.h"
+#include "render.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#include <stb_image.h>
 
 /** Disable the entity in the context while the left mouse button is held, as an action
  * handler that closes a popup on any click would.
@@ -576,6 +583,169 @@ void PickingCost_dense_mesh_changed_after_pick(void) {
             test_assert(fabsf(status->point[2] - z) < 2e-3f);
         }
     }
+
+    ecs_fini(world);
+}
+
+void PickingCost_dense_mesh_released_after_use(void) {
+    // spatial_perf/dense_mesh_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_int(box_jobs_set_workers(world, 0), 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 3});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    ecs_progress(world, 0);
+    int32_t base = box_mesh_cache_count(cache);
+
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 128, .radius = 1});
+    int32_t f;
+    for (f = 0; f < 10; f ++) {
+        box_input_mouse_move(world, 640 + (float)f, 360, false);
+        ecs_progress(world, 0);
+    }
+
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ball);
+    test_int(box_mesh_cache_count(cache), base + 1);
+
+    ecs_delete(world, ball);
+    for (f = 0; f < 700; f ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(box_mesh_cache_count(cache), base);
+
+    ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 128, .radius = 0.5f});
+    ecs_progress(world, 0);
+    for (f = 0; f < 10; f ++) {
+        box_input_mouse_move(world, 640, 360 + (float)f, false);
+        ecs_progress(world, 0);
+        const PickStatus *status = ecs_singleton_get(world, PickStatus);
+        test_uint(status->hit, ball);
+        test_assert(fabsf(status->point[2] - 0.5f) < 2e-2f);
+    }
+
+    ecs_fini(world);
+}
+
+void PickingCost_dense_mesh_back_within_grace(void) {
+    // spatial_perf/dense_mesh_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    test_int(box_jobs_set_workers(world, 0), 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 8, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 32, .height = 32,
+        .write_to_file = "dense_back.png", .resolution_scale = 1});
+    ecs_progress(world, 0);
+    int32_t base = box_mesh_cache_count(cache);
+    char *path = flecs_asprintf(
+        "%s/dense_back.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+
+    int32_t round, f;
+    uint32_t handle = 0;
+    for (round = 0; round < 2; round ++) {
+        ecs_entity_t ball = ecs_new(world);
+        ecs_set(world, ball, Position, {0, 0, 0});
+        ecs_set(world, ball, Sphere, {.segments = 128, .radius = 2});
+        ecs_set(world, ball, Rgb, {0, 0, 0});
+        ecs_set(world, ball, PbrMaterial, {.metallic = 1, .roughness = 1});
+        ecs_set(world, ball, Emissive, {.strength = 1, .color = {255, 0, 0}});
+        if (round) {
+            test_uint(ecs_get(world, ball, ShapeMesh)->mesh, handle);
+        }
+
+        handle = ecs_get(world, ball, ShapeMesh)->mesh;
+        for (f = 0; f < 4; f ++) {
+            box_input_mouse_move(world, 16, 16 + (float)f, false);
+            ecs_progress(world, 0);
+        }
+
+        box_render_sync(world);
+        const PickStatus *status = ecs_singleton_get(world, PickStatus);
+        test_uint(status->hit, ball);
+        test_assert(fabsf(glm_vec3_norm(ECS_CONST_CAST(float*, status->point)) - 2.0f) < 0.05f);
+        int w = 0, h = 0, n = 0;
+        unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        test_assert(px[(16 * 32 + 16) * 4] > 200);
+        test_assert(px[(16 * 32 + 16) * 4 + 1] < 40);
+        stbi_image_free(px);
+
+        ecs_delete(world, ball);
+        for (f = 0; f < 10; f ++) {
+            ecs_progress(world, 0);
+        }
+
+        box_render_sync(world);
+        test_int(box_mesh_cache_count(cache), base + 1);
+        test_int(box_mesh_cache_users(cache, handle), 0);
+        px = stbi_load(path, &w, &h, &n, 4);
+        test_assert(px != NULL);
+        test_assert(px[(16 * 32 + 16) * 4] < 40);
+        stbi_image_free(px);
+    }
+
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void PickingCost_dense_mesh_deleted_while_building(void) {
+    // spatial_perf/dense_mesh_release
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    test_int(box_jobs_set_workers(world, 2), 0);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 3});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f, .far_ = 100});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera});
+    box_input_mouse_move(world, 640, 360, false);
+    ecs_progress(world, 0);
+    int32_t base = box_mesh_cache_count(cache);
+
+    ecs_entity_t ball = ecs_new(world);
+    ecs_set(world, ball, Position, {0, 0, 0});
+    ecs_set(world, ball, Sphere, {.segments = 192, .radius = 1});
+    int32_t f;
+    for (f = 0; f < 10 && ecs_singleton_get(world, PickStatus)->hit != ball; f ++) {
+        box_input_mouse_move(world, 640, 360 + (float)(f % 2), false);
+        ecs_progress(world, 0);
+    }
+
+    test_uint(ecs_singleton_get(world, PickStatus)->hit, ball);
+    test_assert(box_jobs_pending(world) > 0);
+    ecs_delete(world, ball);
+    ecs_progress(world, 0);
+    test_int(box_mesh_cache_count(cache), base + 1);
+    for (f = 0; f < 1000000 && box_jobs_pending(world); f ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(box_jobs_pending(world), 0);
+    for (f = 0; f < 610; f ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(box_mesh_cache_count(cache), base);
 
     ecs_fini(world);
 }

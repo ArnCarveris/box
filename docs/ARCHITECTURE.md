@@ -162,7 +162,11 @@ by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `Chil
 computed roots and the descendants it wrote) to the functions registered with
 `box_transform_on_moved`. Draws and the spatial index follow static moves only through it and
 walk no subtree of their own, so a `Position` set fires no transform observer in render or
-spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires.
+spatial; only `DrawsOnPositionZ`, which keeps the 2D draw order, still fires. Entities that gain or lose
+`DynamicTransform`, owned or inherited, reach draws, spatial and the bake through one transform
+observer and `box_transform_on_dynamic`: an inherited tag costs a forwarded event per entity and
+observer, so deleting a dynamic hierarchy pays for one observer instead of five, and entities
+deleted with their parent are not passed on.
 
 ## Surfaces and the GPU device
 
@@ -202,7 +206,11 @@ light clusters and the spatial index are per scene, so entities of different sce
 interact even when they overlap. Adding or removing `Scene` or reparenting queues the subtree in
 the draw, light and spatial observers, which move it in the next frame. The only cross scene
 reference is `ProjectedAnchor`: it projects the world position of a target through a view's
-camera into pixel `Position` of a UI scene (origin at center, y up) in the same frame. Behind
+camera into pixel `Position` of a UI scene (origin at center, y up) in the same frame. It writes
+that `Position` without OnSet and the `WorldTransform` of the anchored subtree itself, so static
+transforms do not compute the anchor again in the next frame. An anchored subtree moves every
+frame by design, so the bake treats it like `DynamicTransform` or `NoBake` and never captures it
+(`box_projection_anchored`). Behind
 the camera, past the far plane or with a missing target the entity gets `ProjectedHidden` and
 collapses to a point.
 
@@ -226,7 +234,9 @@ Observers on shape, material, hierarchy and scene components and `box_transform_
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
 Static batches upload changes into a change buffer that `scatter.wgsl` scatters into their slots;
 entities with `DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached
-queries. A batch is one instanced indirect draw and is limited to 1M instances.
+queries. A batch is one instanced indirect draw of at most 2^20 instances, so its instance buffer
+fits the 128 MiB storage binding of every WebGPU device; a key with more shapes continues in
+further batches, without a limit on the instances of a key.
 
 Materials: `Rgb`, `PbrMaterial`, `Emissive`, `Opacity` and `Tint` resolve on the CPU, composed
 root down, into the instance. `BlendMode`, `BackFaceMode` and alpha below 1 key the batch.
@@ -280,7 +290,10 @@ against the clip planes and `min_dimension_px` and writes visible slots plus ind
 phase draws what the view drew last frame (a history per instance slot, keyed by view and
 target), a depth pyramid keeps the farthest depth, the late phase tests every instance against
 at most 4x4 texels and draws the newly visible, so a fast camera never misses an instance.
-Blended draws keep a CPU back to front sort and are culled in slot order. `CullStatus` on each
+Blended draws keep a CPU back to front sort; each run of one batch in that order is one draw
+(at most 512 slots) whose job lists its sorted slots, culled in that order. The visible slots
+and slot lists of a target, and the history of a view, are split into pages of at most 128 MiB,
+each bound whole as storage, so the instances a target culls have no limit. `CullStatus` on each
 View reports instances, visible, frustum culled and occlusion culled, read back asynchronously.
 
 **Shadows.** Cascaded maps for the first directional light of the view's scene.

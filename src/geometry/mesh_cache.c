@@ -12,6 +12,7 @@ typedef struct box_mesh_entry_t {
     box_shape_key_t key;      /**< Key the mesh was generated from */
     uint64_t hash;            /**< Hash of shape and key */
     int32_t refs;             /**< Reference count */
+    int32_t holds;            /**< References of modules that follow the mesh, part of refs */
     uint32_t next;            /**< Next handle with the same hash, 0 for none */
 } box_mesh_entry_t;
 
@@ -200,6 +201,41 @@ void box_mesh_cache_keep(
     }
 }
 
+void box_mesh_cache_hold(
+    box_mesh_cache_t *cache,
+    uint32_t handle)
+{
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (entry && entry->shape) {
+        entry->refs ++;
+        entry->holds ++;
+    }
+}
+
+void box_mesh_cache_unhold(
+    box_mesh_cache_t *cache,
+    uint32_t handle)
+{
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (entry && entry->shape && entry->holds > 0) {
+        entry->holds --;
+        box_mesh_cache_release(cache, handle);
+    }
+}
+
+int32_t box_mesh_cache_users(
+    const box_mesh_cache_t *cache,
+    uint32_t handle)
+{
+    int32_t result = 0;
+    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
+    if (entry && entry->shape) {
+        result = entry->refs - entry->holds;
+    }
+
+    return result;
+}
+
 /** Remove an entry from the hash chain it is part of.
  *
  * @param cache The cache
@@ -252,19 +288,6 @@ const box_mesh_t* box_mesh_cache_get(
     box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
     if (entry && entry->shape) {
         result = &entry->mesh;
-    }
-
-    return result;
-}
-
-int32_t box_mesh_cache_refs(
-    const box_mesh_cache_t *cache,
-    uint32_t handle)
-{
-    int32_t result = 0;
-    box_mesh_entry_t *entry = box_mesh_cache_entry(cache, handle);
-    if (entry && entry->shape) {
-        result = entry->refs;
     }
 
     return result;

@@ -15,6 +15,45 @@
 #define STB_IMAGE_STATIC
 #include <stb_image.h>
 
+/** Entity a counter watches and the number of times it was seen */
+typedef struct projection_count_t {
+    ecs_entity_t entity; /**< The watched entity */
+    int32_t count;       /**< Times the entity was seen */
+} projection_count_t;
+
+/** Count the watched entity among the entities whose static transform was computed.
+ *
+ * @param world The world
+ * @param entities The entities
+ * @param count Number of entities
+ * @param ctx The counter
+ */
+static void ProjectionCountMoved(
+    ecs_world_t *world,
+    const ecs_entity_t *entities,
+    int32_t count,
+    void *ctx)
+{
+    projection_count_t *c = ctx;
+    (void)world;
+    for (int32_t i = 0; i < count; i ++) {
+        c->count += entities[i] == c->entity;
+    }
+}
+
+/** Count the watched entity among the entities whose WorldTransform was set.
+ *
+ * @param it The iterator
+ */
+static void ProjectionCountSet(
+    ecs_iter_t *it)
+{
+    projection_count_t *c = it->ctx;
+    for (int32_t i = 0; i < it->count; i ++) {
+        c->count += it->entities[i] == c->entity;
+    }
+}
+
 void Projection_perspective(void) {
     // scenes/projection
     ecs_world_t *world = ecs_init();
@@ -612,5 +651,65 @@ void Projection_drawn_at_projection(void) {
     stbi_image_free(px);
 
     ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Projection_transformed_once_per_frame(void) {
+    // core_fixes/projection_position
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 10, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .lighting.enabled = true});
+    ecs_entity_t target = ecs_new(world);
+    ecs_set(world, target, Position, {0, 0, 0});
+    ecs_entity_t label = ecs_new(world);
+    ecs_set(world, label, ProjectedAnchor, {.target = target, .view = view});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, label);
+    ecs_set(world, child, Position, {0, 10, 0});
+    ecs_progress(world, 0);
+
+    projection_count_t moved = { .entity = label };
+    projection_count_t set = { .entity = label };
+    projection_count_t child_set = { .entity = child };
+    box_transform_on_moved(world, ProjectionCountMoved, &moved, NULL);
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet },
+        .callback = ProjectionCountSet,
+        .ctx = &set
+    });
+    ecs_observer(world, {
+        .query.terms = {{ .id = ecs_id(WorldTransform) }},
+        .events = { EcsOnSet },
+        .callback = ProjectionCountSet,
+        .ctx = &child_set
+    });
+
+    for (int32_t frame = 1; frame <= 5; frame ++) {
+        ecs_set(world, target, Position, {0.5f * (float)frame, 0, 0});
+        ecs_progress(world, 0);
+        const WorldTransform *t = ecs_get(world, label, WorldTransform);
+        test_assert(fabsf(t->m[3][0] - 36.0f * (float)frame) < 0.01f);
+        t = ecs_get(world, child, WorldTransform);
+        test_assert(fabsf(t->m[3][0] - 36.0f * (float)frame) < 0.01f);
+        test_assert(fabsf(t->m[3][1] - 10.0f) < 0.01f);
+    }
+
+    test_int(set.count, 5);
+    test_int(child_set.count, 5);
+
+    for (int32_t frame = 0; frame < 3; frame ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(set.count, 5);
+    test_int(child_set.count, 5);
+    test_int(moved.count, 0);
+    test_flt(ecs_get(world, label, WorldTransform)->m[3][0], 180.0f);
+
     ecs_fini(world);
 }

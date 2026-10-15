@@ -334,6 +334,7 @@ static int box_gpu_init(
     int result = box_gpu_create(gpu);
     gpu->fence_done = 0;
     gpu->lost = false;
+    gpu->thread = ecs_os_thread_self();
     if (result) {
         goto done;
     }
@@ -345,6 +346,7 @@ static int box_gpu_init(
     ecs_map_init(&gpu->targets, NULL);
     ecs_map_init(&gpu->shaders, NULL);
 done:
+    box_gpu_stats_publish(gpu);
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = result == 0;
     gpu->stats.failed = result != 0;
@@ -434,6 +436,7 @@ static void box_gpu_render(
     box_gpu_targets_render(gpu, packet);
 
     box_gpu_effects_sweep(gpu, packet);
+    box_gpu_stats_publish(gpu);
 }
 
 #ifndef __EMSCRIPTEN__
@@ -501,6 +504,7 @@ static void box_gpu_wait(
     WGPUSubmissionIndex index = (WGPUSubmissionIndex)(fence - 1);
     if (fence && gpu->device) {
         wgpuDevicePoll(gpu->device, true, &index);
+        box_gpu_stats_publish(gpu);
     }
 #else
     (void)gpu;
@@ -522,6 +526,7 @@ static bool box_gpu_done(
 #ifndef __EMSCRIPTEN__
     if (fence > gpu->fence_done && gpu->device) {
         wgpuDevicePoll(gpu->device, false, NULL);
+        box_gpu_stats_publish(gpu);
     }
 #endif
 
@@ -592,6 +597,7 @@ static void box_gpu_fini(
     BOX_GPU_RELEASE(gpu->device, wgpuDeviceRelease);
     BOX_GPU_RELEASE(gpu->adapter, wgpuAdapterRelease);
     BOX_GPU_RELEASE(gpu->instance, wgpuInstanceRelease);
+    box_gpu_stats_publish(gpu);
     ecs_os_mutex_lock(gpu->lock);
     gpu->stats.ready = false;
     ecs_os_mutex_unlock(gpu->lock);
@@ -619,70 +625,96 @@ void box_gpu_count(
     box_gpu_t *gpu,
     box_gpu_stat_t stat)
 {
-    ecs_os_mutex_lock(gpu->lock);
     switch (stat) {
     case BOX_GPU_STAT_CREATED:
-        gpu->stats.created ++;
-        gpu->stats.targets ++;
+        gpu->pending.created ++;
+        gpu->pending.targets ++;
         break;
     case BOX_GPU_STAT_CONFIGURED:
-        gpu->stats.configured ++;
+        gpu->pending.configured ++;
         break;
     case BOX_GPU_STAT_DESTROYED:
-        gpu->stats.destroyed ++;
-        gpu->stats.targets --;
+        gpu->pending.destroyed ++;
+        gpu->pending.targets --;
         break;
     case BOX_GPU_STAT_FRAMES:
-        gpu->stats.frames ++;
+        gpu->pending.frames ++;
         break;
     case BOX_GPU_STAT_CAPTURES:
-        gpu->stats.captures ++;
+        gpu->pending.captures ++;
         break;
     case BOX_GPU_STAT_ERRORS:
-        gpu->stats.errors ++;
+        gpu->pending.errors ++;
         break;
     case BOX_GPU_STAT_SHADER_CREATED:
-        gpu->stats.shaders ++;
+        gpu->pending.shaders ++;
         break;
     case BOX_GPU_STAT_SHADER_DESTROYED:
-        gpu->stats.shaders --;
+        gpu->pending.shaders --;
         break;
     case BOX_GPU_STAT_COMPILED:
-        gpu->stats.compiles ++;
+        gpu->pending.compiles ++;
         break;
     case BOX_GPU_STAT_SHADER_ERROR:
-        gpu->stats.shader_errors ++;
+        gpu->pending.shader_errors ++;
         break;
     case BOX_GPU_STAT_MESH_CREATED:
-        gpu->stats.meshes ++;
+        gpu->pending.meshes ++;
         break;
     case BOX_GPU_STAT_MESH_DESTROYED:
-        gpu->stats.meshes --;
+        gpu->pending.meshes --;
         break;
     case BOX_GPU_STAT_BUFFER_CREATED:
-        gpu->stats.buffers ++;
+        gpu->pending.buffers ++;
         break;
     case BOX_GPU_STAT_BUFFER_DESTROYED:
-        gpu->stats.buffers --;
+        gpu->pending.buffers --;
         break;
     case BOX_GPU_STAT_PASS:
-        gpu->stats.passes ++;
+        gpu->pending.passes ++;
         break;
     case BOX_GPU_STAT_DRAW:
-        gpu->stats.draws ++;
+        gpu->pending.draws ++;
         break;
     case BOX_GPU_STAT_SCATTER:
-        gpu->stats.scatters ++;
+        gpu->pending.scatters ++;
         break;
     }
+}
 
+void box_gpu_stats_publish(
+    box_gpu_t *gpu)
+{
+    box_render_gpu_stats_t *p = &gpu->pending;
+    box_render_gpu_stats_t *s = &gpu->stats;
+    ecs_os_mutex_lock(gpu->lock);
+    s->targets += p->targets;
+    s->created += p->created;
+    s->configured += p->configured;
+    s->destroyed += p->destroyed;
+    s->frames += p->frames;
+    s->captures += p->captures;
+    s->errors += p->errors;
+    s->shaders += p->shaders;
+    s->compiles += p->compiles;
+    s->shader_errors += p->shader_errors;
+    s->meshes += p->meshes;
+    s->buffers += p->buffers;
+    s->passes += p->passes;
+    s->draws += p->draws;
+    s->scatters += p->scatters;
+    s->scattered += p->scattered;
+    s->cull_ns += p->cull_ns;
+    s->cull_passes += p->cull_passes;
     ecs_os_mutex_unlock(gpu->lock);
+    ecs_os_memset_t(p, 0, box_render_gpu_stats_t);
 }
 
 box_render_backend_t box_render_gpu_backend(void)
 {
     box_gpu_t *gpu = ecs_os_calloc_t(box_gpu_t);
     gpu->lock = ecs_os_mutex_new();
+    gpu->cull_window = BOX_GPU_CULL_WINDOW;
     ecs_vec_init_t(NULL, &gpu->results, box_render_shader_result_t, 0);
     box_render_backend_t result = {
         .ctx = gpu,
@@ -754,6 +786,38 @@ void box_render_gpu_lose_device(
     }
 }
 
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render && slots > 0;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->cull_window = slots;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
+bool box_render_gpu_readback_delivery(
+    ecs_world_t *world,
+    box_render_readback_delivery_t delivery)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->readbacks = delivery;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
+}
+
 bool box_render_gpu_shader_result(
     ecs_world_t *world,
     box_render_shader_result_t *result)
@@ -811,6 +875,26 @@ bool box_render_gpu_capture_pending(
 {
     (void)world;
     (void)path;
+
+    return false;
+}
+
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots)
+{
+    (void)world;
+    (void)slots;
+
+    return false;
+}
+
+bool box_render_gpu_readback_delivery(
+    ecs_world_t *world,
+    box_render_readback_delivery_t delivery)
+{
+    (void)world;
+    (void)delivery;
 
     return false;
 }

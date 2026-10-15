@@ -207,8 +207,12 @@ static int32_t box_text_working(
     return result;
 }
 
+/** Loading fonts a timed out headless wait names in its warning */
+#define BOX_TEXT_WARN_NAMES (4)
+
 /** In a headless run, wait for the font and glyph jobs in flight so a frame always sees the
- * same atlas.
+ * same atlas, and warn when the wait gives up, naming the font loads not applied yet while
+ * font or glyph jobs are in flight.
  *
  * @param it The iterator of the system
  */
@@ -218,6 +222,7 @@ static void BoxTextFrame(
     box_text_state_t *s = box_text_state_get(it->world);
     const App *app = ecs_singleton_get(it->world, App);
     ecs_time_t start = {0};
+    double waited = 0;
     if (!s || !app || !app->headless) {
         goto done;
     }
@@ -225,13 +230,57 @@ static void BoxTextFrame(
     ecs_time_measure(&start);
     while (box_text_working(s->sync) || box_jobs_running(it->world)) {
         ecs_time_t now = start;
-        if (ecs_time_measure(&now) > BOX_TEXT_HEADLESS_WAIT) {
+        waited = ecs_time_measure(&now);
+        if (waited > BOX_TEXT_HEADLESS_WAIT) {
             break;
         }
 
         ecs_os_sleep(0, 200 * 1000);
     }
 
+    if (waited <= BOX_TEXT_HEADLESS_WAIT) {
+        goto done;
+    }
+
+    ecs_strbuf_t names = ECS_STRBUF_INIT;
+    int32_t loading = 0, i, working = box_text_working(s->sync);
+    ecs_iter_t fit = ecs_each_id(it->world, ecs_id(FontStatus));
+    while (ecs_each_next(&fit)) {
+        const FontStatus *status = ecs_field(&fit, FontStatus, 0);
+        for (i = 0; i < fit.count; i ++) {
+            const Font *font = ecs_get(it->world, fit.entities[i], Font);
+            if (status[i].state != FontLoading) {
+                continue;
+            }
+
+            if (working && loading < BOX_TEXT_WARN_NAMES) {
+                char *name = ecs_get_path(it->world, fit.entities[i]);
+                ecs_strbuf_appendstr(&names, loading ? ", " : " (");
+                ecs_strbuf_appendstr(&names, name);
+                if (font && font->path) {
+                    ecs_strbuf_append(&names, " %s", font->path);
+                }
+
+                ecs_os_free(name);
+            }
+
+            loading ++;
+        }
+    }
+
+    if (working && loading > BOX_TEXT_WARN_NAMES) {
+        ecs_strbuf_append(&names, ", %d more", loading - BOX_TEXT_WARN_NAMES);
+    }
+
+    if (working && loading) {
+        ecs_strbuf_appendstr(&names, ")");
+    }
+
+    char *list = ecs_strbuf_get(&names);
+    ecs_warn("headless text wait timed out after %.1f s: %d font or glyph job(s) in flight, "
+        "%d job(s) running, %d font load(s) not applied yet%s", waited, working,
+        box_jobs_running(it->world), loading, list ? list : "");
+    ecs_os_free(list);
 done:
     return;
 }
