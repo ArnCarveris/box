@@ -41,6 +41,21 @@ void fake_sleep(
 void fake_sleep_late(
     double seconds);
 
+/** OS clock callback that reads the fake clock without advancing it, for ecs_os_api.now_.
+ *
+ * @return The fake time in nanoseconds
+ */
+uint64_t fake_os_now(void);
+
+/** OS sleep callback that advances the fake clock, for ecs_os_api.sleep_.
+ *
+ * @param sec Seconds to sleep
+ * @param nanosec Nanoseconds to sleep
+ */
+void fake_os_sleep(
+    int32_t sec,
+    int32_t nanosec);
+
 /** System that spends fake_work_ms of fake time and reports fake_slept_ms of budget sleep.
  *
  * @param it The iterator of the system

@@ -43,7 +43,15 @@
                     "realtime_during_run",
                     "no_realtime_without_run",
                     "realtime_reset_on_remove",
-                    "realtime_reset_on_fini"
+                    "realtime_reset_on_fini",
+                    "delta_matches_wall_time",
+                    "delta_mismatch_fails",
+                    "delta_tolerance_edges",
+                    "pacer_does_not_spin",
+                    "display_paces_run",
+                    "cadence_checks_display_delta",
+                    "cadence_run_passes",
+                    "fly_moves_camera"
                 ]
             },
             {
