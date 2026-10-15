@@ -17,6 +17,8 @@
                     "one_leaf_10k",
                     "one_leaf_resizes_10k",
                     "rewrap_100_paragraphs",
+                    "position_100k_roots",
+                    "position_100k_children",
                     "idle_frame_10k"
                 ]
             },
