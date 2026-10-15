@@ -656,7 +656,8 @@ box_render_backend_t box_render_gpu_backend(void)
         .free = box_gpu_free,
         .fence = box_gpu_fence,
         .wait = box_gpu_wait,
-        .done = box_gpu_done
+        .done = box_gpu_done,
+        .flush = box_gpu_capture_flush
     };
 
     return result;

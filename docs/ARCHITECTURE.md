@@ -243,7 +243,13 @@ order (creation order, only views whose camera has a `Camera`):
 7. The effects chain, the last effect writing the sRGB target.
 
 After the views the target is blitted if its render size differs, presented, and for a capture
-copied to a readback buffer and written as PNG on the render thread.
+copied to a readback buffer. The render thread maps the buffer without waiting (wgpu's
+`map_async`, as Bevy's screenshots do) and goes on with the next packet; the map callback, which
+fires during a later submit or poll, writes the PNG (through a `.part` file and a rename) and
+counts it in the GPU stats. `box_render_sync`, and the shutdown of the backend, call the
+backend's `flush`, which blocks on the device until every pending capture is written, so a
+capture is on disk after a sync. The browser writes no captures: the frame warns once, and the
+`capture` and `render` commands fail with "captures are not available in the browser".
 
 **Culling.** A compute pass tests each draw's instances (mesh bounds moved by the model matrix)
 against the clip planes and `min_dimension_px` and writes visible slots plus indirect draw args.

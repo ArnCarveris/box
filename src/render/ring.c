@@ -54,6 +54,8 @@ struct box_render_ring_t {
     bool stop;                      /**< The render thread exits once it took every packet */
     bool paused;                    /**< The render thread takes no packets */
     bool flushing;                  /**< A drain ignores the pause */
+    int64_t flushes;                /**< Drains that asked the backend to flush */
+    int64_t flushed;                /**< Flushes the render thread completed */
     float display_rate;             /**< Refresh rate of the simulated display, applied */
     bool vsync;                     /**< The last submitted packet presents with vsync */
     float refresh;                  /**< Refresh rate of the display of the last packet */
@@ -346,6 +348,10 @@ static void box_render_backend_stop(
 {
     box_render_show_pending(ring);
     ring->pending.active = false;
+    if (ring->backend_ready && ring->backend.flush) {
+        ring->backend.flush(ring->backend.ctx);
+    }
+
     if (ring->backend_ready && ring->backend.fini) {
         ring->backend.fini(ring->backend.ctx);
     }
@@ -367,8 +373,9 @@ static bool box_render_ring_readable(
     return ring->taken < ring->submitted && !held;
 }
 
-/** Render packets until the ring stops and every submitted packet is rendered. On macOS the
- * thread runs at the user interactive QoS, as Apple recommends for threads that render frames.
+/** Render packets until the ring stops and every submitted packet is rendered, and flush the
+ * backend when a drain waits for it after the last packet. On macOS the thread runs at the user
+ * interactive QoS, as Apple recommends for threads that render frames.
  *
  * @param arg The ring
  * @return NULL
@@ -383,8 +390,23 @@ static void* box_render_thread_main(
     box_render_backend_start(ring);
     ecs_os_mutex_lock(ring->lock);
     while (true) {
-        while (!box_render_ring_readable(ring) && !(ring->stop && ring->taken == ring->submitted)) {
+        while (!box_render_ring_readable(ring) && !(ring->taken == ring->submitted &&
+            (ring->stop || ring->flushed < ring->flushes)))
+        {
             ecs_os_cond_wait(ring->can_read, ring->lock);
+        }
+
+        if (ring->taken == ring->submitted && ring->flushed < ring->flushes) {
+            int64_t flush = ring->flushes;
+            ecs_os_mutex_unlock(ring->lock);
+            if (ring->backend_ready && ring->backend.flush) {
+                ring->backend.flush(ring->backend.ctx);
+            }
+
+            ecs_os_mutex_lock(ring->lock);
+            ring->flushed = flush;
+            ecs_os_cond_broadcast(ring->can_write);
+            continue;
         }
 
         if (ring->taken == ring->submitted) {
@@ -446,7 +468,8 @@ done:
     return;
 }
 
-/** Wait until every submitted packet is rendered, also while the ring is held.
+/** Wait until every submitted packet is rendered and the backend flushed, also while the
+ * ring is held.
  *
  * @param ring The ring
  */
@@ -459,8 +482,9 @@ static void box_render_ring_drain(
 
     ecs_os_mutex_lock(ring->lock);
     ring->flushing = true;
+    int64_t flush = ++ ring->flushes;
     ecs_os_cond_broadcast(ring->can_read);
-    while (ring->released < ring->submitted) {
+    while (ring->released < ring->submitted || ring->flushed < flush) {
         ecs_os_cond_wait(ring->can_write, ring->lock);
     }
 
@@ -679,6 +703,9 @@ void box_render_ring_sync(
     box_render_ring_t *ring)
 {
     box_render_ring_drain(ring);
+    if (ring->main_thread && ring->backend_ready && ring->backend.flush) {
+        ring->backend.flush(ring->backend.ctx);
+    }
 }
 
 void box_render_ring_status(

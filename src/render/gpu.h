@@ -67,6 +67,9 @@ typedef struct box_gpu_bake_t box_gpu_bake_t;
 /** Forward pipelines by color format, blend mode and back face mode, at most */
 #define BOX_GPU_FORWARD_PIPELINES (64)
 
+/** A capture on its way from the GPU to its PNG file */
+typedef struct box_gpu_capture_t box_gpu_capture_t;
+
 /** A surface on the GPU: the image it presents and the image views render into */
 typedef struct box_gpu_target_t {
     uint32_t handle;                /**< Handle the main thread assigned */
@@ -82,13 +85,9 @@ typedef struct box_gpu_target_t {
     WGPUTexture depth;              /**< Depth texture of the views at the render size */
     WGPUTextureView depth_view;     /**< View of the depth texture */
     bool immediate;                 /**< The window can present without vertical sync */
-    WGPUBuffer readback;            /**< Buffer a capture copies the image into */
-    uint64_t readback_size;         /**< Bytes of the readback buffer */
-    uint8_t *pixels;                /**< Copy of the readback buffer the PNG is encoded from */
-    uint32_t capture_width;         /**< Width of the copied image */
-    uint32_t capture_height;        /**< Height of the copied image */
-    uint32_t capture_stride;        /**< Bytes per row of the copied image */
-    bool capture_pending;           /**< A copy was recorded and not yet written */
+    WGPUBuffer readback;            /**< Idle buffer the next capture copies the image into */
+    uint64_t readback_size;         /**< Bytes of the idle readback buffer */
+    box_gpu_capture_t *capture;     /**< Copy recorded in this frame, not yet mapped */
 } box_gpu_target_t;
 
 /** A compiled shader module */
@@ -414,6 +413,7 @@ typedef struct box_gpu_t {
     uint32_t rendering;             /**< Target that is rendering, materials cannot sample it */
     bool timestamps;                /**< The device has timestamp queries */
     box_gpu_bake_t *bake;           /**< Probe captures, created on the first capture */
+    ecs_vec_t captures;             /**< box_gpu_capture_t* whose readback is mapping */
 } box_gpu_t;
 
 /** Fields of the counters of the backend */
@@ -1333,7 +1333,8 @@ void box_gpu_capture_encode(
     WGPUCommandEncoder encoder,
     WGPUTexture texture);
 
-/** Wait for the readback buffer of a target and write it to a PNG file.
+/** Map the copy the frame recorded without waiting for it; the map callback writes the PNG
+ * file once the GPU finished the copy, as wgpu's map_async does for Bevy's screenshots.
  *
  * @param gpu The backend
  * @param t The target
@@ -1344,12 +1345,21 @@ void box_gpu_capture_write(
     box_gpu_target_t *t,
     const char *path);
 
-/** Release the readback buffer of a target.
+/** Release the idle readback buffer of a target. Captures of the target that are still
+ * mapping complete on their own.
  *
  * @param t The target
  */
 void box_gpu_capture_fini(
     box_gpu_target_t *t);
+
+/** Block on the device until every capture that is mapping wrote its file, the flush callback
+ * of the backend. The browser maps from its event loop, so there it returns at once.
+ *
+ * @param ctx The backend
+ */
+void box_gpu_capture_flush(
+    void *ctx);
 
 #endif
 

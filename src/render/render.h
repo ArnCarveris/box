@@ -465,6 +465,8 @@ typedef struct box_render_backend_t {
     void (*wait)(void*, uint64_t); /**< Block until the GPU finished the work of a fence */
     bool (*done)(void*, uint64_t); /**< Check without blocking whether a fence is done, NULL
                                     *   when only the time a wait takes tells */
+    void (*flush)(void*);       /**< Block until asynchronous work such as captures finished,
+                                 *   on the render thread, NULL when there is none */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
