@@ -283,48 +283,62 @@ constructor and taken literally otherwise. Adding it makes the engine add `Light
 (`probes`, `baked`, `pass`, `converged`, `cache_hit`), removed with it. `NoBake` keeps a static
 shape out of the captures; a static shape has neither `DynamicTransform` nor `ManualTransform`.
 
-**Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over
-the static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
-`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above
-262144 probes), again only when the index or the settings change. Probes inside the oriented
-bounds of a static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource
-(`gpu_bake.c`): a grid uniform, 9 rgb L2 SH irradiance coefficients per probe
-(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, filled with the exact SH of the
-hemisphere ambient when it is created or the ambient changes. A view with `lighting.baked`
-binds it as group 3 of `mesh.wgsl`, whose `ambient()` term blends the 8 surrounding valid
-probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
+**Probe volume.** `RenderExtractBake` (`src/render/bake.c`) places a grid per baked scene over the
+static bounds of its spatial index (`box_spatial_static_bounds`) plus `bounds_padding`,
+`probe_spacing` apart (ceil(extent / spacing) + 1 per axis, centered, spacing widened above 262144
+probes), again only when the index or the settings change. Probes inside the oriented bounds of a
+static captured shape are invalid. The volume is a `BOX_RENDER_VOLUME` resource (`gpu_bake.c`): a
+grid uniform, two probe buffers of 9 rgb L2 SH irradiance coefficients per probe
+(Ramamoorthi-Hanrahan, Sloan's basis) and a validity bit mask, both buffers filled with the exact
+SH of the hemisphere ambient when it is created or the ambient changes. A view with
+`lighting.baked` binds it as group 3 of `mesh.wgsl` with the probe buffer the packet selects for
+the view (one bind group per buffer, same layout), whose `ambient()` term blends the 8 surrounding
+valid probes with DDGI style wrap weights; other views bind a 1x1x1 volume that keeps the
 hemisphere, so a scene without `LightBake` renders exactly as before.
 
 **Probe captures.** Every frame the bake extract moves the unbaked valid probes nearest to the
-cameras of the views of the scene into the packet as a bake batch with the lights of the scene.
-The queue is kept sorted by camera distance and sorted again only when probes return to it or a
-camera moved more than a probe spacing. The number per frame is `budget_ms` over the GPU time
-per probe, an average of measurements, at most 256. The time comes from timestamp queries around
-the captures of a packet (requested natively and by `apps/boxrun/shell.html` when the adapter
-has `timestamp-query`, resolved a packet later because Metal writes pass timestamps when the
-pass completes, read back without waiting, measurements over a second dropped); without them it
-is the CPU time from recording until the queue reports the work done, which includes waits and
-errs on the expensive side. On the render thread the captures run before the targets, in chunks
-of at most 32 probes per command buffer: six 90 degree faces of `capture_size` texels per probe
-render the opaque static batches of the scene with the forward pipeline into an rgba16float
-array, culled per face by frustum and 1 px size, without history, effects or 2D. Batches carry a
-`bake` key only in scenes with `LightBake` (opaque 3D shapes without `DynamicTransform`,
-`ManualTransform` or `NoBake`; the draw observers re-key on changes), so other scenes batch as
-before. The faces are lit by the lights of the scene with a black ambient term; the sun is
-shadowed by one cascade fitted around the bounding sphere of the static bounds (`gpu_shadow.c`),
-point and spot lights are clustered per face and unshadowed. `bake_sh.wgsl` then projects each
-probe: radiance times the SH basis times the exact solid angle of each texel, texels nothing
-covered seeing the hemisphere ambient as a + 1.5 b y so an open probe equals the hemisphere,
-then the clamped cosine convolution per band. The backend reports every probe it captured; a
-probe of a rendered packet it did not report (a missing pipeline or volume, a dropped packet) is
-queued again. Probes not captured yet keep their ambient values, so a partial bake blends in.
-`LightBakeStatus.baked` counts reported probes, `pass` is 1, `converged` is set when every valid
-probe was reported, and `error` explains a `capture_size` outside 1 to 256, which bakes nothing;
-a new grid or ambient starts the pass again. A headless run captures every probe left in each
-packet, so its frames show the converged bake. `PerfRun` warms up again while a bake that can
-progress (valid settings, `budget_ms` above 0, a view of its scene, the GPU backend) has probes
-left, and gives up with an error after 300 frames without progress. `budget_ms` 0 never bakes.
-Only one pass is baked: the captures see emission and direct light, one bounce.
+cameras of the views of the scene into the packet as a bake batch with the lights of the scene. The
+queue is kept sorted by camera distance and sorted again only when probes return to it or a camera
+moved more than a probe spacing. The number per frame is `budget_ms` over the GPU time per probe,
+an average of measurements, at most 256. The time comes from timestamp queries around the captures
+of a packet (requested natively and by `apps/boxrun/shell.html` when the adapter has
+`timestamp-query`, resolved a packet later because Metal writes pass timestamps when the pass
+completes, read back without waiting, measurements over a second dropped); without them it is the
+CPU time from recording until the queue reports the work done, which includes waits and errs on the
+expensive side. On the render thread the captures run before the targets, in chunks of at most 32
+probes per command buffer: six 90 degree faces of `capture_size` texels per probe render the opaque
+static batches of the scene with the forward pipeline into an rgba16float array, culled per face by
+frustum and 1 px size, without history, effects or 2D. Batches carry a `bake` key only in scenes
+with `LightBake` (opaque 3D shapes without `DynamicTransform`, `ManualTransform` or `NoBake`; the
+draw observers re-key on changes), so other scenes batch as before. The faces are lit by the lights
+of the scene and an ambient term from the batch's source buffer (below); the sun is shadowed by one
+cascade fitted around the bounding sphere of the static bounds (`gpu_shadow.c`), point and spot
+lights are clustered per face and unshadowed. `bake_sh.wgsl` then projects each probe: radiance
+times the SH basis times the exact solid angle of each texel, texels nothing covered seeing the
+hemisphere ambient as a + 1.5 b y so an open probe equals the hemisphere, then the clamped cosine
+convolution per band, written into the batch's target buffer.
+
+**Bounces.** A bake is `bounces + 1` capture passes over every valid probe (as Godot's LightmapGI,
+`bounces` 0 bakes direct light and emission only). The first pass shades its faces with a black
+ambient term (the 1x1x1 volume); every later pass binds the probe buffer the previous pass wrote as
+group 3, the way DDGI shades its rays with the previous irradiance, and writes the other buffer.
+Each bake batch in the packet carries its pass, source and target buffer, and each view the buffer
+it shows. Once every probe of a pass is in a packet, the views of that packet switch to its buffer
+(captures run before the targets) and the probes queue for the next pass, so views keep the last
+complete pass while the next one bakes; only a first pass over probes that still hold the ambient
+writes the shown buffer, so a fresh scene lights up probe by probe. The backend reports every probe
+it captured with its pass; a probe of a rendered packet it did not report (a missing pipeline or
+volume, a dropped packet) is queued again, or, when its pass was already read by the next pass or
+shown, the bake starts over. Probes not captured yet keep their ambient values, so a partial first
+pass blends in. `LightBakeStatus.pass` counts completed passes (0 to `bounces + 1`), `baked` the
+reported probes of the pass being baked, `converged` is set when `pass` reaches `bounces + 1`, and
+`error` explains a `capture_size` outside 1 to 256 or `bounces` outside 0 to 16, which bake
+nothing; a new grid, ambient or `bounces` starts the bake again. A headless run chains every pass
+left into each packet, each batch reading the buffer the one before it wrote, so its frames show
+the converged bake. `PerfRun` warms up again while a bake that can progress (valid settings,
+`budget_ms` above 0, a view of its scene, the GPU backend) has probes left (captures of every
+remaining pass), and gives up with an error after 300 frames without progress. `budget_ms` 0 never
+bakes.
 
 ## Spatial index
 
