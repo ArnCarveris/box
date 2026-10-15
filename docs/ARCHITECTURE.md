@@ -284,8 +284,11 @@ gets the buffer, counts and ambient of the scene of its camera. `AmbientLight` (
 intensity) on a scene root, any entity of the scene or as a singleton for the default scene is
 summed per scene. A scene without light entities gets a default sun and sky, so a scene whose
 light has intensity 0 is dark. `View.lighting.enabled` false draws base color and emission only.
-`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists up to 128 point or spot
-lights per cluster; `mesh.wgsl` shades every directional light plus the cluster's lights.
+`cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists the point and spot lights
+that reach each one (spot lights tested against their cone) in one light index list the
+clusters share, sized for every light of the view in every cluster up to the 128 MiB storage
+binding limit, past which a warning is logged once; `mesh.wgsl` shades every directional light
+plus the cluster's lights.
 
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
