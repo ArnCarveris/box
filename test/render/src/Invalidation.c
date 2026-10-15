@@ -39,7 +39,9 @@ void Invalidation_static_move_rebakes_nearby_probes(void) {
     ecs_set(world, box, Box, {1, 1, 1});
     ecs_set(world, box, Emissive, {.strength = 2, .color = {255, 200, 100}});
     ecs_entity_t e = ecs_new(world);
-    ecs_set(world, e, Surface, {.width = 32, .height = 24, .resolution_scale = 1});
+    ecs_set(world, e, Surface, {.width = 64, .height = 48, .write_to_file = "static.png",
+        .resolution_scale = 1});
+    char *path = flecs_asprintf("%s/static.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
 
     int32_t frames = 0;
     while (!ecs_get(world, scene, LightBakeStatus)->converged && frames < 5000) {
@@ -52,6 +54,12 @@ void Invalidation_static_move_rebakes_nearby_probes(void) {
     test_bool(status->converged, true);
     int32_t probes = status->probes, baked = status->baked;
     test_assert(probes > 200);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    int w[2] = {0, 0}, h[2] = {0, 0}, n = 0, x, y, largest = 0;
+    unsigned char *images[2] = {NULL, NULL};
+    images[0] = stbi_load(path, &w[0], &h[0], &n, 4);
+    test_assert(images[0] != NULL);
 
     ecs_set(world, box, Position, {-3, 0.5f, 0});
     ecs_progress(world, 0);
@@ -72,7 +80,26 @@ void Invalidation_static_move_rebakes_nearby_probes(void) {
     status = ecs_get(world, scene, LightBakeStatus);
     test_bool(status->converged, true);
     test_int(status->baked, baked);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    images[1] = stbi_load(path, &w[1], &h[1], &n, 4);
+    test_assert(images[1] != NULL);
+    test_int(w[1], w[0]);
+    test_int(h[1], h[0]);
+    for (y = 0; y < h[0]; y ++) {
+        for (x = w[0] * 3 / 4; x < w[0]; x ++) {
+            for (n = 0; n < 3; n ++) {
+                int32_t o = (y * w[0] + x) * 4 + n;
+                int d = abs((int)images[0][o] - (int)images[1][o]);
+                largest = d > largest ? d : largest;
+            }
+        }
+    }
 
+    test_assert(largest <= 1);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+    ecs_os_free(path);
     ecs_fini(world);
 }
 
@@ -417,17 +444,20 @@ void Invalidation_moved_emissive_leaves_no_light_behind(void) {
         test_int(h[i], h[0]);
     }
 
-    int32_t before = 0, moved = 0, fresh = 0;
+    int32_t before = 0, moved = 0, fresh = 0, moved_mid = 0, fresh_mid = 0;
     for (j = 0; j < 8; j ++) {
-        int32_t x = 52 + j, y = 54;
-        int32_t o = (y * w[0] + x) * 4;
+        int32_t o = (54 * w[0] + 52 + j) * 4, m = (54 * w[0] + 76 + j) * 4;
         before += images[2][o] + images[2][o + 1] + images[2][o + 2];
         moved += images[0][o] + images[0][o + 1] + images[0][o + 2];
         fresh += images[1][o] + images[1][o + 1] + images[1][o + 2];
+        moved_mid += images[0][m] + images[0][m + 1] + images[0][m + 2];
+        fresh_mid += images[1][m] + images[1][m + 1] + images[1][m + 2];
     }
 
     test_assert(before > moved + 8 * 3 * 20);
     test_assert(abs(moved - fresh) <= 8 * 3 * 2);
+    test_assert(fresh_mid > 8 * 3 * 20);
+    test_assert(abs(moved_mid - fresh_mid) <= 8 * 3 * 4);
 
     for (i = 0; i < 3; i ++) {
         stbi_image_free(images[i]);
