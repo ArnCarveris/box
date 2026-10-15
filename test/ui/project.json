@@ -68,6 +68,18 @@
                 ]
             },
             {
+                "id": "Wrap",
+                "testcases": [
+                    "fixed_panel_grows_in_height",
+                    "panel_width_change_rewraps",
+                    "longest_word_is_minimum",
+                    "fixed_width_text",
+                    "fit_text_keeps_its_lines",
+                    "text_width_still_applies",
+                    "script_paragraph"
+                ]
+            },
+            {
                 "id": "Text",
                 "testcases": [
                     "measure_line",
