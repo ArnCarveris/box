@@ -195,6 +195,17 @@
                 ]
             },
             {
+                "id": "Readiness",
+                "setup": true,
+                "testcases": [
+                    "texture_wait_timeout_warns",
+                    "text_wait_timeout_warns",
+                    "ready_frame_does_not_warn",
+                    "many_stuck_textures_counted",
+                    "decoded_texture_not_named"
+                ]
+            },
+            {
                 "id": "FrameClock",
                 "testcases": [
                     "timing_measures_delta_and_interval",
