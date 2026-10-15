@@ -1254,6 +1254,43 @@ void Layout_parent_component(void) {
     ecs_fini(world);
 }
 
+void Layout_parent_reparent(void) {
+    // ui_fixes/parent_reparent
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t r1 = ecs_new(world);
+    ecs_set(world, r1, Layout, { .direction = DirectionRow });
+    ecs_entity_t r2 = ecs_new(world);
+    ecs_set(world, r2, Layout, { .direction = DirectionRow });
+    ecs_entity_t c = ecs_new(world);
+    ecs_set(world, c, EcsParent, {r1});
+    ecs_set(world, c, Rect, {10, 10});
+    ecs_entity_t d = ecs_new(world);
+    ecs_set(world, d, EcsParent, {r1});
+    ecs_set(world, d, Rect, {20, 10});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, EcsParent, {r2});
+    ecs_set(world, e, Rect, {30, 12});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, r1, LayoutBounds)->width, 30);
+    test_flt(ecs_get(world, r2, LayoutBounds)->width, 30);
+
+    ecs_set(world, c, EcsParent, {r2});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, r1, LayoutBounds)->width, 20);
+    test_flt(ecs_get(world, r1, LayoutBounds)->height, 10);
+    test_flt(ecs_get(world, r2, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, r2, LayoutBounds)->height, 12);
+    test_flt(ecs_get(world, d, Position)->x, 0);
+    test_flt(ecs_get(world, e, Position)->x, -5);
+    test_flt(ecs_get(world, c, Position)->x, 15);
+
+    ecs_fini(world);
+}
+
 void Layout_add_remove_child(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();

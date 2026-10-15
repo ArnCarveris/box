@@ -59,6 +59,7 @@
                     "transform_same_frame",
                     "same_in_every_scene",
                     "parent_component",
+                    "parent_reparent",
                     "add_remove_child",
                     "reparent",
                     "unchanged_tree_not_laid_out",
