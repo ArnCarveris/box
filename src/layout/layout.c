@@ -209,8 +209,8 @@ static void box_layout_on_parent(
 /** Find the root of the layout tree of an element.
  *
  * The root is the highest ancestor reached through parents with Layout. An element outside
- * any tree has no root, and neither has an element of a prefab: only instances are laid out,
- * so the layout never adds its outputs to a prefab.
+ * any tree has no root, and neither has a tree whose root is a prefab: only instances are laid
+ * out. flecs tags every descendant of a prefab with Prefab, so checking the root is enough.
  *
  * @param world The world
  * @param e The element
@@ -231,11 +231,8 @@ static ecs_entity_t box_layout_root(
         result = 0;
     }
 
-    for (parent = result; parent; parent = ecs_get_parent(world, parent)) {
-        if (ecs_has_id(world, parent, EcsPrefab)) {
-            result = 0;
-            break;
-        }
+    if (result && ecs_has_id(world, result, EcsPrefab)) {
+        result = 0;
     }
 
     return result;
