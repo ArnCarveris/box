@@ -41,20 +41,23 @@ ECS_ENUM(LightBakeMode, {
 
 /** Directional light travelling along the entity's local +Z */
 ECS_STRUCT(DirectionalLight, {
-    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    float intensity;    /**< Light on a facing white surface, default 1, 0 lights nothing */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
-/** Omnidirectional light */
+/** Omnidirectional light. Intensity is in linear display units: it lights a facing white diffuse
+ * surface at intensity / d^2 at distance d (from 0.01 up), windowed by (1 - (d / range)^4)^2 so
+ * the light reaches zero at range. A directional light lights that surface at its intensity.
+ */
 ECS_STRUCT(PointLight, {
-    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
     float range;        /**< Distance at which the light reaches zero, default 10 */
     LightBakeMode bake; /**< Part of the light in the bake of its scene, default Mixed */
 });
 
 /** Cone light along the entity's local +Z, angles are half angles in degrees */
 ECS_STRUCT(SpotLight, {
-    float intensity;    /**< Radiance scale, default 1, 0 lights nothing */
+    float intensity;    /**< Light on a facing white surface 1 unit away, default 1, 0 none */
     float range;        /**< Distance at which the light reaches zero, default 10 */
     float inner_angle;  /**< Full intensity cone half angle, default 20 */
     float outer_angle;  /**< Zero intensity cone half angle, default 30 */
