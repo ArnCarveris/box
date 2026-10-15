@@ -126,10 +126,15 @@ void Bake_converged_bounces(
     bench_bake(b, true, 2, 3);
 }
 
-void Bake_static_change_100k(
-    bench_t *b)
+/** Move one of 100k static boxes back and forth and bake until the scene converged again.
+ *
+ * @param b The benchmark
+ * @param edge Whether the box is a corner box that moves the static bounds, else a central one
+ */
+static void bench_bake_change(
+    bench_t *b,
+    bool edge)
 {
-    // baked_lighting/invalidation
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
     App *app = ecs_singleton_get_mut(world, App);
@@ -162,7 +167,9 @@ void Bake_static_change_100k(
             ecs_set(world, e, Position, {(float)x * 2 - 316, 0.5f, (float)z * 2 - 316});
             ecs_set(world, e, Box, {0.8f, 1, 0.8f});
             ecs_set(world, e, Rgb, {200, 120, 80});
-            if (x == BENCH_BAKE_CHANGE_ROW / 2 && z == BENCH_BAKE_CHANGE_ROW / 2) {
+            if (edge ? (x == 0 && z == 0) :
+                (x == BENCH_BAKE_CHANGE_ROW / 2 && z == BENCH_BAKE_CHANGE_ROW / 2))
+            {
                 moved = e;
             }
         }
@@ -184,7 +191,9 @@ void Bake_static_change_100k(
     bench_set_items(b, 1);
     while (bench_iter(b)) {
         changes ++;
-        ecs_set(world, moved, Position, {(changes & 1) ? 1.0f : 0.0f, 0.5f, 0});
+        float shift = (changes & 1) ? (edge ? -40.0f : 1.0f) : 0.0f;
+        ecs_set(world, moved, Position, {edge ? -316.0f + shift : shift, 0.5f,
+            edge ? -316.0f : 0.0f});
         i = 0;
         do {
             ecs_progress(world, 0);
@@ -201,4 +210,18 @@ void Bake_static_change_100k(
     bench_counter(b, "probes", (double)status->probes);
     bench_counter(b, "converged", status->converged ? 1.0 : 0.0);
     ecs_fini(world);
+}
+
+void Bake_static_change_100k(
+    bench_t *b)
+{
+    // baked_lighting/invalidation
+    bench_bake_change(b, false);
+}
+
+void Bake_edge_change_100k(
+    bench_t *b)
+{
+    // baked_lighting/invalidation
+    bench_bake_change(b, true);
 }
