@@ -522,3 +522,62 @@ void Mesh3_prefab_delete(void) {
 
     ecs_fini(world);
 }
+
+void Mesh3_prefab_remove(void) {
+    // core_fixes/mesh3_inherit
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, BoxGeometry);
+    box_mesh_cache_t *cache = box_mesh_cache_of(world);
+
+    Mesh3 m = {0};
+    ecs_vec_init_t(NULL, &m.vertices, vec3, 3);
+    ecs_vec_set_count_t(NULL, &m.vertices, vec3, 3);
+    vec3 *p = ecs_vec_first_t(&m.vertices, vec3);
+    for (int i = 0; i < 3; i ++) {
+        glm_vec3_copy((vec3){ (float)(i == 1), (float)(i == 2), 0.0f }, p[i]);
+    }
+
+    ecs_entity_t prefab = ecs_new_w_id(world, EcsPrefab);
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_entity_t instances[10];
+    for (int i = 0; i < 10; i ++) {
+        instances[i] = ecs_new_w_pair(world, EcsIsA, prefab);
+    }
+
+    uint32_t shared = ecs_get(world, instances[1], ShapeMesh)->mesh;
+    p[2][2] = 3.0f;
+    ecs_set_ptr(world, instances[0], Mesh3, &m);
+    uint32_t own = ecs_get(world, instances[0], ShapeMesh)->mesh;
+
+    ecs_remove(world, prefab, Mesh3);
+    test_assert(!ecs_has(world, prefab, Mesh3));
+    test_assert(ecs_has(world, instances[0], Mesh3));
+    test_uint(ecs_get(world, instances[0], ShapeMesh)->mesh, own);
+    for (int i = 1; i < 10; i ++) {
+        test_assert(!ecs_has(world, instances[i], Mesh3));
+        test_assert(!ecs_has(world, instances[i], ShapeMesh));
+    }
+
+    test_assert(box_mesh_cache_get(cache, shared) == NULL);
+
+    p[2][2] = 2.0f;
+    ecs_set_ptr(world, prefab, Mesh3, &m);
+    ecs_vec_fini_t(NULL, &m.vertices, vec3);
+    uint32_t again = ecs_get(world, prefab, ShapeMesh)->mesh;
+    test_flt(box_mesh_cache_get(cache, again)->max[2], 2.0f);
+    test_uint(ecs_get(world, instances[0], ShapeMesh)->mesh, own);
+    for (int i = 1; i < 10; i ++) {
+        const ShapeMesh *sm = ecs_get(world, instances[i], ShapeMesh);
+        test_assert(sm != NULL);
+        test_uint(sm->mesh, again);
+    }
+
+    for (int i = 0; i < 10; i ++) {
+        ecs_delete(world, instances[i]);
+    }
+
+    ecs_delete(world, prefab);
+    test_int(box_mesh_cache_count(cache), 0);
+
+    ecs_fini(world);
+}

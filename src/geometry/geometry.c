@@ -164,10 +164,70 @@ static void box_shape_on_set(
     ecs_os_free(entities);
 }
 
+/** Drop the resolved mesh of an entity.
+ *
+ * Flecs forbids adding or removing a copied component such as ShapeMesh on a prefab once it has
+ * instances, so a prefab keeps ShapeMesh without a mesh; other entities lose ShapeMesh.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param table The table of the entity
+ * @param e The entity
+ */
+static void box_shape_drop(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    const ecs_table_t *table,
+    ecs_entity_t e)
+{
+    ShapeMesh *dst = NULL;
+    if (ecs_table_has_id(world, table, EcsPrefab)) {
+        dst = ecs_get_mut(world, e, ShapeMesh);
+    } else {
+        ecs_remove(stage, e, ShapeMesh);
+    }
+
+    if (dst) {
+        box_mesh_cache_release(shape->cache, dst->mesh);
+        dst->mesh = 0;
+        glm_vec3_one(dst->scale);
+    }
+}
+
+/** Drop the resolved mesh of the instances that inherit a shape their base no longer has.
+ *
+ * Flecs reports the removal to these instances without a destination table, the same way it
+ * reports the deletion of an instance, so the base walks its instances instead.
+ *
+ * @param world The world
+ * @param stage The stage for structural changes
+ * @param shape The shape
+ * @param base The base that lost the shape
+ */
+static void box_shape_drop_instances(
+    ecs_world_t *world,
+    ecs_world_t *stage,
+    const box_shape_t *shape,
+    ecs_entity_t base)
+{
+    ecs_iter_t it = ecs_each_id(world, ecs_pair(EcsIsA, base));
+    while (ecs_each_next(&it)) {
+        bool owned = ecs_table_has_id(world, it.table, shape->desc.component);
+        for (int32_t i = 0; !owned && i < it.count; i ++) {
+            box_shape_drop(world, stage, shape, it.table, it.entities[i]);
+            box_shape_drop_instances(world, stage, shape, it.entities[i]);
+        }
+    }
+}
+
 /** Remove the resolved mesh when a live entity loses the shape.
  *
- * An instance that removes its own value of an inherited shape keeps the shape through IsA;
- * the OnSet flecs emits for the inherited value then brings its ShapeMesh up to date.
+ * Only an inherited shape (Mesh3) stays reachable through IsA: an instance that removes its own
+ * value keeps the prefab's, which the OnSet flecs then emits resolves. A copied shape is gone.
+ *
+ * An entity that loses an inherited shape also drops it from the instances that inherit it.
  *
  * @param it The iterator
  */
@@ -175,12 +235,16 @@ static void box_shape_on_remove(
     ecs_iter_t *it)
 {
     const box_shape_t *shape = it->ctx;
+    ecs_entity_t component = shape->desc.component;
     bool live = it->other_table && ecs_table_get_type(it->other_table)->count;
-    bool kept = live && ecs_search_relation(it->world, it->other_table, 0,
-        shape->desc.component, EcsIsA, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
-    if (live && !kept) {
-        for (int32_t i = 0; i < it->count; i ++) {
-            ecs_remove(it->stage, it->entities[i], ShapeMesh);
+    bool inherited = ecs_has_pair(it->world, component, EcsOnInstantiate, EcsInherit);
+    bool kept = live && inherited && ecs_search_relation(it->world, it->other_table, 0,
+        component, EcsIsA, EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
+    bool self = ecs_field_is_self(it, 0);
+    for (int32_t i = 0; live && !kept && i < it->count; i ++) {
+        box_shape_drop(it->world, it->stage, shape, it->table, it->entities[i]);
+        if (inherited && self) {
+            box_shape_drop_instances(it->world, it->stage, shape, it->entities[i]);
         }
     }
 }
