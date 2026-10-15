@@ -697,6 +697,15 @@ bool box_render_gpu_compile_delivery(
     return result;
 }
 
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+
+    return backend->render == box_gpu_render && box_gpu_capture_pending(backend->ctx, path);
+}
+
 bool box_render_gpu_shader_result(
     ecs_world_t *world,
     box_render_shader_result_t *result)
@@ -744,6 +753,16 @@ bool box_render_gpu_compile_delivery(
 {
     (void)world;
     (void)delivery;
+
+    return false;
+}
+
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path)
+{
+    (void)world;
+    (void)path;
 
     return false;
 }

@@ -546,8 +546,9 @@ frame); both are read live and do not apply to the `Terminal` entities of a scen
 (1 MiB, then `commands.log` moves to `commands.log.1`, logrotate style) and `images` (100) are
 read when a session opens and do not change open sessions. An image of `capture` or `render`
 counts against `images` from the moment it is named until it is deleted: naming one more
-deletes the oldest image the renderer is done with (written, or dropped once
-`RenderStatus.rendered` passed its packet), and when every kept image is still being written
+deletes the oldest image the renderer is done with (its packet rendered, as `RenderStatus.rendered`
+tells, and its readback no longer mapping, so the file is written or will never be), and when
+every kept image is still being written
 the command fails, so a burst of captures cannot leave files behind.
 
 **Captures.** `box_render_capture` queues a camera (or explicit settings); `RenderExtractCaptures`

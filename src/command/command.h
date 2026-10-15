@@ -25,9 +25,9 @@
 /** Name of the file in the session folder that every command line is appended to */
 #define BOX_TERMINAL_LOG "commands.log"
 
-/** Packets after the last submitted one by which the renderer has written or dropped an image
- * that a command names now: a capture goes into the next packet, a render one packet later
- * at most */
+/** Packets after the last submitted one that render an image a command names now: a capture
+ * goes into the next packet, a render one packet later at most. Its file is written once the
+ * GPU finished the readback, which box_render_gpu_capture_pending tells */
 #define BOX_TERMINAL_IMAGE_PACKETS (2)
 
 /** box_terminal_image result: the session keeps no images */

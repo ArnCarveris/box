@@ -1354,12 +1354,23 @@ void box_gpu_capture_fini(
     box_gpu_target_t *t);
 
 /** Block on the device until every capture that is mapping wrote its file, the flush callback
- * of the backend. The browser maps from its event loop, so there it returns at once.
+ * of the backend; captures a wait does not complete are abandoned, so none outlives the device.
+ * The browser maps from its event loop, so there it returns at once.
  *
  * @param ctx The backend
  */
 void box_gpu_capture_flush(
     void *ctx);
+
+/** Check whether the capture of a file is still mapping, so the file may still be written.
+ *
+ * @param gpu The backend
+ * @param path The file
+ * @return Whether a capture of the file is mapping
+ */
+bool box_gpu_capture_pending(
+    box_gpu_t *gpu,
+    const char *path);
 
 #endif
 

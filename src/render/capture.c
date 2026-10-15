@@ -8,13 +8,14 @@
 #ifdef BOX_RENDER_WGPU
 
 #include <stdio.h>
+#include <string.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
 /** A capture on its way from the GPU to its PNG file */
 struct box_gpu_capture_t {
-    box_gpu_t *gpu;                 /**< The backend */
+    box_gpu_t *gpu;                 /**< The backend, NULL once the backend abandoned it */
     uint32_t target;                /**< Handle of the target the buffer returns to */
     WGPUBuffer buffer;              /**< Buffer the image is copied into */
     uint64_t size;                  /**< Bytes of the buffer */
@@ -115,7 +116,30 @@ static void box_gpu_capture_free(
     ecs_os_free(capture);
 }
 
-/** Write the PNG of a capture once its buffer is mapped and free the capture.
+/** Remove a capture from the captures that are mapping.
+ *
+ * @param gpu The backend
+ * @param capture The capture
+ */
+static void box_gpu_capture_done(
+    box_gpu_t *gpu,
+    box_gpu_capture_t *capture)
+{
+    int32_t i, count;
+    ecs_os_mutex_lock(gpu->lock);
+    count = ecs_vec_count(&gpu->captures);
+    for (i = 0; i < count; i ++) {
+        if (ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0] == capture) {
+            ecs_vec_remove_t(&gpu->captures, box_gpu_capture_t*, i);
+            break;
+        }
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+/** Write the PNG of a capture once its buffer is mapped, then stop counting it as pending and
+ * free it. A capture the backend abandoned only frees itself.
  *
  * @param status Outcome of the map
  * @param message Error text
@@ -130,14 +154,12 @@ static void box_gpu_capture_on_map(
 {
     box_gpu_capture_t *capture = userdata1;
     box_gpu_t *gpu = capture->gpu;
-    int32_t i, count = ecs_vec_count(&gpu->captures);
     (void)message;
     (void)userdata2;
-    for (i = 0; i < count; i ++) {
-        if (ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0] == capture) {
-            ecs_vec_remove_t(&gpu->captures, box_gpu_capture_t*, i);
-            break;
-        }
+    if (!gpu) {
+        ecs_os_free(capture->path);
+        ecs_os_free(capture);
+        goto done;
     }
 
     if (status != WGPUMapAsyncStatus_Success) {
@@ -149,7 +171,10 @@ static void box_gpu_capture_on_map(
         box_gpu_count(gpu, BOX_GPU_STAT_CAPTURES);
     }
 
+    box_gpu_capture_done(gpu, capture);
     box_gpu_capture_free(capture);
+done:
+    return;
 }
 
 void box_gpu_capture_encode(
@@ -216,7 +241,9 @@ void box_gpu_capture_write(
 
     t->capture = NULL;
     capture->path = ecs_os_strdup(path);
+    ecs_os_mutex_lock(gpu->lock);
     ecs_vec_append_t(NULL, &gpu->captures, box_gpu_capture_t*)[0] = capture;
+    ecs_os_mutex_unlock(gpu->lock);
     wgpuBufferMapAsync(capture->buffer, WGPUMapMode_Read, 0, (size_t)capture->size,
         (WGPUBufferMapCallbackInfo){
             .mode = WGPUCallbackMode_AllowSpontaneous,
@@ -244,16 +271,39 @@ void box_gpu_capture_fini(
     t->capture = NULL;
 }
 
+/** Abandon the captures that are still mapping: release their buffers and empty the list. The
+ * map callback, which wgpu still fires for a released buffer, frees the capture and its path.
+ *
+ * @param gpu The backend
+ */
+static void box_gpu_capture_abandon(
+    box_gpu_t *gpu)
+{
+    int32_t i;
+    ecs_os_mutex_lock(gpu->lock);
+    for (i = 0; i < ecs_vec_count(&gpu->captures); i ++) {
+        box_gpu_capture_t *capture = ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0];
+        WGPUBuffer buffer = capture->buffer;
+        capture->buffer = NULL;
+        capture->gpu = NULL;
+        wgpuBufferRelease(buffer);
+    }
+
+    ecs_vec_clear(&gpu->captures);
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
 void box_gpu_capture_flush(
     void *ctx)
 {
     box_gpu_t *gpu = ctx;
-#ifndef __EMSCRIPTEN__
     int32_t count = ecs_vec_count(&gpu->captures);
+#ifndef __EMSCRIPTEN__
     while (count && gpu->device) {
         wgpuDevicePoll(gpu->device, true, NULL);
         if (ecs_vec_count(&gpu->captures) == count) {
             ecs_err("%d captures did not complete", count);
+            box_gpu_capture_abandon(gpu);
             break;
         }
 
@@ -261,9 +311,29 @@ void box_gpu_capture_flush(
     }
 #endif
 
+    ecs_os_mutex_lock(gpu->lock);
     if (!ecs_vec_count(&gpu->captures)) {
         ecs_vec_fini_t(NULL, &gpu->captures, box_gpu_capture_t*);
     }
+
+    ecs_os_mutex_unlock(gpu->lock);
+}
+
+bool box_gpu_capture_pending(
+    box_gpu_t *gpu,
+    const char *path)
+{
+    bool result = false;
+    int32_t i;
+    ecs_os_mutex_lock(gpu->lock);
+    for (i = 0; i < ecs_vec_count(&gpu->captures) && !result; i ++) {
+        box_gpu_capture_t *capture = ecs_vec_get_t(&gpu->captures, box_gpu_capture_t*, i)[0];
+        result = !strcmp(capture->path, path);
+    }
+
+    ecs_os_mutex_unlock(gpu->lock);
+
+    return result;
 }
 
 #endif

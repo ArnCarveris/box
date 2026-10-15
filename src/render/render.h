@@ -624,6 +624,17 @@ bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
 
+/** Check whether the GPU backend of a world may still write the capture of a file: its packet
+ * rendered and the readback of the image is still mapping.
+ *
+ * @param world The world
+ * @param path The file
+ * @return Whether a capture of the file is mapping
+ */
+bool box_render_gpu_capture_pending(
+    ecs_world_t *world,
+    const char *path);
+
 /** When the GPU backend applies the outcome of a shader compile.
  *
  * Natively an outcome arrives during the compile, in the browser after the frame; tests pick
@@ -1223,8 +1234,8 @@ void box_render_pause(
     ecs_world_t *world,
     bool paused);
 
-/** Wait until the backend rendered every submitted packet, also while the ring is held,
- * and bring RenderStatus up to date.
+/** Wait until the backend rendered every submitted packet, also while the ring is held, and
+ * flushed it, so every capture of those packets is written, and bring RenderStatus up to date.
  *
  * @param world The world
  */
