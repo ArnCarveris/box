@@ -143,7 +143,7 @@ static int32_t box_layout_read(
 }
 
 /** Track a child the tree holds: keep its parent when it is held through Parent, so moving it
- * marks the parent it leaves, and note it when it lacks the child tag the Position observer
+ * marks the parent it leaves, and note it when it lacks the child tag the Position change query
  * matches.
  *
  * @param world The world
@@ -725,16 +725,8 @@ void box_layout_tree(
     }
 
     state->writing = true;
-    if (state->observer) {
-        ecs_enable(world, state->observer, false);
-    }
-
     for (i = 0; i < count; i ++) {
         box_layout_write(world, &nodes[i]);
-    }
-
-    if (state->observer) {
-        ecs_enable(world, state->observer, true);
     }
 
     state->writing = false;

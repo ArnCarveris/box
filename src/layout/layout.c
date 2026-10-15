@@ -39,34 +39,61 @@ static void box_layout_on_element(
     }
 }
 
-/** Position observer: a child of a Layout moved, which a DirectionNone parent fits.
- *
- * The observer only matches the children the layout tagged when it collected them, so Position
- * sets outside a layout tree never reach it. A child that left its tree keeps the tag, so the
- * parent is checked here.
- *
- * @param it Iterator over the elements
- */
-static void box_layout_on_position(
-    ecs_iter_t *it)
+void box_layout_observe_children(
+    ecs_world_t *world,
+    box_layout_state_t *state)
 {
-    box_layout_state_t *state = it->ctx;
+    if (!state->moved) {
+        state->moved = ecs_query(world, {
+            .terms = {
+                { .id = ecs_id(Position), .inout = EcsIn },
+                { .id = state->child_tag, .inout = EcsInOutFilter }
+            },
+            .cache_kind = EcsQueryCacheAuto,
+            .flags = EcsQueryDetectChanges
+        });
+    }
+}
+
+/** Mark the children whose Position changed since the layout last looked, for a DirectionNone
+ * parent fits them.
+ *
+ * Change detection is per table: a Position set outside a layout tree costs nothing, and a
+ * write through a query field is seen too. The children of a changed table are marked when
+ * their parent has a Layout.
+ *
+ * @param world The world
+ * @param state The state of the layout module
+ * @param mark Mark the children, false to only take in the changes
+ */
+static void box_layout_moved(
+    ecs_world_t *world,
+    box_layout_state_t *state,
+    bool mark)
+{
     int32_t i;
-    if (state->writing) {
+    if (!state->moved || !ecs_query_changed(state->moved)) {
         goto done;
     }
 
-    ecs_entity_t prev = 0;
-    bool laid_out = false;
-    for (i = 0; i < it->count; i ++) {
-        ecs_entity_t parent = ecs_get_parent(it->world, it->entities[i]);
-        if (parent != prev) {
-            laid_out = parent && ecs_has(it->world, parent, Layout);
-            prev = parent;
+    ecs_iter_t it = ecs_query_iter(world, state->moved);
+    while (ecs_query_next(&it)) {
+        ecs_entity_t prev = 0;
+        bool laid_out = false;
+        if (!mark || !ecs_iter_changed(&it)) {
+            continue;
         }
 
-        if (laid_out) {
-            box_layout_mark(state, it->entities[i]);
+        for (i = 0; i < it.count; i ++) {
+            ecs_entity_t parent = ecs_get_parent(world, it.entities[i]);
+            if (parent != prev) {
+                laid_out = parent && ecs_has(world, parent, Layout);
+                prev = parent;
+            }
+
+            if (laid_out) {
+                box_layout_mark(state, it.entities[i]);
+            }
         }
     }
 
@@ -74,22 +101,31 @@ done:
     return;
 }
 
-void box_layout_observe_children(
-    ecs_world_t *world,
-    box_layout_state_t *state)
+/** Remove the child tag from elements that leave their parent, unless they are deleted.
+ *
+ * @param it Iterator over the elements, an OnRemove or OnSet of their hierarchy
+ * @param row First element
+ * @param count Number of elements
+ */
+static void box_layout_untag(
+    ecs_iter_t *it,
+    int32_t row,
+    int32_t count)
 {
-    if (!state->observer) {
-        state->observer = ecs_observer(world, {
-            .entity = ecs_entity(world, { .name = "LayoutOnPosition", .parent = state->module }),
-            .query.terms = {
-                { .id = ecs_id(Position), .inout = EcsInOutNone },
-                { .id = state->child_tag, .inout = EcsInOutFilter }
-            },
-            .events = { EcsOnSet },
-            .callback = box_layout_on_position,
-            .ctx = state
-        });
+    box_layout_state_t *state = it->ctx;
+    int32_t i;
+    bool deleted = it->event == EcsOnRemove &&
+        (!it->other_table || !ecs_table_get_type(it->other_table)->count);
+    if (deleted || !ecs_table_has_id(it->world, it->table, state->child_tag)) {
+        goto done;
     }
+
+    for (i = row; i < row + count; i ++) {
+        ecs_remove_id(it->stage, it->entities[i], state->child_tag);
+    }
+
+done:
+    return;
 }
 
 /** Mark the parent and the elements of a hierarchy change.
@@ -131,6 +167,9 @@ static void box_layout_on_childof(
 {
     ecs_entity_t parent = ecs_pair_second(it->world, ecs_field_id(it, 0));
     box_layout_mark_children(it, 0, it->count, parent);
+    if (it->event == EcsOnRemove) {
+        box_layout_untag(it, 0, it->count);
+    }
 }
 
 /** Parent observer: children were added to or removed from a parent.
@@ -159,6 +198,11 @@ static void box_layout_on_parent(
         }
 
         box_layout_mark_children(it, i, 1, p[i].value);
+        if (it->event == EcsOnRemove || !p[i].value ||
+            !ecs_is_alive(it->world, p[i].value) || !ecs_has(it->world, p[i].value, Layout))
+        {
+            box_layout_untag(it, i, 1);
+        }
     }
 }
 
@@ -289,7 +333,9 @@ static void LayoutUpdate(
 {
     ecs_world_t *world = it->world;
     box_layout_state_t *state = it->ctx;
-    int32_t i, count = ecs_vec_count(&state->marks);
+    int32_t i, count;
+    box_layout_moved(world, state, true);
+    count = ecs_vec_count(&state->marks);
     if (!count) {
         goto done;
     }
@@ -320,6 +366,7 @@ static void LayoutUpdate(
         }
     }
 
+    box_layout_moved(world, state, false);
 done:
     return;
 }
@@ -428,7 +475,6 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->nodes, box_layout_node_t, 0);
     ecs_vec_init_t(NULL, &state->untagged, ecs_entity_t, 0);
     state->child_tag = ecs_entity(world, { .name = "LayoutChild" });
-    state->module = ecs_get_scope(world);
     ecs_map_init(&state->parents, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
 

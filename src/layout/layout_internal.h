@@ -39,12 +39,11 @@ typedef struct {
     ecs_vec_t nodes;              /**< Elements of the tree being laid out */
     ecs_map_t parents;            /**< Element laid out through Parent to its layout parent */
     ecs_vec_t untagged;           /**< Children collect found without the child tag */
-    ecs_entity_t child_tag;       /**< Tag of the children of a Layout the observer watches */
+    ecs_entity_t child_tag;       /**< Tag of the children of a Layout the change query watches */
     const ecs_table_t *child_table; /**< Table of the last child collect checked */
     bool child_kept;              /**< That table has Parent, its children are kept */
     bool child_tagged;            /**< That table has the child tag */
-    ecs_entity_t observer;        /**< Position observer of tagged children, 0 until needed */
-    ecs_entity_t module;          /**< The box.layout module, scope of the lazy observer */
+    ecs_query_t *moved;           /**< Change query of the Position of tagged children */
     box_layout_text_t text;       /**< Hooks of the texts, zero without box.text */
     bool has_text;                /**< The tree being laid out has a text to wrap */
     bool writing;                 /**< The layout is writing its results */
@@ -55,8 +54,9 @@ typedef struct LayoutRegistry {
     box_layout_state_t *state; /**< The state */
 } LayoutRegistry;
 
-/** Create the observer of the Position of tagged children, once the first child is tagged, so
- * a world without layout trees has no observer on Position.
+/** Create the change query of the Position of tagged children once the first child is tagged.
+ *
+ * Only tables the query matches track changes, so Position sets elsewhere cost nothing.
  *
  * @param world The world
  * @param state The state of the layout module

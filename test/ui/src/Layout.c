@@ -1068,6 +1068,78 @@ void Layout_none_refits_moved_child(void) {
     ecs_fini(world);
 }
 
+void Layout_none_refits_query_write(void) {
+    // ui_fixes/layout_observer
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .padding = { 2, 2, 2, 2 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {6, 4});
+    ecs_set(world, a, Position, {10, 0, 0});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 30);
+
+    ecs_query_t *q = ecs_query(world, {
+        .terms = {{ .id = ecs_id(Position) }, { .id = ecs_id(Rect), .inout = EcsInOutNone }}
+    });
+    ecs_iter_t it = ecs_query_iter(world, q);
+    while (ecs_query_next(&it)) {
+        Position *pos = ecs_field(&it, Position, 0);
+        for (int32_t i = 0; i < it.count; i ++) {
+            pos[i].x = 20;
+        }
+    }
+
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 50);
+
+    ecs_query_fini(q);
+    ecs_fini(world);
+}
+
+void Layout_child_leaving_tree_drops_layout_tag(void) {
+    // ui_fixes/layout_observer
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t tag = ecs_lookup(world, "box.layout.LayoutChild");
+    test_assert(tag != 0);
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .padding = { 2, 2, 2, 2 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Rect, {6, 4});
+    ecs_set(world, a, Position, {10, 0, 0});
+    ecs_entity_t b = ecs_new(world);
+    ecs_set(world, b, EcsParent, {p});
+    ecs_set(world, b, Rect, {6, 4});
+    ecs_set(world, b, Position, {0, 0, 0});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 30);
+
+    ecs_entity_t scene = ecs_new(world);
+    ecs_add_pair(world, a, EcsChildOf, scene);
+    ecs_set(world, b, EcsParent, {scene});
+    ecs_progress(world, 0);
+
+    test_assert(!ecs_has_id(world, a, tag));
+    test_assert(!ecs_has_id(world, b, tag));
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 4);
+
+    ecs_add_pair(world, a, EcsChildOf, p);
+    ecs_progress(world, 0);
+    ecs_set(world, a, Position, {20, 0, 0});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, p, LayoutBounds)->width, 50);
+
+    ecs_fini(world);
+}
+
 void Layout_position_keeps_z(void) {
     // ui/layout
     ecs_world_t *world = ecs_init();

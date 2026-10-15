@@ -52,6 +52,8 @@
                     "none_keeps_position",
                     "none_fit_content",
                     "none_refits_moved_child",
+                    "none_refits_query_write",
+                    "child_leaving_tree_drops_layout_tag",
                     "position_keeps_z",
                     "position_owned",
                     "rect_written",
