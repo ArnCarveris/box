@@ -1011,6 +1011,46 @@ static bool box_gpu_cull_capture_draws(
     return result;
 }
 
+/** Add a cull view of probe captures with its uniforms, drawing the batches the captures draw.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene Scene of the captures
+ * @param slot Slot that identifies the cull view
+ * @param cascade 0 for the cascade, -1 for a probe
+ * @param base The uniforms of the cull view, its counter is set here
+ */
+static void box_gpu_cull_capture_view(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    int32_t cascade,
+    box_gpu_cull_uniforms_t *base)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    int32_t i, count = ecs_vec_count(&packet->batches);
+    base->jobs[3] = (uint32_t)ecs_vec_count(&c->views);
+    box_gpu_cull_view_t *cv = ecs_vec_append_t(NULL, &c->views, box_gpu_cull_view_t);
+    ecs_os_memset_t(cv, 0, box_gpu_cull_view_t);
+    cv->slot = slot;
+    cv->cascade = cascade;
+    cv->first_draw = ecs_vec_count(&c->draws);
+    cv->first_dispatch = ecs_vec_count(&c->dispatches);
+    cv->counter = base->jobs[3];
+    cv->group = c->empty_group;
+    for (i = 0; i < count; i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        if (box_gpu_cull_capture_draws(gpu, b, scene, cascade)) {
+            box_gpu_cull_draw_add(gpu, packet, i, base, NULL);
+        }
+    }
+
+    cv = ecs_vec_last_t(&c->views, box_gpu_cull_view_t);
+    cv->draw_count = ecs_vec_count(&c->draws) - cv->first_draw;
+    cv->dispatch_count = ecs_vec_count(&c->dispatches) - cv->first_dispatch;
+}
+
 void box_gpu_cull_capture_add(
     box_gpu_t *gpu,
     const box_render_packet_t *packet,
@@ -1020,9 +1060,8 @@ void box_gpu_cull_capture_add(
     mat4 view_proj,
     float pixels)
 {
-    box_gpu_cull_t *c = &gpu->cull;
     box_gpu_cull_uniforms_t base;
-    int32_t i, count = ecs_vec_count(&packet->batches);
+    int32_t i;
     ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
     box_gpu_cull_planes(view_proj, base.planes);
     for (i = 0; i < 4; i ++) {
@@ -1032,25 +1071,30 @@ void box_gpu_cull_capture_add(
     base.size[0] = pixels;
     base.size[1] = pixels > 0 ? BOX_RENDER_CULL_MIN_DIMENSION : 0.0f;
     base.size[2] = 1.0f;
-    base.jobs[3] = (uint32_t)ecs_vec_count(&c->views);
-    box_gpu_cull_view_t *cv = ecs_vec_append_t(NULL, &c->views, box_gpu_cull_view_t);
-    ecs_os_memset_t(cv, 0, box_gpu_cull_view_t);
-    cv->slot = slot;
-    cv->cascade = cascade;
-    cv->first_draw = ecs_vec_count(&c->draws);
-    cv->first_dispatch = ecs_vec_count(&c->dispatches);
-    cv->counter = base.jobs[3];
-    cv->group = c->empty_group;
-    for (i = 0; i < count; i ++) {
-        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
-        if (box_gpu_cull_capture_draws(gpu, b, scene, cascade)) {
-            box_gpu_cull_draw_add(gpu, packet, i, &base, NULL);
-        }
+    box_gpu_cull_capture_view(gpu, packet, scene, slot, cascade, &base);
+}
+
+void box_gpu_cull_probe_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    const float eye[3],
+    float pixels)
+{
+    box_gpu_cull_uniforms_t base;
+    int32_t i;
+    ecs_os_memset_t(&base, 0, box_gpu_cull_uniforms_t);
+    for (i = 0; i < 6; i ++) {
+        base.planes[i][3] = 1.0f;
     }
 
-    cv = ecs_vec_last_t(&c->views, box_gpu_cull_view_t);
-    cv->draw_count = ecs_vec_count(&c->draws) - cv->first_draw;
-    cv->dispatch_count = ecs_vec_count(&c->dispatches) - cv->first_dispatch;
+    glm_vec3_copy(ECS_CONST_CAST(float*, eye), base.clip_w);
+    base.size[0] = pixels;
+    base.size[1] = pixels > 0 ? BOX_RENDER_CULL_MIN_DIMENSION : 0.0f;
+    base.size[2] = 1.0f;
+    base.size[3] = 1.0f;
+    box_gpu_cull_capture_view(gpu, packet, scene, slot, -1, &base);
 }
 
 /** Make a cull buffer hold a number of bytes, growing it by doubling.

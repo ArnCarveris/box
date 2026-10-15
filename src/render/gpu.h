@@ -236,8 +236,10 @@ typedef struct box_gpu_cull_job_t {
 /** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
 typedef struct box_gpu_cull_uniforms_t {
     vec4 planes[6];                 /**< World space planes, inside where non negative */
-    vec4 clip_w;                    /**< Row of the view projection that gives clip w */
-    vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, unused */
+    vec4 clip_w;                    /**< Row of the view projection that gives clip w, the
+                                     *   probe position when size[3] is 1 */
+    vec4 size;                      /**< Pixels per unit at w 1, smallest size, w guard, 1 when
+                                     *   w is the depth in a face of the probe at clip_w */
     uint32_t jobs[4];               /**< First job, jobs, phase, counters of the cull view */
     mat4 view_proj;                 /**< World to clip space of the view */
     uint32_t hiz[4];                /**< Pyramid width, height and levels, 0 levels for none */
@@ -749,12 +751,12 @@ void box_gpu_bake_capture(
     box_gpu_t *gpu,
     const box_render_packet_t *packet);
 
-/** Record the draws of the cull view of a face of a probe capture into its render pass.
+/** Record the draws of the cull view of a probe capture into the render pass of its faces.
  *
  * @param gpu The backend
  * @param pass The render pass, with an rgba16float color target
  * @param packet The packet
- * @param slot Slot of the cull view of the face
+ * @param slot Slot of the cull view of the probe
  */
 void box_gpu_draw_capture(
     box_gpu_t *gpu,
@@ -923,14 +925,6 @@ WGPUBindGroup box_gpu_light_group_with(
     WGPUBuffer uniforms,
     WGPUBuffer clusters,
     WGPUTextureView shadow);
-
-/** Create a cluster buffer whose light index list holds 128 lights in every cluster.
- *
- * @param gpu The backend
- * @return The buffer, released by the caller
- */
-WGPUBuffer box_gpu_light_clusters_new(
-    box_gpu_t *gpu);
 
 /** Create the bind group of the forward pass of a view: its uniforms, lights, clusters and
  * shadow map.
@@ -1199,7 +1193,7 @@ void box_gpu_cull_upload(
 void box_gpu_cull_reset(
     box_gpu_t *gpu);
 
-/** Add a cull view of a probe capture: a face, or the cascade of its sun.
+/** Add a cull view of probe captures with a frustum, the cascade of their sun.
  *
  * It draws the batches of the scene with bake set, the shadow casters among them for a
  * cascade, tested against the frustum and, with pixels, the smallest projected size.
@@ -1219,6 +1213,27 @@ void box_gpu_cull_capture_add(
     int32_t slot,
     int32_t cascade,
     mat4 view_proj,
+    float pixels);
+
+/** Add the cull view of a probe capture, which every face of the probe draws.
+ *
+ * It draws the batches of the scene with bake set that are large enough seen from the probe:
+ * the sphere around an instance must span at least the smallest size at its depth in the face
+ * its center is in, the largest axis distance to the probe. No frustum is tested.
+ *
+ * @param gpu The backend
+ * @param packet The packet
+ * @param scene Scene of the captures
+ * @param slot Slot that identifies the cull view
+ * @param eye World position of the probe
+ * @param pixels Pixels per unit at depth 1 of a face, 0 to draw every instance
+ */
+void box_gpu_cull_probe_add(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet,
+    ecs_entity_t scene,
+    int32_t slot,
+    const float eye[3],
     float pixels);
 
 /** Record the dispatches of every cull view in one compute pass.

@@ -10,6 +10,7 @@ using box.light
 
 $ {
   AmbientLight: {sky: {150, 178, 210}, ground: {60, 56, 50}, intensity: 0.25}
+  LightBake: {probe_spacing: 1, bounds_padding: -0.3, bounces: 0, budget_ms: 8}
 }
 
 sun {

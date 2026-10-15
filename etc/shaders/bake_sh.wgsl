@@ -11,7 +11,8 @@
 // occluded when the face texel toward the light saw a surface nearer than the light, for a
 // directional light any surface.
 //
-// Face f of probe p is layer 6 p + f. Its texel (x, y), y down, looks along
+// Face f of probe p is the tile at column f and row p of the atlas, size texels on each side.
+// Its texel (x, y), y down, looks along
 // forward + u right + v up with u, v in [-1, 1] and right = cross(forward, up). The depth of
 // a face is reversed with an infinite far plane: near over the view depth, 0 where nothing is.
 
@@ -41,9 +42,9 @@ struct Light {
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
-@group(0) @binding(1) var captures: texture_2d_array<f32>;
+@group(0) @binding(1) var captures: texture_2d<f32>;
 @group(0) @binding(2) var<storage, read_write> volume: array<vec4f>;
-@group(0) @binding(3) var depths: texture_depth_2d_array;
+@group(0) @binding(3) var depths: texture_depth_2d;
 @group(0) @binding(4) var<storage, read> lights: array<Light>;
 
 const GROUP: u32 = 64u;
@@ -51,6 +52,12 @@ const SH_COEFFICIENTS: u32 = 9u;
 const PI: f32 = 3.141592653589793;
 
 var<workgroup> partial: array<array<vec3f, 9>, 64>;
+
+// Texel of the atlas that holds texel (x, y) of a face of a probe.
+fn tile(probe: u32, face: u32, x: u32, y: u32) -> vec2u {
+    let size = max(params.size.x, 1u);
+    return vec2u(face * size + x, probe * size + y);
+}
 
 // Axis a face looks along and its up axis.
 fn face_axes(face: u32) -> mat2x3f {
@@ -115,7 +122,7 @@ fn surface_distance(probe: u32, d: vec3f) -> f32 {
     let v = dot(d, axes[1]) / f;
     let x = min(u32(max((u + 1.0) * 0.5 * f32(size), 0.0)), size - 1u);
     let y = min(u32(max((1.0 - v) * 0.5 * f32(size), 0.0)), size - 1u);
-    let depth = textureLoad(depths, vec2u(x, y), probe * 6u + face, 0);
+    let depth = textureLoad(depths, tile(probe, face, x, y), 0);
     return select(-1.0, params.near.x / max(depth, 1e-20) / f, depth > 0.0);
 }
 
@@ -176,7 +183,7 @@ fn project(@builtin(workgroup_id) group: vec3u, @builtin(local_invocation_index)
         let axes = face_axes(face);
         let right = cross(axes[0], axes[1]);
         let d = normalize(axes[0] + right * (u0 + u1) * 0.5 + axes[1] * (v0 + v1) * 0.5);
-        let texel = textureLoad(captures, vec2u(x, y), probe * 6u + face, 0);
+        let texel = textureLoad(captures, tile(probe, face, x, y), 0);
         let radiance = select(a + b * d.y, texel.rgb, texel.a > 0.5) * weight;
         let y_lm = basis(d);
         for (var k = 0u; k < SH_COEFFICIENTS; k++) {

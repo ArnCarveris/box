@@ -32,9 +32,6 @@
 /** Largest cluster buffer, the default maxStorageBufferBindingSize of WebGPU */
 #define BOX_GPU_CLUSTER_BYTES_MAX ((uint64_t)128 * 1024 * 1024)
 
-/** Point and spot lights the cluster buffer of box_gpu_light_clusters_new lists in every cluster */
-#define BOX_GPU_CLUSTER_SHARED_LIGHTS (128)
-
 /** Point and spot lights per cluster the light index list of a view starts from at most */
 #define BOX_GPU_CLUSTER_BUDGET_LIGHTS (32)
 
@@ -588,13 +585,6 @@ WGPUBindGroup box_gpu_light_group(
 {
     return box_gpu_light_group_with(gpu, v, gpu->view_buffer,
         box_gpu_cluster_buffer(gpu, slot, v), box_gpu_shadow_binding(gpu, v));
-}
-
-WGPUBuffer box_gpu_light_clusters_new(
-    box_gpu_t *gpu)
-{
-    return box_gpu_cluster_buffer_new(gpu,
-        box_gpu_cluster_bytes(box_gpu_cluster_limit(BOX_GPU_CLUSTER_SHARED_LIGHTS)));
 }
 
 #endif
