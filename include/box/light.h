@@ -54,16 +54,9 @@ ECS_STRUCT(AmbientLight, {
 /** Baked indirect lighting of a scene, placed on a Scene root or as a singleton for the default
  * scene. Adding it adds LightBakeStatus.
  *
- * A bake is bounces + 1 passes over every probe: the first captures direct light and emission,
- * every later pass adds a bounce by shading its captures with the probes of the pass before it.
- * Views show the last complete pass while the next one bakes. Changing bounces bakes again.
- *
- * A change rebakes the probes it can reach, which keep their values until then: the bounds a
- * static shape had and has, padded by probe_spacing * (1 + bounces), when it moves, is added
- * or removed or its look or NoBake changes; the range of a point or spot light that changes;
- * every probe for a directional light, the ambient light, bounces or capture_size. Dynamic
- * shapes rebake nothing. probe_spacing, bounds_padding or static bounds that move the grid
- * place a new volume, which bakes from the ambient again.
+ * A bake is bounces + 1 passes: the first captures direct light and emission, each later one
+ * adds a bounce. A change rebakes the probes it can reach, which keep their values meanwhile
+ * (static shapes, lights; see docs/ARCHITECTURE.md, Invalidation). Dynamic shapes rebake none.
  *
  * Values apply as specified: bounces 0 bakes direct emission and light only, budget_ms 0 bakes
  * nothing, a capture_size outside 1 to 256 or bounces outside 0 to 16 bakes nothing and sets
