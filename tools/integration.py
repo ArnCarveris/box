@@ -35,9 +35,11 @@ PerfRun.refresh Hz that paces it), orbits the camera
 around the bounds of the shapes (or lets its controller fly it) and counts as errors every frame
 interval outside [0.9, 1.1] target intervals, every delta_time that differs more than 1 ms from the
 wall time since the previous frame or from the time the display showed the frame before, and every
-uneven present. A scene passes only with zero errors, when a view renders the orbiting (or flying)
-camera, when an orbit covers at least one revolution (frames >= fps * period) or a flying camera
-moved, and when the warmup, the only frames not measured, is at most one second. A run is retried
+present that missed its refresh. A target that does not divide the refresh rate (90 FPS on a
+120 Hz display) shows frames in a cadence of 1 and 2 refreshes: only the display delta and
+the missed presents count then. A scene passes only with zero errors, when a view renders the
+orbiting (or flying) camera, when an orbit covers at least one revolution (frames >= fps *
+period) or a flying camera moved, and when the warmup, the only frames not measured, is at most one second. A run is retried
 only when the load guard refused to start it; a run that started is never retried. Each result
 also holds the range of the visible, frustum culled and occlusion culled instances of the measured
 views and the process CPU use per frame. The results go to <out>/perf.json (test/integration/out
@@ -76,7 +78,7 @@ PERF_FIELDS = ("target_fps", "frames", "errors", "slow", "fast", "min_ms", "mean
                "p99_ms", "max_ms", "fps", "work_mean_ms", "work_p99_ms", "work_max_ms",
                "slept_ms", "stalls", "stall_ms", "warmup", "period", "revolutions", "views",
                "delta_errors", "delta_tolerance_ms", "delta_max_ms", "display_delta_errors",
-               "present_errors", "refresh",
+               "present_errors", "refresh", "cadence",
                "present_mean_ms", "cpu_percent", "cpu_ms", "fly", "travelled")
 CULL_FIELDS = ("visible", "frustum_culled", "occlusion_culled")
 PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "cull_changes",
@@ -607,6 +609,9 @@ def perf_detail(data):
     refresh = data.get("refresh") or 0
     display = (", %g Hz display, present mean %.2f ms" % (refresh, data.get("present_mean_ms", 0))
                if refresh else "")
+    if data.get("cadence"):
+        display += (", cadence: only display delta and missed presents count, slow, fast and "
+                    "delta reported")
     return ("%d errors (%d slow, %d fast, %d delta, %d display delta, %d present) in %d frames at "
             "%d fps%s, frame "
             "mean %.2f ms, p99 %.2f ms, max %.2f ms, delta max %.3f ms, work mean %.2f ms, p99 "

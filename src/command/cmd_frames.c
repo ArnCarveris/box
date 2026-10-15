@@ -46,6 +46,9 @@ static void box_cmd_frames_pacing(
 
     if (timing->fixed) {
         ecs_strbuf_appendstr(buf, ", fixed delta");
+    } else if (render && render->vsync && render->swap_interval > 0 && render->cadence != 1) {
+        ecs_strbuf_append(buf, ", vsync paces: a cadence of %.0f Hz refreshes, %d for this frame",
+            (double)render->refresh_rate, render->swap_interval);
     } else if (render && render->vsync && render->swap_interval > 0) {
         ecs_strbuf_append(buf, ", vsync paces: %d refresh(es) of %.0f Hz per frame",
             render->swap_interval, (double)render->refresh_rate);
@@ -56,7 +59,8 @@ static void box_cmd_frames_pacing(
     }
 
     if (timing->smoothing) {
-        ecs_strbuf_append(buf, ", delta snapped to %.0f Hz", (double)timing->refresh_rate);
+        ecs_strbuf_append(buf, ", delta snapped to refreshes of %.2f Hz",
+            (double)timing->refresh_rate);
     }
 
     ecs_strbuf_appendch(buf, '\n');

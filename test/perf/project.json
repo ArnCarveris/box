@@ -49,7 +49,8 @@
                     "delta_tolerance_edges",
                     "pacer_does_not_spin",
                     "display_paces_run",
-                    "uneven_display_fails",
+                    "cadence_checks_display_delta",
+                    "cadence_run_passes",
                     "fly_moves_camera"
                 ]
             },

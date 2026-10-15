@@ -4,7 +4,9 @@ Every `<scene>.flecs` in this folder is a performance test: it must hold its req
 with a camera that orbits the whole scene (or that its controller flies), and every frame's
 `delta_time` must match the wall time that passed. `tools/integration.py perf` runs each scene
 headless with `boxrun` and fails a scene on any frame outside 10% of its target, any delta off by
-more than 1 ms and any uneven present of a simulated vsync display.
+more than 1 ms and any present of a simulated vsync display that missed its refresh. A target
+that does not divide the display's refresh rate shows in a cadence (see Cadence) and is checked
+only on what a cadence can promise.
 
 ```sh
 python3 tools/integration.py perf --env <name>                  # every scene
@@ -59,7 +61,8 @@ The runner fails a scene that breaks one of these, whatever its frame times:
 - Every measured frame counts: a frame interval outside 10% of the target, a delta that differs
   more than 1 ms from the wall time since the previous frame (or, on a simulated display, from
   the time between the presents of the two frames) and a present interval outside 10% of the
-  target are errors, and one error fails the scene. There is no retry of a run that started; only
+  refreshes planned for the frame before (a missed refresh) are errors, and one error fails the
+  scene. In a cadence only the display delta and the missed refreshes are errors. There is no retry of a run that started; only
   a run the load guard refused to start is retried.
 
 | Member | Meaning |
@@ -91,16 +94,34 @@ any other component.
 - Frame interval: the wall time between the ends of two consecutive frames, taken in the last
   `EcsPostFrame` system after the CPU budget sleep. A frame that finishes early waits until one
   target interval `T = 1 / fps` has passed since the previous end, so an early frame is never
-  counted as fast. The wait never spins: it sleeps 60% of the time left at a time (a process
-  without a window gets up to 50% timer leeway on macOS: a 10 ms sleep returns after up to 15 ms)
-  until 0.1 ms is left, then the rest, and lands within tens of microseconds of `T` because the
-  pacing thread has a time-constraint policy during the run (testing/pacer_priority).
+  counted as fast. The wait never spins. It learns how late the pacing thread wakes from its
+  sleeps (the latency and its spread, from the first waits of the warmup) and wakes that much
+  early: coarse sleeps ask for the time left before the latency divided by 1.5 (a process
+  without a window gets up to 50% timer leeway on macOS: a 10 ms sleep returns after up to
+  15 ms), then one final sleep ends a latency before `T`. A wait that still ends early by more
+  than three times the spread sleeps again. A constant 1 ms wake up latency with full leeway
+  lands within a microsecond of `T` (`Frames_late_wakeups_absorbed`).
+- Platforms: macOS gives the pacing thread a time-constraint policy during the run
+  (testing/pacer_priority), so it wakes within tens of microseconds and the learned latency is
+  small. Linux asks for `SCHED_FIFO` at the lowest real-time priority, which needs
+  `CAP_SYS_NICE` or an `RLIMIT_RTPRIO` above 0 and otherwise warns once and keeps the normal
+  schedule; the learned latency then absorbs the 50 to 100 microsecond timer slack and the usual
+  scheduler delay, and only latency that varies by more than about 0.8 ms from frame to frame
+  at 120 FPS still fails a frame. Windows is not a build target of the engine (it needs POSIX
+  headers); a port would pace with a high resolution waitable timer
+  (`CREATE_WAITABLE_TIMER_HIGH_RESOLUTION`, or `timeBeginPeriod(1)` before Windows 10 1803) and
+  the same learned latency. The browser has no perf runs. The render thread runs at the user
+  interactive QoS on macOS only. Runs with `refresh` do not depend on any of this: the
+  simulated display paces them.
 - Simulated display: with `refresh` the perf pacer does not wait. Every frame presents to a
-  simulated FIFO swap chain of three images on the render thread: it is shown at the first free
-  refresh after the render thread submitted it, for the swap interval `refresh / fps` refreshes;
-  the render thread waits for the GPU fence of the frame two frames back (the GPU may take two
-  refreshes per frame, as with three images, and a GPU that cannot keep up blocks the renderer)
-  and blocks while a present is still queued, which paces the main thread like a window.
+  simulated FIFO swap chain of three images on the render thread. A frame is shown at the first
+  free refresh after the render thread submitted it, for the refreshes the cap asks for
+  (`refresh / fps`, or a cadence); when its GPU work is not done at that refresh (the render
+  thread asks at the refresh, from the queue's work done callback, so the cost of the poll does
+  not count), the display shows the frame before once more and the frame comes at the refresh
+  after the GPU finished, a missed refresh. The render thread
+  renders the next frame while the one before waits for its refresh, and blocks until that
+  refresh, which paces the main thread like a window.
 - Error rule: a measured interval `i` is an error when `i > 1.1 T` (slow) or `i < 0.9 T` (fast).
   Warmup frames are not measured. A run passes only when all `frames` intervals were measured and
   none is an error.
@@ -114,15 +135,28 @@ any other component.
   system, the render submit and any wait for a free render packet included; on a simulated
   display that wait is the presentation pacing the frame, so work is close to the interval. `work_mean_ms` and `work_p99_ms` show the
   headroom a passing scene has left; frame interval statistics of a passing scene sit at `T`.
-- Delta: a run sets `App.realtime`, so `delta_time` is measured like in a window (and snapped to
-  whole refreshes once the delta smoothing knows the refresh rate). Every measured frame compares
-  the unscaled `delta_time` with the wall time since the start of the previous frame on the same
-  OS clock; a difference over `BOX_FRAME_TOLERANCE_MS` (1 ms) is a delta error. The tolerance is
-  absolute because the error of a measured delta is wake up jitter, which does not grow with the
-  frame interval; 1 ms is 12% of a 120 FPS frame, so a delta that passes moves the scene by at
-  most one eighth of a frame's motion. On a simulated display every shown frame also compares its
-  delta with the time since the frame before was shown (display delta errors): the motion of a
-  frame must match how long the display showed the frame before it.
+- Delta: a run sets `App.realtime`, so `delta_time` is measured like in a window (and on a
+  vsync display snapped to the refreshes the frame before is shown for). Every measured frame
+  compares the unscaled `delta_time` with the wall time since the start of the previous frame
+  on the same OS clock; a difference over `BOX_FRAME_TOLERANCE_MS` (1 ms) is a delta error. The
+  tolerance is absolute because the error of a measured delta is wake up jitter, which does not
+  grow with the frame interval; 1 ms is 12% of a 120 FPS frame, so a delta that passes moves the
+  scene by at most one eighth of a frame's motion. This check is close to a self-comparison:
+  the frame loop measures the same interval a few microseconds earlier, so it only fails when
+  the smoothing changes a delta by more than the tolerance.
+- Display delta: the meaningful check. On a simulated display every shown frame compares its
+  delta with the time since the frame before was shown, on the display's own clock: the motion
+  of a frame must match how long the display showed the frame before it. It is the only check
+  that catches a delta that drifts from the refreshes or a frame the display repeated.
+- Cadence: a target that does not divide the refresh rate (90 FPS on 120 Hz) cannot be even:
+  every frame is shown for whole refreshes, so the frames alternate between 1 and 2 refreshes
+  (1, 1, 2, like a 3:2 pulldown) and average the target. The engine plans that cadence in the
+  presents and gives every frame the delta of the refreshes the frame before is shown for, so
+  the motion matches the display; the main thread measures its frames shifted against the
+  presents, so the frame intervals and the delta errors against them are uneven by design.
+  Such a run (`checks.cadence`) counts only display delta errors and missed refreshes;
+  `slow`, `fast` and `delta_errors` are reported. Even 90 FPS needs a display that 90 divides:
+  90 or 180 Hz panels, or a VRR display.
 - CPU: the process CPU time (all threads) over the wall time of the measurement is reported as
   `cpu_percent` and per frame as `cpu_ms`. A pacer or present that busy waits shows up as CPU time
   that grows with the idle time of a frame; on minime the town costs about 3.8 ms of CPU per frame
@@ -180,6 +214,7 @@ whose work was under 2 ms: the pacer's sleep woke late on a busy machine, not th
 | `walk_1m` | 1M collision | 120 | A first person controller walks a circle through 1,000,000 boxes, spheres, cylinders and cones (250,000 each), colliding through the spatial index, while the view looks at the field through a 5 degree lens on the orbit. | 78k | 922k | 0 |
 | `town_orbit_30` .. `town_orbit_120` | windowed town | 30, 60, 90, 120 | The town at the retina size of its window for a minute, orbiting, presenting to a simulated 120 Hz display (90 Hz for 90 FPS, which does not divide 120). | 2.5k..3.6k | 0.1k | 1.1k..2.2k |
 | `town_fly_30` .. `town_fly_120` | moving through the town | 30, 60, 90, 120 | The same, flown through the streets by the scene's `CameraController` with synthetic input for a minute. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
+| `town_fly_90_120hz` | 90 FPS on a 120 Hz display | 90 | The fly run capped at 90 FPS on a simulated 120 Hz display: a cadence of 1, 1 and 2 refreshes, checked only on display deltas and missed refreshes. | 0..2.4k | 0.1k..4.8k | 0..2.4k |
 | `town` | a real scene | 120 | The town of `etc/scenes/town.flecs` (content shared through `town.sources`) with its view: cascaded shadows, occlusion culling with a 4 pixel smallest size, SSAO and tonemapping. | 2.3k..3k | 1k | 0.8k..1.4k |
 | `walk_1m_first_person` | 1M collision, two views | 120 | `walk_1m` with a second view through the walking controller's own camera, rendered after the orbit view. | 78k | 922k | 0 |
 

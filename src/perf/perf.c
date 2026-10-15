@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 
-/** Seconds left below which the pacer sleeps the rest in one go */
+/** Seconds of a coarse sleep below which the pacer sleeps the rest in one go */
 #define BOX_PERF_STEP (0.0001)
 
 /** Seconds before a deadline at which the pacer counts it as reached, below the sleep resolution */
@@ -19,12 +19,19 @@
 /** Seconds of CPU time the real-time schedule adds to the work for the wake ups of the wait */
 #define BOX_PERF_WAKE (0.001)
 
-/** Fraction of the time left that one sleep of the pacer asks for.
- *
- * A process without a window gets up to 50% timer leeway on macOS, so a sleep of the whole
- * time left would overshoot by up to half of it; shorter sleeps converge on the deadline.
- */
-#define BOX_PERF_SLEEP (0.6)
+/** Factor a sleep may take at most: a process without a window gets up to 50% timer leeway on
+ * macOS, so a coarse sleep asks for the time left divided by it and cannot overshoot */
+#define BOX_PERF_LEEWAY (1.5)
+
+/** Seconds of wake up latency the pacer learns at most */
+#define BOX_PERF_WAKE_MAX (0.002)
+
+/** Seconds of wake up latency the pacer leaves to the deadline: waking this much early would
+ * end a wait before its deadline, so the learned latency stops short of it */
+#define BOX_PERF_WAKE_FLOOR (0.00001)
+
+/** Weight of a new latency sample in the learned latency once a few samples were taken */
+#define BOX_PERF_WAKE_GAIN (0.25)
 
 /** Factor on the median work of the warmup frames that the real-time schedule asks for */
 #define BOX_PERF_WORK_MARGIN (1.5)
@@ -51,25 +58,85 @@ static double box_perf_now(void)
     return result;
 }
 
-/** Wait until a deadline with ever shorter sleeps, never busy waiting.
+/** Sleep on the wall clock, or with the sleep a test installed.
  *
+ * @param seconds Seconds to sleep
+ */
+static void box_perf_sleep_for(
+    double seconds)
+{
+    if (box_perf_sleep) {
+        box_perf_sleep(seconds);
+    } else {
+        ecs_sleepf(seconds);
+    }
+}
+
+/** Learn the wake up latency of the pacing thread from a sleep that woke later than planned.
+ *
+ * @param perf The state of the module
+ * @param late Seconds the sleep woke after the time it asked for
+ * @param jitter Whether the sample also updates the spread of the latency
+ */
+static void box_perf_learn(
+    box_perf_t *perf,
+    double late,
+    bool jitter)
+{
+    double gain = 1.0 / (double)(perf->wake_samples + 1);
+    gain = gain > BOX_PERF_WAKE_GAIN ? gain : BOX_PERF_WAKE_GAIN;
+    late = late > BOX_PERF_WAKE_FLOOR ? late - BOX_PERF_WAKE_FLOOR : 0;
+    if (jitter) {
+        perf->wake_jitter += gain * (fabs(late - perf->wake) - perf->wake_jitter);
+        perf->wake += gain * (late - perf->wake);
+    } else {
+        perf->wake += gain * late;
+    }
+
+    perf->wake = perf->wake < 0 ? 0 : perf->wake;
+    perf->wake = perf->wake > BOX_PERF_WAKE_MAX ? BOX_PERF_WAKE_MAX : perf->wake;
+    perf->wake_samples ++;
+}
+
+/** Seconds a wait may end before its deadline: the spread of the wake up latency times this,
+ * since a sleep to make up for less would overshoot by a whole latency */
+#define BOX_PERF_EARLY (3.0)
+
+/** Wait until a deadline with OS sleeps, never busy waiting, waking early by the latency the
+ * thread is learned to wake up with, so a late scheduler on any platform still lands on time.
+ *
+ * Coarse sleeps ask for the time left before the latency and its spread, divided by the timer
+ * leeway, so none overshoots; a final sleep then ends a latency before the deadline. A wait
+ * that still ends early by more than the spread of the latency sleeps again.
+ *
+ * @param perf The state of the module
  * @param deadline Wall seconds to wait for
  * @return The wall clock after the wait
  */
 static double box_perf_wait(
+    box_perf_t *perf,
     double deadline)
 {
     double now = box_perf_now();
-    while (deadline - now > BOX_PERF_EPSILON) {
-        double left = deadline - now;
-        double sleep = left > BOX_PERF_STEP ? left * BOX_PERF_SLEEP : left;
-        if (box_perf_sleep) {
-            box_perf_sleep(sleep);
-        } else {
-            ecs_sleepf(sleep);
+    double left, coarse, sleep, before, early;
+    bool final;
+    early = perf->wake_jitter * BOX_PERF_EARLY;
+    while (deadline - now > (early > BOX_PERF_EPSILON ? early : BOX_PERF_EPSILON)) {
+        left = deadline - now;
+        coarse = (left - 2.0 * perf->wake - 2.0 * perf->wake_jitter) / BOX_PERF_LEEWAY;
+        final = coarse <= BOX_PERF_STEP;
+        sleep = left - perf->wake;
+        sleep = final ? (sleep > BOX_PERF_EPSILON ? sleep : BOX_PERF_EPSILON) : coarse;
+        before = now;
+        box_perf_sleep_for(sleep);
+        now = box_perf_now();
+        if (final) {
+            box_perf_learn(perf, now - before - sleep, true);
+        } else if (now > deadline - perf->wake) {
+            box_perf_learn(perf, now - (deadline - perf->wake), false);
         }
 
-        now = box_perf_now();
+        early = perf->wake_jitter * BOX_PERF_EARLY;
     }
 
     return now;
@@ -197,6 +264,43 @@ static void box_perf_fly_keys(
     }
 }
 
+/** Decide whether a simulated display shows the frames of a run in a cadence: the target does
+ * not divide the refresh rate, so frames alternate between refresh counts.
+ *
+ * @param refresh Refresh rate of the simulated display, 0 for none
+ * @param fps Target frame rate
+ * @return Whether the frames alternate
+ */
+static bool box_perf_cadence(
+    float refresh,
+    float fps)
+{
+    bool result = false;
+    double whole;
+    if (refresh > 0 && fps > 0 && (double)fps < (double)refresh - BOX_RENDER_REFRESH_SLACK) {
+        whole = floor((double)refresh / (double)fps + 0.5);
+        result = fabs(whole * (double)fps - (double)refresh) > BOX_RENDER_REFRESH_SLACK;
+    }
+
+    return result;
+}
+
+/** Sum the errors of a run. In a cadence the frame intervals and the deltas against them are
+ * uneven by design and only reported: what counts is that every delta matches the time the
+ * display showed the frame before it, and that no frame missed its refresh.
+ *
+ * @param status The status to update
+ */
+static void box_perf_errors(
+    PerfStatus *status)
+{
+    const PerfChecks *checks = &status->checks;
+    status->errors = checks->display_delta_errors + checks->present_errors;
+    if (!checks->cadence) {
+        status->errors += status->slow + status->fast + checks->delta_errors;
+    }
+}
+
 /** Start a run from new settings, or mark it invalid.
  *
  * @param it The iterator of the observer
@@ -225,8 +329,12 @@ static void BoxPerfOnSet(
     perf->begin = 0;
     perf->os_begin = 0;
     perf->has_last = false;
+    perf->wake = 0;
+    perf->wake_jitter = 0;
+    perf->wake_samples = 0;
     status.checks.fly = run->fly;
     status.checks.refresh = run->refresh;
+    status.checks.cadence = box_perf_cadence(run->refresh, fps);
     status.checks.delta_tolerance_ms = BOX_FRAME_TOLERANCE_MS;
     perf->priority.refused = false;
     box_perf_priority_reset(&perf->priority);
@@ -462,8 +570,7 @@ static void box_perf_count(
         status->fast ++;
     }
 
-    status->errors = status->slow + status->fast + status->checks.delta_errors +
-        status->checks.display_delta_errors + status->checks.present_errors;
+    box_perf_errors(status);
 }
 
 /** Add the distance the camera moved since the previous measured frame.
@@ -645,8 +752,7 @@ static void box_perf_end_usage(
     status->checks.cpu_ms = status->frame > 0 ? cpu * 1000.0 / (double)status->frame : 0;
     status->checks.present_mean_ms = presents > 0 ? wall * 1000.0 / (double)presents : 0;
     box_perf_presents(world, perf, status);
-    status->errors = status->slow + status->fast + status->checks.delta_errors +
-        status->checks.display_delta_errors + status->checks.present_errors;
+    box_perf_errors(status);
 }
 
 /** Complete the run: write the statistics and the report and quit when asked.
@@ -782,7 +888,7 @@ static void BoxPerfFrame(
         }
 
         if (run->refresh <= 0) {
-            now = box_perf_wait(perf->mark + 1.0 / perf->fps);
+            now = box_perf_wait(perf, perf->mark + 1.0 / perf->fps);
         }
 
         if (perf->state == PerfMeasure) {

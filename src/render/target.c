@@ -331,6 +331,51 @@ static void box_gpu_target_scene(
     t->blit_group = wgpuDeviceCreateBindGroup(gpu->device, &desc);
 }
 
+/** Release the scene texture of a target and its blit bind group.
+ *
+ * @param t The target
+ */
+static void box_gpu_target_scene_release(
+    box_gpu_target_t *t)
+{
+    if (t->blit_group) {
+        wgpuBindGroupRelease(t->blit_group);
+    }
+
+    if (t->scene_view) {
+        wgpuTextureViewRelease(t->scene_view);
+    }
+
+    if (t->scene) {
+        wgpuTextureRelease(t->scene);
+    }
+
+    t->blit_group = NULL;
+    t->scene_view = NULL;
+    t->scene = NULL;
+}
+
+/** Keep the scene texture of a target only while it needs one: a window that may present a
+ * frame again has one, and loses it, with the blit of every frame, when the cap no longer asks
+ * for more than one refresh per frame.
+ *
+ * @param gpu The backend
+ * @param t The target
+ * @param fps Frame rate cap of the frame, 0 for none
+ */
+static void box_gpu_target_scene_follow(
+    box_gpu_t *gpu,
+    box_gpu_target_t *t,
+    float fps)
+{
+    bool needed = box_render_target_scene(&t->desc, t->surface != NULL, fps);
+    if (needed && !t->scene) {
+        box_gpu_target_scene(gpu, t);
+    } else if (!needed && t->scene) {
+        box_gpu_target_scene_release(t);
+    }
+}
+
 /** Make the textures of a target match its description.
  *
  * @param gpu The backend
@@ -693,12 +738,12 @@ void box_gpu_target_render(
     const box_render_target_t *frame)
 {
     box_gpu_target_t *t = ecs_map_get_deref(&gpu->targets, box_gpu_target_t, frame->handle);
-    int32_t swap = t && t->surface && t->desc.vsync
-        ? box_render_swap_interval(t->desc.refresh, packet->fps)
-        : 0;
+    int32_t presents = t
+        ? box_render_window_presents(t->surface != NULL, t->desc.vsync, packet->presents)
+        : 1;
     int32_t i;
-    if (t && swap > 1 && !t->scene) {
-        box_gpu_target_scene(gpu, t);
+    if (t) {
+        box_gpu_target_scene_follow(gpu, t, packet->fps);
     }
 
     WGPUTexture texture = t ? box_gpu_target_acquire(gpu, t) : NULL;
@@ -736,7 +781,7 @@ void box_gpu_target_render(
         box_gpu_capture_write(gpu, t, box_render_packet_data(packet, frame->capture));
     }
 
-    for (i = 1; i < swap && t->scene; i ++) {
+    for (i = 1; i < presents && t->scene; i ++) {
         box_gpu_target_repeat(gpu, t);
     }
 

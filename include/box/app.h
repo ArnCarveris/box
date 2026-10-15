@@ -83,15 +83,16 @@ ECS_STRUCT(FrameRange, {
 /** Timing of the recent frames, written by the engine at the start of every frame.
  *
  * delta is the unscaled delta_time the world advanced with, interval the wall time between the
- * starts of two frames and error their difference. With vsync the delta is snapped to whole
- * refresh periods once the refresh rate is estimated, so it matches what the display shows.
+ * starts of two frames and error their difference. With vsync the delta is the refreshes the
+ * frame before is shown for, timed by the measured refresh rate, so it matches the display.
  */
 ECS_STRUCT(FrameTiming, {
     int32_t frames;         /**< Frames the ranges cover, at most BOX_FRAME_WINDOW */
     double target_ms;       /**< Interval of the App.fps cap, 0 when uncapped */
     bool vsync;             /**< Frames present with vsync, which paces them */
     bool fixed;             /**< Headless fixed step: delta is 1 / App.fps, not measured */
-    float refresh_rate;     /**< Refresh rate estimated from the frame times, 0 while unknown */
+    float refresh_rate;     /**< Display refresh rate measured from the frame times, 0 while
+                             *   the estimate is not complete */
     bool smoothing;         /**< The last delta was snapped to whole refresh periods */
     double delta_ms;        /**< Delta of the last frame */
     double interval_ms;     /**< Interval before the last frame */

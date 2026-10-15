@@ -182,10 +182,19 @@
                     "vsync_paces_without_cap",
                     "vsync_delta_smoothed",
                     "swap_interval_follows_cap",
-                    "uneven_cap_presents_uneven",
+                    "cadence_delta_matches_display",
                     "cap_does_not_spin",
                     "wait_does_not_spin",
-                    "fps_command"
+                    "fps_command",
+                    "long_run_59_94_hz_no_drift",
+                    "long_run_143_98_hz_no_drift",
+                    "late_gpu_repeats_frame",
+                    "fences_end_with_backend",
+                    "smoothing_follows_display_change",
+                    "cap_guard_never_binds_paced",
+                    "cap_guard_bounds_runaway",
+                    "cadence_repeats",
+                    "window_presents_follow_cadence"
                 ]
             }
         ]

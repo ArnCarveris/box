@@ -1,7 +1,9 @@
 // The town of etc/scenes/town.flecs at 90 FPS for a minute, flown by its CameraController with
 // synthetic input (forward and turning left held, boost toggled every 2 s), in the retina window
 // of that scene (1280x720 points, 2560x1440 pixels) presenting to a simulated 90 Hz vsync
-// display, each frame shown for 1 refresh.
+// display, each frame shown for 1 refresh. Even 90 FPS needs a display that 90 divides
+// (90 or 180 Hz panels, VRR); on a fixed 120 Hz display 90 FPS is uneven by nature, see
+// town_fly_90_120hz.
 
 include town_content
 

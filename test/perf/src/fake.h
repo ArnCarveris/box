@@ -33,8 +33,8 @@ double fake_now(void);
 void fake_sleep(
     double seconds);
 
-/** Sleep on the fake clock like a busy machine: with 50% timer leeway and 20 microseconds of
- * wake up latency, as a thread with a real-time schedule wakes.
+/** Sleep on the fake clock like a busy machine: with 50% timer leeway and a millisecond of
+ * wake up latency.
  *
  * @param seconds Seconds asked for
  */

@@ -57,6 +57,9 @@ typedef struct box_perf_t {
     double boost_time;    /**< Perf clock of the last boost toggle of a fly run */
     vec3 last;            /**< Position of the camera in the previous measured frame */
     bool has_last;        /**< last holds a position */
+    double wake;          /**< Seconds the pacing thread is learned to wake after a sleep ends */
+    double wake_jitter;   /**< Mean deviation of the wake up latency from wake */
+    int32_t wake_samples; /**< Latency samples taken during the run */
 } box_perf_t;
 
 /** Distribution of a series of durations */
@@ -74,8 +77,9 @@ extern double (*box_perf_clock)(void);
 /** Replacement for sleeping, NULL for the real sleep. Receives the seconds to sleep. */
 extern void (*box_perf_sleep)(double seconds);
 
-/** Give the calling thread a real-time schedule of one frame per interval, on macOS a
- * time-constraint policy. Other platforms keep their schedule.
+/** Give the calling thread a real-time schedule of one frame per interval: on macOS a
+ * time-constraint policy, on Linux SCHED_FIFO where the user may (CAP_SYS_NICE or an RLIMIT_RTPRIO
+ * above 0). Other platforms keep their schedule and rely on the learned wake up latency.
  *
  * @param priority The schedule to update, a schedule of another thread is reset first
  * @param interval Seconds per frame, the period and the deadline of every frame

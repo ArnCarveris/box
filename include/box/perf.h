@@ -85,8 +85,12 @@ ECS_STRUCT(PerfChecks, {
                                    *   the simulated display showed them after the previous */
     double delta_tolerance_ms; /**< Tolerance of the delta, BOX_FRAME_TOLERANCE_MS */
     double delta_max_ms;  /**< Largest difference of delta_time and the wall time */
-    int32_t present_errors; /**< Present intervals of the simulated display outside 10% */
+    int32_t present_errors; /**< Present intervals of the simulated display outside 10% of the
+                             *   refreshes planned for the frame before: a missed refresh */
     float refresh;        /**< Refresh rate of the simulated display, 0 for none */
+    bool cadence;         /**< The target does not divide the refresh rate: frames alternate
+                           *   between refresh counts, so only the display delta and the
+                           *   missed refreshes count as errors */
     double present_mean_ms; /**< Mean interval between presents during the measurement */
     double cpu_percent;   /**< Process CPU time over wall time during the measurement */
     double cpu_ms;        /**< Process CPU milliseconds per measured frame */
@@ -99,7 +103,8 @@ ECS_STRUCT(PerfStatus, {
     PerfState state;      /**< Progress of the run */
     bool passed;          /**< The run completed every frame without an error */
     int32_t frame;        /**< Frames measured so far */
-    int32_t errors;       /**< Sum of slow, fast, both delta errors and present_errors */
+    int32_t errors;       /**< Sum of slow, fast, both delta errors and present_errors; in a
+                           *   cadence only the display delta and present errors */
     int32_t slow;         /**< Frames longer than 1.1 target intervals */
     int32_t fast;         /**< Frames shorter than 0.9 target intervals */
     PerfChecks checks;    /**< Delta, presentation, CPU and flight checks of the measurement */
