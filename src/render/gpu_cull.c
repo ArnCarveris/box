@@ -27,6 +27,9 @@
 /** Smallest size of a cull buffer in bytes */
 #define BOX_GPU_CULL_MIN_SIZE (4096)
 
+/** Timestamps of the cull passes of one target at most, a begin and an end per pass */
+#define BOX_GPU_CULL_STAMPS (64)
+
 /** Words of the counters of a cull view: drawn, frustum culled and two unused */
 #define BOX_GPU_CULL_COUNTERS (4)
 
@@ -124,6 +127,17 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->uniform_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &c->job_data, box_gpu_cull_job_t, 0);
     ecs_vec_init_t(NULL, &c->pages, box_gpu_cull_page_t, 0);
+    if (gpu->timestamps) {
+        c->stamps = wgpuDeviceCreateQuerySet(gpu->device, &(WGPUQuerySetDescriptor){
+            .type = WGPUQueryType_Timestamp,
+            .count = BOX_GPU_CULL_STAMPS
+        });
+        c->stamp_resolve = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
+            .size = BOX_GPU_CULL_STAMPS * sizeof(uint64_t)
+        });
+    }
+
     c->window = BOX_GPU_CULL_WINDOW;
     ecs_vec_init_t(NULL, &c->arg_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->order, uint64_t, 0);
@@ -216,6 +230,12 @@ void box_gpu_cull_fini(
     }
 
     ecs_vec_fini_t(NULL, &c->pages, box_gpu_cull_page_t);
+    if (c->stamps) {
+        wgpuQuerySetRelease(c->stamps);
+        c->stamps = NULL;
+    }
+
+    box_gpu_cull_release(&c->stamp_resolve);
     c->bound = false;
     box_gpu_cull_release(&c->uniforms);
     box_gpu_cull_release(&c->jobs);
@@ -317,6 +337,23 @@ static void box_gpu_cull_on_map(
         : BOX_GPU_READBACK_FAILED;
 }
 
+/** Get the nanoseconds of one tick of the timestamps.
+ *
+ * @param gpu The backend
+ * @return The period, 1 in the browser, which resolves timestamps in nanoseconds
+ */
+static double box_gpu_cull_period(
+    box_gpu_t *gpu)
+{
+#ifdef __EMSCRIPTEN__
+    (void)gpu;
+
+    return 1.0;
+#else
+    return (double)wgpuQueueGetTimestampPeriod(gpu->queue);
+#endif
+}
+
 /** Turn the counters of a mapped copy into the status of its views.
  *
  * A view whose status is from a newer frame keeps it: copies finish mapping in any order, and
@@ -366,6 +403,16 @@ static void box_gpu_cull_publish(
     }
 
     ecs_os_mutex_unlock(gpu->lock);
+    if (counters && r->stamps) {
+        const uint64_t *t = (const uint64_t*)ECS_OFFSET(counters, r->stamp_offset);
+        uint64_t ticks = 0;
+        for (i = 0; i < (int32_t)r->stamps; i ++) {
+            ticks += t[i * 2 + 1] > t[i * 2] ? t[i * 2 + 1] - t[i * 2] : 0;
+        }
+
+        gpu->pending.cull_ns += (int64_t)((double)ticks * box_gpu_cull_period(gpu));
+        gpu->pending.cull_passes += (int32_t)r->stamps;
+    }
 }
 
 /** Map the counter copies that were submitted and publish the ones that arrived.
@@ -434,6 +481,7 @@ void box_gpu_cull_begin(
     box_gpu_cull_t *c = &gpu->cull;
     c->frame = packet->frame;
     c->stamp ++;
+    c->stamp_count = 0;
     ecs_os_mutex_lock(gpu->lock);
     c->window = gpu->cull_window;
     ecs_os_mutex_unlock(gpu->lock);
@@ -1201,12 +1249,56 @@ done:
     return;
 }
 
+/** Get the timestamps of the next cull pass of a slot and phase, when it records one.
+ *
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @param late The phase
+ * @param out Receives the timestamps
+ * @return The timestamps, NULL without timestamp queries, room or dispatches to time
+ */
+static const WGPUPassTimestampWrites* box_gpu_cull_timed(
+    box_gpu_t *gpu,
+    int32_t slot,
+    bool late,
+    WGPUPassTimestampWrites *out)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    const WGPUPassTimestampWrites *result = NULL;
+    int32_t i, d;
+    if (!c->stamps || !c->bound || !c->parallel || c->stamp_count + 2 > BOX_GPU_CULL_STAMPS) {
+        goto done;
+    }
+
+    for (i = 0; !result && i < ecs_vec_count(&c->views); i ++) {
+        const box_gpu_cull_view_t *cv = ecs_vec_get_t(&c->views, box_gpu_cull_view_t, i);
+        for (d = 0; cv->slot == slot && !result && d < cv->dispatch_count; d ++) {
+            if (ecs_vec_get_t(&c->dispatches, box_gpu_cull_dispatch_t,
+                cv->first_dispatch + d)->late == late)
+            {
+                *out = (WGPUPassTimestampWrites){
+                    .querySet = c->stamps,
+                    .beginningOfPassWriteIndex = c->stamp_count,
+                    .endOfPassWriteIndex = c->stamp_count + 1
+                };
+                c->stamp_count += 2;
+                result = out;
+            }
+        }
+    }
+
+done:
+    return result;
+}
+
 void box_gpu_cull_record(
     box_gpu_t *gpu,
     WGPUCommandEncoder encoder,
     int32_t slot)
 {
-    box_gpu_cull_dispatches(gpu, encoder, slot, false, NULL);
+    WGPUPassTimestampWrites writes;
+    box_gpu_cull_dispatches(gpu, encoder, slot, false,
+        box_gpu_cull_timed(gpu, slot, false, &writes));
 }
 
 bool box_gpu_cull_record_all(
@@ -1264,8 +1356,10 @@ void box_gpu_cull_record_late(
         goto done;
     }
 
+    WGPUPassTimestampWrites writes;
     box_gpu_hiz_build(gpu, encoder, cv->hiz, depth);
-    box_gpu_cull_dispatches(gpu, encoder, slot, true, NULL);
+    box_gpu_cull_dispatches(gpu, encoder, slot, true,
+        box_gpu_cull_timed(gpu, slot, true, &writes));
 done:
     return;
 }
@@ -1320,7 +1414,8 @@ void box_gpu_cull_finish(
         goto done;
     }
 
-    r = box_gpu_cull_readback(gpu, size);
+    uint64_t stamp_offset = (size + 7) & ~(uint64_t)7;
+    r = box_gpu_cull_readback(gpu, stamp_offset + c->stamp_count * sizeof(uint64_t));
     if (!r) {
         goto done;
     }
@@ -1348,6 +1443,17 @@ void box_gpu_cull_finish(
 
     wgpuCommandEncoderCopyBufferToBuffer(encoder, c->counters, 0, r->buffer, 0, size);
     r->used = size;
+    r->stamps = 0;
+    if (c->stamp_count) {
+        wgpuCommandEncoderResolveQuerySet(encoder, c->stamps, 0, c->stamp_count,
+            c->stamp_resolve, 0);
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, c->stamp_resolve, 0, r->buffer,
+            stamp_offset, c->stamp_count * sizeof(uint64_t));
+        r->stamp_offset = stamp_offset;
+        r->stamps = c->stamp_count / 2;
+        r->used = stamp_offset + c->stamp_count * sizeof(uint64_t);
+    }
+
     r->frame = c->frame;
     r->state = BOX_GPU_READBACK_COPIED;
 done:

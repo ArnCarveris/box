@@ -11,10 +11,11 @@
 
 #include <box.h>
 #include <bake_bench.h>
+#include <string.h>
+#include <unistd.h>
 #include "render.h"
 #ifdef __APPLE__
 #include <libproc.h>
-#include <unistd.h>
 #endif
 
 /** Get the instructions the process retired so far.
@@ -32,6 +33,41 @@ static uint64_t bench_cull_instructions(void)
 #endif
 
     return result;
+}
+
+/** Run the measured frames of a world, waiting for the GPU after each, and add the counters.
+ *
+ * The cull_gpu_ns counter is the GPU time of the cull passes of the views read back over the
+ * frames (timestamp queries), cull_passes the passes it covers.
+ *
+ * @param b The benchmark
+ * @param world The world
+ * @param items Items of a frame
+ */
+static void bench_cull_frames(
+    bench_t *b,
+    ecs_world_t *world,
+    int64_t items)
+{
+    box_render_gpu_stats_t before, after;
+    uint32_t word = 0;
+    double frames = 0;
+    uint64_t start = bench_cull_instructions();
+    box_render_gpu_stats(world, &before);
+    bench_set_items(b, items);
+    while (bench_iter(b)) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+        bench_keep(word);
+        frames ++;
+    }
+
+    box_render_gpu_stats(world, &after);
+    bench_counter(b, "instructions", (double)(bench_cull_instructions() - start));
+    bench_counter(b, "frames", frames);
+    bench_counter(b, "cull_gpu_ns", (double)(after.cull_ns - before.cull_ns));
+    bench_counter(b, "cull_passes", (double)(after.cull_passes - before.cull_passes));
 }
 
 /** Boxes along x */
@@ -92,26 +128,13 @@ static void bench_cull(
 
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
-    uint32_t word = 0;
     int32_t i;
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0);
         box_render_sync(world);
     }
 
-    double frames = 0;
-    uint64_t start = bench_cull_instructions();
-    bench_set_items(b, BENCH_CULL_X * BENCH_CULL_Z);
-    while (bench_iter(b)) {
-        ecs_progress(world, 0);
-        box_render_sync(world);
-        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
-        bench_keep(word);
-        frames ++;
-    }
-
-    bench_counter(b, "instructions", (double)(bench_cull_instructions() - start));
-    bench_counter(b, "frames", frames);
+    bench_cull_frames(b, world, BENCH_CULL_X * BENCH_CULL_Z);
     ecs_fini(world);
 }
 
@@ -173,25 +196,12 @@ static void bench_city(
 
     ecs_entity_t surface = ecs_new(world);
     ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
-    uint32_t word = 0;
     for (i = 0; i < 3; i ++) {
         ecs_progress(world, 0);
         box_render_sync(world);
     }
 
-    double frames = 0;
-    uint64_t start = bench_cull_instructions();
-    bench_set_items(b, BENCH_CITY * BENCH_CITY * 41);
-    while (bench_iter(b)) {
-        ecs_progress(world, 0);
-        box_render_sync(world);
-        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
-        bench_keep(word);
-        frames ++;
-    }
-
-    bench_counter(b, "instructions", (double)(bench_cull_instructions() - start));
-    bench_counter(b, "frames", frames);
+    bench_cull_frames(b, world, BENCH_CITY * BENCH_CITY * 41);
     ecs_fini(world);
 }
 
@@ -228,4 +238,83 @@ void Cull_occluded_city_100k_frustum_only(
 {
     // culling/hiz
     bench_city(b, true);
+}
+
+/** Meshes of the many batch case, one batch each */
+#define BENCH_CULL_BATCHES (400)
+
+void Cull_many_batches_shadows(
+    bench_t *b)
+{
+    // render_fixes/deterministic_cull
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 40, 90});
+    ecs_set(world, camera, Rotation, {-0.4f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_add(world, view, View);
+    View *v = ecs_get_mut(world, view, View);
+    v->camera = camera;
+    v->clear = (ClearSettings){.enabled = true, .color = {24, 28, 36, 255}};
+    v->shadows.enabled = true;
+    ecs_modified(world, view, View);
+    ecs_entity_t sun = ecs_new(world);
+    ecs_set(world, sun, Rotation, {0.5423041f, 2.3679806f, -0.4669112f});
+    ecs_set(world, sun, DirectionalLight, {.intensity = 1.5f});
+    int32_t i;
+    for (i = 0; i < BENCH_CULL_BATCHES * 50; i ++) {
+        int32_t mesh = i % BENCH_CULL_BATCHES;
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {(float)(i % 200) * 0.6f - 60, 0.5f,
+            -(float)(i / 200) * 0.6f});
+        ecs_set(world, e, RoundedBox, {0.4f, 0.4f + (float)mesh / 512.0f, 0.4f, 0.05f, 2});
+        ecs_set(world, e, Rgb, {200, 120, 80});
+    }
+
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    bench_cull_frames(b, world, BENCH_CULL_BATCHES * 50);
+    ecs_fini(world);
+}
+
+void Cull_town(
+    bench_t *b)
+{
+    // render_fixes/deterministic_cull
+    char root[1024];
+    int32_t len = (int32_t)(strstr(__FILE__, "bench/render/src/") - __FILE__);
+    ecs_os_snprintf(root, sizeof(root), "%.*s", len, __FILE__);
+    if (len > 0) {
+        bench_keep((uint64_t)chdir(root));
+    }
+
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_script_run_file(world, "etc/scenes/town.flecs");
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    bench_cull_frames(b, world, 1);
+    ecs_fini(world);
 }

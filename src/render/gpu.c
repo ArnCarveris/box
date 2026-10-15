@@ -704,6 +704,8 @@ void box_gpu_stats_publish(
     s->draws += p->draws;
     s->scatters += p->scatters;
     s->scattered += p->scattered;
+    s->cull_ns += p->cull_ns;
+    s->cull_passes += p->cull_passes;
     ecs_os_mutex_unlock(gpu->lock);
     ecs_os_memset_t(p, 0, box_render_gpu_stats_t);
 }

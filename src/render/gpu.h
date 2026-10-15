@@ -244,6 +244,8 @@ typedef struct box_gpu_cull_readback_t {
     int32_t state;                  /**< Free, copied, mapping, mapped or failed */
     int64_t frame;                  /**< Frame of the packet */
     ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
+    uint64_t stamp_offset;          /**< Byte offset of the timestamps after the counters */
+    uint32_t stamps;                /**< Timestamp pairs of its cull passes, 0 for none */
 } box_gpu_cull_readback_t;
 
 /** The cluster buffer of a view slot and the read back of the entries its pass allocated */
@@ -323,6 +325,10 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
     ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
     ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
+    WGPUQuerySet stamps;            /**< Begin and end of the cull passes of a target, NULL
+                                     *   without timestamp queries */
+    WGPUBuffer stamp_resolve;       /**< Resolved timestamps, copied into the readback */
+    uint32_t stamp_count;           /**< Timestamps the passes of the target wrote */
 } box_gpu_cull_t;
 
 /** Uniforms of a view, written per target because the projection follows its size.

@@ -546,6 +546,9 @@ typedef struct box_render_gpu_stats_t {
     int32_t scatters;           /**< Scatter dispatches recorded */
     int32_t scattered;          /**< Instances the scatter dispatches copied */
     int32_t probes;             /**< Probes captured */
+    int64_t cull_ns;            /**< GPU time of the cull passes of views read back, 0 without
+                                 *   timestamp queries */
+    int32_t cull_passes;        /**< Cull passes whose GPU time cull_ns holds */
 } box_render_gpu_stats_t;
 
 /** GPU time of the probe captures the GPU backend measured since the last time it was taken */
