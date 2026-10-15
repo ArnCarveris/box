@@ -35,7 +35,7 @@ void Pacing_budget_above_one_core(void) {
 }
 
 void Pacing_sleeps_when_over_budget(void) {
-    // engine_core/app
+    // test_fixes/pacing_flake
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
 
@@ -47,16 +47,21 @@ void Pacing_sleeps_when_over_budget(void) {
     ecs_singleton_set(world, App, {
         .headless = true, .frames = 6, .cpu_budget = 50, .unguarded = true });
 
+    ecs_progress(world, 0);
+
+    clock_t cpu_start = clock();
     ecs_time_t start;
     ecs_os_get_time(&start);
-    for (int i = 0; i < 6; i ++) {
+    for (int i = 0; i < 5; i ++) {
         ecs_progress(world, 0);
     }
 
     double wall = ecs_time_measure(&start);
+    double cpu = (double)(clock() - cpu_start) / (double)CLOCKS_PER_SEC;
     const AppStatus *status = ecs_singleton_get(world, AppStatus);
-    test_assert(status->slept > 0.05);
-    test_assert(wall > 0.15);
+    test_assert(cpu >= 0.1);
+    test_assert(cpu * 100.0 / 50.0 <= wall * 1.02);
+    test_assert(status->slept <= cpu * 100.0 / 50.0);
 
     ecs_fini(world);
 }
