@@ -440,8 +440,10 @@ typedef struct box_render_batch_t {
     uint32_t textures[BOX_RENDER_TEXTURE_SLOTS]; /**< Texture handles of the layers, 0 for none */
     uint32_t wrap;              /**< TextureWrap of the samplers */
     uint32_t instances;         /**< Buffer handle holding the instance data */
-    uint32_t first_instance;    /**< First instance in the instance buffer */
+    uint32_t first_instance;    /**< First instance in the instance buffer, unused when listed */
     uint32_t instance_count;    /**< Instances to draw */
+    bool listed;                /**< The instances are the slots at slots, not a range */
+    uint32_t slots;             /**< Data offset of instance_count uint32_t slots in draw order */
 } box_render_batch_t;
 
 /** Everything the renderer needs of one frame, filled on the main thread.
@@ -1226,6 +1228,20 @@ void* box_render_packet_resource(
     box_render_resource_op_t op,
     uint32_t handle,
     uint32_t size);
+
+/** Reserve an aligned block of bytes in the data of a packet.
+ *
+ * The block moves when more data is reserved; keep the offset, not the pointer.
+ *
+ * @param p The packet
+ * @param size Bytes to reserve
+ * @param offset_out Receives the data offset of the block
+ * @return The block, NULL when size is 0
+ */
+void* box_render_packet_reserve(
+    box_render_packet_t *p,
+    uint32_t size,
+    uint32_t *offset_out);
 
 /** Get the bytes an upload or a resource change points to.
  *

@@ -18,9 +18,10 @@
 //
 // cull_instances tests one instance per invocation of one job: a workgroup counts its drawn
 // instances and reserves their entries with one atomic, so the order within a draw is not
-// kept. cull_ordered tests one job per invocation in slot order, for the blended draws that
-// are sorted back to front. Both add the drawn and the frustum culled instances to the
-// counters of the cull view.
+// kept. cull_ordered tests one job per invocation in the order of its slots, for the blended
+// draws that are sorted back to front: their jobs list the slots (list is 1, first indexes
+// slot_lists), so a run of one batch in the sorted order is one draw. Both add the drawn and
+// the frustum culled instances to the counters of the cull view.
 
 #include "include/instance.wgsl"
 
@@ -42,6 +43,7 @@ struct Job {
     history: u32,
     extent: vec3f,
     late: u32,
+    list: u32,
 };
 
 // Words of the indexed indirect draw arguments of a draw; the instance count is the second.
@@ -63,6 +65,7 @@ const PHASE_LATE: u32 = 2u;
 @group(0) @binding(2) var<storage, read_write> visible_slots: array<u32>;
 @group(0) @binding(3) var<storage, read_write> args: array<atomic<u32>>;
 @group(0) @binding(4) var<storage, read_write> counters: array<atomic<u32>>;
+@group(0) @binding(5) var<storage, read> slot_lists: array<u32>;
 @group(1) @binding(0) var<storage, read> instances: array<Instance>;
 @group(2) @binding(0) var<storage, read_write> history: array<u32>;
 @group(2) @binding(1) var pyramid: texture_2d<f32>;
@@ -248,9 +251,14 @@ fn cull_ordered(@builtin(global_invocation_id) id: vec3u) {
     var count = 0u;
     var culled = 0u;
     for (var i = 0u; i < job.count; i++) {
-        let d = decide(job, job.first + i);
+        var slot = job.first + i;
+        if (job.list != 0u) {
+            slot = slot_lists[job.first + i];
+        }
+
+        let d = decide(job, slot);
         if (d.x) {
-            visible_slots[job.base + count] = job.first + i;
+            visible_slots[job.base + count] = slot;
             count++;
         }
 

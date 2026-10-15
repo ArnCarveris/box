@@ -20,6 +20,9 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 /** Distance in world units a 2D instance is lifted along its local z axis per layer */
 #define BOX_DRAWS_LAYER_STEP (0.0001f)
 
+/** Most slots of one blended draw, so the ordered cull pass spreads a long run over jobs */
+#define BOX_DRAWS_BLENDED_RUN (512)
+
 /** Bytes the smallest change buffer holds */
 #define BOX_DRAWS_MIN_CHANGES (64 * 1024)
 
@@ -769,8 +772,9 @@ static void box_draws_collect(
 
 /** Add the blended instances of every view, sorted back to front, after the opaque batches.
  *
- * Consecutive slots of one batch become one draw. The sort reuses the storage of earlier
- * frames, so a frame that sorts no more instances than before does not allocate.
+ * The sorted slots of a view go into the packet data; a run of one batch in that order is one
+ * draw listing its slots, split every BOX_DRAWS_BLENDED_RUN slots. Sort and packet storage
+ * is reused, so a frame that sorts no more instances than before does not allocate.
  *
  * @param p The packet
  * @param d The state
@@ -783,6 +787,7 @@ static void box_draws_send_blended(
     for (v = 0; v < ecs_vec_count(&p->views); v ++) {
         box_render_view_t *view = ecs_vec_get_t(&p->views, box_render_view_t, v);
         box_render_batch_t *out = NULL;
+        uint32_t offset = 0;
         box_draws_collect(d, view);
         int32_t count = ecs_vec_count(&d->sorted);
         box_draw_sorted_t *sorted = ecs_vec_first(&d->sorted);
@@ -790,10 +795,16 @@ static void box_draws_send_blended(
             qsort(sorted, (size_t)count, sizeof(box_draw_sorted_t), box_draws_sorted_cmp);
         }
 
+        uint32_t *slots = box_render_packet_reserve(p,
+            (uint32_t)count * (uint32_t)sizeof(uint32_t), &offset);
+        for (i = 0; i < count; i ++) {
+            slots[i] = (uint32_t)sorted[i].slot;
+        }
+
         for (i = 0; i < count; i ++) {
             box_draw_batch_t *b = box_draws_batch(d, sorted[i].batch);
             if (out && out->instances == b->buffer &&
-                out->first_instance + out->instance_count == (uint32_t)sorted[i].slot)
+                out->instance_count < BOX_DRAWS_BLENDED_RUN)
             {
                 out->instance_count ++;
                 continue;
@@ -809,7 +820,8 @@ static void box_draws_send_blended(
             out->mesh = b->key.mesh;
             box_draws_batch_textures(d, b, out);
             out->instances = b->buffer;
-            out->first_instance = (uint32_t)sorted[i].slot;
+            out->listed = true;
+            out->slots = offset + (uint32_t)i * (uint32_t)sizeof(uint32_t);
             out->instance_count = 1;
         }
     }

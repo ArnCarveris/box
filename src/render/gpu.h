@@ -206,6 +206,8 @@ typedef struct box_gpu_cull_job_t {
     uint32_t history;               /**< First history word of its buffer, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
     uint32_t late;                  /**< Draw arguments of its late phase, UINT32_MAX for none */
+    uint32_t list;                  /**< 1 when first indexes the slot lists, 0 for a range */
+    uint32_t pad[3];                /**< Pads the job to the size of Job in cull.wgsl */
 } box_gpu_cull_job_t;
 
 /** Uniforms of one cull dispatch, as in Cull of cull.wgsl */
@@ -264,11 +266,13 @@ typedef struct box_gpu_cull_t {
     int32_t revision;               /**< Revision of the shader the pipelines were made with */
     WGPUBuffer uniforms;            /**< box_gpu_cull_uniforms_t per dispatch */
     WGPUBuffer jobs;                /**< box_gpu_cull_job_t */
+    WGPUBuffer lists;               /**< uint32_t slots of the listed jobs in draw order */
     WGPUBuffer visible;             /**< Slots of the visible instances, per draw */
     WGPUBuffer args;                /**< Indexed indirect draw arguments, per draw */
     WGPUBuffer counters;            /**< Drawn and frustum culled instances per cull view */
     uint64_t uniforms_size;         /**< Bytes of the uniform buffer */
     uint64_t jobs_size;             /**< Bytes of the job buffer */
+    uint64_t lists_size;            /**< Bytes of the slot list buffer */
     uint64_t visible_size;          /**< Bytes of the visible buffer */
     uint64_t args_size;             /**< Bytes of the argument buffer */
     uint64_t counters_size;         /**< Bytes of the counter buffer */
@@ -289,6 +293,7 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t dispatches;           /**< box_gpu_cull_dispatch_t of the target */
     ecs_vec_t uniform_data;         /**< Bytes of the uniforms of the dispatches */
     ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
+    ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
     ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
     ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
     uint32_t visible_count;         /**< Entries of the visible buffer the target uses */

@@ -507,6 +507,12 @@
                     "shader_reload_redraws_every_state",
                     "released_shader_draws_nothing"
                 ]
+            },
+            {
+                "id": "BlendedDraws",
+                "testcases": [
+                    "interleaved_batches_blend_back_to_front"
+                ]
             }
         ]
     }

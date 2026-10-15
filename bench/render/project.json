@@ -120,6 +120,12 @@
                 "benchcases": [
                     "state_combinations"
                 ]
+            },
+            {
+                "id": "Blended",
+                "benchcases": [
+                    "gpu_10k"
+                ]
             }
         ]
     }

@@ -60,7 +60,7 @@ void box_gpu_cull_init(
         .visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Compute,
         .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
     };
-    WGPUBindGroupLayoutEntry entries[5] = {
+    WGPUBindGroupLayoutEntry entries[6] = {
         {
             .binding = 0,
             .visibility = WGPUShaderStage_Compute,
@@ -89,13 +89,18 @@ void box_gpu_cull_init(
             .binding = 4,
             .visibility = WGPUShaderStage_Compute,
             .buffer = { .type = WGPUBufferBindingType_Storage }
+        },
+        {
+            .binding = 5,
+            .visibility = WGPUShaderStage_Compute,
+            .buffer = { .type = WGPUBufferBindingType_ReadOnlyStorage }
         }
     };
     int32_t i;
     gpu->instance_layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
         &(WGPUBindGroupLayoutDescriptor){ .entryCount = 1, .entries = &instance });
     c->layout = wgpuDeviceCreateBindGroupLayout(gpu->device,
-        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 5, .entries = entries });
+        &(WGPUBindGroupLayoutDescriptor){ .entryCount = 6, .entries = entries });
     box_gpu_hiz_init(gpu);
     WGPUBindGroupLayout groups[3] = { c->layout, gpu->instance_layout, c->history_layout };
     c->pipeline_layout = wgpuDeviceCreatePipelineLayout(gpu->device,
@@ -113,6 +118,7 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t, 0);
     ecs_vec_init_t(NULL, &c->uniform_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &c->job_data, box_gpu_cull_job_t, 0);
+    ecs_vec_init_t(NULL, &c->list_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->arg_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->order, uint64_t, 0);
 }
@@ -155,6 +161,7 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t);
     ecs_vec_fini_t(NULL, &c->uniform_data, uint8_t);
     ecs_vec_fini_t(NULL, &c->job_data, box_gpu_cull_job_t);
+    ecs_vec_fini_t(NULL, &c->list_data, uint32_t);
     ecs_vec_fini_t(NULL, &c->arg_data, uint32_t);
     ecs_vec_fini_t(NULL, &c->order, uint64_t);
     if (c->group) {
@@ -164,6 +171,7 @@ void box_gpu_cull_fini(
 
     box_gpu_cull_release(&c->uniforms);
     box_gpu_cull_release(&c->jobs);
+    box_gpu_cull_release(&c->lists);
     box_gpu_cull_release(&c->visible);
     box_gpu_cull_release(&c->args);
     box_gpu_cull_release(&c->counters);
@@ -382,6 +390,7 @@ void box_gpu_cull_begin(
     ecs_vec_clear(&c->dispatches);
     ecs_vec_clear(&c->uniform_data);
     ecs_vec_clear(&c->job_data);
+    ecs_vec_clear(&c->list_data);
     ecs_vec_clear(&c->arg_data);
     c->visible_count = 0;
 }
@@ -520,6 +529,13 @@ static uint32_t box_gpu_cull_job(
     ecs_os_memset_t(job, 0, box_gpu_cull_job_t);
     job->first = b->first_instance;
     job->count = draw->count;
+    if (b->listed) {
+        job->first = (uint32_t)ecs_vec_count(&c->list_data);
+        job->list = 1;
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &c->list_data, uint32_t, (int32_t)draw->count),
+            box_render_packet_data(packet, b->slots), uint32_t, (int32_t)draw->count);
+    }
+
     job->args = draw->args;
     job->base = draw->base;
     job->history = history;
@@ -790,6 +806,7 @@ void box_gpu_cull_reset(
     ecs_vec_clear(&c->dispatches);
     ecs_vec_clear(&c->uniform_data);
     ecs_vec_clear(&c->job_data);
+    ecs_vec_clear(&c->list_data);
     ecs_vec_clear(&c->arg_data);
     c->visible_count = 0;
 }
@@ -918,6 +935,8 @@ void box_gpu_cull_upload(
     grown |= box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
         (uint64_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t),
         WGPUBufferUsage_Storage);
+    grown |= box_gpu_cull_reserve(gpu, &c->lists, &c->lists_size,
+        (uint64_t)ecs_vec_count(&c->list_data) * sizeof(uint32_t), WGPUBufferUsage_Storage);
     grown |= box_gpu_cull_reserve(gpu, &c->visible, &c->visible_size,
         (uint64_t)c->visible_count * sizeof(uint32_t),
         WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
@@ -927,7 +946,7 @@ void box_gpu_cull_upload(
     grown |= box_gpu_cull_reserve(gpu, &c->counters, &c->counters_size, counters,
         WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
     if (grown || !c->group) {
-        WGPUBindGroupEntry entries[5] = {
+        WGPUBindGroupEntry entries[6] = {
             {
                 .binding = 0, .buffer = c->uniforms,
                 .size = sizeof(box_gpu_cull_uniforms_t)
@@ -935,7 +954,8 @@ void box_gpu_cull_upload(
             { .binding = 1, .buffer = c->jobs, .size = c->jobs_size },
             { .binding = 2, .buffer = c->visible, .size = c->visible_size },
             { .binding = 3, .buffer = c->args, .size = c->args_size },
-            { .binding = 4, .buffer = c->counters, .size = c->counters_size }
+            { .binding = 4, .buffer = c->counters, .size = c->counters_size },
+            { .binding = 5, .buffer = c->lists, .size = c->lists_size }
         };
         if (c->group) {
             wgpuBindGroupRelease(c->group);
@@ -943,7 +963,7 @@ void box_gpu_cull_upload(
 
         c->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
             .layout = c->layout,
-            .entryCount = 5,
+            .entryCount = 6,
             .entries = entries
         });
     }
@@ -952,6 +972,11 @@ void box_gpu_cull_upload(
         (size_t)ecs_vec_count(&c->uniform_data));
     wgpuQueueWriteBuffer(gpu->queue, c->jobs, 0, ecs_vec_first(&c->job_data),
         (size_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t));
+    if (ecs_vec_count(&c->list_data)) {
+        wgpuQueueWriteBuffer(gpu->queue, c->lists, 0, ecs_vec_first(&c->list_data),
+            (size_t)ecs_vec_count(&c->list_data) * sizeof(uint32_t));
+    }
+
     wgpuQueueWriteBuffer(gpu->queue, c->args, 0, ecs_vec_first(&c->arg_data),
         (size_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t));
     for (offset = 0; offset < counters; offset += sizeof(zeros)) {

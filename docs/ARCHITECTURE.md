@@ -280,7 +280,8 @@ against the clip planes and `min_dimension_px` and writes visible slots plus ind
 phase draws what the view drew last frame (a history per instance slot, keyed by view and
 target), a depth pyramid keeps the farthest depth, the late phase tests every instance against
 at most 4x4 texels and draws the newly visible, so a fast camera never misses an instance.
-Blended draws keep a CPU back to front sort and are culled in slot order. `CullStatus` on each
+Blended draws keep a CPU back to front sort; each run of one batch in that order is one draw
+(at most 512 slots) whose job lists its sorted slots, culled in that order. `CullStatus` on each
 View reports instances, visible, frustum culled and occlusion culled, read back asynchronously.
 
 **Shadows.** Cascaded maps for the first directional light of the view's scene.

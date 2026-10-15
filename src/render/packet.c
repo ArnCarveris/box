@@ -211,6 +211,14 @@ void* box_render_packet_resource(
     return box_render_packet_alloc(p, size, &resource->data);
 }
 
+void* box_render_packet_reserve(
+    box_render_packet_t *p,
+    uint32_t size,
+    uint32_t *offset_out)
+{
+    return box_render_packet_alloc(p, size, offset_out);
+}
+
 const void* box_render_packet_data(
     const box_render_packet_t *p,
     uint32_t offset)
