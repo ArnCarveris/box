@@ -28,7 +28,10 @@
                 "benchcases": [
                     "move_10k_ui_100k_shapes",
                     "still_cursor_10k_ui_100k_shapes",
-                    "no_cursor_10k_ui_100k_shapes"
+                    "no_cursor_10k_ui_100k_shapes",
+                    "moves_8_per_frame_10k_layout_ui",
+                    "wheel_4_per_frame_10k_layout_ui",
+                    "move_over_hires_mesh"
                 ]
             }
         ]
