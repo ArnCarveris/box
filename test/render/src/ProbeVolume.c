@@ -28,18 +28,22 @@ void ProbeVolume_probe_count_of_layout(void) {
 
     const LightBakeStatus *status = ecs_get(world, scene, LightBakeStatus);
     test_assert(status != NULL);
-    test_int(status->probes, 4 * 3 * 3);
+    test_int(status->probes, 4 * 2 * 2);
 
     box_render_probe_t probe;
     vec3 corner = {-10, -10, -10};
     test_assert(box_render_bake_probe(world, scene, corner, &probe));
     test_flt(probe.position[0], -3);
-    test_flt(probe.position[1], -2);
-    test_flt(probe.position[2], -2);
+    test_flt(probe.position[1], -1);
+    test_flt(probe.position[2], -1);
 
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
     ecs_progress(world, 0);
-    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 5 * 3 * 3);
+    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 4 * 2 * 2);
+    test_assert(box_render_bake_probe(world, scene, corner, &probe));
+    test_flt(probe.position[0], -1.5f);
+    test_flt(probe.position[1], -0.5f);
+    test_flt(probe.position[2], -0.5f);
 
     ecs_fini(world);
 }
@@ -64,12 +68,12 @@ void ProbeVolume_no_static_shapes_no_probes(void) {
     ecs_set(world, floor, Position, {0, 0, 0});
     ecs_set(world, floor, Box, {2, 2, 2});
     ecs_progress(world, 0);
-    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 5 * 5 * 5);
+    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 4 * 4 * 4);
 
     ecs_set(world, mover, Position, {50, 0, 0});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 5 * 5 * 5);
+    test_int(ecs_get(world, ecs_id(LightBake), LightBakeStatus)->probes, 4 * 4 * 4);
 
     ecs_fini(world);
 }
@@ -137,13 +141,13 @@ void ProbeVolume_invalid_inside_rotated_box(void) {
     test_assert(t != NULL);
     float along = t->m[0][0] * t->m[0][2] < 0 ? -0.5f : 0.5f;
     box_render_probe_t probe;
-    test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0, along}, &probe));
+    test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0.5f, along}, &probe));
     test_flt(probe.position[0], 0.5f);
-    test_flt(probe.position[1], 0);
+    test_flt(probe.position[1], 0.5f);
     test_flt(probe.position[2], along);
     test_bool(probe.valid, false);
 
-    test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0, -along}, &probe));
+    test_assert(box_render_bake_probe(world, 0, (vec3){0.5f, 0.5f, -along}, &probe));
     test_flt(probe.position[0], 0.5f);
     test_flt(probe.position[2], -along);
     test_bool(probe.valid, true);
@@ -166,21 +170,21 @@ void ProbeVolume_grid_follows_static_bounds(void) {
     ecs_set(world, b, Position, {0, 0, 0});
     ecs_set(world, b, Box, {2, 2, 2});
     ecs_progress(world, 0);
-    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 3 * 3 * 3);
+    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 2 * 2 * 2);
 
     ecs_set(world, b, Position, {4, 0, 0});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 7 * 3 * 3);
+    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 6 * 2 * 2);
 
     box_render_probe_t probe;
     test_assert(box_render_bake_probe(world, scene, (vec3){10, 0, 0}, &probe));
-    test_flt(probe.position[0], 5);
+    test_flt(probe.position[0], 4.5f);
 
     ecs_set(world, b, Position, {0, 0, 0});
     ecs_progress(world, 0);
     ecs_progress(world, 0);
-    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 3 * 3 * 3);
+    test_int(ecs_get(world, scene, LightBakeStatus)->probes, 2 * 2 * 2);
 
     ecs_delete(world, a);
     ecs_delete(world, b);

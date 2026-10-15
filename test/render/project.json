@@ -166,7 +166,9 @@
                     "box_created_in_on_store",
                     "box_moved_in_on_store",
                     "manual_parent_move_updates_children",
-                    "manual_parent_moved_in_on_store"
+                    "manual_parent_moved_in_on_store",
+                    "mesh3_prefab_instances",
+                    "mesh3_prefab_removed"
                 ]
             },
             {
@@ -282,6 +284,24 @@
                     "invalid_capture_size_bakes_nothing",
                     "perf_run_measures_zero_budget",
                     "perf_run_ignores_unviewed_scene"
+                ]
+            },
+            {
+                "id": "Invalidation",
+                "testcases": [
+                    "static_move_rebakes_nearby_probes",
+                    "dynamic_move_rebakes_nothing",
+                    "point_light_change_limited_to_range",
+                    "directional_light_change_rebakes_scene",
+                    "removed_and_recolored_shapes_rebake",
+                    "moved_emissive_leaves_no_light_behind",
+                    "requeued_probes_keep_values",
+                    "edge_changes_keep_the_volume",
+                    "deleting_uncaptured_shapes_rebakes_nothing",
+                    "second_directional_light_rebakes_scene",
+                    "parent_tint_and_prefab_textures_rebake",
+                    "newly_valid_probe_hidden_until_baked",
+                    "full_rebakes_keep_values"
                 ]
             },
             {
