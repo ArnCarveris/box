@@ -467,8 +467,9 @@ typedef struct box_render_backend_t {
                                     *   when only the time a wait takes tells */
     void (*flush)(void*);       /**< Block until asynchronous work such as captures finished,
                                  *   on the render thread, NULL when there is none */
-    int32_t generation;         /**< Set by the ring: bumped when the backend released what it
-                                 *   was sent, so the extract sends everything again */
+    int32_t generation;         /**< Set by the ring, bumped at fini and on a new backend, as
+                                 *   init runs after or during the next extract; a change makes
+                                 *   the extract send everything again */
 } box_render_backend_t;
 
 /** Backend that renders nothing and records what it received, the default backend */
