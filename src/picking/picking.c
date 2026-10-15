@@ -83,9 +83,6 @@ static bool box_pick_blocks(
     int32_t depth = 0;
     bool result = false;
     box_pick_at(world, st, cursor, &pick);
-    st->memo = (box_pick_memo_t){
-        .pick = pick, .cursor = { cursor[0], cursor[1] },
-        .frame = ecs_get_world_info(world)->frame_count_total, .valid = true };
     for (e = pick.target; e && !result && depth < BOX_PICK_CHAIN_MAX; depth ++) {
         result = ecs_has_id(world, e, InputBlocker);
         e = ecs_get_parent(world, e);
@@ -281,7 +278,6 @@ static void box_pick_send(
         ecs_script_mouse_event(world, &evt);
     }
 
-    st->memo.valid = false;
     st->cursor[0] = src->screen_x;
     st->cursor[1] = src->screen_y;
     st->buttons = src->buttons;
@@ -326,7 +322,6 @@ static void box_pick_scroll(
     }
 
     if (resolved) {
-        st->memo.valid = false;
         ecs_script_tasks_progress(world);
     }
 }
@@ -416,7 +411,6 @@ void BoxPickingUpdate(
         box_input_emit_t emit = *ecs_vec_get_t(&st->emits, box_input_emit_t, i);
         box_pick_t pick;
         if (!emit.is_mouse) {
-            st->memo.valid = false;
             ecs_script_keyboard_event(world, &emit.keyboard);
             continue;
         }
@@ -437,7 +431,6 @@ void BoxPickingUpdate(
     }
 
     ecs_vec_clear(&st->emits);
-    st->memo.valid = false;
     if (!pointer && st->has_cursor) {
         box_pick_refresh(world, st);
     }

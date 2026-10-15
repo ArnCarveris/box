@@ -506,11 +506,11 @@ layer asks picking, when a mouse button goes down or the wheel turns, whether a 
 the cursor: such a press keeps the bindings of that button up until its next press (like
 Godot's unhandled input), and such a wheel is left out of `Mouse.scroll`. Picking casts through
 the spatial index (shapes and UI elements) and tests the triangles of a mesh with 64 or more
-through a hierarchy of its unit mesh, built on its first pick and kept while the mesh is used.
+through a hierarchy of its unit mesh, built by a box.jobs job queued on its first pick (picks
+scan the triangles until it is ready) and kept while the mesh is used and 600 frames after.
 Consecutive moves of a frame with the same buttons and modifiers are coalesced into the last
 one, which carries their summed delta (like the animation frame aligned moves of browsers);
-presses, releases, the wheel and keys are never skipped. The pick of the `blocks` callback is
-reused by the first pointer event of the frame at the same cursor.
+presses, releases, the wheel and keys are never skipped.
 
 `CameraController` and `FirstPersonController` read only `ActionState`, never devices. Default
 actions live under `box.controllers.camera` and `box.controllers.first_person` and stay disabled

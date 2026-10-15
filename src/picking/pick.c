@@ -10,6 +10,7 @@
 #include "../render/render.h"
 #include "../spatial/spatial.h"
 #include "../geometry/mesh_cache.h"
+#include "../jobs/jobs.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -18,6 +19,10 @@
 
 /** Triangles from which a picked mesh gets a triangle hierarchy instead of a linear scan */
 #define BOX_PICK_BVH_TRIANGLES (64)
+
+/** Frames a triangle hierarchy outlives the last shape of its mesh, so a shape that goes away
+ * and comes back, as in a reload or a toggle, finds it built */
+#define BOX_PICK_MESH_IDLE (600)
 
 /** The ray of a cursor in one view */
 typedef struct box_pick_ray_t {
@@ -35,6 +40,14 @@ typedef struct box_pick_tri_walk_t {
     vec3 best;              /**< Distance and barycentric weights of the nearest hit */
     int32_t hit;            /**< First index of the nearest triangle, -1 for none */
 } box_pick_tri_walk_t;
+
+/** A job that builds the triangle hierarchy of a unit mesh on a worker */
+typedef struct box_pick_build_t {
+    box_mesh_t mesh;         /**< Copy of the mesh header; picking holds a reference */
+    uint32_t handle;         /**< Mesh handle */
+    box_pick_state_t *st;    /**< The module state, which takes the tree on completion */
+    box_bvh_t tree;          /**< The tree the work builds */
+} box_pick_build_t;
 
 /** Context of the narrow phase of a ray cast */
 typedef struct box_pick_cast_t {
@@ -243,15 +256,63 @@ static void box_pick_mesh_build(
     ecs_os_free(leaves);
 }
 
-/** Get the triangle hierarchy of a mesh with many triangles, building it on first use.
+/** Build the triangle hierarchy of a job on a worker.
  *
+ * @param ctx The job
+ */
+static void box_pick_build_work(
+    void *ctx)
+{
+    box_pick_build_t *b = ctx;
+    box_pick_mesh_build(&b->mesh, &b->tree);
+}
+
+/** Hand the built hierarchy of a job to the entry of its mesh.
+ *
+ * @param world The world
+ * @param ctx The job
+ */
+static void box_pick_build_complete(
+    ecs_world_t *world,
+    void *ctx)
+{
+    box_pick_build_t *b = ctx;
+    box_pick_mesh_t *pm = ecs_map_get_deref(&b->st->meshes, box_pick_mesh_t, b->handle);
+    (void)world;
+    if (pm && pm->building) {
+        pm->tree = b->tree;
+        pm->ready = true;
+        pm->building = false;
+        box_bvh_init(&b->tree);
+    }
+}
+
+/** Free a job and the tree it did not hand over.
+ *
+ * @param ctx The job
+ */
+static void box_pick_build_free(
+    void *ctx)
+{
+    box_pick_build_t *b = ctx;
+    box_bvh_fini(&b->tree);
+    ecs_os_free(b);
+}
+
+/** Get the triangle hierarchy of a mesh with many triangles.
+ *
+ * The first pick of a mesh queues a job that builds it on a worker; until the job completes
+ * the picks of that mesh scan its triangles, so no frame pays for the build.
+ *
+ * @param world The world
  * @param cache The mesh cache
  * @param st The module state
  * @param handle The mesh handle
  * @param mesh The mesh
- * @return The hierarchy, NULL for a mesh with few triangles
+ * @return The hierarchy, NULL for a mesh with few triangles or one whose tree is not built yet
  */
 static const box_bvh_t* box_pick_mesh_tree(
+    const ecs_world_t *world,
     box_mesh_cache_t *cache,
     box_pick_state_t *st,
     uint32_t handle,
@@ -265,15 +326,27 @@ static const box_bvh_t* box_pick_mesh_tree(
 
     result = ecs_map_get_deref(&st->meshes, box_pick_mesh_t, handle);
     if (!result) {
+        box_pick_build_t *b = ecs_os_calloc_t(box_pick_build_t);
+        b->mesh = *mesh;
+        b->handle = handle;
+        b->st = st;
+        box_bvh_init(&b->tree);
         result = ecs_os_calloc_t(box_pick_mesh_t);
         result->handle = handle;
-        box_pick_mesh_build(mesh, &result->tree);
+        box_bvh_init(&result->tree);
         box_mesh_cache_keep(cache, handle);
         ecs_map_insert_ptr(&st->meshes, handle, result);
+        result->building = !box_job_submit(ECS_CONST_CAST(ecs_world_t*, world),
+            &(box_job_desc_t){ .work = box_pick_build_work,
+                .complete = box_pick_build_complete, .ctx_free = box_pick_build_free,
+                .ctx = b });
+        if (!result->building) {
+            box_pick_build_free(b);
+        }
     }
 
 done:
-    return result ? &result->tree : NULL;
+    return result && result->ready ? &result->tree : NULL;
 }
 
 /** Keep the nearest triangle a ray walk reaches.
@@ -375,7 +448,7 @@ static bool box_pick_mesh(
     glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, origin), 1.0f, o);
     glm_mat4_mulv3(inv, ECS_CONST_CAST(float*, dir), 0.0f, d);
     if (shape->scale[0] != 0 && shape->scale[1] != 0 && shape->scale[2] != 0) {
-        tree = box_pick_mesh_tree(cache, st, shape->mesh, mesh);
+        tree = box_pick_mesh_tree(world, cache, st, shape->mesh, mesh);
     }
 
     if (tree) {
@@ -421,7 +494,8 @@ void box_pick_meshes_prune(
     int32_t i, count = 0;
     while (cache && count < 64 && ecs_map_next(&it)) {
         box_pick_mesh_t *pm = ecs_map_ptr(&it);
-        if (box_mesh_cache_refs(cache, pm->handle) <= 1) {
+        pm->idle = box_mesh_cache_refs(cache, pm->handle) <= 1 ? pm->idle + 1 : 0;
+        if (!pm->building && pm->idle > BOX_PICK_MESH_IDLE) {
             drop[count ++] = pm->handle;
         }
     }
@@ -1143,48 +1217,6 @@ size:
     }
 }
 
-/** Check whether an entity a pick found is still alive.
- *
- * @param world The world
- * @param e The entity, 0 for none
- * @return Whether it is 0 or alive
- */
-static bool box_pick_alive(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    return !e || ecs_is_alive(world, e);
-}
-
-/** Get the pick of the blocks callback when it was made at the same cursor in this frame and
- * nothing was delivered since.
- *
- * @param world The world
- * @param st The module state
- * @param cursor The cursor
- * @param out Receives the pick
- * @return Whether the pick could be reused
- */
-static bool box_pick_memo(
-    const ecs_world_t *world,
-    const box_pick_state_t *st,
-    const vec2 cursor,
-    box_pick_t *out)
-{
-    const box_pick_memo_t *m = &st->memo;
-    const box_pick_t *p = &m->pick;
-    bool result = m->valid && m->frame == ecs_get_world_info(world)->frame_count_total &&
-        m->cursor[0] == cursor[0] && m->cursor[1] == cursor[1] &&
-        box_pick_alive(world, p->target) && box_pick_alive(world, p->handler) &&
-        box_pick_alive(world, p->view) && box_pick_alive(world, p->hit) &&
-        box_pick_alive(world, p->hit_view);
-    if (result) {
-        *out = *p;
-    }
-
-    return result;
-}
-
 void box_pick_at(
     ecs_world_t *world,
     box_pick_state_t *st,
@@ -1192,11 +1224,9 @@ void box_pick_at(
     box_pick_t *out)
 {
     box_pick_surface_t s;
-    if (!box_pick_memo(world, st, cursor, out)) {
-        ecs_os_zeromem(out);
-        box_pick_input_surface(world, st, &s);
-        box_pick_surface(world, st, &s, cursor, 0, out);
-    }
+    ecs_os_zeromem(out);
+    box_pick_input_surface(world, st, &s);
+    box_pick_surface(world, st, &s, cursor, 0, out);
 }
 
 /** Find where the ray of a cursor meets the plane of an entity.

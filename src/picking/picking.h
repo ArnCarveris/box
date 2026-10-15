@@ -65,16 +65,10 @@ typedef struct box_pick_candidate_t {
 typedef struct box_pick_mesh_t {
     box_bvh_t tree;  /**< Triangles of the unit mesh, the item of a leaf is a triangle index */
     uint32_t handle; /**< Mesh handle */
+    int32_t idle;    /**< Frames in a row picking held the only reference to the mesh */
+    bool building;   /**< A job builds the tree and reads the mesh */
+    bool ready;      /**< The tree is built */
 } box_pick_mesh_t;
-
-/** The pick of the blocks callback of the router, reused by the first pointer event of the frame
- * at the same cursor when no event was delivered in between */
-typedef struct box_pick_memo_t {
-    box_pick_t pick;     /**< What the pick found */
-    vec2 cursor;         /**< Cursor of the pick */
-    int64_t frame;       /**< Frame of the pick */
-    bool valid;          /**< Nothing changed the world the pick saw since */
-} box_pick_memo_t;
 
 /** A script task waiting for a wheel movement over an entity */
 typedef struct box_pick_waiter_t {
@@ -90,7 +84,6 @@ typedef struct box_pick_state_t {
     ecs_vec_t candidates;   /**< box_pick_candidate_t of the ray being cast */
     ecs_vec_t waiters;      /**< box_pick_waiter_t of on.scroll */
     ecs_map_t meshes;       /**< Mesh handle to the box_pick_mesh_t of a mesh with many triangles */
-    box_pick_memo_t memo;   /**< Pick of the last blocks callback */
     ecs_entity_t screen;    /**< Target of the events no view handles */
     ecs_entity_t hovered;   /**< Entity that carries Hovered */
     ecs_entity_t pressed;   /**< Entity that carries Pressed */
@@ -135,7 +128,7 @@ void box_pick_resolve(
     const vec2 cursor,
     box_pick_t *out);
 
-/** Drop the triangle hierarchies of meshes that only picking still references.
+/** Drop the triangle hierarchies of meshes that only picking has referenced for a while.
  *
  * @param world The world
  * @param st The module state
