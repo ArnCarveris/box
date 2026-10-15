@@ -139,7 +139,9 @@
                     "overlapping_contours_no_seam",
                     "sharp_corners_large",
                     "tiny_fades",
-                    "glyphs_added_mid_run"
+                    "glyphs_added_mid_run",
+                    "budget_more_glyphs_than_a_page",
+                    "small_budget_reuses_pages"
                 ]
             },
             {

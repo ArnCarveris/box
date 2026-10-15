@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "render.h"
 #include "preprocess.h"
 
@@ -394,4 +395,236 @@ void TextField_glyphs_added_mid_run(void) {
     test_int(off, 0);
     stbi_image_free(images[0]);
     stbi_image_free(images[1]);
+}
+
+void TextField_budget_more_glyphs_than_a_page(void) {
+    // ui_fixes/atlas_upload
+    ecs_os_init();
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = malloc((size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+    int32_t t, tables = (data[4] << 8) | data[5];
+    for (t = 0; t < tables; t ++) {
+        const uint8_t *rec = data + 12 + t * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            data[off + 18] = 250 >> 8;
+            data[off + 19] = 250 & 0xff;
+        }
+    }
+
+    char path[64];
+    snprintf(path, sizeof(path), "/tmp/box_big_glyphs_%d.ttf", (int)getpid());
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+    free(data);
+    ecs_os_free(src);
+    unsigned char *images[2] = { NULL, NULL };
+    int w = 0, h = 0, n = 0, run;
+    for (run = 0; run < 2; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_strbuf_t buf = ECS_STRBUF_INIT;
+        int32_t c, count = 0;
+        for (c = 0x21; c < 0x180 && count < 60; c ++) {
+            if (c >= 0x7F && c < 0xA1) {
+                continue;
+            }
+
+            if (c < 0x80) {
+                ecs_strbuf_appendch(&buf, (char)c);
+            } else {
+                char utf8[2] = { (char)(0xC0 | (c >> 6)), (char)(0x80 | (c & 0x3F)) };
+                ecs_strbuf_appendstrn(&buf, utf8, 2);
+            }
+
+            count ++;
+            if (!(count % 12)) {
+                ecs_strbuf_appendch(&buf, '\n');
+            }
+        }
+
+        char *value = ecs_strbuf_get(&buf);
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 10});
+        ecs_set(world, camera, Camera, {
+            .ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {
+            .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        ecs_entity_t font = ecs_new(world);
+        ecs_set(world, font, Font, {.path = path, .atlas_pages = run ? 16 : 1});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {0, 0, 0});
+        ecs_set(world, e, Rgb, {255, 255, 255});
+        ecs_set(world, e, Text, {.value = value, .size = 3, .line_height = 40, .font = font});
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 640, .height = 400, .write_to_file = "budget.png",
+            .resolution_scale = 1});
+        int32_t i;
+        for (i = 0; i < 4; i ++) {
+            ecs_progress(world, 0);
+        }
+
+        box_render_sync(world);
+        test_int(ecs_get(world, font, FontStatus)->state, FontReady);
+        char *png = flecs_asprintf("%s/budget.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+        images[run] = stbi_load(png, &w, &h, &n, 4);
+        test_assert(images[run] != NULL);
+        ecs_os_free(png);
+        ecs_os_free(value);
+        ecs_fini(world);
+    }
+
+    int32_t i, ink = 0, off = 0;
+    for (i = 0; i < w * h; i ++) {
+        int32_t a = images[0][i * 4], b = images[1][i * 4];
+        ink += b > 128;
+        off += abs(a - b) > 16;
+    }
+
+    test_assert(ink > 3000);
+    test_int(off, 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
+    remove(path);
+    ecs_os_fini();
+}
+
+void TextField_small_budget_reuses_pages(void) {
+    // ui_fixes/atlas_upload
+    ecs_os_init();
+    char *src = box_shader_locate("etc/fonts/B612-Regular.ttf");
+    test_assert(src != NULL);
+    FILE *f = fopen(src, "rb");
+    test_assert(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *data = malloc((size_t)size);
+    test_int((long)fread(data, 1, (size_t)size, f), size);
+    fclose(f);
+    int32_t t, tables = (data[4] << 8) | data[5];
+    for (t = 0; t < tables; t ++) {
+        const uint8_t *rec = data + 12 + t * 16;
+        uint32_t off = ((uint32_t)rec[8] << 24) | (rec[9] << 16) | (rec[10] << 8) | rec[11];
+        if (!memcmp(rec, "head", 4)) {
+            data[off + 18] = 250 >> 8;
+            data[off + 19] = 250 & 0xff;
+        }
+    }
+
+    char path[64];
+    snprintf(path, sizeof(path), "/tmp/box_big_glyphs_%d.ttf", (int)getpid());
+    f = fopen(path, "wb");
+    test_assert(f != NULL);
+    test_int((long)fwrite(data, 1, (size_t)size, f), size);
+    fclose(f);
+    free(data);
+    ecs_os_free(src);
+    unsigned char *images[4] = { NULL, NULL, NULL, NULL };
+    int w = 0, h = 0, n = 0, run, k;
+    for (run = 0; run < 3; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        char *sets[3];
+        for (k = 0; k < 3; k ++) {
+            ecs_strbuf_t buf = ECS_STRBUF_INIT;
+            int32_t c, count = 0;
+            for (c = 0x21 + k * 30; count < 30; c ++) {
+                if (c >= 0x7F && c < 0xA1) {
+                    continue;
+                }
+
+                if (c < 0x80) {
+                    ecs_strbuf_appendch(&buf, (char)c);
+                } else {
+                    char utf8[2] = { (char)(0xC0 | (c >> 6)), (char)(0x80 | (c & 0x3F)) };
+                    ecs_strbuf_appendstrn(&buf, utf8, 2);
+                }
+
+                count ++;
+                if (!(count % 10)) {
+                    ecs_strbuf_appendch(&buf, '\n');
+                }
+            }
+
+            sets[k] = ecs_strbuf_get(&buf);
+        }
+
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 10});
+        ecs_set(world, camera, Camera, {
+            .ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {
+            .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        ecs_entity_t font = ecs_new(world);
+        ecs_set(world, font, Font, {.path = path, .atlas_pages = run ? 16 : 1});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {0, 0, 0});
+        ecs_set(world, e, Rgb, {255, 255, 255});
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 640, .height = 256, .write_to_file = "reuse.png",
+            .resolution_scale = 1});
+        char *png = flecs_asprintf("%s/reuse.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+        const char *steps[7] = { sets[0], "", sets[1], "", sets[2], "", sets[0] };
+        int32_t first = run == 2 ? 6 : (run == 1 ? 4 : 0), last = run == 1 ? 4 : 6, i;
+        for (k = first; k <= last; k ++) {
+            ecs_set(world, e, Text, {.value = ECS_CONST_CAST(char*, steps[k]), .size = 3,
+                .line_height = 40, .font = font});
+            for (i = 0; i < 3; i ++) {
+                ecs_progress(world, 0);
+            }
+
+            box_render_sync(world);
+            if (k == 4 || k == 6) {
+                int32_t slot = run ? run + 1 : k / 2 - 2;
+                images[slot] = stbi_load(png, &w, &h, &n, 4);
+                test_assert(images[slot] != NULL);
+            }
+        }
+
+        ecs_os_free(png);
+        ecs_os_free(sets[0]);
+        ecs_os_free(sets[1]);
+        ecs_os_free(sets[2]);
+        ecs_fini(world);
+    }
+
+    for (k = 0; k < 2; k ++) {
+        int32_t i, ink = 0, off = 0;
+        for (i = 0; i < w * h; i ++) {
+            int32_t a = images[k][i * 4], b = images[k + 2][i * 4];
+            ink += b > 128;
+            off += abs(a - b) > 16;
+        }
+
+        test_assert(ink > 1000);
+        test_int(off, 0);
+    }
+
+    for (k = 0; k < 4; k ++) {
+        stbi_image_free(images[k]);
+    }
+
+    remove(path);
+    ecs_os_fini();
 }
