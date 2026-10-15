@@ -612,6 +612,31 @@ bool box_render_gpu_stats(
     ecs_world_t *world,
     box_render_gpu_stats_t *stats);
 
+/** When the GPU backend applies the outcome of a shader compile.
+ *
+ * Natively an outcome arrives during the compile, in the browser after the frame; tests pick
+ * a delayed delivery to run the asynchronous path of the browser natively.
+ */
+typedef enum box_render_compile_delivery_t {
+    BOX_RENDER_COMPILE_AT_ONCE = 0,     /**< During the compile, the native default */
+    BOX_RENDER_COMPILE_HOLD = 1,        /**< Held until the delivery changes */
+    BOX_RENDER_COMPILE_NEXT_PACKET = 2, /**< At the start of the next packet, oldest first */
+    BOX_RENDER_COMPILE_NEWEST_FIRST = 3 /**< At the start of the next packet, newest first */
+} box_render_compile_delivery_t;
+
+/** Set when the GPU backend of a world applies shader compile outcomes, for tests.
+ *
+ * Outcomes held when the delivery returns to BOX_RENDER_COMPILE_AT_ONCE are applied at the
+ * start of the next packet, oldest first.
+ *
+ * @param world The world
+ * @param delivery When outcomes are applied
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_compile_delivery(
+    ecs_world_t *world,
+    box_render_compile_delivery_t delivery);
+
 /** Take the oldest shader compile result the GPU backend of a world has not handed out yet.
  *
  * @param world The world

@@ -2,8 +2,9 @@
  * @file render/gpu_shader.c
  * @brief Shader modules of the webgpu backend, compiled from preprocessed WGSL by handle.
  *
- * A module replaces the module of its handle once its compile outcome arrives: right away
- * natively, from the event loop in the browser. A module that fails keeps the previous one.
+ * A module replaces the module of its handle once its outcome arrives (at once natively, from
+ * the event loop in the browser) if no newer compile of the handle started; a module that
+ * fails keeps the previous one. box_render_gpu_compile_delivery delays native outcomes.
  */
 
 #include "gpu.h"
@@ -16,6 +17,7 @@ typedef struct box_gpu_compile_t box_gpu_compile_t;
 typedef struct box_gpu_shader_slot_t {
     box_gpu_shader_t shader;        /**< Module and revision, read as box_gpu_shader_t */
     box_gpu_compile_t *pending;     /**< Compiles waiting for their outcome, oldest first */
+    int32_t requested;              /**< Code revision of the newest compile started */
 } box_gpu_shader_slot_t;
 
 /** A module whose compile outcome is awaited, owned by the callback once it waits */
@@ -30,7 +32,23 @@ struct box_gpu_compile_t {
     int32_t revision;               /**< Revision of the code */
     bool failed;                    /**< The module did not compile */
     bool arrived;                   /**< The outcome arrived */
+    bool held;                      /**< The outcome arrived and waits for the next packet */
 };
+
+/** Get when compile outcomes apply.
+ *
+ * @param gpu The backend
+ * @return The delivery box_render_gpu_compile_delivery set
+ */
+static box_render_compile_delivery_t box_gpu_shader_delivery(
+    box_gpu_t *gpu)
+{
+    ecs_os_mutex_lock(gpu->lock);
+    box_render_compile_delivery_t result = gpu->delivery;
+    ecs_os_mutex_unlock(gpu->lock);
+
+    return result;
+}
 
 /** Free a compile and the module it still holds.
  *
@@ -70,7 +88,8 @@ static box_gpu_shader_slot_t* box_gpu_shader_slot(
 
 /** Release the module of a slot and detach the compiles that wait in it.
  *
- * Detached compiles free themselves when their outcome arrives.
+ * Detached compiles free themselves when their outcome arrives; held ones, whose outcome
+ * already arrived, are freed here.
  *
  * @param gpu The backend
  * @param slot The slot, freed
@@ -85,6 +104,10 @@ static void box_gpu_shader_slot_free(
         c->gpu = NULL;
         c->slot = NULL;
         c->next = NULL;
+        if (c->held) {
+            box_gpu_compile_free(c);
+        }
+
         c = next;
     }
 
@@ -125,14 +148,18 @@ static void box_gpu_shader_install(
 
 /** Apply the outcome of a compile: install its module or report its error.
  *
+ * A module of a compile older than the newest one started for the handle is released, so a
+ * late outcome never replaces newer code.
+ *
  * @param compile The compile, its outcome arrived and its backend exists
  */
 static void box_gpu_compile_finish(
     box_gpu_compile_t *compile)
 {
     box_gpu_t *gpu = compile->gpu;
-    box_gpu_shader_slot_t *slot = compile->slot;
-    if (slot) {
+    box_gpu_shader_slot_t *slot = ecs_map_get_deref(&gpu->shaders, box_gpu_shader_slot_t,
+        compile->handle);
+    if (compile->slot) {
         box_gpu_compile_t **ptr = &slot->pending;
         while (*ptr != compile) {
             ptr = &(*ptr)->next;
@@ -152,8 +179,10 @@ static void box_gpu_compile_finish(
     } else {
         box_gpu_count(gpu, BOX_GPU_STAT_COMPILED);
         box_gpu_shader_report(gpu, compile->handle, compile->revision, NULL, compile->label);
-        box_gpu_shader_install(gpu, compile->handle, compile->module);
-        compile->module = NULL;
+        if (compile->revision == slot->requested) {
+            box_gpu_shader_install(gpu, compile->handle, compile->module);
+            compile->module = NULL;
+        }
     }
 
     if (slot && !slot->shader.module && !slot->pending) {
@@ -163,6 +192,9 @@ static void box_gpu_compile_finish(
 }
 
 /** Take the outcome of a compile; one that waits is finished and freed here.
+ *
+ * With a delayed box_render_gpu_compile_delivery an outcome arriving during the compile is held
+ * until box_gpu_shader_deliver, the way the browser delivers it after the frame.
  *
  * @param compile The compile
  * @param failed Whether the module failed to compile
@@ -175,12 +207,19 @@ static void box_gpu_compile_arrive(
     const char *message,
     int len)
 {
-    compile->arrived = true;
     compile->failed = failed;
     if (failed && message) {
         compile->message = flecs_asprintf("%.*s", len, message);
     }
 
+    if (!compile->slot && compile->gpu &&
+        box_gpu_shader_delivery(compile->gpu) != BOX_RENDER_COMPILE_AT_ONCE)
+    {
+        compile->held = true;
+        goto done;
+    }
+
+    compile->arrived = true;
     if (compile->slot || !compile->gpu) {
         if (compile->gpu) {
             box_gpu_compile_finish(compile);
@@ -188,6 +227,9 @@ static void box_gpu_compile_arrive(
 
         box_gpu_compile_free(compile);
     }
+
+done:
+    return;
 }
 
 #ifdef __EMSCRIPTEN__
@@ -324,7 +366,7 @@ static void box_gpu_shader_compile(
     int32_t revision)
 {
     box_gpu_compile_t *compile = ecs_os_calloc_t(box_gpu_compile_t);
-    box_gpu_shader_slot_t *slot;
+    box_gpu_shader_slot_t *slot = box_gpu_shader_slot(gpu, handle);
     WGPUShaderSourceWGSL wgsl = {
         .chain = { .sType = WGPUSType_ShaderSourceWGSL },
         .code = { .data = code, .length = WGPU_STRLEN }
@@ -337,6 +379,7 @@ static void box_gpu_shader_compile(
     compile->label = ecs_os_strdup(label);
     compile->handle = handle;
     compile->revision = revision;
+    slot->requested = revision;
 #ifndef __EMSCRIPTEN__
     wgpuDevicePushErrorScope(gpu->device, WGPUErrorFilter_Validation);
 #endif
@@ -348,7 +391,6 @@ static void box_gpu_shader_compile(
         goto done;
     }
 
-    slot = box_gpu_shader_slot(gpu, handle);
     box_gpu_compile_t **tail = &slot->pending;
     while (*tail) {
         tail = &(*tail)->next;
@@ -356,6 +398,43 @@ static void box_gpu_shader_compile(
 
     *tail = compile;
     compile->slot = slot;
+done:
+    return;
+}
+
+void box_gpu_shader_deliver(
+    box_gpu_t *gpu)
+{
+    box_render_compile_delivery_t delivery = box_gpu_shader_delivery(gpu);
+    ecs_vec_t held;
+    int32_t i, count;
+    if (!ecs_map_is_init(&gpu->shaders) || delivery == BOX_RENDER_COMPILE_HOLD) {
+        goto done;
+    }
+
+    ecs_vec_init_t(NULL, &held, box_gpu_compile_t*, 0);
+    ecs_map_iter_t it = ecs_map_iter(&gpu->shaders);
+    while (ecs_map_next(&it)) {
+        box_gpu_shader_slot_t *slot = ecs_map_ptr(&it);
+        box_gpu_compile_t *c;
+        for (c = slot->pending; c; c = c->next) {
+            if (c->held) {
+                *ecs_vec_append_t(NULL, &held, box_gpu_compile_t*) = c;
+            }
+        }
+    }
+
+    count = ecs_vec_count(&held);
+    for (i = 0; i < count; i ++) {
+        int32_t at = delivery == BOX_RENDER_COMPILE_NEWEST_FIRST ? count - 1 - i : i;
+        box_gpu_compile_t *c = *ecs_vec_get_t(&held, box_gpu_compile_t*, at);
+        c->held = false;
+        c->arrived = true;
+        box_gpu_compile_finish(c);
+        box_gpu_compile_free(c);
+    }
+
+    ecs_vec_fini_t(NULL, &held, box_gpu_compile_t*);
 done:
     return;
 }
