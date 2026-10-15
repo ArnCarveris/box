@@ -349,8 +349,13 @@ bakes.
 ## Spatial index
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
-`ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
-AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. A fat leaf has a
+`ShapeMesh` scale, placed by `WorldTransform`): a static BVH with exact leaves and a dynamic BVH
+with fat leaves for `DynamicTransform` shapes. Both are binary trees whose 64 byte nodes hold the
+boxes of both children (a child is a node or an item, so a node over two items is a two item
+leaf). The build bins all three axes for the surface area heuristic; inserts descend to the
+cheapest sibling and the four closest ancestors try the Box2D v3 rotation that lowers area most.
+A static move refits its ancestors exactly (shrinking too) when one of its four closest ancestors
+still contains it, and is inserted again otherwise. A fat leaf has a
 margin and reaches four times the displacement per frame ahead, at most four margins (a larger
 displacement is a teleport and predicts nothing); it is inserted again only when the bounds leave
 it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`), and a stretched leaf
@@ -361,8 +366,9 @@ after a frame, so an idle frame pays nothing. Each keeps the `WorldTransform` it
 in `SpatialPose`, and the query computes bounds only for shapes whose transform differs from it;
 dynamic transforms publish no change signal, so finding them is one compare per dynamic shape.
 Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow phase
-filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
-the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
+filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them
+for collision, `box_spatial_static_bounds` gives the box around the static shapes of a scene to
+the bake. Bounds are boxes; there is no mesh
 level narrow phase and no picking.
 
 ## Text, layout and UI

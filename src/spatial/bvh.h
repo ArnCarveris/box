@@ -6,7 +6,7 @@
  * from one cache line; a child is a node or an item, so a node over two items is a leaf of two.
  *
  * Built top down with a surface area heuristic binned on all three axes, kept by inserting at
- * the cheapest sibling and by rotations that lower the area of the tree (Box2D v3).
+ * the cheapest sibling and by rotations near the insert that lower the area most (Box2D v3).
  */
 
 #ifndef BOX_SPATIAL_BVH_H

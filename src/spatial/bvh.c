@@ -15,6 +15,9 @@
 /** Ancestors that may still contain a moved exact item before it is inserted again */
 #define BOX_BVH_GROW_LEVELS (4)
 
+/** Ancestors of an inserted item that try a rotation */
+#define BOX_BVH_ROTATE_LEVELS (4)
+
 /** Depth below which a build stops weighing splits and halves the leaves */
 #define BOX_BVH_MAX_SAH_DEPTH (48)
 
@@ -464,21 +467,32 @@ static void box_bvh_rotate(
     }
 }
 
-/** Fit the ancestors of a changed node from the node up: heights, rotations and boxes.
+/** Fit the ancestors of a node whose children changed from the node up: heights, rotations
+ * after an insert (as Box2D v3 does) and boxes.
  *
  * @param tree The tree
  * @param node The first node to fit
- * @param settle Stop at the first node whose box did not change
+ * @param rotate Try a rotation at the first BOX_BVH_ROTATE_LEVELS nodes, after an insert
+ * @param settle Stop at the first node whose box did not change or after BOX_BVH_GROW_LEVELS
+ * nodes, after a move that one of those nodes still contains, above which boxes only shrink
  */
 static void box_bvh_fix(
     box_bvh_t *tree,
     int32_t node,
+    bool rotate,
     bool settle)
 {
+    int32_t level = 0;
     while (node != BOX_BVH_NULL) {
         vec3 min, max;
-        box_bvh_refit_height(tree, node);
-        box_bvh_rotate(tree, node);
+        if (!settle) {
+            box_bvh_refit_height(tree, node);
+        }
+
+        if (rotate && level < BOX_BVH_ROTATE_LEVELS) {
+            box_bvh_rotate(tree, node);
+        }
+
         box_bvh_node_t *n = box_bvh_get(tree, node);
         int32_t slot = n->parent;
         box_bvh_union(n->min[0], n->max[0], n->min[1], n->max[1], min, max);
@@ -486,7 +500,9 @@ static void box_bvh_fix(
         bool same = glm_vec3_eqv(s_min, min) && glm_vec3_eqv(s_max, max);
         glm_vec3_copy(min, s_min);
         glm_vec3_copy(max, s_max);
-        node = slot == BOX_BVH_ROOT || (settle && same) ? BOX_BVH_NULL : slot >> 1;
+        level ++;
+        bool settled = settle && (same || level == BOX_BVH_GROW_LEVELS);
+        node = slot == BOX_BVH_ROOT || settled ? BOX_BVH_NULL : slot >> 1;
     }
 }
 
@@ -553,7 +569,7 @@ void box_bvh_insert(
     box_bvh_put(tree, 2 * node, sibling, s_min, s_max);
     box_bvh_put(tree, 2 * node + 1, BOX_BVH_ITEM(item), min, max);
     box_bvh_put(tree, slot, node, n_min, n_max);
-    box_bvh_fix(tree, node, false);
+    box_bvh_fix(tree, node, true, false);
 done:
     return;
 }
@@ -580,7 +596,7 @@ void box_bvh_remove(
     box_bvh_put(tree, up, sibling, min, max);
     box_bvh_release(tree, parent);
     if (up != BOX_BVH_ROOT) {
-        box_bvh_fix(tree, up >> 1, false);
+        box_bvh_fix(tree, up >> 1, false, false);
     }
 
 done:
@@ -608,7 +624,7 @@ void box_bvh_move(
         glm_vec3_copy(ECS_CONST_CAST(float*, min), s_min);
         glm_vec3_copy(ECS_CONST_CAST(float*, max), s_max);
         if (slot != BOX_BVH_ROOT) {
-            box_bvh_fix(tree, slot >> 1, true);
+            box_bvh_fix(tree, slot >> 1, false, true);
         }
     } else {
         box_bvh_remove(tree, item);
