@@ -12,13 +12,21 @@ typedef struct {
     ecs_ctx_free_t ctx_free;        /**< Frees the context with the world, NULL for none */
 } TransformStaticListener;
 
-/** Entities whose static transform must be recomputed this frame */
+/** State of the static transform: the entities to recompute and the listeners */
 typedef struct {
     ecs_vec_t value;     /**< Vector of ecs_entity_t */
     ecs_vec_t manual;    /**< ManualTransform entities whose WorldTransform was set */
     ecs_vec_t moved;     /**< ecs_entity_t, entities that moved this run */
     ecs_vec_t listeners; /**< TransformStaticListener, receive the moved entities */
-} TransformStaticDirtyEntities;
+    int32_t refs;        /**< Observers and systems that use the state */
+} transform_static_t;
+
+/** Singleton through which box_transform_on_moved finds the state of a world */
+typedef struct {
+    transform_static_t *state; /**< The state, owned by the observers and the system */
+} TransformStaticState;
+
+ECS_COMPONENT_DECLARE(TransformStaticState);
 
 static void transformTree(
     const ecs_world_t *world,
@@ -27,71 +35,49 @@ static void transformTree(
     uint64_t version,
     ecs_vec_t *moved);
 
-/** Free the storage of a dirty entity list.
+/** Drop a reference to the state, freeing it and the listener contexts with the last one.
  *
- * @param ptr The dirty entity list
+ * @param ctx The state
  */
-static void TransformStaticDirtyEntities_free(
-    TransformStaticDirtyEntities *ptr)
+static void transformStaticRelease(
+    void *ctx)
 {
-    int32_t i, count = ecs_vec_count(&ptr->listeners);
-    TransformStaticListener *listeners = ecs_vec_first(&ptr->listeners);
+    transform_static_t *state = ctx;
+    if (-- state->refs) {
+        goto done;
+    }
+
+    int32_t i, count = ecs_vec_count(&state->listeners);
+    TransformStaticListener *listeners = ecs_vec_first(&state->listeners);
     for (i = 0; i < count; i ++) {
         if (listeners[i].ctx_free) {
             listeners[i].ctx_free(listeners[i].ctx);
         }
     }
 
-    ecs_vec_fini_t(NULL, &ptr->value, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &ptr->manual, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &ptr->moved, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &ptr->listeners, TransformStaticListener);
+    ecs_vec_fini_t(NULL, &state->value, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &state->manual, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &state->listeners, TransformStaticListener);
+    ecs_os_free(state);
+done:
+    return;
 }
 
-/** Initialize the storage of a dirty entity list.
+/** Add the entities of an observer event to a list of the state.
  *
- * @param ptr The dirty entity list
- */
-static void TransformStaticDirtyEntities_init(
-    TransformStaticDirtyEntities *ptr)
-{
-    ecs_vec_init_t(NULL, &ptr->value, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &ptr->manual, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &ptr->moved, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &ptr->listeners, TransformStaticListener, 0);
-}
-
-ECS_CTOR(TransformStaticDirtyEntities, ptr, {
-    TransformStaticDirtyEntities_init(ptr);
-})
-
-ECS_MOVE(TransformStaticDirtyEntities, dst, src, {
-    TransformStaticDirtyEntities_free(dst);
-    *dst = *src;
-    TransformStaticDirtyEntities_init(src);
-})
-
-ECS_DTOR(TransformStaticDirtyEntities, ptr, {
-    TransformStaticDirtyEntities_free(ptr);
-})
-
-ECS_COMPONENT_DECLARE(TransformStaticDirtyEntities);
-
-/** Add the entities of an observer event to the dirty list.
- *
- * @param it The observer iterator
+ * @param it The observer iterator, its context is the state
+ * @param list The list
  * @param add Whether to add the entities
  */
 static void transformStaticDirty(
     ecs_iter_t *it,
+    ecs_vec_t *list,
     bool add)
 {
-    TransformStaticDirtyEntities *dirty = add ?
-        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities) : NULL;
-    if (dirty) {
-        for (int i = 0; i < it->count; i ++) {
-            ecs_vec_append_t(NULL, &dirty->value, ecs_entity_t)[0] = it->entities[i];
-        }
+    if (add) {
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, list, ecs_entity_t, it->count), it->entities,
+            ecs_entity_t, it->count);
     }
 }
 
@@ -105,7 +91,8 @@ static void transformStaticDirty(
 static void TransformStatic_OnChange(
     ecs_iter_t *it)
 {
-    transformStaticDirty(it,
+    transform_static_t *state = it->ctx;
+    transformStaticDirty(it, &state->value,
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
 }
 
@@ -116,7 +103,8 @@ static void TransformStatic_OnChange(
 static void TransformStatic_OnStatic(
     ecs_iter_t *it)
 {
-    transformStaticDirty(it,
+    transform_static_t *state = it->ctx;
+    transformStaticDirty(it, &state->value,
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->other_table));
 }
 
@@ -127,13 +115,8 @@ static void TransformStatic_OnStatic(
 static void TransformStatic_OnManual(
     ecs_iter_t *it)
 {
-    TransformStaticDirtyEntities *dirty = box_transform_dynamic(it->world, it->table) ? NULL :
-        ecs_singleton_get_mut(it->world, TransformStaticDirtyEntities);
-    if (dirty) {
-        for (int i = 0; i < it->count; i ++) {
-            ecs_vec_append_t(NULL, &dirty->manual, ecs_entity_t)[0] = it->entities[i];
-        }
-    }
+    transform_static_t *state = it->ctx;
+    transformStaticDirty(it, &state->manual, !box_transform_dynamic(it->world, it->table));
 }
 
 /** Remove the world transform of entities that lose their position.
@@ -344,8 +327,7 @@ static int transformCompareEntity(
 static void TransformStatic(
     ecs_iter_t *it)
 {
-    TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
-        it->world, TransformStaticDirtyEntities);
+    transform_static_t *dirty = it->ctx;
 
     int i = 0, count = ecs_vec_count(&dirty->value);
     ecs_entity_t *entities = ecs_vec_first(&dirty->value);
@@ -385,25 +367,25 @@ void box_transform_on_moved(
     void *ctx,
     ecs_ctx_free_t ctx_free)
 {
-    TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
-        world, TransformStaticDirtyEntities);
-    ecs_assert(dirty != NULL, ECS_INVALID_OPERATION, "box.transform is not imported");
-    ecs_vec_append_t(NULL, &dirty->listeners, TransformStaticListener)[0] =
+    const TransformStaticState *s = ecs_singleton_get(world, TransformStaticState);
+    ecs_assert(s != NULL, ECS_INVALID_OPERATION, "box.transform is not imported");
+    ecs_vec_append_t(NULL, &s->state->listeners, TransformStaticListener)[0] =
         (TransformStaticListener){ .callback = callback, .ctx = ctx, .ctx_free = ctx_free };
 }
 
 void TransformStaticImport(
     ecs_world_t *world)
 {
-    ECS_COMPONENT_DEFINE(world, TransformStaticDirtyEntities);
+    transform_static_t *state = ecs_os_calloc_t(transform_static_t);
+    ecs_vec_init_t(NULL, &state->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->manual, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &state->listeners, TransformStaticListener, 0);
+    state->refs = 8;
 
-    ecs_set_hooks(world, TransformStaticDirtyEntities, {
-        .ctor = ecs_ctor(TransformStaticDirtyEntities),
-        .dtor = ecs_dtor(TransformStaticDirtyEntities),
-        .move = ecs_move(TransformStaticDirtyEntities),
-    });
-
-    ecs_singleton_add(world, TransformStaticDirtyEntities);
+    ECS_COMPONENT_DEFINE(world, TransformStaticState);
+    ecs_set_hooks(world, TransformStaticState, { .ctor = flecs_default_ctor });
+    ecs_singleton_set(world, TransformStaticState, { .state = state });
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnPosition" }),
@@ -412,7 +394,9 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnChange,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
@@ -422,7 +406,9 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnChange,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
@@ -432,7 +418,9 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnChange,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
@@ -442,14 +430,18 @@ void TransformStaticImport(
             { .id = ManualTransform, .inout = EcsInOutFilter }
         },
         .events = { EcsOnSet },
-        .callback = TransformStatic_OnManual
+        .callback = TransformStatic_OnManual,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
         .entity = ecs_entity(world, { .name = "TransformStatic_OnStatic" }),
         .query.terms = {{ .id = DynamicTransform }},
         .events = { EcsOnRemove },
-        .callback = TransformStatic_OnStatic
+        .callback = TransformStatic_OnStatic,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
@@ -469,7 +461,9 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnAdd, EcsOnRemove },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnChange,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_observer(world, {
@@ -479,7 +473,9 @@ void TransformStaticImport(
             { .id = ManualTransform, .oper = EcsNot }
         },
         .events = { EcsOnSet, EcsOnRemove },
-        .callback = TransformStatic_OnChange
+        .callback = TransformStatic_OnChange,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 
     ecs_system(world, {
@@ -488,5 +484,7 @@ void TransformStaticImport(
         }),
         .phase = EcsPreStore,
         .run = TransformStatic,
+        .ctx = state,
+        .ctx_free = transformStaticRelease
     });
 }
