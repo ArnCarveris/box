@@ -142,34 +142,40 @@ static int32_t box_layout_read(
     return result;
 }
 
-/** Keep the parent of a child the tree holds through Parent, to mark it when the child moves.
+/** Track a child the tree holds: keep its parent when it is held through Parent, so moving it
+ * marks the parent it leaves, and note it when it lacks the child tag the Position observer
+ * matches.
  *
  * @param world The world
  * @param state The state of the layout module
  * @param child The child
  * @param parent Its parent
  */
-static void box_layout_keep_parent(
+static void box_layout_track(
     const ecs_world_t *world,
     box_layout_state_t *state,
     ecs_entity_t child,
     ecs_entity_t parent)
 {
     ecs_table_t *table = ecs_get_table(world, child);
-    if (table != state->parent_table) {
-        state->parent_table = table;
-        state->parent_kept = table && ecs_table_has_id(world, table, ecs_id(EcsParent));
+    if (table != state->child_table) {
+        state->child_table = table;
+        state->child_kept = table && ecs_table_has_id(world, table, ecs_id(EcsParent));
+        state->child_tagged = table && ecs_table_has_id(world, table, state->child_tag);
     }
 
-    if (state->parent_kept) {
+    if (state->child_kept) {
         ecs_map_ensure(&state->parents, (ecs_map_key_t)child)[0] = (ecs_map_val_t)parent;
+    }
+
+    if (!state->child_tagged) {
+        *ecs_vec_append_t(NULL, &state->untagged, ecs_entity_t) = child;
     }
 }
 
 /** Collect a tree breadth first, so the children of an element are next to each other.
  *
- * The parent of a child the tree holds through Parent is kept, so moving it away marks the
- * parent it leaves.
+ * Every child is tracked (box_layout_track).
  *
  * @param world The world
  * @param state The state of the layout module
@@ -182,7 +188,8 @@ static void box_layout_collect(
 {
     ecs_vec_clear(&state->nodes);
     state->has_text = false;
-    state->parent_table = NULL;
+    state->child_table = NULL;
+    ecs_vec_clear(&state->untagged);
     box_layout_read(world, state, root);
     int32_t i;
     for (i = 0; i < ecs_vec_count(&state->nodes); i ++) {
@@ -198,7 +205,7 @@ static void box_layout_collect(
             int32_t c;
             for (c = 0; c < it.count; c ++) {
                 box_layout_read(world, state, it.entities[c]);
-                box_layout_keep_parent(world, state, it.entities[c], e);
+                box_layout_track(world, state, it.entities[c], e);
             }
         }
 
@@ -703,6 +710,14 @@ void box_layout_tree(
     box_layout_collect(world, state, root);
     box_layout_node_t *nodes = ecs_vec_first_t(&state->nodes, box_layout_node_t);
     int32_t i, count = ecs_vec_count(&state->nodes);
+    for (i = 0; i < ecs_vec_count(&state->untagged); i ++) {
+        ecs_add_id(world, ecs_vec_get_t(&state->untagged, ecs_entity_t, i)[0], state->child_tag);
+    }
+
+    if (ecs_vec_count(&state->untagged)) {
+        box_layout_observe_children(world, state);
+    }
+
     if (state->has_text) {
         box_layout_solve_text(world, state, nodes, count);
     } else {

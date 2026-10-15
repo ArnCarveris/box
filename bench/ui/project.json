@@ -19,6 +19,7 @@
                     "rewrap_100_paragraphs",
                     "position_100k_roots",
                     "position_100k_children",
+                    "position_100k_children_with_ui",
                     "idle_frame_10k"
                 ]
             },

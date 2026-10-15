@@ -51,6 +51,7 @@
                     "none_anchors",
                     "none_keeps_position",
                     "none_fit_content",
+                    "none_refits_moved_child",
                     "position_keeps_z",
                     "position_owned",
                     "rect_written",

@@ -41,6 +41,10 @@ static void box_layout_on_element(
 
 /** Position observer: a child of a Layout moved, which a DirectionNone parent fits.
  *
+ * The observer only matches the children the layout tagged when it collected them, so Position
+ * sets outside a layout tree never reach it. A child that left its tree keeps the tag, so the
+ * parent is checked here.
+ *
  * @param it Iterator over the elements
  */
 static void box_layout_on_position(
@@ -68,6 +72,25 @@ static void box_layout_on_position(
 
 done:
     return;
+}
+
+void box_layout_observe_children(
+    ecs_world_t *world,
+    box_layout_state_t *state)
+{
+    if (!state->observing) {
+        state->observing = true;
+        ecs_observer(world, {
+            .entity = ecs_entity(world, { .name = "LayoutOnPosition", .parent = state->module }),
+            .query.terms = {
+                { .id = ecs_id(Position), .inout = EcsInOutNone },
+                { .id = state->child_tag, .inout = EcsInOutFilter }
+            },
+            .events = { EcsOnSet },
+            .callback = box_layout_on_position,
+            .ctx = state
+        });
+    }
 }
 
 /** Mark the parent and the elements of a hierarchy change.
@@ -325,6 +348,7 @@ static void box_layout_registry_dtor(
             ecs_vec_fini_t(NULL, &state->marks, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->roots, ecs_entity_t);
             ecs_vec_fini_t(NULL, &state->nodes, box_layout_node_t);
+            ecs_vec_fini_t(NULL, &state->untagged, ecs_entity_t);
             ecs_map_fini(&state->parents);
             ecs_os_free(state);
         }
@@ -403,6 +427,9 @@ void BoxLayoutImport(
     ecs_vec_init_t(NULL, &state->marks, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->roots, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->nodes, box_layout_node_t, 0);
+    ecs_vec_init_t(NULL, &state->untagged, ecs_entity_t, 0);
+    state->child_tag = ecs_entity(world, { .name = "LayoutChild" });
+    state->module = ecs_get_scope(world);
     ecs_map_init(&state->parents, NULL);
     ecs_singleton_ensure(world, LayoutRegistry)->state = state;
 
@@ -425,14 +452,6 @@ void BoxLayoutImport(
         .query.terms = {{ .id = ecs_id(Layout), .inout = EcsInOutNone }},
         .events = { EcsOnRemove },
         .callback = box_layout_on_layout_remove,
-        .ctx = state
-    });
-
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "LayoutOnPosition" }),
-        .query.terms = {{ .id = ecs_id(Position), .inout = EcsInOutNone }},
-        .events = { EcsOnSet },
-        .callback = box_layout_on_position,
         .ctx = state
     });
 

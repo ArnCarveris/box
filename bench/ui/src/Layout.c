@@ -201,6 +201,43 @@ void Layout_position_100k_children(
     ecs_fini(world);
 }
 
+void Layout_position_100k_children_with_ui(
+    bench_t *b)
+{
+    // ui_fixes/layout_observer
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t panel = ecs_new(world);
+    ecs_set(world, panel, Layout, { .direction = DirectionRow });
+    ecs_entity_t item = ecs_new_w_pair(world, EcsChildOf, panel);
+    ecs_set(world, item, Rect, {10, 10});
+    ecs_progress(world, 0);
+    ecs_entity_t *e = ecs_os_malloc_n(ecs_entity_t, BENCH_SETS);
+    ecs_entity_t parent = 0;
+    int32_t i;
+    for (i = 0; i < BENCH_SETS; i ++) {
+        if (!(i % 100)) {
+            parent = ecs_new(world);
+            ecs_set(world, parent, Position, {0, 0, 0});
+        }
+
+        e[i] = ecs_new_w_pair(world, EcsChildOf, parent);
+        ecs_set(world, e[i], Position, {0, 0, 0});
+    }
+
+    float x = 0;
+    bench_set_items(b, BENCH_SETS);
+    while (bench_iter(b)) {
+        x += 1;
+        for (i = 0; i < BENCH_SETS; i ++) {
+            ecs_set(world, e[i], Position, {x, 0, 0});
+        }
+    }
+
+    ecs_os_free(e);
+    ecs_fini(world);
+}
+
 void Layout_idle_frame_10k(
     bench_t *b)
 {
