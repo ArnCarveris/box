@@ -247,7 +247,7 @@ void box_gpu_texture_apply(
     tex = box_gpu_texture_new(gpu, desc->width, desc->height, (const uint8_t*)(desc + 1));
     ((box_gpu_texture_entry_t*)tex)->space = space;
     ecs_map_insert_ptr(&gpu->textures, handle, tex);
-    if (!tex->mipped && space != BOX_GPU_MIP_UNKNOWN) {
+    if (!tex->mipped) {
         *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = handle;
     }
 
@@ -316,21 +316,56 @@ static void box_gpu_texture_mip_chain(
     }
 }
 
-void box_gpu_texture_mips(
-    box_gpu_t *gpu)
+/** Mark the queued textures that a batch of the packet binds in a color layer.
+ *
+ * @param gpu The backend
+ * @param packet The packet whose batches the frame draws
+ */
+static void box_gpu_texture_mips_usage(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
 {
-    int32_t i, count = ecs_vec_count(&gpu->mips);
+    int32_t i, slot, count = ecs_vec_count(&packet->batches);
+    for (i = 0; i < count; i ++) {
+        const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
+        for (slot = 0; slot < BOX_GPU_COLOR_LAYERS; slot ++) {
+            uint32_t handle = b->textures[slot];
+            box_gpu_texture_t *tex = handle && !(handle & BOX_RENDER_TEXTURE_TARGET)
+                ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle)
+                : NULL;
+            if (tex && !tex->mipped) {
+                ((box_gpu_texture_entry_t*)tex)->space = BOX_GPU_MIP_SRGB;
+            }
+        }
+    }
+}
+
+void box_gpu_texture_mips(
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet)
+{
+    int32_t i, kept = 0, count = ecs_vec_count(&gpu->mips);
     if (!count) {
         goto done;
     }
 
+    box_gpu_texture_mips_usage(gpu, packet);
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
     for (i = 0; i < count; i ++) {
         uint32_t handle = *ecs_vec_get_t(&gpu->mips, uint32_t, i);
         box_gpu_texture_t *tex = ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, handle);
-        if (tex && !tex->mipped) {
-            box_gpu_texture_mip_chain(
-                gpu, tex, ((box_gpu_texture_entry_t*)tex)->space, encoder);
+        box_gpu_texture_entry_t *entry = (box_gpu_texture_entry_t*)tex;
+        if (!tex || tex->mipped) {
+            continue;
+        }
+
+        if (entry->space == BOX_GPU_MIP_UNKNOWN) {
+            entry->space = BOX_GPU_MIP_LINEAR;
+        }
+
+        box_gpu_texture_mip_chain(gpu, tex, entry->space, encoder);
+        if (!tex->mipped) {
+            *ecs_vec_get_t(&gpu->mips, uint32_t, kept ++) = handle;
         }
     }
 
@@ -338,7 +373,7 @@ void box_gpu_texture_mips(
     wgpuQueueSubmit(gpu->queue, 1, &commands);
     wgpuCommandBufferRelease(commands);
     wgpuCommandEncoderRelease(encoder);
-    ecs_vec_clear(&gpu->mips);
+    ecs_vec_set_count_t(NULL, &gpu->mips, uint32_t, kept);
 done:
     return;
 }
@@ -407,11 +442,10 @@ static uint64_t box_gpu_material_hash(
     return h ^ (h >> 29);
 }
 
-/** Generate the mip levels of the textures a new bind group binds, in the space of their layers.
+/** Queue the textures a new bind group binds in a color layer whose levels average stored values.
  *
- * A texture gets its levels when a layer first binds it; a color layer that binds a texture
- * averaged as stored generates them again in linear light, which then stays. The passes are
- * submitted before the draws of the frame that bind them.
+ * The next frame generates their levels again in linear light, which then stays: a texture
+ * shared by a color and a data layer is filtered as color.
  *
  * @param gpu The backend
  * @param textures Texture handles of the layers, 0 for the default
@@ -420,38 +454,19 @@ static void box_gpu_material_mips(
     box_gpu_t *gpu,
     const uint32_t *textures)
 {
-    WGPUCommandEncoder encoder = NULL;
     int32_t i;
-    for (i = 0; i < BOX_RENDER_TEXTURE_SLOTS; i ++) {
+    for (i = 0; i < BOX_GPU_COLOR_LAYERS; i ++) {
         box_gpu_texture_t *tex = textures[i] && !(textures[i] & BOX_RENDER_TEXTURE_TARGET)
             ? ecs_map_get_deref(&gpu->textures, box_gpu_texture_t, textures[i])
             : NULL;
-        bool color = i < BOX_GPU_COLOR_LAYERS;
-        box_gpu_mip_space_t space = tex
-            ? ((box_gpu_texture_entry_t*)tex)->space
-            : BOX_GPU_MIP_UNKNOWN;
-        if (!tex || tex->mips == 1 || (tex->mipped && (!color || space == BOX_GPU_MIP_SRGB))) {
+        box_gpu_texture_entry_t *entry = (box_gpu_texture_entry_t*)tex;
+        if (!tex || tex->mips == 1 || !tex->mipped || entry->space == BOX_GPU_MIP_SRGB) {
             continue;
         }
 
-        if (color) {
-            space = BOX_GPU_MIP_SRGB;
-        } else if (space == BOX_GPU_MIP_UNKNOWN) {
-            space = BOX_GPU_MIP_LINEAR;
-        }
-
-        if (!encoder) {
-            encoder = wgpuDeviceCreateCommandEncoder(gpu->device, NULL);
-        }
-
-        box_gpu_texture_mip_chain(gpu, tex, space, encoder);
-    }
-
-    if (encoder) {
-        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, NULL);
-        wgpuQueueSubmit(gpu->queue, 1, &commands);
-        wgpuCommandBufferRelease(commands);
-        wgpuCommandEncoderRelease(encoder);
+        entry->space = BOX_GPU_MIP_SRGB;
+        tex->mipped = false;
+        *ecs_vec_append_t(NULL, &gpu->mips, uint32_t) = textures[i];
     }
 }
 

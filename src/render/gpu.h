@@ -593,12 +593,17 @@ void box_gpu_texture_apply(
     uint32_t handle,
     const box_render_texture_desc_t *desc);
 
-/** Generate the mip levels of the new textures, after the resources of a packet applied.
+/** Generate the mip levels of the queued textures, after the resources of a packet applied.
+ *
+ * A texture a batch binds in a color layer averages linear light, others the stored values;
+ * every chain of the frame is submitted at once, and one that cannot be made stays queued.
  *
  * @param gpu The backend
+ * @param packet The packet whose batches tell the layers that bind the textures
  */
 void box_gpu_texture_mips(
-    box_gpu_t *gpu);
+    box_gpu_t *gpu,
+    const box_render_packet_t *packet);
 
 /** Release every cached bind group of the texture layers, after a texture they bind changed.
  *
