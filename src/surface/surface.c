@@ -36,6 +36,7 @@ typedef struct SurfaceImpl {
     int32_t window_width;           /**< Width in points the window was given */
     int32_t window_height;          /**< Height in points the window was given */
     box_render_target_desc_t desc;  /**< Description the backend last received */
+    int32_t generation;             /**< Generation of the backend that received it */
     char *write_to_file;            /**< Surface.write_to_file the capture path was made from */
     char *capture;                  /**< Path the frames are written to */
 } SurfaceImpl;
@@ -407,8 +408,11 @@ static void box_surface_frame(
     box_render_resource_op_t op = BOX_RENDER_UPDATE;
     box_render_target_desc_t desc;
     float clear[4];
+    int32_t generation = box_render_get_backend(world)->generation;
     if (!impl->handle) {
         box_surface_open(world, e, s, impl, state);
+        op = BOX_RENDER_CREATE;
+    } else if (impl->generation != generation) {
         op = BOX_RENDER_CREATE;
     }
 
@@ -422,6 +426,7 @@ static void box_surface_frame(
             p, BOX_RENDER_TARGET, op, impl->handle, sizeof(desc));
         ecs_os_memcpy_t(dst, &desc, box_render_target_desc_t);
         impl->desc = desc;
+        impl->generation = generation;
         ecs_set(world, e, SurfaceStatus, {
             .width = desc.width,
             .height = desc.height,

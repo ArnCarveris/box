@@ -14,6 +14,7 @@
 typedef struct box_render_textures_t {
     const void *backend;    /**< Context of the backend the textures were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_render_textures_t;
 
 /** Singleton with the texture entities surfaces render into */
@@ -232,7 +233,9 @@ static void BoxRenderExtractTextures(
         goto done;
     }
 
-    if (backend->ctx != state->backend || backend->render != state->render) {
+    if (backend->ctx != state->backend || backend->render != state->render ||
+        backend->generation != state->generation)
+    {
         if (state->backend || state->render) {
             for (i = 0; i < ecs_vec_count(&t->released); i ++) {
                 *ecs_vec_append_t(NULL, &t->free_handles, uint32_t) =
@@ -245,6 +248,7 @@ static void BoxRenderExtractTextures(
 
         state->backend = backend->ctx;
         state->render = backend->render;
+        state->generation = backend->generation;
     }
 
     for (i = 0; i < ecs_vec_count(&t->released); i ++) {
