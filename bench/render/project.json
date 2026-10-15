@@ -2,7 +2,7 @@
     "id": "bench_render",
     "type": "application",
     "value": {
-        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes and the effect passes of box.render",
+        "description": "Benchmarks for the extract of the instanced batches and lights, the shadow pass, the frustum and occlusion cull passes, the effect passes and the baked lighting of box.render",
         "public": false,
         "use": [
             "box"
@@ -82,6 +82,14 @@
                     "ssao",
                     "fog",
                     "all"
+                ]
+            },
+            {
+                "id": "Bake",
+                "benchcases": [
+                    "none",
+                    "unbaked",
+                    "converged"
                 ]
             },
             {

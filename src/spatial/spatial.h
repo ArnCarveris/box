@@ -123,6 +123,20 @@ bool box_spatial_bounds(
     vec3 min,
     vec3 max);
 
+/** Get the box around the static shapes the index holds for a scene.
+ *
+ * @param world The world
+ * @param scene The scene, 0 for the default scene
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ * @return false when the scene has no static shapes
+ */
+bool box_spatial_static_bounds(
+    const ecs_world_t *world,
+    ecs_entity_t scene,
+    vec3 min,
+    vec3 max);
+
 /** Bring the index up to date with the changes since the last update.
  *
  * The SpatialUpdate system does this every frame in OnStore, after the transforms.
