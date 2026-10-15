@@ -444,6 +444,12 @@
                     "bloom_temporal_keeps_last_frame",
                     "follow_surface_resize"
                 ]
+            },
+            {
+                "id": "ShaderCompile",
+                "testcases": [
+                    "failed_recompile_keeps_module"
+                ]
             }
         ]
     }

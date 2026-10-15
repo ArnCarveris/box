@@ -177,7 +177,9 @@ unchanged.
 `Shader {path, defines}` is the shader abstraction. A C style preprocessor
 (`src/render/preprocess.c`: `#include`, `#define`, `#ifdef`, `#pragma once`) runs in
 `RenderExtract`, reloads on mtime or size change (`ShaderSettings.poll_interval`) and the backend
-compiles in an error scope, keeping the old module on failure. Compile errors come back into
+compiles in an error scope natively and through `getCompilationInfo` in the browser, where the
+outcome arrives after the frame. A new module replaces the old one only once its outcome arrived
+and compiled, so a failed module keeps the old one. Compile errors come back into
 `ShaderStatus` as `file:line: message`, mapped through a per line source table. Engine shaders
 live in `etc/shaders` (blit, mesh, shape2d, scatter, cull, cluster, shadow, bloom, ssao, fog,
 tonemap, exposure, bake_sh) with shared includes. `tools/wgsl_check.mjs` validates them with Tint.
