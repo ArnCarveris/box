@@ -373,7 +373,7 @@ static void box_gpu_cull_readback_poll(
     for (i = 0; i < BOX_GPU_CULL_READBACKS; i ++) {
         box_gpu_cull_readback_t *r = &c->readbacks[i];
         if (r->state == BOX_GPU_READBACK_MAPPED && delivery != BOX_RENDER_READBACK_HOLD) {
-            for (j = count; j > 0 && delivery == BOX_RENDER_READBACK_NEWEST_FIRST &&
+            for (j = count; j > 0 && delivery >= BOX_RENDER_READBACK_NEWEST_FIRST &&
                 mapped[j - 1]->frame < r->frame; j --)
             {
                 mapped[j] = mapped[j - 1];
@@ -392,6 +392,10 @@ static void box_gpu_cull_readback_poll(
                     .userdata1 = r
                 });
         }
+    }
+
+    if (delivery == BOX_RENDER_READBACK_ONE_NEWEST && count > 1) {
+        count = 1;
     }
 
     for (i = 0; i < count; i ++) {
@@ -1456,6 +1460,9 @@ bool box_render_gpu_cull_stats(
 
 /** Write the CullStatus of the views whose counters the GPU backend read back.
  *
+ * A status older than the frame a view's CullStatus already has is dropped: copies finish in
+ * any order and a take empties the backend's list between two of them.
+ *
  * @param it The iterator of the system, its ctx a vector of box_render_cull_status_t
  */
 static void BoxRenderCullStatus(
@@ -1470,7 +1477,11 @@ static void BoxRenderCullStatus(
     for (i = 0; i < ecs_vec_count(statuses); i ++) {
         const box_render_cull_status_t *st = ecs_vec_get_t(
             statuses, box_render_cull_status_t, i);
-        if (ecs_is_alive(it->world, st->view) && ecs_has(it->world, st->view, View)) {
+        const CullStatus *cur = ecs_is_alive(it->world, st->view)
+            ? ecs_get(it->world, st->view, CullStatus) : NULL;
+        if (ecs_is_alive(it->world, st->view) && ecs_has(it->world, st->view, View) &&
+            (!cur || cur->frame <= st->status.frame))
+        {
             ecs_set_ptr(it->stage, st->view, CullStatus, &st->status);
         }
     }

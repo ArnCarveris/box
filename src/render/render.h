@@ -697,7 +697,8 @@ bool box_render_gpu_compile_delivery(
 typedef enum box_render_readback_delivery_t {
     BOX_RENDER_READBACK_AT_ONCE = 0,     /**< Every mapped copy, in slot order, the default */
     BOX_RENDER_READBACK_HOLD = 1,        /**< Mapped copies wait until the delivery changes */
-    BOX_RENDER_READBACK_NEWEST_FIRST = 2 /**< Every mapped copy, newest frame first */
+    BOX_RENDER_READBACK_NEWEST_FIRST = 2, /**< Every mapped copy, newest frame first */
+    BOX_RENDER_READBACK_ONE_NEWEST = 3   /**< Only the newest mapped copy per frame */
 } box_render_readback_delivery_t;
 
 /** Set the slots one page of the cull pass holds, for tests.

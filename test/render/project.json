@@ -529,7 +529,8 @@
                 "id": "CullReadback",
                 "testcases": [
                     "older_frame_never_replaces_newer",
-                    "read_off_render_thread_aborts"
+                    "read_off_render_thread_aborts",
+                    "older_frame_after_a_take_is_ignored"
                 ]
             },
             {

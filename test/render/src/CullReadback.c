@@ -93,3 +93,52 @@ void CullReadback_read_off_render_thread_aborts(void) {
     test_expect_abort();
     box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
 }
+
+void CullReadback_older_frame_after_a_take_is_ignored(void) {
+    // render_fixes/cull_readback_order
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .culling = {.enabled = true,
+        .min_dimension_px = 1}});
+    ecs_entity_t cube = ecs_new(world);
+    ecs_set(world, cube, Box, {1, 1, 1});
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 16, .height = 16, .resolution_scale = 1});
+    uint32_t word = 0;
+    int32_t i;
+    for (i = 0; i < 50 && !ecs_has(world, view, CullStatus); i ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+    }
+
+    test_assert(ecs_has(world, view, CullStatus));
+    test_bool(box_render_gpu_readback_delivery(world, BOX_RENDER_READBACK_HOLD), true);
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+    }
+
+    box_render_gpu_readback_delivery(world, BOX_RENDER_READBACK_ONE_NEWEST);
+    int64_t last = ecs_get(world, view, CullStatus)->frame;
+    for (i = 0; i < 8; i ++) {
+        ecs_progress(world, 1.0f / 60);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+        int64_t frame = ecs_get(world, view, CullStatus)->frame;
+        test_assert(frame >= last);
+        last = frame;
+    }
+
+    ecs_fini(world);
+}
