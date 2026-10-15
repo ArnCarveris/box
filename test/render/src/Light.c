@@ -725,3 +725,103 @@ void Light_component_defaults(void) {
 
     ecs_fini(world);
 }
+
+void Light_cluster_lists_every_light(void) {
+    // lighting_fixes/cluster_overflow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    int32_t i;
+    for (i = 0; i < 200; i ++) {
+        ecs_entity_t light = ecs_new(world);
+        ecs_set(world, light, Position, {-3, 0, 0});
+        ecs_set(world, light, PointLight, {.intensity = 0.005f, .range = 2});
+    }
+
+    ecs_entity_t single = ecs_new(world);
+    ecs_set(world, single, Position, {3, 0, 0});
+    ecs_set(world, single, PointLight, {.intensity = 1, .range = 2});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "crowd.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/crowd.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *crowd = &px[(16 * 64 + 20) * 4];
+    unsigned char *reference = &px[(16 * 64 + 44) * 4];
+    test_assert(reference[0] > 40);
+    test_assert(reference[0] < 250);
+    test_assert(abs(crowd[0] - reference[0]) < 8);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Light_spot_light_lights_its_whole_cone(void) {
+    // lighting_fixes/cluster_overflow
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true});
+    ecs_singleton_set(world, AmbientLight, {.intensity = 0});
+    ecs_entity_t wall = ecs_new(world);
+    ecs_set(world, wall, Position, {0, 0, -1});
+    ecs_set(world, wall, Box, {20, 20, 0.1f});
+    ecs_set(world, wall, Rgb, {255, 255, 255});
+    ecs_set(world, wall, PbrMaterial, {.roughness = 1});
+    ecs_entity_t spot = ecs_new(world);
+    ecs_set(world, spot, Position, {-1, 0, 2});
+    ecs_set(world, spot, Rotation, {0, (float)GLM_PI - 0.5f, 0});
+    ecs_set(world, spot, SpotLight, {
+        .intensity = 40, .range = 12, .inner_angle = 40, .outer_angle = 45});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "cone.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/cone.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    unsigned char *outside = &px[(16 * 64 + 21) * 4];
+    unsigned char *edge = &px[(16 * 64 + 27) * 4];
+    unsigned char *center = &px[(16 * 64 + 40) * 4];
+    unsigned char *far = &px[(16 * 64 + 55) * 4];
+    test_assert(outside[0] < 8);
+    test_assert(edge[0] > 200);
+    test_assert(center[0] > 200);
+    test_assert(far[0] > 100);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
