@@ -428,14 +428,16 @@ level narrow phase and no picking.
 
 ## Text, layout and UI
 
-**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path}`
+**Text.** `Text {value, size, line_height, width, align, wrap, font}` and `Font {path, atlas_pages}`
 (`box.text.DefaultFont` is B612 in `etc/fonts`). Fonts load with stb_truetype on the job system.
 Glyph MSDFs are generated lazily per glyph on workers into RGBA8 atlas pages that grow and then
 page. A page reaches the backend as `BOX_RENDER_UPDATE` texture regions into a texture with one mip
 level: whole when it is new or grew, then once per frame the area that covers the glyphs completed
-since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new Font) is the
-atlas budget: a glyph that needs a page beyond it clears the least recently used page that no laid
-out Text shows, and the glyphs of that page are generated again on their next use. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
+since the last frame (`wgpuQueueWriteTexture`). `Font.atlas_pages` (4 for a new Font, a C literal 0 keeps no idle page) is
+the atlas budget: once a layout or a removed Text leaves a font with more pages, the least recently
+used pages no Text shows (disabled Texts are still drawn, so they count) are released and their
+glyphs generated again on next use; a glyph that needs room beyond the budget reuses such a page.
+Only a new `Font.path` loads the font again. Generation follows msdfgen 1.9+: perpendicular distance selection, the overlapping contour
 combiner (contours that overlap, such as composite glyphs, leave no seam) and its error correction
 (`src/text/msdf_correct.c`, edge priority without a distance check, after the scanline sign pass as
 msdfgen runs it with `-scanline`); cusps are pushed apart first, as msdfgen normalizes shapes. Font data is untrusted: a face without units per em fails to load, and a glyph whose box
