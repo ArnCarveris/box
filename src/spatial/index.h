@@ -31,12 +31,6 @@ typedef struct SpatialProxy {
 /** Component id of SpatialProxy */
 extern ECS_COMPONENT_DECLARE(SpatialProxy);
 
-/** A root of a changed subtree with the static transform version it had at the change */
-typedef struct box_spatial_transformed_t {
-    ecs_entity_t entity; /**< The root */
-    uint64_t version;    /**< WorldTransformVersion of the root at the change */
-} box_spatial_transformed_t;
-
 /** An indexed entity with its exact world bounds */
 typedef struct box_spatial_item_t {
     ecs_entity_t entity; /**< The entity, 0 when the item is free */
@@ -65,8 +59,6 @@ typedef struct box_spatial_t {
     ecs_vec_t dirty;           /**< ecs_entity_t, entities whose place may have changed */
     ecs_vec_t moved;           /**< ecs_entity_t, roots of subtrees that moved */
     ecs_vec_t rescoped;        /**< ecs_entity_t, roots of subtrees that may change scene */
-    ecs_vec_t transformed;     /**< box_spatial_transformed_t, roots changed since the update */
-    ecs_vec_t late;            /**< ecs_entity_t, roots placed before their transform was known */
     ecs_vec_t walk;            /**< ecs_entity_t, stack of a subtree walk */
     ecs_vec_t leaves;          /**< box_bvh_leaf_t, scratch of a build */
     ecs_vec_t nodes;           /**< int32_t, scratch of a build */

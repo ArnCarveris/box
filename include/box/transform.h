@@ -84,6 +84,36 @@ bool box_transform_dynamic(
     const ecs_world_t *world,
     const ecs_table_t *table);
 
+/** Receives the roots of the static subtrees whose WorldTransform a TransformStatic run
+ * computed, once per run that computed any; every descendant of a root may have moved.
+ *
+ * @param world The world
+ * @param roots The roots
+ * @param count Number of roots
+ * @param ctx The context passed to box_transform_on_moved
+ */
+typedef void (*box_transform_moved_t)(
+    ecs_world_t *world,
+    const ecs_entity_t *roots,
+    int32_t count,
+    void *ctx);
+
+/** Call a function with the roots of the static subtrees TransformStatic computed.
+ *
+ * Static transforms are computed in EcsPreStore, so a change made later in a frame reaches
+ * the function in the next frame, when its transform is known.
+ *
+ * @param world The world
+ * @param callback The function
+ * @param ctx Context passed to the function
+ * @param ctx_free Frees the context when the world is deleted, NULL for none
+ */
+void box_transform_on_moved(
+    ecs_world_t *world,
+    box_transform_moved_t callback,
+    void *ctx,
+    ecs_ctx_free_t ctx_free);
+
 /** Register the box.transform module.
  *
  * @param world The world

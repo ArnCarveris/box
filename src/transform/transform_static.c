@@ -5,10 +5,19 @@
 
 #include "transform.h"
 
+/** A function that receives the roots of the static subtrees TransformStatic computed */
+typedef struct {
+    box_transform_moved_t callback; /**< The function */
+    void *ctx;                      /**< Context passed to the function */
+    ecs_ctx_free_t ctx_free;        /**< Frees the context with the world, NULL for none */
+} TransformStaticListener;
+
 /** Entities whose static transform must be recomputed this frame */
 typedef struct {
-    ecs_vec_t value;  /**< Vector of ecs_entity_t */
-    ecs_vec_t manual; /**< ManualTransform entities whose WorldTransform was set */
+    ecs_vec_t value;     /**< Vector of ecs_entity_t */
+    ecs_vec_t manual;    /**< ManualTransform entities whose WorldTransform was set */
+    ecs_vec_t moved;     /**< ecs_entity_t, roots of the subtrees computed this run */
+    ecs_vec_t listeners; /**< TransformStaticListener, receive the moved roots */
 } TransformStaticDirtyEntities;
 
 static void transformTree(
@@ -24,20 +33,41 @@ static void transformTree(
 static void TransformStaticDirtyEntities_free(
     TransformStaticDirtyEntities *ptr)
 {
+    int32_t i, count = ecs_vec_count(&ptr->listeners);
+    TransformStaticListener *listeners = ecs_vec_first(&ptr->listeners);
+    for (i = 0; i < count; i ++) {
+        if (listeners[i].ctx_free) {
+            listeners[i].ctx_free(listeners[i].ctx);
+        }
+    }
+
     ecs_vec_fini_t(NULL, &ptr->value, ecs_entity_t);
     ecs_vec_fini_t(NULL, &ptr->manual, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->moved, ecs_entity_t);
+    ecs_vec_fini_t(NULL, &ptr->listeners, TransformStaticListener);
+}
+
+/** Initialize the storage of a dirty entity list.
+ *
+ * @param ptr The dirty entity list
+ */
+static void TransformStaticDirtyEntities_init(
+    TransformStaticDirtyEntities *ptr)
+{
+    ecs_vec_init_t(NULL, &ptr->value, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &ptr->manual, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &ptr->moved, ecs_entity_t, 0);
+    ecs_vec_init_t(NULL, &ptr->listeners, TransformStaticListener, 0);
 }
 
 ECS_CTOR(TransformStaticDirtyEntities, ptr, {
-    ecs_vec_init_t(NULL, &ptr->value, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &ptr->manual, ecs_entity_t, 0);
+    TransformStaticDirtyEntities_init(ptr);
 })
 
 ECS_MOVE(TransformStaticDirtyEntities, dst, src, {
     TransformStaticDirtyEntities_free(dst);
     *dst = *src;
-    ecs_vec_init_t(NULL, &src->value, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &src->manual, ecs_entity_t, 0);
+    TransformStaticDirtyEntities_init(src);
 })
 
 ECS_DTOR(TransformStaticDirtyEntities, ptr, {
@@ -233,19 +263,22 @@ static void transformTree(
  * @param world The world
  * @param e The dirty entity
  * @param version The transform version of the current frame
+ * @return true when the subtree of the entity was computed
  */
-static void transformRoot(
+static bool transformRoot(
     const ecs_world_t *world,
     ecs_entity_t e,
     uint64_t version)
 {
     WorldTransformVersion *v = NULL;
     bool skip = !ecs_is_alive(world, e) || ecs_has(world, e, DynamicTransform);
+    bool result = false;
 
     if (!skip && ecs_has(world, e, ManualTransform)) {
         const WorldTransform *t = ecs_get(world, e, WorldTransform);
         if (t) {
             transformTree(world, e, t, version);
+            result = true;
         }
 
         skip = true;
@@ -273,7 +306,10 @@ static void transformRoot(
         }
 
         transformTree(world, e, t ? t : t_parent, version);
+        result = true;
     }
+
+    return result;
 }
 
 /** Order entity ids for qsort.
@@ -291,8 +327,26 @@ static int transformCompareEntity(
     return (ea > eb) - (ea < eb);
 }
 
+/** Transform a dirty root and remember it as moved when its subtree was computed.
+ *
+ * @param world The world
+ * @param dirty The dirty entity lists
+ * @param e The dirty entity
+ * @param version The transform version of the current frame
+ */
+static void transformStaticRoot(
+    const ecs_world_t *world,
+    TransformStaticDirtyEntities *dirty,
+    ecs_entity_t e,
+    uint64_t version)
+{
+    if (transformRoot(world, e, version)) {
+        ecs_vec_append_t(NULL, &dirty->moved, ecs_entity_t)[0] = e;
+    }
+}
+
 /** Transform all entities in the dirty list, then the subtrees of the manual list once per
- * entity, and clear both lists.
+ * entity, pass the roots of what was computed to the listeners and clear the lists.
  *
  * @param it The system iterator
  */
@@ -308,7 +362,7 @@ static void TransformStatic(
         it->world)->frame_count_total + 1;
 
     for (i = 0; i < count; i ++) {
-        transformRoot(it->world, entities[i], version);
+        transformStaticRoot(it->world, dirty, entities[i], version);
     }
 
     count = ecs_vec_count(&dirty->manual);
@@ -319,12 +373,32 @@ static void TransformStatic(
 
     for (i = 0; i < count; i ++) {
         if (!i || entities[i] != entities[i - 1]) {
-            transformRoot(it->world, entities[i], version);
+            transformStaticRoot(it->world, dirty, entities[i], version);
         }
+    }
+
+    count = ecs_vec_count(&dirty->moved);
+    TransformStaticListener *listeners = ecs_vec_first(&dirty->listeners);
+    for (i = 0; count && i < ecs_vec_count(&dirty->listeners); i ++) {
+        listeners[i].callback(it->world, ecs_vec_first(&dirty->moved), count, listeners[i].ctx);
     }
 
     ecs_vec_clear(&dirty->value);
     ecs_vec_clear(&dirty->manual);
+    ecs_vec_clear(&dirty->moved);
+}
+
+void box_transform_on_moved(
+    ecs_world_t *world,
+    box_transform_moved_t callback,
+    void *ctx,
+    ecs_ctx_free_t ctx_free)
+{
+    TransformStaticDirtyEntities *dirty = ecs_singleton_get_mut(
+        world, TransformStaticDirtyEntities);
+    ecs_assert(dirty != NULL, ECS_INVALID_OPERATION, "box.transform is not imported");
+    ecs_vec_append_t(NULL, &dirty->listeners, TransformStaticListener)[0] =
+        (TransformStaticListener){ .callback = callback, .ctx = ctx, .ctx_free = ctx_free };
 }
 
 void TransformStaticImport(

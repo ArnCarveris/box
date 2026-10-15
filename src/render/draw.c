@@ -84,8 +84,6 @@ static void box_draws_free(
     ecs_vec_fini_t(NULL, &d->dirty, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &d->walk, ecs_entity_t);
-    ecs_vec_fini_t(NULL, &d->transformed, box_draw_transformed_t);
-    ecs_vec_fini_t(NULL, &d->late, ecs_entity_t);
     box_draws_order_fini(d);
     ecs_os_free(d);
 done:
@@ -146,87 +144,39 @@ done:
     return;
 }
 
-/** Remember the entities of an observer event as roots of changed subtrees whose static
- * transform changed, with the transform version they have now.
- *
- * @param it The iterator of the observer
- */
-static void BoxDrawsOnTransform(
-    ecs_iter_t *it)
-{
-    box_render_draws_t *d = it->ctx;
-    int32_t i;
-    if (ecs_is_fini(it->world)) {
-        goto done;
-    }
-
-    BoxDrawsOnMove(it);
-    for (i = 0; i < it->count; i ++) {
-        const WorldTransformVersion *v = ecs_get(
-            it->world, it->entities[i], WorldTransformVersion);
-        *ecs_vec_append_t(NULL, &d->transformed, box_draw_transformed_t) =
-            (box_draw_transformed_t){
-                .entity = it->entities[i], .version = v ? v->version : 0
-            };
-    }
-
-done:
-    return;
-}
-
-/** Remember the static entities whose transform input changed.
+/** Mark the static entities whose WorldTransform was set; the subtree of a ManualTransform
+ * entity arrives through box_transform_on_moved once its static descendants are computed.
  *
  * The DynamicTransform filter runs in the callback, because a Not term on an inherited tag
  * allocates for every event.
  *
  * @param it The iterator of the observer
  */
-static void BoxDrawsOnStaticTransform(
-    ecs_iter_t *it)
-{
-    if (!box_transform_dynamic(it->world, it->table)) {
-        BoxDrawsOnTransform(it);
-    }
-}
-
-/** Remember the entities that gain or lose DynamicTransform, and as moved static entities
- * the ones on the static side of the change that have a local transform.
- *
- * @param it The iterator of the observer
- */
-static void BoxDrawsOnDynamicKind(
-    ecs_iter_t *it)
-{
-    const ecs_table_t *other = it->other_table;
-    BoxDrawsOnChange(it);
-    if (other && !box_transform_dynamic(it->world, other) &&
-        ecs_table_has_id(it->world, other, ecs_id(Position)) &&
-        !ecs_table_has_id(it->world, other, ManualTransform))
-    {
-        BoxDrawsOnTransform(it);
-    }
-}
-
-/** Remember the static entities whose WorldTransform was set, and the ManualTransform ones as
- * roots of changed subtrees, since their static descendants follow them.
- *
- * @param it The iterator of the observer
- */
 static void BoxDrawsOnStaticWorld(
     ecs_iter_t *it)
 {
-    if (box_transform_dynamic(it->world, it->table)) {
-        goto done;
-    }
-
-    if (ecs_table_has_id(it->world, it->table, ManualTransform)) {
-        BoxDrawsOnMove(it);
-    } else {
+    if (!box_transform_dynamic(it->world, it->table)) {
         BoxDrawsOnChange(it);
     }
+}
 
-done:
-    return;
+/** Remember the roots of the static subtrees whose transform was computed.
+ *
+ * @param world The world
+ * @param roots The roots
+ * @param count Number of roots
+ * @param ctx The state
+ */
+static void box_draws_on_moved(
+    ecs_world_t *world,
+    const ecs_entity_t *roots,
+    int32_t count,
+    void *ctx)
+{
+    box_render_draws_t *d = ctx;
+    (void)world;
+    ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &d->moved, ecs_entity_t, count), roots,
+        ecs_entity_t, count);
 }
 
 /** Remember the entities whose parent changed as roots of changed subtrees, and make the 2D
@@ -239,7 +189,7 @@ static void BoxDrawsOnHierarchy(
 {
     box_render_draws_t *d = it->ctx;
     d->order_dirty = true;
-    BoxDrawsOnTransform(it);
+    BoxDrawsOnMove(it);
 }
 
 /** Make the 2D draw order again when the z it was made from changed.
@@ -312,41 +262,6 @@ static void BoxDrawsOnTextRemove(
 
 done:
     return;
-}
-
-/** Walk the roots again whose static transform was not computed yet at the last extract, and
- * keep the roots whose static transform changed after it was computed this frame.
- *
- * A static transform is computed in EcsPreStore and written without an event, so a change made
- * after it is only computed in the next frame, and its subtree is walked again then.
- *
- * @param world The world
- * @param d The state
- */
-static void box_draws_late(
-    ecs_world_t *world,
-    box_render_draws_t *d)
-{
-    int32_t i, count = ecs_vec_count(&d->transformed);
-    box_draw_transformed_t *changes = ecs_vec_first(&d->transformed);
-    for (i = 0; i < ecs_vec_count(&d->late); i ++) {
-        *ecs_vec_append_t(NULL, &d->moved, ecs_entity_t) =
-            *ecs_vec_get_t(&d->late, ecs_entity_t, i);
-    }
-
-    ecs_vec_clear(&d->late);
-    for (i = 0; i < count; i ++) {
-        ecs_entity_t e = changes[i].entity;
-        const WorldTransformVersion *v = ecs_is_alive(world, e) ?
-            ecs_get(world, e, WorldTransformVersion) : NULL;
-        bool pending = v && v->version == changes[i].version &&
-            !ecs_has_id(world, e, DynamicTransform) && !ecs_has_id(world, e, ManualTransform);
-        if (pending) {
-            *ecs_vec_append_t(NULL, &d->late, ecs_entity_t) = e;
-        }
-    }
-
-    ecs_vec_clear(&d->transformed);
 }
 
 /** Mark every entity of the changed subtrees, the roots included.
@@ -654,7 +569,6 @@ static void box_draws_process(
 {
     int32_t i;
     box_draws_text_dynamic(world, d);
-    box_draws_late(world, d);
     box_draws_walk(world, d);
     d->scene_table = NULL;
     for (i = 0; i < ecs_vec_count(&d->dirty); i ++) {
@@ -795,7 +709,7 @@ static void box_draws_observers(
     box_draws_material_observers(world, d);
     box_draws_observer(world, d, "DrawsOnDynamic", (ecs_observer_desc_t){
         .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnDynamicKind);
+        .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnChange);
     box_draws_observer(world, d, "DrawsOnWorldTransform", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(WorldTransform) }},
         .events = { EcsOnSet } }, BoxDrawsOnStaticWorld);
@@ -828,7 +742,8 @@ static void box_draws_observers(
         .events = { EcsOnAdd, EcsOnRemove } }, BoxDrawsOnOrdered);
 }
 
-/** Register the observers of the components a static transform is computed from.
+/** Follow static transforms: the 2D draw order on Position changes, and the subtrees whose
+ * static transform was computed through box_transform_on_moved.
  *
  * @param world The world
  * @param d The state
@@ -837,21 +752,11 @@ static void box_draws_transform_observers(
     ecs_world_t *world,
     box_render_draws_t *d)
 {
-    ecs_entity_t components[3] = { ecs_id(Position), ecs_id(Rotation), ecs_id(Scale) };
-    const char *names[3] = { "DrawsOnPosition", "DrawsOnRotation", "DrawsOnScale" };
-    int32_t i;
-    for (i = 0; i < 3; i ++) {
-        box_draws_observer(world, d, names[i], (ecs_observer_desc_t){
-            .query.terms = {
-                { .id = components[i] },
-                { .id = ManualTransform, .oper = EcsNot }
-            },
-            .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnStaticTransform);
-    }
-
     box_draws_observer(world, d, "DrawsOnPositionZ", (ecs_observer_desc_t){
         .query.terms = {{ .id = ecs_id(Position) }},
         .events = { EcsOnSet, EcsOnRemove } }, BoxDrawsOnPositionZ);
+    d->refs ++;
+    box_transform_on_moved(world, box_draws_on_moved, d, box_draws_free);
 }
 
 /** Create the queries of the dynamic shapes.
@@ -930,8 +835,6 @@ void box_render_draws_init(
     ecs_vec_init_t(NULL, &d->dirty, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->walk, ecs_entity_t, 0);
-    ecs_vec_init_t(NULL, &d->transformed, box_draw_transformed_t, 0);
-    ecs_vec_init_t(NULL, &d->late, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &d->released, uint32_t, 0);
     ecs_vec_init_t(NULL, &d->blended, int32_t, 0);
     ecs_vec_init_t(NULL, &d->sorted, box_draw_sorted_t, 0);

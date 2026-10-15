@@ -154,7 +154,9 @@ target in the same frame. `RenderExtract` and `RenderSubmit` are phases that dep
 descendant) are recomputed every frame. `ManualTransform` means the application writes
 `WorldTransform`; its static descendants follow when it is written with `ecs_set` or followed
 by `ecs_modified`, not by a write through a pointer alone. Hierarchies use `ChildOf` or the
-`Parent` component.
+`Parent` component. `TransformStatic` passes the roots of the static subtrees it computed to the
+functions registered with `box_transform_on_moved`; draws and the spatial index follow static
+moves only through it, so a `Position` set fires no render or spatial observer.
 
 ## Surfaces and the GPU device
 
@@ -205,11 +207,11 @@ persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, tex
 whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
 (model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
 
-Observers on shape, material, transform, hierarchy and scene components queue changed entities,
-so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`). Static batches
-upload changes into a change buffer that `scatter.wgsl` scatters into their slots; entities with
-`DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached queries. A
-batch is one instanced indirect draw and is limited to 1M instances.
+Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
+changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
+Static batches upload changes into a change buffer that `scatter.wgsl` scatters into their slots;
+entities with `DynamicTransform` or `DynamicMaterial` fill dynamic batches every frame from cached
+queries. A batch is one instanced indirect draw and is limited to 1M instances.
 
 Materials: `Rgb`, `PbrMaterial`, `Emissive`, `Opacity` and `Tint` resolve on the CPU, composed
 root down, into the instance. `BlendMode`, `BackFaceMode` and alpha below 1 key the batch.
@@ -347,7 +349,8 @@ bakes.
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
 AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and subtree roots; `SpatialUpdate` (`EcsOnStore`) places only those. Dynamic
+changed shapes and `box_transform_on_moved` the moved static subtrees; `SpatialUpdate`
+(`EcsOnStore`) places only those. Dynamic
 shapes are marked stale and placed by the first query after a frame, so an idle frame pays
 nothing. Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow
 phase filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move`
