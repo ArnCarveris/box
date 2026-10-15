@@ -316,6 +316,20 @@
                 ]
             },
             {
+                "id": "LightModes",
+                "testcases": [
+                    "defaults_to_mixed",
+                    "realtime_light_left_out_of_bake",
+                    "baked_light_only_in_probes",
+                    "modes_identical_without_bake",
+                    "mode_change_rebakes_reach",
+                    "baked_sun_leaves_shadows_to_next",
+                    "first_realtime_light_drops_default_sun",
+                    "baked_light_lights_probes_like_mixed",
+                    "captures_follow_first_non_realtime_sun"
+                ]
+            },
+            {
                 "id": "Bounces",
                 "testcases": [
                     "pass_reaches_bounces",
@@ -454,6 +468,29 @@
                     "script_entry_enabled_by_default",
                     "bloom_temporal_keeps_last_frame",
                     "follow_surface_resize"
+                ]
+            },
+            {
+                "id": "ShaderCompile",
+                "testcases": [
+                    "failed_recompile_keeps_module",
+                    "recompile_in_flight_keeps_old_module",
+                    "broken_recompile_in_flight_reports_error",
+                    "error_stays_until_outcome",
+                    "two_recompiles_in_flight_end_with_newest",
+                    "late_older_outcome_is_ignored",
+                    "new_shader_before_first_outcome",
+                    "delete_shader_mid_compile",
+                    "fini_mid_compile"
+                ]
+            },
+            {
+                "id": "PipelineCache",
+                "testcases": [
+                    "every_state_combination_draws",
+                    "invalid_back_face_mode_keeps_states_apart",
+                    "shader_reload_redraws_every_state",
+                    "released_shader_draws_nothing"
                 ]
             }
         ]

@@ -5,6 +5,9 @@
  * Most cases drop the packets, so they measure gathering 1000 point lights into the light
  * buffer of their scene on the main thread. The cluster cases render on the GPU and wait for
  * every frame; the crowded ones render a tiny image, so the cluster pass is most of its work.
+ *
+ * The baked cases have LightBake: all Mixed lights share the view list with the captures,
+ * cycling modes puts the lights into a view and three capture lists.
  */
 
 #include <box.h>
@@ -40,10 +43,13 @@ static void bench_light_drop(
  *
  * @param b The benchmark
  * @param moving Whether the parent moves every frame, so every light changes
+ * @param modes 0 without LightBake, 1 with LightBake (that bakes nothing) and Mixed lights, 3
+ * with LightBake and lights that cycle through the Mixed, Realtime and Baked modes
  */
 static void bench_light(
     bench_t *b,
-    bool moving)
+    bool moving,
+    int32_t modes)
 {
     ecs_world_t *world = ecs_init();
     ECS_IMPORT(world, Box);
@@ -56,13 +62,19 @@ static void bench_light(
         .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
     ecs_entity_t parent = ecs_new(world);
     ecs_set(world, parent, Position, {0, 0, 0});
+    if (modes) {
+        ecs_singleton_set(world, LightBake, {.probe_spacing = 2, .bounces = 0,
+            .capture_size = 8, .budget_ms = 0});
+    }
+
     int32_t i;
     float x = 0;
     for (i = 0; i < BENCH_LIGHTS; i ++) {
         ecs_entity_t e = ecs_new_w_pair(world, EcsChildOf, parent);
         ecs_set(world, e, Position,
             {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
-        ecs_set(world, e, PointLight, {.intensity = 2, .range = 3});
+        ecs_set(world, e, PointLight, {.intensity = 2, .range = 3,
+            .bake = modes ? (LightBakeMode)(i % modes) : LightBakeModeMixed});
         ecs_set(world, e, Rgb, {255, 200, 100});
     }
 
@@ -262,14 +274,14 @@ void Light_static_1000(
     bench_t *b)
 {
     // lighting/lights
-    bench_light(b, false);
+    bench_light(b, false, 0);
 }
 
 void Light_moving_1000(
     bench_t *b)
 {
     // lighting/lights
-    bench_light(b, true);
+    bench_light(b, true, 0);
 }
 
 void Light_scenes_1000(
@@ -298,4 +310,18 @@ void Light_crowded_spots_512(
 {
     // lighting_fixes/cluster_overflow
     bench_light_crowded(b, true);
+}
+
+void Light_moving_modes_1000(
+    bench_t *b)
+{
+    // baked_lighting/light_modes
+    bench_light(b, true, 3);
+}
+
+void Light_moving_mixed_1000(
+    bench_t *b)
+{
+    // baked_lighting/light_modes
+    bench_light(b, true, 1);
 }

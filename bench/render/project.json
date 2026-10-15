@@ -54,7 +54,9 @@
                     "scenes_1000",
                     "clustered_1000",
                     "crowded_points_512",
-                    "crowded_spots_512"
+                    "crowded_spots_512",
+                    "moving_modes_1000",
+                    "moving_mixed_1000"
                 ]
             },
             {
@@ -110,6 +112,12 @@
                 "benchcases": [
                     "mesh3_instantiate",
                     "box_instantiate"
+                ]
+            },
+            {
+                "id": "Pipelines",
+                "benchcases": [
+                    "state_combinations"
                 ]
             }
         ]
