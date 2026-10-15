@@ -2,9 +2,12 @@
  * @file controllers/move.c
  * @brief Moves a controller capsule through its scene: slide, step up and ground probe.
  *
- * A move reads the shapes around the swept capsule from the spatial index once, then walks the
- * motion in steps of half the radius, or as far as the capsule is clear of every shape when the
- * motion is long (conservative advancement), and pushes the capsule out after each step.
+ * A short move reads the shapes around its swept capsule from the spatial index once; a long one
+ * reads them per stretch ahead, sized to how crowded the scene is, until the region read no
+ * longer covers a chunk ahead.
+ *
+ * The motion goes in steps of half the radius, or as far as the capsule is clear of every shape
+ * (conservative advancement); a step only tests shapes its sweep overlaps and pushes out after.
  */
 
 #include "controllers.h"
@@ -274,6 +277,35 @@ static void box_move_cover(
             m->ahead = len * 2;
         }
     }
+}
+
+/** Find how far along a direction the capsule stays inside the region of the shapes read.
+ *
+ * @param m The move
+ * @param pos The feet
+ * @param dir The unit direction
+ * @return Distance along dir the sweep stays inside the region, negative when pos is outside
+ */
+static float box_move_covered(
+    const box_move_t *m,
+    const vec3 pos,
+    const vec3 dir)
+{
+    vec3 still = { 0, 0, 0 }, lo, hi;
+    float result = m->region ? FLT_MAX : -1;
+    int32_t i;
+    box_move_sweep(m->body, pos, still, BOX_MOVE_MARGIN - BOX_MOVE_FIT, lo, hi);
+    for (i = 0; i < 3 && result >= 0; i ++) {
+        if (lo[i] < m->region_min[i] || hi[i] > m->region_max[i]) {
+            result = -1;
+        } else if (dir[i] > 0) {
+            result = fminf(result, (m->region_max[i] - hi[i]) / dir[i]);
+        } else if (dir[i] < 0) {
+            result = fminf(result, (lo[i] - m->region_min[i]) / -dir[i]);
+        }
+    }
+
+    return result;
 }
 
 /** Start a move: read the shapes the capsule can reach on its first stretch.
@@ -613,12 +645,18 @@ static void box_move_slide(
     }
 
     for (i = 0; i < BOX_MOVE_SWEEPS && len > BOX_MOVE_EPS; i ++) {
-        float step, far = fminf(len, m->ahead);
+        float step, far;
         glm_vec3_scale(rest, 1.0f / len, dir);
         glm_vec3_negate_to(dir, m->back);
-        glm_vec3_scale(dir, far, ahead);
-        box_move_cover(m, pos, ahead, fminf(far, chunk), 0);
-        far = glm_vec3_norm(ahead);
+        far = box_move_covered(m, pos, dir);
+        if (far < fminf(len, chunk)) {
+            far = fminf(len, m->ahead);
+            glm_vec3_scale(dir, far, ahead);
+            box_move_cover(m, pos, ahead, fminf(far, chunk), 0);
+            far = glm_vec3_norm(ahead);
+        }
+
+        far = fminf(far, len);
         step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit, far)), far);
         glm_vec3_muladds(dir, step, pos);
         glm_vec3_scale(dir, len - step, rest);

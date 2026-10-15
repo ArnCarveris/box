@@ -1425,3 +1425,58 @@ void Collision_sheared_box_gap(void) {
 
     ecs_fini(world);
 }
+
+void Collision_crowded_stretch_walls(void) {
+    // controller_fixes/substep_colliders
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t body[40];
+    float wall[40];
+    for (int32_t k = 0; k < 40; k ++) {
+        bool camera = k < 20;
+        float x = 1.5f * (float)k;
+        float above = camera ? 1.28f : 2.0f;
+        wall[k] = -(5 + 20.0f * (float)(k % 20) / 19.0f + 0.37f * (float)(k / 20));
+        for (int32_t i = 0; i < 320; i ++) {
+            ecs_entity_t pebble = ecs_new(world);
+            ecs_set(world, pebble, Position, { x, above, 1 - 0.1f * (float)i });
+            ecs_set(world, pebble, Box, { 0.05f, 0.02f, 0.05f });
+        }
+
+        ecs_entity_t w = ecs_new(world);
+        ecs_set(world, w, Position, { x, 1, wall[k] });
+        ecs_set(world, w, Box, { 1, 4, 0.05f });
+        body[k] = ecs_new(world);
+        if (camera) {
+            ecs_set(world, body[k], Position, { x, 1, 0 });
+            ecs_add(world, body[k], CameraController);
+            CameraController *cc = ecs_get_mut(world, body[k], CameraController);
+            cc->collide = true;
+            cc->speed = 60;
+            cc->boost = 1;
+            cc->acceleration = 1e9f;
+        } else {
+            ecs_set(world, body[k], Position, { x, 1.7f, 0 });
+            ecs_add(world, body[k], FirstPersonController);
+            ecs_get_mut(world, body[k], FirstPersonController)->speed = 60;
+        }
+    }
+
+    ecs_progress(world, 0.1f);
+    box_input_key(world, KeyW, true);
+    for (int32_t f = 0; f < 2; f ++) {
+        ecs_progress(world, 0.5f);
+        for (int32_t k = 0; k < 40; k ++) {
+            float r = k < 20 ? 0.25f : 0.3f;
+            test_assert(ecs_get(world, body[k], Position)->z > wall[k] + 0.025f + r - 0.01f);
+        }
+    }
+
+    for (int32_t k = 0; k < 40; k ++) {
+        float r = k < 20 ? 0.25f : 0.3f;
+        test_assert(ecs_get(world, body[k], Position)->z < wall[k] + 0.025f + r + 0.01f);
+    }
+
+    ecs_fini(world);
+}

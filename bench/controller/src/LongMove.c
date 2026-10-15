@@ -55,12 +55,14 @@ static void bench_long_run(
     };
     Position p = { 0 };
     int32_t i;
+    double run = 0;
     bench_set_items(b, BENCH_LONG_MOVES);
     while (bench_iter(b)) {
         for (i = 0; i < BENCH_LONG_MOVES; i ++) {
             vec3 v = { velocity[0], velocity[1], velocity[2] };
             p = (Position){ 0, 0, 0 };
             box_controller_move(world, &body, &p, v, BENCH_LONG_DT, NULL);
+            run ++;
         }
 
         bench_keep(p.x);
@@ -68,6 +70,7 @@ static void bench_long_run(
 
     bench_counter(b, "x", p.x);
     bench_counter(b, "z", p.z);
+    bench_counter(b, "moves_run", run);
     ecs_fini(world);
 }
 

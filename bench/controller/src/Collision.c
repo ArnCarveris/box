@@ -92,6 +92,7 @@ void Collision_move_1m(
     float extent = BENCH_ROW * BENCH_SPACING;
     uint32_t seed = 7;
     int32_t i, blocked = 0;
+    double run = 0;
     for (i = 0; i < BENCH_MOVES; i ++) {
         float a = bench_random(&seed) * 6.2832f;
         feet[i] = (Position){ bench_random(&seed) * extent, 0, bench_random(&seed) * extent };
@@ -108,6 +109,7 @@ void Collision_move_1m(
             vec3 v = { dir[i][0], dir[i][1], dir[i][2] };
             box_controller_hit_t hit;
             box_controller_move(world, &body, &p, v, BENCH_DT, &hit);
+            run ++;
             blocked += hit.blocked;
         }
 
@@ -115,6 +117,7 @@ void Collision_move_1m(
     }
 
     bench_counter(b, "blocked_pct", 100.0 * blocked / BENCH_MOVES);
+    bench_counter(b, "moves_run", run);
     ecs_os_free(dir);
     ecs_os_free(feet);
     ecs_fini(world);
@@ -129,6 +132,7 @@ void Collision_move_blocked_1m(
     Position *feet = ecs_os_malloc_n(Position, BENCH_MOVES);
     uint32_t seed = 9;
     int32_t i, blocked = 0;
+    double run = 0;
     for (i = 0; i < BENCH_MOVES; i ++) {
         int32_t cell = (int32_t)(bench_random(&seed) * (BENCH_STATIC - 1));
         feet[i] = (Position){ (float)(cell % BENCH_ROW) * BENCH_SPACING - 0.75f, 0,
@@ -143,6 +147,7 @@ void Collision_move_blocked_1m(
             vec3 v = { 4, 0, 0 };
             box_controller_hit_t hit;
             box_controller_move(world, &body, &p, v, 0.1f, &hit);
+            run ++;
             blocked += hit.blocked;
         }
 
@@ -150,6 +155,7 @@ void Collision_move_blocked_1m(
     }
 
     bench_counter(b, "blocked_pct", 100.0 * blocked / BENCH_MOVES);
+    bench_counter(b, "moves_run", run);
     ecs_os_free(feet);
     ecs_fini(world);
 }
@@ -192,6 +198,7 @@ void Collision_fast_move_1m(
     uint32_t seed = 11;
     int32_t i;
     float travelled = 0;
+    double run = 0;
     for (i = 0; i < BENCH_FAST_MOVES; i ++) {
         float a = bench_random(&seed) * 6.2832f;
         feet[i] = (Position){ 100 + bench_random(&seed) * (extent - 200), 0,
@@ -208,6 +215,7 @@ void Collision_fast_move_1m(
             Position p = feet[i];
             vec3 v = { dir[i][0], dir[i][1], dir[i][2] };
             box_controller_move(world, &body, &p, v, BENCH_FAST_DT, NULL);
+            run ++;
             travelled += fabsf(p.x - feet[i].x) + fabsf(p.z - feet[i].z);
         }
 
@@ -215,6 +223,7 @@ void Collision_fast_move_1m(
     }
 
     bench_counter(b, "travelled", travelled / BENCH_FAST_MOVES);
+    bench_counter(b, "moves_run", run);
     ecs_os_free(dir);
     ecs_os_free(feet);
     ecs_fini(world);

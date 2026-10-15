@@ -167,7 +167,8 @@
                     "round_obstacles_block",
                     "capsule_core_crossing",
                     "camera_on_capsule_core",
-                    "sheared_box_gap"
+                    "sheared_box_gap",
+                    "crowded_stretch_walls"
                 ]
             }
         ]
