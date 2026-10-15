@@ -478,8 +478,8 @@ void Invalidation_requeued_probes_keep_values(void) {
 
     ecs_entity_t scene = ecs_new(world);
     ecs_add(world, scene, Scene);
-    ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0.5f,
-        .capture_size = 8, .budget_ms = 0.001f, .bounces = 2});
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 1000000, .bounces = 1});
     ecs_set(world, scene, AmbientLight, {.intensity = 0});
     ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, dark, DirectionalLight, {.intensity = 0});
@@ -529,6 +529,11 @@ void Invalidation_requeued_probes_keep_values(void) {
     }
 
     stbi_image_free(image);
+    ecs_set(world, scene, LightBake, {.probe_spacing = 2, .bounds_padding = 0.5f,
+        .capture_size = 8, .budget_ms = 0.001f, .bounces = 1});
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
     ecs_set(world, glow, Emissive, {.strength = 4, .color = {255, 255, 255}});
     ecs_set(world, glow, Rgb, {10, 10, 10});
 
