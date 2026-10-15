@@ -206,7 +206,9 @@ collapses to a point.
 topology and quantized proportions) plus an instance scale in the private `ShapeMesh`; radius
 and size are never baked. Prefabs resolve their shape too: `Mesh3` is `(OnInstantiate, Inherit)`,
 so instances share the prefab's vertex data and copy the prefab's `ShapeMesh` instead of hashing
-it again; the other shapes are copied into instances. A mesh is sent once per backend as a
+it again. A prefab edit reaches every instance that does not override it (`ecs_set`; `ecs_get_mut`
+on an inheriting instance returns NULL), and instances lose the mesh when the prefab loses it or
+is deleted. The other shapes are copied into instances. A mesh is sent once per backend as a
 resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
 blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
 one. An instance is 128 bytes (model matrix with scale, normal data, color, emissive,
