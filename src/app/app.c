@@ -26,6 +26,8 @@ typedef struct box_app_clock_t {
     double start;               /**< Wall seconds when the module was imported */
     double cpu;                 /**< Process CPU seconds at the end of the previous frame */
     double wall;                /**< Wall seconds at the end of the previous frame */
+    double pace;                /**< Deadline the CPU budget waited to at the end of the
+                                 *   previous frame, its wall time when it did not wait */
     double ticks;               /**< Wall seconds at the start of the previous loop iteration */
     double target;              /**< Deadline of the frame cap, Godot's OS::target_ticks */
     box_app_smoother_t smoother; /**< Delta smoothing while frames present with vsync */
@@ -108,6 +110,12 @@ done:
 /** Count the frame, start the clock on the first frame, stop the world when App says so and
  * sleep when a headless process used more than its CPU budget since the previous frame.
  *
+ * The sleep waits to a deadline that advances from the previous one, as the virtual
+ * scheduling form of a leaky bucket (GCRA) does: a wait that wakes late shortens the next one,
+ * so timer leeway does not lower the CPU share below the budget.
+ *
+ * A frame under its budget starts the next interval at its own wall time: idle earns no credit.
+ *
  * @param it The iterator of the system
  */
 static void BoxAppFrame(
@@ -118,6 +126,7 @@ static void BoxAppFrame(
     AppStatus *status = ecs_singleton_get_mut(it->world, AppStatus);
     double cpu = box_app_cpu_time();
     double wall = box_app_wall_time();
+    double pace = wall;
     if (!app || !status) {
         goto done;
     }
@@ -137,17 +146,19 @@ static void BoxAppFrame(
     }
 
     if (app->headless && !app->unpaced && clock->wall > 0) {
-        double sleep = box_app_pace(cpu - clock->cpu, wall - clock->wall, app->cpu_budget);
+        double sleep = box_app_pace(cpu - clock->cpu, wall - clock->pace, app->cpu_budget);
         if (sleep > 0) {
-            ecs_sleepf(sleep);
-            status->slept += sleep;
-            wall = box_app_wall_time();
+            double now = box_wait_until(wall + sleep);
+            status->slept += now - wall;
+            pace = wall + sleep;
+            wall = now;
         }
     }
 
 done:
     clock->cpu = cpu;
     clock->wall = wall;
+    clock->pace = pace;
 }
 
 /** Add a sample to a series of FrameTiming.

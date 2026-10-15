@@ -78,7 +78,10 @@ unless `App.unguarded` is set. It loads the
 scene as a managed script, starts the `TerminalServer` on `port` and steps the world until it
 quits. `BOX_TEST=1` sets `unguarded` and `unpaced` in every new world. The `AppFrame` system
 (`EcsPostFrame`) counts frames into `AppStatus.frame`, stops on `frames` or `timeout` and in a
-paced headless run sleeps for as long as the process exceeded its CPU budget. Setting
+paced headless run sleeps for as long as the process exceeded its CPU budget. The sleep waits
+with `box_wait_until` to a deadline that advances from the previous one (GCRA, the virtual
+scheduling form of a leaky bucket), so a late wake up shortens the next sleep and the CPU share
+matches the budget; a frame under its budget earns no credit for later ones. Setting
 `App.headless` creates `/tmp/box/<pid>` (`AppStatus.tmp_dir`).
 
 The temporary folder is private: `/tmp/box/<pid>` is made with mode 0700 and must be owned by

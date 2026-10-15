@@ -116,7 +116,8 @@ int box_app_guard(void);
 /** Compute the sleep that brings a process back within its CPU budget.
  *
  * @param cpu_used CPU seconds the process used during the interval
- * @param wall_used Wall seconds the interval took
+ * @param wall_used Wall seconds since the interval started, which is the deadline of the
+ *        previous sleep, so the time a late wake up overslept counts toward this one
  * @param budget Percentage of one core the process may use
  * @return Seconds to sleep, 0 when the process is within its budget
  */
