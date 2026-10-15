@@ -278,7 +278,9 @@ in batch order.
 
 `DirectionalLight`, `PointLight`, `SpotLight` and `AmbientLight` take color from `Rgb`, position
 from `WorldTransform` and direction from the local +Z axis. Constructors give intensity 1, range
-10 and a 20/30 degree cone. `RenderExtractLights` collects the lights of each scene into a
+10 and a 20/30 degree cone. Point and spot lights fall off with the inverse square of the
+distance (clamped below 0.01), windowed to zero at their range as in Frostbite's
+`smoothDistanceAtt`; `include/box/light.h` documents the units. `RenderExtractLights` collects the lights of each scene into a
 storage buffer per scene, directional first, uploaded only when its bytes change. Every view
 gets the buffer, counts and ambient of the scene of its camera. `AmbientLight` (sky, ground,
 intensity) on a scene root, any entity of the scene or as a singleton for the default scene is

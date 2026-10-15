@@ -254,13 +254,18 @@ fn brdf(s: Surface, v: vec3f, l: vec3f, radiance: vec3f) -> vec3f {
     return (diffuse + specular) * radiance * ndl;
 }
 
-// Radiance of a point or spot light at a position: a windowed inverse square falloff that
-// reaches zero at the range, times the smooth cone of a spot light.
+// Distance below which a point or spot light stops getting brighter, so a surface at the light
+// stays finite.
+const LIGHT_MIN_DISTANCE: f32 = 0.01;
+
+// Radiance of a point or spot light at a position: inverse square falloff, smoothly windowed
+// to zero at the range as in Frostbite's smoothDistanceAtt, times the smooth cone of a spot.
 fn attenuation(light: Light, l: vec3f, dist: f32) -> f32 {
     let ratio = dist / max(light.range, 1e-4);
     let window = clamp(1.0 - ratio * ratio * ratio * ratio, 0.0, 1.0);
     let cone = clamp(dot(-l, light.direction) * light.spot_scale + light.spot_offset, 0.0, 1.0);
-    return window * window / (dist * dist + 1.0) * cone * cone;
+    let near_ = max(dist, LIGHT_MIN_DISTANCE);
+    return window * window / (near_ * near_) * cone * cone;
 }
 
 // Light inputs. Every direct light the forward pass uses comes from here: the directional
