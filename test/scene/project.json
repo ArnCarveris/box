@@ -77,7 +77,12 @@
                     "moved_in_pre_store",
                     "moved_in_on_store",
                     "parent_moved_in_pre_store",
-                    "manual_parent_moved_in_pre_store"
+                    "manual_parent_moved_in_pre_store",
+                    "dynamic_random_moves_vs_brute_force",
+                    "dynamic_rotated_in_place",
+                    "dynamic_shape_removed_and_added_back",
+                    "dynamic_to_static_and_back",
+                    "dynamic_fast_mover_exact_bounds"
                 ]
             }
         ]
