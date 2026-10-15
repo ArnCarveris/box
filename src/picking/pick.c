@@ -698,7 +698,29 @@ static bool box_pick_texture(
     return result;
 }
 
-/** Find the Interactive entity that handles the events of a hit: itself or an ancestor.
+/** Find the first entity with a tag on the path of a hit: itself or an ancestor.
+ *
+ * @param world The world
+ * @param e The hit
+ * @param tag Interactive or InputBlocker
+ * @return The entity, 0 when there is none
+ */
+static ecs_entity_t box_pick_path_find(
+    const ecs_world_t *world,
+    ecs_entity_t e,
+    ecs_entity_t tag)
+{
+    int32_t depth = 0;
+    while (e && depth < BOX_PICK_CHAIN_MAX && !ecs_has_id(world, e, tag)) {
+        e = ecs_get_parent(world, e);
+        depth ++;
+    }
+
+    return depth < BOX_PICK_CHAIN_MAX ? e : 0;
+}
+
+/** Find the entity that handles the events of a hit: the first Interactive entity on its path,
+ * else the first InputBlocker, which keeps them from passing to the views rendered before.
  *
  * @param world The world
  * @param e The hit
@@ -708,13 +730,12 @@ static ecs_entity_t box_pick_handler(
     const ecs_world_t *world,
     ecs_entity_t e)
 {
-    int32_t depth = 0;
-    while (e && depth < BOX_PICK_CHAIN_MAX && !ecs_has_id(world, e, Interactive)) {
-        e = ecs_get_parent(world, e);
-        depth ++;
+    ecs_entity_t result = box_pick_path_find(world, e, Interactive);
+    if (!result) {
+        result = box_pick_path_find(world, e, InputBlocker);
     }
 
-    return depth < BOX_PICK_CHAIN_MAX ? e : 0;
+    return result;
 }
 
 /** Order views by descending id, the reverse of their render order.

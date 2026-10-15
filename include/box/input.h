@@ -96,7 +96,7 @@ ECS_STRUCT(Mouse, {
     vec2 position;   /**< Cursor in window points, origin at the top left */
     vec2 delta;      /**< Cursor movement during this frame */
     vec2 normalized; /**< Cursor over the window size, 0..1 from the top left */
-    vec2 scroll;     /**< Wheel offset of this frame */
+    vec2 scroll;     /**< Wheel offset of this frame, without the wheel over an InputBlocker */
     bool pinned;     /**< A synthetic cursor is pinned, platform movement is ignored */
     bool captured;   /**< The platform holds the cursor: hidden, kept in the window, unbounded */
 });
