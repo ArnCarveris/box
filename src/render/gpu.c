@@ -418,7 +418,7 @@ static void box_gpu_render(
         }
     }
 
-    box_gpu_texture_mips(gpu);
+    box_gpu_texture_mips(gpu, packet);
     box_gpu_upload(gpu, packet);
     box_gpu_scatter(gpu, packet);
     box_gpu_bake_capture(gpu, packet);
