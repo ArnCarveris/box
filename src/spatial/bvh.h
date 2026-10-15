@@ -93,25 +93,43 @@ void box_bvh_remove(
     box_bvh_t *tree,
     int32_t leaf);
 
-/** Give a leaf new bounds, keeping its place when a close ancestor still contains them.
+/** Give a leaf exact new bounds, keeping its place when a close ancestor still contains them.
  *
- * Without margin the leaf gets the exact bounds and at most a few ancestors grow; with a
- * margin a leaf that still contains the bounds stays as is, else it is inserted again with
- * the bounds grown by the margin.
+ * The leaf gets the bounds and at most a few ancestors grow, else it is inserted again.
  *
  * @param tree The tree
  * @param leaf The leaf node
  * @param min Minimum corner of the new bounds
  * @param max Maximum corner of the new bounds
- * @param margin Slack around the leaf, 0 for exact bounds
  * @return The leaf node, which differs from leaf when it was inserted again
  */
 int32_t box_bvh_move(
     box_bvh_t *tree,
     int32_t leaf,
     const vec3 min,
+    const vec3 max);
+
+/** Give a fat leaf new bounds, inserting it again only when they leave it or it is too large.
+ *
+ * A leaf inserted again gets the bounds grown by the margin on every side and stretched by
+ * the predicted displacement on the side it moves to. A leaf that still contains the bounds
+ * stays, unless it outgrew that box by more than four margins (b2DynamicTree::MoveProxy).
+ *
+ * @param tree The tree
+ * @param leaf The leaf node
+ * @param min Minimum corner of the new bounds
+ * @param max Maximum corner of the new bounds
+ * @param margin Slack around the bounds on every side
+ * @param ahead Predicted displacement the leaf reaches ahead of the bounds
+ * @return The leaf node, which differs from leaf when it was inserted again
+ */
+int32_t box_bvh_move_fat(
+    box_bvh_t *tree,
+    int32_t leaf,
+    const vec3 min,
     const vec3 max,
-    float margin);
+    float margin,
+    const vec3 ahead);
 
 /** Replace the tree with one built top down from a set of leaves.
  *

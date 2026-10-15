@@ -25,6 +25,9 @@
                     "overlap_sphere_1m",
                     "update_static_1pct",
                     "update_dynamic_10k",
+                    "update_dynamic_100k_1pct",
+                    "overlap_after_teleports_100k",
+                    "overlap_sparse_movers_100k",
                     "idle_100k",
                     "idle_ray_100k"
                 ]

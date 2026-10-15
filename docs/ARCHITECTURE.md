@@ -380,12 +380,18 @@ ambient.
 
 `box.spatial` keeps, per scene, an index over world AABBs of shapes (unit mesh bounds times
 `ShapeMesh` scale, placed by `WorldTransform`): a static BVH (binned SAH build, SAH insert with
-AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. Observers queue
-changed shapes and `box_transform_on_moved` the moved static entities; `SpatialUpdate`
-(`EcsOnStore`) places only those. Dynamic shapes are marked stale and placed by the first query
-after a frame, so an idle frame pays nothing. Queries (`src/spatial/spatial.h`) are scoped to
-one scene: nearest ray with a narrow phase filter, all hits sorted, box and sphere overlap,
-entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
+AVL rotations) and a dynamic BVH with fat leaves for `DynamicTransform` shapes. A fat leaf has a
+margin and reaches four times the displacement per frame ahead, at most four margins (a larger
+displacement is a teleport and predicts nothing); it is inserted again only when the bounds leave
+it or it outgrew them by four margins (Box2D's `b2DynamicTree::MoveProxy`), and a stretched leaf
+whose shape kept its bounds since the last query gets a leaf with only the margin.
+Observers queue changed shapes and `box_transform_on_moved` the moved static entities;
+`SpatialUpdate` (`EcsOnStore`) places only those. Dynamic shapes are placed by the first query
+after a frame, so an idle frame pays nothing. Each keeps the `WorldTransform` its bounds came from
+in `SpatialPose`, and the query computes bounds only for shapes whose transform differs from it;
+dynamic transforms publish no change signal, so finding them is one compare per dynamic shape.
+Queries (`src/spatial/spatial.h`) are scoped to one scene: nearest ray with a narrow phase
+filter, all hits sorted, box and sphere overlap, entity bounds. `box_controller_move` uses them for collision, `box_spatial_static_bounds` gives
 the box around the static shapes of a scene to the bake. Bounds are boxes; there is no mesh
 level narrow phase and no picking.
 

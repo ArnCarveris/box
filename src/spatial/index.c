@@ -11,6 +11,12 @@
 /** Margin of a dynamic leaf relative to its largest extent */
 #define BOX_SPATIAL_MARGIN_SCALE (0.1f)
 
+/** Updates of its last displacement a dynamic leaf reaches ahead (b2_aabbMultiplier) */
+#define BOX_SPATIAL_PREDICT (4.0f)
+
+/** Margins a dynamic leaf reaches ahead at most; a larger prediction is a teleport */
+#define BOX_SPATIAL_PREDICT_MAX (4.0f)
+
 box_spatial_scene_t* box_spatial_scene(
     const box_spatial_t *index,
     ecs_entity_t scene)
@@ -49,6 +55,7 @@ static box_spatial_scene_t* box_spatial_scene_new(
     ecs_vec_init_t(NULL, &s->items, box_spatial_item_t, 0);
     ecs_vec_init_t(NULL, &s->pending, int32_t, 0);
     ecs_vec_init_t(NULL, &s->moved, int32_t, 0);
+    ecs_vec_init_t(NULL, &s->stretched, int32_t, 0);
     s->free_item = -1;
 
     return s;
@@ -66,6 +73,7 @@ static void box_spatial_scene_free(
     ecs_vec_fini_t(NULL, &s->items, box_spatial_item_t);
     ecs_vec_fini_t(NULL, &s->pending, int32_t);
     ecs_vec_fini_t(NULL, &s->moved, int32_t);
+    ecs_vec_fini_t(NULL, &s->stretched, int32_t);
     ecs_os_free(s);
 }
 
@@ -143,6 +151,7 @@ static void box_spatial_item_place(
     int32_t item)
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
+    it->stretched = false;
     if (it->tree == BOX_SPATIAL_DYNAMIC) {
         vec3 min, max;
         float margin = box_spatial_margin(it->min, it->max);
@@ -160,7 +169,8 @@ int32_t box_spatial_item_add(
     ecs_entity_t e,
     int32_t tree,
     const vec3 min,
-    const vec3 max)
+    const vec3 max,
+    uint32_t frame)
 {
     int32_t result = s->free_item;
     box_spatial_item_t *it;
@@ -174,6 +184,7 @@ int32_t box_spatial_item_add(
 
     it->entity = e;
     it->tree = tree;
+    it->frame = frame;
     it->moved = false;
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
@@ -183,17 +194,58 @@ int32_t box_spatial_item_add(
     return result;
 }
 
+/** Predict how far a dynamic leaf reaches ahead from the displacement per update of its item.
+ *
+ * @param it The item, which still has its previous bounds
+ * @param min Minimum corner of the new bounds
+ * @param max Maximum corner of the new bounds
+ * @param frame The current update
+ * @param margin Margin of the leaf
+ * @param ahead Receives the prediction, zero for a displacement too large to predict
+ * @return true when the prediction is not zero
+ */
+static bool box_spatial_ahead(
+    const box_spatial_item_t *it,
+    const vec3 min,
+    const vec3 max,
+    uint32_t frame,
+    float margin,
+    vec3 ahead)
+{
+    uint32_t frames = frame - it->frame;
+    float scale = BOX_SPATIAL_PREDICT * 0.5f / (float)(frames ? frames : 1);
+    float cap = BOX_SPATIAL_PREDICT_MAX * margin;
+    bool teleport = false, result = false;
+    int32_t i;
+    for (i = 0; i < 3; i ++) {
+        ahead[i] = scale * (min[i] + max[i] - it->min[i] - it->max[i]);
+        teleport |= fabsf(ahead[i]) > cap;
+        result |= ahead[i] != 0;
+    }
+
+    if (teleport) {
+        glm_vec3_zero(ahead);
+    }
+
+    return result && !teleport;
+}
+
 bool box_spatial_item_set(
     box_spatial_scene_t *s,
     int32_t item,
     int32_t tree,
     const vec3 min,
-    const vec3 max)
+    const vec3 max,
+    uint32_t frame)
 {
     box_spatial_item_t *it = box_spatial_item(s, item);
     int32_t node = it->node;
+    float margin = box_spatial_margin(min, max);
+    vec3 ahead;
+    bool stretch = box_spatial_ahead(it, min, max, frame, margin, ahead);
     glm_vec3_copy(ECS_CONST_CAST(float*, min), it->min);
     glm_vec3_copy(ECS_CONST_CAST(float*, max), it->max);
+    it->frame = frame;
     if (it->tree != tree) {
         if (node >= 0) {
             box_bvh_remove(&s->trees[it->tree], node);
@@ -203,10 +255,18 @@ bool box_spatial_item_set(
         it->moved = false;
         box_spatial_item_place(s, item);
     } else if (node >= 0 && tree == BOX_SPATIAL_DYNAMIC) {
-        it->node = box_bvh_move(&s->trees[tree], node, min, max, box_spatial_margin(min, max));
+        it->node = box_bvh_move_fat(&s->trees[tree], node, min, max, margin, ahead);
     } else if (node >= 0 && !it->moved) {
         it->moved = true;
         *ecs_vec_append_t(NULL, &s->moved, int32_t) = item;
+    }
+
+    if (tree == BOX_SPATIAL_DYNAMIC && it->node != node && stretch && !it->stretched) {
+        *ecs_vec_append_t(NULL, &s->stretched, int32_t) = item;
+    }
+
+    if (tree == BOX_SPATIAL_DYNAMIC && it->node != node) {
+        it->stretched = stretch;
     }
 
     return it->node != node;
@@ -224,6 +284,7 @@ void box_spatial_item_remove(
 
     it->entity = 0;
     it->moved = false;
+    it->stretched = false;
     it->node = s->free_item;
     s->free_item = item;
     s->count --;
@@ -289,8 +350,7 @@ static void box_spatial_scene_move(
         box_spatial_item_t *it = box_spatial_item(s, moved[i]);
         if (it->moved) {
             it->moved = false;
-            it->node = box_bvh_move(
-                &s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max, 0);
+            it->node = box_bvh_move(&s->trees[BOX_SPATIAL_STATIC], it->node, it->min, it->max);
         }
     }
 
@@ -332,6 +392,47 @@ static void box_spatial_scene_commit(
     ecs_vec_clear(&s->pending);
 done:
     return;
+}
+
+/** Give the stretched leaves of the dynamic items of a scene that kept their bounds in this
+ * update a leaf with only the margin.
+ *
+ * @param s The scene
+ * @param frame The current update
+ * @return Number of leaves inserted again
+ */
+static int32_t box_spatial_scene_settle(
+    box_spatial_scene_t *s,
+    uint32_t frame)
+{
+    int32_t i, kept = 0, result = 0, count = ecs_vec_count(&s->stretched);
+    int32_t *items = ecs_vec_first(&s->stretched);
+    for (i = 0; i < count; i ++) {
+        box_spatial_item_t *it = box_spatial_item(s, items[i]);
+        if (it->stretched && it->frame == frame) {
+            items[kept ++] = items[i];
+        } else if (it->stretched) {
+            box_bvh_remove(&s->trees[BOX_SPATIAL_DYNAMIC], it->node);
+            box_spatial_item_place(s, items[i]);
+            result ++;
+        }
+    }
+
+    ecs_vec_set_count_t(NULL, &s->stretched, int32_t, kept);
+
+    return result;
+}
+
+int32_t box_spatial_settle(
+    box_spatial_t *index)
+{
+    int32_t result = box_spatial_scene_settle(index->root, index->frame);
+    ecs_map_iter_t it = ecs_map_iter(&index->scenes);
+    while (ecs_map_next(&it)) {
+        result += box_spatial_scene_settle(ecs_map_ptr(&it), index->frame);
+    }
+
+    return result;
 }
 
 void box_spatial_move(
