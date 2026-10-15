@@ -83,6 +83,14 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
     `progress.json` instead. `--force` completes past a missing deliverable and says
     so, but never past the review loop: only `--skip-review "<reason>"` closes a task
     whose review has not passed, and it records the reason in `progress.json`.
+    Neither does `--force` close an item whose test reports do not pass: see
+    [Passing tests](#passing-tests).
+
+## Passing tests
+
+`pm done` (task or epic) reads every top level `deliverable/tests*.json` (`tests.json`, `tests_<project>.json`, ...) and refuses when one reports a failed case, an empty case (`empty` above 0, or a case with status `empty`), an empty run (no case passed or failed, or an empty `tests` list) or is not a test report at all. A missing `tests.json` stays a deliverable gap that `--force` passes; a failing report is not, and `--force` never overrides it.
+
+The one way past it is `--waive-tests "<reason>"`, which closes the item and records `tests_waived` (the reason, the time and the failures) in `progress.json`, the way `--skip-review` records `review_skipped`; it is not recorded when every report passes, and reopening the item drops it. `pm check` reports every completed task or epic with a failing report as a problem and one closed with `--waive-tests` as a warning that names the reason; `pm status` and `pm review` print the reason too. A delivered task whose reports fail is in the stage **tests failing** until a passing `pm deliver`.
 
 ## Closing a task
 
@@ -157,6 +165,7 @@ Every task has a stage, derived from its status and the artefacts `pm review` pa
 | --- | --- |
 | not started | pending |
 | implementing | started, no `deliverable/tests.json` yet |
+| tests failing | delivered, but a `tests*.json` reports a failure, an empty test or an empty run |
 | delivered | delivered, outside the review gate: `pm done` closes it |
 | delivered, awaiting review | delivered under the gate, no `review/review.md` yet |
 | review written, fix round 1 / fix round k | findings open, round k of `response.md` missing or incomplete |
