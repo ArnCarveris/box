@@ -1,0 +1,36 @@
+// The town of etc/scenes/town.flecs at 120 FPS for a minute, orbiting, in the retina window of
+// that scene (1280x720 points, 2560x1440 pixels) presenting to a simulated 120 Hz vsync display,
+// each frame shown for 1 refresh.
+
+include town_content
+
+using box.transform
+using box.camera
+using box.view
+using box.effects
+using box.surface
+using box.perf
+
+perf_surface {
+  Surface: {width: 1280, height: 720, pixel_ratio: 2}
+}
+
+ssao {
+  Ssao: {radius: 2.5, bias: 0.025, intensity: 1}
+}
+
+tonemap {
+  Tonemap: {}
+}
+
+camera {
+  Camera: {fov: 55, near_: 0.1}
+}
+
+view {
+  View: {camera: camera, clear: {enabled: true, color: {150, 178, 210, 255}}, lighting: {enabled: true}, shadows: {enabled: true, cascades: 4, resolution: 2048, max_distance: 200, split_lambda: 0.7, depth_bias: 2, normal_offset: 1.5, filter_size: 3, fade: 0.2}, culling: {enabled: true, occlusion: true, min_dimension_px: 4}, effects: [{enabled: true, effect: ssao}, {enabled: true, effect: tonemap}]}
+}
+
+$ {
+  PerfRun: {fps: 120, frames: 7200, warmup: 120, period: 10, elevation: 30, camera: camera, refresh: 120}
+}

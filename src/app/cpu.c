@@ -1,12 +1,25 @@
 /**
  * @file app/cpu.c
- * @brief CPU time of the process, the oversubscription guard and the budget sleep.
+ * @brief CPU time of the process, the oversubscription guard, the budget sleep and the wait.
  */
 
 #include "app.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/resource.h>
+
+/** Seconds left below which a wait sleeps the rest in one go */
+#define BOX_WAIT_STEP (0.0001)
+
+/** Fraction of the time left that one sleep of a longer wait asks for.
+ *
+ * A process without a window gets up to 50% timer leeway on macOS, so a sleep of the whole
+ * time left could overshoot by half of it; shorter sleeps converge on the deadline.
+ */
+#define BOX_WAIT_FRACTION (0.6)
+
+/** Seconds before a deadline at which a wait counts it as reached, below the sleep resolution */
+#define BOX_WAIT_EPSILON (1e-6)
 
 double box_app_cpu_time(void)
 {
@@ -28,6 +41,19 @@ double box_app_wall_time(void)
     ecs_os_get_time(&t);
 
     return (double)t.sec + (double)t.nanosec * 1e-9;
+}
+
+double box_wait_until(
+    double deadline)
+{
+    double now = box_app_wall_time();
+    while (deadline - now > BOX_WAIT_EPSILON) {
+        double left = deadline - now;
+        ecs_sleepf(left > BOX_WAIT_STEP ? left * BOX_WAIT_FRACTION : left);
+        now = box_app_wall_time();
+    }
+
+    return now;
 }
 
 bool box_app_oversubscribed(

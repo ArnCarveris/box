@@ -82,6 +82,15 @@ void box_window_resize(
 void* box_window_layer(
     box_window_t *window);
 
+/** Get the refresh rate of the display a window is on: the monitor under its center. glfw is
+ * asked again only after a window moved or resized, a monitor changed or two seconds passed.
+ *
+ * @param window The window
+ * @return Refresh rate in Hz, 0 when unknown
+ */
+float box_window_refresh(
+    box_window_t *window);
+
 /** Check whether the user asked to close a window.
  *
  * @param window The window

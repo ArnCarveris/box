@@ -204,4 +204,5 @@ void BoxCommandImport(
     box_cmd_script_init(world);
     box_cmd_input_init(world);
     box_cmd_render_init(world);
+    box_cmd_frames_init(world);
 }
