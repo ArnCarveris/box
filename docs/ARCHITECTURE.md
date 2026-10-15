@@ -283,7 +283,9 @@ phase draws what the view drew last frame (a history per instance slot, keyed by
 target), a depth pyramid keeps the farthest depth, the late phase tests every instance against
 at most 4x4 texels and draws the newly visible, so a fast camera never misses an instance.
 Blended draws keep a CPU back to front sort; each run of one batch in that order is one draw
-(at most 512 slots) whose job lists its sorted slots, culled in that order. `CullStatus` on each
+(at most 512 slots) whose job lists its sorted slots, culled in that order. The visible slots
+and slot lists of a target, and the history of a view, are split into pages of at most 128 MiB,
+each bound whole as storage, so the instances a target culls have no limit. `CullStatus` on each
 View reports instances, visible, frustum culled and occlusion culled, read back asynchronously.
 
 **Shadows.** Cascaded maps for the first directional light of the view's scene.

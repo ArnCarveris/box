@@ -710,6 +710,7 @@ box_render_backend_t box_render_gpu_backend(void)
 {
     box_gpu_t *gpu = ecs_os_calloc_t(box_gpu_t);
     gpu->lock = ecs_os_mutex_new();
+    gpu->cull_window = BOX_GPU_CULL_WINDOW;
     ecs_vec_init_t(NULL, &gpu->results, box_render_shader_result_t, 0);
     box_render_backend_t result = {
         .ctx = gpu,
@@ -779,6 +780,22 @@ void box_render_gpu_lose_device(
         gpu->lose = true;
         ecs_os_mutex_unlock(gpu->lock);
     }
+}
+
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots)
+{
+    const box_render_backend_t *backend = box_render_get_backend(world);
+    bool result = backend->render == box_gpu_render && slots > 0;
+    if (result) {
+        box_gpu_t *gpu = backend->ctx;
+        ecs_os_mutex_lock(gpu->lock);
+        gpu->cull_window = slots;
+        ecs_os_mutex_unlock(gpu->lock);
+    }
+
+    return result;
 }
 
 bool box_render_gpu_readback_delivery(
@@ -854,6 +871,16 @@ bool box_render_gpu_capture_pending(
 {
     (void)world;
     (void)path;
+
+    return false;
+}
+
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots)
+{
+    (void)world;
+    (void)slots;
 
     return false;
 }

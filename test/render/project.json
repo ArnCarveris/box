@@ -521,7 +521,8 @@
                 "id": "BatchChunks",
                 "testcases": [
                     "instances_past_binding_limit_render",
-                    "shapes_across_batches_stay_drawn"
+                    "shapes_across_batches_stay_drawn",
+                    "lowered_limits_render_like_defaults"
                 ]
             },
             {

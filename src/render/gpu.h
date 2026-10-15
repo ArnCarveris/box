@@ -148,6 +148,15 @@ typedef struct box_gpu_hiz_t {
     WGPUBindGroup reduce[BOX_GPU_HIZ_LEVELS]; /**< Reduces the level below into each level */
 } box_gpu_hiz_t;
 
+/** A buffer of history words, at most one storage binding window large */
+typedef struct box_gpu_hiz_page_t {
+    WGPUBuffer buffer;              /**< The words, zero when created */
+    uint32_t capacity;              /**< Words of the buffer */
+    uint32_t used;                  /**< Words handed out to ranges */
+    WGPUBindGroup group;            /**< Binds the words and the pyramid for the cull pass */
+    uint32_t group_hiz;             /**< Id of the pyramid the group binds */
+} box_gpu_hiz_page_t;
+
 /** Which instances a view drew in its previous frame, one word per instance slot.
  *
  * Each instance buffer the view draws from has a range of words, 0 for an instance that was
@@ -155,12 +164,8 @@ typedef struct box_gpu_hiz_t {
  * replaced the late phase still tests and draws every instance the early phase missed.
  */
 typedef struct box_gpu_cull_history_t {
-    WGPUBuffer buffer;              /**< The words, zero when created */
-    uint32_t capacity;              /**< Words of the buffer */
-    uint32_t used;                  /**< Words handed out to ranges */
-    ecs_map_t ranges;               /**< Instance buffer handle to offset << 32 | words */
-    WGPUBindGroup group;            /**< Binds the words and the pyramid for the cull pass */
-    uint32_t group_hiz;             /**< Id of the pyramid the group binds */
+    ecs_vec_t pages;                /**< box_gpu_hiz_page_t, each bound whole as storage */
+    ecs_map_t ranges;               /**< Instance buffer handle to page, offset and words */
     int64_t stamp;                  /**< Cull pass the view was last culled in */
 } box_gpu_cull_history_t;
 
@@ -184,7 +189,8 @@ typedef struct box_gpu_cull_draw_t {
     int32_t batch;                  /**< Index of the batch in the packet */
     uint32_t args;                  /**< Index of its indexed indirect draw arguments */
     uint32_t late;                  /**< Arguments of its late phase, UINT32_MAX for none */
-    uint32_t base;                  /**< First of its entries in the visible buffer */
+    uint32_t page;                  /**< Page that holds its visible slots */
+    uint32_t base;                  /**< First of its entries in the visible slots of the page */
     uint32_t count;                 /**< Instances it tests */
 } box_gpu_cull_draw_t;
 
@@ -194,6 +200,8 @@ typedef struct box_gpu_cull_dispatch_t {
     uint32_t groups;                /**< Workgroups to dispatch */
     bool ordered;                   /**< One invocation per job keeps the order of its slots */
     bool late;                      /**< Runs after the early draw, against the pyramid */
+    uint32_t page;                  /**< Page that holds the visible slots of its jobs */
+    WGPUBindGroup history;          /**< History page and pyramid, NULL for those of the view */
 } box_gpu_cull_dispatch_t;
 
 /** Range of instances of one draw the cull shader tests, as in Job of cull.wgsl */
@@ -201,7 +209,7 @@ typedef struct box_gpu_cull_job_t {
     uint32_t first;                 /**< First slot in the instance buffer */
     uint32_t count;                 /**< Slots to test */
     uint32_t args;                  /**< Index of the draw arguments it counts into */
-    uint32_t base;                  /**< First entry it writes in the visible buffer */
+    uint32_t base;                  /**< First entry it writes in the visible slots of its page */
     float center[3];                /**< Center of the mesh bounds */
     uint32_t history;               /**< First history word of its buffer, UINT32_MAX for none */
     float extent[3];                /**< Half size of the mesh bounds */
@@ -247,6 +255,21 @@ typedef struct box_gpu_cluster_t {
     bool cut;                       /**< The last read back pass listed fewer lights than reach */
 } box_gpu_cluster_t;
 
+/** Visible slots and slot lists of a group of draws, each bound whole as storage */
+typedef struct box_gpu_cull_page_t {
+    WGPUBuffer visible;             /**< Slots of the visible instances of its draws */
+    WGPUBuffer lists;               /**< Slots of its listed jobs in draw order */
+    uint64_t visible_size;          /**< Bytes of the visible buffer */
+    uint64_t lists_size;            /**< Bytes of the list buffer */
+    ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
+    uint32_t used;                  /**< Visible slots its draws use in the target */
+    WGPUBindGroup group;            /**< Binds the shared buffers and its own */
+} box_gpu_cull_page_t;
+
+/** Slots of one page of visible slots or history words: the 128 MiB storage binding every
+ * WebGPU device supports, in 4 byte words */
+#define BOX_GPU_CULL_WINDOW ((uint32_t)((128u << 20) / sizeof(uint32_t)))
+
 /** Copies of the cull counters in flight at most */
 #define BOX_GPU_CULL_READBACKS (4)
 
@@ -266,17 +289,16 @@ typedef struct box_gpu_cull_t {
     int32_t revision;               /**< Revision of the shader the pipelines were made with */
     WGPUBuffer uniforms;            /**< box_gpu_cull_uniforms_t per dispatch */
     WGPUBuffer jobs;                /**< box_gpu_cull_job_t */
-    WGPUBuffer lists;               /**< uint32_t slots of the listed jobs in draw order */
-    WGPUBuffer visible;             /**< Slots of the visible instances, per draw */
     WGPUBuffer args;                /**< Indexed indirect draw arguments, per draw */
     WGPUBuffer counters;            /**< Drawn and frustum culled instances per cull view */
     uint64_t uniforms_size;         /**< Bytes of the uniform buffer */
     uint64_t jobs_size;             /**< Bytes of the job buffer */
-    uint64_t lists_size;            /**< Bytes of the slot list buffer */
-    uint64_t visible_size;          /**< Bytes of the visible buffer */
     uint64_t args_size;             /**< Bytes of the argument buffer */
     uint64_t counters_size;         /**< Bytes of the counter buffer */
-    WGPUBindGroup group;            /**< Binds the buffers for the target being rendered */
+    ecs_vec_t pages;                /**< box_gpu_cull_page_t, kept between targets */
+    int32_t page_count;             /**< Pages the draws of the target use */
+    uint32_t window;                /**< Slots of a page and words of a history page */
+    bool bound;                     /**< A pass uploaded its buffers and bound its pages */
     WGPUBuffer empty_history;       /**< History of the cull views without occlusion */
     WGPUTexture empty_hiz;          /**< Pyramid of the cull views without occlusion */
     WGPUTextureView empty_hiz_view; /**< View of the empty pyramid */
@@ -293,10 +315,8 @@ typedef struct box_gpu_cull_t {
     ecs_vec_t dispatches;           /**< box_gpu_cull_dispatch_t of the target */
     ecs_vec_t uniform_data;         /**< Bytes of the uniforms of the dispatches */
     ecs_vec_t job_data;             /**< box_gpu_cull_job_t of the target */
-    ecs_vec_t list_data;            /**< uint32_t, the slot lists of the target */
     ecs_vec_t arg_data;             /**< uint32_t, the draw arguments before culling */
     ecs_vec_t order;                /**< uint64_t, instance buffer and draw of blended draws */
-    uint32_t visible_count;         /**< Entries of the visible buffer the target uses */
 } box_gpu_cull_t;
 
 /** Uniforms of a view, written per target because the projection follows its size.
@@ -411,6 +431,7 @@ typedef struct box_gpu_t {
     ecs_os_mutex_t lock;            /**< Protects the counters and the results */
     box_render_compile_delivery_t delivery; /**< When compile outcomes apply, under the lock */
     box_render_readback_delivery_t readbacks; /**< When cull counters publish, under the lock */
+    uint32_t cull_window;           /**< Slots of a cull page from the next pass, under the lock */
     box_render_gpu_stats_t stats;   /**< Counters read by the main thread */
     box_render_gpu_stats_t pending; /**< Counter changes not yet published, render thread only */
     ecs_os_thread_id_t thread;      /**< Thread that ran init, the only one using the device */
@@ -1289,7 +1310,7 @@ void box_gpu_hiz_ranges(
     const box_render_packet_t *packet,
     int32_t index);
 
-/** Get the first history word of an instance buffer.
+/** Get the first history word of an instance buffer in its page.
  *
  * @param h The history
  * @param buffer Handle of the instance buffer
@@ -1299,17 +1320,29 @@ uint32_t box_gpu_hiz_offset(
     const box_gpu_cull_history_t *h,
     uint32_t buffer);
 
-/** Get the bind group of a history and a pyramid, created again when either changed.
+/** Get the page of the history words of an instance buffer.
+ *
+ * @param h The history
+ * @param buffer Handle of the instance buffer
+ * @return The page, 0 when the buffer has no range
+ */
+uint32_t box_gpu_hiz_page(
+    const box_gpu_cull_history_t *h,
+    uint32_t buffer);
+
+/** Get the bind group of a history page and a pyramid, created again when either changed.
  *
  * @param gpu The backend
  * @param h The history
  * @param hiz The pyramid
+ * @param page The page of the history, the first one when it has none
  * @return The bind group
  */
 WGPUBindGroup box_gpu_hiz_group(
     box_gpu_t *gpu,
     box_gpu_cull_history_t *h,
-    box_gpu_hiz_t *hiz);
+    box_gpu_hiz_t *hiz,
+    uint32_t page);
 
 /** Record the reduction of a depth texture into every level of a pyramid.
  *

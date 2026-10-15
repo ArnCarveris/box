@@ -700,6 +700,20 @@ typedef enum box_render_readback_delivery_t {
     BOX_RENDER_READBACK_NEWEST_FIRST = 2 /**< Every mapped copy, newest frame first */
 } box_render_readback_delivery_t;
 
+/** Set the slots one page of the cull pass holds, for tests.
+ *
+ * The visible slots of the draws of a target and the occlusion history of a view are split
+ * over pages of at most this many 4 byte words, each bound whole as storage; the default is
+ * the 128 MiB storage binding every WebGPU device supports. Applies from the next cull pass.
+ *
+ * @param world The world
+ * @param slots Words per page, at least 1
+ * @return Whether the world renders with the GPU backend
+ */
+bool box_render_gpu_cull_window(
+    ecs_world_t *world,
+    uint32_t slots);
+
 /** Set when the GPU backend of a world publishes cull counters, for tests.
  *
  * @param world The world

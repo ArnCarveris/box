@@ -132,21 +132,36 @@ static void box_gpu_hiz_free(
     ecs_os_free(hiz);
 }
 
-/** Release a history, its buffer and its bind group.
+/** Release the pages of a history and forget its ranges.
+ *
+ * @param h The history
+ */
+static void box_gpu_hiz_pages_release(
+    box_gpu_cull_history_t *h)
+{
+    int32_t i;
+    for (i = 0; i < ecs_vec_count(&h->pages); i ++) {
+        box_gpu_hiz_page_t *p = ecs_vec_get_t(&h->pages, box_gpu_hiz_page_t, i);
+        if (p->group) {
+            wgpuBindGroupRelease(p->group);
+        }
+
+        wgpuBufferRelease(p->buffer);
+    }
+
+    ecs_vec_clear(&h->pages);
+    ecs_map_clear(&h->ranges);
+}
+
+/** Release a history, its pages and their bind groups.
  *
  * @param h The history, freed
  */
 static void box_gpu_hiz_history_free(
     box_gpu_cull_history_t *h)
 {
-    if (h->group) {
-        wgpuBindGroupRelease(h->group);
-    }
-
-    if (h->buffer) {
-        wgpuBufferRelease(h->buffer);
-    }
-
+    box_gpu_hiz_pages_release(h);
+    ecs_vec_fini_t(NULL, &h->pages, box_gpu_hiz_page_t);
     ecs_map_fini(&h->ranges);
     ecs_os_free(h);
 }
@@ -326,6 +341,7 @@ box_gpu_cull_history_t* box_gpu_hiz_history(
         &c->histories, box_gpu_cull_history_t, key);
     if (!result) {
         result = ecs_os_calloc_t(box_gpu_cull_history_t);
+        ecs_vec_init_t(NULL, &result->pages, box_gpu_hiz_page_t, 0);
         ecs_map_init(&result->ranges, NULL);
         ecs_map_insert_ptr(&c->histories, key, result);
     }
@@ -364,6 +380,24 @@ done:
     return result;
 }
 
+/** Pack the page, first word and words of a history range.
+ *
+ * @param page The page
+ * @param offset First word in the page
+ * @param words Words of the range
+ * @return The packed range
+ */
+static uint64_t box_gpu_hiz_range(
+    uint32_t page,
+    uint32_t offset,
+    uint32_t words)
+{
+    ecs_assert(page < (1u << 16) && offset < (1u << 26) && words < (1u << 22),
+        ECS_INTERNAL_ERROR, NULL);
+
+    return ((uint64_t)page << 48) | ((uint64_t)offset << 22) | words;
+}
+
 /** Check whether a history range holds the words of an instance buffer.
  *
  * @param h The history
@@ -378,41 +412,46 @@ static bool box_gpu_hiz_fits(
 {
     const ecs_map_val_t *range = ecs_map_get(&h->ranges, buffer);
 
-    return range && (uint32_t)(*range & 0xFFFFFFFF) >= words;
+    return range && (uint32_t)(*range & ((1u << 22) - 1)) >= words;
 }
 
-/** Start a history over in a buffer with room for a number of words.
+/** Add a page to a history, at most one window large unless one range needs more.
  *
  * @param gpu The backend
  * @param h The history
- * @param words Words the ranges of this frame need
+ * @param words Words the ranges still to place need
+ * @param least Words the page must hold
+ * @return The page
  */
-static void box_gpu_hiz_restart(
+static box_gpu_hiz_page_t* box_gpu_hiz_page_new(
     box_gpu_t *gpu,
     box_gpu_cull_history_t *h,
-    uint32_t words)
+    uint64_t words,
+    uint32_t least)
 {
-    uint32_t capacity = h->capacity ? h->capacity : BOX_GPU_HIZ_MIN_WORDS;
-    while (capacity < words * 2) {
+    uint32_t window = gpu->cull.window;
+    uint64_t capacity = BOX_GPU_HIZ_MIN_WORDS;
+    while (capacity < words * 2 && capacity < window) {
         capacity *= 2;
     }
 
-    if (h->group) {
-        wgpuBindGroupRelease(h->group);
-        h->group = NULL;
+    if (capacity > window) {
+        capacity = window;
     }
 
-    if (h->buffer) {
-        wgpuBufferRelease(h->buffer);
+    if (capacity < least) {
+        capacity = least;
     }
 
-    h->buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+    box_gpu_hiz_page_t *result = ecs_vec_append_t(NULL, &h->pages, box_gpu_hiz_page_t);
+    ecs_os_memset_t(result, 0, box_gpu_hiz_page_t);
+    result->capacity = (uint32_t)capacity;
+    result->buffer = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
         .usage = WGPUBufferUsage_Storage,
-        .size = (uint64_t)capacity * sizeof(uint32_t)
+        .size = capacity * sizeof(uint32_t)
     });
-    h->capacity = capacity;
-    h->used = 0;
-    ecs_map_clear(&h->ranges);
+
+    return result;
 }
 
 void box_gpu_hiz_ranges(
@@ -423,6 +462,8 @@ void box_gpu_hiz_ranges(
 {
     int32_t i, count = ecs_vec_count(&packet->batches);
     uint64_t missing = 0, total = 0;
+    box_gpu_hiz_page_t *page = ecs_vec_count(&h->pages) ? ecs_vec_last_t(
+        &h->pages, box_gpu_hiz_page_t) : NULL;
     for (i = 0; i < count; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, i);
         uint32_t words = box_gpu_hiz_words(gpu, packet, index, b);
@@ -432,8 +473,10 @@ void box_gpu_hiz_ranges(
         }
     }
 
-    if (!h->buffer || h->used + missing > h->capacity) {
-        box_gpu_hiz_restart(gpu, h, (uint32_t)total);
+    if (missing && (!page || page->used + missing > page->capacity)) {
+        box_gpu_hiz_pages_release(h);
+        page = NULL;
+        missing = total;
     }
 
     for (i = 0; i < count; i ++) {
@@ -443,8 +486,14 @@ void box_gpu_hiz_ranges(
             continue;
         }
 
-        ecs_map_ensure(&h->ranges, b->instances)[0] = ((uint64_t)h->used << 32) | words;
-        h->used += words;
+        if (!page || page->used + words > page->capacity) {
+            page = box_gpu_hiz_page_new(gpu, h, missing, words);
+        }
+
+        ecs_map_ensure(&h->ranges, b->instances)[0] = box_gpu_hiz_range(
+            (uint32_t)ecs_vec_count(&h->pages) - 1, page->used, words);
+        page->used += words;
+        missing -= words;
     }
 }
 
@@ -454,37 +503,52 @@ uint32_t box_gpu_hiz_offset(
 {
     const ecs_map_val_t *range = ecs_map_get(&h->ranges, buffer);
 
-    return range ? (uint32_t)(*range >> 32) : UINT32_MAX;
+    return range ? (uint32_t)((*range >> 22) & ((1u << 26) - 1)) : UINT32_MAX;
+}
+
+uint32_t box_gpu_hiz_page(
+    const box_gpu_cull_history_t *h,
+    uint32_t buffer)
+{
+    const ecs_map_val_t *range = ecs_map_get(&h->ranges, buffer);
+
+    return range ? (uint32_t)(*range >> 48) : 0;
 }
 
 WGPUBindGroup box_gpu_hiz_group(
     box_gpu_t *gpu,
     box_gpu_cull_history_t *h,
-    box_gpu_hiz_t *hiz)
+    box_gpu_hiz_t *hiz,
+    uint32_t page)
 {
-    if (h->group && h->group_hiz == hiz->id) {
+    if (!ecs_vec_count(&h->pages)) {
+        box_gpu_hiz_page_new(gpu, h, 0, 0);
+    }
+
+    box_gpu_hiz_page_t *p = ecs_vec_get_t(&h->pages, box_gpu_hiz_page_t, (int32_t)page);
+    if (p->group && p->group_hiz == hiz->id) {
         goto done;
     }
 
-    if (h->group) {
-        wgpuBindGroupRelease(h->group);
+    if (p->group) {
+        wgpuBindGroupRelease(p->group);
     }
 
     WGPUBindGroupEntry entries[2] = {
         {
-            .binding = 0, .buffer = h->buffer,
-            .size = (uint64_t)h->capacity * sizeof(uint32_t)
+            .binding = 0, .buffer = p->buffer,
+            .size = (uint64_t)p->capacity * sizeof(uint32_t)
         },
         { .binding = 1, .textureView = hiz->view }
     };
-    h->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+    p->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
         .layout = gpu->cull.history_layout,
         .entryCount = 2,
         .entries = entries
     });
-    h->group_hiz = hiz->id;
+    p->group_hiz = hiz->id;
 done:
-    return h->group;
+    return p->group;
 }
 
 /** Record one dispatch of a pyramid shader over the texels of a level.

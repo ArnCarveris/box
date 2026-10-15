@@ -26,6 +26,10 @@ static const uint8_t box_draws_image_color[3] = { 255, 255, 255 };
 /** Bytes the smallest change buffer holds */
 #define BOX_DRAWS_MIN_CHANGES (64 * 1024)
 
+/** Bytes the change buffer holds at most, below the 256 MiB buffer size every WebGPU device
+ * supports; a batch whose segment does not fit any more uploads all its instances instead */
+#define BOX_DRAWS_MAX_CHANGES ((uint64_t)128 << 20)
+
 /** Words of one instance */
 #define BOX_DRAWS_WORDS ((uint32_t)(sizeof(box_render_instance_t) / sizeof(uint32_t)))
 
@@ -681,21 +685,25 @@ void box_draws_batch_textures(
  * @param p The packet
  * @param d The state
  * @param b The batch
+ * @param changes Bytes the scatter segments of the frame already take
  * @return Bytes the scatter segment of the batch needs, 0 when it does not scatter
  */
-static uint32_t box_draws_send_batch(
+static uint64_t box_draws_send_batch(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    box_draw_batch_t *b)
+    box_draw_batch_t *b,
+    uint64_t changes)
 {
-    uint32_t result = 0;
+    uint64_t result = 0;
     uint32_t count = (uint32_t)ecs_vec_count(&b->entities);
     box_draws_reserve(p, d, b);
     if (b->key.dynamic || b->full) {
         box_draws_upload_all(p, d, b);
     } else if (ecs_vec_count(&b->changed)) {
         result = box_draws_segment_size(b);
-        if ((uint64_t)result >= (uint64_t)count * sizeof(box_render_instance_t)) {
+        if (result >= (uint64_t)count * sizeof(box_render_instance_t) ||
+            changes + result > BOX_DRAWS_MAX_CHANGES)
+        {
             box_draws_upload_all(p, d, b);
             result = 0;
         }
@@ -893,24 +901,28 @@ static uint32_t box_draws_scatter(
 static void box_draws_send_changes(
     box_render_packet_t *p,
     box_render_draws_t *d,
-    uint32_t total)
+    uint64_t total)
 {
     uint32_t offset = 0;
     int32_t i, count = ecs_vec_count(&d->batches);
     if (total > d->changes_size) {
-        uint32_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
+        uint64_t size = d->changes_size ? d->changes_size : BOX_DRAWS_MIN_CHANGES;
         while (size < total) {
             size *= 2;
+        }
+
+        if (size > BOX_DRAWS_MAX_CHANGES) {
+            size = BOX_DRAWS_MAX_CHANGES;
         }
 
         box_render_buffer_desc_t *desc = box_render_packet_resource(p, BOX_RENDER_BUFFER,
             BOX_RENDER_CREATE, BOX_RENDER_BUFFER_CHANGES, sizeof(box_render_buffer_desc_t));
         desc->size = size;
         desc->usage = BOX_RENDER_BUFFER_STORAGE;
-        d->changes_size = size;
+        d->changes_size = (uint32_t)size;
     }
 
-    uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, total);
+    uint8_t *data = box_render_packet_upload(p, BOX_RENDER_BUFFER_CHANGES, 0, (uint32_t)total);
     d->stats.upload_bytes += total;
     for (i = 0; i < count; i ++) {
         box_draw_batch_t *b = box_draws_batch(d, i);
@@ -1080,7 +1092,7 @@ void box_draws_send(
 {
     box_mesh_cache_t *cache = box_mesh_cache_of(world);
     int32_t i, count = ecs_vec_count(&d->batches);
-    uint32_t changes = 0;
+    uint64_t changes = 0;
     bool views = ecs_vec_count(&p->views) != 0;
     d->textures = box_textures_get(world);
     d->world = world;
@@ -1116,7 +1128,7 @@ void box_draws_send(
         box_draw_batch_t *b = box_draws_batch(d, i);
         b->ready = false;
         if (b->alive && box_draws_mesh(p, d, cache, b->key.mesh)) {
-            changes += box_draws_send_batch(p, d, b);
+            changes += box_draws_send_batch(p, d, b, changes);
         }
 
         if (b->ready && b->key.blend != Opaque &&

@@ -118,7 +118,8 @@ void box_gpu_cull_init(
     ecs_vec_init_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t, 0);
     ecs_vec_init_t(NULL, &c->uniform_data, uint8_t, 0);
     ecs_vec_init_t(NULL, &c->job_data, box_gpu_cull_job_t, 0);
-    ecs_vec_init_t(NULL, &c->list_data, uint32_t, 0);
+    ecs_vec_init_t(NULL, &c->pages, box_gpu_cull_page_t, 0);
+    c->window = BOX_GPU_CULL_WINDOW;
     ecs_vec_init_t(NULL, &c->arg_data, uint32_t, 0);
     ecs_vec_init_t(NULL, &c->order, uint64_t, 0);
 }
@@ -161,18 +162,23 @@ void box_gpu_cull_fini(
     ecs_vec_fini_t(NULL, &c->dispatches, box_gpu_cull_dispatch_t);
     ecs_vec_fini_t(NULL, &c->uniform_data, uint8_t);
     ecs_vec_fini_t(NULL, &c->job_data, box_gpu_cull_job_t);
-    ecs_vec_fini_t(NULL, &c->list_data, uint32_t);
     ecs_vec_fini_t(NULL, &c->arg_data, uint32_t);
     ecs_vec_fini_t(NULL, &c->order, uint64_t);
-    if (c->group) {
-        wgpuBindGroupRelease(c->group);
-        c->group = NULL;
+    for (i = 0; i < ecs_vec_count(&c->pages); i ++) {
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, i);
+        if (pg->group) {
+            wgpuBindGroupRelease(pg->group);
+        }
+
+        box_gpu_cull_release(&pg->visible);
+        box_gpu_cull_release(&pg->lists);
+        ecs_vec_fini_t(NULL, &pg->list_data, uint32_t);
     }
 
+    ecs_vec_fini_t(NULL, &c->pages, box_gpu_cull_page_t);
+    c->bound = false;
     box_gpu_cull_release(&c->uniforms);
     box_gpu_cull_release(&c->jobs);
-    box_gpu_cull_release(&c->lists);
-    box_gpu_cull_release(&c->visible);
     box_gpu_cull_release(&c->args);
     box_gpu_cull_release(&c->counters);
     if (c->parallel) {
@@ -402,6 +408,9 @@ void box_gpu_cull_begin(
     box_gpu_cull_t *c = &gpu->cull;
     c->frame = packet->frame;
     c->stamp ++;
+    ecs_os_mutex_lock(gpu->lock);
+    c->window = gpu->cull_window;
+    ecs_os_mutex_unlock(gpu->lock);
     box_gpu_cull_readback_poll(gpu);
     if (!(c->stamp % BOX_GPU_CULL_PURGE)) {
         box_gpu_hiz_purge(gpu);
@@ -412,9 +421,8 @@ void box_gpu_cull_begin(
     ecs_vec_clear(&c->dispatches);
     ecs_vec_clear(&c->uniform_data);
     ecs_vec_clear(&c->job_data);
-    ecs_vec_clear(&c->list_data);
     ecs_vec_clear(&c->arg_data);
-    c->visible_count = 0;
+    c->page_count = 0;
 }
 
 /** Write the frustum planes of a clip space matrix, normalized and in world space.
@@ -502,6 +510,8 @@ done:
  * @param count Jobs of the dispatch
  * @param instances Instances of the one job of an unordered dispatch, 0 for an ordered one
  * @param phase BOX_GPU_CULL_PHASE_ALL, _EARLY or _LATE
+ * @param page Page that holds the visible slots of its jobs
+ * @param history History page and pyramid of its jobs, NULL for those of the cull view
  */
 static void box_gpu_cull_dispatch(
     box_gpu_cull_t *c,
@@ -510,7 +520,9 @@ static void box_gpu_cull_dispatch(
     uint32_t first,
     uint32_t count,
     uint32_t instances,
-    uint32_t phase)
+    uint32_t phase,
+    uint32_t page,
+    WGPUBindGroup history)
 {
     int32_t offset = ecs_vec_count(&c->uniform_data);
     uint32_t work = instances ? instances : count;
@@ -526,6 +538,32 @@ static void box_gpu_cull_dispatch(
     d->groups = (work + BOX_GPU_CULL_GROUP - 1) / BOX_GPU_CULL_GROUP;
     d->ordered = !instances;
     d->late = phase == BOX_GPU_CULL_PHASE_LATE;
+    d->page = page;
+    d->history = history;
+}
+
+/** Start the next page of visible slots of the target.
+ *
+ * @param c The cull state
+ * @return The page, empty
+ */
+static box_gpu_cull_page_t* box_gpu_cull_page_next(
+    box_gpu_cull_t *c)
+{
+    box_gpu_cull_page_t *result;
+    if (c->page_count == ecs_vec_count(&c->pages)) {
+        result = ecs_vec_append_t(NULL, &c->pages, box_gpu_cull_page_t);
+        ecs_os_memset_t(result, 0, box_gpu_cull_page_t);
+        ecs_vec_init_t(NULL, &result->list_data, uint32_t, 0);
+    } else {
+        result = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, c->page_count);
+    }
+
+    ecs_vec_clear(&result->list_data);
+    result->used = 0;
+    c->page_count ++;
+
+    return result;
 }
 
 /** Append the job of a draw: the slot range it tests and the mesh bounds.
@@ -552,9 +590,11 @@ static uint32_t box_gpu_cull_job(
     job->first = b->first_instance;
     job->count = draw->count;
     if (b->listed) {
-        job->first = (uint32_t)ecs_vec_count(&c->list_data);
+        box_gpu_cull_page_t *pg = ecs_vec_get_t(&c->pages, box_gpu_cull_page_t,
+            (int32_t)draw->page);
+        job->first = (uint32_t)ecs_vec_count(&pg->list_data);
         job->list = 1;
-        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &c->list_data, uint32_t, (int32_t)draw->count),
+        ecs_os_memcpy_n(ecs_vec_grow_t(NULL, &pg->list_data, uint32_t, (int32_t)draw->count),
             box_render_packet_data(packet, b->slots), uint32_t, (int32_t)draw->count);
     }
 
@@ -604,27 +644,28 @@ static void box_gpu_cull_ordered(
     int32_t i, count = ecs_vec_count(&c->order);
     uint64_t *order = ecs_vec_first(&c->order);
     box_gpu_cull_draw_t *draws = ecs_vec_first(&c->draws);
-    uint32_t job_first = 0, jobs = 0, buffer = 0;
+    uint32_t job_first = 0, jobs = 0, buffer = 0, page = 0;
     qsort(order, (size_t)count, sizeof(uint64_t), box_gpu_cull_order_cmp);
     for (i = 0; i < count; i ++) {
         uint32_t handle = (uint32_t)(order[i] >> 32);
-        if (jobs && handle != buffer) {
-            box_gpu_cull_dispatch(c, base, buffer, job_first, jobs, 0, phase);
+        const box_gpu_cull_draw_t *draw = &draws[first + (int32_t)(uint32_t)order[i]];
+        if (jobs && (handle != buffer || draw->page != page)) {
+            box_gpu_cull_dispatch(c, base, buffer, job_first, jobs, 0, phase, page, NULL);
             jobs = 0;
         }
 
-        uint32_t job = box_gpu_cull_job(gpu, packet,
-            &draws[first + (int32_t)(uint32_t)order[i]], UINT32_MAX);
+        uint32_t job = box_gpu_cull_job(gpu, packet, draw, UINT32_MAX);
         if (!jobs) {
             job_first = job;
             buffer = handle;
+            page = draw->page;
         }
 
         jobs ++;
     }
 
     if (jobs) {
-        box_gpu_cull_dispatch(c, base, buffer, job_first, jobs, 0, phase);
+        box_gpu_cull_dispatch(c, base, buffer, job_first, jobs, 0, phase, page, NULL);
     }
 }
 
@@ -641,21 +682,29 @@ static void box_gpu_cull_draw_add(
     const box_render_packet_t *packet,
     int32_t batch,
     const box_gpu_cull_uniforms_t *base,
-    const box_gpu_cull_history_t *history)
+    box_gpu_cull_history_t *history)
 {
     box_gpu_cull_t *c = &gpu->cull;
     const box_render_batch_t *b = ecs_vec_get_t(&packet->batches, box_render_batch_t, batch);
     const box_gpu_cull_view_t *cv = ecs_vec_last_t(&c->views, box_gpu_cull_view_t);
     box_gpu_mesh_t *m = ecs_map_get_deref(&gpu->meshes, box_gpu_mesh_t, b->mesh);
     bool late = history && b->view == -1 && b->pipeline == BOX_RENDER_SHADER_MESH;
+    uint32_t slots = b->instance_count * (late ? 2 : 1);
+    box_gpu_cull_page_t *pg = c->page_count
+        ? ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, c->page_count - 1) : NULL;
+    if (!pg || (pg->used && (uint64_t)pg->used + slots > c->window)) {
+        pg = box_gpu_cull_page_next(c);
+    }
+
     int32_t draw = ecs_vec_count(&c->draws), i;
     box_gpu_cull_draw_t *d = ecs_vec_append_t(NULL, &c->draws, box_gpu_cull_draw_t);
     d->batch = batch;
     d->args = (uint32_t)(ecs_vec_count(&c->arg_data) / BOX_GPU_CULL_ARGS);
     d->late = late ? d->args + 1 : UINT32_MAX;
-    d->base = c->visible_count;
+    d->page = (uint32_t)c->page_count - 1;
+    d->base = pg->used;
     d->count = b->instance_count;
-    c->visible_count += b->instance_count * (late ? 2 : 1);
+    pg->used += slots;
     for (i = 0; i < (late ? 2 : 1); i ++) {
         uint32_t *args = ecs_vec_grow_t(NULL, &c->arg_data, uint32_t, BOX_GPU_CULL_ARGS);
         args[0] = m->index_count;
@@ -671,18 +720,20 @@ static void box_gpu_cull_draw_add(
     } else if (history && !late) {
         uint32_t job = box_gpu_cull_job(gpu, packet, d, UINT32_MAX);
         box_gpu_cull_dispatch(c, base, b->instances, job, 1, d->count,
-            BOX_GPU_CULL_PHASE_LATE);
+            BOX_GPU_CULL_PHASE_LATE, d->page, NULL);
     } else if (late) {
         uint32_t job = box_gpu_cull_job(gpu, packet, d,
             box_gpu_hiz_offset(history, b->instances));
+        WGPUBindGroup group = box_gpu_hiz_group(gpu, history, cv->hiz,
+            box_gpu_hiz_page(history, b->instances));
         box_gpu_cull_dispatch(c, base, b->instances, job, 1, d->count,
-            BOX_GPU_CULL_PHASE_EARLY);
+            BOX_GPU_CULL_PHASE_EARLY, d->page, group);
         box_gpu_cull_dispatch(c, base, b->instances, job, 1, d->count,
-            BOX_GPU_CULL_PHASE_LATE);
+            BOX_GPU_CULL_PHASE_LATE, d->page, group);
     } else {
         uint32_t job = box_gpu_cull_job(gpu, packet, d, UINT32_MAX);
         box_gpu_cull_dispatch(c, base, b->instances, job, 1, d->count,
-            BOX_GPU_CULL_PHASE_ALL);
+            BOX_GPU_CULL_PHASE_ALL, d->page, NULL);
     }
 }
 
@@ -740,7 +791,7 @@ static void box_gpu_cull_view_add(
     cv->counter = base->jobs[3];
     cv->hiz = hiz;
     cv->report = cascade < 0 && !v->target && v->view;
-    cv->group = history ? box_gpu_hiz_group(gpu, history, hiz) : c->empty_group;
+    cv->group = history ? box_gpu_hiz_group(gpu, history, hiz, 0) : c->empty_group;
     ecs_vec_clear(&c->order);
     for (i = 0; i < count * 3; i ++) {
         const box_render_batch_t *b = ecs_vec_get_t(
@@ -828,9 +879,8 @@ void box_gpu_cull_reset(
     ecs_vec_clear(&c->dispatches);
     ecs_vec_clear(&c->uniform_data);
     ecs_vec_clear(&c->job_data);
-    ecs_vec_clear(&c->list_data);
     ecs_vec_clear(&c->arg_data);
-    c->visible_count = 0;
+    c->page_count = 0;
 }
 
 /** Check whether a probe capture draws a batch.
@@ -940,6 +990,52 @@ done:
     return result;
 }
 
+/** Make the buffers of a page hold its slots and lists, upload its lists and bind it.
+ *
+ * @param gpu The backend
+ * @param pg The page
+ * @param grown Whether a buffer the pages share was created again
+ */
+static void box_gpu_cull_page_upload(
+    box_gpu_t *gpu,
+    box_gpu_cull_page_t *pg,
+    bool grown)
+{
+    box_gpu_cull_t *c = &gpu->cull;
+    int32_t lists = ecs_vec_count(&pg->list_data);
+    grown |= box_gpu_cull_reserve(gpu, &pg->visible, &pg->visible_size,
+        (uint64_t)pg->used * sizeof(uint32_t), WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
+    grown |= box_gpu_cull_reserve(gpu, &pg->lists, &pg->lists_size,
+        (uint64_t)lists * sizeof(uint32_t), WGPUBufferUsage_Storage);
+    if (grown || !pg->group) {
+        WGPUBindGroupEntry entries[6] = {
+            {
+                .binding = 0, .buffer = c->uniforms,
+                .size = sizeof(box_gpu_cull_uniforms_t)
+            },
+            { .binding = 1, .buffer = c->jobs, .size = c->jobs_size },
+            { .binding = 2, .buffer = pg->visible, .size = pg->visible_size },
+            { .binding = 3, .buffer = c->args, .size = c->args_size },
+            { .binding = 4, .buffer = c->counters, .size = c->counters_size },
+            { .binding = 5, .buffer = pg->lists, .size = pg->lists_size }
+        };
+        if (pg->group) {
+            wgpuBindGroupRelease(pg->group);
+        }
+
+        pg->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
+            .layout = c->layout,
+            .entryCount = 6,
+            .entries = entries
+        });
+    }
+
+    if (lists) {
+        wgpuQueueWriteBuffer(gpu->queue, pg->lists, 0, ecs_vec_first(&pg->list_data),
+            (size_t)lists * sizeof(uint32_t));
+    }
+}
+
 void box_gpu_cull_upload(
     box_gpu_t *gpu)
 {
@@ -948,6 +1044,7 @@ void box_gpu_cull_upload(
     uint64_t counters = (uint64_t)ecs_vec_count(&c->views) * BOX_GPU_CULL_COUNTERS *
         sizeof(uint32_t), offset;
     bool grown = false;
+    int32_t i;
     if (!ecs_vec_count(&c->dispatches)) {
         goto done;
     }
@@ -957,48 +1054,21 @@ void box_gpu_cull_upload(
     grown |= box_gpu_cull_reserve(gpu, &c->jobs, &c->jobs_size,
         (uint64_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t),
         WGPUBufferUsage_Storage);
-    grown |= box_gpu_cull_reserve(gpu, &c->lists, &c->lists_size,
-        (uint64_t)ecs_vec_count(&c->list_data) * sizeof(uint32_t), WGPUBufferUsage_Storage);
-    grown |= box_gpu_cull_reserve(gpu, &c->visible, &c->visible_size,
-        (uint64_t)c->visible_count * sizeof(uint32_t),
-        WGPUBufferUsage_Storage | WGPUBufferUsage_Vertex);
     grown |= box_gpu_cull_reserve(gpu, &c->args, &c->args_size,
         (uint64_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t),
         WGPUBufferUsage_Storage | WGPUBufferUsage_Indirect | WGPUBufferUsage_CopySrc);
     grown |= box_gpu_cull_reserve(gpu, &c->counters, &c->counters_size, counters,
         WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc);
-    if (grown || !c->group) {
-        WGPUBindGroupEntry entries[6] = {
-            {
-                .binding = 0, .buffer = c->uniforms,
-                .size = sizeof(box_gpu_cull_uniforms_t)
-            },
-            { .binding = 1, .buffer = c->jobs, .size = c->jobs_size },
-            { .binding = 2, .buffer = c->visible, .size = c->visible_size },
-            { .binding = 3, .buffer = c->args, .size = c->args_size },
-            { .binding = 4, .buffer = c->counters, .size = c->counters_size },
-            { .binding = 5, .buffer = c->lists, .size = c->lists_size }
-        };
-        if (c->group) {
-            wgpuBindGroupRelease(c->group);
-        }
-
-        c->group = wgpuDeviceCreateBindGroup(gpu->device, &(WGPUBindGroupDescriptor){
-            .layout = c->layout,
-            .entryCount = 6,
-            .entries = entries
-        });
+    for (i = 0; i < c->page_count; i ++) {
+        box_gpu_cull_page_upload(gpu, ecs_vec_get_t(&c->pages, box_gpu_cull_page_t, i), grown);
     }
+
+    c->bound = true;
 
     wgpuQueueWriteBuffer(gpu->queue, c->uniforms, 0, ecs_vec_first(&c->uniform_data),
         (size_t)ecs_vec_count(&c->uniform_data));
     wgpuQueueWriteBuffer(gpu->queue, c->jobs, 0, ecs_vec_first(&c->job_data),
         (size_t)ecs_vec_count(&c->job_data) * sizeof(box_gpu_cull_job_t));
-    if (ecs_vec_count(&c->list_data)) {
-        wgpuQueueWriteBuffer(gpu->queue, c->lists, 0, ecs_vec_first(&c->list_data),
-            (size_t)ecs_vec_count(&c->list_data) * sizeof(uint32_t));
-    }
-
     wgpuQueueWriteBuffer(gpu->queue, c->args, 0, ecs_vec_first(&c->arg_data),
         (size_t)ecs_vec_count(&c->arg_data) * sizeof(uint32_t));
     for (offset = 0; offset < counters; offset += sizeof(zeros)) {
@@ -1030,7 +1100,7 @@ static void box_gpu_cull_dispatches(
     WGPUComputePassEncoder pass = NULL;
     WGPUComputePipeline bound = NULL;
     int32_t i, d, count = ecs_vec_count(&c->views);
-    if (!c->group || !box_gpu_cull_pipelines(gpu)) {
+    if (!c->bound || !box_gpu_cull_pipelines(gpu)) {
         goto done;
     }
 
@@ -1061,9 +1131,11 @@ static void box_gpu_cull_dispatches(
                 bound = pipeline;
             }
 
-            wgpuComputePassEncoderSetBindGroup(pass, 0, c->group, 1, &offset);
+            wgpuComputePassEncoderSetBindGroup(pass, 0, ecs_vec_get_t(&c->pages,
+                box_gpu_cull_page_t, (int32_t)dp->page)->group, 1, &offset);
             wgpuComputePassEncoderSetBindGroup(pass, 1, box_gpu_instance_group(gpu, b), 0, NULL);
-            wgpuComputePassEncoderSetBindGroup(pass, 2, cv->group, 0, NULL);
+            wgpuComputePassEncoderSetBindGroup(pass, 2, dp->history ? dp->history : cv->group,
+                0, NULL);
             wgpuComputePassEncoderDispatchWorkgroups(pass, dp->groups, 1, 1);
         }
     }
@@ -1092,7 +1164,7 @@ bool box_gpu_cull_record_all(
 {
     box_gpu_cull_dispatches(gpu, encoder, -1, false, writes);
 
-    return ecs_vec_count(&gpu->cull.dispatches) && gpu->cull.group && gpu->cull.parallel;
+    return ecs_vec_count(&gpu->cull.dispatches) && gpu->cull.bound && gpu->cull.parallel;
 }
 
 const box_gpu_cull_view_t* box_gpu_cull_view(
@@ -1103,7 +1175,7 @@ const box_gpu_cull_view_t* box_gpu_cull_view(
     box_gpu_cull_t *c = &gpu->cull;
     const box_gpu_cull_view_t *result = NULL;
     int32_t i, count = ecs_vec_count(&c->views);
-    if (!c->group || !c->parallel) {
+    if (!c->bound || !c->parallel) {
         goto done;
     }
 
@@ -1192,7 +1264,7 @@ void box_gpu_cull_finish(
     int32_t i, d, count = ecs_vec_count(&c->views);
     uint64_t size = (uint64_t)count * BOX_GPU_CULL_COUNTERS * sizeof(uint32_t);
     box_gpu_cull_readback_t *r = NULL;
-    if (!count || !c->group || !c->parallel) {
+    if (!count || !c->bound || !c->parallel) {
         goto done;
     }
 
@@ -1253,7 +1325,8 @@ bool box_gpu_cull_draw(
 
     wgpuRenderPassEncoderSetBindGroup(pass, group, instances, 0, NULL);
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, m->vertices, 0, WGPU_WHOLE_SIZE);
-    wgpuRenderPassEncoderSetVertexBuffer(pass, 1, c->visible,
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 1, ecs_vec_get_t(&c->pages,
+        box_gpu_cull_page_t, (int32_t)draw->page)->visible,
         (uint64_t)base * sizeof(uint32_t), (uint64_t)draw->count * sizeof(uint32_t));
     wgpuRenderPassEncoderSetIndexBuffer(
         pass, m->indices, WGPUIndexFormat_Uint32, 0, WGPU_WHOLE_SIZE);
