@@ -1374,9 +1374,12 @@ static void BoxRenderExtractBake(
     box_render_packet_t *p = box_render_packet(world);
     const box_render_backend_t *backend = box_render_get_backend(world);
     int32_t i, changed = -1;
-    if (backend->ctx != b->backend || backend->render != b->render) {
+    if (backend->ctx != b->backend || backend->render != b->render ||
+        backend->generation != b->generation)
+    {
         b->backend = backend->ctx;
         b->render = backend->render;
+        b->generation = backend->generation;
         for (i = 0; i < ecs_vec_count(&b->volumes); i ++) {
             ecs_vec_get_t(&b->volumes, box_bake_volume_t, i)->sent = false;
         }

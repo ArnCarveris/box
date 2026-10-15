@@ -54,6 +54,8 @@ struct box_render_ring_t {
     bool stop;                      /**< The render thread exits once it took every packet */
     bool paused;                    /**< The render thread takes no packets */
     bool flushing;                  /**< A drain ignores the pause */
+    int64_t flushes;                /**< Drains that asked the backend to flush */
+    int64_t flushed;                /**< Flushes the render thread completed */
     float display_rate;             /**< Refresh rate of the simulated display, applied */
     bool vsync;                     /**< The last submitted packet presents with vsync */
     float refresh;                  /**< Refresh rate of the display of the last packet */
@@ -71,6 +73,9 @@ struct box_render_ring_t {
     int32_t presents_late;          /**< Present intervals over 1.1 frame intervals */
     int32_t presents_early;         /**< Present intervals under 0.9 frame intervals */
     int32_t delta_mismatches;       /**< Shown intervals that differ from the packet delta */
+    int32_t device_losses;          /**< Backend restarts after the device was lost */
+    int32_t generation;             /**< Generation of the backend state, which the acquire
+                                     *   publishes in backend.generation for the extract */
     box_render_shown_t pending;     /**< Frame on the simulated display not yet shown */
 };
 
@@ -339,6 +344,10 @@ done:
 /** Show the pending frame of a simulated display and run the fini of the backend on the
  * calling thread when its init ran, so no fence outlives the device it belongs to.
  *
+ * A stop after an init, whether it succeeded or failed, bumps the generation of the backend:
+ * the next acquire publishes it, so its extract sends everything again, and packets built for
+ * the previous generation are dropped instead of rendered.
+ *
  * @param ring The ring
  */
 static void box_render_backend_stop(
@@ -346,12 +355,66 @@ static void box_render_backend_stop(
 {
     box_render_show_pending(ring);
     ring->pending.active = false;
+    if (ring->backend_ready && ring->backend.flush) {
+        ring->backend.flush(ring->backend.ctx);
+    }
+
     if (ring->backend_ready && ring->backend.fini) {
         ring->backend.fini(ring->backend.ctx);
     }
 
+    if (ring->backend_ready || ring->backend_failed) {
+        ecs_os_mutex_lock(ring->lock);
+        ring->generation ++;
+        ecs_os_mutex_unlock(ring->lock);
+    }
+
     ring->backend_ready = false;
     ring->backend_failed = false;
+}
+
+/** Restart a backend that lost its device on the thread that renders, before its next packet,
+ * as wgpu and Dawn applications do from the device lost callback: the stop bumps the
+ * generation, so the extract sends the whole scene to the new device.
+ *
+ * A failed init drops the packets that follow, as a failed first init does.
+ *
+ * @param ring The ring
+ */
+static void box_render_backend_recover(
+    box_render_ring_t *ring)
+{
+    if (!ring->backend_ready || !ring->backend.lost || !ring->backend.lost(ring->backend.ctx)) {
+        goto done;
+    }
+
+    box_render_backend_stop(ring);
+    box_render_backend_start(ring);
+    ecs_os_mutex_lock(ring->lock);
+    ring->device_losses += ring->backend_ready;
+    ecs_os_mutex_unlock(ring->lock);
+done:
+    return;
+}
+
+/** Recover a lost backend and render a packet unless it was built for an older generation of
+ * the backend, whose resources the backend no longer has.
+ *
+ * @param ring The ring
+ * @param p The packet
+ */
+static void box_render_take(
+    box_render_ring_t *ring,
+    const box_render_packet_t *p)
+{
+    bool current;
+    box_render_backend_recover(ring);
+    ecs_os_mutex_lock(ring->lock);
+    current = p->generation == ring->generation;
+    ecs_os_mutex_unlock(ring->lock);
+    if (current) {
+        box_render_consume(ring, p);
+    }
 }
 
 /** Check whether the render thread may take a packet, called with the lock held.
@@ -367,8 +430,9 @@ static bool box_render_ring_readable(
     return ring->taken < ring->submitted && !held;
 }
 
-/** Render packets until the ring stops and every submitted packet is rendered. On macOS the
- * thread runs at the user interactive QoS, as Apple recommends for threads that render frames.
+/** Render packets until the ring stops and every submitted packet is rendered, and flush the
+ * backend when a drain waits for it after the last packet. On macOS the thread runs at the user
+ * interactive QoS, as Apple recommends for threads that render frames.
  *
  * @param arg The ring
  * @return NULL
@@ -383,8 +447,23 @@ static void* box_render_thread_main(
     box_render_backend_start(ring);
     ecs_os_mutex_lock(ring->lock);
     while (true) {
-        while (!box_render_ring_readable(ring) && !(ring->stop && ring->taken == ring->submitted)) {
+        while (!box_render_ring_readable(ring) && !(ring->taken == ring->submitted &&
+            (ring->stop || ring->flushed < ring->flushes)))
+        {
             ecs_os_cond_wait(ring->can_read, ring->lock);
+        }
+
+        if (ring->taken == ring->submitted && ring->flushed < ring->flushes) {
+            int64_t flush = ring->flushes;
+            ecs_os_mutex_unlock(ring->lock);
+            if (ring->backend_ready && ring->backend.flush) {
+                ring->backend.flush(ring->backend.ctx);
+            }
+
+            ecs_os_mutex_lock(ring->lock);
+            ring->flushed = flush;
+            ecs_os_cond_broadcast(ring->can_write);
+            continue;
         }
 
         if (ring->taken == ring->submitted) {
@@ -393,7 +472,7 @@ static void* box_render_thread_main(
 
         box_render_packet_t *p = box_render_ring_slot(ring, ring->taken ++);
         ecs_os_mutex_unlock(ring->lock);
-        box_render_consume(ring, p);
+        box_render_take(ring, p);
         ecs_os_mutex_lock(ring->lock);
         ring->released ++;
         ecs_os_cond_broadcast(ring->can_write);
@@ -446,7 +525,8 @@ done:
     return;
 }
 
-/** Wait until every submitted packet is rendered, also while the ring is held.
+/** Wait until every submitted packet is rendered and the backend flushed, also while the
+ * ring is held.
  *
  * @param ring The ring
  */
@@ -459,8 +539,9 @@ static void box_render_ring_drain(
 
     ecs_os_mutex_lock(ring->lock);
     ring->flushing = true;
+    int64_t flush = ++ ring->flushes;
     ecs_os_cond_broadcast(ring->can_read);
-    while (ring->released < ring->submitted) {
+    while (ring->released < ring->submitted || ring->flushed < flush) {
         ecs_os_cond_wait(ring->can_write, ring->lock);
     }
 
@@ -579,8 +660,10 @@ box_render_packet_t* box_render_ring_acquire(
     }
 
     result = box_render_ring_slot(ring, ring->acquired ++);
+    ring->backend.generation = ring->generation;
     ecs_os_mutex_unlock(ring->lock);
     box_render_packet_reset(result);
+    result->generation = ring->backend.generation;
 
     return result;
 }
@@ -632,7 +715,7 @@ void box_render_ring_submit(
     ring->submitted ++;
     ring->taken ++;
     ecs_os_mutex_unlock(ring->lock);
-    box_render_consume(ring, p);
+    box_render_take(ring, p);
     ecs_os_mutex_lock(ring->lock);
     ring->released ++;
     ecs_os_mutex_unlock(ring->lock);
@@ -649,7 +732,11 @@ void box_render_ring_set_backend(
         ring->backend.free(ring->backend.ctx);
     }
 
+    ecs_os_mutex_lock(ring->lock);
+    ring->generation ++;
     ring->backend = *backend;
+    ring->backend.generation = ring->generation;
+    ecs_os_mutex_unlock(ring->lock);
     ring->backend_set = true;
 }
 
@@ -679,6 +766,9 @@ void box_render_ring_sync(
     box_render_ring_t *ring)
 {
     box_render_ring_drain(ring);
+    if (ring->main_thread && ring->backend_ready && ring->backend.flush) {
+        ring->backend.flush(ring->backend.ctx);
+    }
 }
 
 void box_render_ring_status(
@@ -700,5 +790,6 @@ void box_render_ring_status(
     status->presents_late = ring->presents_late;
     status->presents_early = ring->presents_early;
     status->delta_mismatches = ring->delta_mismatches;
+    status->device_losses = ring->device_losses;
     ecs_os_mutex_unlock(ring->lock);
 }

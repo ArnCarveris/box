@@ -4,6 +4,7 @@
  */
 
 #include "command.h"
+#include "../render/render.h"
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
@@ -315,13 +316,16 @@ done:
     return;
 }
 
-/** Delete the oldest image of a session that the renderer is done with.
+/** Delete the oldest image of a session that the renderer is done with: written, or dropped
+ * once its packet rendered and its readback is no longer mapping.
  *
+ * @param world The world
  * @param s The session
  * @param rendered RenderStatus.rendered, packets the renderer finished
  * @return Whether an image was deleted or dropped
  */
 static bool box_terminal_image_evict(
+    ecs_world_t *world,
     TerminalSession *s,
     int32_t rendered)
 {
@@ -329,7 +333,9 @@ static bool box_terminal_image_evict(
     bool result = false;
     for (i = 0; i < count && !result; i ++) {
         box_terminal_image_t *image = ecs_vec_get_t(&s->images, box_terminal_image_t, i);
-        result = !unlink(image->path) || (errno == ENOENT && rendered >= image->packet);
+        bool done = rendered >= image->packet &&
+            !box_render_gpu_capture_pending(world, image->path);
+        result = done && (!unlink(image->path) || errno == ENOENT);
         if (result) {
             ecs_os_free(image->path);
             ecs_vec_remove_ordered_t(&s->images, box_terminal_image_t, i);
@@ -356,7 +362,7 @@ int box_terminal_image(
 
     result = BOX_TERMINAL_IMAGE_PENDING;
     while (ecs_vec_count(&s->images) >= s->images_max) {
-        if (!box_terminal_image_evict(s, rendered)) {
+        if (!box_terminal_image_evict(world, s, rendered)) {
             goto done;
         }
     }

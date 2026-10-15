@@ -4,6 +4,9 @@
  *
  * Every glyph of a Text is a slot of a glyph batch keyed like a 2D shape plus its atlas page,
  * drawn with etc/shaders/shape2d.wgsl, which reads the page as a multi channel distance field.
+ *
+ * Pages reach the backend as texture updates: whole when new or grown, then per frame the area
+ * of the glyphs completed since the last one.
  */
 
 #include "draw.h"
@@ -14,6 +17,7 @@ ECS_COMPONENT_DECLARE(TextSlots);
 typedef struct box_draws_atlas_t {
     const void *backend;    /**< Context of the backend the pages were sent to */
     void (*render)(void*, const box_render_packet_t*); /**< Render callback of that backend */
+    int32_t generation;         /**< Generation of that backend, see box_render_backend_t */
 } box_draws_atlas_t;
 
 /** Construct TextSlots values without slots.
@@ -310,7 +314,50 @@ void box_draws_text_dynamic(
     }
 }
 
-/** Send the atlas pages the backend does not have and destroy the released ones.
+/** Send the area of an atlas page the backend does not have: the whole page when the backend
+ * has none of its size, else the area the glyphs completed since the last frame cover.
+ *
+ * @param p The packet
+ * @param page The page
+ * @param whole Send the whole page
+ */
+static void box_draws_atlas_page(
+    box_render_packet_t *p,
+    box_text_page_t *page,
+    bool whole)
+{
+    int32_t x = page->dirty[0], y = page->dirty[1], row;
+    int32_t w = page->dirty[2] - x, h = page->dirty[3] - y;
+    if (whole || page->sent != page->size) {
+        x = y = 0;
+        w = h = page->size;
+    }
+
+    if (w <= 0 || h <= 0) {
+        goto done;
+    }
+
+    box_render_texture_region_t *region = box_render_packet_resource(p,
+        BOX_RENDER_TEXTURE, BOX_RENDER_UPDATE, page->handle,
+        (uint32_t)(sizeof(box_render_texture_region_t) + (size_t)w * (size_t)h * 4));
+    region->texture.width = (uint32_t)page->size;
+    region->texture.height = (uint32_t)page->size;
+    region->x = (uint32_t)x;
+    region->y = (uint32_t)y;
+    region->width = (uint32_t)w;
+    region->height = (uint32_t)h;
+    uint8_t *dst = (uint8_t*)(region + 1);
+    for (row = 0; row < h; row ++) {
+        ecs_os_memcpy(dst + row * w * 4, page->pixels + ((y + row) * page->size + x) * 4, w * 4);
+    }
+
+    page->sent = page->size;
+    ecs_os_memset(page->dirty, 0, ECS_SIZEOF(page->dirty));
+done:
+    return;
+}
+
+/** Send the areas of the atlas pages the backend does not have and destroy the released pages.
  *
  * @param it The iterator of the system
  */
@@ -321,7 +368,8 @@ static void BoxRenderExtractTextAtlas(
     box_text_state_t *s = box_text_state_get(it->world);
     box_render_packet_t *p = box_render_packet(it->world);
     const box_render_backend_t *backend = box_render_get_backend(it->world);
-    bool resend = backend->ctx != state->backend || backend->render != state->render;
+    bool resend = backend->ctx != state->backend || backend->render != state->render ||
+        backend->generation != state->generation;
     int32_t i;
     if (!s) {
         goto done;
@@ -329,6 +377,7 @@ static void BoxRenderExtractTextAtlas(
 
     state->backend = backend->ctx;
     state->render = backend->render;
+    state->generation = backend->generation;
     for (i = 0; i < ecs_vec_count(&s->released) && !resend; i ++) {
         box_render_packet_resource(p, BOX_RENDER_TEXTURE, BOX_RENDER_DESTROY,
             *ecs_vec_get_t(&s->released, uint32_t, i), 0);
@@ -339,19 +388,7 @@ static void BoxRenderExtractTextAtlas(
     while (ecs_map_next(&mit)) {
         box_text_font_t *font = ecs_map_ptr(&mit);
         for (i = 0; i < ecs_vec_count(&font->pages); i ++) {
-            box_text_page_t *page = *ecs_vec_get_t(&font->pages, box_text_page_t*, i);
-            uint32_t size = (uint32_t)(page->size * page->size * 4);
-            if (!page->dirty && !resend) {
-                continue;
-            }
-
-            box_render_texture_desc_t *desc = box_render_packet_resource(p,
-                BOX_RENDER_TEXTURE, BOX_RENDER_CREATE, page->handle,
-                (uint32_t)sizeof(box_render_texture_desc_t) + size);
-            desc->width = (uint32_t)page->size;
-            desc->height = (uint32_t)page->size;
-            ecs_os_memcpy(desc + 1, page->pixels, (ecs_size_t)size);
-            page->dirty = false;
+            box_draws_atlas_page(p, *ecs_vec_get_t(&font->pages, box_text_page_t*, i), resend);
         }
     }
 

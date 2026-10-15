@@ -39,7 +39,7 @@ for x in 0..20 {
   for z in 0..20 {
     {
       Position: {x - 9.5, 0.4, z - 9.5}
-      PointLight: {intensity: 0.8, range: 1.6}
+      PointLight: {intensity: 0.15, range: 1.6}
       Rgb: {60 + (x % 4) * 60, 240 - (z % 4) * 60, 120 + ((x + z) % 3) * 60}
     }
   }

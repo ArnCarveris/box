@@ -52,6 +52,9 @@
                     "static_1000",
                     "moving_1000",
                     "scenes_1000",
+                    "clustered_1000",
+                    "crowded_points_512",
+                    "crowded_spots_512",
                     "moving_modes_1000",
                     "moving_mixed_1000"
                 ]
@@ -101,7 +104,8 @@
                 "id": "Text",
                 "benchcases": [
                     "layout_10k",
-                    "changed_1pct"
+                    "changed_1pct",
+                    "type_new_glyphs"
                 ]
             },
             {

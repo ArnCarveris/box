@@ -23,11 +23,14 @@ extern "C" {
 
 /** A TrueType or OpenType font, loaded on the job system once a Text uses it.
  *
- * Changing the path loads the font again; the previous font stays in use until the new one
- * is ready. The engine writes FontStatus.
+ * A new path loads the font again; the previous font stays in use until the new one is ready.
+ *
+ * Atlas pages beyond atlas_pages that no Text shows are released, least recently used first, and
+ * their glyphs drawn again on next use; only shown pages pass it. A new Font keeps 4, 0 none.
  */
 ECS_STRUCT(Font, {
-    char *path; /**< Font file, relative to the working directory or an ancestor of it */
+    char *path;          /**< Font file, relative to the working directory or an ancestor of it */
+    int32_t atlas_pages; /**< Atlas pages kept before an idle page is cleared for new glyphs */
 });
 
 /** Progress of the load of a Font */

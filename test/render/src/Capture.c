@@ -302,6 +302,7 @@ void Capture_main_thread(void) {
     ecs_set(world, e, Surface, {.width = 32, .height = 16, .write_to_file = "main.png",
         .resolution_scale = 1});
     ecs_progress(world, 0);
+    box_render_sync(world);
 
     char *path = flecs_asprintf("%s/main.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
     int w = 0, h = 0, n = 0, i, wrong = 0;
@@ -347,4 +348,96 @@ void Capture_relative_path_written_before_exit(void) {
     ecs_fini(world);
     ecs_os_api.log_ = log;
     test_int(capture_errors, 0);
+}
+
+void Capture_frame_completes_while_pending(void) {
+    // render_fixes/capture_async
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {40, 80, 160, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "pending.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+
+    box_render_gpu_stats_t stats;
+    test_bool(box_render_gpu_stats(world, &stats), true);
+    test_assert(stats.frames >= 1);
+    test_int(stats.captures, 0);
+
+    box_render_sync(world);
+    box_render_gpu_stats(world, &stats);
+    test_int(stats.captures, 1);
+    test_int(stats.errors, 0);
+
+    char *path = flecs_asprintf("%s/pending.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, i, wrong = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    test_int(w, 64);
+    test_int(h, 32);
+    for (i = 0; i < w * h; i ++) {
+        wrong += px[i * 4] != 40 || px[i * 4 + 1] != 80 || px[i * 4 + 2] != 160 ||
+            px[i * 4 + 3] != 255;
+    }
+
+    test_int(wrong, 0);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}
+
+void Capture_completes_while_frames_run(void) {
+    // render_fixes/capture_async
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {200, 30, 70, 255}}});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .write_to_file = "running.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_set(world, e, Surface, {.width = 32, .height = 32, .resolution_scale = 1});
+
+    box_render_gpu_stats_t stats = {0};
+    int32_t frames;
+    for (frames = 0; frames < 200 && !stats.captures; frames ++) {
+        ecs_progress(world, 0);
+        box_render_gpu_stats(world, &stats);
+    }
+
+    test_int(stats.captures, 1);
+    test_int(stats.errors, 0);
+
+    char *path = flecs_asprintf("%s/running.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0, i, wrong = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < w * h; i ++) {
+        wrong += px[i * 4] != 200 || px[i * 4 + 1] != 30 || px[i * 4 + 2] != 70 ||
+            px[i * 4 + 3] != 255;
+    }
+
+    test_int(wrong, 0);
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
 }
