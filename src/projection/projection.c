@@ -4,6 +4,9 @@
  *
  * Runs in OnStore, after the transforms of the frame and before the render extract, and
  * writes the world transforms of every anchored subtree so the extract sees them this frame.
+ *
+ * Position is written without OnSet: the world transforms are already final, and an OnSet
+ * would make the static transforms compute the anchor again in the next frame.
  */
 
 #define BOX_PROJECTION_IMPL
@@ -268,6 +271,9 @@ static void box_projection_transform(
 
 /** Move every anchored entity to the projection of its target.
  *
+ * The Position written here raises no OnSet; the WorldTransform of the anchor and its subtree
+ * raises one when it changed, which is what draws and the spatial index follow.
+ *
  * @param it The system iterator
  */
 static void BoxProjectionUpdate(
@@ -290,10 +296,9 @@ static void BoxProjectionUpdate(
         }
 
         bool visible = box_projection_point(world, &anchor[i], &lens, &x, &y);
-        if (visible && (p[i].x != x || p[i].y != y)) {
+        if (visible) {
             p[i].x = x;
             p[i].y = y;
-            ecs_modified(world, e, Position);
         }
 
         box_projection_show(world, e, visible);
