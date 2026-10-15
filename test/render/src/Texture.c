@@ -1214,3 +1214,156 @@ void Texture_gpu_svg_colors(void) {
     ecs_os_free(file);
     ecs_fini(world);
 }
+
+void Texture_gpu_albedo_mip_linear_average(void) {
+    // lighting_fixes/albedo_mips
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *checker_file = flecs_asprintf("%s/checker.png", tmp);
+    char *grey_file = flecs_asprintf("%s/grey.png", tmp);
+    uint8_t checker[16 * 16 * 4], grey[16 * 16 * 4];
+    int32_t i, c;
+    for (i = 0; i < 256; i ++) {
+        uint8_t v = ((i % 16) + (i / 16)) % 2 ? 255 : 0;
+        for (c = 0; c < 3; c ++) {
+            checker[i * 4 + c] = v;
+            grey[i * 4 + c] = 188;
+        }
+
+        checker[i * 4 + 3] = 255;
+        grey[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(checker_file, 16, 16, 4, checker, 16 * 4) != 0);
+    test_assert(stbi_write_png(grey_file, 16, 16, 4, grey, 16 * 4) != 0);
+
+    ecs_entity_t checker_tex = ecs_new(world);
+    ecs_set(world, checker_tex, TexturePath, {.path = checker_file});
+    ecs_entity_t grey_tex = ecs_new(world);
+    ecs_set(world, grey_tex, TexturePath, {.path = grey_file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t far = ecs_new(world);
+    ecs_set(world, far, Position, {-3, 0, 0});
+    ecs_set(world, far, Quad, {5, 5});
+    ecs_set(world, far, Rgb, {255, 255, 255});
+    ecs_set(world, far, PbrMaterial, {.roughness = 1});
+    ecs_set(world, far, PbrTextures, {.albedo = checker_tex});
+    ecs_set(world, far, TextureTransform, {.scale_x = 64, .scale_y = 64});
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, Position, {3, 0, 0});
+    ecs_set(world, flat, Quad, {5, 5});
+    ecs_set(world, flat, Rgb, {255, 255, 255});
+    ecs_set(world, flat, PbrMaterial, {.roughness = 1});
+    ecs_set(world, flat, PbrTextures, {.albedo = grey_tex});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "mips.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/mips.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *averaged = &img[(16 * 64 + 18) * 4];
+    unsigned char *reference = &img[(16 * 64 + 46) * 4];
+    test_assert(reference[1] > 60);
+    test_assert(reference[1] < 250);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(averaged[c] - reference[c]) < 12);
+    }
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(grey_file);
+    ecs_os_free(checker_file);
+    ecs_fini(world);
+}
+
+void Texture_gpu_roughness_mip_stored_average(void) {
+    // lighting_fixes/albedo_mips
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    const char *tmp = ecs_singleton_get(world, AppStatus)->tmp_dir;
+    char *checker_file = flecs_asprintf("%s/rough_checker.png", tmp);
+    char *half_file = flecs_asprintf("%s/rough_half.png", tmp);
+    uint8_t checker[16 * 16 * 4], half[16 * 16 * 4];
+    int32_t i, c;
+    for (i = 0; i < 256; i ++) {
+        uint8_t v = ((i % 16) + (i / 16)) % 2 ? 255 : 0;
+        for (c = 0; c < 3; c ++) {
+            checker[i * 4 + c] = v;
+            half[i * 4 + c] = 128;
+        }
+
+        checker[i * 4 + 3] = 255;
+        half[i * 4 + 3] = 255;
+    }
+
+    test_assert(stbi_write_png(checker_file, 16, 16, 4, checker, 16 * 4) != 0);
+    test_assert(stbi_write_png(half_file, 16, 16, 4, half, 16 * 4) != 0);
+
+    ecs_entity_t checker_tex = ecs_new(world);
+    ecs_set(world, checker_tex, TexturePath, {.path = checker_file});
+    ecs_entity_t half_tex = ecs_new(world);
+    ecs_set(world, half_tex, TexturePath, {.path = half_file});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 6});
+    ecs_set(world, camera, Camera, {.fov = 60, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}},
+        .lighting.enabled = true});
+    ecs_entity_t light = ecs_new(world);
+    ecs_set(world, light, Position, {0, 0, 3});
+    ecs_set(world, light, PointLight, {.intensity = 2, .range = 20});
+    ecs_entity_t far = ecs_new(world);
+    ecs_set(world, far, Position, {-1.5f, 0, 0});
+    ecs_set(world, far, Quad, {2.5f, 2.5f});
+    ecs_set(world, far, Rgb, {255, 255, 255});
+    ecs_set(world, far, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, far, PbrTextures, {.roughness = checker_tex});
+    ecs_set(world, far, TextureTransform, {.scale_x = 64, .scale_y = 64});
+    ecs_entity_t flat = ecs_new(world);
+    ecs_set(world, flat, Position, {1.5f, 0, 0});
+    ecs_set(world, flat, Quad, {2.5f, 2.5f});
+    ecs_set(world, flat, Rgb, {255, 255, 255});
+    ecs_set(world, flat, PbrMaterial, {.metallic = 1, .roughness = 1});
+    ecs_set(world, flat, PbrTextures, {.roughness = half_tex});
+    ecs_entity_t e = ecs_new(world);
+    ecs_set(world, e, Surface, {.width = 64, .height = 32, .write_to_file = "rough.png",
+        .resolution_scale = 1});
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+
+    char *path = flecs_asprintf("%s/rough.png", tmp);
+    int w = 0, h = 0, n = 0;
+    unsigned char *img = stbi_load(path, &w, &h, &n, 4);
+    test_assert(img != NULL);
+    unsigned char *averaged = &img[(16 * 64 + 29) * 4];
+    unsigned char *reference = &img[(16 * 64 + 34) * 4];
+    test_assert(reference[1] > 60);
+    for (c = 0; c < 3; c ++) {
+        test_assert(abs(averaged[c] - reference[c]) < 12);
+    }
+
+    stbi_image_free(img);
+    ecs_os_free(path);
+    ecs_os_free(half_file);
+    ecs_os_free(checker_file);
+    ecs_fini(world);
+}

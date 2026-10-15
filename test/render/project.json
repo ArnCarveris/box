@@ -236,7 +236,9 @@
                     "gpu_reload_changes_image",
                     "gpu_deleted_texture_unbinds",
                     "gpu_inherited_from_prefab",
-                    "gpu_svg_colors"
+                    "gpu_svg_colors",
+                    "gpu_albedo_mip_linear_average",
+                    "gpu_roughness_mip_stored_average"
                 ]
             },
             {
