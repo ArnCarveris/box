@@ -665,7 +665,11 @@
                     "dynamic_parent_remove_scale_leaf",
                     "dynamic_parent_remove_position_mid",
                     "dynamic_parent_remove_position_mid_move_root",
-                    "dynamic_parent_remove_position_root"
+                    "dynamic_parent_remove_position_root",
+                    "static_childof_clear_parent",
+                    "static_parent_clear_parent",
+                    "dynamic_childof_clear_parent",
+                    "dynamic_parent_clear_parent"
                 ]
             },
             {

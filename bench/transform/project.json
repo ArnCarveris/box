@@ -36,7 +36,9 @@
                     "static_childof",
                     "static_parent",
                     "dynamic_childof",
-                    "dynamic_parent"
+                    "dynamic_parent",
+                    "static_parent_target",
+                    "dynamic_parent_target"
                 ]
             }
         ]

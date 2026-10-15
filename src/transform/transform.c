@@ -76,12 +76,28 @@ bool box_transform_dynamic(
         EcsSelf | EcsUp, NULL, NULL, NULL) != -1;
 }
 
+/** Test whether the parent of an entity is being deleted.
+ *
+ * @param world The world
+ * @param e The entity
+ * @return true when flecs marked the children of the parent for deletion
+ */
+static bool transformParentDeleting(
+    const ecs_world_t *world,
+    ecs_entity_t e)
+{
+    ecs_entity_t parent = ecs_get_parent(world, e);
+
+    return parent && (ecs_id_get_flags(world, ecs_childof(parent)) & EcsIdMarkedForDelete);
+}
+
 bool transformDeleting(
     const ecs_iter_t *it)
 {
     return it->event == EcsOnRemove && (!it->other_table ||
-        (!ecs_table_get_type(it->other_table)->count && it->table &&
-            ecs_table_has_flags(it->table, EcsTableMarkedForDelete)));
+        (!ecs_table_get_type(it->other_table)->count && it->table && it->count &&
+            (ecs_table_has_flags(it->table, EcsTableMarkedForDelete) ||
+                transformParentDeleting(it->world, it->entities[0]))));
 }
 
 void BoxTransformImport(
