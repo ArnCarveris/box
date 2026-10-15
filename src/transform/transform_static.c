@@ -12,12 +12,20 @@ typedef struct {
     ecs_ctx_free_t ctx_free;        /**< Frees the context with the world, NULL for none */
 } TransformStaticListener;
 
+/** A function that receives the events of entities that gain or lose DynamicTransform */
+typedef struct {
+    ecs_iter_action_t callback; /**< The function */
+    void *ctx;                  /**< Context the function finds in it->ctx */
+    ecs_ctx_free_t ctx_free;    /**< Frees the context with the world, NULL for none */
+} TransformDynamicListener;
+
 /** State of the static transform: the entities to recompute and the listeners */
 typedef struct {
     ecs_vec_t value;     /**< Vector of ecs_entity_t */
     ecs_vec_t manual;    /**< ManualTransform entities whose WorldTransform was set */
     ecs_vec_t moved;     /**< ecs_entity_t, entities that moved this run */
     ecs_vec_t listeners; /**< TransformStaticListener, receive the moved entities */
+    ecs_vec_t dynamic;   /**< TransformDynamicListener, receive DynamicTransform changes */
     int32_t refs;        /**< Observers and systems that use the state */
 } transform_static_t;
 
@@ -55,10 +63,19 @@ static void transformStaticRelease(
         }
     }
 
+    count = ecs_vec_count(&state->dynamic);
+    TransformDynamicListener *dynamic = ecs_vec_first(&state->dynamic);
+    for (i = 0; i < count; i ++) {
+        if (dynamic[i].ctx_free) {
+            dynamic[i].ctx_free(dynamic[i].ctx);
+        }
+    }
+
     ecs_vec_fini_t(NULL, &state->value, ecs_entity_t);
     ecs_vec_fini_t(NULL, &state->manual, ecs_entity_t);
     ecs_vec_fini_t(NULL, &state->moved, ecs_entity_t);
     ecs_vec_fini_t(NULL, &state->listeners, TransformStaticListener);
+    ecs_vec_fini_t(NULL, &state->dynamic, TransformDynamicListener);
     ecs_os_free(state);
 done:
     return;
@@ -96,16 +113,33 @@ static void TransformStatic_OnChange(
         !transformDeleting(it) && !box_transform_dynamic(it->world, it->table));
 }
 
-/** Add entities that stop being dynamic to the dirty list.
+/** Follow entities that gain or lose DynamicTransform, owned or inherited.
+ *
+ * Entities that stop being dynamic stop spreading the tag to their children and join the
+ * dirty list, then every function registered with box_transform_on_dynamic gets the event,
+ * unless the entities are being deleted.
  *
  * @param it The observer iterator
  */
-static void TransformStatic_OnStatic(
+static void Transform_OnDynamic(
     ecs_iter_t *it)
 {
     transform_static_t *state = it->ctx;
-    transformStaticDirty(it, &state->value,
-        !transformDeleting(it) && !box_transform_dynamic(it->world, it->other_table));
+    bool deleting = it->event == EcsOnRemove && transformDeleting(it);
+    if (it->event == EcsOnRemove) {
+        transformDynamicUnspread(it, deleting);
+        transformStaticDirty(it, &state->value,
+            !deleting && !box_transform_dynamic(it->world, it->other_table));
+    }
+
+    int32_t i, count = deleting ? 0 : ecs_vec_count(&state->dynamic);
+    for (i = 0; i < count; i ++) {
+        const TransformDynamicListener *l = ecs_vec_get_t(
+            &state->dynamic, TransformDynamicListener, i);
+        ecs_iter_t listener_it = *it;
+        listener_it.ctx = l->ctx;
+        l->callback(&listener_it);
+    }
 }
 
 /** Add ManualTransform entities whose WorldTransform was set to the manual list.
@@ -373,6 +407,18 @@ void box_transform_on_moved(
         (TransformStaticListener){ .callback = callback, .ctx = ctx, .ctx_free = ctx_free };
 }
 
+void box_transform_on_dynamic(
+    ecs_world_t *world,
+    ecs_iter_action_t callback,
+    void *ctx,
+    ecs_ctx_free_t ctx_free)
+{
+    const TransformStaticState *s = ecs_singleton_get(world, TransformStaticState);
+    ecs_assert(s != NULL, ECS_INVALID_OPERATION, "box.transform is not imported");
+    ecs_vec_append_t(NULL, &s->state->dynamic, TransformDynamicListener)[0] =
+        (TransformDynamicListener){ .callback = callback, .ctx = ctx, .ctx_free = ctx_free };
+}
+
 /** Register an observer that uses the state, counting the reference it holds.
  *
  * @param world The world
@@ -398,6 +444,7 @@ void TransformStaticImport(
     ecs_vec_init_t(NULL, &state->manual, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->moved, ecs_entity_t, 0);
     ecs_vec_init_t(NULL, &state->listeners, TransformStaticListener, 0);
+    ecs_vec_init_t(NULL, &state->dynamic, TransformDynamicListener, 0);
 
     ECS_COMPONENT_DEFINE(world, TransformStaticState);
     ecs_set_hooks(world, TransformStaticState, { .ctor = flecs_default_ctor });
@@ -444,10 +491,10 @@ void TransformStaticImport(
     });
 
     transformStaticObserver(world, state, (ecs_observer_desc_t){
-        .entity = ecs_entity(world, { .name = "TransformStatic_OnStatic" }),
+        .entity = ecs_entity(world, { .name = "Transform_OnDynamic" }),
         .query.terms = {{ .id = DynamicTransform }},
-        .events = { EcsOnRemove },
-        .callback = TransformStatic_OnStatic
+        .events = { EcsOnAdd, EcsOnRemove },
+        .callback = Transform_OnDynamic
     });
 
     ecs_observer(world, {

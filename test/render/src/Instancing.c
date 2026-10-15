@@ -1073,3 +1073,69 @@ void Instancing_mesh3_prefab_removed(void) {
     ecs_os_free(path);
     ecs_fini(world);
 }
+
+void Instancing_dynamic_hierarchy_deleted(void) {
+    // core_fixes/unspread_delete_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {0, 0, 10});
+    ecs_set(world, camera, Camera, {.ortho = true, .ortho_height = 2, .near_ = 0.1f,
+        .far_ = 1000});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {
+        .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 40, .height = 8,
+        .write_to_file = "dyn_deleted.png", .resolution_scale = 1});
+    ecs_entity_t roots[2];
+    int32_t i, r;
+    for (r = 0; r < 2; r ++) {
+        roots[r] = ecs_new(world);
+        ecs_set(world, roots[r], Position, {-4.5f + 5.0f * (float)r, 0, 0});
+        ecs_add(world, roots[r], DynamicTransform);
+        for (i = 0; i < 5; i ++) {
+            ecs_entity_t e = r ? ecs_new(world) : ecs_new_w_pair(world, EcsChildOf, roots[r]);
+            if (r) {
+                ecs_set(world, e, EcsParent, {roots[r]});
+            }
+
+            ecs_set(world, e, Position, {(float)i, 0, 0});
+            ecs_set(world, e, Box, {0.8f, 0.8f, 0.8f});
+            ecs_set(world, e, Rgb, {0, 0, 0});
+            ecs_set(world, e, PbrMaterial, {.metallic = 1, .roughness = 1});
+            ecs_set(world, e, Emissive, {.strength = 1, .color = {255, 0, 0}});
+        }
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    char *path = flecs_asprintf("%s/dyn_deleted.png",
+        ecs_singleton_get(world, AppStatus)->tmp_dir);
+    int w = 0, h = 0, n = 0;
+    unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < 10; i ++) {
+        test_assert(px[(4 * 40 + 2 + 4 * i) * 4] > 200);
+    }
+
+    stbi_image_free(px);
+    ecs_delete(world, roots[0]);
+    ecs_delete(world, roots[1]);
+    ecs_progress(world, 0);
+    box_render_sync(world);
+    px = stbi_load(path, &w, &h, &n, 4);
+    test_assert(px != NULL);
+    for (i = 0; i < 10; i ++) {
+        test_assert(px[(4 * 40 + 2 + 4 * i) * 4] < 40);
+    }
+
+    stbi_image_free(px);
+    ecs_os_free(path);
+    ecs_fini(world);
+}

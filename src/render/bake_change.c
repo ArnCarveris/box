@@ -254,7 +254,7 @@ static bool box_bake_captured_but(
     bool manual = skip != ManualTransform && ecs_has_id(world, e, ManualTransform);
     bool hidden = skip != NoBake && ecs_has_id(world, e, NoBake);
 
-    return !dynamic && !manual && !hidden;
+    return !dynamic && !manual && !hidden && !box_projection_anchored(world, e);
 }
 
 /** Remember the static shapes whose captured look changed.
@@ -408,7 +408,7 @@ void box_bake_changes(
         }
 
         if (ecs_is_alive(world, e) && !ecs_has_id(world, e, NoBake) &&
-            !ecs_has_id(world, e, ManualTransform) &&
+            !ecs_has_id(world, e, ManualTransform) && !box_projection_anchored(world, e) &&
             !box_transform_dynamic(world, ecs_get_table(world, e)) &&
             box_spatial_bounds(world, e, &scene, min, max))
         {
@@ -537,7 +537,7 @@ void box_bake_observers(
         ecs_id(BackFaceMode), ecs_id(TextureWrap), ecs_id(TextureTransform), ecs_id(ShapeMesh)
     };
     ecs_entity_t trees[2] = { ecs_id(Tint), ecs_id(Opacity) };
-    ecs_entity_t flags[3] = { DynamicTransform, ManualTransform, NoBake };
+    ecs_entity_t flags[2] = { ManualTransform, NoBake };
     int32_t i;
     for (i = 0; i < 8; i ++) {
         ecs_observer(world, {
@@ -557,7 +557,8 @@ void box_bake_observers(
         });
     }
 
-    for (i = 0; i < 3; i ++) {
+    box_transform_on_dynamic(world, BakeOnChange, b, NULL);
+    for (i = 0; i < 2; i ++) {
         ecs_observer(world, {
             .query.terms = {{ .id = flags[i] }},
             .events = { EcsOnAdd, EcsOnRemove },

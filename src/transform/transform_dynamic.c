@@ -141,19 +141,13 @@ static void TransformDynamic_SpreadToParented(
     }
 }
 
-/** Stop spreading DynamicTransform to the children of entities that are no longer dynamic.
- *
- * Children that own the tag (added by the application, or by a component such as Velocity
- * that implies DynamicTransform) stay dynamic.
- *
- * @param it The observer iterator
- */
-static void TransformDynamic_Unspread(
-    ecs_iter_t *it)
+void transformDynamicUnspread(
+    ecs_iter_t *it,
+    bool deleting)
 {
     ecs_world_t *world = it->stage;
     ecs_id_t spread = ecs_pair(EcsIsA, DynamicTransformSpread);
-    bool keep = transformDeleting(it) || box_transform_dynamic(it->world, it->other_table);
+    bool keep = deleting || box_transform_dynamic(it->world, it->other_table);
     int count = keep ? 0 : it->count;
 
     for (int i = 0; i < count; i ++) {
@@ -243,12 +237,4 @@ void TransformDynamicImport(
         .callback = TransformDynamic_SpreadToParented
     });
 
-    ecs_observer(world, {
-        .entity = ecs_entity(world, { .name = "TransformDynamic_Unspread" }),
-        .query.terms = {
-            { .id = DynamicTransform }
-        },
-        .events = { EcsOnRemove },
-        .callback = TransformDynamic_Unspread
-    });
 }

@@ -4,6 +4,7 @@
  */
 
 #include <box.h>
+#include "transform_version.h"
 
 /** Compute the world transforms of one depth level of the ChildOf hierarchy.
  *
@@ -65,6 +66,18 @@ const WorldTransform* transformGetParentWorldTransform(
  */
 bool transformDeleting(
     const ecs_iter_t *it);
+
+/** Stop spreading DynamicTransform to the children of entities that are no longer dynamic.
+ *
+ * Children that own the tag (added by the application, or by a component such as Velocity
+ * that implies DynamicTransform) stay dynamic.
+ *
+ * @param it The iterator of an OnRemove DynamicTransform observer
+ * @param deleting Whether the entities are being deleted
+ */
+void transformDynamicUnspread(
+    ecs_iter_t *it,
+    bool deleting);
 
 /** Register the systems and observers of dynamic transforms.
  *
