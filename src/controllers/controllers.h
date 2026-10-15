@@ -103,6 +103,9 @@ extern ECS_COMPONENT_DECLARE(FirstPersonActionMap);
 /** Longest frame a controller simulates: a longer frame, such as a stall, counts as this long */
 #define BOX_CONTROLLER_DT_MAX (0.5f)
 
+/** Upward component of the normal of an edge the drop of a step rests on */
+#define BOX_CONTROLLER_SUPPORT (0.3f)
+
 /** Shape a collider has in its own frame */
 typedef enum box_collider_kind_t {
     BoxColliderBox,      /**< Box with the half extents, also the fallback of other meshes */
@@ -179,9 +182,9 @@ float box_collider_separation(
 
 /** Find how far a capsule reaches into a collider.
  *
- * The surface of the contact is the flat face it lies on, else (an edge, a corner or a round
- * surface) the normal where a ray straight down from the lower cap enters the shape: up when
- * the shape is not below the cap, the normal of the contact when the cap is inside it.
+ * The surface of a contact that faces up by BOX_CONTROLLER_SUPPORT or more is the flat face it
+ * lies on, else (an edge, a corner, a round surface) where a ray down from the lower cap enters
+ * the shape: up when the shape is not below the cap. Other contacts copy their normal.
  *
  * @param c The collider
  * @param a Center of the lower cap of the capsule

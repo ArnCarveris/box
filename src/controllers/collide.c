@@ -525,7 +525,9 @@ bool box_collider_push(
     box_collide_world_dir(c, n, out->normal);
     out->depth = -separation;
     glm_vec3_copy((vec3){ 0, 1, 0 }, out->surface);
-    if (box_collide_face(c, q, f)) {
+    if (out->normal[1] < BOX_CONTROLLER_SUPPORT) {
+        glm_vec3_copy(out->normal, out->surface);
+    } else if (box_collide_face(c, q, f)) {
         box_collide_world_dir(c, f, out->surface);
     } else if (box_collider_ray(c, a, down, FLT_MAX, &t, out->surface) && t <= 0) {
         glm_vec3_copy(out->normal, out->surface);

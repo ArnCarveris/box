@@ -29,9 +29,6 @@
 /** Upward component of the normal of a surface the body can stand on */
 #define BOX_MOVE_WALKABLE (0.7f)
 
-/** Upward component of the normal of an edge the drop of a step rests on */
-#define BOX_MOVE_SUPPORT (0.3f)
-
 /** Margin around the swept capsule within which shapes are read */
 #define BOX_MOVE_MARGIN (0.05f)
 
@@ -176,7 +173,7 @@ static bool box_move_ground(
 {
     bool result = contact->normal[1] >= BOX_MOVE_WALKABLE;
     if (m->support) {
-        result = contact->normal[1] >= BOX_MOVE_SUPPORT &&
+        result = contact->normal[1] >= BOX_CONTROLLER_SUPPORT &&
             contact->surface[1] >= BOX_MOVE_WALKABLE;
     }
 
@@ -293,7 +290,7 @@ static void box_move_push(
             crease = steep[1] >= BOX_MOVE_WALKABLE;
         }
 
-        if (n[1] >= (m->support ? BOX_MOVE_SUPPORT : BOX_MOVE_WALKABLE)) {
+        if (n[1] >= (m->support ? BOX_CONTROLLER_SUPPORT : BOX_MOVE_WALKABLE)) {
             pos[1] += depth / n[1];
         } else if (crease && n[1] > 0) {
             pos[1] += depth / n[1];
