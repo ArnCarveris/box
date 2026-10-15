@@ -84,6 +84,41 @@ bool box_transform_dynamic(
     const ecs_world_t *world,
     const ecs_table_t *table);
 
+/** Receives the entities whose WorldTransform a TransformStatic run changed, once per run
+ * that changed any: every computed root and every descendant whose WorldTransform it wrote.
+ *
+ * An entity can be passed more than once. A root is passed also when it lost its
+ * WorldTransform with its Position; ManualTransform descendants keep the transform the
+ * application wrote and are not passed.
+ *
+ * @param world The world
+ * @param entities The entities
+ * @param count Number of entities
+ * @param ctx The context passed to box_transform_on_moved
+ */
+typedef void (*box_transform_moved_t)(
+    ecs_world_t *world,
+    const ecs_entity_t *entities,
+    int32_t count,
+    void *ctx);
+
+/** Call a function with the entities whose static transform TransformStatic changed.
+ *
+ * Static transforms are computed in EcsPreStore, so a change made later in a frame reaches
+ * the function in the next frame, when its transform is known. Dynamic entities are never
+ * passed.
+ *
+ * @param world The world
+ * @param callback The function
+ * @param ctx Context passed to the function
+ * @param ctx_free Frees the context when the world is deleted, NULL for none
+ */
+void box_transform_on_moved(
+    ecs_world_t *world,
+    box_transform_moved_t callback,
+    void *ctx,
+    ecs_ctx_free_t ctx_free);
+
 /** Register the box.transform module.
  *
  * @param world The world

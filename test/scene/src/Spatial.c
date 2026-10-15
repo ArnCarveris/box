@@ -44,6 +44,21 @@ static bool reject_entity(
     return e != *(ecs_entity_t*)ctx;
 }
 
+/** Move the ManualTransform entity in the context to x = 5 the first time the system runs.
+ *
+ * @param it The iterator of the system
+ */
+static void LateManualMove(
+    ecs_iter_t *it)
+{
+    ecs_entity_t *e = it->ctx;
+    if (*e) {
+        ecs_set(it->world, *e, WorldTransform, {{
+            {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {5, 0, 0, 1}}});
+        *e = 0;
+    }
+}
+
 /** Create a box at x = 5 the first time the system runs.
  *
  * @param it The iterator of the system, its context receives the box
@@ -1457,6 +1472,44 @@ void Spatial_parent_moved_in_pre_store(void) {
     ecs_system(world, {
         .phase = EcsPreStore,
         .callback = LateMove,
+        .ctx = &moving,
+        .immediate = true
+    });
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+    test_uint(moving, 0);
+
+    box_spatial_hit_t hit = {0};
+    box_spatial_ray_t ray = { .origin = {5, 2, -10}, .dir = {0, 0, 1} };
+    test_assert(box_spatial_ray(world, &ray, &hit));
+    test_uint(hit.entity, child);
+    test_flt(hit.distance, 9.5f);
+
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_sphere(world, 0, (vec3){0, 2, 0}, 0.1f, &out), 0);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
+
+void Spatial_manual_parent_moved_in_pre_store(void) {
+    // core_fixes/transform_changed
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t parent = ecs_new(world);
+    ecs_add(world, parent, ManualTransform);
+    ecs_set(world, parent, WorldTransform, {{
+        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}}});
+    ecs_entity_t child = ecs_new_w_pair(world, EcsChildOf, parent);
+    ecs_set(world, child, Position, {0, 2, 0});
+    ecs_set(world, child, Box, {1, 1, 1});
+    ecs_progress(world, 0);
+    ecs_entity_t moving = parent;
+    ecs_system(world, {
+        .phase = EcsPreStore,
+        .callback = LateManualMove,
         .ctx = &moving,
         .immediate = true
     });

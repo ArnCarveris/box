@@ -884,6 +884,21 @@
                     "childof_child_tagged_after_progress_stays_dynamic",
                     "script_tagged_child_stays_dynamic"
                 ]
+            },
+            {
+                "id": "Moved",
+                "testcases": [
+                    "position_set_passes_subtree",
+                    "parent_component_passes_subtree",
+                    "idle_frame_passes_nothing",
+                    "dynamic_entity_not_passed",
+                    "reparent_passes_subtree",
+                    "manual_write_before_pre_store",
+                    "manual_write_after_pre_store",
+                    "dynamic_removed_passes_subtree",
+                    "position_removed_passes_entity",
+                    "ctx_free_on_fini"
+                ]
             }
         ]
     }
