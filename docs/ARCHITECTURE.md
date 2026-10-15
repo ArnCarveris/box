@@ -378,11 +378,11 @@ child adds its fit size to the fit of its parent and takes a weighted share of t
 along the main axis, or stretches to the content box across it. With `Sizing.content_min` (on in
 a new `LayoutItem`, off in a C literal) it never gets less than its content minimum, the
 automatic minimum of CSS flex items; the console opts out so its panel keeps its fraction of the
-surface. The tree is solved one axis at a time in Clay's order: widths are measured and
-resolved, a `Text` with a Grow or Fixed width wraps to its resolved width (`box_text_wrap_to`,
-kept in the private `TextGlyphs`, so no user component is written), then heights are measured
-and resolved. A text fits its lines at `Text.width` and its content minimum is its widest word.
-A text with a fit width keeps its lines. Observers
+surface. The tree is solved in Clay's order: widths are measured and resolved, every
+`Text` takes its resolved width through the hooks box.text registers (`layout_text.h`), then
+heights are measured and resolved. Fitting elements narrow to their parent down to their
+content minimum (the widest word of a wrapping text, else the fit size), which propagates to
+every ancestor. `Text.wrap = TextWrapNewlines` opts a text out; the console does. Observers
 mark elements; `LayoutUpdate` (`EcsPostUpdate`) relays out the trees of marked elements and writes
 `Position` x/y, `LayoutBounds` and `Rect` only where they changed. A reorder through
 `ecs_set_child_order` needs `ecs_modified(parent, Layout)`.
