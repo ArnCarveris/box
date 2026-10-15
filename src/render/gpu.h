@@ -239,6 +239,16 @@ typedef struct box_gpu_cull_readback_t {
     ecs_vec_t records;              /**< box_gpu_cull_record_t of the views */
 } box_gpu_cull_readback_t;
 
+/** The cluster buffer of a view slot and the read back of the entries its pass allocated */
+typedef struct box_gpu_cluster_t {
+    WGPUBuffer buffer;              /**< Allocated entries, offset and count per cluster, list */
+    uint64_t entries;               /**< Entries the light index list holds */
+    WGPUBuffer readback;            /**< Mappable copy of the allocated entries */
+    int32_t state;                  /**< Free, copied, mapping, mapped or failed */
+    int64_t frame;                  /**< Frame of the packet the copy was recorded in */
+    bool cut;                       /**< The last read back pass listed fewer lights than reach */
+} box_gpu_cluster_t;
+
 /** Copies of the cull counters in flight at most */
 #define BOX_GPU_CULL_READBACKS (4)
 
@@ -373,7 +383,7 @@ typedef struct box_gpu_t {
     WGPUPipelineLayout cluster_pipeline_layout; /**< Pipeline layout of the cluster pass */
     WGPUComputePipeline cluster;    /**< Cluster pipeline, NULL until the shader exists */
     int32_t cluster_revision;       /**< Revision of the shader the pipeline was made with */
-    ecs_vec_t clusters;             /**< WGPUBuffer, the cluster buffer of each view slot */
+    ecs_vec_t clusters;             /**< box_gpu_cluster_t of each view slot */
     WGPUBuffer no_lights;           /**< Light buffer of a view whose light buffer is missing */
     ecs_vec_t view_data;            /**< Bytes of the view uniforms of a target */
     WGPUBindGroupLayout shadow_layout; /**< Bind group layout of the shadow pass */

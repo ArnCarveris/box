@@ -3,8 +3,8 @@
  * @brief Light uniforms, the cluster pass and the light bindings of the forward pass.
  *
  * Every view with point or spot lights runs etc/shaders/cluster.wgsl before it draws: it lists,
- * per cluster of the view frustum, the lights that reach it in one shared light index list, so
- * a fragment only shades the lights of its own cluster.
+ * per cluster of the view frustum, the lights that reach it in one shared light index list that
+ * starts from a budget and grows to what the pass allocated, read back a few frames later.
  */
 
 #include "gpu.h"
@@ -35,20 +35,74 @@
 /** Point and spot lights the cluster buffer of box_gpu_light_clusters_new lists in every cluster */
 #define BOX_GPU_CLUSTER_SHARED_LIGHTS (128)
 
-/** The cluster pass warned that a light index list cannot hold every light of every cluster */
-static bool box_gpu_cluster_warned;
+/** Point and spot lights per cluster the light index list of a view starts from at most */
+#define BOX_GPU_CLUSTER_BUDGET_LIGHTS (32)
 
-/** Get the bytes of a cluster buffer whose light index list holds every light in every cluster.
+/** Entries the light index list holds at most within BOX_GPU_CLUSTER_BYTES_MAX */
+#define BOX_GPU_CLUSTER_ENTRIES_MAX (BOX_GPU_CLUSTER_BYTES_MAX / sizeof(uint32_t) - \
+    BOX_GPU_CLUSTER_HEADER)
+
+/** State of the read back of the entries a cluster pass allocated */
+typedef enum box_gpu_cluster_readback_t {
+    BOX_GPU_CLUSTER_FREE,       /**< No copy in flight */
+    BOX_GPU_CLUSTER_COPIED,     /**< The copy is recorded, mapped once a later frame starts */
+    BOX_GPU_CLUSTER_MAPPING,    /**< The copy is being mapped */
+    BOX_GPU_CLUSTER_MAPPED,     /**< The copy can be read */
+    BOX_GPU_CLUSTER_FAILED      /**< The map failed */
+} box_gpu_cluster_readback_t;
+
+/** Get the bytes of a cluster buffer.
  *
- * @param lights Point and spot lights
- * @return The bytes, at most BOX_GPU_CLUSTER_BYTES_MAX
+ * @param entries Entries of its light index list
+ * @return The bytes
  */
 static uint64_t box_gpu_cluster_bytes(
+    uint64_t entries)
+{
+    return (BOX_GPU_CLUSTER_HEADER + entries) * sizeof(uint32_t);
+}
+
+/** Get the entries a light index list holds when every light reaches every cluster.
+ *
+ * @param lights Point and spot lights
+ * @return The entries, at most BOX_GPU_CLUSTER_ENTRIES_MAX
+ */
+static uint64_t box_gpu_cluster_limit(
     uint64_t lights)
 {
-    uint64_t result = (BOX_GPU_CLUSTER_HEADER + BOX_GPU_CLUSTER_COUNT * lights) * sizeof(uint32_t);
+    uint64_t result = BOX_GPU_CLUSTER_COUNT * lights;
 
-    return result < BOX_GPU_CLUSTER_BYTES_MAX ? result : BOX_GPU_CLUSTER_BYTES_MAX;
+    return result < BOX_GPU_CLUSTER_ENTRIES_MAX ? result : BOX_GPU_CLUSTER_ENTRIES_MAX;
+}
+
+/** Get the entries a light index list starts from.
+ *
+ * @param lights Point and spot lights
+ * @return BOX_GPU_CLUSTER_BUDGET_LIGHTS or fewer lights in every cluster
+ */
+static uint64_t box_gpu_cluster_budget(
+    uint64_t lights)
+{
+    return box_gpu_cluster_limit(
+        lights < BOX_GPU_CLUSTER_BUDGET_LIGHTS ? lights : BOX_GPU_CLUSTER_BUDGET_LIGHTS);
+}
+
+/** Round entries up to a power of two, within a limit.
+ *
+ * @param entries Entries
+ * @param limit Largest result
+ * @return The entries rounded up, at most limit
+ */
+static uint64_t box_gpu_cluster_round(
+    uint64_t entries,
+    uint64_t limit)
+{
+    uint64_t result = 1;
+    while (result < entries) {
+        result <<= 1;
+    }
+
+    return result < limit ? result : limit;
 }
 
 /** Create a cluster buffer.
@@ -62,7 +116,7 @@ static WGPUBuffer box_gpu_cluster_buffer_new(
     uint64_t bytes)
 {
     WGPUBufferDescriptor desc = {
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc,
         .size = bytes
     };
 
@@ -105,7 +159,7 @@ void box_gpu_light_init(
             .bindGroupLayouts = &gpu->cluster_layout
         });
     gpu->no_lights = wgpuDeviceCreateBuffer(gpu->device, &empty);
-    ecs_vec_init_t(NULL, &gpu->clusters, WGPUBuffer, 0);
+    ecs_vec_init_t(NULL, &gpu->clusters, box_gpu_cluster_t, 0);
 }
 
 void box_gpu_light_fini(
@@ -113,10 +167,17 @@ void box_gpu_light_fini(
 {
     int32_t i;
     for (i = 0; i < ecs_vec_count(&gpu->clusters); i ++) {
-        wgpuBufferRelease(*ecs_vec_get_t(&gpu->clusters, WGPUBuffer, i));
+        box_gpu_cluster_t *c = ecs_vec_get_t(&gpu->clusters, box_gpu_cluster_t, i);
+        if (c->buffer) {
+            wgpuBufferRelease(c->buffer);
+        }
+
+        if (c->readback) {
+            wgpuBufferRelease(c->readback);
+        }
     }
 
-    ecs_vec_fini_t(NULL, &gpu->clusters, WGPUBuffer);
+    ecs_vec_fini_t(NULL, &gpu->clusters, box_gpu_cluster_t);
     if (gpu->cluster) {
         wgpuComputePipelineRelease(gpu->cluster);
         gpu->cluster = NULL;
@@ -199,10 +260,146 @@ static uint64_t box_gpu_cluster_lights(
     return count > v->lights.directional ? count - v->lights.directional : 0;
 }
 
-/** Get the cluster buffer of a view slot, sized for the lights of the view.
+/** Get the cluster state of a view slot, created on first use.
  *
- * The light index list holds the next power of two of the lights in every cluster, so lights
- * that come and go do not recreate it each frame; it shrinks when it is four times too large.
+ * @param gpu The backend
+ * @param slot Slot of the view in the view buffer
+ * @return The state
+ */
+static box_gpu_cluster_t* box_gpu_cluster_slot(
+    box_gpu_t *gpu,
+    int32_t slot)
+{
+    while (ecs_vec_count(&gpu->clusters) <= slot) {
+        *ecs_vec_append_t(NULL, &gpu->clusters, box_gpu_cluster_t) = (box_gpu_cluster_t){0};
+    }
+
+    return ecs_vec_get_t(&gpu->clusters, box_gpu_cluster_t, slot);
+}
+
+/** Replace the cluster buffer of a view slot with one of another size.
+ *
+ * @param gpu The backend
+ * @param c The cluster state of the slot
+ * @param entries Entries of the new light index list
+ */
+static void box_gpu_cluster_resize(
+    box_gpu_t *gpu,
+    box_gpu_cluster_t *c,
+    uint64_t entries)
+{
+    if (c->buffer) {
+        wgpuBufferRelease(c->buffer);
+    }
+
+    c->buffer = box_gpu_cluster_buffer_new(gpu, box_gpu_cluster_bytes(entries));
+    c->entries = entries;
+}
+
+/** Receive the map of the read back of a cluster pass.
+ *
+ * @param status Whether the map succeeded
+ * @param message Unused
+ * @param userdata1 The backend
+ * @param userdata2 Slot of the view, as an integer
+ */
+static void box_gpu_cluster_on_map(
+    WGPUMapAsyncStatus status,
+    WGPUStringView message,
+    void *userdata1,
+    void *userdata2)
+{
+    box_gpu_t *gpu = userdata1;
+    box_gpu_cluster_t *c = ecs_vec_get_t(
+        &gpu->clusters, box_gpu_cluster_t, (int32_t)(intptr_t)userdata2);
+    (void)message;
+    c->state = status == WGPUMapAsyncStatus_Success
+        ? BOX_GPU_CLUSTER_MAPPED
+        : BOX_GPU_CLUSTER_FAILED;
+}
+
+/** Resize the light index list of a slot to the entries its last read back pass allocated.
+ *
+ * A list that was too small grows to the next power of two and reports the cut, since the
+ * clusters past its end missed lights until then; a list four times too large shrinks.
+ *
+ * @param gpu The backend
+ * @param c The cluster state of the slot
+ * @param allocated Entries the pass allocated
+ * @param lights Point and spot lights of the view
+ */
+static void box_gpu_cluster_fit(
+    box_gpu_t *gpu,
+    box_gpu_cluster_t *c,
+    uint64_t allocated,
+    uint64_t lights)
+{
+    uint64_t limit = box_gpu_cluster_limit(lights), budget = box_gpu_cluster_budget(lights);
+    bool cut = allocated > c->entries;
+    if (cut) {
+        uint64_t grown = box_gpu_cluster_round(allocated, limit);
+        if (!c->cut) {
+            ecs_warn("the clusters of a view needed %u light index entries but held %u, so "
+                "some clusters missed lights; the list %s %u entries", (uint32_t)allocated,
+                (uint32_t)c->entries, grown > c->entries ? "grows to" : "stays at its largest,",
+                (uint32_t)(grown > c->entries ? grown : c->entries));
+        }
+
+        if (grown > c->entries) {
+            box_gpu_cluster_resize(gpu, c, grown);
+        }
+    } else if (allocated * 4 < c->entries) {
+        uint64_t shrunk = box_gpu_cluster_round(allocated * 2, limit);
+        shrunk = shrunk > budget ? shrunk : budget;
+        if (shrunk < c->entries) {
+            box_gpu_cluster_resize(gpu, c, shrunk);
+        }
+    }
+
+    c->cut = cut;
+}
+
+/** Advance the read back of the entries the cluster pass of a slot allocated.
+ *
+ * @param gpu The backend
+ * @param c The cluster state of the slot
+ * @param slot Slot of the view
+ * @param lights Point and spot lights of the view
+ */
+static void box_gpu_cluster_poll(
+    box_gpu_t *gpu,
+    box_gpu_cluster_t *c,
+    int32_t slot,
+    uint64_t lights)
+{
+#ifndef __EMSCRIPTEN__
+    if (c->state == BOX_GPU_CLUSTER_MAPPING) {
+        wgpuDevicePoll(gpu->device, false, NULL);
+    }
+#endif
+
+    if (c->state == BOX_GPU_CLUSTER_MAPPED) {
+        const uint32_t *allocated = wgpuBufferGetConstMappedRange(
+            c->readback, 0, sizeof(uint32_t));
+        uint64_t value = allocated ? *allocated : 0;
+        wgpuBufferUnmap(c->readback);
+        c->state = BOX_GPU_CLUSTER_FREE;
+        box_gpu_cluster_fit(gpu, c, value, lights);
+    } else if (c->state == BOX_GPU_CLUSTER_FAILED) {
+        c->state = BOX_GPU_CLUSTER_FREE;
+    } else if (c->state == BOX_GPU_CLUSTER_COPIED && gpu->cull.frame > c->frame) {
+        c->state = BOX_GPU_CLUSTER_MAPPING;
+        wgpuBufferMapAsync(c->readback, WGPUMapMode_Read, 0, sizeof(uint32_t),
+            (WGPUBufferMapCallbackInfo){
+                .mode = WGPUCallbackMode_AllowSpontaneous,
+                .callback = box_gpu_cluster_on_map,
+                .userdata1 = gpu,
+                .userdata2 = (void*)(intptr_t)slot
+            });
+    }
+}
+
+/** Get the cluster buffer of a view slot, holding at least the budget of the view's lights.
  *
  * @param gpu The backend
  * @param slot Slot of the view in the view buffer
@@ -214,26 +411,16 @@ static WGPUBuffer box_gpu_cluster_buffer(
     int32_t slot,
     const box_render_view_t *v)
 {
-    uint64_t lights = box_gpu_cluster_lights(gpu, v), rounded = 1;
-    while (rounded < lights) {
-        rounded <<= 1;
+    box_gpu_cluster_t *c = box_gpu_cluster_slot(gpu, slot);
+    uint64_t lights = box_gpu_cluster_lights(gpu, v);
+    uint64_t budget = box_gpu_cluster_budget(lights), limit = box_gpu_cluster_limit(lights);
+    if (!c->buffer || c->entries < budget) {
+        box_gpu_cluster_resize(gpu, c, budget);
+    } else if (c->entries > limit) {
+        box_gpu_cluster_resize(gpu, c, limit);
     }
 
-    uint64_t needed = box_gpu_cluster_bytes(lights);
-    uint64_t target = box_gpu_cluster_bytes(rounded);
-    while (ecs_vec_count(&gpu->clusters) <= slot) {
-        *ecs_vec_append_t(NULL, &gpu->clusters, WGPUBuffer) =
-            box_gpu_cluster_buffer_new(gpu, target);
-    }
-
-    WGPUBuffer *result = ecs_vec_get_t(&gpu->clusters, WGPUBuffer, slot);
-    uint64_t size = wgpuBufferGetSize(*result);
-    if (size < needed || size > 4 * target) {
-        wgpuBufferRelease(*result);
-        *result = box_gpu_cluster_buffer_new(gpu, target);
-    }
-
-    return *result;
+    return c->buffer;
 }
 
 /** Get the cluster pipeline, created again when the cluster shader was recompiled.
@@ -309,15 +496,6 @@ void box_gpu_light_cluster_with(
     }
 
     uint64_t size = wgpuBufferGetSize(clusters);
-    uint64_t lights = box_gpu_cluster_lights(gpu, v);
-    if (size < box_gpu_cluster_bytes(lights) && !box_gpu_cluster_warned) {
-        ecs_warn("the light index list of a view holds %u entries, %u lights in every cluster "
-            "need more: a cluster may not list every light that reaches it",
-            (uint32_t)(size / sizeof(uint32_t) - BOX_GPU_CLUSTER_HEADER),
-            (uint32_t)lights);
-        box_gpu_cluster_warned = true;
-    }
-
     WGPUBindGroupEntry entries[3] = {
         { .binding = 0, .buffer = uniforms, .size = sizeof(box_gpu_view_uniforms_t) },
         { .binding = 1, .buffer = b->buffer, .size = b->size },
@@ -350,10 +528,32 @@ void box_gpu_light_cluster(
     const box_render_view_t *v,
     int32_t slot)
 {
-    if (v->lights.enabled && v->lights.count > v->lights.directional) {
-        box_gpu_light_cluster_with(gpu, encoder, v, gpu->view_buffer,
-            (uint32_t)(slot * BOX_GPU_VIEW_STRIDE), box_gpu_cluster_buffer(gpu, slot, v));
+    box_gpu_cluster_t *c = NULL;
+    if (!v->lights.enabled || v->lights.count <= v->lights.directional) {
+        goto done;
     }
+
+    c = box_gpu_cluster_slot(gpu, slot);
+    box_gpu_cluster_poll(gpu, c, slot, box_gpu_cluster_lights(gpu, v));
+    box_gpu_light_cluster_with(gpu, encoder, v, gpu->view_buffer,
+        (uint32_t)(slot * BOX_GPU_VIEW_STRIDE), box_gpu_cluster_buffer(gpu, slot, v));
+    if (c->state != BOX_GPU_CLUSTER_FREE) {
+        goto done;
+    }
+
+    if (!c->readback) {
+        c->readback = wgpuDeviceCreateBuffer(gpu->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+            .size = sizeof(uint32_t)
+        });
+    }
+
+    wgpuCommandEncoderCopyBufferToBuffer(encoder, c->buffer, 0, c->readback, 0,
+        sizeof(uint32_t));
+    c->state = BOX_GPU_CLUSTER_COPIED;
+    c->frame = gpu->cull.frame;
+done:
+    return;
 }
 
 WGPUBindGroup box_gpu_light_group_with(
@@ -393,7 +593,8 @@ WGPUBindGroup box_gpu_light_group(
 WGPUBuffer box_gpu_light_clusters_new(
     box_gpu_t *gpu)
 {
-    return box_gpu_cluster_buffer_new(gpu, box_gpu_cluster_bytes(BOX_GPU_CLUSTER_SHARED_LIGHTS));
+    return box_gpu_cluster_buffer_new(gpu,
+        box_gpu_cluster_bytes(box_gpu_cluster_limit(BOX_GPU_CLUSTER_SHARED_LIGHTS)));
 }
 
 #endif

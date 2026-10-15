@@ -288,9 +288,12 @@ summed per scene. A scene without light entities gets a default sun and sky, so 
 light has intensity 0 is dark. `View.lighting.enabled` false draws base color and emission only.
 `cluster.wgsl` splits the view frustum into 16x9x24 clusters and lists the point and spot lights
 that reach each one (spot lights tested against their cone) in one light index list the
-clusters share, sized for every light of the view in every cluster up to the 128 MiB storage
-binding limit, past which a warning is logged once; `mesh.wgsl` shades every directional light
-plus the cluster's lights.
+clusters share. The list of a view starts at 32 lights per cluster (fewer with fewer lights);
+the entries a pass allocated are read back a few frames later and the list grows to the next
+power of two when they did not fit (up to every light in every cluster and the 128 MiB storage
+binding limit) or shrinks when it is four times too large. Until it grew, clusters past its end
+miss lights, chosen by the order of the atomic allocation, and a warning names the shortfall.
+`mesh.wgsl` shades every directional light plus the cluster's lights.
 
 **Bake settings.** `LightBake` on a `Scene` root (or a singleton for the default scene) holds
 the baked lighting settings: `probe_spacing` 2, `bounces` 2, `capture_size` 16, `budget_ms` 2,
