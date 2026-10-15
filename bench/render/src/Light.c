@@ -2,8 +2,9 @@
  * @file Light.c
  * @brief Benchmarks for the light extract: collecting the lights of the scenes every frame.
  *
- * A case runs frames against a backend that drops the packets, so it measures the main thread:
- * gathering 1000 point lights into the light buffer of their scene and uploading it on change.
+ * Most cases run frames against a backend that drops the packets, so they measure the main
+ * thread: gathering 1000 point lights into the light buffer of their scene and uploading it on
+ * change. The cluster case renders the lights on the GPU and waits for every frame.
  */
 
 #include <box.h>
@@ -130,6 +131,67 @@ static void bench_light_scenes(
     ecs_fini(world);
 }
 
+/** Render frames of a floor lit by point and spot lights, through the cluster pass.
+ *
+ * @param b The benchmark
+ */
+static void bench_light_clustered(
+    bench_t *b)
+{
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    app->unpaced = true;
+    ecs_singleton_modified(world, App);
+    ecs_singleton_set(world, RenderSettings, {.in_flight = 2, .main_thread = true});
+    ecs_entity_t camera = ecs_new(world);
+    ecs_set(world, camera, Position, {40, 20, 70});
+    ecs_set(world, camera, Rotation, {-0.4f, 0, 0});
+    ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
+    ecs_entity_t view = ecs_new(world);
+    ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+        .color = {0, 0, 0, 255}}, .lighting.enabled = true,
+        .culling = {.enabled = true, .occlusion = true, .min_dimension_px = 1}});
+    ecs_entity_t floor = ecs_new(world);
+    ecs_set(world, floor, Position, {40, -0.1f, 25});
+    ecs_set(world, floor, Box, {100, 0.2f, 70});
+    ecs_set(world, floor, Rgb, {200, 200, 200});
+    int32_t i;
+    for (i = 0; i < BENCH_LIGHTS; i ++) {
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position,
+            {(float)(i % BENCH_LIGHTS_ROW) * 2, 1, (float)(i / BENCH_LIGHTS_ROW) * 2});
+        if (i % 10) {
+            ecs_set(world, e, PointLight, {.intensity = 2, .range = 3});
+        } else {
+            ecs_set(world, e, Rotation, {-1.2f, 0, 0});
+            ecs_set(world, e, SpotLight, {.intensity = 4, .range = 8, .inner_angle = 20,
+                .outer_angle = 30});
+        }
+
+        ecs_set(world, e, Rgb, {255, 200, 100});
+    }
+
+    ecs_entity_t surface = ecs_new(world);
+    ecs_set(world, surface, Surface, {.width = 1280, .height = 720, .resolution_scale = 1});
+    uint32_t word = 0;
+    for (i = 0; i < 3; i ++) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+    }
+
+    bench_set_items(b, BENCH_LIGHTS);
+    while (bench_iter(b)) {
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        box_render_gpu_read_buffer(world, BOX_RENDER_BUFFER_FIRST, 0, sizeof(word), &word);
+        bench_keep(word);
+    }
+
+    ecs_fini(world);
+}
+
 void Light_static_1000(
     bench_t *b)
 {
@@ -149,4 +211,11 @@ void Light_scenes_1000(
 {
     // scenes/isolation
     bench_light_scenes(b);
+}
+
+void Light_clustered_1000(
+    bench_t *b)
+{
+    // lighting_fixes/cluster_overflow
+    bench_light_clustered(b);
 }
