@@ -62,8 +62,9 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
    python3 project/pm.py deliver sky/atmosphere --tests render:Atmosphere,core --bench render
    ```
 
-   It writes one report per project into the task's `deliverable/`, merges them
-   into `tests.json`, copies the benchmark report to `bench.json` and exits non
+   It first removes every `tests*.json` of an earlier delivery, writes one report per
+   project into the task's `deliverable/`, merges them into `tests.json` (which lists
+   under `broken` every run that crashed without a report), copies the benchmark report to `bench.json` and exits non
    zero when anything failed. Add a `deliverable/README.md` of under 20 lines and
    the screenshots of the task's own scene.
 
@@ -88,7 +89,7 @@ part that does not fit in a command. Read `CLAUDE.md` for the house rules and
 
 ## Passing tests
 
-`pm done` (task or epic) reads every top level `deliverable/tests*.json` (`tests.json`, `tests_<project>.json`, ...) and refuses when one reports a failed case, an empty case (`empty` above 0, or a case with status `empty`), an empty run (no case passed or failed, or an empty `tests` list) or is not a test report at all. A missing `tests.json` stays a deliverable gap that `--force` passes; a failing report is not, and `--force` never overrides it.
+`pm done` (task or epic) reads every top level `deliverable/tests*.json` (`tests.json`, `tests_<project>.json`, ...) and refuses when one reports a failed case (`fail` above 0, or a case whose status is not `pass`, `empty` or `quarantined`, such as `timeout` or `error`), an empty case (`empty` above 0, or a case with status `empty`), an empty run (no case passed or failed, or an empty `tests` list), a `broken` run that crashed without a report, or is not a test report at all. It also refuses when the latest `delivered` entry in the `progress.json` history has `ok: false` and no `tests*.json` was written after it, so a delivery whose run crashed fails even when its report is gone, and it refuses an epic whose deliverable lacks a `tests_<project>.json` for a project under `test/` with a `project.json`, the report `tools/epic.py` writes for each. `--force` never overrides any of these; it only passes deliverable gaps such as a missing `bench.json`.
 
 The one way past it is `--waive-tests "<reason>"`, which closes the item and records `tests_waived` (the reason, the time and the failures) in `progress.json`, the way `--skip-review` records `review_skipped`; it is not recorded when every report passes, and reopening the item drops it. `pm check` reports every completed task or epic with a failing report as a problem and one closed with `--waive-tests` as a warning that names the reason; `pm status` and `pm review` print the reason too. A delivered task whose reports fail is in the stage **tests failing** until a passing `pm deliver`.
 
@@ -165,14 +166,14 @@ Every task has a stage, derived from its status and the artefacts `pm review` pa
 | --- | --- |
 | not started | pending |
 | implementing | started, no `deliverable/tests.json` yet |
-| tests failing | delivered, but a `tests*.json` reports a failure, an empty test or an empty run |
+| tests failing | delivered, but a `tests*.json` reports a failure, an empty test, an empty run or a broken run, or the latest `pm deliver` failed |
 | delivered | delivered, outside the review gate: `pm done` closes it |
 | delivered, awaiting review | delivered under the gate, no `review/review.md` yet |
 | review written, fix round 1 / fix round k | findings open, round k of `response.md` missing or incomplete |
 | verification round k | response round k written, `verification_r<k>.md` missing |
 | review artefacts malformed | a review artefact breaks the strict format or order (`pm review` lists the lines) |
 | ready to close | the loop has passed, waiting for the redelivery after the review or for `pm done` |
-| complete, complete (review skipped), discarded | closed |
+| complete, complete (review skipped), complete (failing tests waived), discarded | closed; a waived completion names the `--waive-tests` reason |
 
 An epic is **open**, **closing** once every task is complete or discarded but the epic is not done, or
 **complete**, and counts its tasks per stage. The board shows the stage as a chip on every task card
