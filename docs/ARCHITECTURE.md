@@ -204,10 +204,13 @@ collapses to a point.
 
 `RenderExtractDraws` (`src/render/draw.c`) resolves 3D shapes to a shared unit mesh (keyed by
 topology and quantized proportions) plus an instance scale in the private `ShapeMesh`; radius
-and size are never baked. A mesh is sent once per backend as a resource create. Shapes live in
-persistent batches keyed by scene, mesh, pipeline (shader, blend, back face, textures) and
-whether they are dynamic; removed slots are filled with the last one. An instance is 128 bytes
-(model matrix with scale, normal data, color, emissive, metallic/roughness, UV transform).
+and size are never baked. Prefabs resolve their shape too: `Mesh3` is `(OnInstantiate, Inherit)`,
+so instances share the prefab's vertex data and copy the prefab's `ShapeMesh` instead of hashing
+it again; the other shapes are copied into instances. A mesh is sent once per backend as a
+resource create. Shapes live in persistent batches keyed by scene, mesh, pipeline (shader,
+blend, back face, textures) and whether they are dynamic; removed slots are filled with the last
+one. An instance is 128 bytes (model matrix with scale, normal data, color, emissive,
+metallic/roughness, UV transform).
 
 Observers on shape, material, hierarchy and scene components and `box_transform_on_moved` queue
 changed entities, so an unchanged frame visits and uploads nothing (`RenderStatus.upload_bytes`).
