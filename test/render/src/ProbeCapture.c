@@ -120,7 +120,7 @@ void ProbeCapture_dynamic_shape_lit_not_captured(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.3f,
             .capture_size = 16, .budget_ms = 2, .bounces = 0});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
@@ -218,7 +218,7 @@ void ProbeCapture_no_bake_removes_contribution(void) {
 
         ecs_entity_t scene = ecs_new(world);
         ecs_add(world, scene, Scene);
-        ecs_set(world, scene, LightBake, {.probe_spacing = 1.4f, .bounds_padding = -0.4f,
+        ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = -0.3f,
             .capture_size = 16, .budget_ms = 2, .bounces = 0});
         ecs_set(world, scene, AmbientLight, {.intensity = 0});
         ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
