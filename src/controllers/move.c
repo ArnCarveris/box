@@ -33,15 +33,29 @@
 #define BOX_MOVE_MARGIN (0.05f)
 
 /** Steps a long move advances at the most; one that needs more stops short, never skips */
-#define BOX_MOVE_SWEEPS (256)
+#define BOX_MOVE_SWEEPS (1024)
+
+/** Longest step of a long move, in half radii: the region of shapes it reads at once */
+#define BOX_MOVE_CHUNK (16)
 
 /** Contact normals a move keeps to clip the velocity with */
 #define BOX_MOVE_NORMALS (8)
 
-/** State of one move: the shapes it can reach and what it touched */
+/** A shape a move can reach, with its bounds */
+typedef struct box_move_shape_t {
+    box_collider_t collider; /**< The shape */
+    vec3 min;                /**< Minimum corner of its world bounds */
+    vec3 max;                /**< Maximum corner of its world bounds */
+} box_move_shape_t;
+
+/** State of one move: the shapes around it and what it touched */
 typedef struct box_move_t {
+    ecs_world_t *world;                /**< The world */
     const box_controller_body_t *body; /**< The body */
-    ecs_vec_t colliders;               /**< box_collider_t the move can reach */
+    ecs_vec_t shapes;                  /**< box_move_shape_t of the region */
+    vec3 region_min;                   /**< Minimum corner of the box the shapes were read for */
+    vec3 region_max;                   /**< Maximum corner of the box the shapes were read for */
+    bool region;                       /**< The shapes were read */
     vec3 normals[BOX_MOVE_NORMALS];    /**< Normals of the contacts */
     int32_t normal_count;              /**< Normals kept */
     bool ground;                       /**< A contact was walkable */
@@ -79,34 +93,6 @@ static bool box_move_own(
     return result;
 }
 
-/** Read the colliders of the shapes overlapping a box from the index of the scene.
- *
- * @param world The world
- * @param m The move, its colliders are appended to
- * @param min Minimum corner of the box
- * @param max Maximum corner of the box
- */
-static void box_move_gather(
-    ecs_world_t *world,
-    box_move_t *m,
-    const vec3 min,
-    const vec3 max)
-{
-    ecs_vec_t found;
-    int32_t i, count;
-    ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
-    count = box_spatial_overlap_box(world, m->body->scene, min, max, &found);
-    for (i = 0; i < count; i ++) {
-        ecs_entity_t e = *ecs_vec_get_t(&found, ecs_entity_t, i);
-        box_collider_t c;
-        if (!box_move_own(world, m->body, e) && box_collider_resolve(world, e, &c)) {
-            *ecs_vec_append_t(NULL, &m->colliders, box_collider_t) = c;
-        }
-    }
-
-    ecs_vec_fini_t(NULL, &found, ecs_entity_t);
-}
-
 /** Get the segment of the capsule of a body at a position.
  *
  * @param body The body
@@ -127,7 +113,123 @@ static void box_move_segment(
     b[1] = pos[1] + (top > body->radius ? top : body->radius);
 }
 
-/** Start a move: read the shapes the capsule can reach on its way.
+/** Get the box the capsule of a body sweeps over a motion, grown by a pad.
+ *
+ * @param body The body
+ * @param pos The feet before the motion
+ * @param motion The motion
+ * @param pad Distance the box grows by beyond the capsule
+ * @param min Receives the minimum corner
+ * @param max Receives the maximum corner
+ */
+static void box_move_sweep(
+    const box_controller_body_t *body,
+    const vec3 pos,
+    const vec3 motion,
+    float pad,
+    vec3 min,
+    vec3 max)
+{
+    vec3 a, b;
+    int32_t i;
+    box_move_segment(body, pos, a, b);
+    for (i = 0; i < 3; i ++) {
+        min[i] = fminf(a[i], a[i] + motion[i]) - body->radius - pad;
+        max[i] = fmaxf(b[i], b[i] + motion[i]) + body->radius + pad;
+    }
+}
+
+/** Test whether two boxes overlap.
+ *
+ * @param amin Minimum corner of the first box
+ * @param amax Maximum corner of the first box
+ * @param bmin Minimum corner of the second box
+ * @param bmax Maximum corner of the second box
+ * @return true when they overlap
+ */
+static bool box_move_overlap(
+    const vec3 amin,
+    const vec3 amax,
+    const vec3 bmin,
+    const vec3 bmax)
+{
+    return amin[0] <= bmax[0] && amax[0] >= bmin[0] && amin[1] <= bmax[1] &&
+        amax[1] >= bmin[1] && amin[2] <= bmax[2] && amax[2] >= bmin[2];
+}
+
+/** Read the shapes overlapping a box from the index of the scene, replacing the ones read.
+ *
+ * @param m The move, its shapes and region are written
+ * @param min Minimum corner of the box
+ * @param max Maximum corner of the box
+ */
+static void box_move_gather(
+    box_move_t *m,
+    const vec3 min,
+    const vec3 max)
+{
+    ecs_vec_t found;
+    int32_t i, j, k, count;
+    ecs_vec_init_t(NULL, &found, ecs_entity_t, 0);
+    ecs_vec_clear(&m->shapes);
+    count = box_spatial_overlap_box(m->world, m->body->scene, min, max, &found);
+    for (i = 0; i < count; i ++) {
+        ecs_entity_t e = *ecs_vec_get_t(&found, ecs_entity_t, i);
+        box_move_shape_t s;
+        if (box_move_own(m->world, m->body, e) ||
+            !box_collider_resolve(m->world, e, &s.collider))
+        {
+            continue;
+        }
+
+        for (j = 0; j < 3; j ++) {
+            float ext = 0;
+            for (k = 0; k < 3; k ++) {
+                ext += fabsf(s.collider.axis[k][j]) * s.collider.half[k];
+            }
+
+            s.min[j] = s.collider.center[j] - ext;
+            s.max[j] = s.collider.center[j] + ext;
+        }
+
+        *ecs_vec_append_t(NULL, &m->shapes, box_move_shape_t) = s;
+    }
+
+    glm_vec3_copy(ECS_CONST_CAST(float*, min), m->region_min);
+    glm_vec3_copy(ECS_CONST_CAST(float*, max), m->region_max);
+    m->region = true;
+    ecs_vec_fini_t(NULL, &found, ecs_entity_t);
+}
+
+/** Make sure the shapes read cover what the capsule can reach over a motion.
+ *
+ * The box grows by what a push can move the capsule and by the step and probe heights. A move
+ * that leaves the region reads the shapes around its next stretch.
+ *
+ * @param m The move
+ * @param pos The feet before the motion
+ * @param motion The motion
+ */
+static void box_move_cover(
+    box_move_t *m,
+    const vec3 pos,
+    const vec3 motion)
+{
+    const box_controller_body_t *body = m->body;
+    vec3 min, max;
+    box_move_sweep(body, pos, motion, BOX_MOVE_MARGIN + body->radius * BOX_MOVE_FRACTION,
+        min, max);
+    min[1] -= body->probe;
+    max[1] += body->step;
+    if (!m->region || min[0] < m->region_min[0] || min[1] < m->region_min[1] ||
+        min[2] < m->region_min[2] || max[0] > m->region_max[0] ||
+        max[1] > m->region_max[1] || max[2] > m->region_max[2])
+    {
+        box_move_gather(m, min, max);
+    }
+}
+
+/** Start a move: read the shapes the capsule can reach on its first stretch.
  *
  * @param world The world
  * @param m The move, initialized
@@ -142,21 +244,38 @@ static void box_move_init(
     const vec3 start,
     const vec3 motion)
 {
-    vec3 a, b, min, max;
-    float pad = body->radius + BOX_MOVE_MARGIN;
-    int32_t i;
+    float len = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
+    float chunk = body->radius * BOX_MOVE_FRACTION * BOX_MOVE_CHUNK;
+    vec3 first;
     ecs_os_memset_t(m, 0, box_move_t);
+    m->world = world;
     m->body = body;
-    ecs_vec_init_t(NULL, &m->colliders, box_collider_t, 0);
-    box_move_segment(body, start, a, b);
-    for (i = 0; i < 3; i ++) {
-        min[i] = fminf(a[i], a[i] + motion[i]) - pad;
-        max[i] = fmaxf(b[i], b[i] + motion[i]) + pad;
-    }
+    ecs_vec_init_t(NULL, &m->shapes, box_move_shape_t, 0);
+    glm_vec3_scale(ECS_CONST_CAST(float*, motion), len > chunk ? chunk / len : 1.0f, first);
+    box_move_cover(m, start, first);
+}
 
-    min[1] -= body->probe;
-    max[1] += body->step;
-    box_move_gather(world, m, min, max);
+/** Copy a move for an attempt that may replace it, with its own shapes.
+ *
+ * @param m The move
+ * @param out The copy
+ */
+static void box_move_fork(
+    const box_move_t *m,
+    box_move_t *out)
+{
+    *out = *m;
+    out->shapes = ecs_vec_copy_t(NULL, &m->shapes, box_move_shape_t);
+}
+
+/** Free the shapes of a move.
+ *
+ * @param m The move
+ */
+static void box_move_fini(
+    box_move_t *m)
+{
+    ecs_vec_fini_t(NULL, &m->shapes, box_move_shape_t);
 }
 
 /** Test whether the body can stand on a contact.
@@ -225,15 +344,18 @@ static float box_move_deepest(
     box_collider_contact_t *out,
     vec3 steep)
 {
-    const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
-    int32_t i, count = ecs_vec_count(&m->colliders);
+    const box_move_shape_t *s = ecs_vec_first_t(&m->shapes, box_move_shape_t);
+    int32_t i, count = ecs_vec_count(&m->shapes);
     float result = 0;
-    vec3 a, b;
+    vec3 a, b, min, max, still = { 0, 0, 0 };
     glm_vec3_zero(steep);
     box_move_segment(m->body, pos, a, b);
+    box_move_sweep(m->body, pos, still, BOX_MOVE_EPS, min, max);
     for (i = 0; i < count; i ++) {
         box_collider_contact_t contact;
-        if (!box_collider_push(&c[i], a, b, m->body->radius, m->back, &contact)) {
+        if (!box_move_overlap(min, max, s[i].min, s[i].max) ||
+            !box_collider_push(&s[i].collider, a, b, m->body->radius, m->back, &contact))
+        {
             continue;
         }
 
@@ -327,22 +449,31 @@ static void box_move_push(
  * @param pos The feet
  * @param dir The unit direction of the motion
  * @param limit Depth a push can always undo
+ * @param reach Distance along dir beyond which shapes do not matter
  * @return Distance along dir that reaches into no shape further than a push undoes
  */
 static float box_move_clearance(
     const box_move_t *m,
     const vec3 pos,
     const vec3 dir,
-    float limit)
+    float limit,
+    float reach)
 {
-    const box_collider_t *c = ecs_vec_first_t(&m->colliders, box_collider_t);
-    int32_t i, count = ecs_vec_count(&m->colliders);
+    const box_move_shape_t *s = ecs_vec_first_t(&m->shapes, box_move_shape_t);
+    int32_t i, count = ecs_vec_count(&m->shapes);
     float result = FLT_MAX;
-    vec3 a, b, n;
+    vec3 a, b, n, min, max, motion;
     box_move_segment(m->body, pos, a, b);
+    glm_vec3_scale(ECS_CONST_CAST(float*, dir), reach, motion);
+    box_move_sweep(m->body, pos, motion, BOX_MOVE_EPS, min, max);
     for (i = 0; i < count && result > 0; i ++) {
-        float gap = box_collider_separation(&c[i], a, b, m->body->radius, m->back, n);
-        float approach = -glm_vec3_dot(ECS_CONST_CAST(float*, dir), n);
+        float gap, approach;
+        if (!box_move_overlap(min, max, s[i].min, s[i].max)) {
+            continue;
+        }
+
+        gap = box_collider_separation(&s[i].collider, a, b, m->body->radius, m->back, n);
+        approach = -glm_vec3_dot(ECS_CONST_CAST(float*, dir), n);
         gap = gap > 0 ? gap : fmaxf(gap + limit, 0);
         if (approach > 0 && gap < result * approach) {
             result = gap / approach;
@@ -360,6 +491,7 @@ static float box_move_clearance(
  *
  * The motion still to go then loses what pushes into the shapes the step touched (collide and
  * slide), so a blocked motion ends where it is blocked instead of pushing on in small steps.
+ * A step goes at most BOX_MOVE_CHUNK half radii, so it only tests the shapes near it.
  *
  * @param m The move
  * @param pos The feet, written in place
@@ -372,8 +504,9 @@ static void box_move_slide(
 {
     float len = glm_vec3_norm(ECS_CONST_CAST(float*, motion));
     float limit = m->body->radius * BOX_MOVE_FRACTION;
+    float chunk = limit * BOX_MOVE_CHUNK;
     int32_t i, steps = 0;
-    vec3 rest = { 0, 0, 0 }, dir = { 0, 0, 0 };
+    vec3 rest = { 0, 0, 0 }, dir = { 0, 0, 0 }, ahead;
     if (isfinite(len) && len > 0) {
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), -1.0f / len, m->back);
     }
@@ -383,6 +516,7 @@ static void box_move_slide(
     } else if (len <= limit * BOX_MOVE_STEPS) {
         steps = len > limit ? (int32_t)ceilf(len / limit) : 1;
         glm_vec3_scale(ECS_CONST_CAST(float*, motion), 1.0f / (float)steps, dir);
+        box_move_cover(m, pos, motion);
         len = 0;
     } else {
         glm_vec3_copy(ECS_CONST_CAST(float*, motion), rest);
@@ -394,10 +528,12 @@ static void box_move_slide(
     }
 
     for (i = 0; i < BOX_MOVE_SWEEPS && len > BOX_MOVE_EPS; i ++) {
-        float step;
+        float step, far = fminf(len, chunk);
         glm_vec3_scale(rest, 1.0f / len, dir);
         glm_vec3_negate_to(dir, m->back);
-        step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit)), len);
+        glm_vec3_scale(dir, far, ahead);
+        box_move_cover(m, pos, ahead);
+        step = fminf(fmaxf(limit, box_move_clearance(m, pos, dir, limit, far)), far);
         glm_vec3_muladds(dir, step, pos);
         glm_vec3_scale(dir, len - step, rest);
         box_move_push(m, pos, rest);
@@ -436,12 +572,13 @@ static void box_move_step(
     const vec3 motion,
     vec3 pos)
 {
-    box_move_t attempt = *m;
+    box_move_t attempt;
     vec3 up = { 0, m->body->step, 0 };
     vec3 flat = { motion[0], 0, motion[2] };
     vec3 down = { 0, 0, 0 };
     vec3 at;
     glm_vec3_copy(ECS_CONST_CAST(float*, start), at);
+    box_move_fork(m, &attempt);
     attempt.normal_count = 0;
     attempt.ground = attempt.wall = false;
     box_move_slide(&attempt, at, up);
@@ -456,6 +593,13 @@ static void box_move_step(
         m->ground = true;
         m->wall = attempt.wall;
         glm_vec3_copy(at, pos);
+        box_move_fini(m);
+        m->shapes = attempt.shapes;
+        m->region = attempt.region;
+        glm_vec3_copy(attempt.region_min, m->region_min);
+        glm_vec3_copy(attempt.region_max, m->region_max);
+    } else {
+        box_move_fini(&attempt);
     }
 }
 
@@ -468,15 +612,19 @@ static void box_move_probe(
     box_move_t *m,
     vec3 pos)
 {
-    box_move_t attempt = *m;
+    box_move_t attempt;
     vec3 down = { 0, -m->body->probe, 0 };
     vec3 at;
     glm_vec3_copy(pos, at);
+    box_move_fork(m, &attempt);
     attempt.ground = false;
     box_move_slide(&attempt, at, down);
     if (attempt.ground) {
+        box_move_fini(m);
         *m = attempt;
         glm_vec3_copy(at, pos);
+    } else {
+        box_move_fini(&attempt);
     }
 }
 
@@ -545,7 +693,9 @@ bool box_controller_move(
     }
 
     box_move_init(world, &m, body, start, motion);
-    if (ecs_vec_count(&m.colliders)) {
+    if (ecs_vec_count(&m.shapes) || glm_vec3_norm(motion) > body->radius *
+        BOX_MOVE_FRACTION * BOX_MOVE_CHUNK)
+    {
         glm_vec3_copy(start, pos);
         box_move_slide(&m, pos, motion);
         if (m.wall && body->step > 0 && (motion[0] != 0 || motion[2] != 0)) {
@@ -563,7 +713,7 @@ bool box_controller_move(
         }
     }
 
-    ecs_vec_fini_t(NULL, &m.colliders, box_collider_t);
+    box_move_fini(&m);
 
 done:
     result = pos[0] != feet->x || pos[1] != feet->y || pos[2] != feet->z;
@@ -588,7 +738,7 @@ bool box_controller_fits(
     if (body->radius > 0) {
         box_move_init(world, &m, body, pos, still);
         result = box_move_deepest(&m, pos, &contact, steep) <= BOX_MOVE_FIT;
-        ecs_vec_fini_t(NULL, &m.colliders, box_collider_t);
+        box_move_fini(&m);
     }
 
     return result;

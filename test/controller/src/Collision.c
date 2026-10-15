@@ -1230,3 +1230,47 @@ void Collision_sheared_box(void) {
 
     ecs_fini(world);
 }
+
+void Collision_fast_move_dense_posts(void) {
+    // controller_fixes/substep_colliders
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    for (int32_t i = 0; i < 40; i ++) {
+        for (int32_t j = 0; j < 40; j ++) {
+            ecs_entity_t post = ecs_new(world);
+            ecs_set(world, post, Position, { 1.5f * (float)i - 30, 1, -1.5f * (float)j - 3 });
+            ecs_set(world, post, Box, { 0.2f, 40, 0.2f });
+        }
+    }
+
+    ecs_entity_t cam = ecs_new(world);
+    ecs_set(world, cam, Position, { 0.75f, 1, 0 });
+    ecs_set(world, cam, Rotation, { 0, 0.3f, 0 });
+    ecs_add(world, cam, CameraController);
+    ecs_get_mut(world, cam, CameraController)->collide = true;
+    ecs_progress(world, 0.1f);
+
+    box_input_key(world, KeyW, true);
+    box_input_key(world, KeyShiftLeft, true);
+    float travelled = 0;
+    for (int32_t f = 0; f < 4; f ++) {
+        Position before = *ecs_get(world, cam, Position);
+        ecs_progress(world, 0.5f);
+        const Position *p = ecs_get(world, cam, Position);
+        travelled += fabsf(p->x - before.x) + fabsf(p->z - before.z);
+        for (int32_t i = 0; i < 40; i ++) {
+            for (int32_t j = 0; j < 40; j ++) {
+                float dx = fabsf(p->x - (1.5f * (float)i - 30)) - 0.1f;
+                float dz = fabsf(p->z + 1.5f * (float)j + 3) - 0.1f;
+                dx = dx > 0 ? dx : 0;
+                dz = dz > 0 ? dz : 0;
+                test_assert(sqrtf(dx * dx + dz * dz) > 0.24f);
+            }
+        }
+    }
+
+    test_assert(travelled > 5);
+
+    ecs_fini(world);
+}

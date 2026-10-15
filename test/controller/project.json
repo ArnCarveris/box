@@ -162,7 +162,8 @@
                     "walk_into_balls",
                     "ground_beside_round_shapes",
                     "step_over_log",
-                    "sheared_box"
+                    "sheared_box",
+                    "fast_move_dense_posts"
                 ]
             }
         ]
