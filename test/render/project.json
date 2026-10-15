@@ -311,6 +311,17 @@
                 ]
             },
             {
+                "id": "LightModes",
+                "testcases": [
+                    "defaults_to_mixed",
+                    "realtime_light_left_out_of_bake",
+                    "baked_light_only_in_probes",
+                    "modes_identical_without_bake",
+                    "mode_change_rebakes_reach",
+                    "baked_sun_leaves_shadows_to_next"
+                ]
+            },
+            {
                 "id": "Bounces",
                 "testcases": [
                     "pass_reaches_bounces",
