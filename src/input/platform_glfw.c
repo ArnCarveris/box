@@ -32,14 +32,16 @@ static ecs_vec_t box_glfw_windows;
  * @param surface The surface, 0 for every window of the world
  * @param captured Whether the cursor is captured
  * @param ctx Unused
+ * @return Whether the cursor is captured, glfw changes the mode at once
  */
-static void box_glfw_capture(
+static bool box_glfw_capture(
     ecs_world_t *world,
     ecs_entity_t surface,
     bool captured,
     void *ctx)
 {
     box_glfw_window_t *windows = ecs_vec_first_t(&box_glfw_windows, box_glfw_window_t);
+    bool result = false;
     int32_t i;
     (void)ctx;
     for (i = 0; i < ecs_vec_count(&box_glfw_windows); i ++) {
@@ -54,7 +56,11 @@ static void box_glfw_capture(
             glfwSetInputMode(windows[i].window, GLFW_RAW_MOUSE_MOTION,
                 captured ? GLFW_TRUE : GLFW_FALSE);
         }
+
+        result = captured;
     }
+
+    return result;
 }
 
 /** Start pushing the events of a window: its surface is stamped on them until the end.

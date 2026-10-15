@@ -74,7 +74,8 @@ ECS_ENUM(InputEventKind, {
     InputReset,      /**< Every held key, button and action is released, the cursor unpinned */
     InputActionDown, /**< A synthetic hold of an action starts */
     InputActionUp,   /**< A synthetic hold of an action ends */
-    InputCapture     /**< Sets Input.capture to code, a platform sends 0 when it ends a capture */
+    InputCapture,    /**< Sets Input.capture to code, a platform sends 0 when it ends a capture */
+    InputCaptured    /**< The platform took (code 1) or let go (code 0) of the cursor */
 });
 
 /** One device event, pushed by the platform or queued as synthetic input */
@@ -97,13 +98,14 @@ ECS_STRUCT(Mouse, {
     vec2 normalized; /**< Cursor over the window size, 0..1 from the top left */
     vec2 scroll;     /**< Wheel offset of this frame */
     bool pinned;     /**< A synthetic cursor is pinned, platform movement is ignored */
-    bool captured;   /**< The cursor is captured: hidden, held by the window, unbounded moves */
+    bool captured;   /**< The platform holds the cursor: hidden, kept in the window, unbounded */
 });
 
 /** Device state of the current frame, written by the InputUpdate system.
  *
- * The application sets capture; the cursor is captured while it is set and input is focused,
- * through glfw's disabled cursor with raw motion natively and Pointer Lock in the browser.
+ * The application sets capture to capture the cursor while input is focused, through glfw's
+ * disabled cursor with raw motion natively and Pointer Lock in the browser, which grants it at
+ * the next click or key; mouse.captured says when the platform holds it.
  */
 ECS_STRUCT(Input, {
     KeyState keys[104]; /**< State of every key and mouse button, indexed by Key */
@@ -163,12 +165,15 @@ ECS_STRUCT(ActionEvent, {
 
 /** Capture or release the cursor in the window of a surface.
  *
+ * A backend that captures later pushes an InputCaptured event when it does.
+ *
  * @param world The world
  * @param surface The surface, 0 for every window of the world
  * @param captured Whether the cursor is captured
  * @param ctx The ctx of the backend
+ * @return Whether the cursor is captured when the call returns
  */
-typedef void (*box_input_capture_t)(
+typedef bool (*box_input_capture_t)(
     ecs_world_t *world,
     ecs_entity_t surface,
     bool captured,
@@ -300,6 +305,53 @@ bool box_input_dom_on_key(
     bool down,
     bool repeat,
     bool shortcut);
+
+/** Pointer state of the browser backend: the cursor and the pointer lock of the canvas */
+typedef struct box_input_dom_pointer_t {
+    vec2 cursor; /**< Cursor in surface points, moved by the movement of events while locked */
+    bool want;   /**< The device asked for the pointer lock */
+    bool locked; /**< The canvas holds the pointer lock */
+} box_input_dom_pointer_t;
+
+/** Push the cursor move of a browser mouse event: its position, or while the pointer is locked
+ * the cursor moved by the movement of the event, unbounded by the canvas.
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param position Cursor position of the event in surface points
+ * @param movement movementX and movementY of the event in surface points
+ */
+void box_input_dom_on_move(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    const vec2 position,
+    const vec2 movement);
+
+/** Track a pointerlockchange: pushes InputCaptured when the lock starts or ends, and
+ * InputCapture 0 when a wanted lock ends while the page keeps the focus (Escape).
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param locked Whether the canvas holds the lock now
+ * @param page_focused Whether the document has the focus, false when a blur ended the lock
+ * @return Whether the lock must be exited because nothing wants it
+ */
+bool box_input_dom_on_lock(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool locked,
+    bool page_focused);
+
+/** Track a pointerlockerror: a refused lock that is wanted clears Input.capture.
+ *
+ * @param world The world
+ * @param pointer The pointer state
+ * @param page_focused Whether the document has the focus
+ */
+void box_input_dom_on_lock_error(
+    ecs_world_t *world,
+    box_input_dom_pointer_t *pointer,
+    bool page_focused);
 
 /** Push the platform event of a browser wheel event in the units of glfw: one per wheel
  * notch, positive y when the wheel turns away from the user.

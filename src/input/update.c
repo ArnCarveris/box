@@ -469,6 +469,13 @@ static void box_input_apply(
     case InputCapture:
         in->capture = ev->code != 0;
         break;
+    case InputCaptured:
+        if (!ev->code) {
+            dev->has_position = dev->has_position && in->mouse.pinned;
+        }
+
+        in->mouse.captured = ev->code != 0 && dev->capture_applied;
+        break;
     }
 }
 
@@ -494,7 +501,7 @@ static bool box_input_platform_accept(
         box_input_surface_remember(world, dev, ev);
     }
 
-    if (ev->kind == InputResize || ev->kind == InputCapture) {
+    if (ev->kind == InputResize || ev->kind == InputCapture || ev->kind == InputCaptured) {
         result = own;
     } else if (ev->kind == InputFocus) {
         result = own || ev->code != 0;
@@ -570,8 +577,10 @@ void box_input_capture_release(
 }
 
 /** Capture the cursor while Input.capture is set and input is focused, in the window of the
- * input surface, and release it otherwise. A change starts a fresh delta unless a synthetic
- * cursor is pinned, because a platform moves the real cursor when it captures or releases it.
+ * input surface, and release it otherwise.
+ *
+ * Taking or letting go of the cursor at once starts a fresh delta unless a synthetic cursor is
+ * pinned, because the platform moves the real cursor; a later InputCaptured 0 does so in order.
  *
  * @param world The world
  * @param dev The device state
@@ -583,22 +592,26 @@ static void box_input_capture_sync(
     Input *in)
 {
     bool want = in->capture && in->focused;
+    bool moved = false;
     if (dev->capture_applied && (!want || dev->capture_surface != in->surface)) {
         box_input_capture_release(world, dev);
-        dev->has_position = dev->has_position && in->mouse.pinned;
+        moved = in->mouse.captured;
+        in->mouse.captured = false;
     }
 
     if (want && !dev->capture_applied) {
-        if (dev->backend.capture) {
+        in->mouse.captured = dev->backend.capture &&
             dev->backend.capture(world, in->surface, true, dev->backend.ctx);
-        }
-
         dev->capture_applied = true;
         dev->capture_surface = in->surface;
+        moved = moved || in->mouse.captured;
+    }
+
+    if (moved) {
         dev->has_position = dev->has_position && in->mouse.pinned;
     }
 
-    in->mouse.captured = want;
+    in->mouse.captured = in->mouse.captured && dev->capture_applied;
 }
 
 /** Derive the normalized cursor from the window size.

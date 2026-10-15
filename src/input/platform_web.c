@@ -25,9 +25,7 @@ typedef struct box_web_t {
     ecs_entity_t status;    /**< SurfaceStatus component, 0 until the world has one */
     ecs_entity_t component; /**< Surface component, 0 until the world has one */
     vec2 size;              /**< Point size of the surface that presents to the canvas */
-    vec2 cursor;            /**< Cursor in surface points, moved by movementX/Y while locked */
-    bool want;              /**< The device asked to capture the cursor */
-    bool locked;            /**< The canvas holds the pointer lock */
+    box_input_dom_pointer_t pointer; /**< Cursor and pointer lock of the canvas */
 } box_web_t;
 
 /** Check whether the page has the canvas, which a run under node does not.
@@ -128,22 +126,17 @@ static void box_web_push_move(
     box_web_t *web,
     const EmscriptenMouseEvent *event)
 {
-    float point[2] = { 0, 0 };
-    if (web->locked) {
-        box_web_canvas_image(point);
-        web->cursor[0] += point[0] > 0 ? (float)event->movementX * web->size[0] / point[0] : 0;
-        web->cursor[1] += point[1] > 0 ? (float)event->movementY * web->size[1] / point[1] : 0;
-    } else {
-        box_web_canvas_point((double)event->clientX, (double)event->clientY, point);
-        web->cursor[0] = point[0] * web->size[0];
-        web->cursor[1] = point[1] * web->size[1];
-    }
-
-    box_input_platform_push(web->world, &(InputEvent){
-        .kind = InputMove,
-        .value = { web->cursor[0], web->cursor[1] },
-        .surface = web->surface
-    });
+    float point[2] = { 0, 0 }, image[2] = { 0, 0 };
+    vec2 position, movement;
+    box_web_canvas_point((double)event->clientX, (double)event->clientY, point);
+    box_web_canvas_image(image);
+    position[0] = point[0] * web->size[0];
+    position[1] = point[1] * web->size[1];
+    movement[0] = image[0] > 0 ? (float)event->movementX * web->size[0] / image[0] : 0;
+    movement[1] = image[1] > 0 ? (float)event->movementY * web->size[1] / image[1] : 0;
+    box_web_begin(web);
+    box_input_dom_on_move(web->world, &web->pointer, position, movement);
+    box_web_end(web);
 }
 
 /** Push a cursor move.
@@ -231,20 +224,6 @@ static bool box_web_focus(
     return false;
 }
 
-/** Push the end of a capture the browser made, such as Escape leaving the pointer lock, so
- * Input.capture follows it; a lock that ends because the page lost focus keeps the request.
- *
- * @param web The backend state
- */
-static void box_web_lock_lost(
-    box_web_t *web)
-{
-    if (web->want && box_web_has_focus()) {
-        box_input_platform_push(web->world, &(InputEvent){
-            .kind = InputCapture, .code = 0, .surface = web->surface });
-    }
-}
-
 /** Track the pointer lock of the canvas.
  *
  * @param type The event type
@@ -258,13 +237,14 @@ static bool box_web_lock(
     void *ctx)
 {
     box_web_t *web = ctx;
-    bool was = web->locked;
+    bool locked = event->isActive && !strcmp(event->id, "canvas");
+    bool exit;
     (void)type;
-    web->locked = event->isActive && !strcmp(event->id, "canvas");
-    if (web->locked && !web->want) {
+    box_web_begin(web);
+    exit = box_input_dom_on_lock(web->world, &web->pointer, locked, box_web_has_focus());
+    box_web_end(web);
+    if (exit) {
         emscripten_exit_pointerlock();
-    } else if (was && !web->locked) {
-        box_web_lock_lost(web);
     }
 
     return false;
@@ -282,9 +262,12 @@ static bool box_web_lock_error(
     const void *reserved,
     void *ctx)
 {
+    box_web_t *web = ctx;
     (void)type;
     (void)reserved;
-    box_web_lock_lost(ctx);
+    box_web_begin(web);
+    box_input_dom_on_lock_error(web->world, &web->pointer, box_web_has_focus());
+    box_web_end(web);
 
     return false;
 }
@@ -292,14 +275,15 @@ static bool box_web_lock_error(
 /** Capture the cursor with the Pointer Lock API, the capture callback of the backend.
  *
  * Browsers only grant a lock during a user gesture, so the request waits for the next input
- * event handler of the page.
+ * event handler of the page; a release exits the lock and cancels a request still waiting.
  *
  * @param world The world
  * @param surface The surface, the canvas has one
  * @param captured Whether the cursor is captured
  * @param ctx The backend state
+ * @return Whether the canvas holds the lock already
  */
-static void box_web_capture(
+static bool box_web_capture(
     ecs_world_t *world,
     ecs_entity_t surface,
     bool captured,
@@ -308,12 +292,14 @@ static void box_web_capture(
     box_web_t *web = ctx;
     (void)world;
     (void)surface;
-    web->want = captured;
-    if (captured && !web->locked) {
+    web->pointer.want = captured;
+    if (captured && !web->pointer.locked) {
         emscripten_request_pointerlock(BOX_WEB_CANVAS, true);
-    } else if (!captured && web->locked) {
+    } else if (!captured) {
         emscripten_exit_pointerlock();
     }
+
+    return captured && web->pointer.locked;
 }
 
 /** Register or, with NULL state, remove the callbacks of the backend.
@@ -410,7 +396,7 @@ done:
     return;
 }
 
-/** Remove the callbacks and release the backend state.
+/** Remove the callbacks, exit or cancel the pointer lock and release the backend state.
  *
  * @param ctx The backend state
  */
@@ -419,9 +405,7 @@ static void box_web_free(
 {
     box_web_t *web = ctx;
     box_web_callbacks(NULL);
-    if (web->locked) {
-        emscripten_exit_pointerlock();
-    }
+    emscripten_exit_pointerlock();
 
     ecs_os_free(ctx);
 }

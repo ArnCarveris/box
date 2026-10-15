@@ -323,9 +323,17 @@ culling with occlusion, 1 px minimum size and the shadow defaults.
 
 ## Input and controllers
 
-`box.input` has two sources: a platform hook (`box_input_platform_push`, glfw and browser
-backends not implemented) and a synthetic queue applied in order with per event frame delays.
-`InputUpdate` writes the `Input` singleton and emits script events at `box.input.screen`.
+`box.input` has two sources: a platform hook (`box_input_platform_t` with `poll`, `free` and
+`capture` callbacks, events pushed with `box_input_platform_push`) and a synthetic queue applied
+in order with per event frame delays. The glfw backend (`box_input_glfw_attach` when a window
+opens, `box_input_glfw_detach` before it closes) and the browser backend (`box_input_web_attach`
+on the canvas) stamp each event with the surface of its window; only events of the focused
+surface (`Input.surface`) apply. `InputUpdate` writes the `Input` singleton and emits script
+events at `box.input.screen`. Setting `Input.capture` captures the cursor while input is
+focused: glfw's disabled cursor with raw motion natively, the Pointer Lock API in the browser,
+granted at the next click or key. `Mouse.captured` says when the platform holds it, `InputCaptured`
+events report a lock the browser takes or ends, and Escape or a refused lock clears the request
+with an `InputCapture` event.
 `Action` entities get an `ActionState` (down, pressed, released, start, delta, drag) written by
 `ActionUpdate`; `Binding` entities (key, modifiers) map keys to actions, and script events
 `on.pressed`, `on.held`, `on.dragged`, `on.released` fire for them. Real input is ignored while
