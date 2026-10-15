@@ -352,9 +352,10 @@ page (`src/render/text_draw.c`), shaded by `shape2d.wgsl`. No shaping (ligatures
 **Layout.** `Layout` on a parent arranges its children in `OrderedChildren` order in logical
 pixels: rows and columns, fit and grow sizing with weights, min/max, padding, spacing, alignment,
 and `DirectionNone` anchoring with x/y offsets. `LayoutItem` sets per child sizing. A growing
-child adds its fit size to the fit of its parent and, along the main axis, never gets less than
-it: shares fill up the smallest first, as Clay grows its elements; across, it stretches to the
-content box. Observers
+child adds its fit size to the fit of its parent and takes a weighted share of the free space
+along the main axis, or stretches to the content box across it. With `Sizing.content_min` (on in
+a new `LayoutItem`, off in a C literal) it never gets less than its fit size, the automatic
+minimum of CSS flex items; the console opts out so its panel keeps its fraction of the surface. Observers
 mark elements; `LayoutUpdate` (`EcsPostUpdate`) relays out the trees of marked elements and writes
 `Position` x/y, `LayoutBounds` and `Rect` only where they changed. A reorder through
 `ecs_set_child_order` needs `ecs_modified(parent, Layout)`.

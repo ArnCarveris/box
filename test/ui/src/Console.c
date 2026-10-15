@@ -921,6 +921,57 @@ void Console_scrollback_follows_height(void) {
     ecs_fini(world);
 }
 
+void Console_panel_keeps_fraction_with_long_text(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+    ecs_entity_t s = ecs_new(world);
+    ecs_set(world, s, Surface, {.width = 640, .height = 360, .resolution_scale = 1});
+    ecs_singleton_get_mut(world, Console)->open = true;
+    ecs_singleton_modified(world, Console);
+    ecs_progress(world, 0);
+
+    char line[201];
+    for (int32_t i = 0; i < 200; i ++) {
+        line[i] = (char)('a' + i % 26);
+    }
+
+    line[200] = '\0';
+    ecs_os_free(box_console_run(world, line, NULL));
+    for (int32_t i = 0; i < 200; i ++) {
+        box_input_platform_push(world, &(InputEvent){ .kind = InputText, .code = line[i] });
+    }
+
+    ecs_progress(world, 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t before = ecs_lookup(world, CONSOLE_INPUT ".before");
+    test_str(ecs_get(world, before, Text)->value, line);
+    test_assert(ecs_get(world, before, TextBounds)->width > 640);
+    ecs_entity_t log = ecs_lookup(world, CONSOLE_LOG);
+    float widest = 0;
+    ecs_iter_t it = ecs_children(world, log);
+    while (ecs_children_next(&it)) {
+        for (int32_t i = 0; i < it.count; i ++) {
+            const TextBounds *tb = ecs_get(world, it.entities[i], TextBounds);
+            widest = tb && tb->width > widest ? tb->width : widest;
+        }
+    }
+
+    test_assert(widest > 640);
+    ecs_entity_t stack = ecs_lookup(world, "console.ui.screen.stack");
+    ecs_entity_t panel = ecs_lookup(world, "console.ui.screen.stack.panel");
+    test_flt(ecs_get(world, stack, LayoutBounds)->width, 320);
+    test_flt(ecs_get(world, panel, Rect)->width, 320);
+    test_flt(ecs_get(world, panel, Rect)->height, 360);
+    test_flt(ecs_get(world, stack, Position)->x + ecs_get(world, panel, Position)->x, -160);
+
+    ecs_fini(world);
+}
+
 void Console_paste_long(void) {
     // input_fixes/text_input_limit
     ecs_world_t *world = ecs_init();

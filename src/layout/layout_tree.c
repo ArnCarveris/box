@@ -54,6 +54,27 @@ static float box_layout_clamp(
     return result;
 }
 
+/** Bound the size of a growing element by its min, max and, with content_min, its fit size.
+ *
+ * @param c The element
+ * @param axis 0 for x, 1 for y
+ * @param v The share or stretch of the element
+ * @return The bounded size
+ */
+static float box_layout_grow_clamp(
+    const box_layout_node_t *c,
+    int32_t axis,
+    float v)
+{
+    const Sizing *s = box_layout_sizing(c, axis);
+    float result = box_layout_clamp(v, s);
+    if (s->content_min && result < c->base[axis]) {
+        result = c->base[axis];
+    }
+
+    return result;
+}
+
 /** Test whether an element grows on an axis.
  *
  * @param n The element
@@ -236,10 +257,11 @@ static void box_layout_measure(
 
 /** Share the free space of a row or column among its growing children by weight.
  *
- * A growing child never gets less than its basis, its fit size within its min and max, so
- * small shares fill up first, as Clay grows its smallest elements first.
+ * A share starts from zero. A child with content_min never gets less than its fit size, so
+ * the children whose share is below their content keep their content and the others share
+ * the rest, which ends where Clay ends by growing its smallest elements first.
  *
- * A child whose share passes its basis or max keeps the bound, and the rest is shared again.
+ * A child whose share passes a bound keeps the bound, and the rest is shared again.
  *
  * @param nodes The nodes of the tree
  * @param n The parent
@@ -283,7 +305,7 @@ static void box_layout_grow(
             const Sizing *s = box_layout_sizing(c, main);
             float raw = free * fmaxf(s->value, 0.0f) / weights;
             if (!c->frozen) {
-                c->size[main] = fmaxf(box_layout_clamp(raw, s), c->base[main]);
+                c->size[main] = box_layout_grow_clamp(c, main, raw);
                 over += c->size[main] - raw;
             }
         }
@@ -359,7 +381,7 @@ static void box_layout_place(
         box_layout_node_t *c = &nodes[n->first + i];
         for (axis = 0; axis < 2; axis ++) {
             if (axis != main && box_layout_grows(c, axis)) {
-                c->size[axis] = box_layout_clamp(space[axis], box_layout_sizing(c, axis));
+                c->size[axis] = box_layout_grow_clamp(c, axis, space[axis]);
             }
         }
     }

@@ -556,12 +556,12 @@ void Layout_grow_content_is_minimum(void) {
         .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 50 } });
     ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, a, Layout, { .direction = DirectionRow });
-    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 3 } });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 3, .content_min = true } });
     ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
     ecs_set(world, ca, Rect, {40, 10});
     ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
     ecs_set(world, b, Layout, { .direction = DirectionRow });
-    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1 } });
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
     ecs_entity_t cb = ecs_new_w_pair(world, EcsChildOf, b);
     ecs_set(world, cb, Rect, {80, 10});
 
@@ -569,12 +569,12 @@ void Layout_grow_content_is_minimum(void) {
     ecs_set(world, q, Layout, { .direction = DirectionRow, .spacing = 2 });
     ecs_entity_t c = ecs_new_w_pair(world, EcsChildOf, q);
     ecs_set(world, c, Layout, { .direction = DirectionRow });
-    ecs_set(world, c, LayoutItem, { .width = { SizeModeGrow, 1 } });
+    ecs_set(world, c, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
     ecs_entity_t cc = ecs_new_w_pair(world, EcsChildOf, c);
     ecs_set(world, cc, Rect, {40, 10});
     ecs_entity_t d = ecs_new_w_pair(world, EcsChildOf, q);
     ecs_set(world, d, Layout, { .direction = DirectionRow });
-    ecs_set(world, d, LayoutItem, { .width = { SizeModeGrow, 3 } });
+    ecs_set(world, d, LayoutItem, { .width = { SizeModeGrow, 3, .content_min = true } });
     ecs_entity_t cd = ecs_new_w_pair(world, EcsChildOf, d);
     ecs_set(world, cd, Rect, {80, 10});
     ecs_progress(world, 0);
@@ -610,7 +610,8 @@ void Layout_grow_never_below_text(void) {
     ecs_set(world, t, Text, {.value = "Hello world", .size = 16,
         .font = ecs_lookup(world, "box.text.DefaultFont")});
     ecs_set(world, t, LayoutItem, {
-        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+        .width = { SizeModeGrow, 1, .content_min = true },
+        .height = { SizeModeGrow, 1, .content_min = true } });
 
     ecs_entity_t c = ecs_new(world);
     ecs_set(world, c, Layout, { .direction = DirectionColumn });
@@ -619,7 +620,7 @@ void Layout_grow_never_below_text(void) {
     ecs_entity_t u = ecs_new_w_pair(world, EcsChildOf, c);
     ecs_set(world, u, Text, {.value = "Hello world", .size = 16,
         .font = ecs_lookup(world, "box.text.DefaultFont")});
-    ecs_set(world, u, LayoutItem, { .height = { SizeModeGrow, 1 } });
+    ecs_set(world, u, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
     ecs_progress(world, 0);
 
     const TextBounds *tt = ecs_get(world, t, TextBounds);
@@ -630,6 +631,145 @@ void Layout_grow_never_below_text(void) {
     const TextBounds *tu = ecs_get(world, u, TextBounds);
     test_assert(tu->height > 5);
     test_flt(ecs_get(world, u, LayoutBounds)->height, tu->height);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_without_content_min(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 3 } });
+    ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ca, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, Layout, { .direction = DirectionRow });
+    ecs_set(world, b, LayoutItem, {
+        .width = { SizeModeGrow, 1 }, .height = { SizeModeGrow, 1 } });
+    ecs_entity_t cb = ecs_new_w_pair(world, EcsChildOf, b);
+    ecs_set(world, cb, Rect, {80, 70});
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 150);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 50);
+    test_flt(ecs_get(world, b, LayoutBounds)->height, 50);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_cross_axis_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 5 } });
+    ecs_entity_t t = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, t, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, t, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
+
+    ecs_entity_t q = ecs_new(world);
+    ecs_set(world, q, Layout, { .direction = DirectionNone });
+    ecs_set(world, q, LayoutItem, {
+        .width = { SizeModeFixed, 10 }, .height = { SizeModeFixed, 5 } });
+    ecs_entity_t u = ecs_new_w_pair(world, EcsChildOf, q);
+    ecs_set(world, u, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, u, LayoutItem, {
+        .width = { SizeModeGrow, 1, .content_min = true },
+        .height = { SizeModeGrow, 1, .content_min = true } });
+
+    ecs_entity_t r = ecs_new(world);
+    ecs_set(world, r, Layout, { .direction = DirectionRow });
+    ecs_set(world, r, LayoutItem, {
+        .width = { SizeModeFixed, 200 }, .height = { SizeModeFixed, 40 } });
+    ecs_entity_t v = ecs_new_w_pair(world, EcsChildOf, r);
+    ecs_set(world, v, Text, {.value = "Hello world", .size = 16,
+        .font = ecs_lookup(world, "box.text.DefaultFont")});
+    ecs_set(world, v, LayoutItem, { .height = { SizeModeGrow, 1, .content_min = true } });
+    ecs_progress(world, 0);
+
+    const TextBounds *tt = ecs_get(world, t, TextBounds);
+    test_assert(tt != NULL);
+    test_assert(tt->height > 5);
+    test_assert(tt->width > 10);
+    test_flt(ecs_get(world, t, LayoutBounds)->height, tt->height);
+    test_flt(ecs_get(world, u, LayoutBounds)->width, tt->width);
+    test_flt(ecs_get(world, u, LayoutBounds)->height, tt->height);
+    test_flt(ecs_get(world, v, LayoutBounds)->height, 40);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_zero_weight_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_entity_t p = ecs_new(world);
+    ecs_set(world, p, Layout, { .direction = DirectionRow });
+    ecs_set(world, p, LayoutItem, {
+        .width = { SizeModeFixed, 300 }, .height = { SizeModeFixed, 50 } });
+    ecs_entity_t a = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, a, Layout, { .direction = DirectionRow });
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 0, .content_min = true } });
+    ecs_entity_t ca = ecs_new_w_pair(world, EcsChildOf, a);
+    ecs_set(world, ca, Rect, {40, 10});
+    ecs_entity_t b = ecs_new_w_pair(world, EcsChildOf, p);
+    ecs_set(world, b, LayoutItem, { .width = { SizeModeGrow, 1, .content_min = true } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 40);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 260);
+    test_flt(ecs_get(world, a, Position)->x, -130);
+    test_flt(ecs_get(world, b, Position)->x, 20);
+
+    ecs_set(world, a, LayoutItem, { .width = { SizeModeGrow, 0 } });
+    ecs_progress(world, 0);
+
+    test_flt(ecs_get(world, a, LayoutBounds)->width, 0);
+    test_flt(ecs_get(world, b, LayoutBounds)->width, 300);
+
+    ecs_fini(world);
+}
+
+void Layout_grow_script_keeps_content(void) {
+    // ui_fixes/grow_basis
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    const char *code =
+        "using box.layout\n"
+        "using box.geometry\n"
+        "row {\n"
+        "  Layout: {direction: Row}\n"
+        "  LayoutItem: {width: {mode: Fixed, value: 50}, height: {mode: Fixed, value: 20}}\n"
+        "  button {\n"
+        "    Layout: {direction: Row}\n"
+        "    LayoutItem: {width: {mode: Grow}}\n"
+        "    label { Rect: {80, 10} }\n"
+        "  }\n"
+        "  spacer { LayoutItem: {width: {mode: Grow}} }\n"
+        "}\n";
+    test_assert(ecs_script_run(world, "grow", code, NULL) == 0);
+    ecs_progress(world, 0);
+
+    ecs_entity_t button = ecs_lookup(world, "row.button");
+    test_flt(ecs_get(world, button, LayoutBounds)->width, 80);
+    test_flt(ecs_get(world, ecs_lookup(world, "row.spacer"), LayoutBounds)->width, 0);
 
     ecs_fini(world);
 }

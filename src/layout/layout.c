@@ -310,7 +310,7 @@ static void box_layout_registry_move(
     ecs_os_memset(src, 0, ti->size * count);
 }
 
-/** Construct LayoutItem values whose sizes have a value of one, the weight of a growing size.
+/** Construct LayoutItem values whose sizes have a weight of one and keep their content.
  *
  * @param ptr The components
  * @param count Number of components
@@ -325,7 +325,10 @@ static void box_layout_item_ctor(
     int32_t i;
     (void)ti;
     for (i = 0; i < count; i ++) {
-        values[i] = (LayoutItem){ .width = { .value = 1 }, .height = { .value = 1 } };
+        values[i] = (LayoutItem){
+            .width = { .value = 1, .content_min = true },
+            .height = { .value = 1, .content_min = true }
+        };
     }
 }
 
