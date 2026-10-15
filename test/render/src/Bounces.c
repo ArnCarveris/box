@@ -489,3 +489,104 @@ void Bounces_far_end_brightens_with_bounces(void) {
         test_assert(lit[i] < 255);
     }
 }
+
+void Bounces_colored_walls_bleed_with_bounces(void) {
+    // baked_lighting/color_bleed
+    const int32_t bounces[3] = {0, 1, 3};
+    const float parts[5][6] = {
+        {0, -0.1f, 0, 4.4f, 0.2f, 4.4f}, {0, 2, -2.1f, 4.4f, 4, 0.2f},
+        {0, 2, 2.1f, 4.4f, 4, 0.2f}, {-2.1f, 2, 0, 0.2f, 4, 4}, {2.1f, 2, 0, 0.2f, 4, 4}
+    };
+    const uint8_t colors[5][3] = {
+        {235, 235, 230}, {235, 235, 230}, {235, 235, 230}, {210, 30, 25}, {30, 200, 40}
+    };
+    float red[3] = {0, 0, 0}, green[3] = {0, 0, 0}, red_excess[3] = {0, 0, 0};
+    float green_excess[3] = {0, 0, 0};
+    int32_t i, j, x, y;
+
+    for (i = 0; i < 3; i ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_entity_t scene = ecs_new(world);
+        ecs_add(world, scene, Scene);
+        ecs_set(world, scene, LightBake, {.probe_spacing = 0.5f, .bounds_padding = -0.5f,
+            .capture_size = 16, .budget_ms = 2, .bounces = bounces[i]});
+        ecs_set(world, scene, AmbientLight, {.intensity = 0});
+        ecs_entity_t dark = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, dark, DirectionalLight, {.intensity = 0});
+        ecs_entity_t camera = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, camera, Position, {0, 9, 0});
+        ecs_set(world, camera, Rotation, {-1.5708f, 0, 0});
+        ecs_set(world, camera, Camera, {.fov = 50, .near_ = 0.1f});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {.camera = camera, .clear = {.enabled = true,
+            .color = {0, 0, 0, 255}}, .lighting.enabled = true, .lighting.baked = true});
+        ecs_entity_t ceiling = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, ceiling, Position, {0, 4, 0});
+        ecs_set(world, ceiling, Rotation, {1.5708f, 0, 0});
+        ecs_set(world, ceiling, Quad, {4.4f, 4.4f});
+        ecs_set(world, ceiling, Rgb, {235, 235, 230});
+        for (j = 0; j < 5; j ++) {
+            ecs_entity_t part = ecs_new_w_pair(world, EcsChildOf, scene);
+            ecs_set(world, part, Position, {parts[j][0], parts[j][1], parts[j][2]});
+            ecs_set(world, part, Box, {parts[j][3], parts[j][4], parts[j][5]});
+            ecs_set(world, part, Rgb, {colors[j][0], colors[j][1], colors[j][2]});
+        }
+
+        ecs_entity_t lamp = ecs_new_w_pair(world, EcsChildOf, scene);
+        ecs_set(world, lamp, Position, {0, 3.9f, 0});
+        ecs_set(world, lamp, Rotation, {1.5708f, 0, 0});
+        ecs_set(world, lamp, SpotLight, {.intensity = 12, .range = 10, .inner_angle = 15,
+            .outer_angle = 25});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Surface, {.width = 160, .height = 120, .write_to_file = "bleed.png",
+            .resolution_scale = 1});
+        for (j = 0; j < 3; j ++) {
+            ecs_progress(world, 0);
+        }
+
+        box_render_sync(world);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
+
+        char *path = flecs_asprintf("%s/bleed.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+        int w = 0, h = 0, n = 0;
+        unsigned char *image = stbi_load(path, &w, &h, &n, 4);
+        test_assert(image != NULL);
+        test_int(w, 160);
+        test_int(h, 120);
+        float sums[2][3] = {{0, 0, 0}, {0, 0, 0}};
+        for (y = 66; y < 76; y ++) {
+            for (x = 0; x < 6; x ++) {
+                for (j = 0; j < 3; j ++) {
+                    sums[0][j] += image[(y * w + 53 + x) * 4 + j];
+                    sums[1][j] += image[(y * w + 101 + x) * 4 + j];
+                }
+            }
+        }
+
+        test_assert(sums[0][1] > 60 * 8 && sums[1][0] > 60 * 8);
+        test_assert(sums[0][0] < 60 * 250 && sums[1][1] < 60 * 250);
+        red[i] = sums[0][0] / sums[0][1];
+        green[i] = sums[1][1] / sums[1][0];
+        red_excess[i] = (sums[0][0] - sums[0][1]) / 60;
+        green_excess[i] = (sums[1][1] - sums[1][0]) / 60;
+        stbi_image_free(image);
+        ecs_os_free(path);
+        ecs_fini(world);
+    }
+
+    test_assert(red[0] > 0.98f && red[0] < 1.02f);
+    test_assert(green[0] > 0.98f && green[0] < 1.02f);
+    test_assert(red[1] > 1.1f && red[2] > 1.1f);
+    test_assert(green[1] > 1.1f && green[2] > 1.1f);
+    test_assert(red_excess[1] > red_excess[0] + 5);
+    test_assert(red_excess[2] > red_excess[1] + 1);
+    test_assert(green_excess[1] > green_excess[0] + 5);
+    test_assert(green_excess[2] > green_excess[1] + 1);
+}

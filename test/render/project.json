@@ -291,7 +291,8 @@
                     "changing_bounces_restarts",
                     "image_stable_once_converged",
                     "view_keeps_last_complete_pass",
-                    "far_end_brightens_with_bounces"
+                    "far_end_brightens_with_bounces",
+                    "colored_walls_bleed_with_bounces"
                 ]
             },
             {
