@@ -1688,6 +1688,71 @@ void Text_utf8_valid_boundaries(void) {
     ecs_fini(world);
 }
 
+void Text_utf8_three_byte_glyph(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "\xE2\x80\x94", "\xE2\x80\xA6", "\xEF\xBF\xBD", "-" };
+    ecs_entity_t texts[4];
+    int32_t i;
+    for (i = 0; i < 4; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_progress(world, 0);
+
+    float dash = ecs_get(world, texts[0], TextBounds)->width;
+    float ellipsis = ecs_get(world, texts[1], TextBounds)->width;
+    float missing = ecs_get(world, texts[2], TextBounds)->width;
+    test_assert(dash > 0);
+    test_assert(ellipsis > 0);
+    test_assert(fabsf(dash - missing) > 0.5f);
+    test_assert(fabsf(ellipsis - missing) > 0.5f);
+    test_assert(dash > ecs_get(world, texts[3], TextBounds)->width);
+
+    ecs_fini(world);
+}
+
+void Text_utf8_truncated_at_end(void) {
+    // ui_fixes/utf8
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    App *app = ecs_singleton_get_mut(world, App);
+    app->headless = true;
+    ecs_singleton_modified(world, App);
+
+    const char *values[] = { "a\xEF\xBF\xBD", "a\xF0\x9F\x98", "a\xE2\x82", "a\xE2", "a\xC3",
+        "\xEF\xBF\xBD", "\xE2", "\xF4\x8F", "\xC3" };
+    ecs_entity_t texts[9];
+    int32_t i;
+    for (i = 0; i < 9; i ++) {
+        texts[i] = ecs_new(world);
+        ecs_set(world, texts[i], Text, {.value = ECS_CONST_CAST(char*, values[i]), .size = 20,
+            .font = ecs_lookup(world, "box.text.DefaultFont")});
+    }
+
+    ecs_progress(world, 0);
+
+    float tail = ecs_get(world, texts[0], TextBounds)->width;
+    float lone = ecs_get(world, texts[5], TextBounds)->width;
+    test_assert(lone > 0);
+    for (i = 1; i < 5; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, tail);
+    }
+
+    for (i = 6; i < 9; i ++) {
+        test_flt(ecs_get(world, texts[i], TextBounds)->width, lone);
+    }
+
+    ecs_fini(world);
+}
+
 void Text_overlapping_contours_no_seam(void) {
     // ui_fixes/msdf_correction
     ecs_world_t *world = ecs_init();

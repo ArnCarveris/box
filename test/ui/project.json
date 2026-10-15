@@ -129,6 +129,8 @@
                     "utf8_surrogates_replaced",
                     "utf8_above_max_replaced",
                     "utf8_valid_boundaries",
+                    "utf8_three_byte_glyph",
+                    "utf8_truncated_at_end",
                     "overlapping_contours_no_seam",
                     "sharp_corners_large"
                 ]
