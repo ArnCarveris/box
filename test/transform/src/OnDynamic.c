@@ -147,9 +147,8 @@ void OnDynamic_deleted_children_not_passed(void) {
     ecs_progress(world, 0);
 
     ecs_delete(world, parent);
-    for (int32_t i = 0; i < log.remove_count; i ++) {
-        test_assert(log.removed[i] == parent);
-    }
+    test_int(log.remove_count, 1);
+    test_uint(log.removed[0], parent);
 
     ecs_progress(world, 0);
 

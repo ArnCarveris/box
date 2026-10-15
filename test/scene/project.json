@@ -41,6 +41,7 @@
             {
                 "id": "Spatial",
                 "testcases": [
+                    "delete_dynamic_hierarchy",
                     "insert",
                     "insert_rotated_scaled",
                     "insert_child",

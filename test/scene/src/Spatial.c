@@ -1531,3 +1531,52 @@ void Spatial_manual_parent_moved_in_pre_store(void) {
     ecs_vec_fini_t(NULL, &out, ecs_entity_t);
     ecs_fini(world);
 }
+
+void Spatial_delete_dynamic_hierarchy(void) {
+    // core_fixes/unspread_delete_cost
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+    ecs_entity_t roots[2];
+    int32_t i, r;
+    for (r = 0; r < 2; r ++) {
+        roots[r] = ecs_new(world);
+        ecs_set(world, roots[r], Position, {0, 0, 5.0f * (float)r});
+        ecs_add(world, roots[r], DynamicTransform);
+        for (i = 0; i < 5; i ++) {
+            ecs_entity_t e = r ? ecs_new(world) : ecs_new_w_pair(world, EcsChildOf, roots[r]);
+            if (r) {
+                ecs_set(world, e, EcsParent, {roots[r]});
+            }
+
+            ecs_set(world, e, Position, {(float)i * 2, 0, 0});
+            ecs_set(world, e, Box, {1, 1, 1});
+        }
+    }
+
+    ecs_progress(world, 0);
+    ecs_vec_t out;
+    ecs_vec_init_t(NULL, &out, ecs_entity_t, 0);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
+        &out), 10);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, 3}, (vec3){20, 20, 20},
+        &out), 5);
+
+    ecs_delete(world, roots[0]);
+    ecs_progress(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
+        &out), 5);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 3},
+        &out), 0);
+
+    ecs_delete(world, roots[1]);
+    ecs_progress(world, 0);
+    ecs_vec_clear(&out);
+    test_int(box_spatial_overlap_box(world, 0, (vec3){-20, -20, -20}, (vec3){20, 20, 20},
+        &out), 0);
+
+    ecs_vec_fini_t(NULL, &out, ecs_entity_t);
+    ecs_fini(world);
+}
