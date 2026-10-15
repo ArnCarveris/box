@@ -264,6 +264,7 @@
                     "component_defaults",
                     "cluster_lists_every_light",
                     "spot_light_lights_its_whole_cone",
+                    "cluster_list_grows_to_every_light",
                     "point_light_inverse_square",
                     "point_light_fades_smoothly_to_range"
                 ]
