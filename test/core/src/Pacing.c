@@ -146,3 +146,150 @@ void Pacing_env_sets_unpaced(void) {
 
     ecs_fini(world);
 }
+
+/** Process CPU and wall time at the start of each frame and the wall time of its work */
+typedef struct {
+    int32_t count;          /**< Frames marked */
+    clock_t cpu[16];        /**< Process CPU time in clock ticks at the start of the frame */
+    double wall[16];        /**< Wall seconds at the start of the frame */
+    double work[16];        /**< Wall seconds from the start of the frame to its store phase */
+} pacing_frames_t;
+
+static void MarkFrame(ecs_iter_t *it) {
+    pacing_frames_t *frames = it->ctx;
+    ecs_time_t t;
+    ecs_os_get_time(&t);
+    if (frames->count < 16) {
+        frames->cpu[frames->count] = clock();
+        frames->wall[frames->count] = (double)t.sec + (double)t.nanosec * 1e-9;
+        frames->count ++;
+    }
+}
+
+static void MarkWork(ecs_iter_t *it) {
+    pacing_frames_t *frames = it->ctx;
+    ecs_time_t t;
+    ecs_os_get_time(&t);
+    if (frames->count > 0 && frames->count <= 16) {
+        double now = (double)t.sec + (double)t.nanosec * 1e-9;
+        frames->work[frames->count - 1] = now - frames->wall[frames->count - 1];
+    }
+}
+
+void Pacing_budget_share_at_half(void) {
+    // core_fixes/budget_sleep_overshoot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    pacing_frames_t frames = {0};
+    ecs_system(world, {
+        .phase = EcsOnLoad,
+        .run = MarkFrame,
+        .ctx = &frames
+    });
+
+    ecs_system(world, {
+        .phase = EcsOnUpdate,
+        .run = Busy
+    });
+
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .run = MarkWork,
+        .ctx = &frames
+    });
+
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 10, .cpu_budget = 50, .unguarded = true });
+
+    for (int i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(frames.count, 10);
+    double expected = 0;
+    for (int i = 1; i < 9; i ++) {
+        double cpu = (double)(frames.cpu[i + 1] - frames.cpu[i]) / (double)CLOCKS_PER_SEC;
+        double needed = cpu * 100.0 / 50.0;
+        expected += needed > frames.work[i] ? needed : frames.work[i];
+    }
+
+    double wall = frames.wall[9] - frames.wall[1];
+    double cpu = (double)(frames.cpu[9] - frames.cpu[1]) / (double)CLOCKS_PER_SEC;
+    test_assert(cpu >= 0.15);
+    test_assert(cpu * 100.0 / 50.0 <= wall * 1.02);
+    test_assert(wall <= expected * 1.03 + 0.005);
+
+    ecs_fini(world);
+}
+
+void Pacing_budget_share_at_quarter(void) {
+    // core_fixes/budget_sleep_overshoot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    pacing_frames_t frames = {0};
+    ecs_system(world, {
+        .phase = EcsOnLoad,
+        .run = MarkFrame,
+        .ctx = &frames
+    });
+
+    ecs_system(world, {
+        .phase = EcsOnUpdate,
+        .run = Busy
+    });
+
+    ecs_system(world, {
+        .phase = EcsOnStore,
+        .run = MarkWork,
+        .ctx = &frames
+    });
+
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 10, .cpu_budget = 25, .unguarded = true });
+
+    for (int i = 0; i < 10; i ++) {
+        ecs_progress(world, 0);
+    }
+
+    test_int(frames.count, 10);
+    double expected = 0;
+    for (int i = 1; i < 9; i ++) {
+        double cpu = (double)(frames.cpu[i + 1] - frames.cpu[i]) / (double)CLOCKS_PER_SEC;
+        double needed = cpu * 100.0 / 25.0;
+        expected += needed > frames.work[i] ? needed : frames.work[i];
+    }
+
+    double wall = frames.wall[9] - frames.wall[1];
+    double cpu = (double)(frames.cpu[9] - frames.cpu[1]) / (double)CLOCKS_PER_SEC;
+    test_assert(cpu >= 0.15);
+    test_assert(cpu * 100.0 / 25.0 <= wall * 1.02);
+    test_assert(wall <= expected * 1.03 + 0.005);
+
+    ecs_fini(world);
+}
+
+void Pacing_idle_earns_no_credit(void) {
+    // core_fixes/budget_sleep_overshoot
+    ecs_world_t *world = ecs_init();
+    ECS_IMPORT(world, Box);
+
+    ecs_system(world, {
+        .phase = EcsOnUpdate,
+        .run = Busy
+    });
+
+    ecs_singleton_set(world, App, {
+        .headless = true, .frames = 4, .cpu_budget = 25, .unguarded = true });
+
+    ecs_progress(world, 0);
+    ecs_sleepf(0.3);
+    ecs_progress(world, 0);
+    test_flt(ecs_singleton_get(world, AppStatus)->slept, 0);
+
+    ecs_progress(world, 0);
+    test_assert(ecs_singleton_get(world, AppStatus)->slept > 0.04);
+
+    ecs_fini(world);
+}
