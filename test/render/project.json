@@ -47,7 +47,9 @@
                     "view_root_selects_clear",
                     "every_frame",
                     "main_thread",
-                    "relative_path_written_before_exit"
+                    "relative_path_written_before_exit",
+                    "frame_completes_while_pending",
+                    "completes_while_frames_run"
                 ]
             },
             {
