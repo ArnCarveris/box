@@ -52,7 +52,9 @@
                     "static_1000",
                     "moving_1000",
                     "scenes_1000",
-                    "clustered_1000"
+                    "clustered_1000",
+                    "crowded_points_512",
+                    "crowded_spots_512"
                 ]
             },
             {
