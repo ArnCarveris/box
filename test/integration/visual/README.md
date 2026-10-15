@@ -22,11 +22,14 @@ bake3 run apps/boxrun --local-env=<name> -- --headless --frames 3 --timeout 120 
 ```
 
 A headless run steps with a fixed delta, so the frame it writes is the same run after run. The
-runner builds the app once with `bake3 build` and runs every scene with a copy of that binary, so
-a build in the same environment during the suite cannot swap the binary halfway. A render the
-load guard refuses (`cpu oversubscribed`) waits for the load average to drop to the core count
-and runs again, up to `--load-wait` seconds (1800) for the whole run; a scene still refused then
-fails as `not rendered: cpu oversubscribed`, never as a difference. `--app` renders with another bake project and
+runner builds the app once with `bake3 build` and runs every scene with a copy of that binary in
+`.bake/integration`, removed when the run ends, so a build in the same environment during the
+suite cannot swap the binary halfway. A render the load guard refuses (`cpu oversubscribed`)
+waits for the load average to drop to the core count, printing a line when it starts waiting and
+every minute, and runs again, up to `--load-wait` seconds (1800) for the whole run; a scene still
+refused then fails as `not rendered: cpu oversubscribed`, with its own wait and the run's. When a
+commit that changes `etc`, `src`, `include`, `apps` or `test/integration` lands during the run,
+the run prints the changed files and keeps them in the history. `--app` renders with another bake project and
 `--dir` takes scenes and baselines from another folder, which is how a game keeps its own:
 `python3 tools/integration.py visual --dir apps/<game>/test/visual --app <game>`.
 
@@ -50,9 +53,9 @@ that ran. The output folder ignores itself in git.
 ## History
 
 Every run is also kept in `test/integration/out/history` (`--history` moves it), which a rerun
-never overwrites: `<run>/results.json` holds the commit at the start and end, the binary and its
-build time, and per scene the diff stats, exit code, attempts, guard refusals, load wait, load
-average before and after, render seconds and the error lines of its log; the render, baseline,
+never overwrites: `<run>/results.json` holds the commit at the start and end, the files that
+changed between them, the binary and its build time, and per scene the diff stats, exit code,
+attempts, guard refusals, load wait, load average before, at the render and after, render seconds and the error lines of its log; the render, baseline,
 diff, log and script of every failing scene are copied next to it. `runs.jsonl` has one summary
 line per run with the failing scenes. The last 30 runs are kept.
 
