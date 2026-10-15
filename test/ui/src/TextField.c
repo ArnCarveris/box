@@ -1,6 +1,6 @@
 /**
  * @file TextField.c
- * @brief Text: glyph distance fields with overlapping contours, sharp corners and tiny sizes.
+ * @brief Text: glyph distance fields, their atlas uploads, overlapping contours and corners.
  */
 
 #include <box.h>
@@ -306,4 +306,92 @@ void TextField_tiny_fades(void) {
 
     ecs_os_free(png);
     ecs_fini(world);
+}
+
+void TextField_glyphs_added_mid_run(void) {
+    // ui_fixes/atlas_upload
+    unsigned char *images[2] = { NULL, NULL };
+    int w = 0, h = 0, n = 0, run;
+    for (run = 0; run < 2; run ++) {
+        ecs_world_t *world = ecs_init();
+        ECS_IMPORT(world, Box);
+        App *app = ecs_singleton_get_mut(world, App);
+        app->headless = true;
+        ecs_singleton_modified(world, App);
+
+        ecs_strbuf_t buf = ECS_STRBUF_INIT;
+        int32_t c, count = 0;
+        for (c = 0x21; c < 0x180 && count < 240; c ++) {
+            if (c >= 0x7F && c < 0xA1) {
+                continue;
+            }
+
+            if (c < 0x80) {
+                ecs_strbuf_appendch(&buf, (char)c);
+            } else {
+                char utf8[2] = { (char)(0xC0 | (c >> 6)), (char)(0x80 | (c & 0x3F)) };
+                ecs_strbuf_appendstrn(&buf, utf8, 2);
+            }
+
+            count ++;
+            if (!(count % 30)) {
+                ecs_strbuf_appendch(&buf, '\n');
+            }
+        }
+
+        char *value = ecs_strbuf_get(&buf);
+
+        ecs_entity_t camera = ecs_new(world);
+        ecs_set(world, camera, Position, {0, 0, 10});
+        ecs_set(world, camera, Camera, {
+            .ortho = true, .ortho_scale = 1, .near_ = 0.1f, .far_ = 1000});
+        ecs_entity_t view = ecs_new(world);
+        ecs_set(world, view, View, {
+            .camera = camera, .clear = {.enabled = true, .color = {0, 0, 0, 255}}});
+        ecs_entity_t e = ecs_new(world);
+        ecs_set(world, e, Position, {0, 0, 0});
+        ecs_set(world, e, Rgb, {255, 255, 255});
+        ecs_entity_t s = ecs_new(world);
+        ecs_set(world, s, Surface, {.width = 640, .height = 256, .write_to_file = "typed.png",
+            .resolution_scale = 1});
+        int32_t len = (int32_t)strlen(value), at = run ? len : 1;
+        while (true) {
+            char *part = ecs_os_strdup(value);
+            part[at] = 0;
+            ecs_set(world, e, Text, {.value = part, .size = 18, .line_height = 20,
+                .font = ecs_lookup(world, "box.text.DefaultFont")});
+            ecs_os_free(part);
+            ecs_progress(world, 0);
+            if (at == len) {
+                break;
+            }
+
+            at = at + 7 < len ? at + 7 : len;
+            while (at < len && (value[at] & 0xC0) == 0x80) {
+                at ++;
+            }
+        }
+
+        ecs_progress(world, 0);
+        ecs_progress(world, 0);
+        box_render_sync(world);
+        char *png = flecs_asprintf("%s/typed.png", ecs_singleton_get(world, AppStatus)->tmp_dir);
+        images[run] = stbi_load(png, &w, &h, &n, 4);
+        test_assert(images[run] != NULL);
+        ecs_os_free(png);
+        ecs_os_free(value);
+        ecs_fini(world);
+    }
+
+    int32_t i, ink = 0, off = 0;
+    for (i = 0; i < w * h; i ++) {
+        int32_t a = images[0][i * 4], b = images[1][i * 4];
+        ink += b > 128;
+        off += abs(a - b) > 16;
+    }
+
+    test_assert(ink > 2000);
+    test_int(off, 0);
+    stbi_image_free(images[0]);
+    stbi_image_free(images[1]);
 }

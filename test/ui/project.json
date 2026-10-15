@@ -138,7 +138,8 @@
                 "testcases": [
                     "overlapping_contours_no_seam",
                     "sharp_corners_large",
-                    "tiny_fades"
+                    "tiny_fades",
+                    "glyphs_added_mid_run"
                 ]
             },
             {
