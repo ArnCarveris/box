@@ -85,6 +85,12 @@ PERF_KEYS = PERF_FIELDS + ("drawn", "culled", "deg_per_frame", "cull_samples", "
                            "load_before", "load_after") + tuple(
     "%s_%s" % (name, end) for name in CULL_FIELDS for end in ("min", "max"))
 MAX_SETTLE_SECONDS = 1.0
+HISTORY_RUNS = 30
+VISUAL_KEYS = ("max", "mean", "px", "frames", "run_seconds", "exit", "attempts", "load_before",
+               "load_after")
+HISTORY_FILES = (".png", "_baseline.png", "_diff.png", ".log", ".run.flecs")
+LOG_NOTE = re.compile(r"error|warning|timed out|lost|failed|abort", re.IGNORECASE)
+LOG_NOTES = 20
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_CHANNELS = {0: 1, 2: 3, 4: 2, 6: 4}
 
@@ -301,9 +307,12 @@ def render_scene(scene, png, args):
     cmd += ["--", "--headless", "--frames", str(args.frames), "--timeout", str(RENDER_TIMEOUT),
             "--port", "0", harness]
     log = ""
+    run = {"attempts": 0, "timed_out": False}
     for attempt in range(GUARD_RETRIES):
         if os.path.exists(png):
             os.unlink(png)
+        run["attempts"] = attempt + 1
+        start = time.time()
         try:
             proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True,
                                   timeout=RENDER_TIMEOUT * 2)
@@ -312,12 +321,17 @@ def render_scene(scene, png, args):
         except subprocess.TimeoutExpired as e:
             log = "render timed out\n" + str(e.stdout or "") + str(e.stderr or "")
             code = -1
+            run["timed_out"] = True
+        run["run_seconds"] = round(time.time() - start, 3)
         if "cpu oversubscribed" not in log or attempt + 1 == GUARD_RETRIES:
             break
         time.sleep(GUARD_WAIT)
+    run["exit"] = code
+    run["log_notes"] = [line.strip() for line in log.splitlines()
+                        if LOG_NOTE.search(line)][:LOG_NOTES]
     with open(os.path.join(os.path.dirname(png), scene_name(scene) + ".log"), "w") as f:
         f.write(log)
-    return code == 0 and os.path.isfile(png), log
+    return code == 0 and os.path.isfile(png), log, run
 
 
 def run_scene(scene, baseline_dir, out, update, args):
@@ -330,9 +344,12 @@ def run_scene(scene, baseline_dir, out, update, args):
         if os.path.exists(stale):
             os.unlink(stale)
     start = time.time()
-    rendered, log = render_scene(scene, png, args)
+    load_before = load_average()
+    rendered, log, run = render_scene(scene, png, args)
     result = {"scene": name, "path": display(scene), "status": "fail",
-              "image": rendered, "baseline": False, "diff": False}
+              "image": rendered, "baseline": False, "diff": False,
+              "frames": args.frames, "load_before": load_before, "load_after": load_average()}
+    result.update(run)
     if not rendered:
         result["detail"] = "render failed, see %s.log" % name
         tail = log.strip().splitlines()[-15:]
@@ -470,6 +487,59 @@ def ignore_out(out):
             f.write("*\n")
 
 
+def git_commit():
+    try:
+        proc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True,
+                              capture_output=True, timeout=10)
+        return proc.stdout.strip() or None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def prune_history(history):
+    runs = sorted(d for d in os.listdir(history) if os.path.isdir(os.path.join(history, d)))
+    for stale in runs[:-HISTORY_RUNS]:
+        shutil.rmtree(os.path.join(history, stale), ignore_errors=True)
+
+
+def write_history(results, out, directory, args, started, elapsed):
+    history = os.path.abspath(args.history) if args.history else os.path.join(OUT_DIR,
+                                                                               "history")
+    run_id = "%s-%d" % (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(started)), os.getpid())
+    folder = os.path.join(history, run_id)
+    ignore_out(history)
+    os.makedirs(folder, exist_ok=True)
+    failed = [r for r in results if r["status"] != "pass"]
+    for r in failed:
+        for suffix in HISTORY_FILES:
+            source = os.path.join(out, r["scene"] + suffix)
+            if os.path.isfile(source):
+                shutil.copyfile(source, os.path.join(folder, r["scene"] + suffix))
+    summary = {
+        "run": run_id,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
+        "commit": git_commit(),
+        "dir": display(directory),
+        "app": args.app,
+        "env": args.env,
+        "cfg": args.cfg,
+        "frames": args.frames,
+        "size": args.size,
+        "cores": os.cpu_count(),
+        "elapsed": round(elapsed, 3),
+        "passed": len(results) - len(failed),
+        "failed": [{"scene": r["scene"], "detail": r.get("detail", ""),
+                    "load_before": r.get("load_before")} for r in failed],
+    }
+    with open(os.path.join(folder, "results.json"), "w") as f:
+        json.dump(dict(summary, results=results), f, indent=2)
+        f.write("\n")
+    with open(os.path.join(history, "runs.jsonl"), "a") as f:
+        f.write(json.dumps(summary) + "\n")
+    prune_history(history)
+    return folder
+
+
 def cmd_visual(args):
     directory = os.path.abspath(args.dir) if args.dir else VISUAL_DIR
     baseline_dir = os.path.join(directory, "baseline")
@@ -493,10 +563,13 @@ def cmd_visual(args):
                               r.get("detail", "")))
     report = write_report(results, out, baseline_dir)
     failed = sum(1 for r in results if r["status"] != "pass")
+    history = write_history(results, out, directory, args, start, time.time() - start)
+    print("history %s" % display(history))
     print("%d passed, %d failed, report %s" % (len(results) - failed, failed,
                                                display(report)))
     if args.json:
-        write_json(args.json, results, display(directory), time.time() - start)
+        write_json(args.json, results, display(directory), time.time() - start,
+                   keys=VISUAL_KEYS)
 
     return 1 if failed else 0
 
@@ -728,6 +801,8 @@ def main():
     visual.add_argument("--update-baseline", action="append", metavar="SCENE",
                         help="store the render of this scene as its baseline")
     visual.add_argument("--json", help="write the results in the bake3 test report format")
+    visual.add_argument("--history", help="folder that keeps every run, failures with their "
+                        "renders, test/integration/out/history by default")
     visual.set_defaults(fn=cmd_visual)
     perf = sub.add_parser("perf", help="run the perf scenes and check every frame time")
     perf.add_argument("scenes", nargs="*", help="scene names or paths, all scenes when empty")
