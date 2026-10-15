@@ -40,6 +40,10 @@ void ProbeVolume_probe_count_of_layout(void) {
     ecs_set(world, scene, LightBake, {.probe_spacing = 1, .bounds_padding = 0});
     ecs_progress(world, 0);
     test_int(ecs_get(world, scene, LightBakeStatus)->probes, 4 * 2 * 2);
+    test_assert(box_render_bake_probe(world, scene, corner, &probe));
+    test_flt(probe.position[0], -1.5f);
+    test_flt(probe.position[1], -0.5f);
+    test_flt(probe.position[2], -0.5f);
 
     ecs_fini(world);
 }

@@ -600,9 +600,15 @@ void Invalidation_edge_changes_keep_the_volume(void) {
     ecs_set(world, glow, Box, {0.6f, 0.6f, 0.6f});
     ecs_set(world, glow, Rgb, {0, 0, 0});
     ecs_set(world, glow, Emissive, {.strength = 4, .color = {255, 255, 255}});
+    ecs_entity_t panel = ecs_new_w_pair(world, EcsChildOf, scene);
+    ecs_set(world, panel, Position, {0, 2.5f, 0});
+    ecs_set(world, panel, Rotation, {1.5708f, 0, 0});
+    ecs_set(world, panel, Quad, {10, 3});
+    ecs_set(world, panel, Rgb, {0, 0, 0});
+    ecs_set(world, panel, Emissive, {.strength = 1, .color = {255, 255, 255}});
     ecs_entity_t tall = ecs_new_w_pair(world, EcsChildOf, scene);
-    ecs_set(world, tall, Position, {3, 1.5f, 0});
-    ecs_set(world, tall, Box, {0.6f, 3, 0.6f});
+    ecs_set(world, tall, Position, {3, 2.5f, 0});
+    ecs_set(world, tall, Box, {0.6f, 5, 0.6f});
     ecs_set(world, tall, Rgb, {0, 0, 0});
     ecs_entity_t edge = ecs_new_w_pair(world, EcsChildOf, scene);
     ecs_set(world, edge, Position, {5.5f, 0.5f, 0});
@@ -633,12 +639,13 @@ void Invalidation_edge_changes_keep_the_volume(void) {
         test_assert(image != NULL);
         int32_t before = 0;
         for (y = 20; y < 28; y ++) {
-            for (x = 24; x < 30; x ++) {
+            for (x = 24; x < 36; x ++) {
                 before += image[(y * iw + x) * 4 + 1];
             }
         }
 
         stbi_image_free(image);
+        test_assert(before > 8 * 12 * 40);
         if (change == 0) {
             ecs_set(world, edge, Position, {7.5f, 0.5f, 0});
         } else if (change == 1) {
@@ -661,7 +668,7 @@ void Invalidation_edge_changes_keep_the_volume(void) {
             test_assert(image != NULL);
             int32_t sum = 0;
             for (y = 20; y < 28; y ++) {
-                for (x = 24; x < 30; x ++) {
+                for (x = 24; x < 36; x ++) {
                     sum += image[(y * iw + x) * 4 + 1];
                 }
             }
@@ -674,7 +681,7 @@ void Invalidation_edge_changes_keep_the_volume(void) {
 
         test_bool(ecs_get(world, scene, LightBakeStatus)->converged, true);
         test_assert(partial > 3);
-        test_assert(lowest >= before - 48 * 3);
+        test_assert(lowest >= before - 8 * 12 * 3);
     }
 
     ecs_os_free(path);
